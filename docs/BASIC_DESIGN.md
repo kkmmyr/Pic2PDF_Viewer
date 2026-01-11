@@ -11,7 +11,12 @@
     *   PDF変換: `img2pdf`, `Pillow`
     *   サムネイル生成: `Pillow` (生成時), `pymupdf` (既存PDF読み込み時)
     *   ソート: `natsort`
+    *   ソート: `natsort`
     *   サーバー: `uvicorn`
+*   **Kindle Tool** (Python Client)
+    *   GUI自動化: `pyautogui`
+    *   画像処理: `opencv-python` (cv2), `Pillow`
+    *   OCR (Novel): `yomitoku` (Deep Learning based OCR), `torch`
 
 ### 1.2. データフロー
 
@@ -28,5 +33,13 @@
 5.  **Client** -> `GET /[kindle/]thumbnails/...` (Static File) -> **Server** -> Image -> **Client**
 
 #### 3. Kindleキャプチャ (External Tool)
-1.  **Tool** (`kindle-pdf`) -> Capture & Generate -> **File System** (`data/kindle/images`, `data/kindle/pdfs`)
-2.  **Viewer** -> Kindle Tab -> Displays generated content.
+1.  **Tool** (`kindle-pdf`) -> Capture Screen ->
+    *   **Manga**: Black bar detection & crop.
+    *   **Novel**: White BG detection & crop -> **OCR Engine** (`yomitoku`) -> Extract Text.
+2.  **Tool** -> Save Images/Text to `data/kindle/images`.
+3.  **Tool** -> (Optional) `create_pdf` -> Save PDF to `data/kindle/pdfs`.
+4.  **Viewer** -> Kindle Tab -> Displays generated content.
+
+#### 4. OCRバッチ処理
+1.  **User** -> Run `batch_ocr.py` -> Select Target Folder.
+2.  **Script** -> Load existing PNGs -> **OCR Engine** -> Save `.txt` files.
