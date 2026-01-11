@@ -1,14 +1,23 @@
-import { Folder } from 'lucide-react';
+import { Folder, CheckSquare, Square } from 'lucide-react';
 
 interface FolderGridProps {
     directories: string[];
     onFolderClick: (dirName: string) => void;
+    isSelectionMode?: boolean;
+    selectedItems?: Set<string>;
+    onToggleSelect?: (name: string) => void;
 }
 
 /**
  * フォルダ一覧のグリッド表示コンポーネント
  */
-export function FolderGrid({ directories, onFolderClick }: FolderGridProps) {
+export function FolderGrid({
+    directories,
+    onFolderClick,
+    isSelectionMode = false,
+    selectedItems = new Set(),
+    onToggleSelect
+}: FolderGridProps) {
     if (directories.length === 0) return null;
 
     return (
@@ -18,13 +27,31 @@ export function FolderGrid({ directories, onFolderClick }: FolderGridProps) {
                 {directories.map((dir) => (
                     <div
                         key={dir}
-                        onClick={() => onFolderClick(dir)}
-                        className="group cursor-pointer bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all border border-gray-100"
+                        className={`bg-white rounded-lg shadow-md p-4 flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-shadow border-2 ${isSelectionMode && selectedItems.has(dir) ? 'border-blue-500' : 'border-transparent'
+                            }`}
+                        onClick={() => {
+                            if (isSelectionMode && onToggleSelect) {
+                                onToggleSelect(dir);
+                            } else {
+                                onFolderClick(dir);
+                            }
+                        }}
                     >
-                        <div className="aspect-[4/3] bg-blue-50 rounded-lg mb-3 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                            <Folder className="w-12 h-12 text-blue-400" />
+                        <div className="relative">
+                            <Folder className="w-12 h-12 text-yellow-500 fill-yellow-500 mb-2" />
+                            {isSelectionMode && (
+                                <div className="absolute -top-2 -right-2 bg-white rounded-full">
+                                    {selectedItems.has(dir) ? (
+                                        <CheckSquare className="w-5 h-5 text-blue-500 fill-white" />
+                                    ) : (
+                                        <Square className="w-5 h-5 text-gray-400 fill-white" />
+                                    )}
+                                </div>
+                            )}
                         </div>
-                        <p className="font-medium text-gray-700 truncate text-sm">{dir}</p>
+                        <span className="text-sm font-medium text-gray-700 text-center break-words w-full line-clamp-2">
+                            {dir}
+                        </span>
                     </div>
                 ))}
             </div>

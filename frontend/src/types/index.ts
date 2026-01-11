@@ -75,3 +75,16 @@ export type PageSide = 'left' | 'right' | 'single';
  * ライブラリソース
  */
 export type LibrarySource = 'generated' | 'kindle';
+
+export interface CreateDirectoryRequest {
+    path: string;
+    name: string;
+    source: LibrarySource;
+}
+
+export interface MoveItemsRequest {
+    items: string[];
+    source_path: string;
+    destination_path: string;
+    source: LibrarySource;
+}

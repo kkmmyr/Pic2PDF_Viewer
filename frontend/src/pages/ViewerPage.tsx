@@ -10,7 +10,7 @@ import type { PdfFile, ReadingDirection, LibrarySource } from '../types';
 import { buildApiUrl, buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../config/api';
 
 // Hooks
-import { useWindowSize, useBookImages, useImagePreloader } from '../hooks';
+import { useWindowSize, useBookImages, useImagePreloader, useLibraryManagement } from '../hooks';
 
 // Components
 import {
@@ -18,6 +18,7 @@ import {
     LibraryHeader,
     FolderGrid,
     PdfGrid,
+    MoveDialog,
 } from '../components/reader';
 
 // Set worker source
@@ -79,7 +80,7 @@ export default function ViewerPage() {
     }, [selectedPdfState]);
 
     // Fetch PDF list
-    useEffect(() => {
+    const fetchPdfs = useCallback(() => {
         const params = new URLSearchParams();
         if (currentPathState) params.append("path", currentPathState);
         params.append("source", currentSource);
@@ -92,6 +93,27 @@ export default function ViewerPage() {
             })
             .catch(console.error);
     }, [currentPathState, currentSource]);
+
+    useEffect(() => {
+        fetchPdfs();
+    }, [fetchPdfs]);
+
+    // Library Management
+    const {
+        isSelectionMode,
+        selectedItems,
+        isMoveDialogOpen,
+        toggleSelectionMode,
+        toggleSelectItem,
+        createFolder,
+        openMoveDialog,
+        closeMoveDialog,
+        handleMoveItems,
+    } = useLibraryManagement({
+        currentPath: currentPathState,
+        currentSource: currentSource,
+        onRefresh: fetchPdfs
+    });
 
     // Sync URL params with state
     useEffect(() => {
@@ -453,10 +475,24 @@ export default function ViewerPage() {
                 <LibraryHeader
                     currentPath={currentPathState}
                     currentSource={currentSource}
+                    isSelectionMode={isSelectionMode}
+                    selectedCount={selectedItems.size}
                     onUpClick={handleUpClick}
                     onSourceChange={handleSourceChange}
+                    onToggleSelectionMode={toggleSelectionMode}
+                    onCreateFolder={createFolder}
+                    onMoveSelected={openMoveDialog}
                 />
             )}
+
+            {/* Move Dialog */}
+            <MoveDialog
+                open={isMoveDialogOpen}
+                onClose={closeMoveDialog}
+                onMove={handleMoveItems}
+                currentSource={currentSource}
+                sourcePath={currentPathState}
+            />
 
             {/* Content */}
             <div className="flex-1 bg-gray-100 overflow-auto relative">
@@ -465,10 +501,16 @@ export default function ViewerPage() {
                         <FolderGrid
                             directories={directories}
                             onFolderClick={handleFolderClick}
+                            isSelectionMode={isSelectionMode}
+                            selectedItems={selectedItems}
+                            onToggleSelect={toggleSelectItem}
                         />
                         <PdfGrid
                             pdfs={pdfs}
                             onPdfClick={handlePdfClick}
+                            isSelectionMode={isSelectionMode}
+                            selectedItems={selectedItems}
+                            onToggleSelect={toggleSelectItem}
                         />
                     </div>
                 ) : (

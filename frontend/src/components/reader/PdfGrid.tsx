@@ -1,16 +1,34 @@
-import { FileText } from 'lucide-react';
+import { FileText, CheckSquare, Square } from 'lucide-react';
 import { buildStaticUrl } from '../../config/api';
 import type { PdfFile } from '../../types';
 
 interface PdfGridProps {
     pdfs: PdfFile[];
     onPdfClick: (pdfName: string) => void;
+    isSelectionMode?: boolean;
+    selectedItems?: Set<string>;
+    onToggleSelect?: (name: string) => void;
 }
 
 /**
  * PDF一覧のグリッド表示コンポーネント
  */
-export function PdfGrid({ pdfs, onPdfClick }: PdfGridProps) {
+export function PdfGrid({
+    pdfs,
+    onPdfClick,
+    isSelectionMode = false,
+    selectedItems = new Set(),
+    onToggleSelect
+}: PdfGridProps) {
+    if (pdfs.length === 0) {
+        return (
+            <div>
+                <h2 className="text-lg font-semibold mb-4 text-gray-700">PDFs</h2>
+                <p className="text-gray-500">No PDFs found.</p>
+            </div>
+        );
+    }
+
     return (
         <div>
             <h2 className="text-lg font-semibold mb-4 text-gray-700">PDFs</h2>
@@ -18,10 +36,26 @@ export function PdfGrid({ pdfs, onPdfClick }: PdfGridProps) {
                 {pdfs.map((pdf) => (
                     <div
                         key={pdf.name}
-                        onClick={() => onPdfClick(pdf.name)}
-                        className="group cursor-pointer bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition-all border border-gray-100"
+                        className={`bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col border-2 ${isSelectionMode && selectedItems.has(pdf.name) ? 'border-blue-500' : 'border-transparent'
+                            }`}
+                        onClick={() => {
+                            if (isSelectionMode && onToggleSelect) {
+                                onToggleSelect(pdf.name);
+                            } else {
+                                onPdfClick(pdf.name);
+                            }
+                        }}
                     >
-                        <div className="aspect-[3/4] bg-gray-50 rounded-lg mb-3 overflow-hidden relative border border-gray-100">
+                        <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center relative">
+                            {isSelectionMode && (
+                                <div className="absolute top-2 right-2 z-10 bg-white rounded-full">
+                                    {selectedItems.has(pdf.name) ? (
+                                        <CheckSquare className="w-6 h-6 text-blue-500 fill-white" />
+                                    ) : (
+                                        <Square className="w-6 h-6 text-gray-400 fill-white" />
+                                    )}
+                                </div>
+                            )}
                             {pdf.thumbnail ? (
                                 <>
                                     <img
@@ -43,9 +77,14 @@ export function PdfGrid({ pdfs, onPdfClick }: PdfGridProps) {
                                 </div>
                             )}
                         </div>
-                        <p className="font-medium text-gray-700 truncate text-sm" title={pdf.name}>
-                            {pdf.name}
-                        </p>
+                        <div className="p-3 bg-white flex-1 flex flex-col justify-between">
+                            <span className="font-medium text-sm text-gray-800 line-clamp-2" title={pdf.name}>
+                                {pdf.name.replace('.pdf', '')}
+                            </span>
+                            <div className="mt-2 text-xs text-gray-500">
+                                Create: {new Date(pdf.created_at * 1000).toLocaleDateString()}
+                            </div>
+                        </div>
                     </div>
                 ))}
             </div>

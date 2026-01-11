@@ -114,6 +114,31 @@ Pic2PDF_Viewer/
     }
     ```
 
+### `POST /api/directories`
+*   **概要**: フォルダ作成
+*   **リクエストボディ**:
+    ```json
+    {
+      "path": "current/relative/path",
+      "name": "new_folder_name",
+      "source": "generated" // or "kindle"
+    }
+    ```
+*   **レスポンス**: `{"message": "Directory created"}`
+
+### `POST /api/move`
+*   **概要**: ファイル・フォルダ移動
+*   **リクエストボディ**:
+    ```json
+    {
+      "items": ["file1.pdf", "subfolder"],
+      "source_path": "current/relative/path",
+      "destination_path": "dest/relative/path",
+      "source": "generated" // or "kindle"
+    }
+    ```
+*   **レスポンス**: `{"message": "Items moved successfully", "moved_count": 2}`
+
 ## 3. 運用・開発メモ
 *   **起動方法**:
     *   Backend: `python -m uvicorn main:app --reload` (Port 8000)

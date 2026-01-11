@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import os
+import shutil
 import fitz  # PyMuPDF
 from PIL import Image
 from services.pdf_generator import scan_and_generate
@@ -335,6 +336,148 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
         if 'doc' in locals():
             doc.close()
         raise HTTPException(status_code=500, detail=str(e))
+
+import shutil
+
+# ... existing code ...
+
+class CreateDirectoryRequest(BaseModel):
+    path: str
+    name: str
+    source: str = "generated"
+
+@app.post("/api/directories")
+def create_directory(request: CreateDirectoryRequest):
+    # Select base directory
+    if request.source == "kindle":
+        base_pdf_dir = KINDLE_PDF_DIR
+        base_thumb_dir = KINDLE_THUMBNAIL_DIR
+        base_img_dir = KINDLE_IMAGES_DIR
+    else:
+        base_pdf_dir = PDF_DIR
+        base_thumb_dir = THUMBNAIL_DIR
+        base_img_dir = IMAGES_DIR
+
+    # Construct target path
+    target_dir = os.path.join(base_pdf_dir, request.path, request.name)
+    
+    # Security check is implicitly handled by os.path.join but let's be safe
+    if ".." in request.path or ".." in request.name:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    if os.path.exists(target_dir):
+        raise HTTPException(status_code=400, detail="Directory already exists")
+
+    try:
+        os.makedirs(target_dir)
+        
+        # Also create corresponding thumbnail/image dirs to keep structure if needed?
+        # Actually, thumbnails are generated on demand, images are separate.
+        # But if we move folders later, we might want corresponding dirs.
+        # For now, just creating the PDF storage dir is enough for the "folder" to exist in the list.
+        # However, list_pdfs scans PDF_DIR.
+        
+        return {"message": "Directory created"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class MoveItemsRequest(BaseModel):
+    items: list[str] # List of filenames or foldernames in source_path
+    source_path: str
+    destination_path: str
+    source: str = "generated"
+
+@app.post("/api/move")
+def move_items(request: MoveItemsRequest):
+    # 1. Validation
+    if ".." in request.source_path or ".." in request.destination_path:
+        raise HTTPException(status_code=400, detail="Invalid path")
+        
+    for item in request.items:
+        if ".." in item:
+            raise HTTPException(status_code=400, detail="Invalid item name")
+
+    # 2. Select Directories
+    if request.source == "kindle":
+        dirs = {
+            "pdf": KINDLE_PDF_DIR,
+            "thumb": KINDLE_THUMBNAIL_DIR,
+            "img": KINDLE_IMAGES_DIR
+        }
+    else:
+        dirs = {
+            "pdf": PDF_DIR,
+            "thumb": THUMBNAIL_DIR,
+            "img": IMAGES_DIR
+        }
+
+    moved_count = 0
+    errors = []
+
+    # 3. Perform Move for each types (PDFs/Folders, Thumbnails, Images)
+    # We primarily move the "PDF" representation (which is the main source of truth for the file list)
+    # But we should also move associated Thumbnails and Images if they exist.
+
+    for item in request.items:
+        try:
+            # --- Move PDF / Main Content ---
+            src_pdf = os.path.join(dirs["pdf"], request.source_path, item)
+            dst_pdf = os.path.join(dirs["pdf"], request.destination_path, item)
+            
+            if not os.path.exists(src_pdf):
+                errors.append(f"Item not found: {item}")
+                continue
+                
+            if os.path.exists(dst_pdf):
+                errors.append(f"Destination exists: {item}")
+                continue
+            
+            # Ensure destination parent exists
+            os.makedirs(os.path.dirname(dst_pdf), exist_ok=True)
+            shutil.move(src_pdf, dst_pdf)
+            
+            # --- Move Thumbnail ---
+            # If item is file: item.jpg
+            # If item is dir: move the dir? No, thumbnails structure mirrors pdf structure.
+            if os.path.isdir(dst_pdf): # It was a directory
+                src_thumb = os.path.join(dirs["thumb"], request.source_path, item)
+                dst_thumb = os.path.join(dirs["thumb"], request.destination_path, item)
+                if os.path.exists(src_thumb):
+                    os.makedirs(os.path.dirname(dst_thumb), exist_ok=True)
+                    shutil.move(src_thumb, dst_thumb)
+            else: # It was a file
+                thumb_name = os.path.splitext(item)[0] + ".jpg"
+                src_thumb = os.path.join(dirs["thumb"], request.source_path, thumb_name)
+                dst_thumb = os.path.join(dirs["thumb"], request.destination_path, thumb_name)
+                if os.path.exists(src_thumb):
+                    os.makedirs(os.path.dirname(dst_thumb), exist_ok=True)
+                    shutil.move(src_thumb, dst_thumb)
+
+            # --- Move Images (for "View Images" mode) ---
+            # Images are stored in IMAGES_DIR/rel_path/bookname/...
+            # If it's a PDF file (book), we might have extracted images.
+            # Convert item name to book name (remove .pdf)
+            book_name = item
+            if item.lower().endswith('.pdf'):
+                book_name = os.path.splitext(item)[0]
+                
+            src_img = os.path.join(dirs["img"], request.source_path, book_name)
+            dst_img = os.path.join(dirs["img"], request.destination_path, book_name)
+            
+            if os.path.exists(src_img):
+                 os.makedirs(os.path.dirname(dst_img), exist_ok=True)
+                 shutil.move(src_img, dst_img)
+
+            moved_count += 1
+
+        except Exception as e:
+            errors.append(f"Error moving {item}: {str(e)}")
+
+    if moved_count == 0 and errors:
+        raise HTTPException(status_code=500, detail="Failed to move items: " + "; ".join(errors))
+
+    return {"message": "Items moved", "moved_count": moved_count, "errors": errors}
 
 @app.get("/")
 def read_root():

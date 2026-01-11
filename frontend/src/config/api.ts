@@ -20,10 +20,14 @@ export const API_ENDPOINTS = {
     STATUS: '/api/status',
     /** 書籍画像取得 */
     BOOK_IMAGES: (path: string, source: LibrarySource = 'generated') =>
-        `/api/books/${encodeURIComponent(path)}/images?source=${source}`,
+        `/api/books/${path}/images?source=${source}`,
     /** ページ削除 */
     DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
-        `/api/pdfs/${filename}/delete_pages?path=${path}&source=${source}`,
+        `/api/pdfs/${filename}/delete_pages?path=${path || ''}&source=${source}`,
+    /** ディレクトリ一覧取得 */
+    DIRECTORIES: '/api/directories',
+    /** ファイル/ディレクトリ移動 */
+    MOVE: '/api/move',
 } as const;
 
 /**
