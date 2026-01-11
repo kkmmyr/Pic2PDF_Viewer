@@ -21,9 +21,12 @@
 3.  **Server** -> Response (Generated File List) -> **Client**
 
 #### 2. PDF一覧・閲覧
-1.  **Client** -> `GET /api/pdfs?path=...` -> **Server**
-2.  **Server** -> `os.listdir` (Target Dir) -> Check Thumbnails
-    *   **サムネイル自動生成**: サムネイルがないPDFがあれば、バックグラウンドタスクで生成 (`pymupdf` 使用) を予約。
+1.  **Client** -> `GET /api/pdfs?path=...&source=[generated|kindle]` -> **Server**
+2.  **Server** -> `source` パラメータに基づき、対象ディレクトリ (`data/pdfs` or `data/kindle/pdfs`) をスキャン。
 3.  **Server** -> Response (Files with Thumbnail URLs) -> **Client**
-4.  **Client** -> `GET /pdfs/...` (Static File) -> **Server** -> PDF Stream -> **Client** (Render via react-pdf)
-5.  **Client** -> `GET /thumbnails/...` (Static File) -> **Server** -> Image -> **Client** (Render via img tag)
+4.  **Client** -> `GET /[kindle/]pdfs/...` (Static File) -> **Server** -> PDF Stream -> **Client**
+5.  **Client** -> `GET /[kindle/]thumbnails/...` (Static File) -> **Server** -> Image -> **Client**
+
+#### 3. Kindleキャプチャ (External Tool)
+1.  **Tool** (`kindle-pdf`) -> Capture & Generate -> **File System** (`data/kindle/images`, `data/kindle/pdfs`)
+2.  **Viewer** -> Kindle Tab -> Displays generated content.

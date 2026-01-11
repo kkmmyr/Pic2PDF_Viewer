@@ -70,3 +70,8 @@ export type ReadingDirection = 'rtl' | 'ltr';
  * ページ位置
  */
 export type PageSide = 'left' | 'right' | 'single';
+
+/**
+ * ライブラリソース
+ */
+export type LibrarySource = 'generated' | 'kindle';

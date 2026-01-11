@@ -7,7 +7,11 @@ Pic2PDF_Viewer/
 │   ├── data/               # データ格納用
 │   │   ├── pdfs/           # PDFファイルの保存・配信場所 (Static Mount)
 │   │   ├── thumbnails/     # サムネイル画像の保存・配信場所 (Static Mount)
-│   │   └── images/         # 閲覧用WebP画像の保存・配信場所 (Static Mount)
+│   │   ├── images/         # 閲覧用WebP画像の保存・配信場所 (Static Mount)
+│   │   └── kindle/         # Kindle専用データ (Static Mount: /kindle/...)
+│   │       ├── pdfs/
+│   │       ├── thumbnails/
+│   │       └── images/
 │   ├── services/           # ビジネスロジック (PDF生成など)
 │   │   └── pdf_generator.py
 │   ├── main.py             # FastAPIエントリーポイント
@@ -46,7 +50,9 @@ Pic2PDF_Viewer/
 ## 2. API仕様
 
 ### `GET /api/pdfs`
-*   **パラメータ**: `path` (オプション) - 表示するサブディレクトリのパス
+*   **パラメータ**: 
+    *   `path` (オプション) - 表示するサブディレクトリのパス
+    *   `source` (オプション) - 'generated' (default) または 'kindle'。ライブラリの参照元を指定。
 *   **レスポンス**:
     ```json
     {
@@ -75,7 +81,9 @@ Pic2PDF_Viewer/
 *   **レスポンス**: 生成されたファイル名のリスト
 
 ### `POST /api/pdfs/{filename}/delete_pages`
-*   **パラメータ**: `path` (オプション) - 対象ファイルの親ディレクトリパス
+*   **パラメータ**: 
+    *   `path` (オプション) - 対象ファイルの親ディレクトリパス
+    *   `source` (オプション) - 'generated' (default) または 'kindle'。対象ファイルの場所を指定。
 *   **リクエストボディ**:
     ```json
     {
@@ -91,7 +99,9 @@ Pic2PDF_Viewer/
     ```
 
 ### `GET /api/books/{path}/images`
-*   **パラメータ**: `path` (パスパラメータ) - 書籍（フォルダまたはZIP）の相対パス（拡張子なし、またはフォルダ名）
+*   **パラメータ**: 
+    *   `path` (パスパラメータ) - 書籍（フォルダまたはZIP）の相対パス
+    *   `source` (クエリパラメータ, オプション) - 'generated' (default) または 'kindle'。
 *   **レスポンス**:
     ```json
     {

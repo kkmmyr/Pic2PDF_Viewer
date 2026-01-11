@@ -4,7 +4,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import { CheckSquare, Square } from 'lucide-react';
 
 // Types
-import type { PdfFile, ReadingDirection } from '../types';
+import type { PdfFile, ReadingDirection, LibrarySource } from '../types';
 
 // Config
 import { buildApiUrl, buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../config/api';
@@ -35,9 +35,12 @@ export default function ViewerPage() {
     const [pdfs, setPdfs] = useState<PdfFile[]>([]);
     const [directories, setDirectories] = useState<string[]>([]);
 
+    // Source State
+    const [currentSource, setCurrentSource] = useState<LibrarySource>('generated');
+
     // Custom Hooks
     const { height: windowHeight } = useWindowSize();
-    const { imageUrls, numPages: imageNumPages, isImageMode } = useBookImages(selectedPdfState, currentPathState);
+    const { imageUrls, numPages: imageNumPages, isImageMode } = useBookImages(selectedPdfState, currentPathState, currentSource);
 
     // Window Size State
     const [showHeader, setShowHeader] = useState(false);
@@ -74,6 +77,7 @@ export default function ViewerPage() {
     useEffect(() => {
         const params = new URLSearchParams();
         if (currentPathState) params.append("path", currentPathState);
+        params.append("source", currentSource);
 
         fetch(buildApiUrl(`${API_ENDPOINTS.PDFS}?${params.toString()}`))
             .then(res => res.json())
@@ -82,7 +86,7 @@ export default function ViewerPage() {
                 setDirectories(data.directories || []);
             })
             .catch(console.error);
-    }, [currentPathState]);
+    }, [currentPathState, currentSource]);
 
     // Sync URL params with state
     useEffect(() => {
@@ -120,6 +124,12 @@ export default function ViewerPage() {
         newParams.set('file', pdfName);
         setSearchParams(newParams);
     }, [searchParams, setSearchParams]);
+
+    const handleSourceChange = useCallback((source: LibrarySource) => {
+        setCurrentSource(source);
+        setCurrentPath(""); // Reset path to root when switching sources
+        setSearchParams({}); // Clear URL params
+    }, [setSearchParams]);
 
     const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
         setNumPages(numPages);
@@ -219,7 +229,7 @@ export default function ViewerPage() {
 
         try {
             const pageIndices = Array.from(selectedPages).map(p => p - 1);
-            const url = buildApiUrl(API_ENDPOINTS.DELETE_PAGES(selectedPdfState, currentPathState));
+            const url = buildApiUrl(API_ENDPOINTS.DELETE_PAGES(selectedPdfState, currentPathState, currentSource));
 
             const res = await fetch(url, {
                 method: 'POST',
@@ -245,7 +255,7 @@ export default function ViewerPage() {
             const message = e instanceof Error ? e.message : 'Unknown error';
             alert(message);
         }
-    }, [selectedPages, selectedPdfState, currentPathState, pageNumber]);
+    }, [selectedPages, selectedPdfState, currentPathState, pageNumber, currentSource]);
 
     const handleToggleEditMode = useCallback(() => {
         setIsEditMode(prev => !prev);
@@ -436,7 +446,9 @@ export default function ViewerPage() {
             ) : (
                 <LibraryHeader
                     currentPath={currentPathState}
+                    currentSource={currentSource}
                     onUpClick={handleUpClick}
+                    onSourceChange={handleSourceChange}
                 />
             )}
 
@@ -467,7 +479,7 @@ export default function ViewerPage() {
                         ) : (
                             // PDF Mode Render
                             <Document
-                                file={buildStaticUrl(STATIC_PATHS.PDF(currentPathState, selectedPdfState, pdfVersion))}
+                                file={buildStaticUrl(STATIC_PATHS.PDF(currentPathState, selectedPdfState, currentSource, pdfVersion))}
                                 onLoadSuccess={onDocumentLoadSuccess}
                                 className="flex justify-center"
                                 loading={

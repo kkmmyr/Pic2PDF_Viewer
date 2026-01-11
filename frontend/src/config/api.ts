@@ -6,6 +6,8 @@ export const API_CONFIG = {
     BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
 } as const;
 
+import { LibrarySource } from '../types';
+
 /**
  * APIエンドポイント
  */
@@ -17,10 +19,11 @@ export const API_ENDPOINTS = {
     /** ステータス取得 */
     STATUS: '/api/status',
     /** 書籍画像取得 */
-    BOOK_IMAGES: (path: string) => `/api/books/${encodeURIComponent(path)}/images`,
+    BOOK_IMAGES: (path: string, source: LibrarySource = 'generated') =>
+        `/api/books/${encodeURIComponent(path)}/images?source=${source}`,
     /** ページ削除 */
-    DELETE_PAGES: (filename: string, path: string) =>
-        `/api/pdfs/${filename}/delete_pages?path=${path}`,
+    DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
+        `/api/pdfs/${filename}/delete_pages?path=${path}&source=${source}`,
 } as const;
 
 /**
@@ -28,10 +31,11 @@ export const API_ENDPOINTS = {
  */
 export const STATIC_PATHS = {
     /** PDFファイルパス */
-    PDF: (path: string, filename: string, version?: number) => {
+    PDF: (path: string, filename: string, source: LibrarySource = 'generated', version?: number) => {
         const basePath = path ? `/${path}` : '';
         const versionParam = version !== undefined ? `?v=${version}` : '';
-        return `/pdfs${basePath}/${filename}${versionParam}`;
+        const prefix = source === 'kindle' ? '/kindle/pdfs' : '/pdfs';
+        return `${prefix}${basePath}/${filename}${versionParam}`;
     },
     /** サムネイルパス */
     THUMBNAIL: (path: string) => path,

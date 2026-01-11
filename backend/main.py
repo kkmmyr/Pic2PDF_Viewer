@@ -42,10 +42,26 @@ os.makedirs(IMAGES_DIR, exist_ok=True)
 COMPLETE_DIR = os.path.join(os.path.dirname(__file__), "complete")
 os.makedirs(COMPLETE_DIR, exist_ok=True)
 
+# Kindle Data Directories
+KINDLE_DIR = os.path.join(DATA_DIR, "kindle")
+KINDLE_PDF_DIR = os.path.join(KINDLE_DIR, "pdfs")
+KINDLE_THUMBNAIL_DIR = os.path.join(KINDLE_DIR, "thumbnails")
+KINDLE_IMAGES_DIR = os.path.join(KINDLE_DIR, "images")
+
+os.makedirs(KINDLE_PDF_DIR, exist_ok=True)
+os.makedirs(KINDLE_THUMBNAIL_DIR, exist_ok=True)
+os.makedirs(KINDLE_IMAGES_DIR, exist_ok=True)
+
 # Mount directories
+# Generated (Default)
 app.mount("/pdfs", StaticFiles(directory=PDF_DIR), name="pdfs")
 app.mount("/thumbnails", StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
 app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
+
+# Kindle
+app.mount("/kindle/pdfs", StaticFiles(directory=KINDLE_PDF_DIR), name="kindle_pdfs")
+app.mount("/kindle/thumbnails", StaticFiles(directory=KINDLE_THUMBNAIL_DIR), name="kindle_thumbnails")
+app.mount("/kindle/images", StaticFiles(directory=KINDLE_IMAGES_DIR), name="kindle_images")
 
 # Global state to track progress
 current_processing_item = None
@@ -138,16 +154,28 @@ def get_status(source_dir: str):
     return {"items": items_status}
 
 @app.get("/api/pdfs")
-def list_pdfs(background_tasks: BackgroundTasks, path: str = ""):
+def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "generated"):
     # Prevent directory traversal
     if ".." in path or path.startswith("/") or path.startswith("\\"):
          raise HTTPException(status_code=400, detail="Invalid path")
     
-    target_pdf_dir = os.path.join(PDF_DIR, path)
-    target_thumb_dir = os.path.join(THUMBNAIL_DIR, path)
+    # Select directories based on source
+    if source == "kindle":
+        base_pdf_dir = KINDLE_PDF_DIR
+        base_thumb_dir = KINDLE_THUMBNAIL_DIR
+        url_prefix_thumb = "/kindle/thumbnails"
+    else:
+        base_pdf_dir = PDF_DIR
+        base_thumb_dir = THUMBNAIL_DIR
+        url_prefix_thumb = "/thumbnails"
+
+    target_pdf_dir = os.path.join(base_pdf_dir, path)
+    target_thumb_dir = os.path.join(base_thumb_dir, path)
     
     if not os.path.exists(target_pdf_dir):
-        raise HTTPException(status_code=404, detail="Directory not found")
+        # Return empty if dir doesn't exist (e.g. fresh install)
+        return {"files": [], "directories": [], "current_path": path}
+        # raise HTTPException(status_code=404, detail="Directory not found")
     
     if not os.path.isdir(target_pdf_dir):
         raise HTTPException(status_code=400, detail="Not a directory")
@@ -168,14 +196,15 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = ""):
             thumb_url = None
             if os.path.exists(thumb_path):
                 # Construct URL
-                # If path is empty, it's just /thumbnails/thumb_name
-                # If path is subdir, it's /thumbnails/subdir/thumb_name
                 rel_path = os.path.join(path, thumb_name).replace("\\", "/")
-                thumb_url = f"/thumbnails/{rel_path}"
+                thumb_url = f"{url_prefix_thumb}/{rel_path}"
             else:
                 # Trigger background generation
                 background_tasks.add_task(generate_thumbnail_task, item_path, thumb_path)
             
+            # Since frontend constructs PDF URL based on path, we assume frontend will handle the prefix switch
+            # based on source, OR we could return the full PDF URL here.
+            # But the current frontend logic uses STATIC_PATHS which we can update to include source.
             files.append({
                 "name": item,
                 "thumbnail": thumb_url
@@ -184,7 +213,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = ""):
     return {"files": files, "directories": directories, "current_path": path}
 
 @app.get("/api/books/{path:path}/images")
-def list_book_images(path: str):
+def list_book_images(path: str, source: str = "generated"):
     """
     Returns a list of image URLs for a given book (folder/zip name).
     path: relative path to the book folder in IMAGES_DIR (e.g. "subdir/bookname")
@@ -193,12 +222,16 @@ def list_book_images(path: str):
     if ".." in path or path.startswith("/") or path.startswith("\\"):
          raise HTTPException(status_code=400, detail="Invalid path")
     
-    target_dir = os.path.join(IMAGES_DIR, path)
+    if source == "kindle":
+        base_images_dir = KINDLE_IMAGES_DIR
+        url_prefix = "/kindle/images"
+    else:
+        base_images_dir = IMAGES_DIR
+        url_prefix = "/images"
+
+    target_dir = os.path.join(base_images_dir, path)
     
     if not os.path.exists(target_dir):
-        # It's possible the images haven't been extracted yet or don't exist.
-        # For now, just return empty list or 404.
-        # Let's return 404 to indicate "not found as image book".
         raise HTTPException(status_code=404, detail="Images not found")
     
     if not os.path.isdir(target_dir):
@@ -216,12 +249,8 @@ def list_book_images(path: str):
         # Construct URLs
         image_urls = []
         for img in images:
-            # URL encode path components if necessary?
-            # FastAPI StaticFiles handles basic serving.
-            # path is "subdir/bookname", img is "01.webp"
-            # URL: /images/subdir/bookname/01.webp
             rel_path = os.path.join(path, img).replace("\\", "/")
-            image_urls.append(f"/images/{rel_path}")
+            image_urls.append(f"{url_prefix}/{rel_path}")
             
         return {"images": image_urls}
     except Exception as e:
@@ -230,13 +259,22 @@ def list_book_images(path: str):
 class DeletePagesRequest(BaseModel):
     page_indices: list[int]
 
+
 @app.post("/api/pdfs/{filename}/delete_pages")
-def delete_pages(filename: str, request: DeletePagesRequest, path: str = ""):
+def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", source: str = "generated"):
     # 1. Validate Path
     if ".." in path or path.startswith("/") or path.startswith("\\"):
          raise HTTPException(status_code=400, detail="Invalid path")
     
-    target_pdf_dir = os.path.join(PDF_DIR, path)
+    # Select directories based on source
+    if source == "kindle":
+        base_pdf_dir = KINDLE_PDF_DIR
+        base_thumb_dir = KINDLE_THUMBNAIL_DIR
+    else:
+        base_pdf_dir = PDF_DIR
+        base_thumb_dir = THUMBNAIL_DIR
+
+    target_pdf_dir = os.path.join(base_pdf_dir, path)
     pdf_path = os.path.join(target_pdf_dir, filename)
     
     if not os.path.exists(pdf_path):
@@ -278,7 +316,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = ""):
         if new_total > 0:
             # Thumbnail path
             thumb_name = os.path.splitext(filename)[0] + ".jpg"
-            target_thumb_dir = os.path.join(THUMBNAIL_DIR, path)
+            target_thumb_dir = os.path.join(base_thumb_dir, path)
             thumb_path = os.path.join(target_thumb_dir, thumb_name)
             
             # Generate new thumbnail

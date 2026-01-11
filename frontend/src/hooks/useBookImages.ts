@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { buildApiUrl, API_ENDPOINTS } from '../config/api';
+import { LibrarySource } from '../types';
 
 interface UseBookImagesReturn {
     imageUrls: string[] | null;
@@ -13,7 +14,8 @@ interface UseBookImagesReturn {
  */
 export function useBookImages(
     selectedPdf: string | null,
-    currentPath: string
+    currentPath: string,
+    source: LibrarySource = 'generated'
 ): UseBookImagesReturn {
     const [imageUrls, setImageUrls] = useState<string[] | null>(null);
     const [numPages, setNumPages] = useState(0);
@@ -31,7 +33,7 @@ export function useBookImages(
 
         setIsLoading(true);
 
-        fetch(buildApiUrl(API_ENDPOINTS.BOOK_IMAGES(bookPath)))
+        fetch(buildApiUrl(API_ENDPOINTS.BOOK_IMAGES(bookPath, source)))
             .then(res => {
                 if (res.ok) return res.json();
                 throw new Error('No images');
@@ -49,7 +51,7 @@ export function useBookImages(
             .finally(() => {
                 setIsLoading(false);
             });
-    }, [selectedPdf, currentPath]);
+    }, [selectedPdf, currentPath, source]);
 
     return {
         imageUrls,
