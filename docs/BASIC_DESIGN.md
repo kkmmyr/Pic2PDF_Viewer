@@ -11,7 +11,7 @@
     *   PDF変換: `img2pdf`, `Pillow`
     *   サムネイル生成: `Pillow` (生成時), `pymupdf` (既存PDF読み込み時)
     *   ソート: `natsort`
-    *   ソート: `natsort`
+
     *   サーバー: `uvicorn`
 *   **Kindle Tool** (Python Client)
     *   GUI自動化: `pyautogui`

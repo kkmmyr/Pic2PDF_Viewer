@@ -15,12 +15,13 @@ Pic2PDF_Viewer/
 │   │       ├── thumbnails/
 │   │       └── images/
 │   ├── services/           # ビジネスロジック (PDF生成など)
-│   │   └── pdf_generator.py
+│   │   └── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
 │   ├── main.py             # FastAPIエントリーポイント
 │   └── requirements.txt    # Python依存関係
 ├── kindle-pdf/             # Kindle自動化ツール
 │   ├── main_auto.py        # 漫画/雑誌用エントリーポイント
 │   ├── main_novel.py       # 小説用エントリーポイント
+│   ├── main_manual.py      # 手動撮影用エントリーポイント
 │   ├── capturer.py         # 共通キャプチャロジック (Manga)
 │   ├── novel_capturer.py   # 小説用キャプチャロジック (Novel)
 │   ├── batch_ocr.py        # OCRバッチ処理スクリプト
@@ -148,9 +149,17 @@ Pic2PDF_Viewer/
     ```
 *   **レスポンス**: `{"message": "Items moved successfully", "moved_count": 2}`
 
-## 3. クラス設計 (Kindle Tool)
+## 3. クラス設計 (Backend & Kindle Tool)
 
-### `KindleCapturer` (`capturer.py`)
+### `PdfGenerator` (`backend/services/pdf_generator.py`)
+*   **役割**: ディレクトリやZIPファイルのスキャン、画像からのPDF生成、ファイル移動を一元管理。
+*   **主要メソッド**:
+    *   `process_directory()`: 指定ディレクトリ内のWebPをPDF化。
+    *   `process_zip()`: ZIPファイル内のWebPをPDF化。
+    *   `_create_pdf_file()`: `img2pdf` を用いた実際のPDFファイル書き出し。
+    *   `run()`: 処理の実行と、完了ファイルの移動・空ディレクトリ削除の制御。
+
+### `KindleCapturer` (`kindle-pdf/capturer.py`)
 *   **役割**: 基本的なKindleウィンドウ操作、スクリーンショット撮影、PDF作成。
 *   **主要メソッド**:
     *   `find_window()`: Kindleウィンドウのハンドル取得。
