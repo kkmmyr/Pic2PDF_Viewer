@@ -1,13 +1,15 @@
 import os
 import sys
-import argparse
 import glob
 import cv2
-from tkinter import filedialog, Tk
+import numpy as np
+from tkinter import filedialog, Tk, messagebox
+from PIL import Image
 
 # Add parent dir
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ocr.ocr_engine import get_ocr_engine
+from searchable_pdf import SearchablePdfGenerator
 
 def main():
     root = Tk()
@@ -30,8 +32,14 @@ def main():
         print(f"OCR Engine Init Failed: {e}")
         return
 
+    # PDF Generator Init
+    folder_name = os.path.basename(target_dir) or "output"
+    pdf_path = os.path.join(target_dir, f"{folder_name}_searchable.pdf")
+    pdf_gen = SearchablePdfGenerator(pdf_path, debug_mode=False)
+
     # Find Images
-    image_files = sorted(glob.glob(os.path.join(target_dir, "*.png")))
+    # Supports png and webp
+    image_files = sorted(glob.glob(os.path.join(target_dir, "*.png")) + glob.glob(os.path.join(target_dir, "*.webp")))
     print(f"Found {len(image_files)} images.")
     
     full_text_path = os.path.join(target_dir, "full_text.txt")
@@ -43,19 +51,18 @@ def main():
         print(f"Processing {basename}...")
         
         try:
-            img = cv2.imread(img_path)
-            if img is None:
-                print("Failed to load image.")
-                continue
-                
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Use PIL to load to avoid OpenCV unicode path issues
+            with Image.open(img_path) as pil_img:
+                pil_rgb = pil_img.convert('RGB')
+                img_rgb = np.array(pil_rgb)
+
             results = engine.extract_text(img_rgb)
             
             lines = [item['text'] for item in results]
             text_content = "\n".join(lines)
             
             # Save individual txt
-            txt_path = img_path.replace('.png', '.txt')
+            txt_path = os.path.splitext(img_path)[0] + '.txt'
             with open(txt_path, "w", encoding="utf-8") as f:
                 f.write(text_content)
                 
@@ -65,12 +72,24 @@ def main():
                 f.write(text_content)
                 f.write("\n")
                 
+            # Add to PDF
+            pdf_gen.add_page(img_path, results)
+            
             print(f"  Saved {len(lines)} lines.")
             
         except Exception as e:
-            print(f"  Error: {e}")
+            print(f"  Error processing {basename}: {e}")
+            import traceback
+            traceback.print_exc()
 
-    print("Done. Text files saved.")
+    # Save PDF
+    try:
+        pdf_gen.save()
+        print(f"Searchable PDF saved: {pdf_path}")
+        messagebox.showinfo("完了", f"処理が完了しました。\nPDF: {pdf_path}")
+    except Exception as e:
+        print(f"Failed to save PDF: {e}")
+        messagebox.showerror("エラー", f"PDFの保存に失敗しました: {e}")
 
 if __name__ == "__main__":
     main()
