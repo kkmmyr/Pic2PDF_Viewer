@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { CheckSquare, Square } from 'lucide-react';
+import { Document, pdfjs } from 'react-pdf';
 
 // Types
 import type { PdfFile, ReadingDirection, LibrarySource } from '../types';
@@ -19,6 +18,7 @@ import {
     FolderGrid,
     PdfGrid,
     MoveDialog,
+    PageRenderer,
 } from '../components/reader';
 
 // Set worker source
@@ -289,116 +289,24 @@ export default function ViewerPage() {
         setSelectedPages(new Set());
     }, []);
 
-    // Helper to render a page
-    const renderPage = (pNum: number, side: 'left' | 'right' | 'single') => {
-        if (pNum > numPages) {
-            return (
-                <div
-                    key={`page-${pNum}`}
-                    style={{ height: windowHeight - 40, width: (windowHeight - 40) * 0.7 }}
-                    className="bg-gray-800 flex items-center justify-center text-gray-500 max-w-full"
-                >
-                    End
-                </div>
-            );
-        }
-
-        const imgUrl = imageUrls ? imageUrls[pNum - 1] : null;
-        const isSelected = selectedPages.has(pNum);
-
-        const handleClick = (e: React.MouseEvent) => {
-            if (isEditMode) {
-                e.stopPropagation();
-                togglePageSelection(pNum, e);
-            } else {
-                if (side === 'left') {
-                    direction === 'rtl' ? handleNext(e) : handlePrev(e);
-                } else if (side === 'right') {
-                    direction === 'rtl' ? handlePrev(e) : handleNext(e);
-                } else {
-                    handleNext(e);
-                }
-            }
-        };
-
-        const selectionIndicator = isEditMode && (
-            <div className="absolute top-2 right-2 z-10 bg-white rounded-full p-1 shadow-md">
-                {isSelected ? <CheckSquare className="w-6 h-6 text-red-500" /> : <Square className="w-6 h-6 text-gray-400" />}
-            </div>
-        );
-
-        if (isImageMode && imgUrl) {
-            return (
-                <div
-                    key={`page-${pNum}`}
-                    className={`relative ${isSelected ? 'ring-4 ring-red-500' : ''}`}
-                    onClick={handleClick}
-                >
-                    {selectionIndicator}
-                    <img
-                        src={buildStaticUrl(imgUrl)}
-                        alt={`Page ${pNum}`}
-                        style={{ height: windowHeight - 40, width: 'auto', maxWidth: '100%', maxHeight: '100%' }}
-                        className="object-contain"
-                        loading="eager"
-                    />
-                </div>
-            );
-        }
-
-        // PDFモードの場合はDocument内でPageを使用する
-        return null;
-    };
-
-    // Helper to render PDF page
-    const renderPdfPage = (pNum: number, side: 'left' | 'right' | 'single') => {
-        if (pNum > numPages) {
-            return (
-                <div
-                    key={`page-${pNum}`}
-                    style={{ height: windowHeight - 40, width: (windowHeight - 40) * 0.7 }}
-                    className="bg-gray-800 flex items-center justify-center text-gray-500 max-w-full"
-                >
-                    End
-                </div>
-            );
-        }
-
-        const isSelected = selectedPages.has(pNum);
-
-        const handleClick = (e: React.MouseEvent) => {
-            if (isEditMode) {
-                togglePageSelection(pNum, e);
-            } else {
-                if (side === 'left') {
-                    direction === 'rtl' ? handleNext(e) : handlePrev(e);
-                } else if (side === 'right') {
-                    direction === 'rtl' ? handlePrev(e) : handleNext(e);
-                } else {
-                    handleNext(e);
-                }
-            }
-        };
-
+    // Helper to render page via PageRenderer component
+    const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => {
         return (
-            <div
+            <PageRenderer
                 key={`page-${pNum}`}
-                className={`shadow-2xl cursor-pointer shrink-0 max-w-[calc(50vw-2rem)] flex justify-center relative ${isSelected ? 'ring-4 ring-red-500' : ''}`}
-                onClick={handleClick}
-            >
-                {isEditMode && (
-                    <div className="absolute top-2 right-2 z-10 bg-white rounded-full p-1 shadow-md">
-                        {isSelected ? <CheckSquare className="w-6 h-6 text-red-500" /> : <Square className="w-6 h-6 text-gray-400" />}
-                    </div>
-                )}
-                <Page
-                    pageNumber={pNum}
-                    height={windowHeight - 40}
-                    className="bg-white [&_canvas]:!w-auto [&_canvas]:!h-auto [&_canvas]:!max-w-full [&_canvas]:!max-h-full"
-                    renderTextLayer={false}
-                    renderAnnotationLayer={false}
-                />
-            </div>
+                pageNumber={pNum}
+                numPages={numPages}
+                windowHeight={windowHeight}
+                isEditMode={isEditMode}
+                isSelected={selectedPages.has(pNum)}
+                side={side}
+                direction={direction}
+                onToggleSelection={togglePageSelection}
+                onNext={handleNext}
+                onPrev={handlePrev}
+                isImageMode={isImageMode}
+                imageUrl={imageUrls ? imageUrls[pNum - 1] : null}
+            />
         );
     };
 
@@ -407,37 +315,18 @@ export default function ViewerPage() {
         const p1 = pageNumber;
         const p2 = pageNumber + 1;
 
-        if (isImageMode) {
-            if (direction === 'rtl') {
-                return (
-                    <>
-                        {renderPage(p2, 'left')}
-                        {renderPage(p1, 'right')}
-                    </>
-                );
-            } else {
-                return (
-                    <>
-                        {renderPage(p1, 'left')}
-                        {renderPage(p2, 'right')}
-                    </>
-                );
-            }
-        }
-
-        // PDF Mode
         if (direction === 'rtl') {
             return (
                 <>
-                    {renderPdfPage(p2, 'left')}
-                    {renderPdfPage(p1, 'right')}
+                    {renderPageItem(p2, 'left')}
+                    {renderPageItem(p1, 'right')}
                 </>
             );
         } else {
             return (
                 <>
-                    {renderPdfPage(p1, 'left')}
-                    {renderPdfPage(p2, 'right')}
+                    {renderPageItem(p1, 'left')}
+                    {renderPageItem(p2, 'right')}
                 </>
             );
         }
@@ -522,7 +411,7 @@ export default function ViewerPage() {
                         {isImageMode ? (
                             // Image Mode Render
                             <div className="flex gap-0 shadow-2xl justify-center bg-gray-900">
-                                {isSpread ? renderSpreadPages() : renderPage(pageNumber, 'single')}
+                                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
                             </div>
                         ) : (
                             // PDF Mode Render
@@ -537,25 +426,7 @@ export default function ViewerPage() {
                                 }
                             >
                                 <div className="flex shadow-2xl">
-                                    {isSpread ? renderSpreadPages() : (
-                                        <div
-                                            className={`shadow-2xl cursor-pointer shrink-0 max-w-[calc(100vw-2rem)] flex justify-center relative ${selectedPages.has(pageNumber) ? 'ring-4 ring-red-500' : ''}`}
-                                            onClick={(e) => isEditMode ? togglePageSelection(pageNumber, e) : handleNext(e)}
-                                        >
-                                            {isEditMode && (
-                                                <div className="absolute top-2 right-2 z-10 bg-white rounded-full p-1 shadow-md">
-                                                    {selectedPages.has(pageNumber) ? <CheckSquare className="w-6 h-6 text-red-500" /> : <Square className="w-6 h-6 text-gray-400" />}
-                                                </div>
-                                            )}
-                                            <Page
-                                                pageNumber={pageNumber}
-                                                height={windowHeight - 40}
-                                                className="bg-white [&_canvas]:!w-auto [&_canvas]:!h-auto [&_canvas]:!max-w-full [&_canvas]:!max-h-full"
-                                                renderTextLayer={false}
-                                                renderAnnotationLayer={false}
-                                            />
-                                        </div>
-                                    )}
+                                    {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
                                 </div>
                             </Document>
                         )}
