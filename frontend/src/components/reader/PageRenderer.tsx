@@ -1,0 +1,112 @@
+import { Page } from 'react-pdf';
+import { CheckSquare, Square } from 'lucide-react';
+import { buildStaticUrl } from '../../config/api';
+import type { PageSide, ReadingDirection } from '../../types';
+
+interface PageRendererProps {
+    pageNumber: number;
+    numPages: number;
+    windowHeight: number;
+    isEditMode: boolean;
+    isSelected: boolean;
+    side: PageSide;
+    direction: ReadingDirection;
+    onToggleSelection: (pageNum: number, e: React.MouseEvent) => void;
+    onNext: (e: React.MouseEvent) => void;
+    onPrev: (e: React.MouseEvent) => void;
+    // Image mode props
+    imageUrl?: string | null;
+    isImageMode?: boolean;
+}
+
+/**
+ * 単一ページのレンダリングコンポーネント
+ * PDF モードと画像モードの両方に対応
+ */
+export function PageRenderer({
+    pageNumber,
+    numPages,
+    windowHeight,
+    isEditMode,
+    isSelected,
+    side,
+    direction,
+    onToggleSelection,
+    onNext,
+    onPrev,
+    imageUrl,
+    isImageMode = false,
+}: PageRendererProps) {
+    // ページ範囲外の場合はEndプレースホルダーを表示
+    if (pageNumber > numPages) {
+        return (
+            <div
+                style={{ height: windowHeight - 40, width: (windowHeight - 40) * 0.7 }}
+                className="bg-gray-800 flex items-center justify-center text-gray-500 max-w-full"
+            >
+                End
+            </div>
+        );
+    }
+
+    const handleClick = (e: React.MouseEvent) => {
+        if (isEditMode) {
+            e.stopPropagation();
+            onToggleSelection(pageNumber, e);
+        } else {
+            // Navigation logic based on side and direction
+            if (side === 'left') {
+                direction === 'rtl' ? onNext(e) : onPrev(e);
+            } else if (side === 'right') {
+                direction === 'rtl' ? onPrev(e) : onNext(e);
+            } else {
+                onNext(e);
+            }
+        }
+    };
+
+    const selectionIndicator = isEditMode && (
+        <div className="absolute top-2 right-2 z-10 bg-white rounded-full p-1 shadow-md">
+            {isSelected ? (
+                <CheckSquare className="w-6 h-6 text-red-500" />
+            ) : (
+                <Square className="w-6 h-6 text-gray-400" />
+            )}
+        </div>
+    );
+
+    if (isImageMode && imageUrl) {
+        return (
+            <div
+                className={`relative ${isSelected ? 'ring-4 ring-red-500' : ''}`}
+                onClick={handleClick}
+            >
+                {selectionIndicator}
+                <img
+                    src={buildStaticUrl(imageUrl)}
+                    alt={`Page ${pageNumber}`}
+                    style={{ height: windowHeight - 40, width: 'auto', maxWidth: '100%', maxHeight: '100%' }}
+                    className="bg-white"
+                />
+            </div>
+        );
+    }
+
+    // PDF Mode
+    return (
+        <div
+            className={`shadow-2xl cursor-pointer shrink-0 max-w-[calc(50vw-2rem)] flex justify-center relative ${isSelected ? 'ring-4 ring-red-500' : ''
+                }`}
+            onClick={handleClick}
+        >
+            {selectionIndicator}
+            <Page
+                pageNumber={pageNumber}
+                height={windowHeight - 40}
+                className="bg-white [&_canvas]:!w-auto [&_canvas]:!h-auto [&_canvas]:!max-w-full [&_canvas]:!max-h-full"
+                renderTextLayer={false}
+                renderAnnotationLayer={false}
+            />
+        </div>
+    );
+}

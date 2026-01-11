@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+img2pdf
+Pillow
+natsort
+pymupdf
