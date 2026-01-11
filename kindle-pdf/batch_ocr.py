@@ -3,7 +3,6 @@ import sys
 import glob
 import cv2
 import numpy as np
-from tkinter import filedialog, Tk, messagebox
 from PIL import Image
 
 # Add parent dir
@@ -11,85 +10,106 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from ocr.ocr_engine import get_ocr_engine
 from searchable_pdf import SearchablePdfGenerator
 
-def main():
-    root = Tk()
-    root.withdraw()
+# Hardcoded Paths (relative to this script)
+# backend/data/kindle_novel/images, pdfs
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# ../backend/data/kindle_novel
+KINDLE_NOVEL_ROOT = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'kindle_novel'))
+IMAGES_ROOT = os.path.join(KINDLE_NOVEL_ROOT, 'images')
+PDFS_ROOT = os.path.join(KINDLE_NOVEL_ROOT, 'pdfs')
 
-    print("対象の画像フォルダ（001.pngなどが保存されているフォルダ）を選択してください。")
-    target_dir = filedialog.askdirectory(title="画像フォルダを選択")
+def process_book_folder(book_path: str, engine):
+    """
+    Process a single book folder:
+    1. Scan images
+    2. OCR
+    3. Generate PDF
+    """
+    folder_name = os.path.basename(book_path)
+    print(f"Checking book: {folder_name}")
     
-    if not target_dir:
-        print("フォルダが選択されませんでした。")
+    # Define PDF output path
+    pdf_path = os.path.join(PDFS_ROOT, f"{folder_name}.pdf")
+    
+    if os.path.exists(pdf_path):
+        print(f"  Skipping: PDF already exists at {pdf_path}")
         return
 
-    print(f"Selected dir: {target_dir}")
+    print(f"  Start processing for {folder_name}...")
     
-    # OCR Engine Init
-    try:
-        engine = get_ocr_engine('yomitoku')
-        engine.initialize()
-    except Exception as e:
-        print(f"OCR Engine Init Failed: {e}")
-        return
-
-    # PDF Generator Init
-    folder_name = os.path.basename(target_dir) or "output"
-    pdf_path = os.path.join(target_dir, f"{folder_name}_searchable.pdf")
-    pdf_gen = SearchablePdfGenerator(pdf_path, debug_mode=False)
-
     # Find Images
-    # Supports png and webp
-    image_files = sorted(glob.glob(os.path.join(target_dir, "*.png")) + glob.glob(os.path.join(target_dir, "*.webp")))
-    print(f"Found {len(image_files)} images.")
-    
-    full_text_path = os.path.join(target_dir, "full_text.txt")
-    if os.path.exists(full_text_path):
-        os.remove(full_text_path)
+    image_files = sorted(glob.glob(os.path.join(book_path, "*.png")) + glob.glob(os.path.join(book_path, "*.webp")))
+    if not image_files:
+        print("  No images found.")
+        return
 
+    print(f"  Found {len(image_files)} images.")
+
+    # PDF Generator
+    pdf_gen = SearchablePdfGenerator(pdf_path, debug_mode=False)
+    
+    # Full Text Output (Optional, inside images folder for reference?)
+    # or inside PDFs folder? Let's keep inside images folder for now (or skip it if not needed).
+    # User said "OCRは一切しない" for novel_capturer, but here we do OCR.
+    # We can save separate text files if useful, but main goal is PDF.
+    
     for img_path in image_files:
         basename = os.path.basename(img_path)
-        print(f"Processing {basename}...")
+        # print(f"    Processing {basename}...")
         
         try:
-            # Use PIL to load to avoid OpenCV unicode path issues
             with Image.open(img_path) as pil_img:
                 pil_rgb = pil_img.convert('RGB')
                 img_rgb = np.array(pil_rgb)
 
             results = engine.extract_text(img_rgb)
             
-            lines = [item['text'] for item in results]
-            text_content = "\n".join(lines)
-            
-            # Save individual txt
-            txt_path = os.path.splitext(img_path)[0] + '.txt'
-            with open(txt_path, "w", encoding="utf-8") as f:
-                f.write(text_content)
-                
-            # Append to full
-            with open(full_text_path, "a", encoding="utf-8") as f:
-                f.write(f"\n--- {basename} ---\n")
-                f.write(text_content)
-                f.write("\n")
-                
-            # Add to PDF
+            # Save PDF page
             pdf_gen.add_page(img_path, results)
             
-            print(f"  Saved {len(lines)} lines.")
-            
         except Exception as e:
-            print(f"  Error processing {basename}: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"    Error processing {basename}: {e}")
 
     # Save PDF
     try:
         pdf_gen.save()
-        print(f"Searchable PDF saved: {pdf_path}")
-        messagebox.showinfo("完了", f"処理が完了しました。\nPDF: {pdf_path}")
+        print(f"  [SUCCESS] Created PDF: {pdf_path}")
     except Exception as e:
-        print(f"Failed to save PDF: {e}")
-        messagebox.showerror("エラー", f"PDFの保存に失敗しました: {e}")
+        print(f"  [FAILED] Could not save PDF: {e}")
+
+
+def main():
+    print(f"Search Target: {IMAGES_ROOT}")
+    print(f"PDF Output: {PDFS_ROOT}")
+    
+    if not os.path.exists(IMAGES_ROOT):
+        print("Images directory does not exist.")
+        return
+
+    if not os.path.exists(PDFS_ROOT):
+        os.makedirs(PDFS_ROOT)
+
+    # Initialize OCR Engine once
+    try:
+        print("Initializing OCR Engine...")
+        engine = get_ocr_engine('yomitoku')
+        engine.initialize()
+    except Exception as e:
+        print(f"OCR Init Failed: {e}")
+        return
+
+    # Scan all directories in IMAGES_ROOT
+    # os.listdir + isdir check
+    subdirs = [f for f in os.listdir(IMAGES_ROOT) if os.path.isdir(os.path.join(IMAGES_ROOT, f))]
+    subdirs.sort()
+    
+    print(f"Found {len(subdirs)} book folders.")
+    
+    for subdir in subdirs:
+        book_path = os.path.join(IMAGES_ROOT, subdir)
+        process_book_folder(book_path, engine)
+        
+    print("All processing finished.")
 
 if __name__ == "__main__":
     main()

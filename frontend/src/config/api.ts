@@ -38,7 +38,10 @@ export const STATIC_PATHS = {
     PDF: (path: string, filename: string, source: LibrarySource = 'generated', version?: number) => {
         const basePath = path ? `/${path}` : '';
         const versionParam = version !== undefined ? `?v=${version}` : '';
-        const prefix = source === 'kindle' ? '/kindle/pdfs' : '/pdfs';
+        let prefix = '/pdfs';
+        if (source === 'kindle') prefix = '/kindle/pdfs';
+        else if (source === 'novel') prefix = '/kindle_novel/pdfs';
+
         return `${prefix}${basePath}/${filename}${versionParam}`;
     },
     /** サムネイルパス */

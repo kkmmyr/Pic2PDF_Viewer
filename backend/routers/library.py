@@ -30,6 +30,10 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
         base_pdf_dir = KINDLE_PDF_DIR
         base_thumb_dir = KINDLE_THUMBNAIL_DIR
         url_prefix_thumb = "/kindle/thumbnails"
+    elif source == "novel":
+        base_pdf_dir = KINDLE_NOVEL_PDF_DIR
+        base_thumb_dir = KINDLE_NOVEL_THUMBNAIL_DIR
+        url_prefix_thumb = "/kindle_novel/thumbnails"
     else:
         base_pdf_dir = PDF_DIR
         base_thumb_dir = THUMBNAIL_DIR
@@ -78,6 +82,9 @@ def list_book_images(path: str, source: str = "generated"):
     if source == "kindle":
         base_images_dir = KINDLE_IMAGES_DIR
         url_prefix = "/kindle/images"
+    elif source == "novel":
+        base_images_dir = KINDLE_NOVEL_IMAGES_DIR
+        url_prefix = "/kindle_novel/images"
     else:
         base_images_dir = IMAGES_DIR
         url_prefix = "/images"
@@ -115,6 +122,8 @@ class CreateDirectoryRequest(BaseModel):
 def create_directory(request: CreateDirectoryRequest):
     if request.source == "kindle":
         base_pdf_dir = KINDLE_PDF_DIR
+    elif request.source == "novel":
+        base_pdf_dir = KINDLE_NOVEL_PDF_DIR
     else:
         base_pdf_dir = PDF_DIR
 
@@ -152,6 +161,12 @@ def move_items(request: MoveItemsRequest):
             "pdf": KINDLE_PDF_DIR,
             "thumb": KINDLE_THUMBNAIL_DIR,
             "img": KINDLE_IMAGES_DIR
+        }
+    elif request.source == "novel":
+        dirs = {
+            "pdf": KINDLE_NOVEL_PDF_DIR,
+            "thumb": KINDLE_NOVEL_THUMBNAIL_DIR,
+            "img": KINDLE_NOVEL_IMAGES_DIR
         }
     else:
         dirs = {

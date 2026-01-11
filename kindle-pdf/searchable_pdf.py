@@ -66,18 +66,8 @@ class SearchablePdfGenerator:
     def _draw_text_layer(self, results, page_height):
         """
         Draws invisible text over the image based on OCR coordinates.
+        Using TextObject to ensure setTextRenderMode works reliably.
         """
-        # Set Font
-        self.c.setFont(self.FONT_NAME, 10) # Initial size
-
-        if self.debug_mode:
-            # Visible semi-transparent blue
-            self.c.setFillColor(Color(0, 0, 1, 0.3))
-            self.c.setTextRenderMode(0) # Fill text
-        else:
-            # Invisible
-            self.c.setTextRenderMode(3) 
-
         for item in results:
             text = item['text']
             bbox = item['position']
@@ -91,7 +81,6 @@ class SearchablePdfGenerator:
                 x2 = np.max(pts[:, 0])
                 y2 = np.max(pts[:, 1])
             else:
-                # Box format [x1, y1, x2, y2]
                 x1, y1, x2, y2 = bbox
             
             rect_w = x2 - x1
@@ -104,35 +93,43 @@ class SearchablePdfGenerator:
             font_size = rect_w if is_vertical else rect_h
             if font_size < 1: font_size = 10
             
-            self.c.setFont(self.FONT_NAME, font_size)
+            # Create TextObject
+            # Note: We create a new TextObject for each item to handle positioning/rotation individually
+            t = self.c.beginText()
+            t.setFont(self.FONT_NAME, font_size)
             
+            if self.debug_mode:
+                # Visible semi-transparent blue
+                self.c.setFillColor(Color(0, 0, 1, 0.3))
+                t.setTextRenderMode(0) # Fill text
+            else:
+                # Invisible
+                t.setTextRenderMode(3) 
+
             # ReportLab coords (0,0 is bottom-left)
-            # OCR coords (0,0 is top-left)
             pdf_x = x1
-            pdf_y = page_height - y2 # y2 is lower in OCR (larger val), so it's the bottom in PDF too.
+            pdf_y = page_height - y2 
             
             if is_vertical:
                 self.c.saveState()
-                # Center horizontally in the strip, start from top (h - y1)
-                # But rotate needs a pivot.
-                # Let's pivot at the top-center of the box for vertical text?
-                # Actually, simplest approach for vertical text searchability is often
-                # just putting horizontal text rotated 90 degrees or -90.
-                
-                # Pivot at (x + w/2, y_top)
+                # Vertical text handling with rotation
                 pivot_x = pdf_x + rect_w / 2
-                pivot_y = page_height - y1
+                pivot_y = page_height - y1 # Top of the box
                 
                 self.c.translate(pivot_x, pivot_y) 
-                self.c.rotate(-90) # Text runs down
-                self.c.drawString(0, 0, text)
+                self.c.rotate(-90) 
+                
+                # Draw text object at (0,0) relative to rotated canvas
+                t.setTextOrigin(0, 0)
+                t.textOut(text)
+                self.c.drawText(t)
+                
                 self.c.restoreState()
             else:
                 # Horizontal text
-                # Adjust Y to be baseline? drawString y is baseline.
-                # Simple approximation: pdf_y (bottom of rect) + small padding?
-                # Or just pdf_y usually covers it.
-                self.c.drawString(pdf_x, pdf_y, text)
+                t.setTextOrigin(pdf_x, pdf_y)
+                t.textOut(text)
+                self.c.drawText(t)
 
     def save(self):
         self.c.save()

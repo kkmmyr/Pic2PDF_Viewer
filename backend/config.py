@@ -21,6 +21,12 @@ KINDLE_PDF_DIR = os.path.join(KINDLE_DIR, "pdfs")
 KINDLE_THUMBNAIL_DIR = os.path.join(KINDLE_DIR, "thumbnails")
 KINDLE_IMAGES_DIR = os.path.join(KINDLE_DIR, "images")
 
+# Kindle Novel Directories
+KINDLE_NOVEL_DIR = os.path.join(DATA_DIR, "kindle_novel")
+KINDLE_NOVEL_PDF_DIR = os.path.join(KINDLE_NOVEL_DIR, "pdfs")
+KINDLE_NOVEL_THUMBNAIL_DIR = os.path.join(KINDLE_NOVEL_DIR, "thumbnails")
+KINDLE_NOVEL_IMAGES_DIR = os.path.join(KINDLE_NOVEL_DIR, "images")
+
 # Ensure directories exist
 def ensure_directories():
     os.makedirs(PDF_DIR, exist_ok=True)
@@ -31,5 +37,9 @@ def ensure_directories():
     os.makedirs(KINDLE_PDF_DIR, exist_ok=True)
     os.makedirs(KINDLE_THUMBNAIL_DIR, exist_ok=True)
     os.makedirs(KINDLE_IMAGES_DIR, exist_ok=True)
+
+    os.makedirs(KINDLE_NOVEL_PDF_DIR, exist_ok=True)
+    os.makedirs(KINDLE_NOVEL_THUMBNAIL_DIR, exist_ok=True)
+    os.makedirs(KINDLE_NOVEL_IMAGES_DIR, exist_ok=True)
 
 ensure_directories()

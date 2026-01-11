@@ -87,6 +87,9 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     if source == "kindle":
         base_pdf_dir = KINDLE_PDF_DIR
         base_thumb_dir = KINDLE_THUMBNAIL_DIR
+    elif source == "novel":
+        base_pdf_dir = KINDLE_NOVEL_PDF_DIR
+        base_thumb_dir = KINDLE_NOVEL_THUMBNAIL_DIR
     else:
         base_pdf_dir = PDF_DIR
         base_thumb_dir = THUMBNAIL_DIR

@@ -9,9 +9,7 @@ from typing import Tuple, List
 # Add parent directory to path to import ocr module
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from ocr.ocr_engine import get_ocr_engine
 from capturer import AutoKindleCapturer, AutoConfig, KindleCapturer
-from searchable_pdf import SearchablePdfGenerator
 
 @dataclass
 class NovelConfig(AutoConfig):
@@ -19,8 +17,21 @@ class NovelConfig(AutoConfig):
     # 白背景判定の閾値 (RGB各値がこれ以上なら白とみなす)
     WHITE_THRESHOLD: int = 240
     
-    # OCR Engine
-    OCR_ENGINE: str = 'yomitoku'
+    # OCR Engine Removed
+    # OCR_ENGINE: str = 'yomitoku'
+    
+    # Update Output Dir to backend/data/kindle_novel/images
+    # We need to access backend config or hardcode relative path?
+    # backend/config.py has KINDLE_NOVEL_IMAGES_DIR.
+    # Since capturer.py uses a relative path from __file__, we can do the same here or just override Config defaults.
+    # Base Config has IMG_OUTPUT_DIR relative to backend/data/kindle/images.
+    # We want backend/data/kindle_novel/images.
+    
+    # Path: ../backend/data/kindle_novel/images
+    # Current file is in kindle-pdf/.
+    # So: ../backend/data/kindle_novel/images
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    IMG_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'kindle_novel', 'images'))
 
 class NovelKindleCapturer(AutoKindleCapturer):
     """小説用キャプチャクラス (白背景検出 + OCR)"""
@@ -30,34 +41,30 @@ class NovelKindleCapturer(AutoKindleCapturer):
         self.config = NovelConfig()
         self.ocr = None
         
-    def initialize_ocr(self):
-        """OCRエンジンの初期化"""
-        print(f"Initializing OCR engine ({self.config.OCR_ENGINE})...")
-        try:
-            self.ocr = get_ocr_engine(self.config.OCR_ENGINE)
-            self.ocr.initialize()
-            print("OCR engine initialized.")
-        except Exception as e:
-            print(f"Failed to initialize OCR engine: {e}")
-            raise e
+    def initialize(self):
+        # No OCR init needed
+        pass
 
     def _detect_boundaries(self, img: np.ndarray, w: int, h: int):
         """
         全画面画像からコンテンツ領域（文字領域）を検出する
         白背景(>WHITE_THRESHOLD)の中から、非白画素(文字)がある範囲を探す
         """
-        # 上下は固定値
+        # 上下は固定値 (フルスクリーン設定に従う)
         self.config.CROP_Y1 = self.config.FULLSCREEN_CROP_TOP
         self.config.CROP_Y2 = h - self.config.FULLSCREEN_CROP_BOTTOM_MARGIN
         
-        scan_y_list = [h // 4, h // 2, (h * 3) // 4]
+        # --- X-Axis Detection (Left/Right) ---
+        # スキャンラインを増やす (10点)
+        num_points = 10
+        scan_y_list = np.linspace(h * 0.05, h * 0.95, num_points, dtype=int)
         
         left_edges = []
         right_edges = []
         
-        offset = self.config.SIDE_IGNORE_PX
+        offset_x = self.config.SIDE_IGNORE_PX
 
-        print(f"Scanning for TEXT boundaries at Y={scan_y_list}, Offset={offset} (White Threshold={self.config.WHITE_THRESHOLD})")
+        print(f"Scanning for X-boundaries at Y={scan_y_list}, Offset={offset_x} (White Threshold={self.config.WHITE_THRESHOLD})")
 
         for y in scan_y_list:
             row = img[y]
@@ -65,16 +72,16 @@ class NovelKindleCapturer(AutoKindleCapturer):
             is_white = np.all(row >= self.config.WHITE_THRESHOLD, axis=1)
             
             # 左端検出 (左から走査して初めて白でない＝文字が現れる場所)
-            left = offset
-            for x in range(offset, w):
+            left = offset_x
+            for x in range(offset_x, w):
                 if not is_white[x]: # 文字発見
                     left = x
                     break
             left_edges.append(left)
             
             # 右端検出
-            right = w - offset
-            for x in range(w - 1 - offset, -1, -1):
+            right = w - offset_x
+            for x in range(w - 1 - offset_x, -1, -1):
                 if not is_white[x]: # 文字発見
                     right = x
                     break
@@ -100,41 +107,7 @@ class NovelKindleCapturer(AutoKindleCapturer):
             self.config.CROP_X1 = 0
             self.config.CROP_X2 = w
 
-    def _perform_ocr_and_save(self, image: np.ndarray, page_num: int, save_dir: str):
-        """OCRを実行してテキストを保存"""
-        print(f"[DEBUG] Starting OCR for page {page_num}...")
-        if not self.ocr:
-            print("[DEBUG] OCR engine is None!")
-            return
-
-        try:
-            # OCRはRGB画像を期待することが多いが、OpenCVはBGR
-            # yomitoku/paddleはRGBを好む場合が多いので変換確認
-            image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            results = self.ocr.extract_text(image_rgb)
-            
-            # テキスト抽出
-            lines = [item['text'] for item in results]
-            text_content = "\n".join(lines)
-            print(f"[DEBUG] Extracted {len(lines)} lines. Saving to file...")
-            
-            txt_filename = os.path.join(save_dir, f"{page_num:03d}.txt")
-            with open(txt_filename, "w", encoding="utf-8") as f:
-                f.write(text_content)
-                
-            # また、全ページ結合用のテキストファイルにも追記モードで書き込むと便利かも
-            full_text_path = os.path.join(save_dir, "full_text.txt")
-            with open(full_text_path, "a", encoding="utf-8") as f:
-                f.write(f"\n--- Page {page_num} ---\n")
-                f.write(text_content)
-                f.write("\n")
-                
-            print(f"OCR completed for page {page_num}. {len(lines)} lines extracted.")
-            return results
-            
-        except Exception as e:
-            print(f"OCR failed for page {page_num}: {e}")
-            return []
+    # _perform_ocr_and_save removed
 
     def capture_loop(self, title: str) -> Tuple[int, str]:
         # Override capture_loop to inject OCR
@@ -142,20 +115,7 @@ class NovelKindleCapturer(AutoKindleCapturer):
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
             
-        # OCR初期化
-        self.initialize_ocr()
-        
-        # 既存のfull_text.txtがあればリセット
-        full_text_path = os.path.join(save_dir, "full_text.txt")
-        if os.path.exists(full_text_path):
-            os.remove(full_text_path)
-
-        print(f"Saving images and text to: {save_dir}")
-        
-        # Searchable PDF Init
-        folder_name = os.path.basename(save_dir) or title
-        pdf_path = os.path.join(save_dir, f"{folder_name}_searchable.pdf")
-        pdf_gen = SearchablePdfGenerator(pdf_path, debug_mode=False)
+        # No OCR/PDF Init
         
         if self.hwnd:
             from ctypes import windll
@@ -182,26 +142,13 @@ class NovelKindleCapturer(AutoKindleCapturer):
                 if time.perf_counter() - start_time > self.config.TIMEOUT_SEC:
                     print("Timeout: Page did not change.")
                     # Save PDF before returning
-                    try:
-                        pdf_gen.save()
-                        print(f"Searchable PDF saved: {pdf_path}")
-                    except Exception as e:
-                        print(f"Failed to save PDF: {e}")
                     return page - 1, save_dir
 
             # 画像保存
             self._save_image(current_image, filename)
             
-            # OCR実行
-            ocr_results = self._perform_ocr_and_save(current_image, page, save_dir)
-            
-            # PDFページ追加
-            if ocr_results:
-                # current_image is numpy array (BGR). SearchablePdfGenerator expects path or PIL.
-                # However, add_page currently expects image_path string to load image again.
-                # To minimize disk I/O read, we could modify add_page or just pass the filename we just saved.
-                # We just saved to `filename`.
-                pdf_gen.add_page(filename, ocr_results)
+            # OCR Removed
+            # PDF Removed
             
             print(f'Page: {page}, {current_image.shape}, {time.perf_counter() - start_time:.2f} sec')
 

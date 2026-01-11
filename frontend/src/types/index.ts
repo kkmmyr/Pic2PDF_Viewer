@@ -74,7 +74,7 @@ export type PageSide = 'left' | 'right' | 'single';
 /**
  * ライブラリソース
  */
-export type LibrarySource = 'generated' | 'kindle';
+export type LibrarySource = 'generated' | 'kindle' | 'novel';
 
 export interface CreateDirectoryRequest {
     path: string;

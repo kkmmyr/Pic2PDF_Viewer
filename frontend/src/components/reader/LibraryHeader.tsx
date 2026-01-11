@@ -103,6 +103,15 @@ export function LibraryHeader({
                     >
                         Kindle
                     </button>
+                    <button
+                        onClick={() => onSourceChange('novel')}
+                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${currentSource === 'novel'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                    >
+                        Novel
+                    </button>
                 </div>
             </div>
         </div>
