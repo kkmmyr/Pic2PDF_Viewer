@@ -26,20 +26,25 @@
 3.  **Server** -> Response (Generated File List) -> **Client**
 
 #### 2. PDF一覧・閲覧
-1.  **Client** -> `GET /api/pdfs?path=...&source=[generated|kindle]` -> **Server**
-2.  **Server** -> `source` パラメータに基づき、対象ディレクトリ (`data/pdfs` or `data/kindle/pdfs`) をスキャン。
+1.  **Client** -> `GET /api/pdfs?path=...&source=[generated|kindle|novel]` -> **Server**
+2.  **Server** -> `source` パラメータに基づき、対象ディレクトリ (`data/pdfs`, `data/kindle/pdfs`, `data/kindle_novel/pdfs`) をスキャン。
 3.  **Server** -> Response (Files with Thumbnail URLs) -> **Client**
-4.  **Client** -> `GET /[kindle/]pdfs/...` (Static File) -> **Server** -> PDF Stream -> **Client**
-5.  **Client** -> `GET /[kindle/]thumbnails/...` (Static File) -> **Server** -> Image -> **Client**
+4.  **Client** -> `GET` Static Files -> **Server** -> PDF Stream / Thumbnails -> **Client**
 
 #### 3. Kindleキャプチャ (External Tool)
-1.  **Tool** (`kindle-pdf`) -> Capture Screen ->
-    *   **Manga**: Black bar detection & crop.
-    *   **Novel**: White BG detection & crop -> **OCR Engine** (`yomitoku`) -> Extract Text.
-2.  **Tool** -> Save Images/Text to `data/kindle/images`.
-3.  **Tool** -> (Optional) `create_pdf` -> Save PDF to `data/kindle/pdfs`.
-4.  **Viewer** -> Kindle Tab -> Displays generated content.
+*   **Manga/Manual**: `kindle-pdf/main_auto.py` / `main_manual.py`
+    1.  Capture Screen -> Crop.
+    2.  Save Images -> Create PDF (`data/kindle/pdfs`).
+*   **Novel**: `kindle-pdf/main_novel.py`
+    1.  Capture Screen -> **Dynamic Crop** (X-Axis only, White BG detection).
+    2.  Save Images ONLY to `data/kindle_novel/images`. (No OCR at capture time).
 
-#### 4. OCRバッチ処理
-1.  **User** -> Run `batch_ocr.py` -> Select Target Folder.
-2.  **Script** -> Load existing PNGs -> **OCR Engine** -> Save `.txt` files.
+#### 4. Novel Batch OCR (Background Processing)
+*   **Script**: `kindle-pdf/batch_ocr.py`
+    1.  **Auto Scan**: Checks `data/kindle_novel/images` for all book folders.
+    2.  **Skip Check**: Skips if corresponding PDF already exists in `data/kindle_novel/pdfs`.
+    3.  **Process**:
+        *   Load Images.
+        *   **OCR Engine** (`yomitoku`) -> Extract Text & Layout.
+        *   **PDF Gen** (`SearchablePdfGenerator`) -> Create PDF with invisible text overlay.
+    4.  **Output**: Save Searchable PDF to `data/kindle_novel/pdfs`.

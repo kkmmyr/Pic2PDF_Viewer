@@ -10,10 +10,14 @@ Pic2PDF_Viewer/
 │   │   │   ├── thumbnails/ # サムネイル画像の保存・配信場所 (Static Mount)
 │   │   │   ├── images/     # 閲覧用WebP画像の保存・配信場所 (Static Mount)
 │   │   │   └── complete/   # 処理済みソースファイルの移動先
-│   │   └── kindle/         # Kindle専用データ (Static Mount: /kindle/...)
+│   │   ├── kindle/         # Kindle専用データ (Static Mount: /kindle/...)
 │   │       ├── pdfs/
 │   │       ├── thumbnails/
 │   │       └── images/
+│   │   └── kindle_novel/   # Kindle小説用データ (Static Mount: /kindle_novel/...)
+│   │       ├── pdfs/       # Searchable PDF
+│   │       ├── thumbnails/
+│   │       └── images/     # キャプチャ生画像
 │   ├── services/           # ビジネスロジック (PDF生成など)
 │   │   └── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
 │   ├── main.py             # FastAPIエントリーポイント
@@ -64,7 +68,7 @@ Pic2PDF_Viewer/
 ### `GET /api/pdfs`
 *   **パラメータ**: 
     *   `path` (オプション) - 表示するサブディレクトリのパス
-    *   `source` (オプション) - 'generated' (default) または 'kindle'。ライブラリの参照元を指定。
+    *   `source` (オプション) - 'generated' (default) / 'kindle' / 'novel'。ライブラリの参照元を指定。
 *   **レスポンス**:
     ```json
     {
@@ -95,7 +99,7 @@ Pic2PDF_Viewer/
 ### `POST /api/pdfs/{filename}/delete_pages`
 *   **パラメータ**: 
     *   `path` (オプション) - 対象ファイルの親ディレクトリパス
-    *   `source` (オプション) - 'generated' (default) または 'kindle'。対象ファイルの場所を指定。
+    *   `source` (オプション) - 'generated' (default) / 'kindle' / 'novel'。対象ファイルの場所を指定。
 *   **リクエストボディ**:
     ```json
     {
@@ -113,7 +117,7 @@ Pic2PDF_Viewer/
 ### `GET /api/books/{path}/images`
 *   **パラメータ**: 
     *   `path` (パスパラメータ) - 書籍（フォルダまたはZIP）の相対パス
-    *   `source` (クエリパラメータ, オプション) - 'generated' (default) または 'kindle'。
+    *   `source` (クエリパラメータ, オプション) - 'generated' (default) / 'kindle' / 'novel'。
 *   **レスポンス**:
     ```json
     {
@@ -173,9 +177,19 @@ Pic2PDF_Viewer/
 
 ### `NovelKindleCapturer` (`novel_capturer.py`)
 *   **継承**: `AutoKindleCapturer`
-*   **役割**: 小説用の自動クロップ（白背景検出）とOCR処理。
-*   **主要メソッド**:
-    *   `_perform_ocr_and_save()`: 画像を保存し、OCRエンジンを呼び出してテキストを抽出・保存。
+*   **役割**: 小説用の自動クロップ（X軸白背景検出）と画像保存。
+*   **変更点**: OCR/PDF生成機能は削除（`batch_ocr.py`へ委譲）。撮影速度を優先。
+
+### `SearchablePdfGenerator` (`kindle-pdf/searchable_pdf.py`)
+*   **役割**: 画像とOCR結果から「透明テキスト付きPDF」を生成する。
+*   **使用ライブラリ**: `ReportLab`
+*   **特徴**:
+    *   `add_page(image_path, ocr_results)`: 画像を描画し、その上に検索用テキスト（透明）を配置する。
+    *   `_draw_text_layer`: 縦書き判定と文字回転、`TextObject` を用いた描画モード制御。
+
+### `BatchOCR` (`kindle-pdf/batch_ocr.py`)
+*   **役割**: `kindle_novel/images` 配下の新規フォルダを監視し、自動的にSearchable PDF化する。
+*   **フロー**: フォルダ検知 -> OCR (`yomitoku`) -> PDF生成 (`SearchablePdfGenerator`)。
 
 ### `BookInfoDialog` (`capturer.py`)
 *   **役割**: 書籍情報入力ダイアログ。

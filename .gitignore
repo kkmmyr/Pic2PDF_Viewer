@@ -6,6 +6,8 @@ __pycache__/
 *.dll
 .Python
 env/
+venv/
+venv-gpu/
 build/
 develop-eggs/
 dist/
