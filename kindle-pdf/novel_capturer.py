@@ -11,6 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from ocr.ocr_engine import get_ocr_engine
 from capturer import AutoKindleCapturer, AutoConfig, KindleCapturer
+from searchable_pdf import SearchablePdfGenerator
 
 @dataclass
 class NovelConfig(AutoConfig):
@@ -129,9 +130,11 @@ class NovelKindleCapturer(AutoKindleCapturer):
                 f.write("\n")
                 
             print(f"OCR completed for page {page_num}. {len(lines)} lines extracted.")
+            return results
             
         except Exception as e:
             print(f"OCR failed for page {page_num}: {e}")
+            return []
 
     def capture_loop(self, title: str) -> Tuple[int, str]:
         # Override capture_loop to inject OCR
@@ -148,6 +151,11 @@ class NovelKindleCapturer(AutoKindleCapturer):
             os.remove(full_text_path)
 
         print(f"Saving images and text to: {save_dir}")
+        
+        # Searchable PDF Init
+        folder_name = os.path.basename(save_dir) or title
+        pdf_path = os.path.join(save_dir, f"{folder_name}_searchable.pdf")
+        pdf_gen = SearchablePdfGenerator(pdf_path, debug_mode=False)
         
         if self.hwnd:
             from ctypes import windll
@@ -173,13 +181,27 @@ class NovelKindleCapturer(AutoKindleCapturer):
 
                 if time.perf_counter() - start_time > self.config.TIMEOUT_SEC:
                     print("Timeout: Page did not change.")
+                    # Save PDF before returning
+                    try:
+                        pdf_gen.save()
+                        print(f"Searchable PDF saved: {pdf_path}")
+                    except Exception as e:
+                        print(f"Failed to save PDF: {e}")
                     return page - 1, save_dir
 
             # 画像保存
             self._save_image(current_image, filename)
             
             # OCR実行
-            self._perform_ocr_and_save(current_image, page, save_dir)
+            ocr_results = self._perform_ocr_and_save(current_image, page, save_dir)
+            
+            # PDFページ追加
+            if ocr_results:
+                # current_image is numpy array (BGR). SearchablePdfGenerator expects path or PIL.
+                # However, add_page currently expects image_path string to load image again.
+                # To minimize disk I/O read, we could modify add_page or just pass the filename we just saved.
+                # We just saved to `filename`.
+                pdf_gen.add_page(filename, ocr_results)
             
             print(f'Page: {page}, {current_image.shape}, {time.perf_counter() - start_time:.2f} sec')
 
