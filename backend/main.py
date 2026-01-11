@@ -25,21 +25,23 @@ app.add_middleware(
 
 # Base Data Directory
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+MAIN_DATA_DIR = os.path.join(DATA_DIR, "main")
 
 # Ensure pdfs directory exists
-PDF_DIR = os.path.join(DATA_DIR, "pdfs")
+PDF_DIR = os.path.join(MAIN_DATA_DIR, "pdfs")
 os.makedirs(PDF_DIR, exist_ok=True)
 
 # Ensure thumbnails directory exists
-THUMBNAIL_DIR = os.path.join(DATA_DIR, "thumbnails")
+THUMBNAIL_DIR = os.path.join(MAIN_DATA_DIR, "thumbnails")
 os.makedirs(THUMBNAIL_DIR, exist_ok=True)
 
 # Ensure images directory exists
-IMAGES_DIR = os.path.join(DATA_DIR, "images")
+IMAGES_DIR = os.path.join(MAIN_DATA_DIR, "images")
 os.makedirs(IMAGES_DIR, exist_ok=True)
 
 # Ensure complete directory exists
-COMPLETE_DIR = os.path.join(os.path.dirname(__file__), "complete")
+# COMPLETE_DIR = os.path.join(os.path.dirname(__file__), "complete")
+COMPLETE_DIR = os.path.join(MAIN_DATA_DIR, "complete")
 os.makedirs(COMPLETE_DIR, exist_ok=True)
 
 # Kindle Data Directories

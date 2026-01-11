@@ -5,9 +5,11 @@
 Pic2PDF_Viewer/
 ├── backend/
 │   ├── data/               # データ格納用
-│   │   ├── pdfs/           # PDFファイルの保存・配信場所 (Static Mount)
-│   │   ├── thumbnails/     # サムネイル画像の保存・配信場所 (Static Mount)
-│   │   ├── images/         # 閲覧用WebP画像の保存・配信場所 (Static Mount)
+│   │   ├── main/           # メイン（生成済）データ格納用
+│   │   │   ├── pdfs/       # PDFファイルの保存・配信場所 (Static Mount)
+│   │   │   ├── thumbnails/ # サムネイル画像の保存・配信場所 (Static Mount)
+│   │   │   ├── images/     # 閲覧用WebP画像の保存・配信場所 (Static Mount)
+│   │   │   └── complete/   # 処理済みソースファイルの移動先
 │   │   └── kindle/         # Kindle専用データ (Static Mount: /kindle/...)
 │   │       ├── pdfs/
 │   │       ├── thumbnails/
