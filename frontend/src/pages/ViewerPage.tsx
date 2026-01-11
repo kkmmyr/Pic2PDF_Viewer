@@ -9,7 +9,7 @@ import type { PdfFile, ReadingDirection, LibrarySource } from '../types';
 import { buildApiUrl, buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../config/api';
 
 // Hooks
-import { useWindowSize, useBookImages, useImagePreloader, useLibraryManagement } from '../hooks';
+import { useWindowSize, useBookImages, useImagePreloader, useLibraryManagement, useReaderNavigation } from '../hooks';
 
 // Components
 import {
@@ -52,7 +52,20 @@ export default function ViewerPage() {
     const [isSpread, setIsSpread] = useState(true);
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
     const [numPages, setNumPages] = useState<number>(0);
-    const [pageNumber, setPageNumber] = useState<number>(1);
+
+    // Page Navigation Hook
+    const {
+        pageNumber,
+        setPageNumber,
+        handleNext,
+        handlePrev,
+        resetPage
+    } = useReaderNavigation({
+        numPages,
+        isSpread,
+        direction,
+        isActive: !!selectedPdfState
+    });
 
     // Edit Mode State
     const [isEditMode, setIsEditMode] = useState(false);
@@ -76,8 +89,8 @@ export default function ViewerPage() {
         setIsEditMode(false);
         setSelectedPages(new Set());
         setNumPages(0);
-        setPageNumber(1);
-    }, [selectedPdfState]);
+        resetPage();
+    }, [selectedPdfState, resetPage]);
 
     // Fetch PDF list
     const fetchPdfs = useCallback(() => {
@@ -166,72 +179,15 @@ export default function ViewerPage() {
         const newParams = new URLSearchParams(searchParams);
         newParams.delete('file');
         setSearchParams(newParams);
-        setPageNumber(1);
+        resetPage();
         setIsEditMode(false);
         setSelectedPages(new Set());
-    }, [searchParams, setSearchParams]);
-
-    // Page navigation
-    const handleNext = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
-        e?.stopPropagation?.();
-        if (!isSpread) {
-            if (pageNumber < numPages) setPageNumber(prev => prev + 1);
-            return;
-        }
-
-        if (direction === 'rtl') {
-            if (pageNumber === 1) {
-                if (pageNumber + 1 <= numPages) setPageNumber(2);
-            } else {
-                if (pageNumber + 2 <= numPages) setPageNumber(prev => prev + 2);
-            }
-        } else {
-            if (pageNumber + 2 <= numPages) setPageNumber(prev => prev + 2);
-            else if (pageNumber + 1 <= numPages) setPageNumber(prev => prev + 1);
-        }
-    }, [pageNumber, numPages, isSpread, direction]);
-
-    const handlePrev = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
-        e?.stopPropagation?.();
-        if (!isSpread) {
-            if (pageNumber > 1) setPageNumber(prev => prev - 1);
-            return;
-        }
-
-        if (direction === 'rtl') {
-            if (pageNumber === 2) {
-                setPageNumber(1);
-            } else if (pageNumber > 2) {
-                setPageNumber(prev => prev - 2);
-            }
-        } else {
-            if (pageNumber > 2) setPageNumber(prev => prev - 2);
-            else if (pageNumber === 2) setPageNumber(1);
-        }
-    }, [pageNumber, isSpread, direction]);
+    }, [searchParams, setSearchParams, resetPage]);
 
     const toggleDirection = useCallback(() => {
         setDirection(prev => prev === 'rtl' ? 'ltr' : 'rtl');
-        setPageNumber(1);
-    }, []);
-
-    // Keyboard Navigation
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!selectedPdfState) return;
-
-            if (e.key === 'ArrowLeft') {
-                if (direction === 'rtl') handleNext();
-                else handlePrev();
-            } else if (e.key === 'ArrowRight') {
-                if (direction === 'rtl') handlePrev();
-                else handleNext();
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedPdfState, direction, handleNext, handlePrev]);
+        resetPage();
+    }, [resetPage]);
 
     // Edit Mode Logic
     const togglePageSelection = useCallback((pNum: number, e: React.MouseEvent) => {
