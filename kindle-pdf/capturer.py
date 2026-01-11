@@ -12,13 +12,14 @@ from ctypes.wintypes import RECT
 import cv2
 import numpy as np
 from PIL import ImageGrab, Image
-from tkinter import messagebox, simpledialog
+import tkinter as tk
+from tkinter import messagebox, simpledialog, ttk
 
 @dataclass
 class Config:
     """アプリケーション設定"""
     KINDLE_WINDOW_TITLE: str = 'Kindle for PC'
-    PAGE_CHANGE_KEY: str = 'left'  # ページめくりキー
+    PAGE_CHANGE_KEY: str = 'left'  # ページめくりキー (デフォルト)
     WAIT_SEC: float = 0.15         # キー入力後の微小待機
     PAGE_TURN_WAIT: float = 0.5    # ページめくり完了待ち
     TIMEOUT_SEC: float = 5.0       # ページ変化待ちタイムアウト
@@ -41,6 +42,38 @@ class Config:
     # タイトルクリーニング用
     TITLE_PREFIX: str = "Kindle for PC - "
     REMOVE_AUTHOR_STR: str = "工藤智康さんの"
+
+class BookInfoDialog(simpledialog.Dialog):
+    def __init__(self, parent, title, initialvalue):
+        self.initialvalue = initialvalue
+        self.result_title = None
+        self.result_direction = None
+        super().__init__(parent, title)
+
+    def body(self, master):
+        tk.Label(master, text="タイトル:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        self.e_title = tk.Entry(master, width=50)
+        self.e_title.insert(0, self.initialvalue)
+        self.e_title.grid(row=0, column=1, padx=5, pady=5)
+
+        tk.Label(master, text="ページめくり:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        
+        self.var_direction = tk.StringVar(value="left") # Default: Left Key (Standard for Vertical)
+        
+        frame_dir = tk.Frame(master)
+        frame_dir.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        
+        # Note: In Kindle PC:
+        # Vertical Text (Manga/Novel) -> Press Left Arrow to go Next.
+        # Horizontal Text (Tech Book) -> Press Right Arrow to go Next.
+        tk.Radiobutton(frame_dir, text="左キー (縦書き/右開き)", variable=self.var_direction, value="left").pack(side="left", padx=5)
+        tk.Radiobutton(frame_dir, text="右キー (横書き/左開き)", variable=self.var_direction, value="right").pack(side="left", padx=5)
+
+        return self.e_title # Focus
+
+    def apply(self):
+        self.result_title = self.e_title.get()
+        self.result_direction = self.var_direction.get()
 
 class KindleCapturer:
     """Kindleの画面キャプチャとPDF化を行うクラス"""
@@ -117,8 +150,23 @@ class KindleCapturer:
         if not default_title:
             default_title = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
-        title = simpledialog.askstring('タイトルを入力', 'タイトルを入力して下さい', initialvalue=default_title)
-        return title if title else default_title
+        # Use Custom Dialog
+        root = tk.Tk()
+        root.withdraw() # Hide main window
+        
+        # Ensure dialog is top most
+        root.attributes("-topmost", True)
+        
+        d = BookInfoDialog(root, "書籍情報入力", default_title)
+        
+        if d.result_title:
+            # Update config with selected direction
+            self.config.PAGE_CHANGE_KEY = d.result_direction
+            print(f"Set page turn key to: {self.config.PAGE_CHANGE_KEY}")
+            return d.result_title
+        else:
+            # Cancelled or closed
+            return None
 
     def _capture_screen(self) -> np.ndarray:
         """現在の設定範囲でスクリーンショットを取得"""
