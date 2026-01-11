@@ -10,7 +10,7 @@ import type { PdfFile, ReadingDirection, LibrarySource } from '../types';
 import { buildApiUrl, buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../config/api';
 
 // Hooks
-import { useWindowSize, useBookImages } from '../hooks';
+import { useWindowSize, useBookImages, useImagePreloader } from '../hooks';
 
 // Components
 import {
@@ -42,6 +42,8 @@ export default function ViewerPage() {
     const { height: windowHeight } = useWindowSize();
     const { imageUrls, numPages: imageNumPages, isImageMode } = useBookImages(selectedPdfState, currentPathState, currentSource);
 
+
+
     // Window Size State
     const [showHeader, setShowHeader] = useState(false);
 
@@ -57,6 +59,9 @@ export default function ViewerPage() {
 
     // PDF Version for cache busting
     const [pdfVersion, setPdfVersion] = useState(0);
+
+    // Image Preloading
+    useImagePreloader(imageUrls, pageNumber - 1, 3); // Preload 3 pages ahead/behind
 
     // Update numPages when in image mode
     useEffect(() => {
@@ -312,7 +317,8 @@ export default function ViewerPage() {
                         src={buildStaticUrl(imgUrl)}
                         alt={`Page ${pNum}`}
                         style={{ height: windowHeight - 40, width: 'auto', maxWidth: '100%', maxHeight: '100%' }}
-                        className="bg-white"
+                        className="object-contain"
+                        loading="eager"
                     />
                 </div>
             );
@@ -473,7 +479,7 @@ export default function ViewerPage() {
                     >
                         {isImageMode ? (
                             // Image Mode Render
-                            <div className="flex gap-0 shadow-2xl justify-center bg-white">
+                            <div className="flex gap-0 shadow-2xl justify-center bg-gray-900">
                                 {isSpread ? renderSpreadPages() : renderPage(pageNumber, 'single')}
                             </div>
                         ) : (
