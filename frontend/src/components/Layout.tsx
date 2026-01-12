@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import { FileText, Library, Settings } from 'lucide-react';
+import { FileText, Library, Settings, Terminal } from 'lucide-react';
 
 export default function Layout() {
     const location = useLocation();
@@ -41,6 +41,13 @@ export default function Layout() {
                                 >
                                     <Settings className="w-4 h-4" />
                                     Generator
+                                </Link>
+                                <Link
+                                    to="/ocr"
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/ocr')}`}
+                                >
+                                    <Terminal className="w-4 h-4" />
+                                    Novel OCR
                                 </Link>
                             </nav>
                         </div>

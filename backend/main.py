@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from config import *
-from routers import library, pdfs
+from routers import library, pdfs, ocr
 
 app = FastAPI()
 
@@ -39,6 +39,7 @@ app.mount("/kindle_novel/images", StaticFiles(directory=KINDLE_NOVEL_IMAGES_DIR)
 # Include Routers
 app.include_router(library.router, prefix="/api", tags=["library"])
 app.include_router(pdfs.router, prefix="/api", tags=["pdfs"])
+app.include_router(ocr.router, prefix="/api", tags=["ocr"])
 
 @app.get("/")
 def read_root():

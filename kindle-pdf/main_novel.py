@@ -25,11 +25,7 @@ def main():
         # 終了処理 (フルスクリーン解除)
         capturer.cleanup()
         
-        pdf_path = capturer.create_pdf(title, image_save_dir)
-        
-        msg = f"撮影とOCRが終了しました。\n合計 {total_pages} ページを処理しました。"
-        if pdf_path:
-            msg += f"\n\nPDFを作成しました:\n{pdf_path}"
+        msg = f"撮影が終了しました。\n合計 {total_pages} ページを処理しました。\n\n続いて batch_ocr.py を実行してOCR処理を行ってください。"
         
         messagebox.showinfo("完了", msg)
 

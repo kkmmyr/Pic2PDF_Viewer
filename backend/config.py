@@ -42,4 +42,21 @@ def ensure_directories():
     os.makedirs(KINDLE_NOVEL_THUMBNAIL_DIR, exist_ok=True)
     os.makedirs(KINDLE_NOVEL_IMAGES_DIR, exist_ok=True)
 
+    os.makedirs(KINDLE_NOVEL_IMAGES_DIR, exist_ok=True)
+
 ensure_directories()
+
+# OCR Configuration
+import sys
+# Default paths
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # f:\61.tool\Pic2PDF_Viewer
+
+# Check for venv-gpu
+GPU_VENV_PYTHON = os.path.join(PROJECT_ROOT, "venv-gpu", "Scripts", "python.exe")
+if os.path.exists(GPU_VENV_PYTHON):
+    OCR_PYTHON_PATH = GPU_VENV_PYTHON
+else:
+    # Fallback to current python
+    OCR_PYTHON_PATH = sys.executable
+
+BATCH_OCR_SCRIPT = os.path.join(PROJECT_ROOT, "kindle-pdf", "batch_ocr.py")

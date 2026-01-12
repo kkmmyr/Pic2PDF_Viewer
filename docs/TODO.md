@@ -5,10 +5,11 @@
 ## 1. OCR処理のCPU/GPU制御
 - [ ] **CPU利用の明示化**: OCR実行時 (`batch_ocr.py` 等)、GPUが利用できない場合はCPUを利用するように制御・ログ出力を明確にする（現在は自動フォールバックしているが、挙動を保証する）。
 - [ ] **GPU環境の調査**: `C:\Users\amash\OneDrive\61.tool\kichikuou-rance` の環境ではGPUが動作しているとのことなので、そのvenv設定やライブラリ構成を参考にする（または流用を検討する）。
+- [ ] **OCRテキスト結合の改善**: ノベルの縦書きテキストにおいて、文が断片化してPDF化される問題がある。単純な距離ベースの結合では全体が一つに繋がってしまうため、より高度なクラスタリングロジックや `yomitoku` のパラメータ調整により、適切な行/文単位での結合を目指す。
 - [ ] **フリガナ除去の調整**: OCR処理結果にまだフリガナが残っている場合があるため、フィルタリングの閾値調整やロジック改善を行い、除去精度を向上させる。
 
 ## 2. Kindleキャプチャの改善
-- [ ] **不要なPDF出力の削除**: `kindle-pdf/main_novel.py` 実行時、最後に `capturer.create_pdf` が呼ばれており、`backend/data/kindle/pdfs` に画像PDFが生成されてしまう。Novelフローでは `batch_ocr.py` でSearchable PDF (`kindle_novel/pdfs`) を生成するため、この重複したPDF生成処理を削除する。
+- [x] **不要なPDF出力の削除**: `kindle-pdf/main_novel.py` 実行時、最後に `capturer.create_pdf` が呼ばれており、`backend/data/kindle/pdfs` に画像PDFが生成されてしまう。Novelフローでは `batch_ocr.py` でSearchable PDF (`kindle_novel/pdfs`) を生成するため、この重複したPDF生成処理を削除する。
 
 ## 3. Web UI機能拡張
 - [ ] **OCR実行画面の追加**: Webビューア上に、LibraryやGeneratorと同じ階層で「Novel OCR」等のタブ（またはページ）を追加する。

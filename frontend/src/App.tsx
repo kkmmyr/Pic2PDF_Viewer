@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import GeneratorPage from './pages/GeneratorPage';
 import ViewerPage from './pages/ViewerPage';
+import OCRPage from './pages/OCRPage';
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
           <Route index element={<Navigate to="/viewer" replace />} />
           <Route path="viewer" element={<ViewerPage />} />
           <Route path="generator" element={<GeneratorPage />} />
+          <Route path="ocr" element={<OCRPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

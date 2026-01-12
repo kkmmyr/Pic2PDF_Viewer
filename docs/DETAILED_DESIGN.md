@@ -19,6 +19,8 @@ Pic2PDF_Viewer/
 │   │       ├── thumbnails/
 │   │       └── images/     # キャプチャ生画像
 │   ├── services/           # ビジネスロジック (PDF生成など)
+
+
 │   │   └── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
 │   ├── main.py             # FastAPIエントリーポイント
 │   └── requirements.txt    # Python依存関係
@@ -35,14 +37,18 @@ Pic2PDF_Viewer/
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # 共通コンポーネント
-│   │   │   ├── Layout.tsx
-│   │   │   └── reader/     # リーダー関連コンポーネント
-│   │   │       ├── index.ts
-│   │   │       ├── PageRenderer.tsx
-│   │   │       ├── ReaderHeader.tsx
-│   │   │       ├── LibraryHeader.tsx
-│   │   │       ├── FolderGrid.tsx
-│   │   │       └── PdfGrid.tsx
+│   │   │   ├── common/     # 共通UIコンポーネント
+│   │   │   │   └── Layout.tsx
+│   │   │   ├── library/    # ライブラリ関連コンポーネント
+│   │   │   │   ├── LibraryHeader.tsx
+│   │   │   │   ├── FolderGrid.tsx
+│   │   │   │   └── PdfGrid.tsx
+│   │   │   ├── reader/     # リーダー関連コンポーネント
+│   │   │   │   ├── index.ts
+│   │   │   │   ├── PageRenderer.tsx
+│   │   │   │   └── ReaderHeader.tsx
+│   │   │   └── ocr/        # OCR関連コンポーネント
+│   │   │       └── OCRPanel.tsx
 │   │   ├── config/         # 設定ファイル
 │   │   │   └── api.ts      # API URL設定
 │   │   ├── hooks/          # カスタムフック
@@ -62,6 +68,16 @@ Pic2PDF_Viewer/
     ├── BASIC_DESIGN.md     # 基本設計
     └── DETAILED_DESIGN.md  # 本詳細設計書
 ```
+
+### 1.2 データ配置 (Backend)
+- `backend/data/`: データ格納ルート
+    - `main/`: メイン（生成済）データ格納用
+    - `kindle/`: Kindleキャプチャ (漫画)
+    - `kindle_novel/`: Kindleキャプチャ (小説)
+
+### 1.3 構成設定 (config.py)
+- **OCR設定**: `OCR_PYTHON_PATH` (venv-gpu検知), `BATCH_OCR_SCRIPT`
+
 
 ## 2. API仕様
 
@@ -114,7 +130,14 @@ Pic2PDF_Viewer/
     }
     ```
 
+### 3. OCR API
+- **POST /api/ocr/run**: Novel用OCR処理 (`batch_ocr.py`) の実行を開始する。
+- **POST /api/ocr/stop**: 実行中のOCRプロセスを停止する。
+- **GET /api/ocr/status**: 現在のOCRプロセスのステータスとログを取得する。
+    - Response: `{ status: "idle"|"running"|"error", logs: string[], last_return_code: number|null }`
+
 ### `GET /api/books/{path}/images`
+*   **概要**: 指定された書籍（フォルダまたはZIP）の画像リストとサイズ情報を取得。
 *   **パラメータ**: 
     *   `path` (パスパラメータ) - 書籍（フォルダまたはZIP）の相対パス
     *   `source` (クエリパラメータ, オプション) - 'generated' (default) / 'kindle' / 'novel'。
