@@ -19,8 +19,7 @@ Pic2PDF_Viewer/
 │   │       ├── thumbnails/
 │   │       └── images/     # キャプチャ生画像
 │   ├── services/           # ビジネスロジック (PDF生成など)
-
-
+│   │   ├── ocr_service.py  # OCRプロセス管理 (OCRService)
 │   │   └── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
 │   ├── main.py             # FastAPIエントリーポイント
 │   └── requirements.txt    # Python依存関係
@@ -178,6 +177,13 @@ Pic2PDF_Viewer/
 
 ## 3. クラス設計 (Backend & Kindle Tool)
 
+### `OCRService` (`backend/services/ocr_service.py`)
+*   **役割**: OCRバックグラウンドプロセスの管理、ログ収集、ステータス管理。
+*   **主要メソッド**:
+    *   `start_ocr()`: `batch_ocr.py` をサブプロセスとして起動。UTF-8エンコーディングを強制。
+    *   `stop_ocr()`: 実行中のプロセスを停止 (Terminate/Kill)。
+    *   `get_status()`: 現在の状態と直近のログを返却。
+
 ### `PdfGenerator` (`backend/services/pdf_generator.py`)
 *   **役割**: ディレクトリやZIPファイルのスキャン、画像からのPDF生成、ファイル移動を一元管理。
 *   **主要メソッド**:
@@ -221,7 +227,9 @@ Pic2PDF_Viewer/
 ### `YomitokuEngine` (`ocr/ocr_engine.py`)
 *   **役割**: `yomitoku` ライブラリを用いたOCR処理。
 *   **特徴**:
-    *   `extract_text()`: 画像からテキストを抽出。
+    *   `extract_text()`: 画像からテキストを抽出。段落判定または単語判定に分岐。
+    *   `_process_paragraphs()`: 段落情報の処理。フリガナ除去フィルタ(`_calculate_thickness`)を含む。
+    *   `_process_words()`: 単語情報の処理。座標ソートとフリガナ除去フィルタを含む。
     *   **Fallback Logic**: 段落検出失敗時に、座標ベースで読み順をソートするロジックを実装。
     *   **Furigana Filter**: 文字サイズ（厚み）によるフリガナ除去フィルタ。
 

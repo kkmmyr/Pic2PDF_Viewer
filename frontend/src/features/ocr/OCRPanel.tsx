@@ -4,8 +4,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import TerminalIcon from '@mui/icons-material/Terminal';
 import axios from 'axios';
-
-const API_BASE = 'http://localhost:8000/api';
+import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
 
 export const OCRPanel: React.FC = () => {
     const [status, setStatus] = useState<string>('idle');
@@ -17,15 +16,11 @@ export const OCRPanel: React.FC = () => {
 
     const fetchStatus = async () => {
         try {
-            const res = await axios.get(`${API_BASE}/ocr/status`);
+            const res = await axios.get(buildApiUrl(API_ENDPOINTS.OCR_STATUS));
             setStatus(res.data.status);
             setLogs(res.data.logs);
-
-            // Auto scroll only if running or just finished
-            // Simply auto-scroll to bottom for now
         } catch (err) {
             console.error(err);
-            // setError('Failed to fetch status');
         }
     };
 
@@ -50,7 +45,7 @@ export const OCRPanel: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            await axios.post(`${API_BASE}/ocr/run`);
+            await axios.post(buildApiUrl(API_ENDPOINTS.OCR_RUN));
             // Status will update via polling
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to start OCR');
@@ -62,7 +57,7 @@ export const OCRPanel: React.FC = () => {
     const handleStop = async () => {
         setLoading(true);
         try {
-            await axios.post(`${API_BASE}/ocr/stop`);
+            await axios.post(buildApiUrl(API_ENDPOINTS.OCR_STOP));
         } catch (err: any) {
             setError(err.response?.data?.detail || 'Failed to stop OCR');
         } finally {
