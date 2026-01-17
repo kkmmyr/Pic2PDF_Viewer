@@ -4,7 +4,7 @@ import { buildApiUrl, API_ENDPOINTS } from '../config/api';
 import type { StatusItem, GenerateResponse } from '../types';
 
 // デフォルトの入力ディレクトリパス
-const DEFAULT_SOURCE_DIR = 'F:\\61.tool\\Pic2PDF_Viewer\\backend\\input';
+const DEFAULT_SOURCE_DIR = 'D:\\61.tool\\Pic2PDF_Viewer\\backend\\input';
 
 export default function GeneratorPage() {
     const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
