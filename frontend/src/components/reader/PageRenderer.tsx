@@ -85,7 +85,7 @@ export function PageRenderer({
                 <img
                     src={buildStaticUrl(imageUrl)}
                     alt={`Page ${pageNumber}`}
-                    style={{ height: windowHeight - 40, width: 'auto', maxWidth: '100%', maxHeight: '100%' }}
+                    style={{ height: 'auto', width: 'auto', maxWidth: '100%', maxHeight: windowHeight - 40, objectFit: 'contain' }}
                     className="bg-white"
                 />
             </div>
@@ -103,7 +103,7 @@ export function PageRenderer({
             <Page
                 pageNumber={pageNumber}
                 height={windowHeight - 40}
-                className="bg-white [&_canvas]:!w-auto [&_canvas]:!h-auto [&_canvas]:!max-w-full [&_canvas]:!max-h-full"
+                className="bg-white !w-auto !h-auto !max-w-full flex items-center justify-center [&_canvas]:!w-auto [&_canvas]:!h-auto [&_canvas]:!max-w-full [&_canvas]:!max-h-full [&_canvas]:object-contain"
                 renderTextLayer={false}
                 renderAnnotationLayer={false}
             />
