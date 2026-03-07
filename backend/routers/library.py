@@ -4,7 +4,7 @@ import os
 import shutil
 import fitz
 from typing import Optional, List
-from config import *
+from config import get_dirs_by_source
 
 router = APIRouter()
 
@@ -26,18 +26,10 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
     if ".." in path or path.startswith("/") or path.startswith("\\"):
          raise HTTPException(status_code=400, detail="Invalid path")
     
-    if source == "kindle":
-        base_pdf_dir = KINDLE_PDF_DIR
-        base_thumb_dir = KINDLE_THUMBNAIL_DIR
-        url_prefix_thumb = "/kindle/thumbnails"
-    elif source == "novel":
-        base_pdf_dir = KINDLE_NOVEL_PDF_DIR
-        base_thumb_dir = KINDLE_NOVEL_THUMBNAIL_DIR
-        url_prefix_thumb = "/kindle_novel/thumbnails"
-    else:
-        base_pdf_dir = PDF_DIR
-        base_thumb_dir = THUMBNAIL_DIR
-        url_prefix_thumb = "/thumbnails"
+    dirs = get_dirs_by_source(source)
+    base_pdf_dir = dirs["pdf"]
+    base_thumb_dir = dirs["thumb"]
+    url_prefix_thumb = dirs["thumb_url_prefix"]
 
     target_pdf_dir = os.path.join(base_pdf_dir, path)
     target_thumb_dir = os.path.join(base_thumb_dir, path)
@@ -79,15 +71,9 @@ def list_book_images(path: str, source: str = "generated"):
     if ".." in path or path.startswith("/") or path.startswith("\\"):
          raise HTTPException(status_code=400, detail="Invalid path")
     
-    if source == "kindle":
-        base_images_dir = KINDLE_IMAGES_DIR
-        url_prefix = "/kindle/images"
-    elif source == "novel":
-        base_images_dir = KINDLE_NOVEL_IMAGES_DIR
-        url_prefix = "/kindle_novel/images"
-    else:
-        base_images_dir = IMAGES_DIR
-        url_prefix = "/images"
+    dirs = get_dirs_by_source(source)
+    base_images_dir = dirs["img"]
+    url_prefix = dirs["thumb_url_prefix"].replace("/thumbnails", "/images")
 
     target_dir = os.path.join(base_images_dir, path)
     
@@ -120,12 +106,8 @@ class CreateDirectoryRequest(BaseModel):
 
 @router.post("/directories")
 def create_directory(request: CreateDirectoryRequest):
-    if request.source == "kindle":
-        base_pdf_dir = KINDLE_PDF_DIR
-    elif request.source == "novel":
-        base_pdf_dir = KINDLE_NOVEL_PDF_DIR
-    else:
-        base_pdf_dir = PDF_DIR
+    dirs = get_dirs_by_source(request.source)
+    base_pdf_dir = dirs["pdf"]
 
     target_dir = os.path.join(base_pdf_dir, request.path, request.name)
     
@@ -156,24 +138,7 @@ def move_items(request: MoveItemsRequest):
         if ".." in item:
             raise HTTPException(status_code=400, detail="Invalid item name")
 
-    if request.source == "kindle":
-        dirs = {
-            "pdf": KINDLE_PDF_DIR,
-            "thumb": KINDLE_THUMBNAIL_DIR,
-            "img": KINDLE_IMAGES_DIR
-        }
-    elif request.source == "novel":
-        dirs = {
-            "pdf": KINDLE_NOVEL_PDF_DIR,
-            "thumb": KINDLE_NOVEL_THUMBNAIL_DIR,
-            "img": KINDLE_NOVEL_IMAGES_DIR
-        }
-    else:
-        dirs = {
-            "pdf": PDF_DIR,
-            "thumb": THUMBNAIL_DIR,
-            "img": IMAGES_DIR
-        }
+    dirs = get_dirs_by_source(request.source)
 
     moved_count = 0
     errors = []

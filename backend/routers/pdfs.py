@@ -3,37 +3,55 @@ from pydantic import BaseModel
 import os
 import fitz
 from services.pdf_generator import scan_and_generate
-from config import *
+from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR, IMAGES_DIR
 
 router = APIRouter()
 
-# Global state to track progress (retained here or moved to a shared state module?)
-# For simplicity, keeping a simple simple in-memory state. 
-# Shared state is tricky if routers are split.
-# Let's simple keep it module level here, assuming only one worker process.
-current_processing_item = None
+class GenerateState:
+    """PDF生成の進捗状態を管理するシングルトンクラス。"""
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.current_item = None
+        return cls._instance
+
+generate_state = GenerateState()
 
 class GenerateRequest(BaseModel):
     source_dir: str
+    generate_compressed: bool = False
+    quality: int = 50
 
 @router.post("/generate")
 def generate_pdfs(request: GenerateRequest):
-    global current_processing_item
     if not os.path.isdir(request.source_dir):
         raise HTTPException(status_code=400, detail="Invalid directory path")
-    
+
     def progress_callback(item_name):
-        global current_processing_item
-        current_processing_item = item_name
+        generate_state.current_item = item_name
         print(f"Processing: {item_name}")
 
     try:
-        current_processing_item = "Starting..."
-        generated = scan_and_generate(request.source_dir, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, progress_callback)
-        current_processing_item = None
+        generate_state.current_item = "Starting..."
+        compressed_dir = PDF_COMPRESSED_DIR if request.generate_compressed else None
+        quality = request.quality if request.generate_compressed else None
+        
+        generated = scan_and_generate(
+            request.source_dir, 
+            PDF_DIR, 
+            THUMBNAIL_DIR, 
+            IMAGES_DIR, 
+            COMPLETE_DIR, 
+            compressed_output_dir=compressed_dir,
+            quality=quality,
+            progress_callback=progress_callback
+        )
+        generate_state.current_item = None
         return {"message": "Generation complete", "files": generated}
     except Exception as e:
-        current_processing_item = None
+        generate_state.current_item = None
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status")
@@ -53,7 +71,7 @@ def get_status(source_dir: str):
             status = "not_started"
             pdf_path = os.path.join(PDF_DIR, f"{folder_name}.pdf")
             
-            if current_processing_item == folder_name:
+            if generate_state.current_item == folder_name:
                 status = "in_progress"
             elif os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
                 status = "completed"
@@ -67,7 +85,7 @@ def get_status(source_dir: str):
             status = "not_started"
             pdf_path = os.path.join(PDF_DIR, f"{item_name}.pdf")
             
-            if current_processing_item == item_name:
+            if generate_state.current_item == item_name:
                 status = "in_progress"
             elif os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
                 status = "completed"
@@ -140,4 +158,57 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     except Exception as e:
         if 'doc' in locals() and doc:
             doc.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class BatchCompressRequest(BaseModel):
+    quality: int = 50
+
+@router.post("/batch_compress")
+def batch_compress_pdfs(request: BatchCompressRequest):
+    if not os.path.exists(IMAGES_DIR):
+        raise HTTPException(status_code=404, detail="Images directory not found")
+
+    generated = []
+    try:
+        from natsort import natsorted
+        from services.pdf_generator import PdfGenerator
+        
+        for root, dirs, files in os.walk(IMAGES_DIR):
+            webp_files = [f for f in files if f.lower().endswith('.webp')]
+            if not webp_files:
+                continue
+                
+            rel_path = os.path.relpath(root, IMAGES_DIR)
+            folder_name = os.path.basename(root)
+            
+            generate_state.current_item = f"Batch: {rel_path}"
+            print(f"Processing folder: {rel_path}")
+            
+            webp_files = natsorted(webp_files)
+            image_paths = [os.path.join(root, f) for f in webp_files]
+            
+            pdf_filename = f"{folder_name}.pdf"
+            
+            if rel_path == ".":
+                target_output_dir = PDF_COMPRESSED_DIR
+            else:
+                target_output_dir = os.path.join(PDF_COMPRESSED_DIR, os.path.dirname(rel_path))
+            
+            os.makedirs(target_output_dir, exist_ok=True)
+            output_path = os.path.join(target_output_dir, pdf_filename)
+            
+            if os.path.exists(output_path):
+                print(f"Skipping already compressed: {output_path}")
+                continue
+            
+            generator = PdfGenerator(PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR, request.quality)
+            generator._create_pdf_file(image_paths, output_path, quality=request.quality)
+            
+            generated.append(os.path.join(rel_path, pdf_filename) if rel_path != "." else pdf_filename)
+            print(f"Batch compressed: {output_path}")
+
+        generate_state.current_item = None
+        return {"message": "Batch compression complete", "files": generated}
+    except Exception as e:
+        generate_state.current_item = None
         raise HTTPException(status_code=500, detail=str(e))

@@ -3,7 +3,7 @@ import os
 import threading
 from collections import deque
 from typing import List, Optional, Dict, Any
-from config import OCR_PYTHON_PATH, BATCH_OCR_SCRIPT
+from config import BATCH_OCR_LAUNCHER
 
 class OCRService:
     _instance = None
@@ -31,16 +31,12 @@ class OCRService:
         if self.is_running:
             raise RuntimeError("OCR process is already running")
 
-        # Prepare command
-        cmd = [OCR_PYTHON_PATH, BATCH_OCR_SCRIPT]
+        # Prepare command - use batch launcher which sets up PYTHONPATH
+        cmd = [BATCH_OCR_LAUNCHER]
         
-        # Note: BATCH_OCR_SCRIPT currently defaults to processing all.
         # If we want to support arguments later, we can add them to cmd.
         if target_dir:
             cmd.extend(["--target-dir", target_dir])
-        
-        # Add -u to python executable args for unbuffered output
-        cmd.insert(1, "-u") 
 
         # Force UTF-8 output
         env = os.environ.copy()
@@ -78,18 +74,15 @@ class OCRService:
         if not self.is_running or not self.process:
             raise RuntimeError("No running process to stop")
         
+        self.process.terminate()
+        self.logs.append("Sent TERMINATE signal...")
         try:
-            self.process.terminate()
-            self.logs.append("Sent TERMINATE signal...")
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-                self.logs.append("Sent KILL signal...")
-            
-            self.status = "idle"
-        except Exception as e:
-            raise e
+            self.process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            self.process.kill()
+            self.logs.append("Sent KILL signal...")
+        
+        self.status = "idle"
 
     def get_status(self) -> Dict[str, Any]:
         return {

@@ -135,6 +135,7 @@ export default function ViewerPage() {
 
         if (path !== currentPathState) setCurrentPath(path);
         if (file !== selectedPdfState) setSelectedPdf(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchParams]);
 
     // Navigation handlers

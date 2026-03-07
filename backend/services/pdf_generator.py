@@ -29,11 +29,14 @@ def generate_thumbnail(image_data_or_path, output_path):
         print(f"Failed to generate thumbnail {output_path}: {e}")
 
 class PdfGenerator:
-    def __init__(self, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str, progress_callback=None):
+    def __init__(self, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str, 
+                 compressed_output_dir: str = None, quality: int = None, progress_callback=None):
         self.output_dir = output_dir
         self.thumbnail_dir = thumbnail_dir
         self.images_dir = images_dir
         self.complete_dir = complete_dir
+        self.compressed_output_dir = compressed_output_dir
+        self.quality = quality
         self.progress_callback = progress_callback
         self.generated_files = []
         self.moves = [] # List of (src, dst, is_dir)
@@ -87,6 +90,7 @@ class PdfGenerator:
                             img_f.write(data)
                 
                 self._create_pdf_file(image_data_list, output_path)
+                self._create_compressed_pdf(image_data_list, pdf_filename)
                 
                 self.generated_files.append(pdf_filename)
                 print(f"Generated from ZIP: {output_path}")
@@ -128,6 +132,7 @@ class PdfGenerator:
                 shutil.copy2(img_path, dst_path)
 
             self._create_pdf_file(image_paths, output_path)
+            self._create_compressed_pdf(image_paths, pdf_filename)
             
             self.generated_files.append(pdf_filename)
             print(f"Generated from Folder: {output_path}")
@@ -146,10 +151,36 @@ class PdfGenerator:
         except Exception as e:
             print(f"Failed to generate PDF for folder {root}: {e}")
 
-    def _create_pdf_file(self, images, output_path):
+    def _create_compressed_pdf(self, images, pdf_filename: str):
+        """圧縮版PDFが有効な場合に compressed_output_dir へ出力する共通ヘルパー。"""
+        if not (self.compressed_output_dir and self.quality):
+            return
+        compressed_path = os.path.join(self.compressed_output_dir, pdf_filename)
+        self._create_pdf_file(images, compressed_path, quality=self.quality)
+        print(f"Generated compressed PDF: {compressed_path}")
+
+    def _create_pdf_file(self, images, output_path, quality: int = None):
         """Helper to create PDF from image data list or path list"""
-        with open(output_path, "wb") as f:
-            f.write(img2pdf.convert(images))
+        if quality:
+            processed_images = []
+            for img_data_or_path in images:
+                if isinstance(img_data_or_path, bytes):
+                    img = Image.open(io.BytesIO(img_data_or_path))
+                else:
+                    img = Image.open(img_data_or_path)
+                
+                if img.mode in ("RGBA", "P"):
+                    img = img.convert("RGB")
+                
+                out_io = io.BytesIO()
+                img.save(out_io, format="JPEG", quality=quality)
+                processed_images.append(out_io.getvalue())
+            
+            with open(output_path, "wb") as f:
+                f.write(img2pdf.convert(processed_images))
+        else:
+            with open(output_path, "wb") as f:
+                f.write(img2pdf.convert(images))
 
     def execute_moves(self):
         for src, dst, is_dir in self.moves:
@@ -201,11 +232,13 @@ class PdfGenerator:
         
         return self.generated_files
 
-def scan_and_generate(source_dir: str, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str, progress_callback=None):
+def scan_and_generate(source_dir: str, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str, 
+                      compressed_output_dir: str = None, quality: int = None, progress_callback=None):
     """
     Wrapper function for backward compatibility.
     Recursively scans source_dir for directories and ZIP files containing WebP images,
     converts them to PDF, saves them to output_dir, and moves source to complete_dir.
     """
-    generator = PdfGenerator(output_dir, thumbnail_dir, images_dir, complete_dir, progress_callback)
+    generator = PdfGenerator(output_dir, thumbnail_dir, images_dir, complete_dir, 
+                             compressed_output_dir, quality, progress_callback)
     return generator.run(source_dir)
