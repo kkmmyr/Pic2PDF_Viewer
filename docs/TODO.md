@@ -17,6 +17,7 @@
 - [x] **不要なPDF出力の削除**: `kindle-pdf/main_novel.py` 実行時、最後に `capturer.create_pdf` が呼ばれており、`backend/data/kindle/pdfs` に画像PDFが生成されてしまう。Novelフローでは `batch_ocr.py` でSearchable PDF (`kindle_novel/pdfs`) を生成するため、この重複したPDF生成処理を削除する。
 
 ## 3. Web UI機能拡張
-- [ ] **OCR実行画面の追加**: Webビューア上に、LibraryやGeneratorと同じ階層で「Novel OCR」等のタブ（またはページ）を追加する。
-    - 画面上から `batch_ocr.py` (または同等のロジック) を実行できるようにする。
-    - 実行状況を画面で確認できるようにする。
+- [x] **OCR実行画面の追加**: Webビューア上に、LibraryやGeneratorと同じ階層で「Novel OCR」ページを追加する。
+    - `frontend/src/pages/OCRPage.tsx` + `frontend/src/features/ocr/OCRPanel.tsx` として実装済み。
+    - `/ocr` ルートにルーティング登録済み。
+    - `batch_ocr.py` の実行・停止ボタン、コンソールログのリアルタイム表示機能を実装。

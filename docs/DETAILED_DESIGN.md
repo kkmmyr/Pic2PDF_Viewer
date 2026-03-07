@@ -6,21 +6,27 @@ Pic2PDF_Viewer/
 ├── backend/
 │   ├── data/               # データ格納用
 │   │   ├── main/           # メイン（生成済）データ格納用
-│   │   │   ├── pdfs/       # PDFファイルの保存・配信場所 (Static Mount)
-│   │   │   ├── thumbnails/ # サムネイル画像の保存・配信場所 (Static Mount)
-│   │   │   ├── images/     # 閲覧用WebP画像の保存・配信場所 (Static Mount)
-│   │   │   └── complete/   # 処理済みソースファイルの移動先
+│   │   │   ├── pdfs/           # PDFファイルの保存・配信場所 (Static Mount: /pdfs)
+│   │   │   ├── pdfs_compressed/ # 圧縮版PDFの保存場所 (Static Mount: /pdfs_compressed)
+│   │   │   ├── thumbnails/     # サムネイル画像の保存・配信場所 (Static Mount: /thumbnails)
+│   │   │   ├── images/         # 閲覧用WebP画像の保存・配信場所 (Static Mount: /images)
+│   │   │   └── complete/       # 処理済みソースファイルの移動先
 │   │   ├── kindle/         # Kindle専用データ (Static Mount: /kindle/...)
-│   │       ├── pdfs/
-│   │       ├── thumbnails/
-│   │       └── images/
+│   │   │   ├── pdfs/
+│   │   │   ├── thumbnails/
+│   │   │   └── images/
 │   │   └── kindle_novel/   # Kindle小説用データ (Static Mount: /kindle_novel/...)
 │   │       ├── pdfs/       # Searchable PDF
 │   │       ├── thumbnails/
 │   │       └── images/     # キャプチャ生画像
-│   ├── services/           # ビジネスロジック (PDF生成など)
+│   ├── routers/            # APIルーター
+│   │   ├── library.py      # PDFs一覧・書籍画像・フォルダ管理・移動
+│   │   ├── pdfs.py         # PDF生成・ページ削除・圧縮
+│   │   └── ocr.py          # OCR実行・停止・ステータス
+│   ├── services/           # ビジネスロジック
 │   │   ├── ocr_service.py  # OCRプロセス管理 (OCRService)
 │   │   └── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
+│   ├── config.py           # パス定数・OCR起動設定
 │   ├── main.py             # FastAPIエントリーポイント
 │   └── requirements.txt    # Python依存関係
 ├── kindle-pdf/             # Kindle自動化ツール
@@ -30,24 +36,26 @@ Pic2PDF_Viewer/
 │   ├── capturer.py         # 共通キャプチャロジック (Manga)
 │   ├── novel_capturer.py   # 小説用キャプチャロジック (Novel)
 │   ├── batch_ocr.py        # OCRバッチ処理スクリプト
+│   ├── searchable_pdf.py   # SearchablePdfGenerator
+│   ├── start_batch_ocr.bat # OCR起動ランチャー (.bat経由)
 │   └── requirements.txt
 ├── ocr/
 │   └── ocr_engine.py       # OCRエンジン抽象化 + Yomitoku実装
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # 共通コンポーネント
-│   │   │   ├── common/     # 共通UIコンポーネント
-│   │   │   │   └── Layout.tsx
-│   │   │   ├── library/    # ライブラリ関連コンポーネント
-│   │   │   │   ├── LibraryHeader.tsx
-│   │   │   │   ├── FolderGrid.tsx
-│   │   │   │   └── PdfGrid.tsx
-│   │   │   ├── reader/     # リーダー関連コンポーネント
-│   │   │   │   ├── index.ts
-│   │   │   │   ├── PageRenderer.tsx
-│   │   │   │   └── ReaderHeader.tsx
-│   │   │   └── ocr/        # OCR関連コンポーネント
-│   │   │       └── OCRPanel.tsx
+│   │   │   ├── Layout.tsx  # グローバルレイアウト
+│   │   │   └── reader/     # リーダー・ライブラリ関連コンポーネント
+│   │   │       ├── index.ts
+│   │   │       ├── FolderGrid.tsx
+│   │   │       ├── LibraryHeader.tsx
+│   │   │       ├── MoveDialog.tsx
+│   │   │       ├── PageRenderer.tsx
+│   │   │       ├── PdfGrid.tsx
+│   │   │       └── ReaderHeader.tsx
+│   │   ├── features/       # 機能別モジュール
+│   │   │   └── ocr/
+│   │   │       └── OCRPanel.tsx  # OCR実行UI
 │   │   ├── config/         # 設定ファイル
 │   │   │   └── api.ts      # API URL設定
 │   │   ├── hooks/          # カスタムフック
@@ -55,11 +63,14 @@ Pic2PDF_Viewer/
 │   │   │   ├── useWindowSize.ts
 │   │   │   ├── useReaderNavigation.ts
 │   │   │   ├── useBookImages.ts
+│   │   │   ├── useImagePreloader.ts    # 画像先読みフック
+│   │   │   └── useLibraryManagement.ts # ライブラリ操作フック
 │   │   ├── types/          # 型定義
 │   │   │   └── index.ts
 │   │   ├── pages/          # ページコンポーネント
 │   │   │   ├── ViewerPage.tsx
-│   │   │   └── GeneratorPage.tsx
+│   │   │   ├── GeneratorPage.tsx
+│   │   │   └── OCRPage.tsx  # OCR実行ページ (/ocr)
 │   │   └── App.tsx         # ルーティング定義
 │   └── package.json
 └── docs/
@@ -75,7 +86,10 @@ Pic2PDF_Viewer/
     - `kindle_novel/`: Kindleキャプチャ (小説)
 
 ### 1.3 構成設定 (config.py)
-- **OCR設定**: `OCR_PYTHON_PATH` (venv-gpu検知), `BATCH_OCR_SCRIPT`
+- **パス定数**: `PDF_DIR`, `PDF_COMPRESSED_DIR`, `THUMBNAIL_DIR`, `IMAGES_DIR`, `COMPLETE_DIR`
+- **Kindle**: `KINDLE_PDF_DIR`, `KINDLE_THUMBNAIL_DIR`, `KINDLE_IMAGES_DIR`
+- **Kindle Novel**: `KINDLE_NOVEL_PDF_DIR`, `KINDLE_NOVEL_THUMBNAIL_DIR`, `KINDLE_NOVEL_IMAGES_DIR`
+- **OCR起動設定**: `BATCH_OCR_LAUNCHER` — `kindle-pdf/start_batch_ocr.bat` へのパス。`.bat` ファイル経由で正しいPython環境とPATHを設定してOCRを起動する。
 
 
 ## 2. API仕様
@@ -106,10 +120,35 @@ Pic2PDF_Viewer/
 *   **リクエストボディ**:
     ```json
     {
-      "source_dir": "C:\\Absolute\\Path\\To\\Images"
+      "source_dir": "C:\\Absolute\\Path\\To\\Images",
+      "generate_compressed": false,
+      "quality": 50
     }
     ```
+    - `generate_compressed` (オプション, bool): `true` の場合、圧縮版PDFを `pdfs_compressed/` にも同時生成する。
+    - `quality` (オプション, int): 圧縮品質 (1〜95)。`generate_compressed` が `true` の場合のみ使用。
 *   **レスポンス**: 生成されたファイル名のリスト
+
+### `GET /api/status`
+*   **概要**: PDF生成処理の進捗状況を取得する。
+*   **クエリパラメータ**: `source_dir` - スキャン対象のソースディレクトリ
+*   **レスポンス**:
+    ```json
+    {
+      "items": [
+        {"name": "folder_name", "type": "folder", "status": "not_started"|"in_progress"|"completed"},
+        {"name": "zip_name",    "type": "zip",    "status": "not_started"|"in_progress"|"completed"}
+      ]
+    }
+    ```
+
+### `POST /api/batch_compress`
+*   **概要**: `data/main/images/` 配下の全WebP画像を一括で圧縮PDFに変換し `pdfs_compressed/` へ出力する。既存ファイルはスキップ。
+*   **リクエストボディ**:
+    ```json
+    { "quality": 50 }
+    ```
+*   **レスポンス**: `{"message": "Batch compression complete", "files": [...]}`
 
 ### `POST /api/pdfs/{filename}/delete_pages`
 *   **パラメータ**: 
@@ -118,7 +157,7 @@ Pic2PDF_Viewer/
 *   **リクエストボディ**:
     ```json
     {
-      "page_indices": [0, 2, 5]  // 削除するページのインデックス（0始まり）
+      "page_indices": [0, 2, 5]
     }
     ```
 *   **レスポンス**:
@@ -170,10 +209,11 @@ Pic2PDF_Viewer/
       "items": ["file1.pdf", "subfolder"],
       "source_path": "current/relative/path",
       "destination_path": "dest/relative/path",
-      "source": "generated" // or "kindle"
+      "source": "generated"
     }
     ```
-*   **レスポンス**: `{"message": "Items moved successfully", "moved_count": 2}`
+*   **レスポンス**: `{"message": "Items moved", "moved_count": 2, "errors": []}`
+    - `errors`: 個別アイテムのエラーメッセージリスト（成功時は空配列）
 
 ## 3. クラス設計 (Backend & Kindle Tool)
 
