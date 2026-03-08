@@ -32,6 +32,8 @@ export const API_ENDPOINTS = {
     OCR_RUN: '/api/ocr/run',
     OCR_STOP: '/api/ocr/stop',
     OCR_STATUS: '/api/ocr/status',
+    /** 既存PDFの一括圧縮 */
+    BATCH_COMPRESS: '/api/batch_compress',
 } as const;
 
 /**

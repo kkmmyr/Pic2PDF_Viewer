@@ -7,12 +7,14 @@
     *   PDF描画: `react-pdf`
     *   ルーティング: `react-router-dom`
     *   アイコン: `lucide-react`
+    *   HTTPクライアント: `axios` (共通 `apiClient` による管理)
 *   **Web UI Viewer**:
     *   ブラウザベースのモダンなUI (React + MUI/Tailwind)。
     *   生成されたPDFの閲覧、サムネイル表示。
     *   フォルダ管理機能。
     *   **Novel OCR 実行**: Webブラウザから直接OCR処理を実行・監視する機能。
 *   **Backend**: Python (FastAPI)
+    *   **Architecture**: サービス層 (Services) によるビジネスロジックの分離。
     *   PDF変換: `img2pdf`, `Pillow`
     *   サムネイル生成: `Pillow` (生成時), `pymupdf` (既存PDF読み込み時)
     *   ソート: `natsort`

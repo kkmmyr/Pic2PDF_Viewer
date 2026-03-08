@@ -25,7 +25,9 @@ Pic2PDF_Viewer/
 │   │   └── ocr.py          # OCR実行・停止・ステータス
 │   ├── services/           # ビジネスロジック
 │   │   ├── ocr_service.py  # OCRプロセス管理 (OCRService)
-│   │   └── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
+│   │   ├── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
+│   │   ├── pdf_service.py  # PDF操作 (PdfService)
+│   │   └── thumbnail_service.py # サムネイル生成 (ThumbnailService)
 │   ├── config.py           # パス定数・OCR起動設定
 │   ├── main.py             # FastAPIエントリーポイント
 │   └── requirements.txt    # Python依存関係
@@ -57,14 +59,17 @@ Pic2PDF_Viewer/
 │   │   │   └── ocr/
 │   │   │       └── OCRPanel.tsx  # OCR実行UI
 │   │   ├── config/         # 設定ファイル
-│   │   │   └── api.ts      # API URL設定
+│   │   │   ├── api.ts      # API URL設定
+│   │   │   └── api_client.ts # 共通APIクライアント (axiosベース)
 │   │   ├── hooks/          # カスタムフック
 │   │   │   ├── index.ts
 │   │   │   ├── useWindowSize.ts
 │   │   │   ├── useReaderNavigation.ts
 │   │   │   ├── useBookImages.ts
 │   │   │   ├── useImagePreloader.ts    # 画像先読みフック
-│   │   │   └── useLibraryManagement.ts # ライブラリ操作フック
+│   │   │   ├── useLibraryManagement.ts # ライブラリ操作フック
+│   │   │   ├── usePdfStatus.ts         # PDF生成ステータス監視
+│   │   │   └── useOcrStatus.ts         # OCRステータス監視
 │   │   ├── types/          # 型定義
 │   │   │   └── index.ts
 │   │   ├── pages/          # ページコンポーネント
@@ -232,6 +237,17 @@ Pic2PDF_Viewer/
     *   `_create_pdf_file()`: `img2pdf` を用いた実際のPDFファイル書き出し。
     *   `run()`: 処理の実行と、完了ファイルの移動・空ディレクトリ削除の制御。
 
+### `PdfService` (`backend/services/pdf_service.py`)
+*   **役割**: 既存PDFの編集操作を一元管理。
+*   **主要メソッド**:
+    *   `delete_pages()`: 指定されたページの削除とPDFの再保存。
+    *   `get_page_count()`: PDFの総ページ数を取得。
+
+### `ThumbnailService` (`backend/services/thumbnail_service.py`)
+*   **役割**: PDFからのサムネイル画像生成。
+*   **主要メソッド**:
+    *   `generate_thumbnail()`: 最初のページを座標指定またはスケール指定で画像出力。
+
 ### `KindleCapturer` (`kindle-pdf/capturer.py`)
 *   **役割**: 基本的なKindleウィンドウ操作、スクリーンショット撮影、PDF作成。
 *   **主要メソッド**:
@@ -282,3 +298,6 @@ Pic2PDF_Viewer/
     *   `react-pdf` のWorker設定は `unpkg` から動的に読み込む設定になっている。
     *   バックエンドの `data/pdfs` ディレクトリは静的ファイルとして `/pdfs` パスでマウントされている。
     *   バックエンドの `data/thumbnails` ディレクトリは静的ファイルとして `/thumbnails` パスでマウントされている。
+*   **環境設定**:
+    *   Frontend: `frontend/.env` に `VITE_DEFAULT_SOURCE_DIR` を設定することで、生成画面のデフォルトパスを変更可能。
+    *   Backend: サービス層の抽出により、ロジックの単体テストが容易な構成になっている。

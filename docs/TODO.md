@@ -21,3 +21,8 @@
     - `frontend/src/pages/OCRPage.tsx` + `frontend/src/features/ocr/OCRPanel.tsx` として実装済み。
     - `/ocr` ルートにルーティング登録済み。
     - `batch_ocr.py` の実行・停止ボタン、コンソールログのリアルタイム表示機能を実装。
+
+## 4. リファクタリング (Completed 2026-03-08)
+- [x] **環境変数の導入**: フロントエンドの `.env` 対応。
+- [x] **サービス層の抽出**: バックエンドロジックの整理（`PdfService`, `ThumbnailService`）。
+- [x] **フロントエンドの共通化**: `apiClient` 導入とカスタムフックによるクリーンアップ。

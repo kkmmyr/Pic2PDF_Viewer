@@ -8,18 +8,7 @@ from config import get_dirs_by_source
 
 router = APIRouter()
 
-def generate_thumbnail_task(pdf_path: str, thumbnail_path: str):
-    try:
-        os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
-        doc = fitz.open(pdf_path)
-        if len(doc) > 0:
-            page = doc.load_page(0)
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
-            pix.save(thumbnail_path)
-            print(f"Generated thumbnail: {thumbnail_path}")
-        doc.close()
-    except Exception as e:
-        print(f"Failed to generate thumbnail for {pdf_path}: {e}")
+from services.thumbnail_service import ThumbnailService
 
 @router.get("/pdfs")
 def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "generated"):
@@ -31,8 +20,8 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
     base_thumb_dir = dirs["thumb"]
     url_prefix_thumb = dirs["thumb_url_prefix"]
 
-    target_pdf_dir = os.path.join(base_pdf_dir, path)
-    target_thumb_dir = os.path.join(base_thumb_dir, path)
+    target_pdf_dir = os.path.join(base_pdf_dir, path).replace("\\", "/")
+    target_thumb_dir = os.path.join(base_thumb_dir, path).replace("\\", "/")
     
     if not os.path.exists(target_pdf_dir):
         return {"files": [], "directories": [], "current_path": path}
@@ -45,19 +34,19 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
     directories = []
 
     for item in items:
-        item_path = os.path.join(target_pdf_dir, item)
+        item_path = os.path.join(target_pdf_dir, item).replace("\\", "/")
         if os.path.isdir(item_path):
             directories.append(item)
         elif item.lower().endswith('.pdf'):
             thumb_name = os.path.splitext(item)[0] + ".jpg"
-            thumb_path = os.path.join(target_thumb_dir, thumb_name)
+            thumb_path = os.path.join(target_thumb_dir, thumb_name).replace("\\", "/")
             
             thumb_url = None
             if os.path.exists(thumb_path):
                 rel_path = os.path.join(path, thumb_name).replace("\\", "/")
                 thumb_url = f"{url_prefix_thumb}/{rel_path}"
             else:
-                background_tasks.add_task(generate_thumbnail_task, item_path, thumb_path)
+                background_tasks.add_task(ThumbnailService.generate_thumbnail, item_path, thumb_path)
             
             files.append({
                 "name": item,

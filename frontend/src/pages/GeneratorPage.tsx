@@ -1,42 +1,25 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { FolderSearch, Loader2, Zap } from 'lucide-react';
-import { buildApiUrl, API_ENDPOINTS } from '../config/api';
-import type { StatusItem, GenerateResponse } from '../types';
+import { API_ENDPOINTS } from '../config/api';
+import apiClient from '../config/api_client';
+import { usePdfStatus } from '../hooks/usePdfStatus';
+import type { GenerateResponse, StatusItem } from '../types';
 
 // デフォルトの入力ディレクトリパス
-const DEFAULT_SOURCE_DIR = 'D:\\61.tool\\Pic2PDF_Viewer\\backend\\input';
+const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
 
 export default function GeneratorPage() {
     const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<GenerateResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [statusItems, setStatusItems] = useState<StatusItem[]>([]);
 
     // Compression settings
     const [generateCompressed, setGenerateCompressed] = useState(true);
     const [quality, setQuality] = useState(50);
 
-    const fetchStatus = useCallback(async () => {
-        if (!sourceDir) return;
-        try {
-            const params = new URLSearchParams({ source_dir: sourceDir });
-            const res = await fetch(buildApiUrl(`${API_ENDPOINTS.STATUS}?${params.toString()}`));
-            const data = await res.json();
-            setStatusItems(data.items || []);
-        } catch (e) {
-            console.error("Failed to fetch status", e);
-        }
-    }, [sourceDir]);
-
-    // Poll status while loading
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        if (loading) {
-            interval = setInterval(fetchStatus, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [loading, fetchStatus]);
+    // Use custom hook for status polling
+    const { statusItems, refetch: fetchStatus } = usePdfStatus(sourceDir, loading);
 
     const handleGenerate = async () => {
         if (!sourceDir) return;
@@ -45,33 +28,17 @@ export default function GeneratorPage() {
         setError(null);
         setResult(null);
 
-        // Start polling immediately
-        fetchStatus();
-
         try {
-            const response = await fetch(buildApiUrl(API_ENDPOINTS.GENERATE), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    source_dir: sourceDir,
-                    generate_compressed: generateCompressed,
-                    quality: quality
-                }),
+            const data = await apiClient.post<any, GenerateResponse>(API_ENDPOINTS.GENERATE, {
+                source_dir: sourceDir,
+                generate_compressed: generateCompressed,
+                quality: quality
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Generation failed');
-            }
-
-            const data = await response.json();
             setResult(data);
             fetchStatus(); // Final status check
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            setError(message);
+        } catch (err: any) {
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -83,24 +50,12 @@ export default function GeneratorPage() {
         setResult(null);
 
         try {
-            const response = await fetch(buildApiUrl(API_ENDPOINTS.BATCH_COMPRESS), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ quality: quality }),
+            const data = await apiClient.post<any, GenerateResponse>(API_ENDPOINTS.BATCH_COMPRESS, {
+                quality: quality
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Batch compression failed');
-            }
-
-            const data = await response.json();
             setResult(data);
-        } catch (err: unknown) {
-            const message = err instanceof Error ? err.message : 'Unknown error';
-            setError(message);
+        } catch (err: any) {
+            setError(err.message);
         } finally {
             setLoading(false);
         }

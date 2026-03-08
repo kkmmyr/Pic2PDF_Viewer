@@ -3,38 +3,13 @@ import { Box, Button, Card, CardContent, Typography, Alert, CircularProgress, Ch
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import StopIcon from '@mui/icons-material/Stop';
 import TerminalIcon from '@mui/icons-material/Terminal';
-import axios from 'axios';
-import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
+import { useOcrStatus } from '../../hooks/useOcrStatus';
 
 export const OCRPanel: React.FC = () => {
-    const [status, setStatus] = useState<string>('idle');
-    const [logs, setLogs] = useState<string[]>([]);
+    const { status, logs, startOcr, stopOcr } = useOcrStatus();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const logEndRef = useRef<HTMLDivElement>(null);
-    const pollingRef = useRef<number | null>(null);
-
-    const fetchStatus = async () => {
-        try {
-            const res = await axios.get(buildApiUrl(API_ENDPOINTS.OCR_STATUS));
-            setStatus(res.data.status);
-            setLogs(res.data.logs);
-        } catch (err) {
-            console.error(err);
-        }
-    };
-
-    useEffect(() => {
-        // Initial fetch
-        fetchStatus();
-
-        // Start polling
-        pollingRef.current = window.setInterval(fetchStatus, 1000);
-
-        return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
-        };
-    }, []);
 
     useEffect(() => {
         // Auto scroll to bottom when logs change
@@ -45,10 +20,9 @@ export const OCRPanel: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            await axios.post(buildApiUrl(API_ENDPOINTS.OCR_RUN));
-            // Status will update via polling
+            await startOcr();
         } catch (err: any) {
-            setError(err.response?.data?.detail || 'Failed to start OCR');
+            setError(err.message);
         } finally {
             setLoading(false);
         }
@@ -57,9 +31,9 @@ export const OCRPanel: React.FC = () => {
     const handleStop = async () => {
         setLoading(true);
         try {
-            await axios.post(buildApiUrl(API_ENDPOINTS.OCR_STOP));
+            await stopOcr();
         } catch (err: any) {
-            setError(err.response?.data?.detail || 'Failed to stop OCR');
+            setError(err.message);
         } finally {
             setLoading(false);
         }

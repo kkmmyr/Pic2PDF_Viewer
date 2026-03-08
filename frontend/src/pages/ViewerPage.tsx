@@ -6,7 +6,8 @@ import { Document, pdfjs } from 'react-pdf';
 import type { PdfFile, ReadingDirection, LibrarySource } from '../types';
 
 // Config
-import { buildApiUrl, buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../config/api';
+import { buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../config/api';
+import apiClient from '../config/api_client';
 
 // Hooks
 import { useWindowSize, useBookImages, useImagePreloader, useLibraryManagement, useReaderNavigation } from '../hooks';
@@ -93,18 +94,19 @@ export default function ViewerPage() {
     }, [selectedPdfState, resetPage]);
 
     // Fetch PDF list
-    const fetchPdfs = useCallback(() => {
-        const params = new URLSearchParams();
-        if (currentPathState) params.append("path", currentPathState);
-        params.append("source", currentSource);
-
-        fetch(buildApiUrl(`${API_ENDPOINTS.PDFS}?${params.toString()}`))
-            .then(res => res.json())
-            .then(data => {
-                setPdfs(data.files);
-                setDirectories(data.directories || []);
-            })
-            .catch(console.error);
+    const fetchPdfs = useCallback(async () => {
+        try {
+            const data = await apiClient.get<any, any>(API_ENDPOINTS.PDFS, {
+                params: {
+                    path: currentPathState,
+                    source: currentSource
+                }
+            });
+            setPdfs(data.files);
+            setDirectories(data.directories || []);
+        } catch (e) {
+            console.error(e);
+        }
     }, [currentPathState, currentSource]);
 
     useEffect(() => {
@@ -213,20 +215,10 @@ export default function ViewerPage() {
 
         try {
             const pageIndices = Array.from(selectedPages).map(p => p - 1);
-            const url = buildApiUrl(API_ENDPOINTS.DELETE_PAGES(selectedPdfState, currentPathState, currentSource));
-
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ page_indices: pageIndices })
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || 'Failed to delete pages');
-            }
-
-            const data = await res.json();
+            const data = await apiClient.post<any, any>(
+                API_ENDPOINTS.DELETE_PAGES(selectedPdfState, currentPathState, currentSource),
+                { page_indices: pageIndices }
+            );
 
             setIsEditMode(false);
             setSelectedPages(new Set());
@@ -235,9 +227,8 @@ export default function ViewerPage() {
             if (pageNumber > data.total_pages) {
                 setPageNumber(Math.max(1, data.total_pages));
             }
-        } catch (e: unknown) {
-            const message = e instanceof Error ? e.message : 'Unknown error';
-            alert(message);
+        } catch (e: any) {
+            alert(e.message);
         }
     }, [selectedPages, selectedPdfState, currentPathState, pageNumber, currentSource]);
 

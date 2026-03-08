@@ -5,9 +5,12 @@ import cv2
 import numpy as np
 from PIL import Image
 
-# Add parent dir
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from ocr.ocr_engine import get_ocr_engine
+# OCR module path setup (共通venvで実行する前提)
+OCR_MODULE_PATH = r"D:\61.tool\common\ocr"
+if OCR_MODULE_PATH not in sys.path:
+    sys.path.insert(0, OCR_MODULE_PATH)
+
+from ocr_engine import get_ocr_engine
 from searchable_pdf import SearchablePdfGenerator
 
 # Hardcoded Paths (relative to this script)

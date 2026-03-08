@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { buildApiUrl, API_ENDPOINTS } from '../config/api';
-import { LibrarySource } from '../types';
+import { API_ENDPOINTS } from '../config/api';
+import apiClient from '../config/api_client';
+import { LibrarySource, BookImagesResponse } from '../types';
 
 interface UseBookImagesReturn {
     imageUrls: string[] | null;
@@ -33,11 +34,7 @@ export function useBookImages(
 
         setIsLoading(true);
 
-        fetch(buildApiUrl(API_ENDPOINTS.BOOK_IMAGES(bookPath, source)))
-            .then(res => {
-                if (res.ok) return res.json();
-                throw new Error('No images');
-            })
+        apiClient.get<any, BookImagesResponse>(API_ENDPOINTS.BOOK_IMAGES(bookPath, source))
             .then(data => {
                 if (data.images && data.images.length > 0) {
                     setImageUrls(data.images);

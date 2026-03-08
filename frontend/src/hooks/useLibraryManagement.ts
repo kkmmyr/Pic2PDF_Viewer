@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { LibrarySource } from '../types';
-import { buildApiUrl, API_ENDPOINTS } from '../config/api';
+import { API_ENDPOINTS } from '../config/api';
+import apiClient from '../config/api_client';
 
 interface UseLibraryManagementProps {
     currentPath: string;
@@ -39,21 +40,11 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         if (!name) return;
 
         try {
-            const res = await fetch(buildApiUrl(API_ENDPOINTS.DIRECTORIES), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    path: currentPath,
-                    name,
-                    source: currentSource
-                })
+            await apiClient.post(API_ENDPOINTS.DIRECTORIES, {
+                path: currentPath,
+                name,
+                source: currentSource
             });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || 'Failed to create directory');
-            }
-
             onRefresh();
         } catch (e: any) {
             alert(e.message);
@@ -73,21 +64,12 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         if (selectedItems.size === 0) return;
 
         try {
-            const res = await fetch(buildApiUrl(API_ENDPOINTS.MOVE), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    items: Array.from(selectedItems),
-                    source_path: currentPath,
-                    destination_path: destination,
-                    source: currentSource
-                })
+            await apiClient.post(API_ENDPOINTS.MOVE, {
+                items: Array.from(selectedItems),
+                source_path: currentPath,
+                destination_path: destination,
+                source: currentSource
             });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || 'Failed to move items');
-            }
 
             // Success
             setIsMoveDialogOpen(false);

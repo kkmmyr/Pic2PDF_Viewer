@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
-import fitz
+from services.pdf_service import PdfService
+from services.thumbnail_service import ThumbnailService
 from services.pdf_generator import scan_and_generate
-from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR, IMAGES_DIR
+from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR
 
 router = APIRouter()
 
@@ -102,15 +103,9 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     if ".." in path or path.startswith("/") or path.startswith("\\"):
          raise HTTPException(status_code=400, detail="Invalid path")
     
-    if source == "kindle":
-        base_pdf_dir = KINDLE_PDF_DIR
-        base_thumb_dir = KINDLE_THUMBNAIL_DIR
-    elif source == "novel":
-        base_pdf_dir = KINDLE_NOVEL_PDF_DIR
-        base_thumb_dir = KINDLE_NOVEL_THUMBNAIL_DIR
-    else:
-        base_pdf_dir = PDF_DIR
-        base_thumb_dir = THUMBNAIL_DIR
+    dirs = get_dirs_by_source(source)
+    base_pdf_dir = dirs["pdf"]
+    base_thumb_dir = dirs["thumb"]
 
     target_pdf_dir = os.path.join(base_pdf_dir, path)
     pdf_path = os.path.join(target_pdf_dir, filename)
@@ -119,45 +114,19 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        doc = fitz.open(pdf_path)
-        total_pages = len(doc)
-        
-        indices = sorted(list(set(request.page_indices)), reverse=True)
-        for idx in indices:
-            if idx < 0 or idx >= total_pages:
-                doc.close()
-                raise HTTPException(status_code=400, detail=f"Invalid page index: {idx}")
-
-        for idx in indices:
-            doc.delete_page(idx)
-        
-        temp_path = pdf_path + ".tmp"
-        doc.save(temp_path)
-        doc.close()
-        
-        os.replace(temp_path, pdf_path)
+        new_total = PdfService.delete_pages(pdf_path, request.page_indices)
         
         # Regenerate thumbnail if needed
-        doc_new = fitz.open(pdf_path)
-        new_total = len(doc_new)
-        
         if new_total > 0:
             thumb_name = os.path.splitext(filename)[0] + ".jpg"
             target_thumb_dir = os.path.join(base_thumb_dir, path)
             thumb_path = os.path.join(target_thumb_dir, thumb_name)
-            
-            page = doc_new.load_page(0)
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
-            pix.save(thumb_path)
+            ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
             print(f"Regenerated thumbnail: {thumb_path}")
-            
-        doc_new.close()
 
         return {"message": "Pages deleted successfully", "total_pages": new_total}
 
     except Exception as e:
-        if 'doc' in locals() and doc:
-            doc.close()
         raise HTTPException(status_code=500, detail=str(e))
 
 class BatchCompressRequest(BaseModel):
