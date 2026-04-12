@@ -2,8 +2,12 @@ import subprocess
 import os
 import threading
 from collections import deque
-from typing import List, Optional, Dict, Any
+from typing import Optional, Dict, Any
 from config import BATCH_OCR_LAUNCHER
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 class OCRService:
     _instance = None
@@ -15,9 +19,9 @@ class OCRService:
                 instance = super(OCRService, cls).__new__(cls)
                 instance.process = None
                 instance.status = "idle"  # idle, running, error
-                instance.logs = deque(maxlen=2000)
-                instance.last_return_code = None
-                instance._lock = threading.Lock()  # インスタンス状態を保護するロック
+                instance.logs: deque = deque(maxlen=2000)
+                instance.last_return_code: Optional[int] = None
+                instance._lock = threading.Lock()
                 cls._instance = instance
         return cls._instance
 
@@ -28,7 +32,6 @@ class OCRService:
             if self.process and self.process.poll() is None:
                 return True
             else:
-                # ゾンビプロセスのクリーンアップ
                 self.status = "idle"
         return False
 
@@ -58,13 +61,14 @@ class OCRService:
                 self.logs.clear()
                 self.logs.append(f"Starting OCR process: {' '.join(cmd)}")
                 pid = self.process.pid
+                logger.info("OCR process started (PID: %d)", pid)
 
             except Exception as e:
                 self.status = "error"
                 self.logs.append(f"Failed to start process: {str(e)}")
+                logger.error("Failed to start OCR process: %s", e)
                 raise e
 
-        # スレッドはロック解放後に起動（デッドロック回避）
         t_log = threading.Thread(target=self._log_reader, daemon=True)
         t_log.start()
 
@@ -80,6 +84,7 @@ class OCRService:
 
             self.process.terminate()
             self.logs.append("Sent TERMINATE signal...")
+            logger.info("Sent TERMINATE signal to OCR process")
 
         try:
             self.process.wait(timeout=5)
@@ -87,6 +92,7 @@ class OCRService:
             self.process.kill()
             with self._lock:
                 self.logs.append("Sent KILL signal...")
+                logger.warning("OCR process did not terminate; sent KILL signal")
 
         with self._lock:
             self.status = "idle"
@@ -96,21 +102,20 @@ class OCRService:
             return {
                 "status": self.status,
                 "last_return_code": self.last_return_code,
-                "logs": list(self.logs)
+                "logs": list(self.logs),
             }
 
-    def _log_reader(self):
+    def _log_reader(self) -> None:
         """プロセスの stdout を読み取ってログキューに追記する。"""
         if not self.process or not self.process.stdout:
             return
 
         for line in iter(self.process.stdout.readline, b''):
             decoded = line.decode('utf-8', errors='replace').rstrip()
-            # deque.append は CPython の GIL により原子的なので lock 不要
             self.logs.append(decoded)
         self.process.stdout.close()
 
-    def _process_monitor(self):
+    def _process_monitor(self) -> None:
         """プロセス終了を監視してステータスを更新する。"""
         if not self.process:
             return
@@ -123,8 +128,10 @@ class OCRService:
 
             if self.process.returncode == 0:
                 self.logs.append("Process finished successfully.")
+                logger.info("OCR process finished successfully")
             else:
                 self.logs.append(f"Process finished with error code: {self.process.returncode}")
+                logger.error("OCR process finished with error code: %d", self.process.returncode)
 
 
 # Global instance

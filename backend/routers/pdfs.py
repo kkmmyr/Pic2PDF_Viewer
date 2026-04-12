@@ -9,6 +9,9 @@ from services.thumbnail_service import ThumbnailService
 from services.pdf_generator import scan_and_generate
 from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR
 from utils.path_utils import validate_safe_path
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -56,7 +59,7 @@ def generate_pdfs(request: GenerateRequest):
 
     def progress_callback(item_name: str):
         generate_state.set_current_item(item_name)
-        print(f"Processing: {item_name}")
+        logger.info("Processing: %s", item_name)
 
     try:
         generate_state.set_current_item("Starting...")
@@ -147,7 +150,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
             target_thumb_dir = os.path.join(base_thumb_dir, path)
             thumb_path = os.path.join(target_thumb_dir, thumb_name)
             ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
-            print(f"Regenerated thumbnail: {thumb_path}")
+            logger.info("Regenerated thumbnail: %s", thumb_path)
 
         return {"message": "Pages deleted successfully", "total_pages": new_total}
 
@@ -176,7 +179,7 @@ def batch_compress_pdfs(request: BatchCompressRequest):
             folder_name = os.path.basename(root)
 
             generate_state.set_current_item(f"Batch: {rel_path}")
-            print(f"Processing folder: {rel_path}")
+            logger.info("Processing folder: %s", rel_path)
 
             webp_files = natsorted(webp_files)
             image_paths = [os.path.join(root, f) for f in webp_files]
@@ -192,14 +195,14 @@ def batch_compress_pdfs(request: BatchCompressRequest):
             output_path = os.path.join(target_output_dir, pdf_filename)
 
             if os.path.exists(output_path):
-                print(f"Skipping already compressed: {output_path}")
+                logger.info("Skipping already compressed: %s", output_path)
                 continue
 
             generator = PdfGenerator(PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR, request.quality)
             generator._create_pdf_file(image_paths, output_path, quality=request.quality)
 
             generated.append(os.path.join(rel_path, pdf_filename) if rel_path != "." else pdf_filename)
-            print(f"Batch compressed: {output_path}")
+            logger.info("Batch compressed: %s", output_path)
 
         generate_state.set_current_item(None)
         return {"message": "Batch compression complete", "files": generated}

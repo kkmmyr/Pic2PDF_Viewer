@@ -6,6 +6,9 @@ import shutil
 from natsort import natsorted
 from PIL import Image
 from typing import Optional, Callable, Union
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def generate_thumbnail(image_data_or_path: Union[bytes, str], output_path: str) -> None:
@@ -15,7 +18,6 @@ def generate_thumbnail(image_data_or_path: Union[bytes, str], output_path: str) 
         else:
             img = Image.open(image_data_or_path)
 
-        # Resize to height 500px, keeping aspect ratio
         base_height = 500
         h_percent = base_height / float(img.size[1])
         w_size = int(float(img.size[0]) * h_percent)
@@ -25,9 +27,9 @@ def generate_thumbnail(image_data_or_path: Union[bytes, str], output_path: str) 
             img = img.convert("RGB")
 
         img.save(output_path, "JPEG")
-        print(f"Generated thumbnail: {output_path}")
+        logger.info("Generated thumbnail: %s", output_path)
     except Exception as e:
-        print(f"Failed to generate thumbnail {output_path}: {e}")
+        logger.error("Failed to generate thumbnail %s: %s", output_path, e)
 
 
 class PdfGenerator:
@@ -42,10 +44,10 @@ class PdfGenerator:
         self.quality = quality
         self.progress_callback = progress_callback
         self.generated_files: list[str] = []
-        self.moves: list[tuple[str, str, bool]] = []  # (src, dst, is_dir)
+        self.moves: list[tuple[str, str, bool]] = []
 
     # ------------------------------------------------------------------
-    # 共通: サムネイル・PDF・圧縮PDF を一括生成してファイル名を記録する
+    # 共通: サムネイル・PDF・圧縮PDF を一括生成
     # ------------------------------------------------------------------
     def _generate_outputs(
         self,
@@ -98,9 +100,8 @@ class PdfGenerator:
                 if not webp_in_zip:
                     return
 
-                # 画像データ読み込み & images_dir へ保存
                 image_data_list: list[bytes] = []
-                for i, image_name in enumerate(webp_in_zip):
+                for image_name in webp_in_zip:
                     with zf.open(image_name) as image_file:
                         data = image_file.read()
                     image_data_list.append(data)
@@ -111,11 +112,11 @@ class PdfGenerator:
                         img_f.write(data)
 
             output_path = self._generate_outputs(item_name, image_data_list, image_data_list[0])
-            print(f"Generated from ZIP: {output_path}")
+            logger.info("Generated from ZIP: %s", output_path)
             self.moves.append((zip_path, os.path.join(self.complete_dir, zip_filename), False))
 
         except Exception as e:
-            print(f"Failed to generate PDF for ZIP {zip_path}: {e}")
+            logger.error("Failed to generate PDF for ZIP %s: %s", zip_path, e)
 
     # ------------------------------------------------------------------
     # ディレクトリ処理
@@ -133,16 +134,14 @@ class PdfGenerator:
         os.makedirs(target_images_dir, exist_ok=True)
 
         try:
-            # images_dir へコピー
             for img_path, img_name in zip(image_paths, webp_files):
                 shutil.copy2(img_path, os.path.join(target_images_dir, img_name))
 
             output_path = self._generate_outputs(
                 folder_name, image_paths, image_paths[0] if image_paths else b''
             )
-            print(f"Generated from Folder: {output_path}")
+            logger.info("Generated from Folder: %s", output_path)
 
-            # 移動スケジュール
             if not is_root:
                 self.moves.append((root, os.path.join(self.complete_dir, folder_name), True))
             else:
@@ -154,21 +153,19 @@ class PdfGenerator:
                     ))
 
         except Exception as e:
-            print(f"Failed to generate PDF for folder {root}: {e}")
+            logger.error("Failed to generate PDF for folder %s: %s", root, e)
 
     # ------------------------------------------------------------------
-    # 圧縮 PDF 生成 (内部ヘルパー)
+    # 圧縮 PDF 生成
     # ------------------------------------------------------------------
     def _create_compressed_pdf(self, images: list, pdf_filename: str) -> None:
-        """圧縮版PDFが有効な場合に compressed_output_dir へ出力する。"""
         if not (self.compressed_output_dir and self.quality):
             return
         compressed_path = os.path.join(self.compressed_output_dir, pdf_filename)
         self._create_pdf_file(images, compressed_path, quality=self.quality)
-        print(f"Generated compressed PDF: {compressed_path}")
+        logger.info("Generated compressed PDF: %s", compressed_path)
 
     def _create_pdf_file(self, images: list, output_path: str, quality: Optional[int] = None) -> None:
-        """画像データ (bytes) またはパスのリストから PDF を生成する。"""
         if quality:
             processed: list[bytes] = []
             for item in images:
@@ -185,7 +182,7 @@ class PdfGenerator:
                 f.write(img2pdf.convert(images))
 
     # ------------------------------------------------------------------
-    # ファイル移動 (バックアップ＋ロールバック付き)
+    # ファイル移動（バックアップ＋ロールバック）
     # ------------------------------------------------------------------
     def execute_moves(self) -> None:
         for src, dst, is_dir in self.moves:
@@ -196,7 +193,7 @@ class PdfGenerator:
                     shutil.move(dst, backup_path)
 
                 shutil.move(src, dst)
-                print(f"Moved {'folder' if is_dir else 'file'} to: {dst}")
+                logger.info("Moved %s to: %s", "folder" if is_dir else "file", dst)
 
                 if backup_path and os.path.exists(backup_path):
                     if os.path.isdir(backup_path):
@@ -205,13 +202,13 @@ class PdfGenerator:
                         os.remove(backup_path)
 
             except Exception as e:
-                print(f"Failed to move {src} to {dst}: {e}")
+                logger.error("Failed to move %s to %s: %s", src, dst, e)
                 if backup_path and os.path.exists(backup_path):
                     try:
                         shutil.move(backup_path, dst)
-                        print(f"Restored backup: {dst}")
+                        logger.info("Restored backup: %s", dst)
                     except Exception as restore_err:
-                        print(f"Failed to restore backup {backup_path}: {restore_err}")
+                        logger.error("Failed to restore backup %s: %s", backup_path, restore_err)
 
     # ------------------------------------------------------------------
     # エントリポイント
@@ -237,9 +234,9 @@ class PdfGenerator:
                 try:
                     if not os.listdir(folder):
                         os.rmdir(folder)
-                        print(f"Removed empty directory: {folder}")
+                        logger.info("Removed empty directory: %s", folder)
                 except Exception as e:
-                    print(f"Failed to remove directory {folder}: {e}")
+                    logger.error("Failed to remove directory %s: %s", folder, e)
 
         return self.generated_files
 
@@ -254,9 +251,7 @@ def scan_and_generate(
     quality: Optional[int] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> list[str]:
-    """
-    後方互換ラッパー。source_dir 内の WebP/ZIP を PDF に変換する。
-    """
+    """後方互換ラッパー。source_dir 内の WebP/ZIP を PDF に変換する。"""
     generator = PdfGenerator(
         output_dir, thumbnail_dir, images_dir, complete_dir,
         compressed_output_dir, quality, progress_callback
