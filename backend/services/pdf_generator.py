@@ -184,19 +184,32 @@ class PdfGenerator:
 
     def execute_moves(self):
         for src, dst, is_dir in self.moves:
+            backup_path = None
             try:
+                # 既存の移動先をバックアップ（上書き前に保護）
                 if os.path.exists(dst):
-                    # Remove existing target to allow move (overwrite)
-                    if os.path.isdir(dst):
-                        shutil.rmtree(dst)
-                    else:
-                        os.remove(dst)
-                    print(f"Removed existing target: {dst}")
-                
+                    backup_path = dst + ".__bak__"
+                    shutil.move(dst, backup_path)
+
                 shutil.move(src, dst)
                 print(f"Moved {'folder' if is_dir else 'file'} to: {dst}")
+
+                # 移動成功 → バックアップを削除
+                if backup_path and os.path.exists(backup_path):
+                    if os.path.isdir(backup_path):
+                        shutil.rmtree(backup_path)
+                    else:
+                        os.remove(backup_path)
+
             except Exception as e:
                 print(f"Failed to move {src} to {dst}: {e}")
+                # バックアップを元の場所に戻す
+                if backup_path and os.path.exists(backup_path):
+                    try:
+                        shutil.move(backup_path, dst)
+                        print(f"Restored backup: {dst}")
+                    except Exception as restore_err:
+                        print(f"Failed to restore backup {backup_path}: {restore_err}")
 
     def run(self, source_dir: str):
         cleanups = []
