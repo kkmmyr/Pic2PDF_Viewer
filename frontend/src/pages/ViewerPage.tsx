@@ -62,9 +62,12 @@ export default function ViewerPage() {
         isSelectionMode,
         selectedItems,
         isMoveDialogOpen,
+        isCreateFolderOpen,
         toggleSelectionMode,
         toggleSelectItem,
-        createFolder,
+        openCreateFolderDialog,
+        closeCreateFolderDialog,
+        handleCreateFolder,
         openMoveDialog,
         closeMoveDialog,
         handleMoveItems,
@@ -99,13 +102,16 @@ export default function ViewerPage() {
                     isSelectionMode={isSelectionMode}
                     selectedItems={selectedItems}
                     isMoveDialogOpen={isMoveDialogOpen}
+                    isCreateFolderOpen={isCreateFolderOpen}
                     onPdfClick={(name) => selectPdf(name, currentPath)}
                     onFolderClick={(dir) => navigateIntoFolder(dir, currentPath)}
                     onUpClick={() => navigateUp(currentPath)}
                     onSourceChange={handleSourceChange}
                     onToggleSelectionMode={toggleSelectionMode}
                     onToggleSelect={toggleSelectItem}
-                    onCreateFolder={createFolder}
+                    onOpenCreateFolder={openCreateFolderDialog}
+                    onCloseCreateFolder={closeCreateFolderDialog}
+                    onCreateFolder={handleCreateFolder}
                     onMoveSelected={openMoveDialog}
                     onCloseMoveDialog={closeMoveDialog}
                     onMoveItems={handleMoveItems}

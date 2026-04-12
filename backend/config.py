@@ -6,6 +6,10 @@
 """
 import os
 from typing import TypedDict
+from dotenv import load_dotenv
+
+# プロジェクトルートの .env を読み込む（存在しない場合は無視）
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"))
 
 # ---------------------------------------------------------------------------
 # データディレクトリパス定義

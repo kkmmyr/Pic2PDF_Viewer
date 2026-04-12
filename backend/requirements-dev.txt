@@ -1,0 +1,6 @@
+# 開発・テスト用依存パッケージ
+# インストール: pip install -r requirements-dev.txt
+-r requirements.txt
+pytest
+pytest-asyncio
+httpx

@@ -1,10 +1,6 @@
 import type { PdfFile, LibrarySource } from '../../types';
-import {
-    LibraryHeader,
-    FolderGrid,
-    PdfGrid,
-    MoveDialog,
-} from '../reader';
+import { LibraryHeader, FolderGrid, PdfGrid, MoveDialog } from '../reader';
+import { CreateFolderDialog } from './CreateFolderDialog';
 
 interface LibraryPanelProps {
     pdfs: PdfFile[];
@@ -16,6 +12,8 @@ interface LibraryPanelProps {
     selectedItems: Set<string>;
     // 移動ダイアログ
     isMoveDialogOpen: boolean;
+    // フォルダ作成ダイアログ
+    isCreateFolderOpen: boolean;
     // コールバック
     onPdfClick: (name: string) => void;
     onFolderClick: (name: string) => void;
@@ -23,7 +21,9 @@ interface LibraryPanelProps {
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
     onToggleSelect: (item: string) => void;
-    onCreateFolder: () => void;
+    onOpenCreateFolder: () => void;
+    onCloseCreateFolder: () => void;
+    onCreateFolder: (name: string) => Promise<void>;
     onMoveSelected: () => void;
     onCloseMoveDialog: () => void;
     onMoveItems: (destination: string) => Promise<void>;
@@ -31,26 +31,16 @@ interface LibraryPanelProps {
 
 /**
  * ライブラリ一覧ビュー。
- * フォルダ/PDF グリッド・ヘッダー・移動ダイアログをまとめて管理する。
+ * フォルダ/PDF グリッド・ヘッダー・移動ダイアログ・フォルダ作成ダイアログを管理する。
  */
 export function LibraryPanel({
-    pdfs,
-    directories,
-    currentPath,
-    currentSource,
-    isSelectionMode,
-    selectedItems,
-    isMoveDialogOpen,
-    onPdfClick,
-    onFolderClick,
-    onUpClick,
-    onSourceChange,
-    onToggleSelectionMode,
-    onToggleSelect,
-    onCreateFolder,
-    onMoveSelected,
-    onCloseMoveDialog,
-    onMoveItems,
+    pdfs, directories, currentPath, currentSource,
+    isSelectionMode, selectedItems,
+    isMoveDialogOpen, isCreateFolderOpen,
+    onPdfClick, onFolderClick, onUpClick, onSourceChange,
+    onToggleSelectionMode, onToggleSelect,
+    onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
+    onMoveSelected, onCloseMoveDialog, onMoveItems,
 }: LibraryPanelProps) {
     return (
         <>
@@ -62,8 +52,14 @@ export function LibraryPanel({
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
-                onCreateFolder={onCreateFolder}
+                onCreateFolder={onOpenCreateFolder}
                 onMoveSelected={onMoveSelected}
+            />
+
+            <CreateFolderDialog
+                open={isCreateFolderOpen}
+                onClose={onCloseCreateFolder}
+                onCreate={onCreateFolder}
             />
 
             <MoveDialog
