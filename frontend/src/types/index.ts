@@ -35,6 +35,8 @@ export interface DeletePagesResponse {
  */
 export interface GenerateRequest {
     source_dir: string;
+    generate_compressed?: boolean;
+    quality?: number;
 }
 
 /**
@@ -43,6 +45,13 @@ export interface GenerateRequest {
 export interface GenerateResponse {
     message: string;
     files: string[];
+}
+
+/**
+ * 一括圧縮APIリクエスト
+ */
+export interface BatchCompressRequest {
+    quality: number;
 }
 
 /**
@@ -59,6 +68,15 @@ export interface StatusItem {
  */
 export interface StatusResponse {
     items: StatusItem[];
+}
+
+/**
+ * OCR ステータスAPIレスポンス
+ */
+export interface OcrStatusResponse {
+    status: 'idle' | 'running' | 'error';
+    last_return_code: number | null;
+    logs: string[];
 }
 
 /**
