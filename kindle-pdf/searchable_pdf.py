@@ -66,70 +66,105 @@ class SearchablePdfGenerator:
     def _draw_text_layer(self, results, page_height):
         """
         Draws invisible text over the image based on OCR coordinates.
-        Using TextObject to ensure setTextRenderMode works reliably.
+
+        縦書きテキストの配置方針:
+          - 1文字ずつ縦に配置する（rotate方式は長い列が途中で切れるため廃止）
+          - 各文字のy位置を上から順に計算して個別に TextObject を生成する
+          - これによりPDFの検索・コピーで文字が正しく取得できる
         """
         for item in results:
             text = item['text']
             bbox = item['position']
-            
+
             # Normalize bbox to [x1, y1, x2, y2]
             if isinstance(bbox, list) and isinstance(bbox[0], list):
-                # Points format (Polygon) -> Convert to Rect
                 pts = np.array(bbox)
-                x1 = np.min(pts[:, 0])
-                y1 = np.min(pts[:, 1])
-                x2 = np.max(pts[:, 0])
-                y2 = np.max(pts[:, 1])
+                x1 = float(np.min(pts[:, 0]))
+                y1 = float(np.min(pts[:, 1]))
+                x2 = float(np.max(pts[:, 0]))
+                y2 = float(np.max(pts[:, 1]))
             else:
-                x1, y1, x2, y2 = bbox
-            
+                x1, y1, x2, y2 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+
             rect_w = x2 - x1
             rect_h = y2 - y1
-            
-            # Heuristic for vertical text detection
+
+            if not text or rect_w < 1 or rect_h < 1:
+                continue
+
+            # 縦書き判定（高さが幅の2倍超）
             is_vertical = rect_h > rect_w * 2
-            
-            # Determine font size to approximately fill the box
-            font_size = rect_w if is_vertical else rect_h
-            if font_size < 1: font_size = 10
-            
-            # Create TextObject
-            # Note: We create a new TextObject for each item to handle positioning/rotation individually
+
+            if is_vertical:
+                self._draw_vertical_text(text, x1, y1, x2, y2, page_height)
+            else:
+                self._draw_horizontal_text(text, x1, y1, x2, y2, page_height)
+
+    def _draw_vertical_text(self, text: str, x1: float, y1: float,
+                            x2: float, y2: float, page_height: float):
+        """
+        縦書きテキストを1文字ずつ縦に配置する。
+
+        各文字を bbox の上端から下端に向かって等間隔に並べる。
+        ReportLab 座標系（原点=左下）に変換して配置。
+        """
+        rect_w = x2 - x1
+        rect_h = y2 - y1
+        n = len(text)
+        if n == 0:
+            return
+
+        # フォントサイズ = 列幅（文字の横幅に合わせる）
+        font_size = max(rect_w * 0.9, 6.0)
+
+        # 1文字あたりの高さ（bbox全体をn文字で均等分割）
+        char_step = rect_h / n
+
+        # 文字の横中心 x（ReportLab座標）
+        char_x = x1 + (rect_w - font_size) / 2
+
+        for i, char in enumerate(text):
+            # 画像座標: 文字の上端 y = y1 + i * char_step
+            # 文字ベースラインはその1文字分下
+            img_y_baseline = y1 + i * char_step + char_step * 0.8
+
+            # ReportLab座標変換（y軸反転）
+            pdf_y = page_height - img_y_baseline
+
             t = self.c.beginText()
             t.setFont(self.FONT_NAME, font_size)
-            
-            if self.debug_mode:
-                # Visible semi-transparent blue
-                self.c.setFillColor(Color(0, 0, 1, 0.3))
-                t.setTextRenderMode(0) # Fill text
-            else:
-                # Invisible
-                t.setTextRenderMode(3) 
 
-            # ReportLab coords (0,0 is bottom-left)
-            pdf_x = x1
-            pdf_y = page_height - y2 
-            
-            if is_vertical:
-                self.c.saveState()
-                # Vertical text handling with rotation
-                pivot_x = pdf_x + rect_w / 2
-                pivot_y = page_height - y1 # Top of the box
-                
-                self.c.translate(pivot_x, pivot_y) 
-                self.c.rotate(-90) 
-                
-                # Draw text object at (0,0) relative to rotated canvas
-                t.setTextOrigin(0, 0)
-                t.textOut(text)
-                self.c.drawText(t)
-                
-                self.c.restoreState()
+            if self.debug_mode:
+                self.c.setFillColor(Color(0, 0, 1, 0.3))
+                t.setTextRenderMode(0)
             else:
-                # Horizontal text
-                t.setTextOrigin(pdf_x, pdf_y)
-                t.textOut(text)
-                self.c.drawText(t)
+                t.setTextRenderMode(3)
+
+            t.setTextOrigin(char_x, pdf_y)
+            t.textOut(char)
+            self.c.drawText(t)
+
+    def _draw_horizontal_text(self, text: str, x1: float, y1: float,
+                              x2: float, y2: float, page_height: float):
+        """横書きテキストをbbox内に配置する。"""
+        rect_h = y2 - y1
+        font_size = max(rect_h * 0.8, 6.0)
+
+        # ReportLab座標変換（y軸反転、ベースラインは下端寄り）
+        pdf_y = page_height - y2 + rect_h * 0.15
+
+        t = self.c.beginText()
+        t.setFont(self.FONT_NAME, font_size)
+
+        if self.debug_mode:
+            self.c.setFillColor(Color(0, 0, 1, 0.3))
+            t.setTextRenderMode(0)
+        else:
+            t.setTextRenderMode(3)
+
+        t.setTextOrigin(x1, pdf_y)
+        t.textOut(text)
+        self.c.drawText(t)
 
     def save(self):
         self.c.save()

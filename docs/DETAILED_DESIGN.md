@@ -41,8 +41,8 @@ Pic2PDF_Viewer/
 │   ├── searchable_pdf.py   # SearchablePdfGenerator
 │   ├── start_batch_ocr.bat # OCR起動ランチャー (.bat経由)
 │   └── requirements.txt
-├── ocr/
-│   └── ocr_engine.py       # OCRエンジン抽象化 + Yomitoku実装
+├── start.bat               # バックエンド・フロントエンド同時起動スクリプト
+├── 起動方法.md              # 起動手順メモ
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # 共通コンポーネント
@@ -174,7 +174,7 @@ Pic2PDF_Viewer/
     ```
 
 ### 3. OCR API
-- **POST /api/ocr/run**: Novel用OCR処理 (`batch_ocr.py`) の実行を開始する。
+- **POST /api/ocr/run**: Novel用OCR処理 (`batch_ocr.py`) の実行を開始する。クエリパラメータ `target_dir` (オプション) で対象ディレクトリを指定可能。
 - **POST /api/ocr/stop**: 実行中のOCRプロセスを停止する。
 - **GET /api/ocr/status**: 現在のOCRプロセスのステータスとログを取得する。
     - Response: `{ status: "idle"|"running"|"error", logs: string[], last_return_code: number|null }`
@@ -270,7 +270,9 @@ Pic2PDF_Viewer/
 *   **使用ライブラリ**: `ReportLab`
 *   **特徴**:
     *   `add_page(image_path, ocr_results)`: 画像を描画し、その上に検索用テキスト（透明）を配置する。
-    *   `_draw_text_layer`: 縦書き判定と文字回転、`TextObject` を用いた描画モード制御。
+    *   `_draw_text_layer`: 縦書き（aspect > 2）と横書きに分岐して描画。
+    *   `_draw_vertical_text`: **1文字ずつ個別の `TextObject` で縦に配置**（旧: `-90°` 回転+`textOut(全文)` 方式は50文字超でPDF描画域外にはみ出すため廃止）。
+    *   `_draw_horizontal_text`: 横書き（ルビ等）の配置。フォントサイズをbbox高さに合わせる。
 
 ### `BatchOCR` (`kindle-pdf/batch_ocr.py`)
 *   **役割**: `kindle_novel/images` 配下の新規フォルダを監視し、自動的にSearchable PDF化する。
@@ -280,7 +282,7 @@ Pic2PDF_Viewer/
 *   **役割**: 書籍情報入力ダイアログ。
 *   **入力**: タイトル、ページめくり方向（左キー/右キー）。
 
-### `YomitokuEngine` (`ocr/ocr_engine.py`)
+### `YomitokuEngine` (`D:\61.tool\common\ocr\ocr_engine.py`)
 *   **役割**: `yomitoku` ライブラリを用いたOCR処理。
 *   **特徴**:
     *   `extract_text()`: 画像からテキストを抽出。段落判定または単語判定に分岐。
