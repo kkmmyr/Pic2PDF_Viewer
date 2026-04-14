@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, Card, CardContent, Typography, Alert, CircularProgress, Chip, Stack } from '@mui/material';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import StopIcon from '@mui/icons-material/Stop';
-import TerminalIcon from '@mui/icons-material/Terminal';
+import { useState, useEffect, useRef } from 'react';
+import { Play, Square, Terminal, AlertCircle } from 'lucide-react';
 import { useOcrStatus } from '../../hooks/useOcrStatus';
 
+/**
+ * Novel OCR 実行パネル (Tailwind実装)。
+ * MUI を使わずTailwindのみで再実装。ダークモードは dark: クラスで対応。
+ */
 export const OCRPanel: React.FC = () => {
     const { status, logs, startOcr, stopOcr } = useOcrStatus();
     const [loading, setLoading] = useState(false);
@@ -12,7 +13,6 @@ export const OCRPanel: React.FC = () => {
     const logEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        // Auto scroll to bottom when logs change
         logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
 
@@ -21,8 +21,8 @@ export const OCRPanel: React.FC = () => {
         setError(null);
         try {
             await startOcr();
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'OCR開始に失敗しました。');
         } finally {
             setLoading(false);
         }
@@ -32,8 +32,8 @@ export const OCRPanel: React.FC = () => {
         setLoading(true);
         try {
             await stopOcr();
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'OCR停止に失敗しました。');
         } finally {
             setLoading(false);
         }
@@ -41,75 +41,75 @@ export const OCRPanel: React.FC = () => {
 
     const isRunning = status === 'running';
 
-    return (
-        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <CardContent sx={{ flexShrink: 0 }}>
-                <Stack direction="row" alignItems="center" spacing={2} mb={2}>
-                    <Typography variant="h5" component="div">
-                        Novel OCR Execution
-                    </Typography>
-                    <Chip
-                        label={status.toUpperCase()}
-                        color={status === 'running' ? 'primary' : status === 'idle' ? 'default' : 'error'}
-                        variant={status === 'running' ? 'filled' : 'outlined'}
-                    />
-                </Stack>
+    const statusBadge = {
+        running: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-700',
+        idle:    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
+        error:   'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-700',
+    }[status] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600';
 
-                <Stack direction="row" spacing={2} mb={2}>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <PlayArrowIcon />}
+    return (
+        <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* ヘッダー */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                <div className="flex items-center gap-3 mb-4">
+                    <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+                        Novel OCR Execution
+                    </h2>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide ${statusBadge}`}>
+                        {status}
+                    </span>
+                </div>
+
+                <div className="flex gap-3">
+                    <button
                         onClick={handleStart}
                         disabled={isRunning || loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-900 text-white text-sm font-medium rounded-lg transition-colors"
                     >
+                        {loading && !isRunning ? (
+                            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <Play className="w-4 h-4 fill-white" />
+                        )}
                         Start OCR
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="error"
-                        startIcon={<StopIcon />}
+                    </button>
+                    <button
                         onClick={handleStop}
                         disabled={!isRunning || loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900 text-white text-sm font-medium rounded-lg transition-colors"
                     >
+                        <Square className="w-4 h-4 fill-white" />
                         Stop OCR
-                    </Button>
-                </Stack>
+                    </button>
+                </div>
 
                 {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+                    <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800 text-sm">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        {error}
+                    </div>
                 )}
-            </CardContent>
+            </div>
 
-            <Box sx={{
-                flexGrow: 1,
-                bgcolor: '#1e1e1e',
-                color: '#d4d4d4',
-                p: 2,
-                overflowY: 'auto',
-                fontFamily: 'Consolas, Monaco, "Andale Mono", "Ubuntu Mono", monospace',
-                fontSize: '0.9rem',
-                mx: 2,
-                mb: 2,
-                borderRadius: 1,
-                border: '1px solid #333'
-            }}>
-                <Stack direction="row" alignItems="center" spacing={1} mb={1} sx={{ color: '#888', borderBottom: '1px solid #333', pb: 1 }}>
-                    <TerminalIcon fontSize="small" />
-                    <Typography variant="caption">Console Output (batch_ocr.py)</Typography>
-                </Stack>
-
-                {logs.length === 0 ? (
-                    <Typography color="gray" fontStyle="italic">No logs available.</Typography>
-                ) : (
-                    logs.map((line, index) => (
-                        <div key={index} style={{ whiteSpace: 'pre-wrap', lineHeight: '1.4' }}>
-                            {line}
-                        </div>
-                    ))
-                )}
-                <div ref={logEndRef} />
-            </Box>
-        </Card>
+            {/* コンソールログエリア */}
+            <div className="flex-1 flex flex-col min-h-0 m-4">
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-700 text-gray-400 text-xs">
+                    <Terminal className="w-4 h-4" />
+                    <span>Console Output (batch_ocr.py)</span>
+                </div>
+                <div className="flex-1 overflow-y-auto bg-[#0d1117] dark:bg-[#0d1117] rounded-lg p-3 font-mono text-sm text-[#d4d4d4] border border-gray-700">
+                    {logs.length === 0 ? (
+                        <span className="text-gray-500 italic">No logs available.</span>
+                    ) : (
+                        logs.map((line, index) => (
+                            <div key={index} className="whitespace-pre-wrap leading-relaxed">
+                                {line}
+                            </div>
+                        ))
+                    )}
+                    <div ref={logEndRef} />
+                </div>
+            </div>
+        </div>
     );
 };
