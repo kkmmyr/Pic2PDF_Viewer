@@ -28,6 +28,9 @@ Pic2PDF_Viewer/
 │   │   ├── pdf_generator.py # PDF生成ロジック (PdfGenerator Class)
 │   │   ├── pdf_service.py  # PDF操作 (PdfService)
 │   │   └── thumbnail_service.py # サムネイル生成 (ThumbnailService)
+│   ├── utils/
+│   │   ├── path_utils.py   # パスバリデーション一元化
+│   │   └── logger.py       # ロギング設定
 │   ├── config.py           # パス定数・OCR起動設定
 │   ├── main.py             # FastAPIエントリーポイント
 │   └── requirements.txt    # Python依存関係
@@ -47,6 +50,7 @@ Pic2PDF_Viewer/
 │   ├── src/
 │   │   ├── components/     # 共通コンポーネント
 │   │   │   ├── Layout.tsx  # グローバルレイアウト
+│   │   │   ├── ErrorBoundary.tsx # エラーバウンダリ
 │   │   │   └── reader/     # リーダー・ライブラリ関連コンポーネント
 │   │   │       ├── index.ts
 │   │   │       ├── FolderGrid.tsx
@@ -68,6 +72,7 @@ Pic2PDF_Viewer/
 │   │   │   ├── useBookImages.ts
 │   │   │   ├── useImagePreloader.ts    # 画像先読みフック
 │   │   │   ├── useLibraryManagement.ts # ライブラリ操作フック
+│   │   │   ├── usePolling.ts           # 共通ポーリングフック
 │   │   │   ├── usePdfStatus.ts         # PDF生成ステータス監視
 │   │   │   └── useOcrStatus.ts         # OCRステータス監視
 │   │   ├── types/          # 型定義
@@ -80,8 +85,12 @@ Pic2PDF_Viewer/
 │   └── package.json
 └── docs/
     ├── REQUIREMENTS.md     # 要件定義
-    ├── BASIC_DESIGN.md     # 基本設計
-    └── DETAILED_DESIGN.md  # 本詳細設計書
+    ├── BASIC_DESIGN.md     # 基本設計（技術スタック・データフロー）
+    ├── DETAILED_DESIGN.md  # 本詳細設計書（ディレクトリ構成・クラス設計）
+    ├── API_SPEC.md         # API仕様
+    ├── OCR_DESIGN.md       # OCR設計・改善記録
+    ├── GPU_SETUP.md        # GPU環境セットアップ手順
+    └── CHANGELOG.md        # 変更履歴
 ```
 
 ### 1.2 データ配置 (Backend)
@@ -96,210 +105,98 @@ Pic2PDF_Viewer/
 - **Kindle Novel**: `KINDLE_NOVEL_PDF_DIR`, `KINDLE_NOVEL_THUMBNAIL_DIR`, `KINDLE_NOVEL_IMAGES_DIR`
 - **OCR起動設定**: `BATCH_OCR_LAUNCHER` — `kindle-pdf/start_batch_ocr.bat` へのパス。`.bat` ファイル経由で正しいPython環境とPATHを設定してOCRを起動する。
 
+---
 
-## 2. API仕様
+## 2. クラス設計
 
-### `GET /api/pdfs`
-*   **パラメータ**: 
-    *   `path` (オプション) - 表示するサブディレクトリのパス
-    *   `source` (オプション) - 'generated' (default) / 'kindle' / 'novel'。ライブラリの参照元を指定。
-*   **レスポンス**:
-    ```json
-    {
-      "files": [
-        {
-          "name": "file1.pdf",
-          "thumbnail": "/thumbnails/path/to/file1.jpg"
-        },
-        {
-          "name": "file2.pdf",
-          "thumbnail": null
-        }
-      ],
-      "directories": ["subdir1", "subdir2"],
-      "current_path": "path/to/current"
-    }
-    ```
+### バックエンド (`backend/`)
 
-### `POST /api/generate`
-*   **リクエストボディ**:
-    ```json
-    {
-      "source_dir": "C:\\Absolute\\Path\\To\\Images",
-      "generate_compressed": false,
-      "quality": 50
-    }
-    ```
-    - `generate_compressed` (オプション, bool): `true` の場合、圧縮版PDFを `pdfs_compressed/` にも同時生成する。
-    - `quality` (オプション, int): 圧縮品質 (1〜95)。`generate_compressed` が `true` の場合のみ使用。
-*   **レスポンス**: 生成されたファイル名のリスト
+#### `OCRService` (`backend/services/ocr_service.py`)
+- **役割**: OCRバックグラウンドプロセスの管理、ログ収集、ステータス管理。
+- **主要メソッド**:
+    - `start_ocr()`: `batch_ocr.py` をサブプロセスとして起動。UTF-8エンコーディングを強制。
+    - `stop_ocr()`: 実行中のプロセスを停止 (Terminate/Kill)。
+    - `get_status()`: 現在の状態と直近のログを返却。
 
-### `GET /api/status`
-*   **概要**: PDF生成処理の進捗状況を取得する。
-*   **クエリパラメータ**: `source_dir` - スキャン対象のソースディレクトリ
-*   **レスポンス**:
-    ```json
-    {
-      "items": [
-        {"name": "folder_name", "type": "folder", "status": "not_started"|"in_progress"|"completed"},
-        {"name": "zip_name",    "type": "zip",    "status": "not_started"|"in_progress"|"completed"}
-      ]
-    }
-    ```
+#### `PdfGenerator` (`backend/services/pdf_generator.py`)
+- **役割**: ディレクトリやZIPファイルのスキャン、画像からのPDF生成、ファイル移動を一元管理。
+- **主要メソッド**:
+    - `process_directory()`: 指定ディレクトリ内のWebPをPDF化。
+    - `process_zip()`: ZIPファイル内のWebPをPDF化。
+    - `_process_images()`: サムネイル生成・PDF生成・画像移動の共通処理。
+    - `run()`: 処理の実行と、完了ファイルの移動・空ディレクトリ削除の制御。
 
-### `POST /api/batch_compress`
-*   **概要**: `data/main/images/` 配下の全WebP画像を一括で圧縮PDFに変換し `pdfs_compressed/` へ出力する。既存ファイルはスキップ。
-*   **リクエストボディ**:
-    ```json
-    { "quality": 50 }
-    ```
-*   **レスポンス**: `{"message": "Batch compression complete", "files": [...]}`
+#### `PdfService` (`backend/services/pdf_service.py`)
+- **役割**: 既存PDFの編集操作を一元管理。
+- **主要メソッド**:
+    - `delete_pages()`: 指定されたページの削除とPDFの再保存。
+    - `get_page_count()`: PDFの総ページ数を取得。
 
-### `POST /api/pdfs/{filename}/delete_pages`
-*   **パラメータ**: 
-    *   `path` (オプション) - 対象ファイルの親ディレクトリパス
-    *   `source` (オプション) - 'generated' (default) / 'kindle' / 'novel'。対象ファイルの場所を指定。
-*   **リクエストボディ**:
-    ```json
-    {
-      "page_indices": [0, 2, 5]
-    }
-    ```
-*   **レスポンス**:
-    ```json
-    {
-      "message": "Pages deleted successfully",
-      "total_pages": 10
-    }
-    ```
+#### `ThumbnailService` (`backend/services/thumbnail_service.py`)
+- **役割**: PDFからのサムネイル画像生成。
+- **主要メソッド**:
+    - `generate_thumbnail()`: 最初のページを座標指定またはスケール指定で画像出力。
 
-### 3. OCR API
-- **POST /api/ocr/run**: Novel用OCR処理 (`batch_ocr.py`) の実行を開始する。クエリパラメータ `target_dir` (オプション) で対象ディレクトリを指定可能。
-- **POST /api/ocr/stop**: 実行中のOCRプロセスを停止する。
-- **GET /api/ocr/status**: 現在のOCRプロセスのステータスとログを取得する。
-    - Response: `{ status: "idle"|"running"|"error", logs: string[], last_return_code: number|null }`
+---
 
-### `GET /api/books/{path}/images`
-*   **概要**: 指定された書籍（フォルダまたはZIP）の画像リストとサイズ情報を取得。
-*   **パラメータ**: 
-    *   `path` (パスパラメータ) - 書籍（フォルダまたはZIP）の相対パス
-    *   `source` (クエリパラメータ, オプション) - 'generated' (default) / 'kindle' / 'novel'。
-*   **レスポンス**:
-    ```json
-    {
-      "images": [
-        "/images/path/to/book/01.webp",
-        "/images/path/to/book/02.webp"
-      ]
-    }
-    ```
+### Kindleキャプチャツール (`kindle-pdf/`)
 
-### `POST /api/directories`
-*   **概要**: フォルダ作成
-*   **リクエストボディ**:
-    ```json
-    {
-      "path": "current/relative/path",
-      "name": "new_folder_name",
-      "source": "generated" // or "kindle"
-    }
-    ```
-*   **レスポンス**: `{"message": "Directory created"}`
+#### `KindleCapturer` (`kindle-pdf/capturer.py`)
+- **役割**: 基本的なKindleウィンドウ操作、スクリーンショット撮影、PDF作成。
+- **主要メソッド**:
+    - `find_window()`: Kindleウィンドウのハンドル取得。
+    - `get_book_title()`: タイトル入力ダイアログ（`BookInfoDialog`）の表示。
+    - `capture_loop()`: ページめくりと撮影のループ。
 
-### `POST /api/move`
-*   **概要**: ファイル・フォルダ移動
-*   **リクエストボディ**:
-    ```json
-    {
-      "items": ["file1.pdf", "subfolder"],
-      "source_path": "current/relative/path",
-      "destination_path": "dest/relative/path",
-      "source": "generated"
-    }
-    ```
-*   **レスポンス**: `{"message": "Items moved", "moved_count": 2, "errors": []}`
-    - `errors`: 個別アイテムのエラーメッセージリスト（成功時は空配列）
+#### `AutoKindleCapturer` (`capturer.py`)
+- **継承**: `KindleCapturer`
+- **役割**: 漫画/雑誌用の自動クロップ（黒帯検出）。フルスクリーンモードを使用。
 
-## 3. クラス設計 (Backend & Kindle Tool)
+#### `NovelKindleCapturer` (`novel_capturer.py`)
+- **継承**: `AutoKindleCapturer`
+- **役割**: 小説用の自動クロップ（X軸白背景検出）と画像保存。
+- **特徴**: OCR/PDF生成機能は削除（`batch_ocr.py`へ委譲）。撮影速度を優先。
 
-### `OCRService` (`backend/services/ocr_service.py`)
-*   **役割**: OCRバックグラウンドプロセスの管理、ログ収集、ステータス管理。
-*   **主要メソッド**:
-    *   `start_ocr()`: `batch_ocr.py` をサブプロセスとして起動。UTF-8エンコーディングを強制。
-    *   `stop_ocr()`: 実行中のプロセスを停止 (Terminate/Kill)。
-    *   `get_status()`: 現在の状態と直近のログを返却。
+#### `BookInfoDialog` (`capturer.py`)
+- **役割**: 書籍情報入力ダイアログ。
+- **入力**: タイトル、ページめくり方向（左キー/右キー）。
 
-### `PdfGenerator` (`backend/services/pdf_generator.py`)
-*   **役割**: ディレクトリやZIPファイルのスキャン、画像からのPDF生成、ファイル移動を一元管理。
-*   **主要メソッド**:
-    *   `process_directory()`: 指定ディレクトリ内のWebPをPDF化。
-    *   `process_zip()`: ZIPファイル内のWebPをPDF化。
-    *   `_create_pdf_file()`: `img2pdf` を用いた実際のPDFファイル書き出し。
-    *   `run()`: 処理の実行と、完了ファイルの移動・空ディレクトリ削除の制御。
+#### `SearchablePdfGenerator` (`kindle-pdf/searchable_pdf.py`)
+- **役割**: 画像とOCR結果から「透明テキスト付きPDF」を生成する。
+- **使用ライブラリ**: `ReportLab`
+- **主要メソッド**:
+    - `add_page(image_path, ocr_results)`: 画像を描画し、その上に検索用テキスト（透明）を配置する。
+    - `_draw_vertical_text`: **1文字ずつ個別の `TextObject` で縦に配置**（旧: `-90°` 回転+`textOut(全文)` 方式は廃止）。
+    - `_draw_horizontal_text`: 横書き（ルビ等）の配置。
+- 詳細設計: [OCR_DESIGN.md](OCR_DESIGN.md)
 
-### `PdfService` (`backend/services/pdf_service.py`)
-*   **役割**: 既存PDFの編集操作を一元管理。
-*   **主要メソッド**:
-    *   `delete_pages()`: 指定されたページの削除とPDFの再保存。
-    *   `get_page_count()`: PDFの総ページ数を取得。
+#### `BatchOCR` (`kindle-pdf/batch_ocr.py`)
+- **役割**: `kindle_novel/images` 配下の未処理フォルダを走査し、自動的にSearchable PDF化する。
+- **フロー**: フォルダ検知 → OCR (`yomitoku`) → PDF生成 (`SearchablePdfGenerator`)
 
-### `ThumbnailService` (`backend/services/thumbnail_service.py`)
-*   **役割**: PDFからのサムネイル画像生成。
-*   **主要メソッド**:
-    *   `generate_thumbnail()`: 最初のページを座標指定またはスケール指定で画像出力。
+---
 
-### `KindleCapturer` (`kindle-pdf/capturer.py`)
-*   **役割**: 基本的なKindleウィンドウ操作、スクリーンショット撮影、PDF作成。
-*   **主要メソッド**:
-    *   `find_window()`: Kindleウィンドウのハンドル取得。
-    *   `get_book_title()`: タイトル入力ダイアログ（`BookInfoDialog`）の表示。
-    *   `capture_loop()`: ページめくりと撮影のループ。
+### OCRエンジン (`D:\61.tool\common\ocr\`)
 
-### `AutoKindleCapturer` (`capturer.py`)
-*   **継承**: `KindleCapturer`
-*   **役割**: 漫画/雑誌用の自動クロップ（黒帯検出）。
-*   **特徴**: フルスクリーンモードを使用。
+#### `YomitokuEngine` (`ocr_engine.py`)
+- **役割**: `yomitoku` ライブラリを用いたOCR処理。
+- **主要メソッド**:
+    - `extract_text()`: 画像からテキストを抽出。段落判定または単語判定に分岐。
+    - `_process_words()`: 単語情報の処理。thickness統一・aspect比判定・フリガナ除去・正規化。
+    - `filter_ruby_text()`: ヒストグラム谷（valley）自動検出によるフリガナ除去。
+    - `normalize_text()`: 3点リーダー・特殊記号の正規化。
+- 詳細設計: [OCR_DESIGN.md](OCR_DESIGN.md)
 
-### `NovelKindleCapturer` (`novel_capturer.py`)
-*   **継承**: `AutoKindleCapturer`
-*   **役割**: 小説用の自動クロップ（X軸白背景検出）と画像保存。
-*   **変更点**: OCR/PDF生成機能は削除（`batch_ocr.py`へ委譲）。撮影速度を優先。
+---
 
-### `SearchablePdfGenerator` (`kindle-pdf/searchable_pdf.py`)
-*   **役割**: 画像とOCR結果から「透明テキスト付きPDF」を生成する。
-*   **使用ライブラリ**: `ReportLab`
-*   **特徴**:
-    *   `add_page(image_path, ocr_results)`: 画像を描画し、その上に検索用テキスト（透明）を配置する。
-    *   `_draw_text_layer`: 縦書き（aspect > 2）と横書きに分岐して描画。
-    *   `_draw_vertical_text`: **1文字ずつ個別の `TextObject` で縦に配置**（旧: `-90°` 回転+`textOut(全文)` 方式は50文字超でPDF描画域外にはみ出すため廃止）。
-    *   `_draw_horizontal_text`: 横書き（ルビ等）の配置。フォントサイズをbbox高さに合わせる。
+## 3. 運用・開発メモ
 
-### `BatchOCR` (`kindle-pdf/batch_ocr.py`)
-*   **役割**: `kindle_novel/images` 配下の新規フォルダを監視し、自動的にSearchable PDF化する。
-*   **フロー**: フォルダ検知 -> OCR (`yomitoku`) -> PDF生成 (`SearchablePdfGenerator`)。
-
-### `BookInfoDialog` (`capturer.py`)
-*   **役割**: 書籍情報入力ダイアログ。
-*   **入力**: タイトル、ページめくり方向（左キー/右キー）。
-
-### `YomitokuEngine` (`D:\61.tool\common\ocr\ocr_engine.py`)
-*   **役割**: `yomitoku` ライブラリを用いたOCR処理。
-*   **特徴**:
-    *   `extract_text()`: 画像からテキストを抽出。段落判定または単語判定に分岐。
-    *   `_process_paragraphs()`: 段落情報の処理。フリガナ除去フィルタ(`_calculate_thickness`)を含む。
-    *   `_process_words()`: 単語情報の処理。座標ソートとフリガナ除去フィルタを含む。
-    *   **Fallback Logic**: 段落検出失敗時に、座標ベースで読み順をソートするロジックを実装。
-    *   **Furigana Filter**: 文字サイズ（厚み）によるフリガナ除去フィルタ。
-
-## 4. 運用・開発メモ
-
-*   **起動方法**:
-    *   Backend: `python -m uvicorn main:app --reload` (Port 8000)
-    *   Frontend: `npm run dev` (Port 5173)
-*   **注意点**:
-    *   `react-pdf` のWorker設定は `unpkg` から動的に読み込む設定になっている。
-    *   バックエンドの `data/pdfs` ディレクトリは静的ファイルとして `/pdfs` パスでマウントされている。
-    *   バックエンドの `data/thumbnails` ディレクトリは静的ファイルとして `/thumbnails` パスでマウントされている。
-*   **環境設定**:
-    *   Frontend: `frontend/.env` に `VITE_DEFAULT_SOURCE_DIR` を設定することで、生成画面のデフォルトパスを変更可能。
-    *   Backend: サービス層の抽出により、ロジックの単体テストが容易な構成になっている。
+- **起動方法**: [起動方法.md](../起動方法.md) を参照
+    - Backend: `python -m uvicorn main:app --reload` (Port 8000)
+    - Frontend: `npm run dev` (Port 5173)
+- **注意点**:
+    - `react-pdf` のWorker設定は `unpkg` から動的に読み込む設定になっている。
+    - `data/pdfs` / `data/thumbnails` は静的ファイルとして `/pdfs` / `/thumbnails` パスでマウントされている。
+- **環境設定**:
+    - Frontend: `frontend/.env` に `VITE_DEFAULT_SOURCE_DIR` を設定することで生成画面のデフォルトパスを変更可能。
+    - Backend: `python-dotenv` 導入済み。`.env` ファイルから設定を読み込む。
