@@ -54,10 +54,12 @@ Pic2PDF_Viewer/
 │   │   │   └── reader/     # リーダー・ライブラリ関連コンポーネント
 │   │   │       ├── index.ts
 │   │   │       ├── FolderGrid.tsx
+│   │   │       ├── LazyThumbnail.tsx   # IntersectionObserver遅延読み込み
 │   │   │       ├── LibraryHeader.tsx
 │   │   │       ├── MoveDialog.tsx
 │   │   │       ├── PageRenderer.tsx
 │   │   │       ├── PdfGrid.tsx
+│   │   │       ├── PdfSearchBar.tsx    # PDF内テキスト検索バー
 │   │   │       └── ReaderHeader.tsx
 │   │   ├── features/       # 機能別モジュール
 │   │   │   └── ocr/
@@ -74,7 +76,10 @@ Pic2PDF_Viewer/
 │   │   │   ├── useLibraryManagement.ts # ライブラリ操作フック
 │   │   │   ├── usePolling.ts           # 共通ポーリングフック
 │   │   │   ├── usePdfStatus.ts         # PDF生成ステータス監視
-│   │   │   └── useOcrStatus.ts         # OCRステータス監視
+│   │   │   ├── useOcrStatus.ts         # OCRステータス監視
+│   │   │   ├── useDarkMode.ts          # ダークモード管理 (localStorage永続化)
+│   │   │   ├── useFavorites.ts         # お気に入り管理 (source別localStorage)
+│   │   │   └── useSortedPdfs.ts        # PDF並び替え (useMemo)
 │   │   ├── types/          # 型定義
 │   │   │   └── index.ts
 │   │   ├── pages/          # ページコンポーネント
@@ -117,6 +122,15 @@ Pic2PDF_Viewer/
     - `start_ocr()`: `batch_ocr.py` をサブプロセスとして起動。UTF-8エンコーディングを強制。
     - `stop_ocr()`: 実行中のプロセスを停止 (Terminate/Kill)。
     - `get_status()`: 現在の状態と直近のログを返却。
+
+#### `JobStore` / `GenerateJob` (`backend/routers/pdfs.py`)
+- **役割**: 非同期PDF生成ジョブのライフサイクル管理。
+- **設計**:
+    - `GenerateJob`: UUID・ステータス・進捗アイテム・ファイルリスト・エラーを保持。`threading.Lock` で状態更新をスレッドセーフに。
+    - `JobStore`: 最大20件のジョブをメモリ管理。FIFO方式で古いジョブを自動削除。
+- **エンドポイント**:
+    - `POST /api/generate` → バックグラウンドスレッド起動 + `{job_id}` を即返却。
+    - `GET /api/generate/job/{job_id}` → ジョブ進捗取得（クライアントが1500msでポーリング）。
 
 #### `PdfGenerator` (`backend/services/pdf_generator.py`)
 - **役割**: ディレクトリやZIPファイルのスキャン、画像からのPDF生成、ファイル移動を一元管理。
@@ -186,6 +200,41 @@ Pic2PDF_Viewer/
     - `filter_ruby_text()`: ヒストグラム谷（valley）自動検出によるフリガナ除去。
     - `normalize_text()`: 3点リーダー・特殊記号の正規化。
 - 詳細設計: [OCR_DESIGN.md](OCR_DESIGN.md)
+
+---
+
+### フロントエンドフック (`frontend/src/hooks/`)
+
+#### `useDarkMode`
+- **役割**: ダークモード状態の管理と永続化。
+- **設計**:
+    - `index.html` インラインスクリプトと連携し、React マウント前に `<html class="dark">` を適用してフラッシュを防止。
+    - `useState` 初期化フェーズで即座に `classList` を操作（`useEffect` 待ちのラグを排除）。
+    - `localStorage` キー `darkMode` に `true/false` 文字列で永続化。
+    - システムカラースキーム (`prefers-color-scheme: dark`) をフォールバックとして使用。
+
+#### `useFavorites`
+- **役割**: お気に入りPDFの管理（ソース別）。
+- **設計**:
+    - `localStorage` キー `favorites_{source}` に `string[]` (JSON) で永続化。
+    - `source` が切り替わった際に `useEffect` で該当ソースのデータを再ロード。
+    - `toggle(name)` はimmutableなSet更新 + 即時永続化。
+
+#### `useSortedPdfs`
+- **役割**: PDF一覧の並び替えロジック（`useMemo` でメモ化）。
+- **ソート順**: `name_asc` / `name_desc` / `date_asc` / `date_desc` / `favorites_first`
+    - `favorites_first`: お気に入りを先頭に、同グループ内は名前昇順。
+    - 日付ソートは `created_at` (Unix timestamp) を使用。
+
+### フロントエンドコンポーネント
+
+#### `LazyThumbnail` (`frontend/src/components/reader/LazyThumbnail.tsx`)
+- **役割**: サムネイル画像の遅延読み込み。
+- **設計**: `IntersectionObserver` で viewport から200px前に入った時点で `src` をセット。エラー時は `FileText` アイコンにフォールバック。
+
+#### `PdfSearchBar` (`frontend/src/components/reader/PdfSearchBar.tsx`)
+- **役割**: PDF内テキスト検索UI。`ReaderHeader` 直下に固定表示。
+- **設計**: 300msデバウンスで親へ検索テキストを通知。Enter/Shift+Enterで次/前へ移動。マッチ数 "X / Y" 表示。
 
 ---
 

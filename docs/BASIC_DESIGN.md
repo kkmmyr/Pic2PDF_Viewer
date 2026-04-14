@@ -3,15 +3,19 @@
 ## 1. アーキテクチャ設計
 
 ### 1.1. 技術スタック
-*   **Frontend**: React (Vite), TypeScript, TailwindCSS
+*   **Frontend**: React (Vite), TypeScript, TailwindCSS (`darkMode: 'class'`)
     *   PDF描画: `react-pdf`
     *   ルーティング: `react-router-dom`
     *   アイコン: `lucide-react`
     *   HTTPクライアント: `axios` (共通 `apiClient` による管理)
+    *   **注**: MUI (`@mui/material`) は全廃し、TailwindCSSに統一済み。
 *   **Web UI Viewer**:
-    *   ブラウザベースのモダンなUI (React + MUI/Tailwind)。
-    *   生成されたPDFの閲覧、サムネイル表示。
-    *   フォルダ管理機能。
+    *   ブラウザベースのモダンなUI (React + TailwindCSS)。
+    *   生成されたPDFの閲覧、サムネイル表示（Lazy Load）。
+    *   フォルダ管理機能（作成・移動）。
+    *   お気に入り / 並び替え機能（LocalStorage永続化）。
+    *   ダークモード対応（localStorage + flash防止インラインスクリプト）。
+    *   PDF内テキスト検索（Searchable PDF対応、Ctrl+F）。
     *   **Novel OCR 実行**: Webブラウザから直接OCR処理を実行・監視する機能。
 *   **Backend**: Python (FastAPI)
     *   **Architecture**: サービス層 (Services) によるビジネスロジックの分離。
@@ -27,10 +31,12 @@
 
 ### 1.2. データフロー
 
-#### 1. PDF生成
+#### 1. PDF生成（非同期）
 1.  **Client** -> `POST /api/generate` (source_dir) -> **Server**
-2.  **Server** -> `scan_and_generate` -> **File System** (Read WebP, Write PDF & Thumbnail)
-3.  **Server** -> Response (Generated File List) -> **Client**
+2.  **Server** -> ジョブ作成 (UUID) -> バックグラウンドスレッド起動 -> Response `{job_id, status: "pending"}`
+3.  **Server** (Background) -> `scan_and_generate` -> **File System** (Read WebP, Write PDF & Thumbnail)
+4.  **Client** -> `GET /api/generate/job/{job_id}` (ポーリング 1500ms間隔) -> **Server** -> ジョブ進捗
+5.  完了時: `status: "completed"` + 生成ファイルリスト
 
 #### 2. PDF一覧・閲覧
 1.  **Client** -> `GET /api/pdfs?path=...&source=[generated|kindle|novel]` -> **Server**

@@ -4,6 +4,46 @@
 
 ---
 
+## 2026-04-14: 新機能追加 & MUI→Tailwind統一
+
+### 概要
+UX改善機能を4点実装し、フロントエンドのUIライブラリをMUI→TailwindCSS（Tailwind統一）に移行。
+
+### 新機能
+
+#### 1. PDF生成の非同期化 (Backend + Frontend)
+- `backend/routers/pdfs.py`: `JobStore` / `GenerateJob` クラスを新設。UUIDジョブ管理 + スレッドセーフ設計。
+- `POST /api/generate` → バックグラウンドスレッドで実行、`job_id` を即返却。
+- `GET /api/generate/job/{job_id}` → ジョブ進捗ポーリングエンドポイントを追加。
+- フロントエンド (`GeneratorPage.tsx`): 1500msポーリング、進捗UI（Clock/CheckCircle/XCircle アイコン、プログレスバー）。
+
+#### 2. お気に入り / 並び替え
+- `useFavorites.ts`: ソース別 `localStorage` 永続化。ソース切り替え時に自動再ロード。
+- `useSortedPdfs.ts`: 5種類のソート順に対応 (`name_asc/desc`, `date_asc/desc`, `favorites_first`)。
+- `LibraryPanel.tsx` / `LibraryHeader.tsx`: ソート順セレクタ追加 + localStorage永続化。
+- `PdfGrid.tsx`: サムネイル左上に★ボタン追加。お気に入り状態をアンバー色で表示。
+- `library.py`: `/api/pdfs` レスポンスに `created_at` (Unix timestamp) を追加。
+
+#### 3. ダークモード
+- `tailwind.config.js`: `darkMode: 'class'` 設定。
+- `index.html`: React マウント前にインラインスクリプトで `<html class="dark">` 適用（フラッシュ防止）。
+- `useDarkMode.ts`: `useState` 初期化時に即適用 + `localStorage` 永続化 + システムカラースキームフォールバック。
+- 全コンポーネントに `dark:` クラスを適用。`Layout.tsx` にMoon/Sunトグルボタン追加。
+
+#### 4. サムネイル遅延読み込み (Lazy Load)
+- `LazyThumbnail.tsx`: `IntersectionObserver` (rootMargin 200px) でビューポート外のサムネイルを遅延読み込み。エラー時はFileTextアイコンにフォールバック。
+
+#### 5. PDF内テキスト検索
+- `PdfSearchBar.tsx`: Ctrl+F でサーチバーを開く。300msデバウンス入力、Enter/Shift+Enterで次/前移動、マッチ数表示。
+- `ReaderPanel.tsx`: pdfjs で全ページテキストを走査してマッチカウント、`customTextRenderer` でハイライト表示。`renderTextLayer` は検索中のみ有効化（パフォーマンス最適化）。
+
+### MUI→TailwindCSS統一
+- `OCRPanel.tsx` / `OCRPage.tsx`: MUI `Box` / `Typography` / `Button` / `Chip` → Tailwindクラスに完全置き換え。`ThemeProvider` を削除。
+- `CreateFolderDialog.tsx`: MUI `Dialog` → Tailwind固定オーバーレイ実装。バリデーション・Escクローズ・Enterサブミット・外クリックで閉じる。
+- `package.json`: `@mui/material`, `@mui/icons-material`, `@emotion/react`, `@emotion/styled` を削除（約123パッケージ削減）。
+
+---
+
 ## 2026-04-13: OCR品質改善
 
 ### 概要
