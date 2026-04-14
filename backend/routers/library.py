@@ -48,9 +48,11 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
             else:
                 background_tasks.add_task(ThumbnailService.generate_thumbnail, item_path, thumb_path)
 
+            created_at = int(os.path.getctime(item_path))
             files.append({
                 "name": item,
-                "thumbnail": thumb_url
+                "thumbnail": thumb_url,
+                "created_at": created_at,
             })
 
     return {"files": files, "directories": directories, "current_path": path}

@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from enum import Enum
 import os
 import threading
+import uuid
 from typing import Optional
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
@@ -22,8 +23,76 @@ class GenerateStatus(str, Enum):
     COMPLETED = "completed"
 
 
+# ---------------------------------------------------------------------------
+# ジョブ管理: 非同期PDF生成用
+# ---------------------------------------------------------------------------
+
+class JobStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class GenerateJob:
+    """1回のPDF生成ジョブを表すデータクラス。"""
+    def __init__(self, job_id: str):
+        self.job_id = job_id
+        self.status: JobStatus = JobStatus.PENDING
+        self.current_item: Optional[str] = None
+        self.files: list[str] = []
+        self.message: str = ""
+        self.error: Optional[str] = None
+        self._lock = threading.Lock()
+
+    def to_dict(self) -> dict:
+        with self._lock:
+            return {
+                "job_id": self.job_id,
+                "status": self.status.value,
+                "current_item": self.current_item,
+                "files": list(self.files),
+                "message": self.message,
+                "error": self.error,
+            }
+
+    def update(self, **kwargs) -> None:
+        with self._lock:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+
+class JobStore:
+    """実行中・完了済みジョブを保持するスレッドセーフなストア。"""
+    _MAX_JOBS = 20  # 古いジョブを自動削除する上限
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._jobs: dict[str, GenerateJob] = {}
+        self._order: list[str] = []
+
+    def create(self) -> GenerateJob:
+        job = GenerateJob(str(uuid.uuid4()))
+        with self._lock:
+            self._jobs[job.job_id] = job
+            self._order.append(job.job_id)
+            # 古いジョブを削除
+            while len(self._order) > self._MAX_JOBS:
+                old_id = self._order.pop(0)
+                self._jobs.pop(old_id, None)
+        return job
+
+    def get(self, job_id: str) -> Optional[GenerateJob]:
+        with self._lock:
+            return self._jobs.get(job_id)
+
+
+job_store = JobStore()
+
+
 class GenerateState:
-    """PDF生成の進捗状態を管理するスレッドセーフなシングルトンクラス。"""
+    """PDF生成の進捗状態を管理するスレッドセーフなシングルトンクラス。
+    (後方互換: /api/status エンドポイントで使用)"""
     _instance = None
     _class_lock = threading.Lock()
 
@@ -47,22 +116,24 @@ class GenerateState:
 
 generate_state = GenerateState()
 
+
 class GenerateRequest(BaseModel):
     source_dir: str
     generate_compressed: bool = False
     quality: int = 50
 
-@router.post("/generate")
-def generate_pdfs(request: GenerateRequest):
-    if not os.path.isdir(request.source_dir):
-        raise HTTPException(status_code=400, detail="Invalid directory path")
 
+def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
+    """バックグラウンドスレッドでPDF生成を実行する。"""
     def progress_callback(item_name: str):
+        job.update(current_item=item_name)
         generate_state.set_current_item(item_name)
         logger.info("Processing: %s", item_name)
 
     try:
+        job.update(status=JobStatus.RUNNING, current_item="Starting...")
         generate_state.set_current_item("Starting...")
+
         compressed_dir = PDF_COMPRESSED_DIR if request.generate_compressed else None
         quality = request.quality if request.generate_compressed else None
 
@@ -74,13 +145,41 @@ def generate_pdfs(request: GenerateRequest):
             COMPLETE_DIR,
             compressed_output_dir=compressed_dir,
             quality=quality,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+        )
+        job.update(
+            status=JobStatus.COMPLETED,
+            current_item=None,
+            files=generated,
+            message="Generation complete",
         )
         generate_state.set_current_item(None)
-        return {"message": "Generation complete", "files": generated}
+        logger.info("Job %s completed: %d files", job.job_id, len(generated))
     except Exception as e:
+        job.update(status=JobStatus.FAILED, current_item=None, error=str(e))
         generate_state.set_current_item(None)
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Job %s failed: %s", job.job_id, e)
+
+
+@router.post("/generate")
+def generate_pdfs(request: GenerateRequest):
+    if not os.path.isdir(request.source_dir):
+        raise HTTPException(status_code=400, detail="Invalid directory path")
+
+    job = job_store.create()
+    t = threading.Thread(target=_run_generate_job, args=(job, request), daemon=True)
+    t.start()
+
+    return {"job_id": job.job_id, "status": "pending"}
+
+
+@router.get("/generate/job/{job_id}")
+def get_generate_job(job_id: str):
+    """ジョブの進捗・結果を取得する。"""
+    job = job_store.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job.to_dict()
 
 @router.get("/status")
 def get_status(source_dir: str):
