@@ -1,4 +1,4 @@
-import { ArrowLeft, Trash2, CheckSquare, Square } from 'lucide-react';
+import { ArrowLeft, Trash2, CheckSquare, Square, Search } from 'lucide-react';
 import type { ReadingDirection } from '../../types';
 
 interface ReaderHeaderProps {
@@ -10,17 +10,16 @@ interface ReaderHeaderProps {
     isEditMode: boolean;
     selectedPagesCount: number;
     showHeader: boolean;
+    isSearchOpen: boolean;
     onClose: () => void;
     onToggleDirection: () => void;
     onToggleSpread: () => void;
     onToggleEditMode: () => void;
     onDeletePages: () => void;
     onMouseLeave: () => void;
+    onToggleSearch: () => void;
 }
 
-/**
- * リーダービューのヘッダーコンポーネント
- */
 export function ReaderHeader({
     selectedPdf,
     direction,
@@ -30,50 +29,71 @@ export function ReaderHeader({
     isEditMode,
     selectedPagesCount,
     showHeader,
+    isSearchOpen,
     onClose,
     onToggleDirection,
     onToggleSpread,
     onToggleEditMode,
     onDeletePages,
     onMouseLeave,
+    onToggleSearch,
 }: ReaderHeaderProps) {
     return (
         <div
-            className={`fixed top-0 left-0 right-0 h-14 border-b bg-white/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-50 transition-transform duration-300 ${!showHeader ? '-translate-y-full' : 'translate-y-0'
-                }`}
+            className={`fixed top-0 left-0 right-0 h-14 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-50 transition-transform duration-300 ${
+                !showHeader ? '-translate-y-full' : 'translate-y-0'
+            }`}
             onMouseLeave={onMouseLeave}
         >
             <div className="flex items-center gap-4">
                 <button
                     onClick={onClose}
-                    className="p-2 hover:bg-gray-100 rounded-full"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
                 >
-                    <ArrowLeft className="w-5 h-5" />
+                    <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                 </button>
-                <h1 className="font-semibold truncate max-w-xl">{selectedPdf}</h1>
+                <h1 className="font-semibold truncate max-w-xl text-gray-900 dark:text-gray-100">{selectedPdf}</h1>
             </div>
 
             <div className="flex items-center gap-2">
                 <button
                     onClick={onToggleDirection}
-                    className="px-3 py-1.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
                 >
                     {direction === 'rtl' ? 'Right Binding (RTL)' : 'Left Binding (LTR)'}
                 </button>
                 <button
                     onClick={onToggleSpread}
-                    className="px-3 py-1.5 text-sm font-medium bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
                 >
                     {isSpread ? 'Spread' : 'Single'}
                 </button>
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 dark:text-gray-400">
                     {pageNumber} / {numPages}
                 </span>
-                <div className="h-6 w-px bg-gray-300 mx-2" />
+                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2" />
+
+                {/* 検索ボタン */}
+                <button
+                    onClick={onToggleSearch}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                        isSearchOpen
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'
+                            : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
+                    title="テキスト検索 (Ctrl+F)"
+                >
+                    <Search className="w-4 h-4" />
+                    Search
+                </button>
+
                 <button
                     onClick={onToggleEditMode}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${isEditMode ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 hover:bg-gray-200'
-                        }`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
+                        isEditMode
+                            ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-400'
+                            : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
                 >
                     {isEditMode ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
                     {isEditMode ? 'Done' : 'Edit'}
@@ -81,7 +101,7 @@ export function ReaderHeader({
                 {isEditMode && selectedPagesCount > 0 && (
                     <button
                         onClick={onDeletePages}
-                        className="px-3 py-1.5 text-sm font-medium bg-red-100 text-red-700 hover:bg-red-200 rounded-md transition-colors flex items-center gap-2"
+                        className="px-3 py-1.5 text-sm font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 rounded-md transition-colors flex items-center gap-2"
                     >
                         <Trash2 className="w-4 h-4" />
                         Delete ({selectedPagesCount})

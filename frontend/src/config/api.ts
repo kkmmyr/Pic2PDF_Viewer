@@ -34,6 +34,8 @@ export const API_ENDPOINTS = {
     OCR_STATUS: '/api/ocr/status',
     /** 既存PDFの一括圧縮 */
     BATCH_COMPRESS: '/api/batch_compress',
+    /** Generate ジョブ進捗取得 */
+    GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
 } as const;
 
 /**

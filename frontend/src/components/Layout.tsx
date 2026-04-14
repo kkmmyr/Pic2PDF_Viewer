@@ -1,19 +1,23 @@
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import { FileText, Library, Settings, Terminal } from 'lucide-react';
+import { FileText, Library, Settings, Terminal, Moon, Sun } from 'lucide-react';
+import { useDarkMode } from '../hooks';
 
 export default function Layout() {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const isReaderMode = searchParams.has('file');
+    const { isDark, toggle: toggleDark } = useDarkMode();
 
     const isActive = (path: string) => {
-        return location.pathname === path ? "text-blue-600 bg-blue-50" : "text-gray-600 hover:bg-gray-50";
+        return location.pathname === path
+            ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30'
+            : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800';
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-900">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col font-sans text-gray-900 dark:text-gray-100">
             {!isReaderMode && (
-                <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+                <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex justify-between h-16">
                             <div className="flex items-center">
@@ -49,6 +53,15 @@ export default function Layout() {
                                     <Terminal className="w-4 h-4" />
                                     Novel OCR
                                 </Link>
+
+                                {/* ダークモード切り替えボタン */}
+                                <button
+                                    onClick={toggleDark}
+                                    className="ml-2 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    title={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+                                >
+                                    {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                                </button>
                             </nav>
                         </div>
                     </div>

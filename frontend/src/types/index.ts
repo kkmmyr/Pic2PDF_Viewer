@@ -4,6 +4,7 @@
 export interface PdfFile {
     name: string;
     thumbnail: string | null;
+    created_at: number;
 }
 
 /**
@@ -106,3 +107,24 @@ export interface MoveItemsRequest {
     destination_path: string;
     source: LibrarySource;
 }
+
+/**
+ * Generator ジョブステータス
+ */
+export type GenerateJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export interface GenerateJob {
+    job_id: string;
+    status: GenerateJobStatus;
+    /** 現在処理中のアイテム名 */
+    current_item: string | null;
+    /** 生成済みファイル一覧（完了後に設定） */
+    files: string[];
+    message: string;
+    error: string | null;
+}
+
+/**
+ * 並び替え順序
+ */
+export type SortOrder = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc' | 'favorites_first';

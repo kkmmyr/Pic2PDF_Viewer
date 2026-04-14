@@ -1,13 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 
 import type { LibrarySource, ReadingDirection, DeletePagesResponse } from '../../types';
 import { buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import { useWindowSize, useBookImages, useImagePreloader, useReaderNavigation } from '../../hooks';
-import { ReaderHeader, PageRenderer } from '../reader';
+import { ReaderHeader, PageRenderer, PdfSearchBar } from '../reader';
 
-// Worker は呼び出し元で設定済みの場合もあるが、念のためここでも保証する
 if (!pdfjs.GlobalWorkerOptions.workerSrc) {
     pdfjs.GlobalWorkerOptions.workerSrc =
         `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -17,17 +16,16 @@ interface ReaderPanelProps {
     selectedPdf: string;
     currentPath: string;
     currentSource: LibrarySource;
-    /** PDF が更新された時にバージョンをインクリメントして親に通知する */
     onPdfUpdated: () => void;
-    /** リーダーを閉じてライブラリに戻る */
     onClose: () => void;
 }
 
 /**
  * PDF/画像リーダービュー。
  *
- * Reader の表示状態・編集状態を内部で一元管理し、
- * ViewerPage からの props は最小限（選択中PDF・パス・ソース・コールバック）のみ受け取る。
+ * 追加機能:
+ * - Viewer内検索: Ctrl+F でサーチバーを開き、PDFテキストレイヤーをハイライト
+ * - ダークモード対応の背景色
  */
 export function ReaderPanel({
     selectedPdf,
@@ -55,28 +53,102 @@ export function ReaderPanel({
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
 
+    // 検索
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const [matchCount, setMatchCount] = useState(0);
+    const [currentMatch, setCurrentMatch] = useState(0);
+    // PDFページのテキストコンテンツ: { pageNum -> TextItem[] }
+    const pdfRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
+
+    // Ctrl+F でサーチバーを開く
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
+
+    // 検索クローズ時にリセット
+    const handleCloseSearch = useCallback(() => {
+        setIsSearchOpen(false);
+        setSearchText('');
+        setMatchCount(0);
+        setCurrentMatch(0);
+    }, []);
+
+    // テキスト検索: 全ページを走査してマッチ数を算出し、最初のマッチページに移動
+    const searchAllPages = useCallback(async (text: string) => {
+        if (!pdfRef.current || !text) {
+            setMatchCount(0);
+            setCurrentMatch(0);
+            return;
+        }
+
+        let totalMatches = 0;
+        let firstMatchPage = -1;
+        const lowerText = text.toLowerCase();
+
+        for (let i = 1; i <= pdfRef.current.numPages; i++) {
+            const page = await pdfRef.current.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items
+                .map((item) => ('str' in item ? item.str : ''))
+                .join('');
+            const count = (pageText.toLowerCase().match(new RegExp(
+                lowerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'
+            )) || []).length;
+
+            if (count > 0 && firstMatchPage === -1) firstMatchPage = i;
+            totalMatches += count;
+        }
+
+        setMatchCount(totalMatches);
+        setCurrentMatch(totalMatches > 0 ? 1 : 0);
+        if (firstMatchPage > 0 && firstMatchPage !== pageNumber) {
+            setPageNumber(firstMatchPage);
+        }
+    }, [pageNumber, setPageNumber]);
+
+    useEffect(() => {
+        if (!isSearchOpen) return;
+        searchAllPages(searchText);
+    }, [searchText, isSearchOpen, searchAllPages]);
+
+    const handlePrevMatch = useCallback(() => {
+        setCurrentMatch(prev => (prev > 1 ? prev - 1 : matchCount));
+    }, [matchCount]);
+
+    const handleNextMatch = useCallback(() => {
+        setCurrentMatch(prev => (prev < matchCount ? prev + 1 : 1));
+    }, [matchCount]);
+
     // プリロード (3ページ先読み)
     useImagePreloader(imageUrls, pageNumber - 1, 3);
 
-    // 画像モード切り替え時に numPages を更新
     useEffect(() => {
         if (isImageMode) setNumPages(imageNumPages);
     }, [isImageMode, imageNumPages]);
 
-    // PDF が変わったらリセット
     useEffect(() => {
         setIsEditMode(false);
         setSelectedPages(new Set());
         setNumPages(0);
+        handleCloseSearch();
         resetPage();
-    }, [selectedPdf, resetPage]);
+    }, [selectedPdf, resetPage, handleCloseSearch]);
 
     const handleClose = useCallback(() => {
         resetPage();
         setIsEditMode(false);
         setSelectedPages(new Set());
+        handleCloseSearch();
         onClose();
-    }, [resetPage, onClose]);
+    }, [resetPage, onClose, handleCloseSearch]);
 
     const toggleDirection = useCallback(() => {
         setDirection(prev => (prev === 'rtl' ? 'ltr' : 'rtl'));
@@ -121,11 +193,22 @@ export function ReaderPanel({
         }
     }, [selectedPages, selectedPdf, currentPath, currentSource, pageNumber, onPdfUpdated, setPageNumber]);
 
-    const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-        setNumPages(numPages);
+    const onDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
+        setNumPages(pdf.numPages);
+        pdfRef.current = pdf;
     }, []);
 
-    // ページレンダリングヘルパー
+    // テキストレイヤーのハイライトレンダラー
+    const customTextRenderer = useCallback(
+        ({ str }: { str: string }) => {
+            if (!searchText || !str) return str;
+            const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escaped})`, 'gi');
+            return str.replace(regex, `<mark style="background:rgba(255,200,0,0.5);border-radius:2px;">$1</mark>`);
+        },
+        [searchText]
+    );
+
     const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => (
         <PageRenderer
             key={`page-${pNum}`}
@@ -141,6 +224,8 @@ export function ReaderPanel({
             onPrev={handlePrev}
             isImageMode={isImageMode}
             imageUrl={imageUrls ? imageUrls[pNum - 1] : null}
+            searchText={searchText}
+            customTextRenderer={!isImageMode && searchText ? customTextRenderer : undefined}
         />
     );
 
@@ -156,6 +241,9 @@ export function ReaderPanel({
     const pdfUrl = buildStaticUrl(
         STATIC_PATHS.PDF(currentPath, selectedPdf, currentSource, pdfVersion)
     );
+
+    // 検索バーが開いている分だけコンテンツを下げるオフセット
+    const contentTopOffset = isSearchOpen ? 'pt-10' : '';
 
     return (
         <>
@@ -174,15 +262,30 @@ export function ReaderPanel({
                 isEditMode={isEditMode}
                 selectedPagesCount={selectedPages.size}
                 showHeader={showHeader}
+                isSearchOpen={isSearchOpen}
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
                 onToggleSpread={() => setIsSpread(s => !s)}
                 onToggleEditMode={handleToggleEditMode}
                 onDeletePages={handleDeletePages}
                 onMouseLeave={() => setShowHeader(false)}
+                onToggleSearch={() => setIsSearchOpen(s => !s)}
             />
 
-            <div className="flex-1 bg-gray-100 overflow-auto relative">
+            {/* 検索バー (ヘッダーが表示中のみ表示) */}
+            {isSearchOpen && showHeader && (
+                <PdfSearchBar
+                    searchText={searchText}
+                    matchCount={matchCount}
+                    currentMatch={currentMatch}
+                    onSearchChange={setSearchText}
+                    onPrevMatch={handlePrevMatch}
+                    onNextMatch={handleNextMatch}
+                    onClose={handleCloseSearch}
+                />
+            )}
+
+            <div className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}>
                 <div
                     className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
                     onClick={handleNext}

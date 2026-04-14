@@ -17,11 +17,15 @@ interface PageRendererProps {
     // Image mode props
     imageUrl?: string | null;
     isImageMode?: boolean;
+    // Search props (PDF mode only)
+    searchText?: string;
+    customTextRenderer?: (props: { str: string; itemIndex: number }) => string;
 }
 
 /**
  * 単一ページのレンダリングコンポーネント
- * PDF モードと画像モードの両方に対応
+ * - PDF モードと画像モードの両方に対応
+ * - 検索テキストがある場合はテキストレイヤーを有効化してハイライト表示
  */
 export function PageRenderer({
     pageNumber,
@@ -36,8 +40,9 @@ export function PageRenderer({
     onPrev,
     imageUrl,
     isImageMode = false,
+    searchText,
+    customTextRenderer,
 }: PageRendererProps) {
-    // ページ範囲外の場合はEndプレースホルダーを表示
     if (pageNumber > numPages) {
         return (
             <div
@@ -54,7 +59,6 @@ export function PageRenderer({
             e.stopPropagation();
             onToggleSelection(pageNumber, e);
         } else {
-            // Navigation logic based on side and direction
             if (side === 'left') {
                 direction === 'rtl' ? onNext(e) : onPrev(e);
             } else if (side === 'right') {
@@ -92,11 +96,14 @@ export function PageRenderer({
         );
     }
 
-    // PDF Mode
+    // テキスト検索が有効な場合はテキストレイヤーも描画する
+    const enableTextLayer = Boolean(searchText && customTextRenderer);
+
     return (
         <div
-            className={`shadow-2xl cursor-pointer shrink-0 max-w-[calc(50vw-2rem)] flex justify-center relative ${isSelected ? 'ring-4 ring-red-500' : ''
-                }`}
+            className={`shadow-2xl cursor-pointer shrink-0 max-w-[calc(50vw-2rem)] flex justify-center relative ${
+                isSelected ? 'ring-4 ring-red-500' : ''
+            }`}
             onClick={handleClick}
         >
             {selectionIndicator}
@@ -104,8 +111,9 @@ export function PageRenderer({
                 pageNumber={pageNumber}
                 height={windowHeight - 40}
                 className="bg-white !w-auto !h-auto !max-w-full flex items-center justify-center [&_canvas]:!w-auto [&_canvas]:!h-auto [&_canvas]:!max-w-full [&_canvas]:!max-h-full [&_canvas]:object-contain"
-                renderTextLayer={false}
+                renderTextLayer={enableTextLayer}
                 renderAnnotationLayer={false}
+                customTextRenderer={enableTextLayer ? customTextRenderer : undefined}
             />
         </div>
     );

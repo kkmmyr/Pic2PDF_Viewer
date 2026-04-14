@@ -1,117 +1,127 @@
-import { ArrowLeft } from 'lucide-react';
-import { LibrarySource } from '../../types';
+import { ArrowLeft, ArrowUpDown } from 'lucide-react';
+import type { LibrarySource, SortOrder } from '../../types';
 
 interface LibraryHeaderProps {
     currentPath: string;
     currentSource: LibrarySource;
     isSelectionMode: boolean;
     selectedCount: number;
+    sortOrder: SortOrder;
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
     onCreateFolder: () => void;
     onMoveSelected: () => void;
+    onSortChange: (order: SortOrder) => void;
 }
 
-/**
- * ライブラリビューのヘッダーコンポーネント
- */
+const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
+    { value: 'name_asc',        label: '名前 (A→Z)' },
+    { value: 'name_desc',       label: '名前 (Z→A)' },
+    { value: 'date_desc',       label: '新しい順' },
+    { value: 'date_asc',        label: '古い順' },
+    { value: 'favorites_first', label: 'お気に入り優先' },
+];
+
 export function LibraryHeader({
     currentPath,
     currentSource,
     isSelectionMode,
     selectedCount,
+    sortOrder,
     onUpClick,
     onSourceChange,
     onToggleSelectionMode,
     onCreateFolder,
-    onMoveSelected
+    onMoveSelected,
+    onSortChange,
 }: LibraryHeaderProps) {
     return (
-        <div className="sticky top-0 h-14 border-b bg-white/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-50">
-            <div className="flex items-center gap-4">
-                {currentPath && (
-                    <button
-                        onClick={onUpClick}
-                        className="p-2 hover:bg-gray-100 rounded-full"
-                    >
-                        <ArrowLeft className="w-5 h-5" />
-                    </button>
-                )}
-                <h1 className="font-semibold truncate">
-                    {currentPath ? currentPath.split('/').pop() : 'Library'}
-                </h1>
-            </div>
-
-            <div className="flex items-center gap-3">
-                {/* Action Buttons */}
-                <div className="flex gap-2 mr-4">
-                    {isSelectionMode ? (
-                        <>
-                            <span className="text-sm font-medium self-center mr-2">
-                                {selectedCount} 選択中
-                            </span>
-                            <button
-                                onClick={onMoveSelected}
-                                disabled={selectedCount === 0}
-                                className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                移動
-                            </button>
-                            <button
-                                onClick={onToggleSelectionMode}
-                                className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-300"
-                            >
-                                キャンセル
-                            </button>
-                        </>
-                    ) : (
-                        <>
-                            <button
-                                onClick={onCreateFolder}
-                                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200"
-                            >
-                                + フォルダ作成
-                            </button>
-                            <button
-                                onClick={onToggleSelectionMode}
-                                className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200"
-                            >
-                                選択
-                            </button>
-                        </>
+        <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-50">
+            <div className="h-14 flex items-center px-4 justify-between">
+                <div className="flex items-center gap-4">
+                    {currentPath && (
+                        <button
+                            onClick={onUpClick}
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+                        >
+                            <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        </button>
                     )}
+                    <h1 className="font-semibold truncate text-gray-900 dark:text-gray-100">
+                        {currentPath ? currentPath.split('/').pop() : 'Library'}
+                    </h1>
                 </div>
 
-                {/* Source Tabs */}
-                <div className="flex bg-gray-100 rounded-lg p-1">
-                    <button
-                        onClick={() => onSourceChange('generated')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${currentSource === 'generated'
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-900'
-                            }`}
-                    >
-                        Main
-                    </button>
-                    <button
-                        onClick={() => onSourceChange('kindle')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${currentSource === 'kindle'
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-900'
-                            }`}
-                    >
-                        Kindle
-                    </button>
-                    <button
-                        onClick={() => onSourceChange('novel')}
-                        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${currentSource === 'novel'
-                            ? 'bg-white text-blue-600 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-900'
-                            }`}
-                    >
-                        Novel
-                    </button>
+                <div className="flex items-center gap-3">
+                    <div className="flex gap-2 mr-2">
+                        {isSelectionMode ? (
+                            <>
+                                <span className="text-sm font-medium self-center mr-2 text-gray-700 dark:text-gray-300">
+                                    {selectedCount} 選択中
+                                </span>
+                                <button
+                                    onClick={onMoveSelected}
+                                    disabled={selectedCount === 0}
+                                    className="px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    移動
+                                </button>
+                                <button
+                                    onClick={onToggleSelectionMode}
+                                    className="px-3 py-1.5 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600"
+                                >
+                                    キャンセル
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={onCreateFolder}
+                                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    + フォルダ作成
+                                </button>
+                                <button
+                                    onClick={onToggleSelectionMode}
+                                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700"
+                                >
+                                    選択
+                                </button>
+                            </>
+                        )}
+                    </div>
+
+                    {!isSelectionMode && (
+                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                            <ArrowUpDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                            <select
+                                value={sortOrder}
+                                onChange={(e) => onSortChange(e.target.value as SortOrder)}
+                                className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                            >
+                                {SORT_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                        {(['generated', 'kindle', 'novel'] as LibrarySource[]).map((src) => (
+                            <button
+                                key={src}
+                                onClick={() => onSourceChange(src)}
+                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                                    currentSource === src
+                                        ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                {src === 'generated' ? 'Main' : src === 'kindle' ? 'Kindle' : 'Novel'}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

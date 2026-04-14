@@ -1,6 +1,18 @@
-import type { PdfFile, LibrarySource } from '../../types';
+import { useState, useCallback } from 'react';
+import type { PdfFile, LibrarySource, SortOrder } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid, MoveDialog } from '../reader';
 import { CreateFolderDialog } from './CreateFolderDialog';
+import { useFavorites, useSortedPdfs } from '../../hooks';
+
+const SORT_STORAGE_KEY = 'librarySortOrder';
+
+function readStoredSort(): SortOrder {
+    try {
+        const v = localStorage.getItem(SORT_STORAGE_KEY);
+        if (v) return v as SortOrder;
+    } catch { /* ignore */ }
+    return 'name_asc';
+}
 
 interface LibraryPanelProps {
     pdfs: PdfFile[];
@@ -32,6 +44,7 @@ interface LibraryPanelProps {
 /**
  * ライブラリ一覧ビュー。
  * フォルダ/PDF グリッド・ヘッダー・移動ダイアログ・フォルダ作成ダイアログを管理する。
+ * お気に入り・並び替えもこのコンポーネントで完結させる。
  */
 export function LibraryPanel({
     pdfs, directories, currentPath, currentSource,
@@ -42,6 +55,16 @@ export function LibraryPanel({
     onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
     onMoveSelected, onCloseMoveDialog, onMoveItems,
 }: LibraryPanelProps) {
+    const [sortOrder, setSortOrder] = useState<SortOrder>(readStoredSort);
+
+    const handleSortChange = useCallback((order: SortOrder) => {
+        setSortOrder(order);
+        try { localStorage.setItem(SORT_STORAGE_KEY, order); } catch { /* ignore */ }
+    }, []);
+
+    const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
+    const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites);
+
     return (
         <>
             <LibraryHeader
@@ -49,11 +72,13 @@ export function LibraryPanel({
                 currentSource={currentSource}
                 isSelectionMode={isSelectionMode}
                 selectedCount={selectedItems.size}
+                sortOrder={sortOrder}
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
                 onCreateFolder={onOpenCreateFolder}
                 onMoveSelected={onMoveSelected}
+                onSortChange={handleSortChange}
             />
 
             <CreateFolderDialog
@@ -70,7 +95,7 @@ export function LibraryPanel({
                 sourcePath={currentPath}
             />
 
-            <div className="flex-1 bg-gray-100 overflow-auto">
+            <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">
                     <FolderGrid
                         directories={directories}
@@ -80,11 +105,13 @@ export function LibraryPanel({
                         onToggleSelect={onToggleSelect}
                     />
                     <PdfGrid
-                        pdfs={pdfs}
+                        pdfs={sortedPdfs}
                         onPdfClick={onPdfClick}
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
                         onToggleSelect={onToggleSelect}
+                        favorites={favorites}
+                        onToggleFavorite={toggleFavorite}
                     />
                 </div>
             </div>
