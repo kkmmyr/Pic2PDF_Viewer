@@ -5,81 +5,75 @@ import apiClient from '../config/api_client';
 import { usePdfStatus } from '../hooks/usePdfStatus';
 import type { GenerateResponse, StatusItem } from '../types';
 
-// デフォルトの入力ディレクトリパス
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
+const DEFAULT_QUALITY = 50;
 
 export default function GeneratorPage() {
     const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
-    const [loading, setLoading] = useState(false);
+    // 生成・圧縮を別々のローディング状態で管理し、どちらの処理中か明確にする
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [isCompressing, setIsCompressing] = useState(false);
     const [result, setResult] = useState<GenerateResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    // Compression settings
     const [generateCompressed, setGenerateCompressed] = useState(true);
-    const [quality, setQuality] = useState(50);
+    const [quality, setQuality] = useState(DEFAULT_QUALITY);
 
-    // Use custom hook for status polling
-    const { statusItems, refetch: fetchStatus } = usePdfStatus(sourceDir, loading);
+    const isLoading = isGenerating || isCompressing;
+    const { statusItems, refetch: fetchStatus } = usePdfStatus(sourceDir, isLoading);
 
     const handleGenerate = async () => {
         if (!sourceDir) return;
 
-        setLoading(true);
+        setIsGenerating(true);
         setError(null);
         setResult(null);
 
         try {
-            const data = await apiClient.post<any, GenerateResponse>(API_ENDPOINTS.GENERATE, {
+            const data = await apiClient.post<unknown, GenerateResponse>(API_ENDPOINTS.GENERATE, {
                 source_dir: sourceDir,
                 generate_compressed: generateCompressed,
-                quality: quality
+                quality,
             });
-
             setResult(data);
-            fetchStatus(); // Final status check
-        } catch (err: any) {
-            setError(err.message);
+            fetchStatus();
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : '生成に失敗しました。');
         } finally {
-            setLoading(false);
+            setIsGenerating(false);
         }
     };
 
     const handleBatchCompress = async () => {
-        setLoading(true);
+        setIsCompressing(true);
         setError(null);
         setResult(null);
 
         try {
-            const data = await apiClient.post<any, GenerateResponse>(API_ENDPOINTS.BATCH_COMPRESS, {
-                quality: quality
+            const data = await apiClient.post<unknown, GenerateResponse>(API_ENDPOINTS.BATCH_COMPRESS, {
+                quality,
             });
             setResult(data);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : '一括圧縮に失敗しました。');
         } finally {
-            setLoading(false);
+            setIsCompressing(false);
         }
     };
 
     const getStatusBadgeClass = (status: StatusItem['status']) => {
         switch (status) {
-            case 'completed':
-                return 'bg-green-100 text-green-800';
-            case 'in_progress':
-                return 'bg-blue-100 text-blue-800';
-            default:
-                return 'bg-gray-100 text-gray-800';
+            case 'completed':   return 'bg-green-100 text-green-800';
+            case 'in_progress': return 'bg-blue-100 text-blue-800';
+            default:            return 'bg-gray-100 text-gray-800';
         }
     };
 
     const getStatusLabel = (status: StatusItem['status']) => {
         switch (status) {
-            case 'completed':
-                return 'Completed';
-            case 'in_progress':
-                return 'In Progress';
-            default:
-                return 'Not Started';
+            case 'completed':   return 'Completed';
+            case 'in_progress': return 'In Progress';
+            default:            return 'Not Started';
         }
     };
 
@@ -153,17 +147,17 @@ export default function GeneratorPage() {
                         )}
                     </div>
 
-                    {/* Batch Compress Option */}
+                    {/* Buttons */}
                     <div className="flex flex-col gap-4">
                         <button
                             onClick={handleGenerate}
-                            disabled={loading || !sourceDir}
+                            disabled={isLoading || !sourceDir}
                             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 transition-all hover:scale-[1.01] active:scale-[0.99]"
                         >
-                            {loading ? (
+                            {isGenerating ? (
                                 <>
                                     <Loader2 className="animate-spin" />
-                                    Processing...
+                                    Generating...
                                 </>
                             ) : (
                                 <>
@@ -184,15 +178,15 @@ export default function GeneratorPage() {
 
                         <button
                             onClick={handleBatchCompress}
-                            disabled={loading}
+                            disabled={isLoading}
                             className="w-full flex items-center justify-center gap-2 bg-white hover:bg-gray-50 disabled:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl border border-gray-300 transition-all"
                         >
-                            {loading ? (
+                            {isCompressing ? (
                                 <Loader2 className="animate-spin" size={18} />
                             ) : (
                                 <Zap size={18} className="text-amber-500" />
                             )}
-                            Batch Compress All Existing PDFs
+                            {isCompressing ? 'Compressing...' : 'Batch Compress All Existing PDFs'}
                         </button>
                     </div>
 

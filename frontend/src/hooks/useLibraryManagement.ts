@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { LibrarySource } from '../types';
+import type { LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 
@@ -13,12 +13,11 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+    const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
 
     const toggleSelectionMode = useCallback(() => {
         setIsSelectionMode(prev => {
-            if (prev) {
-                setSelectedItems(new Set());
-            }
+            if (prev) setSelectedItems(new Set());
             return !prev;
         });
     }, []);
@@ -26,29 +25,24 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
     const toggleSelectItem = useCallback((name: string) => {
         setSelectedItems(prev => {
             const next = new Set(prev);
-            if (next.has(name)) {
-                next.delete(name);
-            } else {
-                next.add(name);
-            }
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
             return next;
         });
     }, []);
 
-    const createFolder = useCallback(async () => {
-        const name = prompt("フォルダ名を入力してください");
-        if (!name) return;
+    // フォルダ作成ダイアログの開閉
+    const openCreateFolderDialog = useCallback(() => setIsCreateFolderOpen(true), []);
+    const closeCreateFolderDialog = useCallback(() => setIsCreateFolderOpen(false), []);
 
-        try {
-            await apiClient.post(API_ENDPOINTS.DIRECTORIES, {
-                path: currentPath,
-                name,
-                source: currentSource
-            });
-            onRefresh();
-        } catch (e: any) {
-            alert(e.message);
-        }
+    // 実際のフォルダ作成 API 呼び出し（CreateFolderDialog から名前を受け取る）
+    const handleCreateFolder = useCallback(async (name: string) => {
+        await apiClient.post(API_ENDPOINTS.DIRECTORIES, {
+            path: currentPath,
+            name,
+            source: currentSource,
+        });
+        onRefresh();
     }, [currentPath, currentSource, onRefresh]);
 
     const openMoveDialog = useCallback(() => {
@@ -56,38 +50,34 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         setIsMoveDialogOpen(true);
     }, [selectedItems]);
 
-    const closeMoveDialog = useCallback(() => {
-        setIsMoveDialogOpen(false);
-    }, []);
+    const closeMoveDialog = useCallback(() => setIsMoveDialogOpen(false), []);
 
     const handleMoveItems = useCallback(async (destination: string) => {
         if (selectedItems.size === 0) return;
 
-        try {
-            await apiClient.post(API_ENDPOINTS.MOVE, {
-                items: Array.from(selectedItems),
-                source_path: currentPath,
-                destination_path: destination,
-                source: currentSource
-            });
+        await apiClient.post(API_ENDPOINTS.MOVE, {
+            items: Array.from(selectedItems),
+            source_path: currentPath,
+            destination_path: destination,
+            source: currentSource,
+        });
 
-            // Success
-            setIsMoveDialogOpen(false);
-            setIsSelectionMode(false);
-            setSelectedItems(new Set());
-            onRefresh();
-        } catch (e: any) {
-            alert(e.message);
-        }
+        setIsMoveDialogOpen(false);
+        setIsSelectionMode(false);
+        setSelectedItems(new Set());
+        onRefresh();
     }, [selectedItems, currentPath, currentSource, onRefresh]);
 
     return {
         isSelectionMode,
         selectedItems,
         isMoveDialogOpen,
+        isCreateFolderOpen,
         toggleSelectionMode,
         toggleSelectItem,
-        createFolder,
+        openCreateFolderDialog,
+        closeCreateFolderDialog,
+        handleCreateFolder,
         openMoveDialog,
         closeMoveDialog,
         handleMoveItems,
