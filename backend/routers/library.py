@@ -189,3 +189,58 @@ def move_items(request: MoveItemsRequest):
         raise HTTPException(status_code=500, detail="Failed to move items: " + "; ".join(errors))
 
     return {"message": "Items moved", "moved_count": moved_count, "errors": errors}
+
+
+class RenameItemRequest(BaseModel):
+    path: str
+    old_name: str
+    new_name: str
+    source: str = "generated"
+
+
+@router.patch("/rename")
+def rename_item(request: RenameItemRequest):
+    validate_safe_path(request.path, param_name="path")
+    validate_safe_name(request.old_name, param_name="old_name")
+    validate_safe_name(request.new_name, param_name="new_name")
+
+    dirs = get_dirs_by_source(request.source)
+    renamed_parts: list[tuple[str, str]] = []  # (変更後, 変更前) — ロールバック用
+
+    try:
+        src_pdf = os.path.join(dirs["pdf"], request.path, request.old_name)
+        dst_pdf = os.path.join(dirs["pdf"], request.path, request.new_name)
+
+        if not os.path.exists(src_pdf):
+            raise HTTPException(status_code=404, detail="Item not found")
+        if os.path.exists(dst_pdf):
+            raise HTTPException(status_code=400, detail="Name already exists")
+
+        os.rename(src_pdf, dst_pdf)
+        renamed_parts.append((dst_pdf, src_pdf))
+
+        # サムネイルのリネーム
+        old_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.old_name)[0] + ".jpg")
+        new_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.new_name)[0] + ".jpg")
+        if os.path.exists(old_thumb):
+            os.rename(old_thumb, new_thumb)
+            renamed_parts.append((new_thumb, old_thumb))
+
+        # 画像ディレクトリのリネーム
+        old_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.old_name)[0])
+        new_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.new_name)[0])
+        if os.path.exists(old_img):
+            os.rename(old_img, new_img)
+            renamed_parts.append((new_img, old_img))
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        for renamed_dst, original_src in reversed(renamed_parts):
+            try:
+                os.rename(renamed_dst, original_src)
+            except Exception:
+                pass
+        raise HTTPException(status_code=500, detail=f"Rename failed: {str(e)}")
+
+    return {"message": "Item renamed", "new_name": request.new_name}
