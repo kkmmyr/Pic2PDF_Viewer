@@ -28,6 +28,8 @@ export const API_ENDPOINTS = {
     DIRECTORIES: '/api/directories',
     /** ファイル/ディレクトリ移動 */
     MOVE: '/api/move',
+    /** PDFリネーム */
+    RENAME: '/api/rename',
     /** OCR機能 */
     OCR_RUN: '/api/ocr/run',
     OCR_STOP: '/api/ocr/stop',

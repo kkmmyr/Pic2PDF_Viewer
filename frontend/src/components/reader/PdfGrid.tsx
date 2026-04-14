@@ -1,4 +1,4 @@
-import { CheckSquare, Square, Star } from 'lucide-react';
+import { CheckSquare, Square, Star, Pencil } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
 
@@ -10,6 +10,7 @@ interface PdfGridProps {
     onToggleSelect?: (name: string) => void;
     favorites?: Set<string>;
     onToggleFavorite?: (name: string) => void;
+    onRename?: (name: string) => void;
 }
 
 /**
@@ -25,6 +26,7 @@ export function PdfGrid({
     onToggleSelect,
     favorites = new Set(),
     onToggleFavorite,
+    onRename,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -103,9 +105,20 @@ export function PdfGrid({
                                             ? new Date(pdf.created_at * 1000).toLocaleDateString()
                                             : ''}
                                     </span>
-                                    {isFav && (
-                                        <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
-                                    )}
+                                    <div className="flex items-center gap-1">
+                                        {!isSelectionMode && onRename && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onRename(pdf.name); }}
+                                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                                                title="名前を変更"
+                                            >
+                                                <Pencil className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                        {isFav && (
+                                            <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -270,6 +270,7 @@ export function ReaderPanel({
                 onDeletePages={handleDeletePages}
                 onMouseLeave={() => setShowHeader(false)}
                 onToggleSearch={() => setIsSearchOpen(s => !s)}
+                onPageJump={setPageNumber}
             />
 
             {/* 検索バー (ヘッダーが表示中のみ表示) */}

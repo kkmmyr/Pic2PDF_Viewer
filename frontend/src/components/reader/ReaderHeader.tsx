@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Trash2, CheckSquare, Square, Search } from 'lucide-react';
 import type { ReadingDirection } from '../../types';
 
@@ -18,6 +19,7 @@ interface ReaderHeaderProps {
     onDeletePages: () => void;
     onMouseLeave: () => void;
     onToggleSearch: () => void;
+    onPageJump: (page: number) => void;
 }
 
 export function ReaderHeader({
@@ -37,7 +39,35 @@ export function ReaderHeader({
     onDeletePages,
     onMouseLeave,
     onToggleSearch,
+    onPageJump,
 }: ReaderHeaderProps) {
+    const [isEditingPage, setIsEditingPage] = useState(false);
+    const [inputValue, setInputValue] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (isEditingPage) {
+            setInputValue(String(pageNumber));
+            setTimeout(() => {
+                inputRef.current?.focus();
+                inputRef.current?.select();
+            }, 0);
+        }
+    }, [isEditingPage, pageNumber]);
+
+    const commitPageJump = () => {
+        const n = parseInt(inputValue, 10);
+        if (!isNaN(n)) {
+            onPageJump(Math.max(1, Math.min(n, numPages)));
+        }
+        setIsEditingPage(false);
+    };
+
+    const handlePageKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') commitPageJump();
+        if (e.key === 'Escape') setIsEditingPage(false);
+    };
+
     return (
         <div
             className={`fixed top-0 left-0 right-0 h-14 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-50 transition-transform duration-300 ${
@@ -68,9 +98,33 @@ export function ReaderHeader({
                 >
                     {isSpread ? 'Spread' : 'Single'}
                 </button>
-                <span className="text-sm text-gray-500 dark:text-gray-400">
-                    {pageNumber} / {numPages}
-                </span>
+
+                {/* ページ番号 (クリックで直接入力) */}
+                {isEditingPage ? (
+                    <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
+                        <input
+                            ref={inputRef}
+                            type="number"
+                            min={1}
+                            max={numPages}
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={handlePageKeyDown}
+                            onBlur={commitPageJump}
+                            className="w-14 px-1.5 py-0.5 text-sm text-center border border-blue-400 dark:border-blue-500 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-400"
+                        />
+                        <span>/ {numPages}</span>
+                    </div>
+                ) : (
+                    <button
+                        onClick={() => setIsEditingPage(true)}
+                        title="クリックでページ移動"
+                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors tabular-nums"
+                    >
+                        {pageNumber} / {numPages}
+                    </button>
+                )}
+
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2" />
 
                 {/* 検索ボタン */}

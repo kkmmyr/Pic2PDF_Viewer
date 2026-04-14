@@ -57,12 +57,13 @@ export default function ViewerPage() {
         fetchPdfs();
     }, [fetchPdfs, libraryVersion]);
 
-    // ライブラリ管理（フォルダ作成・移動）
+    // ライブラリ管理（フォルダ作成・移動・リネーム）
     const {
         isSelectionMode,
         selectedItems,
         isMoveDialogOpen,
         isCreateFolderOpen,
+        renameTarget,
         toggleSelectionMode,
         toggleSelectItem,
         openCreateFolderDialog,
@@ -71,6 +72,9 @@ export default function ViewerPage() {
         openMoveDialog,
         closeMoveDialog,
         handleMoveItems,
+        openRenameDialog,
+        closeRenameDialog,
+        handleRename,
     } = useLibraryManagement({
         currentPath,
         currentSource,
@@ -103,6 +107,7 @@ export default function ViewerPage() {
                     selectedItems={selectedItems}
                     isMoveDialogOpen={isMoveDialogOpen}
                     isCreateFolderOpen={isCreateFolderOpen}
+                    renameTarget={renameTarget}
                     onPdfClick={(name) => selectPdf(name, currentPath)}
                     onFolderClick={(dir) => navigateIntoFolder(dir, currentPath)}
                     onUpClick={() => navigateUp(currentPath)}
@@ -115,6 +120,9 @@ export default function ViewerPage() {
                     onMoveSelected={openMoveDialog}
                     onCloseMoveDialog={closeMoveDialog}
                     onMoveItems={handleMoveItems}
+                    onOpenRename={openRenameDialog}
+                    onCloseRename={closeRenameDialog}
+                    onRenameItem={handleRename}
                 />
             )}
         </div>
