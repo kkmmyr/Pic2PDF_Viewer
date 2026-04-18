@@ -1,15 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { pdfjs } from 'react-pdf';
-
 import type { PdfFile, LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import { useUrlState } from '../hooks/useUrlState';
 import { useLibraryManagement } from '../hooks';
 import { LibraryPanel, ReaderPanel } from '../components/viewer';
-
-pdfjs.GlobalWorkerOptions.workerSrc =
-    `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 /**
  * ViewerPage — ライブラリ閲覧 & PDF リーダーのルートコンポーネント。
@@ -26,16 +21,16 @@ export default function ViewerPage() {
     const {
         currentPath,
         selectedPdf,
+        currentSource,
         navigateIntoFolder,
         navigateUp,
         selectPdf,
         clearPdf,
-        resetAll,
+        setSource,
     } = useUrlState();
 
     const [pdfs, setPdfs] = useState<PdfFile[]>([]);
     const [directories, setDirectories] = useState<string[]>([]);
-    const [currentSource, setCurrentSource] = useState<LibrarySource>('generated');
     // PDF 一覧の再取得トリガー（ページ削除後などに使用）
     const [libraryVersion, setLibraryVersion] = useState(0);
 
@@ -83,9 +78,8 @@ export default function ViewerPage() {
 
     // ソース切り替え
     const handleSourceChange = useCallback((source: LibrarySource) => {
-        setCurrentSource(source);
-        resetAll();
-    }, [resetAll]);
+        setSource(source);
+    }, [setSource]);
 
     return (
         <div className="h-full flex flex-col relative">
@@ -95,7 +89,7 @@ export default function ViewerPage() {
                     currentPath={currentPath}
                     currentSource={currentSource}
                     onPdfUpdated={() => setLibraryVersion(v => v + 1)}
-                    onClose={() => clearPdf(currentPath)}
+                    onClose={() => clearPdf(currentPath, currentSource)}
                 />
             ) : (
                 <LibraryPanel
@@ -108,9 +102,9 @@ export default function ViewerPage() {
                     isMoveDialogOpen={isMoveDialogOpen}
                     isCreateFolderOpen={isCreateFolderOpen}
                     renameTarget={renameTarget}
-                    onPdfClick={(name) => selectPdf(name, currentPath)}
-                    onFolderClick={(dir) => navigateIntoFolder(dir, currentPath)}
-                    onUpClick={() => navigateUp(currentPath)}
+                    onPdfClick={(name) => selectPdf(name, currentPath, currentSource)}
+                    onFolderClick={(dir) => navigateIntoFolder(dir, currentPath, currentSource)}
+                    onUpClick={() => navigateUp(currentPath, currentSource)}
                     onSourceChange={handleSourceChange}
                     onToggleSelectionMode={toggleSelectionMode}
                     onToggleSelect={toggleSelectItem}

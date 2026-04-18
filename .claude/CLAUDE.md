@@ -101,7 +101,7 @@ cd frontend && npm run dev  # :5173
 | [frontend/src/hooks/useSortedPdfs.ts](../frontend/src/hooks/useSortedPdfs.ts) | PDF一覧並び替え (useMemo) |
 | [frontend/src/hooks/useFavorites.ts](../frontend/src/hooks/useFavorites.ts) | お気に入り管理 (source別localStorage) |
 | [frontend/src/hooks/useDarkMode.ts](../frontend/src/hooks/useDarkMode.ts) | ダークモード管理 (localStorage永続化) |
-| [frontend/src/hooks/useUrlState.ts](../frontend/src/hooks/useUrlState.ts) | URLパラメータ同期 (path/file の読み書き) |
+| [frontend/src/hooks/useUrlState.ts](../frontend/src/hooks/useUrlState.ts) | URLパラメータ同期 (path/file/source の読み書き) |
 | [frontend/src/hooks/usePolling.ts](../frontend/src/hooks/usePolling.ts) | 共通ポーリングフック |
 | [frontend/src/hooks/usePdfStatus.ts](../frontend/src/hooks/usePdfStatus.ts) | PDF生成ジョブ監視 |
 | [frontend/src/hooks/useOcrStatus.ts](../frontend/src/hooks/useOcrStatus.ts) | OCRステータス監視 |

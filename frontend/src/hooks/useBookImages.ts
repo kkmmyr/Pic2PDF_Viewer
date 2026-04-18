@@ -28,6 +28,9 @@ export function useBookImages(
 
         if (!selectedPdf) return;
 
+        // novel ソースは OCR 済み Searchable PDF なので、PDF モードで表示する（画像取得スキップ）
+        if (source === 'novel') return;
+
         // Try to fetch images
         const bookName = selectedPdf.replace(/\.pdf$/i, '');
         const bookPath = currentPath ? `${currentPath}/${bookName}` : bookName;

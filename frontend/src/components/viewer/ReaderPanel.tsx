@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 import type { LibrarySource, ReadingDirection, SpreadMode, DeletePagesResponse } from '../../types';
 import { buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../../config/api';
@@ -7,10 +8,11 @@ import apiClient from '../../config/api_client';
 import { useWindowSize, useBookImages, useImagePreloader, useReaderNavigation } from '../../hooks';
 import { ReaderHeader, PageRenderer, PdfSearchBar } from '../reader';
 
-if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc =
-        `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-}
+// <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+).toString();
 
 interface ReaderPanelProps {
     selectedPdf: string;
@@ -87,8 +89,8 @@ export function ReaderPanel({
     }, []);
 
     // テキスト検索: 全ページを走査してマッチ数を算出し、最初のマッチページに移動
-    const searchAllPages = useCallback(async (text: string) => {
-        if (!pdfRef.current || !text) {
+    const searchAllPages = useCallback(async (text: string, pdf: pdfjs.PDFDocumentProxy) => {
+        if (!text) {
             setMatchCount(0);
             setCurrentMatch(0);
             return;
@@ -96,17 +98,17 @@ export function ReaderPanel({
 
         let totalMatches = 0;
         let firstMatchPage = -1;
-        const lowerText = text.toLowerCase();
+        const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escaped, 'gi');
 
-        for (let i = 1; i <= pdfRef.current.numPages; i++) {
-            const page = await pdfRef.current.getPage(i);
+        for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
             const content = await page.getTextContent();
             const pageText = content.items
                 .map((item) => ('str' in item ? item.str : ''))
                 .join('');
-            const count = (pageText.toLowerCase().match(new RegExp(
-                lowerText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'
-            )) || []).length;
+            const matches = pageText.match(regex);
+            const count = matches ? matches.length : 0;
 
             if (count > 0 && firstMatchPage === -1) firstMatchPage = i;
             totalMatches += count;
@@ -114,14 +116,19 @@ export function ReaderPanel({
 
         setMatchCount(totalMatches);
         setCurrentMatch(totalMatches > 0 ? 1 : 0);
-        if (firstMatchPage > 0 && firstMatchPage !== pageNumber) {
+        if (firstMatchPage > 0) {
             setPageNumber(firstMatchPage);
         }
-    }, [pageNumber, setPageNumber]);
+    }, [setPageNumber]);
 
     useEffect(() => {
-        if (!isSearchOpen) return;
-        searchAllPages(searchText);
+        if (!isSearchOpen || !searchText) {
+            setMatchCount(0);
+            setCurrentMatch(0);
+            return;
+        }
+        if (!pdfRef.current) return;
+        searchAllPages(searchText, pdfRef.current);
     }, [searchText, isSearchOpen, searchAllPages]);
 
     const handlePrevMatch = useCallback(() => {
@@ -216,7 +223,11 @@ export function ReaderPanel({
     const onDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
         setNumPages(pdf.numPages);
         pdfRef.current = pdf;
-    }, []);
+        // PDF ロード完了時点で検索テキストが入力済みなら即検索
+        if (isSearchOpen && searchText) {
+            searchAllPages(searchText, pdf);
+        }
+    }, [isSearchOpen, searchText, searchAllPages]);
 
     // テキストレイヤーのハイライトレンダラー
     const customTextRenderer = useCallback(
@@ -283,7 +294,7 @@ export function ReaderPanel({
                 numPages={numPages}
                 isEditMode={isEditMode}
                 selectedPagesCount={selectedPages.size}
-                showHeader={showHeader}
+                showHeader={showHeader || isSearchOpen}
                 isSearchOpen={isSearchOpen}
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
@@ -295,8 +306,8 @@ export function ReaderPanel({
                 onPageJump={setPageNumber}
             />
 
-            {/* 検索バー (ヘッダーが表示中のみ表示) */}
-            {isSearchOpen && showHeader && (
+            {/* 検索バー (isSearchOpen 中は常に表示) */}
+            {isSearchOpen && (
                 <PdfSearchBar
                     searchText={searchText}
                     matchCount={matchCount}
