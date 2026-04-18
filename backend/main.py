@@ -7,7 +7,7 @@ from config import (
     KINDLE_PDF_DIR, KINDLE_THUMBNAIL_DIR, KINDLE_IMAGES_DIR,
     KINDLE_NOVEL_PDF_DIR, KINDLE_NOVEL_THUMBNAIL_DIR, KINDLE_NOVEL_IMAGES_DIR,
 )
-from routers import library, pdfs, ocr
+from routers import library, pdfs, ocr, meta
 
 app = FastAPI()
 
@@ -35,3 +35,4 @@ app.mount("/kindle_novel/images",      StaticFiles(directory=KINDLE_NOVEL_IMAGES
 app.include_router(library.router, prefix="/api", tags=["library"])
 app.include_router(pdfs.router,    prefix="/api", tags=["pdfs"])
 app.include_router(ocr.router,     prefix="/api", tags=["ocr"])
+app.include_router(meta.router,    prefix="/api", tags=["meta"])
