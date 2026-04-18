@@ -159,3 +159,21 @@ export interface UpdateMetaRequest {
     authors: string[];
     source: string;
 }
+
+/**
+ * サムネイル一括再生成APIレスポンス
+ */
+export interface RegenerateThumbnailBulkResponse {
+    message: string;
+    succeeded: string[];
+    failed: string[];
+}
+
+/**
+ * PDF結合APIレスポンス
+ */
+export interface MergePdfsResponse {
+    message: string;
+    output_name: string;
+    total_pages: number;
+}

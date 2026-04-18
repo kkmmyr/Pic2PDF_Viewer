@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpDown, Search, User } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Search, User, ImageIcon, Merge } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 
 interface LibraryHeaderProps {
@@ -16,6 +16,8 @@ interface LibraryHeaderProps {
     onCreateFolder: () => void;
     onMoveSelected: () => void;
     onBulkSetAuthor: () => void;
+    onRegenThumbnailBulk: () => void;
+    onMergePdfs: () => void;
     onSortChange: (order: SortOrder) => void;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
@@ -44,6 +46,8 @@ export function LibraryHeader({
     onCreateFolder,
     onMoveSelected,
     onBulkSetAuthor,
+    onRegenThumbnailBulk,
+    onMergePdfs,
     onSortChange,
     onSearchChange,
     onAuthorFilterChange,
@@ -112,6 +116,24 @@ export function LibraryHeader({
                                     className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     作者を設定
+                                </button>
+                                <button
+                                    onClick={onMergePdfs}
+                                    disabled={selectedCount < 2}
+                                    title="選択した書籍を1つのPDFに結合"
+                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-md text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                >
+                                    <Merge className="w-4 h-4" />
+                                    結合
+                                </button>
+                                <button
+                                    onClick={onRegenThumbnailBulk}
+                                    disabled={selectedCount === 0}
+                                    title="選択した書籍のサムネイルを再生成"
+                                    className="px-3 py-1.5 bg-amber-600 text-white rounded-md text-sm font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                >
+                                    <ImageIcon className="w-4 h-4" />
+                                    サムネイル再生成
                                 </button>
                                 <button
                                     onClick={onMoveSelected}

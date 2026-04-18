@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import type { PdfFile, LibrarySource, SortOrder } from '../../types';
+import type { PdfFile, LibrarySource, SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid, MoveDialog } from '../reader';
-import { CreateFolderDialog, RenameDialog, BulkAuthorDialog } from './';
+import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
 import { useFavorites, useSortedPdfs, useBookMeta } from '../../hooks';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -71,6 +71,9 @@ export function LibraryPanel({
     // 一括作者設定ダイアログ
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
 
+    // PDF結合ダイアログ
+    const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
+
     // パスまたはソース変更時に検索テキスト・フィルターをリセット
     useEffect(() => {
         setSearchText('');
@@ -130,6 +133,34 @@ export function LibraryPanel({
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
     }, [selectedItems, currentPath, updateAuthors]);
 
+    // サムネイル一括再生成
+    const handleRegenThumbnailBulk = useCallback(async () => {
+        const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+        if (names.length === 0) return;
+        try {
+            const data = await apiClient.post<unknown, RegenerateThumbnailBulkResponse>(
+                API_ENDPOINTS.REGENERATE_THUMBNAIL_BULK,
+                { names, path: currentPath, source: currentSource }
+            );
+            onRefresh();
+            if (data.failed.length > 0) {
+                alert(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`);
+            }
+        } catch (e: unknown) {
+            alert(e instanceof Error ? e.message : 'サムネイル再生成に失敗しました。');
+        }
+    }, [selectedItems, currentPath, currentSource, onRefresh]);
+
+    // PDF結合
+    const handleMergePdfs = useCallback(async (outputName: string) => {
+        const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+        await apiClient.post<unknown, MergePdfsResponse>(
+            API_ENDPOINTS.MERGE_PDFS,
+            { names, output_name: outputName, path: currentPath, source: currentSource }
+        );
+        onRefresh();
+    }, [selectedItems, currentPath, currentSource, onRefresh]);
+
     return (
         <>
             <LibraryHeader
@@ -147,6 +178,8 @@ export function LibraryPanel({
                 onCreateFolder={onOpenCreateFolder}
                 onMoveSelected={onMoveSelected}
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
+                onRegenThumbnailBulk={handleRegenThumbnailBulk}
+                onMergePdfs={() => setIsMergeDialogOpen(true)}
                 onSortChange={handleSortChange}
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
@@ -179,6 +212,13 @@ export function LibraryPanel({
                 targetCount={selectedItems.size}
                 onClose={() => setIsBulkAuthorOpen(false)}
                 onApply={handleBulkApplyAuthors}
+            />
+
+            <MergeDialog
+                open={isMergeDialogOpen}
+                selectedItems={Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'))}
+                onClose={() => setIsMergeDialogOpen(false)}
+                onMerge={handleMergePdfs}
             />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
