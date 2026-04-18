@@ -2,14 +2,15 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import os
 import shutil
-import fitz
-from typing import Optional, List
+from typing import Optional
 from config import get_dirs_by_source
 from utils.path_utils import validate_safe_path, validate_safe_name, join_path
+from services.thumbnail_service import ThumbnailService
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter()
-
-from services.thumbnail_service import ThumbnailService
 
 @router.get("/pdfs")
 def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "generated"):
@@ -196,6 +197,7 @@ class RenameItemRequest(BaseModel):
     old_name: str
     new_name: str
     source: str = "generated"
+    is_folder: bool = False
 
 
 @router.patch("/rename")
@@ -208,30 +210,38 @@ def rename_item(request: RenameItemRequest):
     renamed_parts: list[tuple[str, str]] = []  # (変更後, 変更前) — ロールバック用
 
     try:
-        src_pdf = os.path.join(dirs["pdf"], request.path, request.old_name)
-        dst_pdf = os.path.join(dirs["pdf"], request.path, request.new_name)
+        src = os.path.join(dirs["pdf"], request.path, request.old_name)
+        dst = os.path.join(dirs["pdf"], request.path, request.new_name)
 
-        if not os.path.exists(src_pdf):
+        if not os.path.exists(src):
             raise HTTPException(status_code=404, detail="Item not found")
-        if os.path.exists(dst_pdf):
+        if os.path.exists(dst):
             raise HTTPException(status_code=400, detail="Name already exists")
 
-        os.rename(src_pdf, dst_pdf)
-        renamed_parts.append((dst_pdf, src_pdf))
+        os.rename(src, dst)
+        renamed_parts.append((dst, src))
 
-        # サムネイルのリネーム
-        old_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.old_name)[0] + ".jpg")
-        new_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.new_name)[0] + ".jpg")
-        if os.path.exists(old_thumb):
-            os.rename(old_thumb, new_thumb)
-            renamed_parts.append((new_thumb, old_thumb))
+        if request.is_folder:
+            # フォルダの場合: サムネイルフォルダ・画像フォルダを同名でリネーム
+            for base_dir in (dirs["thumb"], dirs["img"]):
+                old_sub = os.path.join(base_dir, request.path, request.old_name)
+                new_sub = os.path.join(base_dir, request.path, request.new_name)
+                if os.path.exists(old_sub):
+                    os.rename(old_sub, new_sub)
+                    renamed_parts.append((new_sub, old_sub))
+        else:
+            # PDFファイルの場合: サムネイル(.jpg)・画像ディレクトリをリネーム
+            old_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.old_name)[0] + ".jpg")
+            new_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.new_name)[0] + ".jpg")
+            if os.path.exists(old_thumb):
+                os.rename(old_thumb, new_thumb)
+                renamed_parts.append((new_thumb, old_thumb))
 
-        # 画像ディレクトリのリネーム
-        old_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.old_name)[0])
-        new_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.new_name)[0])
-        if os.path.exists(old_img):
-            os.rename(old_img, new_img)
-            renamed_parts.append((new_img, old_img))
+            old_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.old_name)[0])
+            new_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.new_name)[0])
+            if os.path.exists(old_img):
+                os.rename(old_img, new_img)
+                renamed_parts.append((new_img, old_img))
 
     except HTTPException:
         raise
@@ -239,8 +249,35 @@ def rename_item(request: RenameItemRequest):
         for renamed_dst, original_src in reversed(renamed_parts):
             try:
                 os.rename(renamed_dst, original_src)
-            except Exception:
-                pass
+            except Exception as rollback_err:
+                logger.error("Rollback failed: %s -> %s: %s", renamed_dst, original_src, rollback_err)
         raise HTTPException(status_code=500, detail=f"Rename failed: {str(e)}")
 
     return {"message": "Item renamed", "new_name": request.new_name}
+
+
+class RegenerateThumbnailRequest(BaseModel):
+    path: str
+    name: str  # .pdf 拡張子付きファイル名
+    source: str = "generated"
+
+
+@router.post("/thumbnails/regenerate")
+def regenerate_thumbnail(request: RegenerateThumbnailRequest):
+    validate_safe_path(request.path, param_name="path")
+    validate_safe_name(request.name, param_name="name")
+
+    dirs = get_dirs_by_source(request.source)
+
+    pdf_path = os.path.join(dirs["pdf"], request.path, request.name)
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    thumb_name = os.path.splitext(request.name)[0] + ".jpg"
+    thumb_path = os.path.join(dirs["thumb"], request.path, thumb_name)
+
+    ok = ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to regenerate thumbnail")
+
+    return {"message": "Thumbnail regenerated"}

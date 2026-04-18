@@ -41,11 +41,12 @@ export interface GenerateRequest {
 }
 
 /**
- * PDF生成APIレスポンス
+ * PDF生成APIレスポンス（POST /api/generate）
+ * ジョブが非同期で開始されたことを示す。進捗は GenerateJob でポーリングして取得する。
  */
 export interface GenerateResponse {
-    message: string;
-    files: string[];
+    job_id: string;
+    status: 'pending';
 }
 
 /**
@@ -84,6 +85,14 @@ export interface OcrStatusResponse {
  * 読み取り方向
  */
 export type ReadingDirection = 'rtl' | 'ltr';
+
+/**
+ * 見開きモード
+ * - 'auto'   : ページの縦横比で自動判定（横長→1ページ、縦長→見開き）
+ * - 'spread' : 常に見開き（2ページ）表示
+ * - 'single' : 常に1ページ表示
+ */
+export type SpreadMode = 'auto' | 'spread' | 'single';
 
 /**
  * ページ位置
@@ -128,3 +137,25 @@ export interface GenerateJob {
  * 並び替え順序
  */
 export type SortOrder = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc' | 'favorites_first';
+
+/**
+ * 書籍メタデータ（1冊分）
+ */
+export interface BookMetaEntry {
+    authors: string[];
+}
+
+/**
+ * meta.json 全体（キー: "{path}/{filename}" または "{filename}"）
+ */
+export type BookMetaMap = Record<string, BookMetaEntry>;
+
+/**
+ * メタデータ更新リクエスト
+ */
+export interface UpdateMetaRequest {
+    path: string;
+    names: string[];
+    authors: string[];
+    source: string;
+}

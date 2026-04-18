@@ -1,6 +1,5 @@
 import os
 import fitz
-from typing import List
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -8,7 +7,7 @@ logger = get_logger(__name__)
 
 class PdfService:
     @staticmethod
-    def delete_pages(pdf_path: str, page_indices: List[int]) -> int:
+    def delete_pages(pdf_path: str, page_indices: list[int]) -> int:
         """
         PDF から指定したページを削除する。
 
@@ -27,6 +26,7 @@ class PdfService:
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
         doc = None
+        temp_path = pdf_path + ".tmp"
         try:
             doc = fitz.open(pdf_path)
             total_pages = len(doc)
@@ -40,7 +40,6 @@ class PdfService:
             for idx in indices:
                 doc.delete_page(idx)
 
-            temp_path = pdf_path + ".tmp"
             doc.save(temp_path)
             doc.close()
             doc = None
@@ -54,6 +53,11 @@ class PdfService:
         finally:
             if doc:
                 doc.close()
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
     @staticmethod
     def get_page_count(pdf_path: str) -> int:
