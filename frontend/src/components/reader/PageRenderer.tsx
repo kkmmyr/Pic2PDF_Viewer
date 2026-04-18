@@ -20,12 +20,15 @@ interface PageRendererProps {
     // Search props (PDF mode only)
     searchText?: string;
     customTextRenderer?: (props: { str: string; itemIndex: number }) => string;
+    /** ページのサイズが判明したときに呼ばれるコールバック（自動見開き判定用） */
+    onPageSize?: (width: number, height: number) => void;
 }
 
 /**
  * 単一ページのレンダリングコンポーネント
  * - PDF モードと画像モードの両方に対応
  * - 検索テキストがある場合はテキストレイヤーを有効化してハイライト表示
+ * - onPageSize コールバックでページの縦横比を親に通知（自動見開き判定）
  */
 export function PageRenderer({
     pageNumber,
@@ -42,6 +45,7 @@ export function PageRenderer({
     isImageMode = false,
     searchText,
     customTextRenderer,
+    onPageSize,
 }: PageRendererProps) {
     if (pageNumber > numPages) {
         return (
@@ -91,6 +95,10 @@ export function PageRenderer({
                     alt={`Page ${pageNumber}`}
                     style={{ height: 'auto', width: 'auto', maxWidth: '100%', maxHeight: windowHeight - 40, objectFit: 'contain' }}
                     className="bg-white"
+                    onLoad={(e) => {
+                        const img = e.currentTarget;
+                        onPageSize?.(img.naturalWidth, img.naturalHeight);
+                    }}
                 />
             </div>
         );
@@ -114,6 +122,9 @@ export function PageRenderer({
                 renderTextLayer={enableTextLayer}
                 renderAnnotationLayer={false}
                 customTextRenderer={enableTextLayer ? customTextRenderer : undefined}
+                onRenderSuccess={(page) => {
+                    onPageSize?.(page.width, page.height);
+                }}
             />
         </div>
     );

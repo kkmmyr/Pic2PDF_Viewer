@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Trash2, CheckSquare, Square, Search } from 'lucide-react';
-import type { ReadingDirection } from '../../types';
+import { ArrowLeft, Trash2, CheckSquare, Square, Search, Wand2, BookOpen, FileText } from 'lucide-react';
+import type { ReadingDirection, SpreadMode } from '../../types';
 
 interface ReaderHeaderProps {
     selectedPdf: string;
     direction: ReadingDirection;
+    spreadMode: SpreadMode;
     isSpread: boolean;
     pageNumber: number;
     numPages: number;
@@ -14,7 +15,7 @@ interface ReaderHeaderProps {
     isSearchOpen: boolean;
     onClose: () => void;
     onToggleDirection: () => void;
-    onToggleSpread: () => void;
+    onCycleSpreadMode: () => void;
     onToggleEditMode: () => void;
     onDeletePages: () => void;
     onMouseLeave: () => void;
@@ -22,9 +23,16 @@ interface ReaderHeaderProps {
     onPageJump: (page: number) => void;
 }
 
+const SPREAD_MODE_CONFIG: Record<SpreadMode, { label: string; icon: React.ReactNode; next: SpreadMode }> = {
+    auto:   { label: 'Auto',   icon: <Wand2     className="w-4 h-4" />, next: 'spread' },
+    spread: { label: 'Spread', icon: <BookOpen  className="w-4 h-4" />, next: 'single' },
+    single: { label: 'Single', icon: <FileText  className="w-4 h-4" />, next: 'auto'   },
+};
+
 export function ReaderHeader({
     selectedPdf,
     direction,
+    spreadMode,
     isSpread,
     pageNumber,
     numPages,
@@ -34,7 +42,7 @@ export function ReaderHeader({
     isSearchOpen,
     onClose,
     onToggleDirection,
-    onToggleSpread,
+    onCycleSpreadMode,
     onToggleEditMode,
     onDeletePages,
     onMouseLeave,
@@ -92,11 +100,18 @@ export function ReaderHeader({
                 >
                     {direction === 'rtl' ? 'Right Binding (RTL)' : 'Left Binding (LTR)'}
                 </button>
+                {/* 見開きモードトグル（Auto / Spread / Single を循環） */}
                 <button
-                    onClick={onToggleSpread}
-                    className="px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
+                    onClick={onCycleSpreadMode}
+                    title={`次のモード: ${SPREAD_MODE_CONFIG[spreadMode].next}`}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
+                        spreadMode === 'auto'
+                            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                            : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
                 >
-                    {isSpread ? 'Spread' : 'Single'}
+                    {SPREAD_MODE_CONFIG[spreadMode].icon}
+                    {SPREAD_MODE_CONFIG[spreadMode].label}
                 </button>
 
                 {/* ページ番号 (クリックで直接入力) */}

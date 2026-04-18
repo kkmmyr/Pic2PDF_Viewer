@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 
-import type { LibrarySource, ReadingDirection, DeletePagesResponse } from '../../types';
+import type { LibrarySource, ReadingDirection, SpreadMode, DeletePagesResponse } from '../../types';
 import { buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import { useWindowSize, useBookImages, useImagePreloader, useReaderNavigation } from '../../hooks';
@@ -39,7 +39,12 @@ export function ReaderPanel({
         useBookImages(selectedPdf, currentPath, currentSource);
 
     // Reader 設定
-    const [isSpread, setIsSpread] = useState(true);
+    const [spreadMode, setSpreadMode] = useState<SpreadMode>('auto');
+    // autoモード時にページサイズから計算した実効値（true=見開き、false=1ページ）
+    const [autoIsSpread, setAutoIsSpread] = useState(true);
+    // 実際のレンダリングに使う isSpread
+    const isSpread = spreadMode === 'auto' ? autoIsSpread
+        : spreadMode === 'spread';
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
     const [numPages, setNumPages] = useState(0);
     const [showHeader, setShowHeader] = useState(false);
@@ -138,6 +143,7 @@ export function ReaderPanel({
         setIsEditMode(false);
         setSelectedPages(new Set());
         setNumPages(0);
+        setAutoIsSpread(true); // PDF切り替え時に自動判定をリセット
         handleCloseSearch();
         resetPage();
     }, [selectedPdf, resetPage, handleCloseSearch]);
@@ -154,6 +160,20 @@ export function ReaderPanel({
         setDirection(prev => (prev === 'rtl' ? 'ltr' : 'rtl'));
         resetPage();
     }, [resetPage]);
+
+    // Auto → Spread → Single → Auto の順に循環
+    const cycleSpreadMode = useCallback(() => {
+        setSpreadMode(prev =>
+            prev === 'auto' ? 'spread' : prev === 'spread' ? 'single' : 'auto'
+        );
+    }, []);
+
+    // autoモード時: ページサイズから見開きかどうかを判定する
+    const handlePageSize = useCallback((width: number, height: number) => {
+        if (spreadMode !== 'auto') return;
+        // 横長（width > height）→ 1ページ、縦長 → 見開き
+        setAutoIsSpread(width <= height);
+    }, [spreadMode]);
 
     const handleToggleEditMode = useCallback(() => {
         setIsEditMode(prev => !prev);
@@ -226,6 +246,7 @@ export function ReaderPanel({
             imageUrl={imageUrls ? imageUrls[pNum - 1] : null}
             searchText={searchText}
             customTextRenderer={!isImageMode && searchText ? customTextRenderer : undefined}
+            onPageSize={side === 'right' || side === 'single' ? handlePageSize : undefined}
         />
     );
 
@@ -256,6 +277,7 @@ export function ReaderPanel({
             <ReaderHeader
                 selectedPdf={selectedPdf}
                 direction={direction}
+                spreadMode={spreadMode}
                 isSpread={isSpread}
                 pageNumber={pageNumber}
                 numPages={numPages}
@@ -265,7 +287,7 @@ export function ReaderPanel({
                 isSearchOpen={isSearchOpen}
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
-                onToggleSpread={() => setIsSpread(s => !s)}
+                onCycleSpreadMode={cycleSpreadMode}
                 onToggleEditMode={handleToggleEditMode}
                 onDeletePages={handleDeletePages}
                 onMouseLeave={() => setShowHeader(false)}
