@@ -30,6 +30,8 @@ export const API_ENDPOINTS = {
     MOVE: '/api/move',
     /** PDFリネーム */
     RENAME: '/api/rename',
+    /** サムネイル再生成 */
+    REGENERATE_THUMBNAIL: '/api/thumbnails/regenerate',
     /** OCR機能 */
     OCR_RUN: '/api/ocr/run',
     OCR_STOP: '/api/ocr/stop',
@@ -38,6 +40,8 @@ export const API_ENDPOINTS = {
     BATCH_COMPRESS: '/api/batch_compress',
     /** Generate ジョブ進捗取得 */
     GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
+    /** 書籍メタデータ取得・更新 */
+    META: '/api/meta',
 } as const;
 
 /**

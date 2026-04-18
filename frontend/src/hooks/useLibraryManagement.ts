@@ -14,7 +14,7 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
     const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(false);
-    const [renameTarget, setRenameTarget] = useState<string | null>(null);
+    const [renameTarget, setRenameTarget] = useState<{ name: string; isFolder: boolean } | null>(null);
 
     const toggleSelectionMode = useCallback(() => {
         setIsSelectionMode(prev => {
@@ -69,16 +69,17 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         onRefresh();
     }, [selectedItems, currentPath, currentSource, onRefresh]);
 
-    const openRenameDialog = useCallback((name: string) => setRenameTarget(name), []);
+    const openRenameDialog = useCallback((name: string, isFolder = false) => setRenameTarget({ name, isFolder }), []);
     const closeRenameDialog = useCallback(() => setRenameTarget(null), []);
 
     const handleRename = useCallback(async (newName: string) => {
         if (!renameTarget) return;
         await apiClient.patch(API_ENDPOINTS.RENAME, {
             path: currentPath,
-            old_name: renameTarget,
+            old_name: renameTarget.name,
             new_name: newName,
             source: currentSource,
+            is_folder: renameTarget.isFolder,
         });
         setRenameTarget(null);
         onRefresh();

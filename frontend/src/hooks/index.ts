@@ -10,3 +10,4 @@ export { useOcrStatus } from './useOcrStatus';
 export { useFavorites } from './useFavorites';
 export { useSortedPdfs } from './useSortedPdfs';
 export { useDarkMode } from './useDarkMode';
+export { useBookMeta } from './useBookMeta';
