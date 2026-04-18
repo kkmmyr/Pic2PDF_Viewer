@@ -123,6 +123,7 @@ export default function ViewerPage() {
                     onOpenRename={openRenameDialog}
                     onCloseRename={closeRenameDialog}
                     onRenameItem={handleRename}
+                    onRefresh={fetchPdfs}
                 />
             )}
         </div>

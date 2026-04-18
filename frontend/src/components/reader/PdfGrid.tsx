@@ -1,4 +1,4 @@
-import { CheckSquare, Square, Star, Pencil } from 'lucide-react';
+import { CheckSquare, Square, Star, Pencil, RefreshCw } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
 
@@ -11,6 +11,9 @@ interface PdfGridProps {
     favorites?: Set<string>;
     onToggleFavorite?: (name: string) => void;
     onRename?: (name: string) => void;
+    onRegenThumb?: (name: string) => void;
+    /** 書籍名 → 作者名リスト のマップ（カード下部に表示） */
+    getAuthors?: (name: string) => string[];
 }
 
 /**
@@ -27,6 +30,8 @@ export function PdfGrid({
     favorites = new Set(),
     onToggleFavorite,
     onRename,
+    onRegenThumb,
+    getAuthors,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -99,6 +104,19 @@ export function PdfGrid({
                                 <span className="font-medium text-sm text-gray-800 dark:text-gray-200 line-clamp-2" title={pdf.name}>
                                     {pdf.name.replace('.pdf', '')}
                                 </span>
+                                {/* 作者名タグ */}
+                                {getAuthors && (() => {
+                                    const authors = getAuthors(pdf.name);
+                                    return authors.length > 0 ? (
+                                        <div className="mt-1 flex flex-wrap gap-1">
+                                            {authors.map((a, i) => (
+                                                <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate max-w-full">
+                                                    {a}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null;
+                                })()}
                                 <div className="mt-2 flex items-center justify-between">
                                     <span className="text-xs text-gray-500 dark:text-gray-400">
                                         {pdf.created_at
@@ -113,6 +131,15 @@ export function PdfGrid({
                                                 title="名前を変更"
                                             >
                                                 <Pencil className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                        {!isSelectionMode && onRegenThumb && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onRegenThumb(pdf.name); }}
+                                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                                                title="サムネイルを再生成"
+                                            >
+                                                <RefreshCw className="w-3 h-3" />
                                             </button>
                                         )}
                                         {isFav && (

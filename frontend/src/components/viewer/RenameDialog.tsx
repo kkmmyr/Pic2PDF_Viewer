@@ -5,17 +5,19 @@ const FORBIDDEN_RE = /[/\\:*?"<>|]/;
 
 interface Props {
     open: boolean;
-    currentName: string;  // .pdf 拡張子あり
+    currentName: string;  // PDF の場合は .pdf 拡張子あり、フォルダの場合は拡張子なし
+    isFolder?: boolean;
     onClose: () => void;
     onRename: (newName: string) => Promise<void>;
 }
 
 /**
- * PDFリネームダイアログ (Tailwind実装)。
- * 拡張子 .pdf は表示から省き、確定時に自動付加する。
+ * PDF/フォルダ共用リネームダイアログ (Tailwind実装)。
+ * PDF の場合は拡張子 .pdf を表示から省き、確定時に自動付加する。
+ * フォルダの場合はそのまま扱う。
  */
-export function RenameDialog({ open, currentName, onClose, onRename }: Props) {
-    const stem = currentName.replace(/\.pdf$/i, '');
+export function RenameDialog({ open, currentName, isFolder = false, onClose, onRename }: Props) {
+    const stem = isFolder ? currentName : currentName.replace(/\.pdf$/i, '');
     const [name, setName] = useState(stem);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export function RenameDialog({ open, currentName, onClose, onRename }: Props) {
     if (!open) return null;
 
     const validate = (value: string): string | null => {
-        if (!value.trim()) return 'ファイル名を入力してください。';
+        if (!value.trim()) return `${isFolder ? 'フォルダ名' : 'ファイル名'}を入力してください。`;
         if (FORBIDDEN_RE.test(value)) return '使用できない文字が含まれています: / \\ : * ? " < > |';
         return null;
     };
@@ -54,7 +56,7 @@ export function RenameDialog({ open, currentName, onClose, onRename }: Props) {
         if (name.trim() === stem) { onClose(); return; }
         setLoading(true);
         try {
-            await onRename(name.trim() + '.pdf');
+            await onRename(isFolder ? name.trim() : name.trim() + '.pdf');
             onClose();
         } catch (e: unknown) {
             setError(e instanceof Error ? e.message : 'リネームに失敗しました。');
@@ -106,7 +108,9 @@ export function RenameDialog({ open, currentName, onClose, onRename }: Props) {
                                     : 'border-gray-300 dark:border-gray-600'
                             }`}
                         />
-                        <span className="text-sm text-gray-400 dark:text-gray-500 shrink-0">.pdf</span>
+                        {!isFolder && (
+                            <span className="text-sm text-gray-400 dark:text-gray-500 shrink-0">.pdf</span>
+                        )}
                     </div>
                     <p className={`mt-1.5 text-xs min-h-[1rem] ${displayError ? 'text-red-500 dark:text-red-400' : 'text-transparent'}`}>
                         {displayError ?? '　'}

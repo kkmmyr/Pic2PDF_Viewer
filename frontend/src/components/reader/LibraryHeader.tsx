@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowUpDown, Search } from 'lucide-react';
+import { ArrowLeft, ArrowUpDown, Search, User } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 
 interface LibraryHeaderProps {
@@ -8,13 +8,17 @@ interface LibraryHeaderProps {
     selectedCount: number;
     sortOrder: SortOrder;
     searchText: string;
+    authorFilter: string;       // '' = フィルターなし
+    allAuthors: string[];       // フィルター候補リスト
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
     onCreateFolder: () => void;
     onMoveSelected: () => void;
+    onBulkSetAuthor: () => void;
     onSortChange: (order: SortOrder) => void;
     onSearchChange: (text: string) => void;
+    onAuthorFilterChange: (author: string) => void;
 }
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
@@ -32,13 +36,17 @@ export function LibraryHeader({
     selectedCount,
     sortOrder,
     searchText,
+    authorFilter,
+    allAuthors,
     onUpClick,
     onSourceChange,
     onToggleSelectionMode,
     onCreateFolder,
     onMoveSelected,
+    onBulkSetAuthor,
     onSortChange,
     onSearchChange,
+    onAuthorFilterChange,
 }: LibraryHeaderProps) {
     return (
         <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-50">
@@ -58,18 +66,38 @@ export function LibraryHeader({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* 検索入力 */}
+                    {/* 通常モード: 検索・作者フィルター・ソート */}
                     {!isSelectionMode && (
-                        <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none" />
-                            <input
-                                type="text"
-                                value={searchText}
-                                onChange={(e) => onSearchChange(e.target.value)}
-                                placeholder="タイトルを検索..."
-                                className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 w-44"
-                            />
-                        </div>
+                        <>
+                            {/* タイトル検索 */}
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={searchText}
+                                    onChange={(e) => onSearchChange(e.target.value)}
+                                    placeholder="タイトルを検索..."
+                                    className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 w-44"
+                                />
+                            </div>
+
+                            {/* 作者フィルター */}
+                            {allAuthors.length > 0 && (
+                                <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                                    <User className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                                    <select
+                                        value={authorFilter}
+                                        onChange={(e) => onAuthorFilterChange(e.target.value)}
+                                        className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                    >
+                                        <option value="">作者: すべて</option>
+                                        {allAuthors.map(a => (
+                                            <option key={a} value={a}>{a}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     <div className="flex gap-2 mr-2">
@@ -78,6 +106,13 @@ export function LibraryHeader({
                                 <span className="text-sm font-medium self-center mr-2 text-gray-700 dark:text-gray-300">
                                     {selectedCount} 選択中
                                 </span>
+                                <button
+                                    onClick={onBulkSetAuthor}
+                                    disabled={selectedCount === 0}
+                                    className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    作者を設定
+                                </button>
                                 <button
                                     onClick={onMoveSelected}
                                     disabled={selectedCount === 0}

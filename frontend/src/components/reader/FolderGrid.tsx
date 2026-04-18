@@ -1,4 +1,4 @@
-import { Folder, CheckSquare, Square } from 'lucide-react';
+import { Folder, CheckSquare, Square, Pencil } from 'lucide-react';
 
 interface FolderGridProps {
     directories: string[];
@@ -6,6 +6,7 @@ interface FolderGridProps {
     isSelectionMode?: boolean;
     selectedItems?: Set<string>;
     onToggleSelect?: (name: string) => void;
+    onRename?: (name: string) => void;
 }
 
 export function FolderGrid({
@@ -13,7 +14,8 @@ export function FolderGrid({
     onFolderClick,
     isSelectionMode = false,
     selectedItems = new Set(),
-    onToggleSelect
+    onToggleSelect,
+    onRename,
 }: FolderGridProps) {
     if (directories.length === 0) return null;
 
@@ -49,9 +51,20 @@ export function FolderGrid({
                                 </div>
                             )}
                         </div>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center break-words w-full line-clamp-2">
-                            {dir}
-                        </span>
+                        <div className="flex items-center justify-center gap-1 w-full">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center break-words line-clamp-2 flex-1">
+                                {dir}
+                            </span>
+                            {!isSelectionMode && onRename && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onRename(dir); }}
+                                    className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors shrink-0"
+                                    title="名前を変更"
+                                >
+                                    <Pencil className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>
