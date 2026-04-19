@@ -1,12 +1,13 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import os
-import shutil
 from typing import Optional
 import fitz
-from config import get_dirs_by_source
+from config import get_dirs_by_source, SUPPORTED_IMAGE_FORMATS
 from utils.path_utils import validate_safe_path, validate_safe_name, join_path
+from utils.file_naming import get_thumbnail_name
 from services.thumbnail_service import ThumbnailService
+from services.file_manager import FileManager
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -40,7 +41,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
         if os.path.isdir(item_path):
             directories.append(item)
         elif item.lower().endswith('.pdf'):
-            thumb_name = os.path.splitext(item)[0] + ".jpg"
+            thumb_name = get_thumbnail_name(item)
             thumb_path = join_path(target_thumb_dir, thumb_name)
 
             thumb_url = None
@@ -77,7 +78,7 @@ def list_book_images(path: str, source: str = "generated"):
 
     try:
         files = os.listdir(target_dir)
-        images = [f for f in files if f.lower().endswith(('.webp', '.jpg', '.jpeg', '.png'))]
+        images = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
 
         from natsort import natsorted
         images = natsorted(images)
@@ -134,58 +135,15 @@ def move_items(request: MoveItemsRequest):
     errors = []
 
     for item in request.items:
-        moved_parts: list[tuple[str, str]] = []  # (移動先, 移動元) — ロールバック用
         try:
-            src_pdf = os.path.join(dirs["pdf"], request.source_path, item)
-            dst_pdf = os.path.join(dirs["pdf"], request.destination_path, item)
-
-            if not os.path.exists(src_pdf):
-                errors.append(f"Item not found: {item}")
-                continue
-
-            if os.path.exists(dst_pdf):
-                errors.append(f"Destination exists: {item}")
-                continue
-
-            # PDF を移動
-            os.makedirs(os.path.dirname(dst_pdf), exist_ok=True)
-            shutil.move(src_pdf, dst_pdf)
-            moved_parts.append((dst_pdf, src_pdf))
-
-            # サムネイルを移動
-            if os.path.isdir(dst_pdf):
-                src_thumb = os.path.join(dirs["thumb"], request.source_path, item)
-                dst_thumb = os.path.join(dirs["thumb"], request.destination_path, item)
-            else:
-                thumb_name = os.path.splitext(item)[0] + ".jpg"
-                src_thumb = os.path.join(dirs["thumb"], request.source_path, thumb_name)
-                dst_thumb = os.path.join(dirs["thumb"], request.destination_path, thumb_name)
-
-            if os.path.exists(src_thumb):
-                os.makedirs(os.path.dirname(dst_thumb), exist_ok=True)
-                shutil.move(src_thumb, dst_thumb)
-                moved_parts.append((dst_thumb, src_thumb))
-
-            # 画像ディレクトリを移動
-            book_name = os.path.splitext(item)[0] if item.lower().endswith('.pdf') else item
-            src_img = os.path.join(dirs["img"], request.source_path, book_name)
-            dst_img = os.path.join(dirs["img"], request.destination_path, book_name)
-
-            if os.path.exists(src_img):
-                os.makedirs(os.path.dirname(dst_img), exist_ok=True)
-                shutil.move(src_img, dst_img)
-                moved_parts.append((dst_img, src_img))
-
+            FileManager.move_with_assets(item, request.source_path, request.destination_path, dirs)
             moved_count += 1
-
-        except Exception as e:
-            # 移動済みファイルを元の場所に戻す
-            for moved_dst, original_src in reversed(moved_parts):
-                try:
-                    shutil.move(moved_dst, original_src)
-                except Exception as rollback_err:
-                    errors.append(f"Rollback failed for {moved_dst}: {str(rollback_err)}")
-            errors.append(f"Error moving {item}: {str(e)}")
+        except FileNotFoundError:
+            errors.append(f"Item not found: {item}")
+        except FileExistsError:
+            errors.append(f"Destination exists: {item}")
+        except OSError as e:
+            errors.append(str(e))
 
     if moved_count == 0 and errors:
         raise HTTPException(status_code=500, detail="Failed to move items: " + "; ".join(errors))
@@ -208,51 +166,17 @@ def rename_item(request: RenameItemRequest):
     validate_safe_name(request.new_name, param_name="new_name")
 
     dirs = get_dirs_by_source(request.source)
-    renamed_parts: list[tuple[str, str]] = []  # (変更後, 変更前) — ロールバック用
 
     try:
-        src = os.path.join(dirs["pdf"], request.path, request.old_name)
-        dst = os.path.join(dirs["pdf"], request.path, request.new_name)
-
-        if not os.path.exists(src):
-            raise HTTPException(status_code=404, detail="Item not found")
-        if os.path.exists(dst):
-            raise HTTPException(status_code=400, detail="Name already exists")
-
-        os.rename(src, dst)
-        renamed_parts.append((dst, src))
-
-        if request.is_folder:
-            # フォルダの場合: サムネイルフォルダ・画像フォルダを同名でリネーム
-            for base_dir in (dirs["thumb"], dirs["img"]):
-                old_sub = os.path.join(base_dir, request.path, request.old_name)
-                new_sub = os.path.join(base_dir, request.path, request.new_name)
-                if os.path.exists(old_sub):
-                    os.rename(old_sub, new_sub)
-                    renamed_parts.append((new_sub, old_sub))
-        else:
-            # PDFファイルの場合: サムネイル(.jpg)・画像ディレクトリをリネーム
-            old_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.old_name)[0] + ".jpg")
-            new_thumb = os.path.join(dirs["thumb"], request.path, os.path.splitext(request.new_name)[0] + ".jpg")
-            if os.path.exists(old_thumb):
-                os.rename(old_thumb, new_thumb)
-                renamed_parts.append((new_thumb, old_thumb))
-
-            old_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.old_name)[0])
-            new_img = os.path.join(dirs["img"], request.path, os.path.splitext(request.new_name)[0])
-            if os.path.exists(old_img):
-                os.rename(old_img, new_img)
-                renamed_parts.append((new_img, old_img))
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        for renamed_dst, original_src in reversed(renamed_parts):
-            try:
-                os.rename(renamed_dst, original_src)
-            except Exception as rollback_err:
-                logger.error("Rollback failed: %s -> %s: %s", renamed_dst, original_src, rollback_err)
-        raise HTTPException(status_code=500, detail=f"Rename failed: {str(e)}")
+        FileManager.rename_with_assets(
+            request.path, request.old_name, request.new_name, request.is_folder, dirs
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Item not found")
+    except FileExistsError:
+        raise HTTPException(status_code=400, detail="Name already exists")
+    except OSError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
     return {"message": "Item renamed", "new_name": request.new_name}
 
@@ -274,7 +198,7 @@ def regenerate_thumbnail(request: RegenerateThumbnailRequest):
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="PDF not found")
 
-    thumb_name = os.path.splitext(request.name)[0] + ".jpg"
+    thumb_name = get_thumbnail_name(request.name)
     thumb_path = os.path.join(dirs["thumb"], request.path, thumb_name)
 
     ok = ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
@@ -306,7 +230,7 @@ def regenerate_thumbnail_bulk(request: RegenerateThumbnailBulkRequest):
         if not os.path.exists(pdf_path):
             failed.append(name)
             continue
-        thumb_name = os.path.splitext(name)[0] + ".jpg"
+        thumb_name = get_thumbnail_name(name)
         thumb_path = os.path.join(dirs["thumb"], request.path, thumb_name)
         ok = ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
         if ok:
@@ -367,7 +291,7 @@ def merge_pdfs(request: MergePdfsRequest):
             merged_doc.close()
 
     # サムネイル生成
-    thumb_name = os.path.splitext(request.output_name)[0] + ".jpg"
+    thumb_name = get_thumbnail_name(request.output_name)
     thumb_path = os.path.join(base_thumb_dir, request.path, thumb_name)
     ThumbnailService.generate_thumbnail(output_path, thumb_path)
 

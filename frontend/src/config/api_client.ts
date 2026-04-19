@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
-import { API_CONFIG } from './api';
+import { API_CONFIG as API_URL_CONFIG } from './api';
+import { API_CONFIG } from '../constants';
 
 /** API エラーの種別 */
 export type ApiErrorKind = 'network' | 'timeout' | 'server' | 'client' | 'unknown';
@@ -20,9 +21,9 @@ export class ApiError extends Error {
 }
 
 const apiClient = axios.create({
-    baseURL: API_CONFIG.BASE_URL,
+    baseURL: API_URL_CONFIG.BASE_URL,
     headers: { 'Content-Type': 'application/json' },
-    timeout: 30_000,
+    timeout: API_CONFIG.TIMEOUT_MS,
 });
 
 apiClient.interceptors.response.use(

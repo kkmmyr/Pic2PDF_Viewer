@@ -1,13 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { FolderSearch, Loader2, Zap, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import { usePdfStatus } from '../hooks/usePdfStatus';
+import { useGenerateJob } from '../hooks/useGenerateJob';
 import type { GenerateJob, StatusItem } from '../types';
 
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
 const DEFAULT_QUALITY = 50;
-const JOB_POLL_INTERVAL = 1500;
 
 export default function GeneratorPage() {
     const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
@@ -18,59 +18,35 @@ export default function GeneratorPage() {
     const [generateCompressed, setGenerateCompressed] = useState(true);
     const [quality, setQuality] = useState(DEFAULT_QUALITY);
 
-    const [currentJob, setCurrentJob] = useState<GenerateJob | null>(null);
-    const pollRef = useRef<number | null>(null);
+    const onCompleted = useCallback((job: GenerateJob) => {
+        setResult({ message: job.message, files: job.files });
+        fetchStatus();
+    }, []);
 
-    const isGenerating = currentJob !== null && (currentJob.status === 'pending' || currentJob.status === 'running');
+    const onFailed = useCallback((job: GenerateJob) => {
+        setError(job.error ?? '生成に失敗しました。');
+    }, []);
+
+    const { currentJob, restoredSourceDir, isGenerating, isRestoredJob, startJob } = useGenerateJob(onCompleted, onFailed);
+
+    useEffect(() => {
+        if (restoredSourceDir) setSourceDir(restoredSourceDir);
+    }, [restoredSourceDir]);
+
     const isLoading = isGenerating || isCompressing;
 
     const { statusItems, refetch: fetchStatus } = usePdfStatus(sourceDir, isLoading);
-
-    useEffect(() => {
-        if (!currentJob) return;
-        if (currentJob.status === 'completed' || currentJob.status === 'failed') return;
-
-        pollRef.current = window.setInterval(async () => {
-            try {
-                const job = await apiClient.get<unknown, GenerateJob>(
-                    API_ENDPOINTS.GENERATE_JOB(currentJob.job_id)
-                );
-                setCurrentJob(job);
-
-                if (job.status === 'completed') {
-                    setResult({ message: job.message, files: job.files });
-                    fetchStatus();
-                    clearInterval(pollRef.current ?? undefined);
-                    pollRef.current = null;
-                } else if (job.status === 'failed') {
-                    setError(job.error ?? '生成に失敗しました。');
-                    clearInterval(pollRef.current ?? undefined);
-                    pollRef.current = null;
-                }
-            } catch (e) {
-                console.error('Failed to poll job status', e);
-            }
-        }, JOB_POLL_INTERVAL);
-
-        return () => {
-            if (pollRef.current !== null) {
-                clearInterval(pollRef.current);
-                pollRef.current = null;
-            }
-        };
-    }, [currentJob?.job_id, currentJob?.status]);
 
     const handleGenerate = async () => {
         if (!sourceDir) return;
         setError(null);
         setResult(null);
-        setCurrentJob(null);
         try {
             const data = await apiClient.post<unknown, { job_id: string; status: string }>(
                 API_ENDPOINTS.GENERATE,
                 { source_dir: sourceDir, generate_compressed: generateCompressed, quality }
             );
-            setCurrentJob({ job_id: data.job_id, status: 'pending', current_item: null, files: [], message: '', error: null });
+            startJob(data.job_id, sourceDir);
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : '生成に失敗しました。');
         }
@@ -124,6 +100,14 @@ export default function GeneratorPage() {
                 </h2>
 
                 <div className="space-y-6">
+                    {/* Restored job banner */}
+                    {isRestoredJob && (
+                        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-800 dark:text-amber-300">
+                            <Loader2 size={15} className="animate-spin shrink-0" />
+                            前回の生成ジョブが実行中です — <span className="font-medium truncate">{restoredSourceDir}</span>
+                        </div>
+                    )}
+
                     {/* Source Directory Input */}
                     <div>
                         <label htmlFor="sourceDir" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

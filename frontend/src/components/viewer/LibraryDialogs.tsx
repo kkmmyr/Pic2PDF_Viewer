@@ -1,0 +1,80 @@
+import type { LibrarySource } from '../../types';
+import { MoveDialog } from '../reader';
+import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
+
+export interface LibraryDialogsProps {
+    currentPath: string;
+    currentSource: LibrarySource;
+    selectedItems: Set<string>;
+    // CreateFolder
+    isCreateFolderOpen: boolean;
+    onCloseCreateFolder: () => void;
+    onCreateFolder: (name: string) => Promise<void>;
+    // Rename
+    renameTarget: { name: string; isFolder: boolean } | null;
+    onCloseRename: () => void;
+    onRenameItem: (newName: string) => Promise<void>;
+    // Move
+    isMoveDialogOpen: boolean;
+    onCloseMoveDialog: () => void;
+    onMoveItems: (destination: string) => Promise<void>;
+    // BulkAuthor
+    isBulkAuthorOpen: boolean;
+    onCloseBulkAuthor: () => void;
+    onBulkApplyAuthors: (authors: string[]) => Promise<void>;
+    // Merge
+    isMergeDialogOpen: boolean;
+    onCloseMergeDialog: () => void;
+    onMergePdfs: (outputName: string) => Promise<void>;
+}
+
+export function LibraryDialogs({
+    currentPath, currentSource, selectedItems,
+    isCreateFolderOpen, onCloseCreateFolder, onCreateFolder,
+    renameTarget, onCloseRename, onRenameItem,
+    isMoveDialogOpen, onCloseMoveDialog, onMoveItems,
+    isBulkAuthorOpen, onCloseBulkAuthor, onBulkApplyAuthors,
+    isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
+}: LibraryDialogsProps) {
+    const pdfItems = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+
+    return (
+        <>
+            <CreateFolderDialog
+                open={isCreateFolderOpen}
+                onClose={onCloseCreateFolder}
+                onCreate={onCreateFolder}
+            />
+
+            <RenameDialog
+                open={renameTarget !== null}
+                currentName={renameTarget?.name ?? ''}
+                isFolder={renameTarget?.isFolder ?? false}
+                onClose={onCloseRename}
+                onRename={onRenameItem}
+            />
+
+            <MoveDialog
+                open={isMoveDialogOpen}
+                onClose={onCloseMoveDialog}
+                onMove={onMoveItems}
+                currentSource={currentSource}
+                sourcePath={currentPath}
+            />
+
+            <BulkAuthorDialog
+                open={isBulkAuthorOpen}
+                targetCount={selectedItems.size}
+                onClose={onCloseBulkAuthor}
+                onApply={onBulkApplyAuthors}
+            />
+
+            <MergeDialog
+                open={isMergeDialogOpen}
+                selectedItems={pdfItems}
+                onClose={onCloseMergeDialog}
+                onMerge={onMergePdfs}
+            />
+        </>
+    );
+}

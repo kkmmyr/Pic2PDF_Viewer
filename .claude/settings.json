@@ -1,11 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir -p \"01_要件定義\" \"02_基本設計\" \"03_詳細設計\" \"04_環境構築\" \"05_記録\")",
-      "Bash(mv REQUIREMENTS.md \"01_要件定義/要件定義書.md\")",
-      "Bash(mv BASIC_DESIGN.md \"02_基本設計/基本設計書.md\")",
-      "Bash(mv DETAILED_DESIGN.md \"03_詳細設計/詳細設計書.md\")",
-      "Bash(mv API_SPEC.md \"03_詳細設計/API仕様書.md\")"
+      "WebFetch(domain:zenn.dev)",
+      "Bash(xargs wc *)"
+    ],
+    "additionalDirectories": [
+      "d:\\61.tool\\Pic2PDF_Viewer\\.claude"
     ]
   }
 }

@@ -3,7 +3,7 @@ import os
 import threading
 from collections import deque
 from typing import Optional, Dict, Any
-from config import BATCH_OCR_LAUNCHER
+from config import BATCH_OCR_LAUNCHER, OCR_LOG_MAXLEN
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -19,7 +19,7 @@ class OCRService:
                 instance = super(OCRService, cls).__new__(cls)
                 instance.process = None
                 instance.status = "idle"  # idle, running, error
-                instance.logs: deque = deque(maxlen=2000)
+                instance.logs: deque = deque(maxlen=OCR_LOG_MAXLEN)
                 instance.last_return_code: Optional[int] = None
                 instance._lock = threading.Lock()
                 cls._instance = instance

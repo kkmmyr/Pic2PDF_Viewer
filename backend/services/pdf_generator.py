@@ -6,6 +6,7 @@ import shutil
 from natsort import natsorted
 from PIL import Image
 from typing import Optional, Callable, Union
+from config import THUMBNAIL_HEIGHT, SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -18,10 +19,9 @@ def generate_thumbnail(image_data_or_path: Union[bytes, str], output_path: str) 
         else:
             img = Image.open(image_data_or_path)
 
-        base_height = 500
-        h_percent = base_height / float(img.size[1])
+        h_percent = THUMBNAIL_HEIGHT / float(img.size[1])
         w_size = int(float(img.size[0]) * h_percent)
-        img = img.resize((w_size, base_height), Image.Resampling.LANCZOS)
+        img = img.resize((w_size, THUMBNAIL_HEIGHT), Image.Resampling.LANCZOS)
 
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
@@ -95,7 +95,7 @@ class PdfGenerator:
         try:
             with zipfile.ZipFile(zip_path, 'r') as zf:
                 webp_in_zip = natsorted(
-                    [f for f in zf.namelist() if f.lower().endswith('.webp')]
+                    [f for f in zf.namelist() if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
                 )
                 if not webp_in_zip:
                     return
@@ -217,10 +217,10 @@ class PdfGenerator:
         cleanups: list[str] = []
 
         for root, dirs, files in os.walk(source_dir, topdown=False):
-            for zip_filename in [f for f in files if f.lower().endswith('.zip')]:
+            for zip_filename in [f for f in files if f.lower().endswith(SUPPORTED_ZIP_FORMAT)]:
                 self.process_zip(root, zip_filename)
 
-            webp_files = [f for f in files if f.lower().endswith('.webp')]
+            webp_files = [f for f in files if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
             if webp_files:
                 self.process_directory(root, webp_files, is_root=(root == source_dir))
 

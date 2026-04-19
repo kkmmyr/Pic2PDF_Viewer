@@ -1,52 +1,37 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-*.dll
-.Python
-env/
-venv/
-venv-gpu/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-.pytest_cache/
-.coverage
+*.pyo
+venv*/
+.venv/
 
-# React / Node
+# Node
 node_modules/
 frontend/dist/
-deployment/
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# Pic2PDF Viewer Specific
+# Data (large binary/generated files)
 backend/data/
-backend/complete/
-backend/input/
-backend/imgs/
 
-# Editor directories
-.idea/
+# PDF.js worker (copy from node_modules/pdfjs-dist/build/ if needed)
+frontend/public/pdf.worker.min.mjs
+
+# Debug output
+debug_crops/
+
+# Environment
+.env
+*.env
+!.env.example
+
+# Claude local settings
+.claude/settings.local.json
+
+# Editor / OS
 .vscode/
-*.swp
-*.swo
+.idea/
+Thumbs.db
 .DS_Store
+新しいフォルダー/
+
+# Processed source files
+backend/complete/

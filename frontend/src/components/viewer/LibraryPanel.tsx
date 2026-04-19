@@ -1,19 +1,17 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { PdfFile, LibrarySource, SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
-import { LibraryHeader, FolderGrid, PdfGrid, MoveDialog } from '../reader';
-import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
+import { LibraryHeader, FolderGrid, PdfGrid } from '../reader';
+import { LibraryDialogs } from './LibraryDialogs';
 import { useFavorites, useSortedPdfs, useBookMeta } from '../../hooks';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
+import { STORAGE_KEYS } from '../../constants';
+import { getStorageJson, setStorageJson } from '../../utils/storage';
 
-const SORT_STORAGE_KEY = 'librarySortOrder';
+const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
 
 function readStoredSort(): SortOrder {
-    try {
-        const v = localStorage.getItem(SORT_STORAGE_KEY);
-        if (v) return v as SortOrder;
-    } catch { /* ignore */ }
-    return 'name_asc';
+    return getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc');
 }
 
 interface LibraryPanelProps {
@@ -82,7 +80,7 @@ export function LibraryPanel({
 
     const handleSortChange = useCallback((order: SortOrder) => {
         setSortOrder(order);
-        try { localStorage.setItem(SORT_STORAGE_KEY, order); } catch { /* ignore */ }
+        setStorageJson(SORT_STORAGE_KEY, order);
     }, []);
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
@@ -185,40 +183,25 @@ export function LibraryPanel({
                 onAuthorFilterChange={setAuthorFilter}
             />
 
-            <CreateFolderDialog
-                open={isCreateFolderOpen}
-                onClose={onCloseCreateFolder}
-                onCreate={onCreateFolder}
-            />
-
-            <RenameDialog
-                open={renameTarget !== null}
-                currentName={renameTarget?.name ?? ''}
-                isFolder={renameTarget?.isFolder ?? false}
-                onClose={onCloseRename}
-                onRename={onRenameItem}
-            />
-
-            <MoveDialog
-                open={isMoveDialogOpen}
-                onClose={onCloseMoveDialog}
-                onMove={onMoveItems}
+            <LibraryDialogs
+                currentPath={currentPath}
                 currentSource={currentSource}
-                sourcePath={currentPath}
-            />
-
-            <BulkAuthorDialog
-                open={isBulkAuthorOpen}
-                targetCount={selectedItems.size}
-                onClose={() => setIsBulkAuthorOpen(false)}
-                onApply={handleBulkApplyAuthors}
-            />
-
-            <MergeDialog
-                open={isMergeDialogOpen}
-                selectedItems={Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'))}
-                onClose={() => setIsMergeDialogOpen(false)}
-                onMerge={handleMergePdfs}
+                selectedItems={selectedItems}
+                isCreateFolderOpen={isCreateFolderOpen}
+                onCloseCreateFolder={onCloseCreateFolder}
+                onCreateFolder={onCreateFolder}
+                renameTarget={renameTarget}
+                onCloseRename={onCloseRename}
+                onRenameItem={onRenameItem}
+                isMoveDialogOpen={isMoveDialogOpen}
+                onCloseMoveDialog={onCloseMoveDialog}
+                onMoveItems={onMoveItems}
+                isBulkAuthorOpen={isBulkAuthorOpen}
+                onCloseBulkAuthor={() => setIsBulkAuthorOpen(false)}
+                onBulkApplyAuthors={handleBulkApplyAuthors}
+                isMergeDialogOpen={isMergeDialogOpen}
+                onCloseMergeDialog={() => setIsMergeDialogOpen(false)}
+                onMergePdfs={handleMergePdfs}
             />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
