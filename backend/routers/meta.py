@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from typing import Optional
 from config import DATA_DIR, get_dirs_by_source
 from utils.path_utils import validate_safe_path, validate_safe_name
-from services.author_resolver import resolve_author
+from services.author_resolver import resolve_author, resolve_author_debug
 
 router = APIRouter()
 
@@ -204,9 +204,9 @@ def _run_auto_fill(source: str, overwrite: bool) -> None:
             state.results.append({"title": title, "author": author})
             state.done += 1
 
-            # 最後の1件以外は待機（SearXNG への連続リクエストを避ける）
+            # 最後の1件以外は待機（SearXNG の上流エンジンへの連続リクエストを避ける）
             if i < len(targets) - 1:
-                time.sleep(1.0)
+                time.sleep(5.0)
 
         state.status = "done"
         state.current = ""
@@ -243,6 +243,17 @@ def start_auto_fill(
     thread.start()
 
     return {"started": True, "source": source, "overwrite": overwrite}
+
+
+@router.get("/meta/auto-fill/test")
+def test_auto_fill(title: str, source: str = "generated") -> dict:
+    """
+    1件分のサークル名解決を実行し、各ステップの中間結果を返すデバッグ用エンドポイント。
+    SearXNG の検索結果と Gemma の応答を確認するために使う。
+    """
+    if source not in VALID_SOURCES:
+        raise HTTPException(status_code=400, detail="Invalid source")
+    return resolve_author_debug(title, source)
 
 
 @router.get("/meta/auto-fill/status")
