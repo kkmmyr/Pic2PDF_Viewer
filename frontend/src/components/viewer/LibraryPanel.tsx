@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { PdfFile, LibrarySource, SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
-import { useFavorites, useSortedPdfs, useBookMeta } from '../../hooks';
+import { useFavorites, useSortedPdfs, useBookMeta, useAutoFillAuthors } from '../../hooks';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import { STORAGE_KEYS } from '../../constants';
@@ -87,7 +87,11 @@ export function LibraryPanel({
     const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites);
 
     // メタデータ（作者名）管理
-    const { getAuthors, updateAuthors, allAuthors } = useBookMeta(currentSource);
+    const { getAuthors, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
+
+    // サークル名自動登録
+    const { jobStatus: autoFillStatus, startAutoFill } = useAutoFillAuthors(currentSource, refreshMeta);
+    const [autoFillOverwrite, setAutoFillOverwrite] = useState(false);
 
     const handleRegenThumb = useCallback(async (name: string) => {
         await apiClient.post(API_ENDPOINTS.REGENERATE_THUMBNAIL, {
@@ -203,6 +207,55 @@ export function LibraryPanel({
                 onCloseMergeDialog={() => setIsMergeDialogOpen(false)}
                 onMergePdfs={handleMergePdfs}
             />
+
+            {/* サークル名自動登録バー */}
+            <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3 min-h-[40px]">
+                {autoFillStatus.status !== 'running' && (
+                    <>
+                        <button
+                            onClick={() => startAutoFill(autoFillOverwrite)}
+                            className="text-xs px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shrink-0"
+                        >
+                            サークル名自動登録
+                        </button>
+                        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={autoFillOverwrite}
+                                onChange={e => setAutoFillOverwrite(e.target.checked)}
+                                className="w-3 h-3 accent-indigo-600"
+                            />
+                            登録済みも上書き
+                        </label>
+                    </>
+                )}
+                {autoFillStatus.status === 'running' && (
+                    <div className="flex-1 flex items-center gap-3">
+                        <div className="flex-1">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate">
+                                {autoFillStatus.done} / {autoFillStatus.total} 件 — {autoFillStatus.current}
+                            </div>
+                            <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                                    style={{ width: autoFillStatus.total > 0 ? `${(autoFillStatus.done / autoFillStatus.total) * 100}%` : '0%' }}
+                                />
+                            </div>
+                        </div>
+                        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">処理中…</span>
+                    </div>
+                )}
+                {autoFillStatus.status === 'done' && (
+                    <span className="text-xs text-green-600 dark:text-green-400 ml-2">
+                        完了 — {autoFillStatus.done} 件登録、{autoFillStatus.skipped} 件スキップ
+                    </span>
+                )}
+                {autoFillStatus.status === 'error' && (
+                    <span className="text-xs text-red-500 dark:text-red-400 truncate ml-2">
+                        エラー: {autoFillStatus.error}
+                    </span>
+                )}
+            </div>
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">
