@@ -265,6 +265,8 @@ export function ReaderPanel({
         const p1 = pageNumber;
         const p2 = pageNumber + 1;
         if (direction === 'rtl') {
+            // RTL: page 1 is the cover, shown alone to avoid page 2 appearing in both spreads
+            if (pageNumber === 1) return <>{renderPageItem(p1, 'single')}</>;
             return <>{renderPageItem(p2, 'left')}{renderPageItem(p1, 'right')}</>;
         }
         return <>{renderPageItem(p1, 'left')}{renderPageItem(p2, 'right')}</>;
