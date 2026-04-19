@@ -12,15 +12,17 @@ from config import GEMMA_TOOL_DIR
 _QUERY_CONFIG: dict[str, dict[str, str]] = {
     "generated": {
         "query_template": '"{title}" サークル 同人誌',
-        "extract_target_suffix": "のサークル名のみ。サークル名が見つからない場合は「作者不明」とだけ答えてください。余計な説明は不要です。",
+        # extract_target には「何を抽出するか」だけ書く。命令文・フォールバック指示を含めると
+        # _call_gemma の外側プロンプトと衝突し Gemma が誤動作する。
+        "extract_target_suffix": "のサークル名（なければ著者名）",
     },
     "kindle": {
         "query_template": '"{title}" 著者 漫画',
-        "extract_target_suffix": "のサークル名または著者名のみ。見つからない場合は「作者不明」とだけ答えてください。余計な説明は不要です。",
+        "extract_target_suffix": "のサークル名または著者名",
     },
     "novel": {
         "query_template": '"{title}" 著者 小説',
-        "extract_target_suffix": "のサークル名または著者名のみ。見つからない場合は「作者不明」とだけ答えてください。余計な説明は不要です。",
+        "extract_target_suffix": "のサークル名または著者名",
     },
 }
 
