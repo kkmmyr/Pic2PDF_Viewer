@@ -67,9 +67,9 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
         generate_state.set_current_item(None)
         logger.info("Job %s completed: %d files", job.job_id, len(generated))
     except Exception as e:
+        logger.exception("Job %s failed", job.job_id)
         job.update(status=JobStatus.FAILED, current_item=None, error=str(e))
         generate_state.set_current_item(None)
-        logger.error("Job %s failed: %s", job.job_id, e)
 
 
 @router.post("/generate")
@@ -165,6 +165,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
         return {"message": "Pages deleted successfully", "total_pages": new_total}
 
     except Exception as e:
+        logger.exception("delete_pages failed: %s", filename)
         raise HTTPException(status_code=500, detail=str(e))
 
 class BatchCompressRequest(BaseModel):
@@ -218,4 +219,5 @@ def batch_compress_pdfs(request: BatchCompressRequest):
         return {"message": "Batch compression complete", "files": generated}
     except Exception as e:
         generate_state.set_current_item(None)
+        logger.exception("batch_compress failed")
         raise HTTPException(status_code=500, detail=str(e))

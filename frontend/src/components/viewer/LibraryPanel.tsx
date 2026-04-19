@@ -1,8 +1,9 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import type { PdfFile, LibrarySource, SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
+import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { useFavorites, useSortedPdfs, useBookMeta, useAutoFillAuthors } from '../../hooks';
+import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import { STORAGE_KEYS } from '../../constants';
@@ -14,62 +15,28 @@ function readStoredSort(): SortOrder {
     return getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc');
 }
 
-interface LibraryPanelProps {
-    pdfs: PdfFile[];
-    directories: string[];
-    currentPath: string;
-    currentSource: LibrarySource;
-    // 選択モード
-    isSelectionMode: boolean;
-    selectedItems: Set<string>;
-    // 移動ダイアログ
-    isMoveDialogOpen: boolean;
-    // フォルダ作成ダイアログ
-    isCreateFolderOpen: boolean;
-    // リネームダイアログ
-    renameTarget: { name: string; isFolder: boolean } | null;
-    // コールバック
-    onPdfClick: (name: string) => void;
-    onFolderClick: (name: string) => void;
-    onUpClick: () => void;
-    onSourceChange: (source: LibrarySource) => void;
-    onToggleSelectionMode: () => void;
-    onToggleSelect: (item: string) => void;
-    onOpenCreateFolder: () => void;
-    onCloseCreateFolder: () => void;
-    onCreateFolder: (name: string) => Promise<void>;
-    onMoveSelected: () => void;
-    onCloseMoveDialog: () => void;
-    onMoveItems: (destination: string) => Promise<void>;
-    onOpenRename: (name: string, isFolder?: boolean) => void;
-    onCloseRename: () => void;
-    onRenameItem: (newName: string) => Promise<void>;
-    onRefresh: () => void;
-}
-
 /**
  * ライブラリ一覧ビュー。
  * フォルダ/PDF グリッド・ヘッダー・各ダイアログを管理する。
  * お気に入り・並び替え・タイトル検索・作者フィルター・メタデータ管理もこのコンポーネントで完結させる。
  */
-export function LibraryPanel({
-    pdfs, directories, currentPath, currentSource,
-    isSelectionMode, selectedItems,
-    isMoveDialogOpen, isCreateFolderOpen, renameTarget,
-    onPdfClick, onFolderClick, onUpClick, onSourceChange,
-    onToggleSelectionMode, onToggleSelect,
-    onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
-    onMoveSelected, onCloseMoveDialog, onMoveItems,
-    onOpenRename, onCloseRename, onRenameItem, onRefresh,
-}: LibraryPanelProps) {
+export function LibraryPanel() {
+    const {
+        pdfs, directories, currentPath, currentSource,
+        isSelectionMode, selectedItems,
+        isMoveDialogOpen, isCreateFolderOpen, renameTarget,
+        onPdfClick, onFolderClick, onUpClick, onSourceChange,
+        onToggleSelectionMode, onToggleSelect,
+        onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
+        onMoveSelected, onCloseMoveDialog, onMoveItems,
+        onOpenRename, onCloseRename, onRenameItem, onRefresh,
+    } = useLibraryContext();
+
     const [sortOrder, setSortOrder] = useState<SortOrder>(readStoredSort);
     const [searchText, setSearchText] = useState('');
     const [authorFilter, setAuthorFilter] = useState('');
 
-    // 一括作者設定ダイアログ
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
-
-    // PDF結合ダイアログ
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
 
     // パスまたはソース変更時に検索テキスト・フィルターをリセット
@@ -86,10 +53,7 @@ export function LibraryPanel({
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
     const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites);
 
-    // メタデータ（作者名）管理
     const { getAuthors, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
-
-    // サークル名自動登録
     const { jobStatus: autoFillStatus, startAutoFill } = useAutoFillAuthors(currentSource, refreshMeta);
     const [autoFillOverwrite, setAutoFillOverwrite] = useState(false);
 
@@ -102,7 +66,6 @@ export function LibraryPanel({
         onRefresh();
     }, [currentPath, currentSource, onRefresh]);
 
-    // タイトル検索 + 作者フィルター
     const filteredPdfs = useMemo(() => {
         let result = sortedPdfs;
 
@@ -130,12 +93,10 @@ export function LibraryPanel({
         return directories.filter(d => d.toLowerCase().includes(lower));
     }, [directories, searchText]);
 
-    // 一括作者設定
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
     }, [selectedItems, currentPath, updateAuthors]);
 
-    // サムネイル一括再生成
     const handleRegenThumbnailBulk = useCallback(async () => {
         const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
         if (names.length === 0) return;
@@ -153,7 +114,6 @@ export function LibraryPanel({
         }
     }, [selectedItems, currentPath, currentSource, onRefresh]);
 
-    // PDF結合
     const handleMergePdfs = useCallback(async (outputName: string) => {
         const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
         await apiClient.post<unknown, MergePdfsResponse>(
@@ -281,7 +241,6 @@ export function LibraryPanel({
                     />
                 </div>
             </div>
-
         </>
     );
 }

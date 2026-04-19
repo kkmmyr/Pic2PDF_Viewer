@@ -9,9 +9,11 @@
 | [backend/routers/ocr.py](../../backend/routers/ocr.py) | OCR実行・停止・ステータスAPI |
 | [backend/routers/meta.py](../../backend/routers/meta.py) | 書籍メタデータ（作者名）取得・更新API |
 | [backend/services/pdf_service.py](../../backend/services/pdf_service.py) | PDFページ削除・ページ数取得ロジック |
-| [backend/services/pdf_generator.py](../../backend/services/pdf_generator.py) | WebP/ZIP → PDF変換 |
+| [backend/services/pdf_generator.py](../../backend/services/pdf_generator.py) | WebP/ZIP → PDF変換（`_collect_images` 共通フロー） |
 | [backend/services/thumbnail_service.py](../../backend/services/thumbnail_service.py) | サムネイル生成 |
 | [backend/services/ocr_service.py](../../backend/services/ocr_service.py) | OCRバックグラウンドプロセス管理 |
+| [backend/services/meta_store.py](../../backend/services/meta_store.py) | meta.json CRUD・ソース別ロック管理 |
+| [backend/services/auto_fill_service.py](../../backend/services/auto_fill_service.py) | サークル名自動登録ジョブ管理（AutoFillState・スレッド起動） |
 
 **主要ライブラリ:** `fastapi`, `uvicorn`, `img2pdf`, `Pillow`, `pymupdf`, `natsort`
 
@@ -24,7 +26,7 @@
 | ファイル | 役割 |
 |---|---|
 | [frontend/src/App.tsx](../../frontend/src/App.tsx) | ルーティング (`/viewer`, `/generator`, `/ocr`) |
-| [frontend/src/pages/ViewerPage.tsx](../../frontend/src/pages/ViewerPage.tsx) | PDFライブラリ・リーダー統合ページ |
+| [frontend/src/pages/ViewerPage.tsx](../../frontend/src/pages/ViewerPage.tsx) | PDFライブラリ・リーダー統合ページ（LibraryProvider でラップするだけのシンプルな構造） |
 | [frontend/src/pages/GeneratorPage.tsx](../../frontend/src/pages/GeneratorPage.tsx) | PDF生成ページ |
 | [frontend/src/pages/OCRPage.tsx](../../frontend/src/pages/OCRPage.tsx) | Novel OCR実行ページ |
 
@@ -32,7 +34,7 @@
 
 | ファイル | 役割 |
 |---|---|
-| [frontend/src/components/viewer/LibraryPanel.tsx](../../frontend/src/components/viewer/LibraryPanel.tsx) | ライブラリUI（一覧・ソート・お気に入り・作者フィルター） |
+| [frontend/src/components/viewer/LibraryPanel.tsx](../../frontend/src/components/viewer/LibraryPanel.tsx) | ライブラリUI（一覧・ソート・お気に入り・作者フィルター）props なし、LibraryContext から取得 |
 | [frontend/src/components/viewer/ReaderPanel.tsx](../../frontend/src/components/viewer/ReaderPanel.tsx) | PDFリーダーUI（ページ表示・見開き制御・検索・削除） |
 | [frontend/src/components/viewer/BulkAuthorDialog.tsx](../../frontend/src/components/viewer/BulkAuthorDialog.tsx) | 複数書籍への作者名一括設定ダイアログ |
 | [frontend/src/components/viewer/CreateFolderDialog.tsx](../../frontend/src/components/viewer/CreateFolderDialog.tsx) | フォルダ作成ダイアログ |
@@ -68,6 +70,12 @@
 | [frontend/src/hooks/usePdfStatus.ts](../../frontend/src/hooks/usePdfStatus.ts) | PDF生成ジョブ監視 |
 | [frontend/src/hooks/useOcrStatus.ts](../../frontend/src/hooks/useOcrStatus.ts) | OCRステータス監視 |
 | [frontend/src/hooks/useWindowSize.ts](../../frontend/src/hooks/useWindowSize.ts) | ウィンドウサイズ取得 |
+
+**Context**
+
+| ファイル | 役割 |
+|---|---|
+| [frontend/src/contexts/LibraryContext.tsx](../../frontend/src/contexts/LibraryContext.tsx) | ライブラリ状態一元管理（pdfs・選択モード・ダイアログ開閉・ナビゲーション）`LibraryProvider` + `useLibraryContext` |
 
 **設定**
 

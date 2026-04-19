@@ -42,6 +42,10 @@ export const API_ENDPOINTS = {
     GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
     /** 書籍メタデータ取得・更新 */
     META: '/api/meta',
+    /** 作者名自動登録ジョブ開始 */
+    META_AUTO_FILL: '/api/meta/auto-fill',
+    /** 作者名自動登録ジョブ進捗取得 */
+    META_AUTO_FILL_STATUS: '/api/meta/auto-fill/status',
     /** サムネイル一括再生成 */
     REGENERATE_THUMBNAIL_BULK: '/api/thumbnails/regenerate_bulk',
     /** PDF結合 */

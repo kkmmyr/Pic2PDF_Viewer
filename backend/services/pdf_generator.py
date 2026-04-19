@@ -5,31 +5,31 @@ import io
 import shutil
 from natsort import natsorted
 from PIL import Image
-from typing import Optional, Callable, Union
+from typing import Optional, Callable
 from config import THUMBNAIL_HEIGHT, SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 
-def generate_thumbnail(image_data_or_path: Union[bytes, str], output_path: str) -> None:
+def generate_thumbnail(image_path: str, output_path: str) -> None:
     try:
-        if isinstance(image_data_or_path, bytes):
-            img = Image.open(io.BytesIO(image_data_or_path))
-        else:
-            img = Image.open(image_data_or_path)
-
+        img = Image.open(image_path)
         h_percent = THUMBNAIL_HEIGHT / float(img.size[1])
         w_size = int(float(img.size[0]) * h_percent)
         img = img.resize((w_size, THUMBNAIL_HEIGHT), Image.Resampling.LANCZOS)
-
         if img.mode in ("RGBA", "P"):
             img = img.convert("RGB")
-
         img.save(output_path, "JPEG")
         logger.info("Generated thumbnail: %s", output_path)
     except Exception as e:
         logger.error("Failed to generate thumbnail %s: %s", output_path, e)
+
+
+def _collect_images(images_dir: str) -> list[str]:
+    """ディレクトリ内の WebP 画像を自然順で収集する。"""
+    files = [f for f in os.listdir(images_dir) if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
+    return [os.path.join(images_dir, f) for f in natsorted(files)]
 
 
 class PdfGenerator:
@@ -47,37 +47,25 @@ class PdfGenerator:
         self.moves: list[tuple[str, str, bool]] = []
 
     # ------------------------------------------------------------------
-    # 共通: サムネイル・PDF・圧縮PDF を一括生成
+    # 共通: images_dir に収集済みの画像から PDF・サムネイル・圧縮 PDF を生成
     # ------------------------------------------------------------------
-    def _generate_outputs(
-        self,
-        item_name: str,
-        images: list,
-        thumb_source: Union[bytes, str],
-    ) -> str:
-        """
-        サムネイル生成・PDF生成・圧縮PDF生成の共通処理。
+    def _generate_outputs(self, item_name: str, item_images_dir: str) -> str:
+        image_paths = _collect_images(item_images_dir)
+        if not image_paths:
+            raise ValueError(f"No images found in {item_images_dir}")
 
-        Args:
-            item_name: 出力ファイルのベース名 (拡張子なし)
-            images: PDF化する画像のリスト (bytes または ファイルパス)
-            thumb_source: サムネイル生成に使う最初の画像 (bytes または パス)
-
-        Returns:
-            生成した PDF のフルパス
-        """
         pdf_filename = f"{item_name}.pdf"
         output_path = os.path.join(self.output_dir, pdf_filename)
         thumb_path = os.path.join(self.thumbnail_dir, f"{item_name}.jpg")
 
-        generate_thumbnail(thumb_source, thumb_path)
-        self._create_pdf_file(images, output_path)
-        self._create_compressed_pdf(images, pdf_filename)
+        generate_thumbnail(image_paths[0], thumb_path)
+        self._create_pdf_file(image_paths, output_path)
+        self._create_compressed_pdf(image_paths, pdf_filename)
         self.generated_files.append(pdf_filename)
         return output_path
 
     # ------------------------------------------------------------------
-    # ZIP 処理
+    # ZIP 処理: images_dir に展開 → 共通フローへ
     # ------------------------------------------------------------------
     def process_zip(self, root: str, zip_filename: str) -> None:
         item_name = os.path.splitext(zip_filename)[0]
@@ -100,18 +88,14 @@ class PdfGenerator:
                 if not webp_in_zip:
                     return
 
-                image_data_list: list[bytes] = []
                 for image_name in webp_in_zip:
                     with zf.open(image_name) as image_file:
                         data = image_file.read()
-                    image_data_list.append(data)
-
-                    image_out_path = os.path.join(target_images_dir, image_name)
-                    os.makedirs(os.path.dirname(image_out_path), exist_ok=True)
+                    image_out_path = os.path.join(target_images_dir, os.path.basename(image_name))
                     with open(image_out_path, "wb") as img_f:
                         img_f.write(data)
 
-            output_path = self._generate_outputs(item_name, image_data_list, image_data_list[0])
+            output_path = self._generate_outputs(item_name, target_images_dir)
             logger.info("Generated from ZIP: %s", output_path)
             self.moves.append((zip_path, os.path.join(self.complete_dir, zip_filename), False))
 
@@ -119,7 +103,7 @@ class PdfGenerator:
             logger.error("Failed to generate PDF for ZIP %s: %s", zip_path, e)
 
     # ------------------------------------------------------------------
-    # ディレクトリ処理
+    # ディレクトリ処理: images_dir にコピー → 共通フローへ
     # ------------------------------------------------------------------
     def process_directory(self, root: str, webp_files: list[str], is_root: bool) -> None:
         folder_name = os.path.basename(root)
@@ -127,19 +111,14 @@ class PdfGenerator:
         if self.progress_callback:
             self.progress_callback(folder_name)
 
-        webp_files = natsorted(webp_files)
-        image_paths = [os.path.join(root, f) for f in webp_files]
-
         target_images_dir = os.path.join(self.images_dir, folder_name)
         os.makedirs(target_images_dir, exist_ok=True)
 
         try:
-            for img_path, img_name in zip(image_paths, webp_files):
-                shutil.copy2(img_path, os.path.join(target_images_dir, img_name))
+            for img_name in webp_files:
+                shutil.copy2(os.path.join(root, img_name), os.path.join(target_images_dir, img_name))
 
-            output_path = self._generate_outputs(
-                folder_name, image_paths, image_paths[0] if image_paths else b''
-            )
+            output_path = self._generate_outputs(folder_name, target_images_dir)
             logger.info("Generated from Folder: %s", output_path)
 
             if not is_root:
@@ -158,18 +137,18 @@ class PdfGenerator:
     # ------------------------------------------------------------------
     # 圧縮 PDF 生成
     # ------------------------------------------------------------------
-    def _create_compressed_pdf(self, images: list, pdf_filename: str) -> None:
+    def _create_compressed_pdf(self, image_paths: list[str], pdf_filename: str) -> None:
         if not (self.compressed_output_dir and self.quality):
             return
         compressed_path = os.path.join(self.compressed_output_dir, pdf_filename)
-        self._create_pdf_file(images, compressed_path, quality=self.quality)
+        self._create_pdf_file(image_paths, compressed_path, quality=self.quality)
         logger.info("Generated compressed PDF: %s", compressed_path)
 
-    def _create_pdf_file(self, images: list, output_path: str, quality: Optional[int] = None) -> None:
+    def _create_pdf_file(self, image_paths: list[str], output_path: str, quality: Optional[int] = None) -> None:
         if quality:
             processed: list[bytes] = []
-            for item in images:
-                img = Image.open(io.BytesIO(item)) if isinstance(item, bytes) else Image.open(item)
+            for item in image_paths:
+                img = Image.open(item)
                 if img.mode in ("RGBA", "P"):
                     img = img.convert("RGB")
                 buf = io.BytesIO()
@@ -179,7 +158,7 @@ class PdfGenerator:
                 f.write(img2pdf.convert(processed))
         else:
             with open(output_path, "wb") as f:
-                f.write(img2pdf.convert(images))
+                f.write(img2pdf.convert(image_paths))
 
     # ------------------------------------------------------------------
     # ファイル移動（バックアップ＋ロールバック）
@@ -251,7 +230,7 @@ def scan_and_generate(
     quality: Optional[int] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> list[str]:
-    """後方互換ラッパー。source_dir 内の WebP/ZIP を PDF に変換する。"""
+    """source_dir 内の WebP/ZIP を PDF に変換する。"""
     generator = PdfGenerator(
         output_dir, thumbnail_dir, images_dir, complete_dir,
         compressed_output_dir, quality, progress_callback

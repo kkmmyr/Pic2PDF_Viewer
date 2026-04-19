@@ -90,6 +90,7 @@ def list_book_images(path: str, source: str = "generated"):
 
         return {"images": image_urls}
     except Exception as e:
+        logger.exception("list_book_images failed: %s", path)
         raise HTTPException(status_code=500, detail=str(e))
 
 class CreateDirectoryRequest(BaseModel):
@@ -114,6 +115,7 @@ def create_directory(request: CreateDirectoryRequest):
         os.makedirs(target_dir)
         return {"message": "Directory created"}
     except Exception as e:
+        logger.exception("create_directory failed: %s", target_dir)
         raise HTTPException(status_code=500, detail=str(e))
 
 class MoveItemsRequest(BaseModel):

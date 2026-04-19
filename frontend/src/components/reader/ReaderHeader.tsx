@@ -6,7 +6,6 @@ interface ReaderHeaderProps {
     selectedPdf: string;
     direction: ReadingDirection;
     spreadMode: SpreadMode;
-    isSpread: boolean;
     pageNumber: number;
     numPages: number;
     isEditMode: boolean;
@@ -33,7 +32,6 @@ export function ReaderHeader({
     selectedPdf,
     direction,
     spreadMode,
-    isSpread,
     pageNumber,
     numPages,
     isEditMode,

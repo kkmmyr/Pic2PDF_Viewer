@@ -11,3 +11,5 @@ export { useFavorites } from './useFavorites';
 export { useSortedPdfs } from './useSortedPdfs';
 export { useDarkMode } from './useDarkMode';
 export { useBookMeta } from './useBookMeta';
+export { useAutoFillAuthors } from './useAutoFillAuthors';
+export type { AutoFillStatus } from './useAutoFillAuthors';

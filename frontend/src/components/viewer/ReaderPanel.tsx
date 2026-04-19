@@ -291,7 +291,6 @@ export function ReaderPanel({
                 selectedPdf={selectedPdf}
                 direction={direction}
                 spreadMode={spreadMode}
-                isSpread={isSpread}
                 pageNumber={pageNumber}
                 numPages={numPages}
                 isEditMode={isEditMode}
