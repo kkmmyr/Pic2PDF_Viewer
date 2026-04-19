@@ -225,7 +225,7 @@ export function LibraryPanel({
                                 onChange={e => setAutoFillOverwrite(e.target.checked)}
                                 className="w-3 h-3 accent-indigo-600"
                             />
-                            登録済みも上書き
+                            作者名登録済みも上書き
                         </label>
                     </>
                 )}

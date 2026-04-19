@@ -173,10 +173,14 @@ def _run_auto_fill(source: str, overwrite: bool) -> None:
         with lock:
             meta = _load_meta(source)
 
-        # overwrite=False: 登録済み（「作者不明」含む）をスキップ
-        # overwrite=True:  全件処理（既存エントリを上書き）
+        # overwrite=False: 作者名が確定済みのものだけスキップ（「作者不明」は再試行）
+        # overwrite=True:  全件処理（確定済みの作者名も上書き）
+        def _has_real_author(key: str) -> bool:
+            authors = meta.get(key, {}).get("authors", [])
+            return bool(authors) and authors != ["作者不明"]
+
         targets = all_pdfs if overwrite else [
-            (p, f) for p, f in all_pdfs if _make_key(p, f) not in meta
+            (p, f) for p, f in all_pdfs if not _has_real_author(_make_key(p, f))
         ]
 
         state.total = len(all_pdfs)
@@ -220,8 +224,8 @@ def start_auto_fill(
 ) -> dict:
     """
     サークル名自動登録ジョブを開始する。
-    - overwrite=False（デフォルト）: 登録済み（「作者不明」含む）はスキップ。
-    - overwrite=True: 全件を上書き再処理。
+    - overwrite=False（デフォルト）: 作者名確定済みのみスキップ。「作者不明」は再試行。
+    - overwrite=True: 作者名確定済みも含め全件を上書き再処理。
     - 既にジョブが実行中の場合は 409 を返す。
     """
     if source not in VALID_SOURCES:
