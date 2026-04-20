@@ -3,6 +3,11 @@ author_resolver.py — タイトルからサークル名を推定するサービ
 
 web_extract (Gemma 4 ツール) を使い、Web検索 + Gemma でサークル名を取得する。
 ソース種別に応じてクエリを切り替えることで汎用的に利用できる。
+
+generated ソースの検索フロー:
+  1. DLsite / Fanza 直接検索 (site: フィルタ) → Snippet にサークル名が含まれることが多い
+  2. ヒットしない場合は汎用クエリ（サークル 同人誌）にフォールバック
+kindle / novel ソースは汎用クエリのみ。
 """
 import sys
 from config import GEMMA_TOOL_DIR
@@ -27,21 +32,57 @@ _QUERY_CONFIG: dict[str, dict[str, str]] = {
     },
 }
 
+# generated ソース向け: DLsite / Fanza を site: フィルタで直接検索するクエリ
+# Fanza のコンテンツは dmm.co.jp ドメインで提供されており、
+# Snippet に「作品名(サークル名) - FANZA」形式でサークル名が含まれることが多い。
+# DLsite の Snippet にはサークル名が入らないケースがあるため dmm.co.jp を優先する。
+_DIRECT_SITES_QUERY = '{title} site:dmm.co.jp OR site:dlsite.com'
+_DIRECT_SITES_EXTRACT_SUFFIX = "のサークル名（なければ著者名）"
+
 
 def _ensure_web_extract():
     """web_extract モジュールをインポートして返す。失敗時は None。"""
-    if GEMMA_TOOL_DIR not in sys.path:
-        sys.path.insert(0, GEMMA_TOOL_DIR)
+    import os
+    lib_dir = os.path.join(GEMMA_TOOL_DIR, "lib")
+    for p in (GEMMA_TOOL_DIR, lib_dir):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+    # backend の config.py が sys.modules['config'] にキャッシュされているため、
+    # web_extract が Gemma の config を読めず ImportError になる。
+    # インポート時だけ backend config を退避し、完了後に復元する。
+    # （web_extract は TIMEOUT_FETCH_URL をモジュール変数に取り込むため、
+    #   復元後も正常に動作する）
+    saved_config = sys.modules.pop("config", None)
     try:
         from web_extract import web_extract, searxng_search  # type: ignore[import]
         return web_extract, searxng_search
     except ImportError:
         return None, None
+    finally:
+        if saved_config is not None:
+            sys.modules["config"] = saved_config
+
+
+def _try_direct_sites(title: str, web_extract) -> str:
+    """
+    DLsite / Fanza を site: フィルタで検索してサークル名を取得する。
+    取得できなかった場合は空文字を返す（呼び出し側でフォールバック）。
+    """
+    query = _DIRECT_SITES_QUERY.format(title=title)
+    extract_target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
+    result = web_extract(query, extract_target, language="ja")
+    result = result.strip() if result else ""
+    # 「作者不明」が返った場合はフォールバックさせる
+    return result if result and result != "作者不明" else ""
 
 
 def resolve_author(title: str, source: str) -> str:
     """
     Web検索 + Gemma でタイトルからサークル名/著者名を推定する。
+
+    generated ソースは DLsite/Fanza 直接検索を先に試み、
+    ヒットしない場合のみ汎用クエリにフォールバックする。
 
     Args:
         title: 拡張子なしのファイル名（書籍タイトル）
@@ -54,6 +95,13 @@ def resolve_author(title: str, source: str) -> str:
     if web_extract is None:
         return "作者不明"
 
+    # generated ソースは DLsite/Fanza 直接検索を優先
+    if source == "generated":
+        author = _try_direct_sites(title, web_extract)
+        if author:
+            return author
+
+    # フォールバック: 既存の汎用クエリ
     config = _QUERY_CONFIG.get(source, _QUERY_CONFIG["generated"])
     query = config["query_template"].format(title=title)
     extract_target = f'「{title}」' + config["extract_target_suffix"]
@@ -71,6 +119,32 @@ def resolve_author_debug(title: str, source: str) -> dict:
     if web_extract is None:
         return {"error": "web_extract モジュールをインポートできません。GEMMA_TOOL_DIR を確認してください。"}
 
+    result = {
+        "title": title,
+        "source": source,
+    }
+
+    # generated ソースは DLsite/Fanza 直接検索ステップを追加
+    if source == "generated":
+        direct_query = _DIRECT_SITES_QUERY.format(title=title)
+        direct_target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
+        direct_snippets = searxng_search(direct_query, num_results=5, language="ja")
+        direct_gemma = web_extract(direct_query, direct_target, language="ja") if direct_snippets else ""
+        direct_result = direct_gemma.strip() if direct_gemma and direct_gemma.strip() else ""
+
+        result["direct_query"] = direct_query
+        result["direct_searxng_hit"] = bool(direct_snippets)
+        result["direct_searxng_snippets"] = direct_snippets[:500] if direct_snippets else ""
+        result["direct_gemma_raw"] = direct_gemma
+        result["direct_result"] = direct_result if direct_result and direct_result != "作者不明" else ""
+
+        # 直接検索でサークル名が取れた場合はフォールバック不要
+        if result["direct_result"]:
+            result["final"] = result["direct_result"]
+            result["used_fallback"] = False
+            return result
+
+    # 汎用クエリ（フォールバック or kindle/novel）
     config = _QUERY_CONFIG.get(source, _QUERY_CONFIG["generated"])
     query = config["query_template"].format(title=title)
     extract_target = f'「{title}」' + config["extract_target_suffix"]
@@ -78,13 +152,14 @@ def resolve_author_debug(title: str, source: str) -> dict:
     snippets = searxng_search(query, num_results=5, language="ja")
     gemma_result = web_extract(query, extract_target, language="ja") if snippets else ""
 
-    return {
-        "title": title,
-        "source": source,
-        "query": query,
-        "extract_target": extract_target,
-        "searxng_hit": bool(snippets),
-        "searxng_snippets": snippets[:500] if snippets else "",
-        "gemma_raw": gemma_result,
-        "final": gemma_result.strip() if gemma_result and gemma_result.strip() else "作者不明",
-    }
+    result["query"] = query
+    result["extract_target"] = extract_target
+    result["searxng_hit"] = bool(snippets)
+    result["searxng_snippets"] = snippets[:500] if snippets else ""
+    result["gemma_raw"] = gemma_result
+    result["final"] = gemma_result.strip() if gemma_result and gemma_result.strip() else "作者不明"
+
+    if source == "generated":
+        result["used_fallback"] = True
+
+    return result
