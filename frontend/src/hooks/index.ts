@@ -13,3 +13,7 @@ export { useDarkMode } from './useDarkMode';
 export { useBookMeta } from './useBookMeta';
 export { useAutoFillAuthors } from './useAutoFillAuthors';
 export type { AutoFillStatus } from './useAutoFillAuthors';
+export { useLibraryFilter } from './useLibraryFilter';
+export { usePdfSearch } from './usePdfSearch';
+export { useToast } from './useToast';
+export type { Toast, ToastType } from './useToast';

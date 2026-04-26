@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { UI_CONFIG } from '../../constants';
 
 interface PdfSearchBarProps {
     /** 検索テキスト */
@@ -37,7 +38,7 @@ export function PdfSearchBar({
     useEffect(() => {
         const timer = setTimeout(() => {
             onSearchChange(localText);
-        }, 300);
+        }, UI_CONFIG.SEARCH_DEBOUNCE_MS);
         return () => clearTimeout(timer);
     }, [localText, onSearchChange]);
 

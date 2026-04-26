@@ -1,5 +1,8 @@
-import { ArrowLeft, ArrowUpDown, Search, User, ImageIcon, Merge } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
+import { HeaderSearchBar } from './HeaderSearchBar';
+import { HeaderSortSelect } from './HeaderSortSelect';
+import { SourceSelector } from './SourceSelector';
 
 interface LibraryHeaderProps {
     currentPath: string;
@@ -8,8 +11,8 @@ interface LibraryHeaderProps {
     selectedCount: number;
     sortOrder: SortOrder;
     searchText: string;
-    authorFilter: string;       // '' = フィルターなし
-    allAuthors: string[];       // フィルター候補リスト
+    authorFilter: string;
+    allAuthors: string[];
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
@@ -22,14 +25,6 @@ interface LibraryHeaderProps {
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
 }
-
-const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
-    { value: 'name_asc',        label: '名前 (A→Z)' },
-    { value: 'name_desc',       label: '名前 (Z→A)' },
-    { value: 'date_desc',       label: '新しい順' },
-    { value: 'date_asc',        label: '古い順' },
-    { value: 'favorites_first', label: 'お気に入り優先' },
-];
 
 export function LibraryHeader({
     currentPath,
@@ -70,38 +65,14 @@ export function LibraryHeader({
                 </div>
 
                 <div className="flex items-center gap-3">
-                    {/* 通常モード: 検索・作者フィルター・ソート */}
                     {!isSelectionMode && (
-                        <>
-                            {/* タイトル検索 */}
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 dark:text-gray-500 pointer-events-none" />
-                                <input
-                                    type="text"
-                                    value={searchText}
-                                    onChange={(e) => onSearchChange(e.target.value)}
-                                    placeholder="タイトルを検索..."
-                                    className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 w-44"
-                                />
-                            </div>
-
-                            {/* 作者フィルター */}
-                            {allAuthors.length > 0 && (
-                                <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                                    <User className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                                    <select
-                                        value={authorFilter}
-                                        onChange={(e) => onAuthorFilterChange(e.target.value)}
-                                        className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                    >
-                                        <option value="">作者: すべて</option>
-                                        {allAuthors.map(a => (
-                                            <option key={a} value={a}>{a}</option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-                        </>
+                        <HeaderSearchBar
+                            searchText={searchText}
+                            authorFilter={authorFilter}
+                            allAuthors={allAuthors}
+                            onSearchChange={onSearchChange}
+                            onAuthorFilterChange={onAuthorFilterChange}
+                        />
                     )}
 
                     <div className="flex gap-2 mr-2">
@@ -168,35 +139,10 @@ export function LibraryHeader({
                     </div>
 
                     {!isSelectionMode && (
-                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                            <ArrowUpDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                            <select
-                                value={sortOrder}
-                                onChange={(e) => onSortChange(e.target.value as SortOrder)}
-                                className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                            >
-                                {SORT_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
-                        </div>
+                        <HeaderSortSelect sortOrder={sortOrder} onSortChange={onSortChange} />
                     )}
 
-                    <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                        {(['generated', 'kindle', 'novel'] as LibrarySource[]).map((src) => (
-                            <button
-                                key={src}
-                                onClick={() => onSourceChange(src)}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                                    currentSource === src
-                                        ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                                        : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                                }`}
-                            >
-                                {src === 'generated' ? 'Main' : src === 'kindle' ? 'Kindle' : 'Novel'}
-                            </button>
-                        ))}
-                    </div>
+                    <SourceSelector currentSource={currentSource} onSourceChange={onSourceChange} />
                 </div>
             </div>
         </div>

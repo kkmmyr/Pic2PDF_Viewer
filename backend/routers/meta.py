@@ -10,9 +10,10 @@ from pydantic import BaseModel
 from config import get_dirs_by_source
 from utils.path_utils import validate_safe_path, validate_safe_name
 from services.author_resolver import resolve_author_debug
-from services.meta_store import get_lock, load_meta, save_meta, make_key
+from services.meta_store import make_key, load_meta, update_meta_locked
 from services.auto_fill_service import (
     VALID_SOURCES,
+    VALID_MODES,
     get_auto_fill_state,
     start_auto_fill_job,
 )
@@ -63,17 +64,15 @@ def update_meta(request: UpdateMetaRequest) -> dict:
 
     authors = [a.strip() for a in request.authors if a.strip()]
 
-    lock = get_lock(request.source)
-    with lock:
-        data = load_meta(request.source)
+    def _apply(data):
         for name in request.names:
             key = make_key(request.path, name)
             if authors:
                 data[key] = {"authors": authors}
             else:
                 data.pop(key, None)
-        save_meta(request.source, data)
 
+    update_meta_locked(request.source, _apply)
     return {"message": "Updated", "updated_count": len(request.names)}
 
 
@@ -84,23 +83,26 @@ def update_meta(request: UpdateMetaRequest) -> dict:
 @router.post("/meta/auto-fill")
 def start_auto_fill(
     source: str = "generated",
-    overwrite: bool = False,
+    mode: str = "unknown_only",
 ) -> dict:
     """
     サークル名自動登録ジョブを開始する。
-    - overwrite=False（デフォルト）: 作者名確定済みのみスキップ。「作者不明」は再試行。
-    - overwrite=True: 作者名確定済みも含め全件を上書き再処理。
+    - mode=missing_only : 作者名エントリが存在しない書籍のみ
+    - mode=unknown_only : 「作者不明」の書籍のみ（デフォルト）
+    - mode=overwrite_all: 登録済みを含む全件を上書き
     - 既にジョブが実行中の場合は 409 を返す。
     """
     if source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
+    if mode not in VALID_MODES:
+        raise HTTPException(status_code=400, detail=f"Invalid mode. Choose from: {', '.join(VALID_MODES)}")
 
     state = get_auto_fill_state(source)
     if state.status == "running":
         raise HTTPException(status_code=409, detail="Auto-fill job is already running")
 
-    start_auto_fill_job(source, overwrite)
-    return {"started": True, "source": source, "overwrite": overwrite}
+    start_auto_fill_job(source, mode)
+    return {"started": True, "source": source, "mode": mode}
 
 
 @router.get("/meta/auto-fill/test")

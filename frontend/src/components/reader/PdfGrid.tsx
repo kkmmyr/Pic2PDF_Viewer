@@ -14,6 +14,8 @@ interface PdfGridProps {
     onRegenThumb?: (name: string) => void;
     /** 書籍名 → 作者名リスト のマップ（カード下部に表示） */
     getAuthors?: (name: string) => string[];
+    /** 作者タグクリック時に絞り込みを行うコールバック */
+    onAuthorClick?: (author: string) => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function PdfGrid({
     onRename,
     onRegenThumb,
     getAuthors,
+    onAuthorClick,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -51,20 +54,22 @@ export function PdfGrid({
                     return (
                         <div
                             key={pdf.name}
-                            className={`bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer flex flex-col border-2 ${
+                            className={`bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
                                 isSelectionMode && selectedItems.has(pdf.name)
                                     ? 'border-blue-500'
                                     : 'border-transparent'
                             }`}
-                            onClick={() => {
-                                if (isSelectionMode && onToggleSelect) {
-                                    onToggleSelect(pdf.name);
-                                } else {
-                                    onPdfClick(pdf.name);
-                                }
-                            }}
                         >
-                            <div className="aspect-[3/4] relative">
+                            <div
+                                className="aspect-[3/4] relative cursor-pointer"
+                                onClick={() => {
+                                    if (isSelectionMode && onToggleSelect) {
+                                        onToggleSelect(pdf.name);
+                                    } else {
+                                        onPdfClick(pdf.name);
+                                    }
+                                }}
+                            >
                                 {/* 選択チェックボックス */}
                                 {isSelectionMode && (
                                     <div className="absolute top-2 right-2 z-10 bg-white dark:bg-gray-800 rounded-full">
@@ -110,7 +115,12 @@ export function PdfGrid({
                                     return authors.length > 0 ? (
                                         <div className="mt-1 flex flex-wrap gap-1">
                                             {authors.map((a, i) => (
-                                                <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate max-w-full">
+                                                <span
+                                                    key={i}
+                                                    className={`text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800/50' : ''}`}
+                                                    onClick={onAuthorClick ? (e) => { e.stopPropagation(); onAuthorClick(a); } : undefined}
+                                                    title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
+                                                >
                                                     {a}
                                                 </span>
                                             ))}

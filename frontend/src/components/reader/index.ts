@@ -1,9 +1,13 @@
 export { PageRenderer } from './PageRenderer';
 export { ReaderHeader } from './ReaderHeader';
 export { LibraryHeader } from './LibraryHeader';
+export { HeaderSearchBar } from './HeaderSearchBar';
+export { HeaderSortSelect } from './HeaderSortSelect';
+export { SourceSelector } from './SourceSelector';
 export { FolderGrid } from './FolderGrid';
 export { PdfGrid } from './PdfGrid';
 export { LazyThumbnail } from './LazyThumbnail';
 export { PdfSearchBar } from './PdfSearchBar';
+export { ToastContainer } from './ToastContainer';
 export * from './MoveDialog';
 export * from './PageRenderer';

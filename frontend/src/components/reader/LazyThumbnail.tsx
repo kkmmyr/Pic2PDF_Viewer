@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText } from 'lucide-react';
 import { buildStaticUrl } from '../../config/api';
+import { UI_CONFIG } from '../../constants';
 
 interface LazyThumbnailProps {
     src: string | null;
@@ -28,7 +29,7 @@ export function LazyThumbnail({ src, alt, className = '' }: LazyThumbnailProps) 
                     observer.disconnect();
                 }
             },
-            { rootMargin: '200px' } // 200px 手前からプリロード開始
+            { rootMargin: UI_CONFIG.PRELOAD_MARGIN }
         );
         observer.observe(el);
         return () => observer.disconnect();

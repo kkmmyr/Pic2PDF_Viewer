@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 import type { LibrarySource, ReadingDirection, SpreadMode, DeletePagesResponse } from '../../types';
 import { buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../../config/api';
 import apiClient from '../../config/api_client';
-import { useWindowSize, useBookImages, useImagePreloader, useReaderNavigation } from '../../hooks';
-import { ReaderHeader, PageRenderer, PdfSearchBar } from '../reader';
+import { useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast } from '../../hooks';
+import { usePdfSearch } from '../../hooks/usePdfSearch';
+import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer } from '../reader';
 
 // <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -59,14 +60,18 @@ export function ReaderPanel({
     // 編集モード
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
+    const { toasts, showToast, dismissToast } = useToast();
 
     // 検索
     const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [searchText, setSearchText] = useState('');
-    const [matchCount, setMatchCount] = useState(0);
-    const [currentMatch, setCurrentMatch] = useState(0);
-    // PDFページのテキストコンテンツ: { pageNum -> TextItem[] }
-    const pdfRef = useRef<pdfjs.PDFDocumentProxy | null>(null);
+    const {
+        searchText, setSearchText,
+        matchCount, currentMatch,
+        handleCloseSearch: closeSearchState,
+        handlePrevMatch, handleNextMatch,
+        customTextRenderer,
+        onDocumentLoaded,
+    } = usePdfSearch({ isSearchOpen, setPageNumber });
 
     // Ctrl+F でサーチバーを開く
     useEffect(() => {
@@ -80,64 +85,10 @@ export function ReaderPanel({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, []);
 
-    // 検索クローズ時にリセット
     const handleCloseSearch = useCallback(() => {
         setIsSearchOpen(false);
-        setSearchText('');
-        setMatchCount(0);
-        setCurrentMatch(0);
-    }, []);
-
-    // テキスト検索: 全ページを走査してマッチ数を算出し、最初のマッチページに移動
-    const searchAllPages = useCallback(async (text: string, pdf: pdfjs.PDFDocumentProxy) => {
-        if (!text) {
-            setMatchCount(0);
-            setCurrentMatch(0);
-            return;
-        }
-
-        let totalMatches = 0;
-        let firstMatchPage = -1;
-        const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(escaped, 'gi');
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-            const page = await pdf.getPage(i);
-            const content = await page.getTextContent();
-            const pageText = content.items
-                .map((item) => ('str' in item ? item.str : ''))
-                .join('');
-            const matches = pageText.match(regex);
-            const count = matches ? matches.length : 0;
-
-            if (count > 0 && firstMatchPage === -1) firstMatchPage = i;
-            totalMatches += count;
-        }
-
-        setMatchCount(totalMatches);
-        setCurrentMatch(totalMatches > 0 ? 1 : 0);
-        if (firstMatchPage > 0) {
-            setPageNumber(firstMatchPage);
-        }
-    }, [setPageNumber]);
-
-    useEffect(() => {
-        if (!isSearchOpen || !searchText) {
-            setMatchCount(0);
-            setCurrentMatch(0);
-            return;
-        }
-        if (!pdfRef.current) return;
-        searchAllPages(searchText, pdfRef.current);
-    }, [searchText, isSearchOpen, searchAllPages]);
-
-    const handlePrevMatch = useCallback(() => {
-        setCurrentMatch(prev => (prev > 1 ? prev - 1 : matchCount));
-    }, [matchCount]);
-
-    const handleNextMatch = useCallback(() => {
-        setCurrentMatch(prev => (prev < matchCount ? prev + 1 : 1));
-    }, [matchCount]);
+        closeSearchState();
+    }, [closeSearchState]);
 
     // プリロード (3ページ先読み)
     useImagePreloader(imageUrls, pageNumber - 1, 3);
@@ -216,29 +167,14 @@ export function ReaderPanel({
                 setPageNumber(Math.max(1, data.total_pages));
             }
         } catch (e: unknown) {
-            alert(e instanceof Error ? e.message : '削除に失敗しました。');
+            showToast(e instanceof Error ? e.message : '削除に失敗しました。', 'error');
         }
-    }, [selectedPages, selectedPdf, currentPath, currentSource, pageNumber, onPdfUpdated, setPageNumber]);
+    }, [selectedPages, selectedPdf, currentPath, currentSource, pageNumber, onPdfUpdated, setPageNumber, showToast]);
 
     const onDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
         setNumPages(pdf.numPages);
-        pdfRef.current = pdf;
-        // PDF ロード完了時点で検索テキストが入力済みなら即検索
-        if (isSearchOpen && searchText) {
-            searchAllPages(searchText, pdf);
-        }
-    }, [isSearchOpen, searchText, searchAllPages]);
-
-    // テキストレイヤーのハイライトレンダラー
-    const customTextRenderer = useCallback(
-        ({ str }: { str: string }) => {
-            if (!searchText || !str) return str;
-            const escaped = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`(${escaped})`, 'gi');
-            return str.replace(regex, `<mark style="background:rgba(255,200,0,0.5);border-radius:2px;">$1</mark>`);
-        },
-        [searchText]
-    );
+        onDocumentLoaded(pdf);
+    }, [onDocumentLoaded]);
 
     const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => (
         <PageRenderer
@@ -347,6 +283,7 @@ export function ReaderPanel({
                     )}
                 </div>
             </div>
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );
 }

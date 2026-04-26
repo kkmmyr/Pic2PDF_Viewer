@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { LibrarySource } from '../types';
+import { STORAGE_KEYS } from '../constants';
 
-/** localStorage キーの生成: ソース別に分離する */
-const storageKey = (source: LibrarySource) => `favorites_${source}`;
+const storageKey = (source: LibrarySource) => `${STORAGE_KEYS.FAVORITES_PREFIX}${source}`;
 
 /**
  * お気に入り管理フック。

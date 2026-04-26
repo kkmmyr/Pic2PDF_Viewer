@@ -5,9 +5,12 @@ import time
 from dataclasses import dataclass, field
 from config import get_dirs_by_source
 from services.author_resolver import resolve_author
-from services.meta_store import get_lock, load_meta, save_meta, make_key
+from services.meta_store import MetaDict, get_lock, load_meta, make_key, update_meta_locked
+from utils.file_utils import is_pdf_file
 
 VALID_SOURCES = ("generated", "kindle", "novel")
+VALID_MODES = ("missing_only", "unknown_only", "overwrite_all")
+AUTOFILL_REQUEST_DELAY_SEC = 5.0
 
 
 @dataclass
@@ -37,13 +40,24 @@ def reset_auto_fill_state(source: str) -> None:
         _auto_fill_states[source] = AutoFillState(status="running")
 
 
-def _has_real_author(meta: dict, key: str) -> bool:
-    authors = meta.get(key, {}).get("authors", [])
-    return bool(authors) and authors != ["作者不明"]
+def _is_missing(meta: MetaDict, key: str) -> bool:
+    """作者名エントリが存在しない（完全未登録）。"""
+    return key not in meta or not meta[key].get("authors")
 
 
-def run_auto_fill(source: str, overwrite: bool) -> None:
-    """バックグラウンドでサークル名を順次解決して meta.json に保存する。"""
+def _is_unknown(meta: MetaDict, key: str) -> bool:
+    """作者名が「作者不明」。"""
+    return meta.get(key, {}).get("authors") == ["作者不明"]
+
+
+def run_auto_fill(source: str, mode: str) -> None:
+    """バックグラウンドでサークル名を順次解決して meta.json に保存する。
+
+    mode:
+        missing_only  — 作者名エントリが存在しない書籍のみ
+        unknown_only  — 「作者不明」の書籍のみ
+        overwrite_all — 全件を上書き
+    """
     state = get_auto_fill_state(source)
     try:
         pdf_root = get_dirs_by_source(source)["pdf"]
@@ -52,7 +66,7 @@ def run_auto_fill(source: str, overwrite: bool) -> None:
         if os.path.isdir(pdf_root):
             for root, _, files in os.walk(pdf_root):
                 for f in sorted(files):
-                    if f.lower().endswith(".pdf"):
+                    if is_pdf_file(f):
                         rel = os.path.relpath(root, pdf_root)
                         rel_path = "" if rel == "." else rel.replace("\\", "/")
                         all_pdfs.append((rel_path, f))
@@ -61,11 +75,14 @@ def run_auto_fill(source: str, overwrite: bool) -> None:
         with lock:
             meta = load_meta(source)
 
-        targets = all_pdfs if overwrite else [
-            (p, f) for p, f in all_pdfs if not _has_real_author(meta, make_key(p, f))
-        ]
+        if mode == "overwrite_all":
+            targets = all_pdfs
+        elif mode == "missing_only":
+            targets = [(p, f) for p, f in all_pdfs if _is_missing(meta, make_key(p, f))]
+        else:  # unknown_only (default)
+            targets = [(p, f) for p, f in all_pdfs if _is_missing(meta, make_key(p, f)) or _is_unknown(meta, make_key(p, f))]
 
-        state.total = len(all_pdfs)
+        state.total = len(targets)
         state.skipped = len(all_pdfs) - len(targets)
 
         if not targets:
@@ -77,18 +94,14 @@ def run_auto_fill(source: str, overwrite: bool) -> None:
             state.current = title
 
             author = resolve_author(title, source)
-
-            with lock:
-                meta = load_meta(source)
-                meta[make_key(rel_path, filename)] = {"authors": [author]}
-                save_meta(source, meta)
+            key = make_key(rel_path, filename)
+            update_meta_locked(source, lambda m, k=key, a=author: m.update({k: {"authors": [a]}}))
 
             state.results.append({"title": title, "author": author})
             state.done += 1
 
-            # SearXNG の上流エンジンへの連続リクエストを避ける
             if i < len(targets) - 1:
-                time.sleep(5.0)
+                time.sleep(AUTOFILL_REQUEST_DELAY_SEC)
 
         state.status = "done"
         state.current = ""
@@ -99,8 +112,8 @@ def run_auto_fill(source: str, overwrite: bool) -> None:
         state.current = ""
 
 
-def start_auto_fill_job(source: str, overwrite: bool) -> None:
+def start_auto_fill_job(source: str, mode: str) -> None:
     """auto-fill ジョブをバックグラウンドスレッドで起動する。"""
     reset_auto_fill_state(source)
-    thread = threading.Thread(target=run_auto_fill, args=(source, overwrite), daemon=True)
+    thread = threading.Thread(target=run_auto_fill, args=(source, mode), daemon=True)
     thread.start()

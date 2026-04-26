@@ -8,6 +8,8 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+PROCESS_TERMINATE_TIMEOUT_SEC = 5
+
 
 class OCRService:
     _instance = None
@@ -87,7 +89,7 @@ class OCRService:
             logger.info("Sent TERMINATE signal to OCR process")
 
         try:
-            self.process.wait(timeout=5)
+            self.process.wait(timeout=PROCESS_TERMINATE_TIMEOUT_SEC)
         except subprocess.TimeoutExpired:
             self.process.kill()
             with self._lock:

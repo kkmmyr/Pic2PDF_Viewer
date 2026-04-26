@@ -6,7 +6,8 @@ import shutil
 from natsort import natsorted
 from PIL import Image
 from typing import Optional, Callable
-from config import THUMBNAIL_HEIGHT, SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT
+from config import THUMBNAIL_HEIGHT
+from utils.file_utils import is_webp_file, is_zip_file
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -28,7 +29,7 @@ def generate_thumbnail(image_path: str, output_path: str) -> None:
 
 def _collect_images(images_dir: str) -> list[str]:
     """ディレクトリ内の WebP 画像を自然順で収集する。"""
-    files = [f for f in os.listdir(images_dir) if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
+    files = [f for f in os.listdir(images_dir) if is_webp_file(f)]
     return [os.path.join(images_dir, f) for f in natsorted(files)]
 
 
@@ -83,7 +84,7 @@ class PdfGenerator:
         try:
             with zipfile.ZipFile(zip_path, 'r') as zf:
                 webp_in_zip = natsorted(
-                    [f for f in zf.namelist() if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
+                    [f for f in zf.namelist() if is_webp_file(f)]
                 )
                 if not webp_in_zip:
                     return
@@ -196,10 +197,10 @@ class PdfGenerator:
         cleanups: list[str] = []
 
         for root, dirs, files in os.walk(source_dir, topdown=False):
-            for zip_filename in [f for f in files if f.lower().endswith(SUPPORTED_ZIP_FORMAT)]:
+            for zip_filename in [f for f in files if is_zip_file(f)]:
                 self.process_zip(root, zip_filename)
 
-            webp_files = [f for f in files if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
+            webp_files = [f for f in files if is_webp_file(f)]
             if webp_files:
                 self.process_directory(root, webp_files, is_root=(root == source_dir))
 

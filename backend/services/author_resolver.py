@@ -64,6 +64,33 @@ def _ensure_web_extract():
             sys.modules["config"] = saved_config
 
 
+_INVALID_PATTERNS = (
+    "dlsite",
+    "dmm",
+    "fanza",
+    "http://",
+    "https://",
+    "site:",
+    "{",
+)
+_MAX_AUTHOR_LEN = 80
+
+
+def _sanitize_author(value: str) -> str:
+    """
+    Gemma が返した値が不正（URL・JSON・ブランド名・長文）な場合は '作者不明' を返す。
+    正常な値はそのまま返す。
+    """
+    if not value or value == "None":
+        return "作者不明"
+    if len(value) > _MAX_AUTHOR_LEN:
+        return "作者不明"
+    lower = value.lower()
+    if any(pat in lower for pat in _INVALID_PATTERNS):
+        return "作者不明"
+    return value
+
+
 def _try_direct_sites(title: str, web_extract) -> str:
     """
     DLsite / Fanza を site: フィルタで検索してサークル名を取得する。
@@ -72,9 +99,10 @@ def _try_direct_sites(title: str, web_extract) -> str:
     query = _DIRECT_SITES_QUERY.format(title=title)
     extract_target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
     result = web_extract(query, extract_target, language="ja")
-    result = result.strip() if result else ""
+    result = str(result).strip() if result is not None else ""
+    sanitized = _sanitize_author(result)
     # 「作者不明」が返った場合はフォールバックさせる
-    return result if result and result != "作者不明" else ""
+    return sanitized if sanitized != "作者不明" else ""
 
 
 def resolve_author(title: str, source: str) -> str:
@@ -99,7 +127,7 @@ def resolve_author(title: str, source: str) -> str:
     if source == "generated":
         author = _try_direct_sites(title, web_extract)
         if author:
-            return author
+            return _sanitize_author(author)
 
     # フォールバック: 既存の汎用クエリ
     config = _QUERY_CONFIG.get(source, _QUERY_CONFIG["generated"])
@@ -107,7 +135,8 @@ def resolve_author(title: str, source: str) -> str:
     extract_target = f'「{title}」' + config["extract_target_suffix"]
 
     result = web_extract(query, extract_target, language="ja")
-    return result.strip() if result and result.strip() else "作者不明"
+    result_str = str(result).strip() if result is not None else ""
+    return _sanitize_author(result_str) if result_str else "作者不明"
 
 
 def resolve_author_debug(title: str, source: str) -> dict:
@@ -130,7 +159,7 @@ def resolve_author_debug(title: str, source: str) -> dict:
         direct_target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
         direct_snippets = searxng_search(direct_query, num_results=5, language="ja")
         direct_gemma = web_extract(direct_query, direct_target, language="ja") if direct_snippets else ""
-        direct_result = direct_gemma.strip() if direct_gemma and direct_gemma.strip() else ""
+        direct_result = str(direct_gemma).strip() if direct_gemma is not None else ""
 
         result["direct_query"] = direct_query
         result["direct_searxng_hit"] = bool(direct_snippets)
@@ -157,7 +186,8 @@ def resolve_author_debug(title: str, source: str) -> dict:
     result["searxng_hit"] = bool(snippets)
     result["searxng_snippets"] = snippets[:500] if snippets else ""
     result["gemma_raw"] = gemma_result
-    result["final"] = gemma_result.strip() if gemma_result and gemma_result.strip() else "作者不明"
+    gemma_str = str(gemma_result).strip() if gemma_result is not None else ""
+    result["final"] = gemma_str if gemma_str else "作者不明"
 
     if source == "generated":
         result["used_fallback"] = True

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { STORAGE_KEYS } from '../constants';
 
-const STORAGE_KEY = 'darkMode';
+const STORAGE_KEY = STORAGE_KEYS.DARK_MODE;
 
 /** localStorage + html クラスを同期する純粋関数（副作用あり） */
 function applyDark(isDark: boolean) {

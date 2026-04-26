@@ -8,8 +8,9 @@ from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
 from services.pdf_generator import scan_and_generate
 from services.job_manager import GenerateJob, JobStore, JobStatus, GenerateState
-from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR, SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT
+from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR
 from utils.path_utils import validate_safe_path
+from utils.file_utils import is_webp_file, is_zip_file
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
 
@@ -101,7 +102,7 @@ def get_status(source_dir: str):
     items_status = []
 
     for root, dirs, files in os.walk(source_dir):
-        webp_files = [f for f in files if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
+        webp_files = [f for f in files if is_webp_file(f)]
         if webp_files:
             folder_name = os.path.basename(root)
             if root == source_dir:
@@ -118,7 +119,7 @@ def get_status(source_dir: str):
 
             items_status.append({"name": folder_name, "type": "folder", "status": status})
 
-        zip_files = [f for f in files if f.lower().endswith(SUPPORTED_ZIP_FORMAT)]
+        zip_files = [f for f in files if is_zip_file(f)]
         for zip_file in zip_files:
             item_name = os.path.splitext(zip_file)[0]
 
@@ -182,7 +183,7 @@ def batch_compress_pdfs(request: BatchCompressRequest):
         from services.pdf_generator import PdfGenerator
 
         for root, dirs, files in os.walk(IMAGES_DIR):
-            webp_files = [f for f in files if f.lower().endswith(SUPPORTED_WEBP_FORMAT)]
+            webp_files = [f for f in files if is_webp_file(f)]
             if not webp_files:
                 continue
 

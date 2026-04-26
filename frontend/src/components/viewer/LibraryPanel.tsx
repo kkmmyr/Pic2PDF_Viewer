@@ -1,8 +1,8 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
-import { LibraryHeader, FolderGrid, PdfGrid } from '../reader';
+import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
-import { useFavorites, useSortedPdfs, useBookMeta, useAutoFillAuthors } from '../../hooks';
+import { useFavorites, useSortedPdfs, useBookMeta, useAutoFillAuthors, useLibraryFilter, useToast } from '../../hooks';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -55,7 +55,8 @@ export function LibraryPanel() {
 
     const { getAuthors, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
     const { jobStatus: autoFillStatus, startAutoFill } = useAutoFillAuthors(currentSource, refreshMeta);
-    const [autoFillOverwrite, setAutoFillOverwrite] = useState(false);
+    const [autoFillMode, setAutoFillMode] = useState<'missing_only' | 'unknown_only' | 'overwrite_all'>('unknown_only');
+    const { toasts, showToast, dismissToast } = useToast();
 
     const handleRegenThumb = useCallback(async (name: string) => {
         await apiClient.post(API_ENDPOINTS.REGENERATE_THUMBNAIL, {
@@ -66,32 +67,14 @@ export function LibraryPanel() {
         onRefresh();
     }, [currentPath, currentSource, onRefresh]);
 
-    const filteredPdfs = useMemo(() => {
-        let result = sortedPdfs;
-
-        if (searchText.trim()) {
-            const lower = searchText.toLowerCase();
-            result = result.filter(p =>
-                p.name.toLowerCase().includes(lower) ||
-                getAuthors(currentPath, p.name).some(a => a.toLowerCase().includes(lower))
-            );
-        }
-
-        if (authorFilter) {
-            result = result.filter(p => {
-                const authors = getAuthors(currentPath, p.name);
-                return authors.includes(authorFilter);
-            });
-        }
-
-        return result;
-    }, [sortedPdfs, searchText, authorFilter, getAuthors, currentPath]);
-
-    const filteredDirs = useMemo(() => {
-        if (!searchText.trim()) return directories;
-        const lower = searchText.toLowerCase();
-        return directories.filter(d => d.toLowerCase().includes(lower));
-    }, [directories, searchText]);
+    const { filteredPdfs, filteredDirs } = useLibraryFilter({
+        pdfs: sortedPdfs,
+        directories,
+        searchText,
+        authorFilter,
+        currentPath,
+        getAuthors,
+    });
 
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
@@ -107,10 +90,10 @@ export function LibraryPanel() {
             );
             onRefresh();
             if (data.failed.length > 0) {
-                alert(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`);
+                showToast(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`, 'error');
             }
         } catch (e: unknown) {
-            alert(e instanceof Error ? e.message : 'サムネイル再生成に失敗しました。');
+            showToast(e instanceof Error ? e.message : 'サムネイル再生成に失敗しました。', 'error');
         }
     }, [selectedItems, currentPath, currentSource, onRefresh]);
 
@@ -173,20 +156,41 @@ export function LibraryPanel() {
                 {autoFillStatus.status !== 'running' && (
                     <>
                         <button
-                            onClick={() => startAutoFill(autoFillOverwrite)}
+                            onClick={async () => {
+                                try {
+                                    await startAutoFill(autoFillMode);
+                                } catch (e: unknown) {
+                                    showToast(
+                                        e instanceof Error ? e.message : '自動登録の開始に失敗しました。Ollama と SearXNG が起動しているか確認してください。',
+                                        'error'
+                                    );
+                                }
+                            }}
                             className="text-xs px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shrink-0"
                         >
                             サークル名自動登録
                         </button>
-                        <label className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
-                                checked={autoFillOverwrite}
-                                onChange={e => setAutoFillOverwrite(e.target.checked)}
-                                className="w-3 h-3 accent-indigo-600"
-                            />
-                            作者名登録済みも上書き
-                        </label>
+                        <div className="flex items-center gap-3">
+                            {(
+                                [
+                                    { value: 'missing_only', label: '未登録のみ' },
+                                    { value: 'unknown_only', label: '作者不明のみ' },
+                                    { value: 'overwrite_all', label: '全件上書き' },
+                                ] as const
+                            ).map(({ value, label }) => (
+                                <label key={value} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                                    <input
+                                        type="radio"
+                                        name="autoFillMode"
+                                        value={value}
+                                        checked={autoFillMode === value}
+                                        onChange={() => setAutoFillMode(value)}
+                                        className="accent-indigo-600"
+                                    />
+                                    {label}
+                                </label>
+                            ))}
+                        </div>
                     </>
                 )}
                 {autoFillStatus.status === 'running' && (
@@ -238,9 +242,11 @@ export function LibraryPanel() {
                         onRename={onOpenRename}
                         onRegenThumb={handleRegenThumb}
                         getAuthors={(name) => getAuthors(currentPath, name)}
+                        onAuthorClick={setAuthorFilter}
                     />
                 </div>
             </div>
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );
 }

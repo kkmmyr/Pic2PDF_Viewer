@@ -3,7 +3,8 @@ from pydantic import BaseModel
 import os
 from typing import Optional
 import fitz
-from config import get_dirs_by_source, SUPPORTED_IMAGE_FORMATS
+from config import get_dirs_by_source
+from utils.file_utils import is_image_file, is_pdf_file
 from utils.path_utils import validate_safe_path, validate_safe_name, join_path
 from utils.file_naming import get_thumbnail_name
 from services.thumbnail_service import ThumbnailService
@@ -40,7 +41,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
         item_path = join_path(target_pdf_dir, item)
         if os.path.isdir(item_path):
             directories.append(item)
-        elif item.lower().endswith('.pdf'):
+        elif is_pdf_file(item):
             thumb_name = get_thumbnail_name(item)
             thumb_path = join_path(target_thumb_dir, thumb_name)
 
@@ -78,7 +79,7 @@ def list_book_images(path: str, source: str = "generated"):
 
     try:
         files = os.listdir(target_dir)
-        images = [f for f in files if f.lower().endswith(SUPPORTED_IMAGE_FORMATS)]
+        images = [f for f in files if is_image_file(f)]
 
         from natsort import natsorted
         images = natsorted(images)
@@ -263,7 +264,7 @@ def merge_pdfs(request: MergePdfsRequest):
     if len(request.names) < 2:
         raise HTTPException(status_code=400, detail="At least 2 PDFs are required for merging")
 
-    if not request.output_name.lower().endswith(".pdf"):
+    if not is_pdf_file(request.output_name):
         raise HTTPException(status_code=400, detail="output_name must end with .pdf")
 
     dirs = get_dirs_by_source(request.source)

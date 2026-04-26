@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import type { LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
+import { API_CONFIG } from '../constants';
 
 export interface AutoFillStatus {
     status: 'idle' | 'running' | 'done' | 'error';
@@ -63,7 +64,7 @@ export function useAutoFillAuthors(source: LibrarySource, onComplete?: () => voi
                 setJobStatus(data);
                 // 既に実行中なら即ポーリング開始
                 if (data.status === 'running') {
-                    intervalRef.current = setInterval(fetchStatus, 1500);
+                    intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
                 }
             } catch {
                 // ignore
@@ -72,15 +73,11 @@ export function useAutoFillAuthors(source: LibrarySource, onComplete?: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [source]);
 
-    const startAutoFill = useCallback(async (overwrite = false) => {
-        try {
-            await apiClient.post(API_ENDPOINTS.META_AUTO_FILL, null, { params: { source, overwrite } });
-            clearPolling();
-            intervalRef.current = setInterval(fetchStatus, 1500);
-            fetchStatus();
-        } catch (e: unknown) {
-            alert(e instanceof Error ? e.message : '自動登録の開始に失敗しました。Ollama と SearXNG が起動しているか確認してください。');
-        }
+    const startAutoFill = useCallback(async (mode: 'missing_only' | 'unknown_only' | 'overwrite_all' = 'unknown_only') => {
+        await apiClient.post(API_ENDPOINTS.META_AUTO_FILL, null, { params: { source, mode } });
+        clearPolling();
+        intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
+        fetchStatus();
     }, [source, clearPolling, fetchStatus]);
 
     useEffect(() => () => clearPolling(), [clearPolling]);
