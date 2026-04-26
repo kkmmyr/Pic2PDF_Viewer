@@ -45,6 +45,11 @@ export function useBookMeta(source: string) {
         return meta[makeKey(path, name)]?.view_count ?? 0;
     }, [meta, makeKey]);
 
+    /** 1冊の最終閲覧時刻 (UNIX 秒) を返す（未閲覧は undefined） */
+    const getLastViewedAt = useCallback((path: string, name: string): number | undefined => {
+        return meta[makeKey(path, name)]?.last_viewed_at;
+    }, [meta, makeKey]);
+
     /** 閲覧を記録（カウント +1、UI には反映されるが失敗時は黙ってスキップ） */
     const recordView = useCallback(async (path: string, name: string): Promise<void> => {
         try {
@@ -104,5 +109,5 @@ export function useBookMeta(source: string) {
         Object.values(meta).flatMap(e => e.authors)
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
-    return { meta, getAuthors, getViewCount, recordView, updateAuthors, allAuthors, refreshMeta: fetchMeta };
+    return { meta, getAuthors, getViewCount, getLastViewedAt, recordView, updateAuthors, allAuthors, refreshMeta: fetchMeta };
 }

@@ -22,6 +22,9 @@ from services.auto_fill_service import (
 
 router = APIRouter()
 
+# 同じ書籍を短時間に何度開いても view_count を膨らませない閾値（秒）
+VIEW_COUNT_DEBOUNCE_SEC = 300
+
 
 # ---------------------------------------------------------------------------
 # リクエスト/レスポンスモデル
@@ -94,7 +97,12 @@ def update_meta(request: UpdateMetaRequest) -> dict:
 
 @router.post("/meta/view")
 def record_view(request: RecordViewRequest) -> dict:
-    """書籍の閲覧を記録（view_count を +1、last_viewed_at を更新）。"""
+    """書籍の閲覧を記録する。
+
+    - `last_viewed_at` は呼び出し毎に常に現在時刻で更新（最近見た順ソート用）。
+    - `view_count` は前回 last_viewed_at から VIEW_COUNT_DEBOUNCE_SEC 以上経過した場合のみ +1。
+      短時間で同じ書籍を何度も開いてもカウントが膨らまないようにする。
+    """
     if request.source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
 
@@ -107,10 +115,17 @@ def record_view(request: RecordViewRequest) -> dict:
 
     def _apply(data):
         existing = data.get(key, {})
-        new_count = int(existing.get("view_count", 0)) + 1
+        prev_count = int(existing.get("view_count", 0))
+        prev_viewed_at = existing.get("last_viewed_at")
+        should_increment = (
+            prev_viewed_at is None
+            or (now - float(prev_viewed_at)) >= VIEW_COUNT_DEBOUNCE_SEC
+        )
+        new_count = prev_count + 1 if should_increment else prev_count
         data[key] = {**existing, "view_count": new_count, "last_viewed_at": now}
         result["view_count"] = new_count
         result["last_viewed_at"] = now
+        result["incremented"] = should_increment
 
     update_meta_locked(request.source, _apply)
     return result

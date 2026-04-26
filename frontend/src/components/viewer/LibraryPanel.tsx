@@ -51,8 +51,14 @@ export function LibraryPanel() {
     }, []);
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
-    const { meta, getAuthors, getViewCount, recordView, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
-    const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites, (name) => getViewCount(currentPath, name));
+    const { meta, getAuthors, getViewCount, getLastViewedAt, recordView, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
+    const sortedPdfs = useSortedPdfs(
+        pdfs,
+        sortOrder,
+        favorites,
+        (name) => getViewCount(currentPath, name),
+        (name) => getLastViewedAt(currentPath, name),
+    );
 
     const handlePdfClick = useCallback((name: string) => {
         recordView(currentPath, name);
