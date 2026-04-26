@@ -1,0 +1,32 @@
+[project]
+name = "pic2pdf-viewer-kindle"
+version = "0.1.0"
+description = "Kindle capture tools for Pic2PDF Viewer"
+requires-python = ">=3.12"
+dependencies = [
+    "pyautogui",
+    "pillow",
+    "opencv-python",
+    "numpy",
+]
+
+[dependency-groups]
+gpu = [
+    "yomitoku",
+    "torch==2.5.1",
+    "torchvision==0.20.1",
+    "torchaudio==2.5.1",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }
+torchaudio = { index = "pytorch-cu121" }
+
+[tool.uv]
+package = false

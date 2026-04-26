@@ -51,9 +51,13 @@ export function LibraryPanel() {
     }, []);
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
-    const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites);
+    const { meta, getAuthors, getViewCount, recordView, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
+    const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites, (name) => getViewCount(currentPath, name));
 
-    const { meta, getAuthors, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
+    const handlePdfClick = useCallback((name: string) => {
+        recordView(currentPath, name);
+        onPdfClick(name);
+    }, [recordView, currentPath, onPdfClick]);
     const { jobStatus: autoFillStatus, startAutoFill } = useAutoFillAuthors(currentSource, refreshMeta);
     const [autoFillMode, setAutoFillMode] = useState<'missing_only' | 'unknown_only' | 'overwrite_all'>('unknown_only');
     const { toasts, showToast, dismissToast } = useToast();
@@ -233,7 +237,7 @@ export function LibraryPanel() {
                     />
                     <PdfGrid
                         pdfs={filteredPdfs}
-                        onPdfClick={onPdfClick}
+                        onPdfClick={handlePdfClick}
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
                         onToggleSelect={onToggleSelect}

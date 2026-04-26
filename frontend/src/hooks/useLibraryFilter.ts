@@ -26,8 +26,9 @@ export function useLibraryFilter({
     const filteredPdfs = useMemo(() => {
         let result = pdfs;
 
-        if (searchText.trim()) {
-            const lower = searchText.toLowerCase();
+        const trimmed = searchText.trim();
+        if (trimmed) {
+            const lower = trimmed.toLowerCase();
             result = result.filter(p =>
                 p.name.toLowerCase().includes(lower) ||
                 getAuthorsFromMeta(meta, currentPath, p.name).some(a => a.toLowerCase().includes(lower))
@@ -44,8 +45,9 @@ export function useLibraryFilter({
     }, [pdfs, searchText, authorFilter, currentPath, meta]);
 
     const filteredDirs = useMemo(() => {
-        if (!searchText.trim()) return directories;
-        const lower = searchText.toLowerCase();
+        const trimmed = searchText.trim();
+        if (!trimmed) return directories;
+        const lower = trimmed.toLowerCase();
         return directories.filter(d => d.toLowerCase().includes(lower));
     }, [directories, searchText]);
 

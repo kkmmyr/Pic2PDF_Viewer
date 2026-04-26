@@ -23,13 +23,15 @@ export function FolderGrid({
         <div className="mb-8">
             <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">Folders</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {directories.map((dir) => (
+                {directories.map((dir) => {
+                    const isSelected = isSelectionMode && selectedItems.has(dir);
+                    return (
                     <div
                         key={dir}
-                        className={`bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-shadow border-2 ${
-                            isSelectionMode && selectedItems.has(dir)
-                                ? 'border-blue-500'
-                                : 'border-transparent'
+                        className={`rounded-lg shadow-md p-4 flex flex-col items-center justify-center cursor-pointer hover:shadow-lg transition-shadow border-2 ${
+                            isSelected
+                                ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
+                                : 'border-transparent bg-white dark:bg-gray-800'
                         }`}
                         onClick={() => {
                             if (isSelectionMode && onToggleSelect) {
@@ -43,8 +45,8 @@ export function FolderGrid({
                             <Folder className="w-12 h-12 text-yellow-500 fill-yellow-500 mb-2" />
                             {isSelectionMode && (
                                 <div className="absolute -top-2 -right-2 bg-white dark:bg-gray-800 rounded-full">
-                                    {selectedItems.has(dir) ? (
-                                        <CheckSquare className="w-5 h-5 text-blue-500 fill-white" />
+                                    {isSelected ? (
+                                        <CheckSquare className="w-5 h-5 text-amber-500 fill-white" />
                                     ) : (
                                         <Square className="w-5 h-5 text-gray-400 fill-white" />
                                     )}
@@ -66,7 +68,8 @@ export function FolderGrid({
                             )}
                         </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

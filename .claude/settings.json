@@ -7,5 +7,31 @@
     "additionalDirectories": [
       "d:\\61.tool\\Pic2PDF_Viewer\\.claude"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check_docs_updated.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/remind_tests.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }

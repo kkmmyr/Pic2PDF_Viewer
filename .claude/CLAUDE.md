@@ -27,11 +27,14 @@ WebP画像・ZIPをPDF化してブラウザで閲覧するWebアプリ。Kindle�
 ## 起動方法
 
 ```bash
-# バックエンド
-cd backend && python -m uvicorn main:app --reload  # :8000
+# バックエンド（uv が依存解決と起動を一括実行）
+cd backend && uv run uvicorn main:app --reload  # :8000
 
 # フロントエンド
 cd frontend && npm run dev  # :5173
 ```
 
-詳細: [起動方法.md](../起動方法.md)
+Python パッケージ管理は **uv** を使用。`pyproject.toml` + `uv.lock` で依存を固定。
+
+- 起動詳細: [起動方法.md](../起動方法.md)
+- 環境構築: [docs/04_環境構築/uv環境セットアップ.md](../docs/04_環境構築/uv環境セットアップ.md)

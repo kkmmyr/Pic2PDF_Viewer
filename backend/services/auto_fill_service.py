@@ -82,7 +82,7 @@ def run_auto_fill(source: str, mode: str) -> None:
         else:  # unknown_only (default)
             targets = [
                 (p, f) for p, f in all_pdfs
-                if (k := make_key(p, f)) and (_is_missing(meta, k) or _is_unknown(meta, k))
+                if _is_missing(meta, k := make_key(p, f)) or _is_unknown(meta, k)
             ]
 
         state.total = len(targets)

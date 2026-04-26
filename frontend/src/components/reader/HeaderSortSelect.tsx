@@ -7,6 +7,7 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
     { value: 'date_desc',       label: '新しい順' },
     { value: 'date_asc',        label: '古い順' },
     { value: 'favorites_first', label: 'お気に入り優先' },
+    { value: 'view_desc',       label: 'よく見る順' },
 ];
 
 interface HeaderSortSelectProps {

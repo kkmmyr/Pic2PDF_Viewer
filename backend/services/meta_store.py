@@ -1,13 +1,20 @@
-"""meta.json の読み書き・ロック管理。"""
+"""meta.json の読み書き・ロック管理。
+
+詳細仕様: docs/03_詳細設計/詳細設計書.md「閲覧回数ソート（よく見る順）」節
+"""
 import json
 import os
 import threading
-from typing import Callable, TypedDict
+from typing import Callable, NotRequired, TypedDict
 from config import DATA_DIR
 
 
 class MetaEntry(TypedDict):
     authors: list[str]
+    # 閲覧回数。既存エントリには含まれない場合があるため任意。
+    view_count: NotRequired[int]
+    # 最終閲覧時刻 (UNIX time, float)。
+    last_viewed_at: NotRequired[float]
 
 
 MetaDict = dict[str, MetaEntry]

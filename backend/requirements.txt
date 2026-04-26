@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-img2pdf
-natsort
-Pillow
-pymupdf
-python-dotenv

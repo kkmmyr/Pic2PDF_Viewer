@@ -51,13 +51,14 @@ export function PdfGrid({
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {pdfs.map((pdf) => {
                     const isFav = favorites.has(pdf.name);
+                    const isSelected = isSelectionMode && selectedItems.has(pdf.name);
                     return (
                         <div
                             key={pdf.name}
-                            className={`bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
-                                isSelectionMode && selectedItems.has(pdf.name)
-                                    ? 'border-blue-500'
-                                    : 'border-transparent'
+                            className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
+                                isSelected
+                                    ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
+                                    : 'border-transparent bg-white dark:bg-gray-800'
                             }`}
                         >
                             <div
@@ -73,8 +74,8 @@ export function PdfGrid({
                                 {/* 選択チェックボックス */}
                                 {isSelectionMode && (
                                     <div className="absolute top-2 right-2 z-10 bg-white dark:bg-gray-800 rounded-full">
-                                        {selectedItems.has(pdf.name) ? (
-                                            <CheckSquare className="w-6 h-6 text-blue-500 fill-white" />
+                                        {isSelected ? (
+                                            <CheckSquare className="w-6 h-6 text-amber-500 fill-white" />
                                         ) : (
                                             <Square className="w-6 h-6 text-gray-400 fill-white" />
                                         )}
@@ -105,7 +106,7 @@ export function PdfGrid({
                                 <LazyThumbnail src={pdf.thumbnail} alt={pdf.name} className="absolute inset-0" />
                             </div>
 
-                            <div className="p-3 bg-white dark:bg-gray-800 flex-1 flex flex-col justify-between">
+                            <div className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}>
                                 <span className="font-medium text-sm text-gray-800 dark:text-gray-200 line-clamp-2" title={pdf.name}>
                                     {pdf.name.replace('.pdf', '')}
                                 </span>

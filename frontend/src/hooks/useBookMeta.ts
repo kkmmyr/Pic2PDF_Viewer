@@ -40,6 +40,35 @@ export function useBookMeta(source: string) {
         return meta[makeKey(path, name)]?.authors ?? [];
     }, [meta, makeKey]);
 
+    /** 1冊の閲覧回数を返す（未記録は 0） */
+    const getViewCount = useCallback((path: string, name: string): number => {
+        return meta[makeKey(path, name)]?.view_count ?? 0;
+    }, [meta, makeKey]);
+
+    /** 閲覧を記録（カウント +1、UI には反映されるが失敗時は黙ってスキップ） */
+    const recordView = useCallback(async (path: string, name: string): Promise<void> => {
+        try {
+            const res = await apiClient.post<unknown, { view_count: number; last_viewed_at: number }>(
+                API_ENDPOINTS.META_VIEW,
+                { path, name, source }
+            );
+            setMeta(prev => {
+                const key = makeKey(path, name);
+                const existing = prev[key] ?? { authors: [] };
+                return {
+                    ...prev,
+                    [key]: {
+                        ...existing,
+                        view_count: res.view_count,
+                        last_viewed_at: res.last_viewed_at,
+                    },
+                };
+            });
+        } catch {
+            // 閲覧記録の失敗はユーザー体験に影響しないので握りつぶす
+        }
+    }, [source, makeKey]);
+
     /**
      * 1冊または複数冊の作者名を上書き保存する。
      * names に複数のファイル名を渡すと一括更新。
@@ -75,5 +104,5 @@ export function useBookMeta(source: string) {
         Object.values(meta).flatMap(e => e.authors)
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
-    return { meta, getAuthors, updateAuthors, allAuthors, refreshMeta: fetchMeta };
+    return { meta, getAuthors, getViewCount, recordView, updateAuthors, allAuthors, refreshMeta: fetchMeta };
 }
