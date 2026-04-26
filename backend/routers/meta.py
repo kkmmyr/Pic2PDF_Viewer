@@ -84,10 +84,11 @@ def update_meta(request: UpdateMetaRequest) -> dict:
                 # 既存の view_count / last_viewed_at を保持して authors のみ更新
                 data[key] = {**existing, "authors": authors}
             elif existing:
-                # authors を空にした場合は authors キーを除去（view_count は保持）
+                # authors を空にした場合: 他のフィールド (view_count 等) があれば
+                # authors=[] にして残し、無ければエントリごと削除
                 rest = {k: v for k, v in existing.items() if k != "authors"}
                 if rest:
-                    data[key] = rest
+                    data[key] = {"authors": [], **rest}
                 else:
                     data.pop(key, None)
 

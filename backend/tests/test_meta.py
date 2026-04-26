@@ -162,3 +162,49 @@ class TestRecordView:
             "path": "", "name": "book.pdf", "source": "invalid",
         })
         assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# PATCH /api/meta — 作者更新時の view_count 保持
+# ---------------------------------------------------------------------------
+
+class TestUpdateAuthorsPreservesViewCount:
+    def test_update_authors_preserves_view_count(self, view_client, tmp_path):
+        # 閲覧記録 → 作者を後から付与
+        view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["サークルA"], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["authors"] == ["サークルA"]
+        assert meta["book.pdf"]["view_count"] == 1
+        assert meta["book.pdf"]["last_viewed_at"] > 0
+
+    def test_clear_authors_keeps_view_count(self, view_client, tmp_path):
+        # 作者あり + 閲覧記録 → 作者を空にする
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["サークルA"], "source": "generated",
+        })
+        view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": [], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        # authors=[] になり、view_count は保持される
+        assert meta["book.pdf"]["authors"] == []
+        assert meta["book.pdf"]["view_count"] == 1
+
+    def test_clear_authors_removes_entry_if_no_other_fields(self, view_client, tmp_path):
+        # 作者のみのエントリで authors を空にすると、エントリごと削除
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["サークルA"], "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": [], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert "book.pdf" not in meta

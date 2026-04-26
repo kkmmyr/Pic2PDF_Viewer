@@ -89,15 +89,24 @@ export function useBookMeta(source: string) {
             authors,
             source,
         });
-        // ローカル状態も即時更新（再フェッチを待たずに反映）
+        // ローカル状態も即時更新（再フェッチを待たずに反映）。
+        // バックエンドの挙動に合わせて view_count / last_viewed_at は保持する。
         setMeta(prev => {
             const next = { ...prev };
             for (const name of names) {
                 const key = makeKey(path, name);
+                const existing = next[key];
                 if (authors.length > 0) {
-                    next[key] = { authors };
-                } else {
-                    delete next[key];
+                    next[key] = { ...existing, authors };
+                } else if (existing) {
+                    // authors を空にした場合: authors を消すが view_count 等は残す。
+                    // 残るフィールドが無ければエントリごと削除。
+                    const { authors: _omit, ...rest } = existing;
+                    if (Object.keys(rest).length > 0) {
+                        next[key] = { authors: [], ...rest };
+                    } else {
+                        delete next[key];
+                    }
                 }
             }
             return next;
