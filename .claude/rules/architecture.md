@@ -12,8 +12,9 @@
 | [backend/services/pdf_generator.py](../../backend/services/pdf_generator.py) | WebP/ZIP → PDF変換（`_collect_images` 共通フロー） |
 | [backend/services/thumbnail_service.py](../../backend/services/thumbnail_service.py) | サムネイル生成 |
 | [backend/services/ocr_service.py](../../backend/services/ocr_service.py) | OCRバックグラウンドプロセス管理 |
-| [backend/services/meta_store.py](../../backend/services/meta_store.py) | meta.json CRUD・ソース別ロック管理 |
+| [backend/services/meta_store.py](../../backend/services/meta_store.py) | meta.json CRUD・ソース別ロック管理・`update_meta_locked()` |
 | [backend/services/auto_fill_service.py](../../backend/services/auto_fill_service.py) | サークル名自動登録ジョブ管理（AutoFillState・スレッド起動） |
+| [backend/utils/file_utils.py](../../backend/utils/file_utils.py) | 拡張子チェックユーティリティ（is_pdf_file / is_webp_file / is_zip_file / is_image_file） |
 
 **主要ライブラリ:** `fastapi`, `uvicorn`, `img2pdf`, `Pillow`, `pymupdf`, `natsort`
 
@@ -52,6 +53,10 @@
 | [frontend/src/components/reader/PdfSearchBar.tsx](../../frontend/src/components/reader/PdfSearchBar.tsx) | PDF内テキスト検索バー |
 | [frontend/src/components/reader/LazyThumbnail.tsx](../../frontend/src/components/reader/LazyThumbnail.tsx) | サムネイル遅延読み込み (IntersectionObserver) |
 | [frontend/src/components/reader/MoveDialog.tsx](../../frontend/src/components/reader/MoveDialog.tsx) | 書籍移動ダイアログ |
+| [frontend/src/components/reader/HeaderSearchBar.tsx](../../frontend/src/components/reader/HeaderSearchBar.tsx) | タイトル検索入力・作者フィルター選択 |
+| [frontend/src/components/reader/HeaderSortSelect.tsx](../../frontend/src/components/reader/HeaderSortSelect.tsx) | ソート順選択ドロップダウン |
+| [frontend/src/components/reader/SourceSelector.tsx](../../frontend/src/components/reader/SourceSelector.tsx) | ソース切り替えタブ（generated / kindle / novel） |
+| [frontend/src/components/reader/ToastContainer.tsx](../../frontend/src/components/reader/ToastContainer.tsx) | トースト通知表示（右下固定・種別色分け） |
 
 **カスタムフック (hooks/)**
 
@@ -70,6 +75,9 @@
 | [frontend/src/hooks/usePdfStatus.ts](../../frontend/src/hooks/usePdfStatus.ts) | PDF生成ジョブ監視 |
 | [frontend/src/hooks/useOcrStatus.ts](../../frontend/src/hooks/useOcrStatus.ts) | OCRステータス監視 |
 | [frontend/src/hooks/useWindowSize.ts](../../frontend/src/hooks/useWindowSize.ts) | ウィンドウサイズ取得 |
+| [frontend/src/hooks/useLibraryFilter.ts](../../frontend/src/hooks/useLibraryFilter.ts) | PDF/フォルダのフィルタリング（searchText / authorFilter / currentPath） |
+| [frontend/src/hooks/usePdfSearch.ts](../../frontend/src/hooks/usePdfSearch.ts) | PDF テキスト検索（全ページ走査・マッチハイライト） |
+| [frontend/src/hooks/useToast.ts](../../frontend/src/hooks/useToast.ts) | トースト通知管理（4秒自動消去） |
 
 **Context**
 
