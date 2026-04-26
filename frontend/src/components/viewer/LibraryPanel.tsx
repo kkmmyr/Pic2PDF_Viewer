@@ -53,7 +53,7 @@ export function LibraryPanel() {
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
     const sortedPdfs = useSortedPdfs(pdfs, sortOrder, favorites);
 
-    const { getAuthors, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
+    const { meta, getAuthors, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
     const { jobStatus: autoFillStatus, startAutoFill } = useAutoFillAuthors(currentSource, refreshMeta);
     const [autoFillMode, setAutoFillMode] = useState<'missing_only' | 'unknown_only' | 'overwrite_all'>('unknown_only');
     const { toasts, showToast, dismissToast } = useToast();
@@ -73,7 +73,7 @@ export function LibraryPanel() {
         searchText,
         authorFilter,
         currentPath,
-        getAuthors,
+        meta,
     });
 
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {

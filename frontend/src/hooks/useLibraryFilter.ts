@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { PdfFile } from '../types';
+import type { PdfFile, BookMetaMap } from '../types';
 
 interface UseLibraryFilterParams {
     pdfs: PdfFile[];
@@ -7,7 +7,12 @@ interface UseLibraryFilterParams {
     searchText: string;
     authorFilter: string;
     currentPath: string;
-    getAuthors: (path: string, name: string) => string[];
+    meta: BookMetaMap;
+}
+
+function getAuthorsFromMeta(meta: BookMetaMap, path: string, name: string): string[] {
+    const key = path ? `${path}/${name}` : name;
+    return meta[key]?.authors ?? [];
 }
 
 export function useLibraryFilter({
@@ -16,7 +21,7 @@ export function useLibraryFilter({
     searchText,
     authorFilter,
     currentPath,
-    getAuthors,
+    meta,
 }: UseLibraryFilterParams) {
     const filteredPdfs = useMemo(() => {
         let result = pdfs;
@@ -25,18 +30,18 @@ export function useLibraryFilter({
             const lower = searchText.toLowerCase();
             result = result.filter(p =>
                 p.name.toLowerCase().includes(lower) ||
-                getAuthors(currentPath, p.name).some(a => a.toLowerCase().includes(lower))
+                getAuthorsFromMeta(meta, currentPath, p.name).some(a => a.toLowerCase().includes(lower))
             );
         }
 
         if (authorFilter) {
             result = result.filter(p =>
-                getAuthors(currentPath, p.name).includes(authorFilter)
+                getAuthorsFromMeta(meta, currentPath, p.name).includes(authorFilter)
             );
         }
 
         return result;
-    }, [pdfs, searchText, authorFilter, currentPath, getAuthors]);
+    }, [pdfs, searchText, authorFilter, currentPath, meta]);
 
     const filteredDirs = useMemo(() => {
         if (!searchText.trim()) return directories;

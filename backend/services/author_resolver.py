@@ -81,6 +81,7 @@ def _sanitize_author(value: str) -> str:
     Gemma が返した値が不正（URL・JSON・ブランド名・長文）な場合は '作者不明' を返す。
     正常な値はそのまま返す。
     """
+    value = value.strip()
     if not value or value == "None":
         return "作者不明"
     if len(value) > _MAX_AUTHOR_LEN:
