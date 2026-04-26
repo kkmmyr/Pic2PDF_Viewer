@@ -1,11 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:zenn.dev)",
-      "Bash(xargs wc *)"
-    ],
-    "additionalDirectories": [
-      "d:\\61.tool\\Pic2PDF_Viewer\\.claude"
+      "WebFetch(domain:zenn.dev)"
     ]
   },
   "hooks": {
