@@ -128,6 +128,51 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
+### `POST /api/thumbnails/regenerate_bulk`
+選択した複数PDFのサムネイルを一括再生成する。
+
+**リクエストボディ**:
+```json
+{
+  "names": ["book1.pdf", "book2.pdf"],
+  "path": "current/relative/path",
+  "source": "generated"
+}
+```
+
+**レスポンス**:
+```json
+{ "message": "Bulk thumbnail regeneration complete", "succeeded": ["book1.pdf"], "failed": [] }
+```
+
+---
+
+### `POST /api/pdfs/merge`
+複数のPDFを順番に結合して新しいPDFを生成する。
+
+**リクエストボディ**:
+```json
+{
+  "names": ["book1.pdf", "book2.pdf"],
+  "output_name": "merged.pdf",
+  "path": "current/relative/path",
+  "source": "generated"
+}
+```
+- `names` — 結合対象のファイル名リスト（2件以上必須、順序通りに結合）
+- `output_name` — 出力ファイル名（`.pdf` 拡張子必須、既存ファイル名と重複不可）
+
+**レスポンス**:
+```json
+{ "message": "PDFs merged successfully", "output_name": "merged.pdf", "total_pages": 42 }
+```
+
+**エラー**:
+- `400`: `names` が1件以下 / `output_name` に `.pdf` がない / 出力先に同名ファイルが存在する
+- `404`: 結合対象PDFが存在しない
+
+---
+
 ### `POST /api/thumbnails/regenerate`
 指定PDFのサムネイルを再生成する。
 
@@ -149,6 +194,58 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ## 書籍メタデータ
+
+### `POST /api/meta/auto-fill`
+指定ソースの書籍に対してサークル名自動登録ジョブを開始する。
+
+**クエリパラメータ**:
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `mode` (オプション) — `missing_only`(default: `unknown_only`) / `unknown_only` / `overwrite_all`
+  - `missing_only`: 作者名エントリが未登録の書籍のみ処理
+  - `unknown_only`: 「作者不明」または未登録の書籍を処理（デフォルト）
+  - `overwrite_all`: 全件を上書き処理
+
+**レスポンス**: `{"started": true, "source": "generated", "mode": "unknown_only"}`
+
+**エラー**:
+- `400`: 既にジョブが実行中 / 不正な `mode` 値
+
+---
+
+### `GET /api/meta/auto-fill/status`
+自動登録ジョブの進捗を取得する。クライアントは 1500ms 間隔でポーリングする。
+
+**クエリパラメータ**:
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**レスポンス**:
+```json
+{
+  "status": "running",
+  "total": 15,
+  "done": 3,
+  "skipped": 264,
+  "current": "book_title",
+  "results": [{"title": "book_title", "author": "作者A"}],
+  "error": ""
+}
+```
+- `status` の値: `idle` / `running` / `done` / `error`
+- `total`: 処理対象件数（スキップ分を除く）
+- `skipped`: 対象外としてスキップした件数
+
+---
+
+### `GET /api/meta/auto-fill/test`
+1件分の自動登録をデバッグ実行する。ジョブを起動せず同期的に結果を返す。
+
+**クエリパラメータ**:
+- `title` — テスト対象の書籍タイトル
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**レスポンス**: `{"title": "book_title", "author": "作者A"}`
+
+---
 
 ### `GET /api/meta`
 指定ソースの書籍メタデータ（作者名）を全件取得する。
