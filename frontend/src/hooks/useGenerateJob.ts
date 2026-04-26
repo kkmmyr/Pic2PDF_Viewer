@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import apiClient from '../config/api_client';
+import apiClient, { ApiError } from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
 import { usePolling } from './usePolling';
 import { STORAGE_KEYS, API_CONFIG } from '../constants';
@@ -57,6 +57,11 @@ export function useGenerateJob(
             }
         } catch (e) {
             console.error('Failed to poll job status', e);
+            // 404 はサーバー再起動等でジョブが消えた状態。ポーリングを停止してストレージをクリアする
+            if (e instanceof ApiError && e.status === 404) {
+                removeStorage(STORAGE_KEY);
+                setCurrentJob(null);
+            }
         }
     }, [currentJob, onCompleted, onFailed]);
 
