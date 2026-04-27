@@ -15,12 +15,11 @@ WebP画像・ZIPをPDF化してブラウザで閲覧するWebアプリ。Kindle�
 **設計書:**
 - 要件: [docs/01_要件定義/要件定義書.md](../docs/01_要件定義/要件定義書.md)
 - 基本設計: [docs/02_基本設計/基本設計書.md](../docs/02_基本設計/基本設計書.md)
+- アーキテクチャ詳細: [docs/02_基本設計/アーキテクチャ詳細.md](../docs/02_基本設計/アーキテクチャ詳細.md) ← **コード変更タスクでは最初に Read で読み込む**
 - 詳細設計: [docs/03_詳細設計/詳細設計書.md](../docs/03_詳細設計/詳細設計書.md)
 - API: [docs/03_詳細設計/API仕様書.md](../docs/03_詳細設計/API仕様書.md)
 - OCR: [docs/03_詳細設計/OCR設計書.md](../docs/03_詳細設計/OCR設計書.md)
 - 変更履歴: [docs/05_記録/変更履歴.md](../docs/05_記録/変更履歴.md)
-
-**アーキテクチャ詳細:** [.claude/rules/architecture.md](rules/architecture.md)
 
 ---
 
