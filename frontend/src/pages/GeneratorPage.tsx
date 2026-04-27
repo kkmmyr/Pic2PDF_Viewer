@@ -1,10 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
-import { FolderSearch, Loader2, Zap, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { FolderSearch, Loader2, Zap } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import { usePdfStatus } from '../hooks/usePdfStatus';
 import { useGenerateJob } from '../hooks/useGenerateJob';
-import type { GenerateJob, StatusItem } from '../types';
+import { CompressionOptions } from '../components/generator/CompressionOptions';
+import { JobProgress } from '../components/generator/JobProgress';
+import { StatusTable } from '../components/generator/StatusTable';
+import type { GenerateJob } from '../types';
 
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
 const DEFAULT_QUALITY = 50;
@@ -21,6 +24,7 @@ export default function GeneratorPage() {
     const onCompleted = useCallback((job: GenerateJob) => {
         setResult({ message: job.message, files: job.files });
         fetchStatus();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const onFailed = useCallback((job: GenerateJob) => {
@@ -69,28 +73,6 @@ export default function GeneratorPage() {
         }
     };
 
-    const getStatusBadgeClass = (status: StatusItem['status']) => {
-        switch (status) {
-            case 'completed':   return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-200 dark:border-green-700';
-            case 'in_progress': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 border-blue-200 dark:border-blue-700';
-            default:            return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600';
-        }
-    };
-
-    const getStatusLabel = (status: StatusItem['status']) => {
-        switch (status) {
-            case 'completed':   return 'Completed';
-            case 'in_progress': return 'In Progress';
-            default:            return 'Not Started';
-        }
-    };
-
-    const jobProgressClass = currentJob?.status === 'failed'
-        ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
-        : currentJob?.status === 'completed'
-            ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800'
-            : 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800';
-
     return (
         <div className="max-w-4xl mx-auto p-6">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
@@ -134,40 +116,12 @@ export default function GeneratorPage() {
                         </p>
                     </div>
 
-                    {/* Compression Options */}
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800 space-y-4">
-                        <div className="flex items-center gap-3">
-                            <input
-                                type="checkbox"
-                                id="generateCompressed"
-                                checked={generateCompressed}
-                                onChange={(e) => setGenerateCompressed(e.target.checked)}
-                                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                            />
-                            <label htmlFor="generateCompressed" className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2 cursor-pointer">
-                                <Zap size={16} className="text-amber-500 fill-amber-500" />
-                                Generate Compressed Version (別途保存)
-                            </label>
-                        </div>
-
-                        {generateCompressed && (
-                            <div className="pl-8 space-y-2">
-                                <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                                    <span>Compression Quality: {quality}</span>
-                                    <span className="text-xs">Lower is smaller but lower quality</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="10"
-                                    max="95"
-                                    step="5"
-                                    value={quality}
-                                    onChange={(e) => setQuality(parseInt(e.target.value))}
-                                    className="w-full h-2 bg-blue-200 dark:bg-blue-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
-                                />
-                            </div>
-                        )}
-                    </div>
+                    <CompressionOptions
+                        enabled={generateCompressed}
+                        quality={quality}
+                        onEnabledChange={setGenerateCompressed}
+                        onQualityChange={setQuality}
+                    />
 
                     {/* Buttons */}
                     <div className="flex flex-col gap-4">
@@ -198,33 +152,7 @@ export default function GeneratorPage() {
                         </button>
                     </div>
 
-                    {/* Job Progress */}
-                    {currentJob && (
-                        <div className={`p-4 rounded-lg border animate-in fade-in slide-in-from-top-2 ${jobProgressClass}`}>
-                            <div className="flex items-center gap-2 mb-2">
-                                {currentJob.status === 'completed' && <CheckCircle className="text-green-600 dark:text-green-400" size={18} />}
-                                {currentJob.status === 'failed' && <XCircle className="text-red-600 dark:text-red-400" size={18} />}
-                                {(currentJob.status === 'pending' || currentJob.status === 'running') && (
-                                    <Clock className="text-blue-600 dark:text-blue-400 animate-pulse" size={18} />
-                                )}
-                                <span className={`text-sm font-semibold ${
-                                    currentJob.status === 'failed' ? 'text-red-700 dark:text-red-400'
-                                    : currentJob.status === 'completed' ? 'text-green-700 dark:text-green-400'
-                                    : 'text-blue-700 dark:text-blue-400'
-                                }`}>
-                                    {currentJob.status === 'pending' && 'ジョブを開始中...'}
-                                    {currentJob.status === 'running' && (currentJob.current_item ? `処理中: ${currentJob.current_item}` : '処理中...')}
-                                    {currentJob.status === 'completed' && 'Generation complete'}
-                                    {currentJob.status === 'failed' && '生成に失敗しました'}
-                                </span>
-                            </div>
-                            {currentJob.status === 'running' && (
-                                <div className="w-full bg-blue-200 dark:bg-blue-800 rounded-full h-1.5 mt-2">
-                                    <div className="bg-blue-600 h-1.5 rounded-full animate-pulse w-1/2" />
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    {currentJob && <JobProgress job={currentJob} />}
 
                     {/* Error Message */}
                     {error && (
@@ -233,36 +161,7 @@ export default function GeneratorPage() {
                         </div>
                     )}
 
-                    {/* Status Table */}
-                    {statusItems.length > 0 && (
-                        <div className="mt-8">
-                            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Items Status</h3>
-                            <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-                                <table className="w-full text-left text-sm">
-                                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">
-                                        <tr>
-                                            <th className="px-4 py-3">Name</th>
-                                            <th className="px-4 py-3">Type</th>
-                                            <th className="px-4 py-3">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                        {statusItems.map((item) => (
-                                            <tr key={item.name} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                                <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{item.name}</td>
-                                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 uppercase text-[10px] tracking-wider font-semibold">{item.type}</td>
-                                                <td className="px-4 py-3">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusBadgeClass(item.status)}`}>
-                                                        {getStatusLabel(item.status)}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
+                    <StatusTable items={statusItems} />
 
                     {/* Result Message */}
                     {result && (

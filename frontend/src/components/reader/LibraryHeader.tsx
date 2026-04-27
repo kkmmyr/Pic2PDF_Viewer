@@ -48,7 +48,7 @@ export function LibraryHeader({
     onAuthorFilterChange,
 }: LibraryHeaderProps) {
     return (
-        <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-50">
+        <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-header">
             <div className="h-14 flex items-center px-4 justify-between">
                 <div className="flex items-center gap-4">
                     {currentPath && (

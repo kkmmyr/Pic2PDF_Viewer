@@ -3,14 +3,19 @@ from pydantic import BaseModel
 from enum import Enum
 import os
 import threading
-from typing import Optional
+
+import fitz
+
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
-from services.pdf_generator import scan_and_generate
-from services.job_manager import GenerateJob, JobStore, JobStatus, GenerateState
-from config import get_dirs_by_source, PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR
-from utils.path_utils import validate_safe_path
-from utils.file_utils import is_webp_file, is_zip_file
+from services.pdf_generator import scan_and_generate, batch_compress
+from services.job_manager import GenerateJob, JobStore, JobStatus
+from config import (
+    get_dirs_by_source,
+    PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR,
+)
+from utils.path_utils import validate_safe_path, validate_safe_name
+from utils.file_utils import is_webp_file, is_zip_file, is_pdf_file
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
 
@@ -26,7 +31,6 @@ class GenerateStatus(str, Enum):
 
 
 job_store = JobStore()
-generate_state = GenerateState()
 
 
 class GenerateRequest(BaseModel):
@@ -39,12 +43,10 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
     """バックグラウンドスレッドでPDF生成を実行する。"""
     def progress_callback(item_name: str):
         job.update(current_item=item_name)
-        generate_state.set_current_item(item_name)
         logger.info("Processing: %s", item_name)
 
     try:
         job.update(status=JobStatus.RUNNING, current_item="Starting...")
-        generate_state.set_current_item("Starting...")
 
         compressed_dir = PDF_COMPRESSED_DIR if request.generate_compressed else None
         quality = request.quality if request.generate_compressed else None
@@ -65,12 +67,10 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
             files=generated,
             message="Generation complete",
         )
-        generate_state.set_current_item(None)
         logger.info("Job %s completed: %d files", job.job_id, len(generated))
     except Exception as e:
         logger.exception("Job %s failed", job.job_id)
         job.update(status=JobStatus.FAILED, current_item=None, error=str(e))
-        generate_state.set_current_item(None)
 
 
 @router.post("/generate")
@@ -98,7 +98,7 @@ def get_status(source_dir: str):
     if not os.path.isdir(source_dir):
         return {"items": []}
 
-    current_item = generate_state.get_current_item()
+    current_item = job_store.get_active_current_item()
     items_status = []
 
     for root, dirs, files in os.walk(source_dir):
@@ -169,56 +169,78 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
         logger.exception("delete_pages failed: %s", filename)
         raise HTTPException(status_code=500, detail=str(e))
 
+
 class BatchCompressRequest(BaseModel):
     quality: int = 50
+
 
 @router.post("/batch_compress")
 def batch_compress_pdfs(request: BatchCompressRequest):
     if not os.path.exists(IMAGES_DIR):
         raise HTTPException(status_code=404, detail="Images directory not found")
 
-    generated = []
     try:
-        from natsort import natsorted
-        from services.pdf_generator import PdfGenerator
-
-        for root, dirs, files in os.walk(IMAGES_DIR):
-            webp_files = [f for f in files if is_webp_file(f)]
-            if not webp_files:
-                continue
-
-            rel_path = os.path.relpath(root, IMAGES_DIR)
-            folder_name = os.path.basename(root)
-
-            generate_state.set_current_item(f"Batch: {rel_path}")
-            logger.info("Processing folder: %s", rel_path)
-
-            webp_files = natsorted(webp_files)
-            image_paths = [os.path.join(root, f) for f in webp_files]
-
-            pdf_filename = f"{folder_name}.pdf"
-
-            if rel_path == ".":
-                target_output_dir = PDF_COMPRESSED_DIR
-            else:
-                target_output_dir = os.path.join(PDF_COMPRESSED_DIR, os.path.dirname(rel_path))
-
-            os.makedirs(target_output_dir, exist_ok=True)
-            output_path = os.path.join(target_output_dir, pdf_filename)
-
-            if os.path.exists(output_path):
-                logger.info("Skipping already compressed: %s", output_path)
-                continue
-
-            generator = PdfGenerator(PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR, request.quality)
-            generator._create_pdf_file(image_paths, output_path, quality=request.quality)
-
-            generated.append(os.path.join(rel_path, pdf_filename) if rel_path != "." else pdf_filename)
-            logger.info("Batch compressed: %s", output_path)
-
-        generate_state.set_current_item(None)
+        generated = batch_compress(IMAGES_DIR, PDF_COMPRESSED_DIR, request.quality)
         return {"message": "Batch compression complete", "files": generated}
     except Exception as e:
-        generate_state.set_current_item(None)
         logger.exception("batch_compress failed")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# PDF 結合（複数の PDF を順番に結合して新しい PDF を生成）
+# ---------------------------------------------------------------------------
+
+class MergePdfsRequest(BaseModel):
+    names: list[str]   # 結合対象の .pdf ファイル名リスト（順序通りに結合）
+    output_name: str   # 出力ファイル名（.pdf 拡張子付き）
+    path: str = ""
+    source: str = "generated"
+
+
+@router.post("/pdfs/merge")
+def merge_pdfs(request: MergePdfsRequest):
+    """複数の PDF を順番に結合して新しい PDF を生成する。"""
+    validate_safe_path(request.path, param_name="path")
+    validate_safe_name(request.output_name, param_name="output_name")
+    for name in request.names:
+        validate_safe_name(name, param_name="name")
+
+    if len(request.names) < 2:
+        raise HTTPException(status_code=400, detail="At least 2 PDFs are required for merging")
+
+    if not is_pdf_file(request.output_name):
+        raise HTTPException(status_code=400, detail="output_name must end with .pdf")
+
+    dirs = get_dirs_by_source(request.source)
+    base_pdf_dir = dirs["pdf"]
+    base_thumb_dir = dirs["thumb"]
+
+    output_path = os.path.join(base_pdf_dir, request.path, request.output_name)
+    if os.path.exists(output_path):
+        raise HTTPException(status_code=400, detail="Output file already exists")
+
+    merged_doc = None
+    try:
+        merged_doc = fitz.open()
+        for name in request.names:
+            pdf_path = os.path.join(base_pdf_dir, request.path, name)
+            if not os.path.exists(pdf_path):
+                raise HTTPException(status_code=404, detail=f"PDF not found: {name}")
+            with fitz.open(pdf_path) as src:
+                merged_doc.insert_pdf(src)
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        merged_doc.save(output_path)
+        total_pages = len(merged_doc)
+        logger.info("Merged %d PDFs into %s (%d pages)", len(request.names), output_path, total_pages)
+    finally:
+        if merged_doc:
+            merged_doc.close()
+
+    # サムネイル生成
+    thumb_name = get_thumbnail_name(request.output_name)
+    thumb_path = os.path.join(base_thumb_dir, request.path, thumb_name)
+    ThumbnailService.generate_thumbnail(output_path, thumb_path)
+
+    return {"message": "PDFs merged successfully", "output_name": request.output_name, "total_pages": total_pages}

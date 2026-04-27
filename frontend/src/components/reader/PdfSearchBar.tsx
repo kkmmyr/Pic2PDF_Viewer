@@ -52,7 +52,7 @@ export function PdfSearchBar({
     };
 
     return (
-        <div className="fixed top-14 left-0 right-0 z-40 flex items-center gap-2 px-4 py-2 bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-700 shadow-sm backdrop-blur-sm animate-in slide-in-from-top-1 duration-150">
+        <div className="fixed top-14 left-0 right-0 z-overlay-bar flex items-center gap-2 px-4 py-2 bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-700 shadow-sm backdrop-blur-sm animate-in slide-in-from-top-1 duration-150">
             <Search className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
             <input
                 ref={inputRef}

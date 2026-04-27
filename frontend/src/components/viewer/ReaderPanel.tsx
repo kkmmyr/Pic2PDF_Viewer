@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 
-import type { LibrarySource, ReadingDirection, SpreadMode, DeletePagesResponse } from '../../types';
-import { buildStaticUrl, API_ENDPOINTS, STATIC_PATHS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import { useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast } from '../../hooks';
+import type { LibrarySource, ReadingDirection } from '../../types';
+import { buildStaticUrl, STATIC_PATHS } from '../../config/api';
+import {
+    useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast,
+    useSpreadMode, useEditMode,
+} from '../../hooks';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer } from '../reader';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 // <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -26,41 +29,39 @@ interface ReaderPanelProps {
 /**
  * PDF/画像リーダービュー。
  *
- * 追加機能:
- * - Viewer内検索: Ctrl+F でサーチバーを開き、PDFテキストレイヤーをハイライト
- * - ダークモード対応の背景色
+ * - Ctrl+F で PDF テキストレイヤーをハイライト検索
+ * - 編集モードでページを選択して削除（`useEditMode`）
+ * - 見開き Auto/Spread/Single モード切り替え（`useSpreadMode`）
  */
 export function ReaderPanel({
-    selectedPdf,
-    currentPath,
-    currentSource,
-    onPdfUpdated,
-    onClose,
+    selectedPdf, currentPath, currentSource, onPdfUpdated, onClose,
 }: ReaderPanelProps) {
     const { height: windowHeight } = useWindowSize();
     const { imageUrls, numPages: imageNumPages, isImageMode } =
         useBookImages(selectedPdf, currentPath, currentSource);
 
-    // Reader 設定
-    const [spreadMode, setSpreadMode] = useState<SpreadMode>('auto');
-    // autoモード時にページサイズから計算した実効値（true=見開き、false=1ページ）
-    const [autoIsSpread, setAutoIsSpread] = useState(true);
-    // 実際のレンダリングに使う isSpread
-    const isSpread = spreadMode === 'auto' ? autoIsSpread
-        : spreadMode === 'spread';
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
     const [numPages, setNumPages] = useState(0);
     const [showHeader, setShowHeader] = useState(false);
     const [pdfVersion, setPdfVersion] = useState(0);
 
-    // ページナビゲーション
+    const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
+
     const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } =
         useReaderNavigation({ numPages, isSpread, direction, isActive: true });
 
-    // 編集モード
-    const [isEditMode, setIsEditMode] = useState(false);
-    const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
     const { toasts, showToast, dismissToast } = useToast();
+
+    const {
+        isEditMode, selectedPages,
+        toggleEditMode, togglePageSelection, resetEditMode,
+        requestDeletePages, confirmDeletePages, cancelDeletePages, pendingDeleteCount,
+    } = useEditMode({
+        selectedPdf, currentPath, currentSource,
+        pageNumber, setPageNumber, onPdfUpdated,
+        bumpPdfVersion: () => setPdfVersion(v => v + 1),
+        showError: (msg) => showToast(msg, 'error'),
+    });
 
     // 検索
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -98,78 +99,24 @@ export function ReaderPanel({
     }, [isImageMode, imageNumPages]);
 
     useEffect(() => {
-        setIsEditMode(false);
-        setSelectedPages(new Set());
+        resetEditMode();
         setNumPages(0);
-        setAutoIsSpread(true); // PDF切り替え時に自動判定をリセット
+        resetAutoSpread();
         handleCloseSearch();
         resetPage();
-    }, [selectedPdf, resetPage, handleCloseSearch]);
+    }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread]);
 
     const handleClose = useCallback(() => {
         resetPage();
-        setIsEditMode(false);
-        setSelectedPages(new Set());
+        resetEditMode();
         handleCloseSearch();
         onClose();
-    }, [resetPage, onClose, handleCloseSearch]);
+    }, [resetPage, onClose, handleCloseSearch, resetEditMode]);
 
     const toggleDirection = useCallback(() => {
         setDirection(prev => (prev === 'rtl' ? 'ltr' : 'rtl'));
         resetPage();
     }, [resetPage]);
-
-    // Auto → Spread → Single → Auto の順に循環
-    const cycleSpreadMode = useCallback(() => {
-        setSpreadMode(prev =>
-            prev === 'auto' ? 'spread' : prev === 'spread' ? 'single' : 'auto'
-        );
-    }, []);
-
-    // autoモード時: ページサイズから見開きかどうかを判定する
-    const handlePageSize = useCallback((width: number, height: number) => {
-        if (spreadMode !== 'auto') return;
-        // 横長（width > height）→ 1ページ、縦長 → 見開き
-        setAutoIsSpread(width <= height);
-    }, [spreadMode]);
-
-    const handleToggleEditMode = useCallback(() => {
-        setIsEditMode(prev => !prev);
-        setSelectedPages(new Set());
-    }, []);
-
-    const togglePageSelection = useCallback((pNum: number, e: React.MouseEvent) => {
-        e.stopPropagation();
-        setSelectedPages(prev => {
-            const next = new Set(prev);
-            if (next.has(pNum)) next.delete(pNum);
-            else next.add(pNum);
-            return next;
-        });
-    }, []);
-
-    const handleDeletePages = useCallback(async () => {
-        if (selectedPages.size === 0) return;
-        if (!confirm(`${selectedPages.size} ページを削除しますか？この操作は元に戻せません。`)) return;
-
-        try {
-            const pageIndices = Array.from(selectedPages).map(p => p - 1);
-            const data = await apiClient.post<unknown, DeletePagesResponse>(
-                API_ENDPOINTS.DELETE_PAGES(selectedPdf, currentPath, currentSource),
-                { page_indices: pageIndices }
-            );
-            setIsEditMode(false);
-            setSelectedPages(new Set());
-            setPdfVersion(v => v + 1);
-            onPdfUpdated();
-
-            if (pageNumber > data.total_pages) {
-                setPageNumber(Math.max(1, data.total_pages));
-            }
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '削除に失敗しました。', 'error');
-        }
-    }, [selectedPages, selectedPdf, currentPath, currentSource, pageNumber, onPdfUpdated, setPageNumber, showToast]);
 
     const onDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
         setNumPages(pdf.numPages);
@@ -201,7 +148,7 @@ export function ReaderPanel({
         const p1 = pageNumber;
         const p2 = pageNumber + 1;
         if (direction === 'rtl') {
-            // RTL: page 1 is the cover, shown alone to avoid page 2 appearing in both spreads
+            // RTL: 1ページ目（表紙）は単独表示。2ページ目を両スプレッドに出さないため
             if (pageNumber === 1) return <>{renderPageItem(p1, 'single')}</>;
             return <>{renderPageItem(p2, 'left')}{renderPageItem(p1, 'right')}</>;
         }
@@ -219,7 +166,7 @@ export function ReaderPanel({
         <>
             {/* ヘッダー表示トリガーゾーン */}
             <div
-                className="fixed top-0 left-0 right-0 h-16 z-40"
+                className="fixed top-0 left-0 right-0 h-16 z-overlay-bar"
                 onMouseEnter={() => setShowHeader(true)}
             />
 
@@ -236,14 +183,13 @@ export function ReaderPanel({
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
                 onCycleSpreadMode={cycleSpreadMode}
-                onToggleEditMode={handleToggleEditMode}
-                onDeletePages={handleDeletePages}
+                onToggleEditMode={toggleEditMode}
+                onDeletePages={requestDeletePages}
                 onMouseLeave={() => setShowHeader(false)}
                 onToggleSearch={() => setIsSearchOpen(s => !s)}
                 onPageJump={setPageNumber}
             />
 
-            {/* 検索バー (isSearchOpen 中は常に表示) */}
             {isSearchOpen && (
                 <PdfSearchBar
                     searchText={searchText}
@@ -283,6 +229,16 @@ export function ReaderPanel({
                     )}
                 </div>
             </div>
+            <ConfirmDialog
+                open={pendingDeleteCount > 0}
+                title="ページを削除"
+                message={`${pendingDeleteCount} ページを削除しますか？\nこの操作は元に戻せません。`}
+                confirmLabel="削除"
+                danger
+                onConfirm={confirmDeletePages}
+                onCancel={cancelDeletePages}
+            />
+
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );

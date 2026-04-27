@@ -65,28 +65,16 @@ class JobStore:
         with self._lock:
             return self._jobs.get(job_id)
 
+    def get_active_current_item(self) -> Optional[str]:
+        """最新の RUNNING ジョブの current_item を返す。
 
-class GenerateState:
-    """PDF生成の進捗状態を管理するスレッドセーフなシングルトンクラス。
-    (後方互換: /api/status エンドポイントで使用)
-    """
-
-    _instance = None
-    _class_lock = threading.Lock()
-
-    def __new__(cls):
-        with cls._class_lock:
-            if cls._instance is None:
-                instance = super().__new__(cls)
-                instance._lock = threading.Lock()
-                instance._current_item: Optional[str] = None
-                cls._instance = instance
-        return cls._instance
-
-    def set_current_item(self, item: Optional[str]) -> None:
+        `/api/status` で「現在処理中のアイテム名」を取得するために使う。
+        RUNNING のジョブがなければ None。
+        """
         with self._lock:
-            self._current_item = item
-
-    def get_current_item(self) -> Optional[str]:
-        with self._lock:
-            return self._current_item
+            # 新しい順に走査して RUNNING ジョブを探す
+            for job_id in reversed(self._order):
+                job = self._jobs.get(job_id)
+                if job is not None and job.status == JobStatus.RUNNING:
+                    return job.current_item
+        return None

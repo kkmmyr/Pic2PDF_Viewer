@@ -4,12 +4,13 @@
 |---|---|
 | [backend/main.py](../../backend/main.py) | アプリ起動・ルーター登録・静的ファイルマウント |
 | [backend/config.py](../../backend/config.py) | データディレクトリ定数・`get_dirs_by_source()` |
-| [backend/routers/library.py](../../backend/routers/library.py) | ライブラリ一覧・フォルダ管理・リネームAPI |
-| [backend/routers/pdfs.py](../../backend/routers/pdfs.py) | PDF生成（非同期ジョブ）・ページ削除・圧縮API |
-| [backend/routers/ocr.py](../../backend/routers/ocr.py) | OCR実行・停止・ステータスAPI |
-| [backend/routers/meta.py](../../backend/routers/meta.py) | 書籍メタデータ（作者名）取得・更新API |
+| [backend/routers/library.py](../../backend/routers/library.py) | ライブラリ一覧・フォルダ管理・移動・リネーム API |
+| [backend/routers/pdfs.py](../../backend/routers/pdfs.py) | PDF 生成（非同期ジョブ）・ページ削除・圧縮・PDF 結合 API |
+| [backend/routers/thumbnails.py](../../backend/routers/thumbnails.py) | サムネイル再生成 API（単発 / 一括） |
+| [backend/routers/ocr.py](../../backend/routers/ocr.py) | OCR 実行・停止・ステータス API |
+| [backend/routers/meta.py](../../backend/routers/meta.py) | 書籍メタデータ（作者名）取得・更新 API |
 | [backend/services/pdf_service.py](../../backend/services/pdf_service.py) | PDFページ削除・ページ数取得ロジック |
-| [backend/services/pdf_generator.py](../../backend/services/pdf_generator.py) | WebP/ZIP → PDF変換（`_collect_images` 共通フロー） |
+| [backend/services/pdf_generator.py](../../backend/services/pdf_generator.py) | WebP/ZIP → PDF 変換（`scan_and_generate` / `batch_compress` / `_collect_images` 共通フロー） |
 | [backend/services/thumbnail_service.py](../../backend/services/thumbnail_service.py) | サムネイル生成 |
 | [backend/services/ocr_service.py](../../backend/services/ocr_service.py) | OCRバックグラウンドプロセス管理 |
 | [backend/services/meta_store.py](../../backend/services/meta_store.py) | meta.json CRUD・ソース別ロック管理・`update_meta_locked()` |
@@ -31,15 +32,32 @@
 | [frontend/src/pages/GeneratorPage.tsx](../../frontend/src/pages/GeneratorPage.tsx) | PDF生成ページ |
 | [frontend/src/pages/OCRPage.tsx](../../frontend/src/pages/OCRPage.tsx) | Novel OCR実行ページ |
 
+**コンポーネント (ui/ — 共通プリミティブ)**
+
+| ファイル | 役割 |
+|---|---|
+| [frontend/src/components/ui/Dialog.tsx](../../frontend/src/components/ui/Dialog.tsx) | ダイアログ共通シェル（オーバーレイ + Esc/外クリック閉じ + Header/Body/Footer + ボタン） |
+| [frontend/src/components/ui/ConfirmDialog.tsx](../../frontend/src/components/ui/ConfirmDialog.tsx) | 汎用確認ダイアログ（OS ネイティブ `confirm()` の置換用、危険操作対応） |
+
 **コンポーネント (viewer/ — 状態管理層)**
 
 | ファイル | 役割 |
 |---|---|
 | [frontend/src/components/viewer/LibraryPanel.tsx](../../frontend/src/components/viewer/LibraryPanel.tsx) | ライブラリUI（一覧・ソート・お気に入り・作者フィルター）props なし、LibraryContext から取得 |
 | [frontend/src/components/viewer/ReaderPanel.tsx](../../frontend/src/components/viewer/ReaderPanel.tsx) | PDFリーダーUI（ページ表示・見開き制御・検索・削除） |
-| [frontend/src/components/viewer/BulkAuthorDialog.tsx](../../frontend/src/components/viewer/BulkAuthorDialog.tsx) | 複数書籍への作者名一括設定ダイアログ |
-| [frontend/src/components/viewer/CreateFolderDialog.tsx](../../frontend/src/components/viewer/CreateFolderDialog.tsx) | フォルダ作成ダイアログ |
-| [frontend/src/components/viewer/RenameDialog.tsx](../../frontend/src/components/viewer/RenameDialog.tsx) | PDF/フォルダ共用リネームダイアログ |
+| [frontend/src/components/viewer/BulkAuthorDialog.tsx](../../frontend/src/components/viewer/BulkAuthorDialog.tsx) | 複数書籍への作者名一括設定ダイアログ（`<Dialog>` ベース） |
+| [frontend/src/components/viewer/CreateFolderDialog.tsx](../../frontend/src/components/viewer/CreateFolderDialog.tsx) | フォルダ作成ダイアログ（`<Dialog>` ベース） |
+| [frontend/src/components/viewer/RenameDialog.tsx](../../frontend/src/components/viewer/RenameDialog.tsx) | PDF/フォルダ共用リネームダイアログ（`<Dialog>` ベース） |
+| [frontend/src/components/viewer/MergeDialog.tsx](../../frontend/src/components/viewer/MergeDialog.tsx) | PDF 結合ダイアログ（`<Dialog>` ベース） |
+| [frontend/src/components/viewer/AutoFillAuthorsBar.tsx](../../frontend/src/components/viewer/AutoFillAuthorsBar.tsx) | サークル名自動登録バー（実行ボタン・モード選択・進捗表示） |
+
+**コンポーネント (generator/ — PDF生成ページ用)**
+
+| ファイル | 役割 |
+|---|---|
+| [frontend/src/components/generator/CompressionOptions.tsx](../../frontend/src/components/generator/CompressionOptions.tsx) | 圧縮版生成チェックボックス + 品質スライダー |
+| [frontend/src/components/generator/JobProgress.tsx](../../frontend/src/components/generator/JobProgress.tsx) | PDF 生成ジョブの進捗パネル（pending/running/completed/failed） |
+| [frontend/src/components/generator/StatusTable.tsx](../../frontend/src/components/generator/StatusTable.tsx) | 生成対象のステータス一覧表 |
 
 **コンポーネント (reader/ — プレゼンテーション層)**
 
@@ -78,6 +96,8 @@
 | [frontend/src/hooks/useLibraryFilter.ts](../../frontend/src/hooks/useLibraryFilter.ts) | PDF/フォルダのフィルタリング（searchText / authorFilter / currentPath） |
 | [frontend/src/hooks/usePdfSearch.ts](../../frontend/src/hooks/usePdfSearch.ts) | PDF テキスト検索（全ページ走査・マッチハイライト） |
 | [frontend/src/hooks/useToast.ts](../../frontend/src/hooks/useToast.ts) | トースト通知管理（4秒自動消去） |
+| [frontend/src/hooks/useSpreadMode.ts](../../frontend/src/hooks/useSpreadMode.ts) | 見開きモード（Auto/Spread/Single）の循環 + ページサイズによる Auto 判定 |
+| [frontend/src/hooks/useEditMode.ts](../../frontend/src/hooks/useEditMode.ts) | リーダー編集モード（ページ選択・削除リクエスト・確認ダイアログ） |
 
 **Context**
 
@@ -91,6 +111,9 @@
 |---|---|
 | [frontend/src/config/api.ts](../../frontend/src/config/api.ts) | API URL定数・静的ファイルパス |
 | [frontend/src/config/api_client.ts](../../frontend/src/config/api_client.ts) | axios共通クライアント |
+| [frontend/src/utils/validation.ts](../../frontend/src/utils/validation.ts) | ファイル名/フォルダ名バリデーション（`validateFilename` / `FORBIDDEN_FILENAME_CHARS`） |
+| [frontend/src/utils/storage.ts](../../frontend/src/utils/storage.ts) | localStorage の JSON 読み書きユーティリティ |
+| [frontend/tailwind.config.js](../../frontend/tailwind.config.js) | Tailwind 設定（z-index 階層: `z-card-badge` / `z-overlay-bar` / `z-header` / `z-toast` / `z-dialog` / `z-dialog-nested`） |
 
 **主要ライブラリ:** `react-pdf`, `tailwindcss`, `axios`, `react-router-dom`, `lucide-react`
 

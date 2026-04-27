@@ -1,6 +1,7 @@
 import os
 import shutil
 from utils.file_naming import get_thumbnail_name
+from utils.file_utils import is_pdf_file
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -63,7 +64,7 @@ class FileManager:
                 moved_parts.append((dst_thumb, src_thumb))
 
             # 画像ディレクトリを移動
-            book_name = os.path.splitext(item)[0] if item.lower().endswith('.pdf') else item
+            book_name = os.path.splitext(item)[0] if is_pdf_file(item) else item
             src_img = os.path.join(dirs["img"], src_path, book_name)
             dst_img = os.path.join(dirs["img"], dst_path, book_name)
 

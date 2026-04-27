@@ -2,7 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
-import { useFavorites, useSortedPdfs, useBookMeta, useAutoFillAuthors, useLibraryFilter, useToast } from '../../hooks';
+import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
+import { useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast } from '../../hooks';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -64,8 +65,6 @@ export function LibraryPanel() {
         recordView(currentPath, name);
         onPdfClick(name);
     }, [recordView, currentPath, onPdfClick]);
-    const { jobStatus: autoFillStatus, startAutoFill } = useAutoFillAuthors(currentSource, refreshMeta);
-    const [autoFillMode, setAutoFillMode] = useState<'missing_only' | 'unknown_only' | 'overwrite_all'>('unknown_only');
     const { toasts, showToast, dismissToast } = useToast();
 
     const handleRegenThumb = useCallback(async (name: string) => {
@@ -161,75 +160,7 @@ export function LibraryPanel() {
                 onMergePdfs={handleMergePdfs}
             />
 
-            {/* サークル名自動登録バー */}
-            <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center gap-3 min-h-[40px]">
-                {autoFillStatus.status !== 'running' && (
-                    <>
-                        <button
-                            onClick={async () => {
-                                try {
-                                    await startAutoFill(autoFillMode);
-                                } catch (e: unknown) {
-                                    showToast(
-                                        e instanceof Error ? e.message : '自動登録の開始に失敗しました。Ollama と SearXNG が起動しているか確認してください。',
-                                        'error'
-                                    );
-                                }
-                            }}
-                            className="text-xs px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shrink-0"
-                        >
-                            サークル名自動登録
-                        </button>
-                        <div className="flex items-center gap-3">
-                            {(
-                                [
-                                    { value: 'missing_only', label: '未登録のみ' },
-                                    { value: 'unknown_only', label: '作者不明のみ' },
-                                    { value: 'overwrite_all', label: '全件上書き' },
-                                ] as const
-                            ).map(({ value, label }) => (
-                                <label key={value} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
-                                    <input
-                                        type="radio"
-                                        name="autoFillMode"
-                                        value={value}
-                                        checked={autoFillMode === value}
-                                        onChange={() => setAutoFillMode(value)}
-                                        className="accent-indigo-600"
-                                    />
-                                    {label}
-                                </label>
-                            ))}
-                        </div>
-                    </>
-                )}
-                {autoFillStatus.status === 'running' && (
-                    <div className="flex-1 flex items-center gap-3">
-                        <div className="flex-1">
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1 truncate">
-                                {autoFillStatus.done} / {autoFillStatus.total} 件 — {autoFillStatus.current}
-                            </div>
-                            <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                                    style={{ width: autoFillStatus.total > 0 ? `${(autoFillStatus.done / autoFillStatus.total) * 100}%` : '0%' }}
-                                />
-                            </div>
-                        </div>
-                        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">処理中…</span>
-                    </div>
-                )}
-                {autoFillStatus.status === 'done' && (
-                    <span className="text-xs text-green-600 dark:text-green-400 ml-2">
-                        完了 — {autoFillStatus.done} 件登録、{autoFillStatus.skipped} 件スキップ
-                    </span>
-                )}
-                {autoFillStatus.status === 'error' && (
-                    <span className="text-xs text-red-500 dark:text-red-400 truncate ml-2">
-                        エラー: {autoFillStatus.error}
-                    </span>
-                )}
-            </div>
+            <AutoFillAuthorsBar source={currentSource} onComplete={refreshMeta} />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">

@@ -98,7 +98,12 @@ def run_auto_fill(source: str, mode: str) -> None:
 
             author = resolve_author(title, source)
             key = make_key(rel_path, filename)
-            update_meta_locked(source, lambda m, k=key, a=author: m.update({k: {"authors": [a]}}))
+
+            # 既存の view_count / last_viewed_at を保持して authors のみ更新する
+            def _apply(m, k=key, a=author):
+                existing = m.get(k, {})
+                m[k] = {**existing, "authors": [a]}
+            update_meta_locked(source, _apply)
 
             state.results.append({"title": title, "author": author})
             state.done += 1

@@ -76,7 +76,7 @@ export function ReaderHeader({
 
     return (
         <div
-            className={`fixed top-0 left-0 right-0 h-14 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-50 transition-transform duration-300 ${
+            className={`fixed top-0 left-0 right-0 h-14 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-header transition-transform duration-300 ${
                 !showHeader ? '-translate-y-full' : 'translate-y-0'
             }`}
             onMouseLeave={onMouseLeave}
