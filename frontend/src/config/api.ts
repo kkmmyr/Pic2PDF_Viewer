@@ -1,9 +1,12 @@
 /**
  * API設定
- * 開発環境と本番環境で切り替え可能
+ * 本番ビルド時は同一オリジン配信（dist 統合モード）のため空文字。
+ * 開発時は VITE_API_URL または localhost:8000 を使用。
  */
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+    BASE_URL: import.meta.env.PROD
+        ? ''
+        : (import.meta.env.VITE_API_URL || 'http://localhost:8000'),
 } as const;
 
 import { LibrarySource } from '../types';

@@ -43,6 +43,9 @@ KINDLE_NOVEL_IMAGES_DIR    = os.path.join(KINDLE_NOVEL_DIR, "images")
 # OCR 起動スクリプト
 BATCH_OCR_LAUNCHER = os.path.join(PROJECT_ROOT, "kindle-pdf", "start_batch_ocr.bat")
 
+# フロントエンド配信ディレクトリ（リリースモード用）
+FRONTEND_DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
+
 # Gemma 4 ツールディレクトリ（web_extract モジュールの場所）
 # .env の GEMMA_TOOL_DIR で上書き可能
 GEMMA_TOOL_DIR: str = os.environ.get("GEMMA_TOOL_DIR", r"D:\61.tool\Gemma 4")
