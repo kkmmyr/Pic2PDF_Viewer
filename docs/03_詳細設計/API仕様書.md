@@ -200,7 +200,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 **クエリパラメータ**:
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
-- `mode` (オプション) — `missing_only`(default: `unknown_only`) / `unknown_only` / `overwrite_all`
+- `mode` (オプション、default: `unknown_only`) — 処理対象の絞り込み条件
   - `missing_only`: 作者名エントリが未登録の書籍のみ処理
   - `unknown_only`: 「作者不明」または未登録の書籍を処理（デフォルト）
   - `overwrite_all`: 全件を上書き処理
@@ -237,35 +237,58 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ### `GET /api/meta/auto-fill/test`
-1件分の自動登録をデバッグ実行する。ジョブを起動せず同期的に結果を返す。
+1件分の自動登録をデバッグ実行する。ジョブを起動せず同期的に、各ステップ（DLsite/Fanza 直接検索 / 汎用クエリへのフォールバック / Gemma 抽出結果）の中間状態を返す。SearXNG・Gemma の挙動確認用。
 
 **クエリパラメータ**:
 - `title` — テスト対象の書籍タイトル
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
 
-**レスポンス**: `{"title": "book_title", "author": "作者A"}`
+**レスポンス例** (generated ソース):
+```json
+{
+  "title": "サンプルタイトル",
+  "source": "generated",
+  "direct_query": "サンプルタイトル site:dmm.co.jp OR site:dlsite.com",
+  "direct_searxng_hit": true,
+  "direct_searxng_snippets": "...検索結果スニペット先頭500文字...",
+  "direct_gemma_raw": "サークル名候補",
+  "direct_result": "サークル名候補",
+  "final": "サークル名候補",
+  "used_fallback": false
+}
+```
+
+汎用クエリへフォールバックする場合は加えて `query` / `extract_target` / `searxng_hit` / `searxng_snippets` / `gemma_raw` フィールドが含まれる。
 
 ---
 
 ### `GET /api/meta`
-指定ソースの書籍メタデータ（作者名）を全件取得する。
+指定ソースの書籍メタデータを全件取得する。各エントリは作者名・閲覧回数・最終閲覧時刻を含む。
 
 **クエリパラメータ**:
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
 
-**レスポンス**:
+**レスポンス例**:
 ```json
 {
-  "book.pdf": { "authors": ["作者A"] },
-  "subdir/another.pdf": { "authors": ["作者A", "作者B"] }
+  "book.pdf": {
+    "authors": ["作者A"],
+    "view_count": 5,
+    "last_viewed_at": 1714200000.0
+  },
+  "subdir/another.pdf": {
+    "authors": ["作者A", "作者B"]
+  }
 }
 ```
 - キー: `"{path}/{filename}"` または `"{filename}"`（path が空の場合）
+- `view_count` / `last_viewed_at` は閲覧記録がある場合のみ含まれる（`POST /api/meta/view` で更新される）。
+- `last_viewed_at` は UNIX タイムスタンプ（秒、float）。
 
 ---
 
 ### `PATCH /api/meta`
-1冊または複数冊の作者名を上書き保存する。
+1冊または複数冊の作者名を上書き保存する。閲覧履歴等の他フィールドは保持される。
 
 **リクエストボディ**:
 ```json
@@ -277,9 +300,39 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 }
 ```
 - `names` — 更新対象のファイル名リスト（複数指定で一括更新）
-- `authors` — 上書きする作者名リスト（空配列の場合はエントリを削除）
+- `authors` — 上書きする作者名リスト
+
+**マージ規則**:
+- `authors` が非空: 既存エントリの `view_count` / `last_viewed_at` を **保持** し、`authors` のみを上書き。
+- `authors` が空配列 (`[]`): `view_count` 等の他フィールドが残っていれば `authors: []` で残す。他フィールドが無ければエントリ自体を削除。
 
 **レスポンス**: `{"message": "Updated", "updated_count": 2}`
+
+---
+
+### `POST /api/meta/view`
+書籍の閲覧を記録する。`last_viewed_at` は呼び出し毎に常に更新されるが、`view_count` は前回の閲覧から `VIEW_COUNT_DEBOUNCE_SEC = 300`（5分）以上経過した場合のみ +1 される（連打抑制）。`authors` 等の他フィールドは保持される。
+
+**リクエストボディ**:
+```json
+{
+  "path": "current/relative/path",
+  "name": "book.pdf",
+  "source": "generated"
+}
+```
+
+**レスポンス**:
+```json
+{
+  "view_count": 6,
+  "last_viewed_at": 1714200300.5,
+  "incremented": true
+}
+```
+- `incremented`: 連打抑制によりカウントが据え置かれた場合は `false`、+1 した場合は `true`。
+
+**用途**: ライブラリ画面で書籍カードをクリックした瞬間にフロントエンドが呼び出す。「最近見た順」ソート (`recent_view`) と「よく見る順」ソート (`view_desc`) のためのデータを蓄積する。
 
 ---
 
