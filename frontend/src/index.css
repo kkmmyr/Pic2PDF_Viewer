@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ----------------------------------------------------------------
+ * ネイティブフォーム要素のダークモード対応。
+ *
+ * <select> のドロップダウンメニュー（<option> 要素）はブラウザ任せの
+ * ネイティブ UI で描画されるため Tailwind の `dark:` 修飾子だけでは
+ * 暗くならない。html.dark に `color-scheme: dark` を当てると Chromium /
+ * Firefox 共にネイティブ要素を暗いテーマで描画してくれる。
+ *
+ * useDarkMode フックは <html> に `dark` クラスを付ける実装なので
+ * `html.dark` セレクタで制御する。
+ * -------------------------------------------------------------- */
+html.dark {
+    color-scheme: dark;
+}
+html:not(.dark) {
+    color-scheme: light;
+}
