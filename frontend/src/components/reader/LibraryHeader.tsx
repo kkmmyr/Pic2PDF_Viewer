@@ -1,9 +1,16 @@
-import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, X } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
 import { SourceSelector } from './SourceSelector';
+
+export interface LibraryBreadcrumb {
+    kind: 'home' | 'author' | 'series';
+    label: string;
+    /** 指定なしならクリック不可（現在地） */
+    onClick?: () => void;
+}
 
 interface LibraryHeaderProps {
     currentPath: string;
@@ -16,10 +23,10 @@ interface LibraryHeaderProps {
     tagFilter: string;
     allAuthors: string[];
     allTags: string[];
-    /** ライブラリの集約モード（none / series / author） */
+    /** ライブラリの集約モード（none / series / author / author-then-series） */
     groupMode: GroupMode;
-    /** シリーズドリルダウン中のチップ表示用情報。null なら非表示 */
-    seriesFilterChip: { id: string; title: string } | null;
+    /** ドリルダウン中のパンくず（空配列なら非表示）。先頭から順に並び、最後の要素は現在地 */
+    breadcrumbs: LibraryBreadcrumb[];
     /** 非表示書籍を表示するモード（ゴミ箱モード） */
     showHidden: boolean;
     onUpClick: () => void;
@@ -37,7 +44,6 @@ interface LibraryHeaderProps {
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
-    onClearSeriesFilter: () => void;
     onToggleShowHidden: () => void;
 }
 
@@ -53,7 +59,7 @@ export function LibraryHeader({
     allAuthors,
     allTags,
     groupMode,
-    seriesFilterChip,
+    breadcrumbs,
     showHidden,
     onUpClick,
     onSourceChange,
@@ -70,7 +76,6 @@ export function LibraryHeader({
     onAuthorFilterChange,
     onTagFilterChange,
     onGroupModeChange,
-    onClearSeriesFilter,
     onToggleShowHidden,
 }: LibraryHeaderProps) {
     return (
@@ -98,6 +103,8 @@ export function LibraryHeader({
                             tagFilter={tagFilter}
                             allAuthors={allAuthors}
                             allTags={allTags}
+                            // パンくず表示中は作者 select を隠して操作をパンくずに集約する
+                            hideAuthorSelect={breadcrumbs.length > 0}
                             onSearchChange={onSearchChange}
                             onAuthorFilterChange={onAuthorFilterChange}
                             onTagFilterChange={onTagFilterChange}
@@ -208,22 +215,8 @@ export function LibraryHeader({
                                 <option value="none">グループ化なし</option>
                                 <option value="series">シリーズで</option>
                                 <option value="author">作者で</option>
+                                <option value="author-then-series">作者 → シリーズで</option>
                             </select>
-                        </div>
-                    )}
-
-                    {!isSelectionMode && seriesFilterChip && (
-                        <div className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700">
-                            <span className="truncate max-w-[180px]" title={seriesFilterChip.title}>
-                                シリーズ: {seriesFilterChip.title}
-                            </span>
-                            <button
-                                onClick={onClearSeriesFilter}
-                                className="hover:bg-purple-200 dark:hover:bg-purple-800/60 rounded p-0.5"
-                                title="シリーズフィルターを解除"
-                            >
-                                <X className="w-3 h-3" />
-                            </button>
                         </div>
                     )}
 
@@ -249,6 +242,36 @@ export function LibraryHeader({
                     <SourceSelector currentSource={currentSource} onSourceChange={onSourceChange} />
                 </div>
             </div>
+
+            {/* ドリルダウン中のパンくず（フィルター適用時のみ表示） */}
+            {!isSelectionMode && breadcrumbs.length > 0 && (
+                <div className="px-4 py-1.5 flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 border-t border-gray-100 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-900/40">
+                    {breadcrumbs.map((crumb, i) => {
+                        const isLast = i === breadcrumbs.length - 1;
+                        const Icon = crumb.kind === 'home' ? Home : crumb.kind === 'author' ? User : Library;
+                        const labelEl = (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${
+                                isLast
+                                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium'
+                                    : crumb.onClick
+                                        ? 'hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer'
+                                        : ''
+                            }`}>
+                                <Icon className="w-3.5 h-3.5" />
+                                <span className="truncate max-w-[180px]">{crumb.label}</span>
+                            </span>
+                        );
+                        return (
+                            <span key={`${crumb.kind}-${i}`} className="inline-flex items-center gap-1.5">
+                                {i > 0 && <ChevronRight className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" />}
+                                {crumb.onClick && !isLast
+                                    ? <button onClick={crumb.onClick}>{labelEl}</button>
+                                    : labelEl}
+                            </span>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

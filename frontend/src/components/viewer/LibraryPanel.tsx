@@ -144,9 +144,16 @@ export function LibraryPanel() {
         meta,
     });
 
-    // ドリルダウン中（authorFilter or seriesFilter 適用中）はグループ化を無効化する。
-    // 「同じ作者だけの一覧」を「作者単位で集約」してさらに 1 枚にすると意味がないため。
-    const effectiveGroupMode: GroupMode = (authorFilter || seriesFilter) ? 'none' : groupMode;
+    // 集約モードの有効値を計算する。
+    // - シリーズドリルダウン中（seriesFilter）はフラット
+    // - 「作者 → シリーズ」モード時は、authorFilter の有無で 1 階層と 2 階層を切替
+    // - 単純な author / series モードでドリルダウン中は集約を無効化
+    const effectiveGroupMode: GroupMode =
+        seriesFilter
+            ? 'none'
+            : groupMode === 'author-then-series'
+                ? (authorFilter ? 'series' : 'author')
+                : (authorFilter ? 'none' : groupMode);
 
     // 集約: シリーズ / 作者 / なし。none のときは filteredPdfs をそのまま返す
     const grouped = useLibraryGrouping({
@@ -157,14 +164,42 @@ export function LibraryPanel() {
     });
 
     // シリーズフィルター中の表示用チップ情報（タイトルは meta から引く）
-    const seriesFilterChip = seriesFilter
-        ? {
-              id: seriesFilter,
-              title:
-                  Object.values(meta).find(e => e.series_id === seriesFilter)?.series_title
-                  ?? 'シリーズ',
-          }
+    const seriesFilterTitle = seriesFilter
+        ? (Object.values(meta).find(e => e.series_id === seriesFilter)?.series_title ?? 'シリーズ')
         : null;
+
+    // ドリルダウン中はパンくずを表示する。
+    // 各クリックハンドラは setSearchParams を 1 回で済ませて履歴ノイズを抑える。
+    const clearAllDrilldown = useCallback(() => {
+        const next = new URLSearchParams(searchParams);
+        next.delete('author');
+        next.delete('series');
+        setSearchParams(next);
+    }, [searchParams, setSearchParams]);
+
+    type Crumb = { kind: 'home' | 'author' | 'series'; label: string; onClick?: () => void };
+    const breadcrumbs: Crumb[] = (() => {
+        if (!authorFilter && !seriesFilter) return [];
+        const items: Crumb[] = [
+            { kind: 'home', label: 'ライブラリ', onClick: clearAllDrilldown },
+        ];
+        if (authorFilter) {
+            items.push({
+                kind: 'author',
+                label: authorFilter,
+                // 作者階層に戻る = seriesFilter のみクリア（authorFilter は維持）。現在地ならクリック不可
+                onClick: seriesFilter ? () => setSeriesFilter('') : undefined,
+            });
+        }
+        if (seriesFilter) {
+            items.push({
+                kind: 'series',
+                label: seriesFilterTitle ?? 'シリーズ',
+                // 現在地（クリック不可）
+            });
+        }
+        return items;
+    })();
 
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
@@ -244,7 +279,7 @@ export function LibraryPanel() {
                 allAuthors={allAuthors}
                 allTags={allTags}
                 groupMode={groupMode}
-                seriesFilterChip={seriesFilterChip}
+                breadcrumbs={breadcrumbs}
                 showHidden={showHidden}
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
@@ -261,7 +296,6 @@ export function LibraryPanel() {
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
                 onGroupModeChange={handleGroupModeChange}
-                onClearSeriesFilter={() => setSeriesFilter('')}
                 onToggleShowHidden={handleToggleShowHidden}
             />
 

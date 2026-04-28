@@ -6,6 +6,8 @@ interface HeaderSearchBarProps {
     tagFilter: string;
     allAuthors: string[];
     allTags: string[];
+    /** ドリルダウン中はパンくずに集約するため作者 select を隠す */
+    hideAuthorSelect?: boolean;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
@@ -17,6 +19,7 @@ export function HeaderSearchBar({
     tagFilter,
     allAuthors,
     allTags,
+    hideAuthorSelect = false,
     onSearchChange,
     onAuthorFilterChange,
     onTagFilterChange,
@@ -34,7 +37,7 @@ export function HeaderSearchBar({
                 />
             </div>
 
-            {allAuthors.length > 0 && (
+            {allAuthors.length > 0 && !hideAuthorSelect && (
                 <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                     <User className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
                     <select

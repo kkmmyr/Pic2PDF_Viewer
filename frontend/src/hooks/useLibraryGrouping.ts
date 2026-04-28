@@ -1,7 +1,15 @@
 import { useMemo } from 'react';
 import type { PdfFile, BookMetaMap } from '../types';
 
-export type GroupMode = 'none' | 'series' | 'author';
+/**
+ * ライブラリの集約モード:
+ * - `none`: フラット表示
+ * - `series`: シリーズ単位で集約
+ * - `author`: 作者単位で集約
+ * - `author-then-series`: 2 階層モード。`useLibraryGrouping` 自体は `'none' | 'series' | 'author'`
+ *   しか受け取らないため、LibraryPanel 側で階層に応じて `effectiveGroupMode` に変換する。
+ */
+export type GroupMode = 'none' | 'series' | 'author' | 'author-then-series';
 
 export interface GroupBadge {
     /** バッジに表示するメンバー数 */
