@@ -19,3 +19,22 @@ html.dark {
 html:not(.dark) {
     color-scheme: light;
 }
+
+/* ----------------------------------------------------------------
+ * <option> のドロップダウン背景を明示。
+ *
+ * `color-scheme` だけでは <select> 自身に当たっている Tailwind の
+ * `bg-purple-50 dark:bg-purple-900/30` 等の背景色が <option> にも継承され、
+ * 「ライトモード薄ピンク背景 + color-scheme=dark の白文字」で読めなくなる。
+ * 各 select に option クラスを足す代わりに、グローバル CSS で統一する。
+ *
+ * 色は Tailwind の gray-100 / gray-800 / gray-900 と揃える。
+ * -------------------------------------------------------------- */
+html.dark select option {
+    background-color: rgb(31, 41, 55);  /* gray-800 */
+    color: rgb(243, 244, 246);          /* gray-100 */
+}
+html:not(.dark) select option {
+    background-color: rgb(255, 255, 255);
+    color: rgb(17, 24, 39);             /* gray-900 */
+}
