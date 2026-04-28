@@ -263,7 +263,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ### `GET /api/meta`
-指定ソースの書籍メタデータを全件取得する。各エントリは作者名・タグ・閲覧回数・最終閲覧時刻を含む。
+指定ソースの書籍メタデータを全件取得する。各エントリは作者名・タグ・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグなどを含む。
 
 **クエリパラメータ**:
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
@@ -275,16 +275,22 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
     "authors": ["作者A"],
     "tags": ["ジャンル1", "気分A"],
     "view_count": 5,
-    "last_viewed_at": 1714200000.0
+    "last_viewed_at": 1714200000.0,
+    "series_id": "abc12345",
+    "series_title": "シリーズタイトル",
+    "series_index": 1.5
   },
   "subdir/another.pdf": {
-    "authors": ["作者A", "作者B"]
+    "authors": ["作者A", "作者B"],
+    "hidden": true
   }
 }
 ```
 - キー: `"{path}/{filename}"` または `"{filename}"`（path が空の場合）
-- `tags` / `view_count` / `last_viewed_at` は登録があった場合のみ含まれる。
+- すべての追加フィールド（`tags` / `view_count` / `last_viewed_at` / `series_id` / `series_title` / `series_index` / `hidden`）は登録があった場合のみ含まれる任意フィールド。
 - `last_viewed_at` は UNIX タイムスタンプ（秒、float）。
+- `series_index` は `float`（小数巻 `2.5` 等に対応）。
+- `hidden=true` の書籍は通常モードでは UI 上非表示（API レスポンスには含まれる）。
 
 ---
 
