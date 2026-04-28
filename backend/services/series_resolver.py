@@ -4,17 +4,23 @@
 シリーズとしてグループ化し、`meta.json` に `series_id` / `series_title` /
 `series_index` を書き戻す。
 
-Phase 1: ルールベースのみ。Phase 2 で Gemma 補助を追加予定（現時点では未使用）。
+Phase 1: ルールベース。
+Phase 2: `use_gemma=True` 指定時、ルール判定後に同作者でシリーズ未割当の
+書籍を Gemma に問い合わせて既存シリーズに追加するかを判定する。
 """
 import hashlib
 import os
 import re
+import sys
 import threading
 from dataclasses import dataclass, field
 
-from config import get_dirs_by_source
+from config import GEMMA_TOOL_DIR, get_dirs_by_source
 from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
 from utils.file_utils import is_pdf_file
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 VALID_SOURCES = ("generated", "kindle", "novel")
 SERIES_MIN_PREFIX_LEN = 5
@@ -55,6 +61,55 @@ def get_state(source: str) -> SeriesResolveState:
 def reset_state(source: str) -> None:
     with _states_lock:
         _states[source] = SeriesResolveState(status="running")
+
+
+# ---------------------------------------------------------------------------
+# Gemma 補助（Phase 2）
+# ---------------------------------------------------------------------------
+
+def _ensure_ollama_client():
+    """Gemma 4 ツールの ollama_client.call_ollama をインポートして返す。
+
+    失敗時は None。`author_resolver._ensure_web_extract` と同じパターンで
+    backend の `config` モジュールが Gemma 側の `config` と衝突しないよう退避する。
+    """
+    lib_dir = os.path.join(GEMMA_TOOL_DIR, "lib")
+    for p in (GEMMA_TOOL_DIR, lib_dir):
+        if p not in sys.path:
+            sys.path.insert(0, p)
+
+    saved_config = sys.modules.pop("config", None)
+    try:
+        from ollama_client import call_ollama  # type: ignore[import]
+        return call_ollama
+    except ImportError:
+        return None
+    finally:
+        if saved_config is not None:
+            sys.modules["config"] = saved_config
+
+
+def _ask_gemma_is_same_series(
+    call_ollama, reference_titles: list[str], candidate_title: str
+) -> bool:
+    """Gemma に「candidate_title は reference_titles と同じシリーズか？」を問う。
+
+    `call_ollama` は `_ensure_ollama_client()` の戻り値。応答が "YES" で
+    始まれば True を返す。タイムアウト・例外時は False（黙って除外）。
+    """
+    refs = "\n".join(f"- {t}" for t in reference_titles[:5])
+    prompt = (
+        f"以下のタイトルは同じシリーズの書籍ですか？YES または NO のいずれかだけで答えてください。\n\n"
+        f"シリーズの代表タイトル:\n{refs}\n\n"
+        f"判定対象:\n- {candidate_title}\n\n"
+        f"YES または NO:"
+    )
+    try:
+        response = call_ollama(prompt, source="series_resolver")
+        return str(response).strip().upper().startswith("YES")
+    except Exception as e:
+        logger.warning("Gemma series check failed for %r: %s", candidate_title, e)
+        return False
 
 
 def _parse_volume_index(suffix: str) -> int | None:
@@ -189,8 +244,91 @@ def _detect_series_in_group(
     return result
 
 
-def run_resolve(source: str) -> None:
-    """対象ソースのシリーズ判定を実行し、`meta.json` に書き戻す。"""
+def _augment_with_gemma(
+    source: str,
+    groups: dict[tuple[str, ...], list[tuple[str, str, str]]],
+    created_series: set[str],
+    state: SeriesResolveState,
+) -> None:
+    """ルール判定後に Gemma で曖昧ケースを再評価する。
+
+    各シリーズ（既に series_id が割り当てられたメンバー集合）に対し、
+    同作者でシリーズ未割当の書籍を Gemma に問い合わせる。
+    """
+    call_ollama = _ensure_ollama_client()
+    if call_ollama is None:
+        logger.warning("Gemma client unavailable; skipping use_gemma phase")
+        return
+
+    # 最新の meta を読み直して、ルール判定で割り当てられたシリーズ情報を取得
+    meta = load_meta(source)
+
+    # series_id ごとのメンバー（タイトル・キー・現在の最大 index）を集計
+    series_members: dict[str, dict] = {}
+    for key, entry in meta.items():
+        sid = entry.get("series_id")
+        if not sid:
+            continue
+        title = os.path.splitext(os.path.basename(key))[0]
+        m = series_members.setdefault(sid, {
+            "titles": [],
+            "max_index": 0,
+            "series_title": entry.get("series_title", ""),
+            "authors_key": tuple(sorted({a.strip() for a in entry.get("authors", []) if a.strip()})),
+        })
+        m["titles"].append(title)
+        m["max_index"] = max(m["max_index"], int(entry.get("series_index", 0)))
+
+    # 各作者グループから「シリーズ未割当」の書籍を抽出
+    for authors_key, group in groups.items():
+        unassigned = [
+            (rel_path, fname, title)
+            for (rel_path, fname, title) in group
+            if not meta.get(make_key(rel_path, fname), {}).get("series_id")
+        ]
+        if not unassigned:
+            continue
+
+        # この作者の既存シリーズだけを問い合わせ対象にする
+        relevant_series = {
+            sid: m for sid, m in series_members.items() if m["authors_key"] == authors_key
+        }
+        if not relevant_series:
+            continue
+
+        for (rel_path, fname, title) in unassigned:
+            state.current = title
+            for sid, info in relevant_series.items():
+                if not _ask_gemma_is_same_series(call_ollama, info["titles"], title):
+                    continue
+
+                # シリーズに追加（既存 max_index + 1）
+                info["max_index"] += 1
+                next_idx = info["max_index"]
+                info["titles"].append(title)
+                series_title = info["series_title"]
+                target_key = make_key(rel_path, fname)
+
+                def _apply(data: MetaDict, k=target_key, sid_=sid, idx=next_idx, st=series_title) -> None:
+                    existing = dict(data.get(k, {}))
+                    existing["series_id"] = sid_
+                    existing["series_title"] = st
+                    existing["series_index"] = idx
+                    data[k] = existing
+                update_meta_locked(source, _apply)
+
+                created_series.add(sid)
+                state.created = len(created_series)
+                break  # 1 つのシリーズにマッチしたら以降は試さない
+
+
+def run_resolve(source: str, use_gemma: bool = False) -> None:
+    """対象ソースのシリーズ判定を実行し、`meta.json` に書き戻す。
+
+    Args:
+        source: `generated` / `kindle` / `novel`
+        use_gemma: True の場合、ルール判定後に Gemma で曖昧ケースを再評価する。
+    """
     state = get_state(source)
     try:
         books = _collect_books(source)
@@ -235,6 +373,10 @@ def run_resolve(source: str) -> None:
             # 1 グループあたりの最初の書籍タイトルを current に
             state.current = group[0][2] if group else ""
 
+        # Phase 2: Gemma 補助
+        if use_gemma:
+            _augment_with_gemma(source, groups, created_series, state)
+
         # books に作者なしの書籍が含まれている場合は per_group_done < total になる。
         # 最終的に done = total に揃える。
         state.done = state.total
@@ -246,8 +388,8 @@ def run_resolve(source: str) -> None:
         state.current = ""
 
 
-def start_resolve_job(source: str) -> None:
+def start_resolve_job(source: str, use_gemma: bool = False) -> None:
     """シリーズ判定ジョブをバックグラウンドスレッドで起動する。"""
     reset_state(source)
-    thread = threading.Thread(target=run_resolve, args=(source,), daemon=True)
+    thread = threading.Thread(target=run_resolve, args=(source, use_gemma), daemon=True)
     thread.start()

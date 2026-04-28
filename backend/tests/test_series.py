@@ -261,3 +261,111 @@ class TestRunResolve:
         assert meta["Series 1.pdf"]["tags"] == ["タグ1"]
         assert meta["Series 1.pdf"]["view_count"] == 5
         assert meta["Series 1.pdf"]["last_viewed_at"] == 1700000000.0
+
+
+# ---------------------------------------------------------------------------
+# Gemma 補助（Phase 2）
+# ---------------------------------------------------------------------------
+
+class TestGemmaAugmentation:
+    def test_yes_response_adds_to_existing_series(self, series_env, monkeypatch):
+        """Gemma が YES と答えた書籍は既存シリーズに追加される。"""
+        tmp_path, pdf_dir = series_env
+
+        # 同作者の「鬼滅の刃 1」「鬼滅の刃 2」と「鬼滅の刃 外伝」
+        for name in ("鬼滅の刃 1.pdf", "鬼滅の刃 2.pdf", "鬼滅の刃 外伝.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "鬼滅の刃 1.pdf":   {"authors": ["A"]},
+            "鬼滅の刃 2.pdf":   {"authors": ["A"]},
+            "鬼滅の刃 外伝.pdf": {"authors": ["A"]},
+        })
+
+        # Gemma を YES だけ返すモック関数に差し替え
+        fake_call = lambda prompt, source="series_resolver": "YES"
+        monkeypatch.setattr(
+            "services.series_resolver._ensure_ollama_client",
+            lambda: fake_call,
+        )
+
+        reset_state("generated")
+        run_resolve("generated", use_gemma=True)
+
+        meta = _read_meta(tmp_path)
+        # 外伝も series_id が付与されて既存シリーズに合流する
+        assert meta["鬼滅の刃 外伝.pdf"]["series_id"] == meta["鬼滅の刃 1.pdf"]["series_id"]
+        # series_index は max+1 = 3 になる
+        assert meta["鬼滅の刃 外伝.pdf"]["series_index"] == 3
+
+    def test_no_response_keeps_unassigned(self, series_env, monkeypatch):
+        """Gemma が NO と答えた書籍はシリーズ未割当のまま。"""
+        tmp_path, pdf_dir = series_env
+
+        for name in ("鬼滅の刃 1.pdf", "鬼滅の刃 2.pdf", "進撃の巨人.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "鬼滅の刃 1.pdf": {"authors": ["A"]},
+            "鬼滅の刃 2.pdf": {"authors": ["A"]},
+            "進撃の巨人.pdf": {"authors": ["A"]},
+        })
+
+        fake_call = lambda prompt, source="series_resolver": "NO"
+        monkeypatch.setattr(
+            "services.series_resolver._ensure_ollama_client",
+            lambda: fake_call,
+        )
+
+        reset_state("generated")
+        run_resolve("generated", use_gemma=True)
+
+        meta = _read_meta(tmp_path)
+        # 進撃の巨人はシリーズ未割当のまま
+        assert "series_id" not in meta["進撃の巨人.pdf"]
+
+    def test_gemma_unavailable_does_not_error(self, series_env, monkeypatch):
+        """Gemma クライアントが取得できなくてもジョブ自体は成功する。"""
+        tmp_path, pdf_dir = series_env
+
+        for name in ("Some Book 1.pdf", "Some Book 2.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "Some Book 1.pdf": {"authors": ["A"]},
+            "Some Book 2.pdf": {"authors": ["A"]},
+        })
+
+        # Gemma クライアントがインポート不可な状況を模擬
+        monkeypatch.setattr(
+            "services.series_resolver._ensure_ollama_client",
+            lambda: None,
+        )
+
+        reset_state("generated")
+        run_resolve("generated", use_gemma=True)
+
+        # ルール判定だけは通って、シリーズ化されている
+        meta = _read_meta(tmp_path)
+        assert meta["Some Book 1.pdf"]["series_id"] == meta["Some Book 2.pdf"]["series_id"]
+        state = get_state("generated")
+        assert state.status == "done"
+
+    def test_use_gemma_false_does_not_call(self, series_env, monkeypatch):
+        """use_gemma=False のとき Gemma クライアントは呼ばれない。"""
+        tmp_path, pdf_dir = series_env
+
+        (pdf_dir / "Book A 1.pdf").write_bytes(b"")
+        (pdf_dir / "Book A 2.pdf").write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "Book A 1.pdf": {"authors": ["A"]},
+            "Book A 2.pdf": {"authors": ["A"]},
+        })
+
+        called = []
+        def fake_ensure():
+            called.append(True)
+            return None
+        monkeypatch.setattr("services.series_resolver._ensure_ollama_client", fake_ensure)
+
+        reset_state("generated")
+        run_resolve("generated", use_gemma=False)
+
+        assert called == []  # 一度も呼ばれない

@@ -15,8 +15,11 @@ router = APIRouter()
 
 
 @router.post("/series/resolve")
-def start_series_resolve(source: str = "generated") -> dict:
-    """シリーズ判定ジョブを起動する。"""
+def start_series_resolve(source: str = "generated", use_gemma: bool = False) -> dict:
+    """シリーズ判定ジョブを起動する。
+
+    `use_gemma=true` を指定すると、ルール判定後に Gemma で曖昧ケースを再評価する。
+    """
     if source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
 
@@ -24,8 +27,8 @@ def start_series_resolve(source: str = "generated") -> dict:
     if state.status == "running":
         raise HTTPException(status_code=409, detail="Series resolve job is already running")
 
-    start_resolve_job(source)
-    return {"started": True, "source": source}
+    start_resolve_job(source, use_gemma=use_gemma)
+    return {"started": True, "source": source, "use_gemma": use_gemma}
 
 
 @router.get("/series/resolve/status")

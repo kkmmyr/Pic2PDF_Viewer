@@ -348,8 +348,9 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 **クエリパラメータ**:
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `use_gemma` (オプション、`true` / `false`、default `false`) — ルールベース判定後に Gemma を使った曖昧ケース判定を実行するかどうか。`true` の場合、同作者でシリーズ未割当の書籍（巻数パターンでないが同プレフィックスを持つ「外伝」「番外編」など）を 1 件ずつ Gemma に問い合わせ、`YES` 応答ならシリーズに追加する。
 
-**レスポンス**: `{"started": true, "source": "generated"}`
+**レスポンス**: `{"started": true, "source": "generated", "use_gemma": false}`
 
 **エラー**:
 - `400`: 不正な source
