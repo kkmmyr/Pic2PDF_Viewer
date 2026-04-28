@@ -54,6 +54,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `/refactor-status` | リファクタ計画書の未着手 Phase をサマリ |
 | `/big-files` | 肥大化候補ファイル上位 10 件を表示 |
 | `/check-docs` | 設計書と実装の整合性をクロスチェック |
+| `/audit` | npm audit + uv audit でセキュリティ脆弱性を確認 |
 
 定義は [commands/](commands/) を参照。
 
