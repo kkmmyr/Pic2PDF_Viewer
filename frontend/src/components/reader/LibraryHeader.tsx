@@ -192,10 +192,17 @@ export function LibraryHeader({
                                 value={groupMode}
                                 onChange={(e) => onGroupModeChange(e.target.value as GroupMode)}
                                 title="ライブラリの集約表示"
-                                className={`border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 max-w-[140px] truncate ${
+                                /*
+                                 * select 自身の背景は常に bg-white / dark:bg-gray-800 に固定する。
+                                 * Chromium では <option> の背景色が <select> の bg を継承し、
+                                 * かつ CSS で <option> 個別に上書きできないため、<select> 側で
+                                 * 紫背景にすると <option> がダークモードで読めなくなる。
+                                 * 紫強調は border + ring + 文字色で表現する。
+                                 */
+                                className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400 max-w-[140px] truncate ${
                                     groupMode !== 'none'
-                                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700'
-                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                                        ? 'text-purple-700 dark:text-purple-300 border-purple-400 dark:border-purple-600 ring-1 ring-purple-200 dark:ring-purple-800'
+                                        : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
                                 }`}
                             >
                                 <option value="none">グループ化なし</option>
