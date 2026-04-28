@@ -12,6 +12,8 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 |---|---|:---:|---|
 | [CLAUDE.md](CLAUDE.md) | プロジェクトの最上位指示。MCP / 設計書リンク / 起動方法 | ✅ | 設計書追加・MCP 追加・起動方法変更時 |
 | [rules/coding_conventions.md](rules/coding_conventions.md) | コーディング規約（Python / TypeScript / 共通の振る舞い縛り） | ✅ | リファクタリングで新しい共通パターンが確立したら追記 |
+| [rules/git_workflow.md](rules/git_workflow.md) | git 運用ルール（コミット粒度・メッセージ書式・危険操作禁止） | ✅ | 運用方針を変えたとき |
+| [rules/test_strategy.md](rules/test_strategy.md) | テスト方針（必須対象・パターン・やらないこと） | ✅ | 新しいテストパターンが確立したら追記 |
 | [commands/](commands/) | スラッシュコマンド定義（`/<filename>` で呼べる） | ❌ | 頻用作業を発見したら新規作成 |
 | [hooks/check_docs_updated.sh](hooks/check_docs_updated.sh) | PreToolUse: 実装変更前に docs/ が更新されているか確認 | ❌ (実行のみ) | 判定ロジック改善時 |
 | [hooks/remind_tests.sh](hooks/remind_tests.sh) | PostToolUse: 大きめの実装変更時にテスト実行を促す | ❌ (実行のみ) | 対象ファイル拡張時 |
@@ -51,6 +53,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `/typecheck` | TypeScript 型チェック (`tsc --noEmit`) |
 | `/refactor-status` | リファクタ計画書の未着手 Phase をサマリ |
 | `/big-files` | 肥大化候補ファイル上位 10 件を表示 |
+| `/check-docs` | 設計書と実装の整合性をクロスチェック |
 
 定義は [commands/](commands/) を参照。
 
