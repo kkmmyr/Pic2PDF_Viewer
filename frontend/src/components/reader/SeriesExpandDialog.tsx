@@ -7,10 +7,16 @@ interface SeriesExpandDialogProps {
     open: boolean;
     seriesTitle: string;
     members: PdfFile[];
-    /** 各メンバーの巻数を name から引く */
+    /** 各メンバーの巻数を name から引く（小数巻あり） */
     getIndex: (name: string) => number;
     onClose: () => void;
     onPdfClick: (name: string) => void;
+}
+
+/** 巻数を表示用文字列に整形する（整数は整数のまま、小数は小数点を表示）。 */
+function formatVolumeIndex(n: number): string {
+    if (n <= 0) return '';
+    return Number.isInteger(n) ? String(n) : String(n);  // n.toString() は 2.5 → "2.5"
 }
 
 /**
@@ -45,7 +51,7 @@ export function SeriesExpandDialog({
                                     {idx > 0 && (
                                         <div className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow">
                                             <Library className="w-3 h-3" />
-                                            {idx}
+                                            {formatVolumeIndex(idx)}
                                         </div>
                                     )}
                                 </div>

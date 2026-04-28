@@ -163,6 +163,55 @@ export function useBookMeta(source: string) {
         return updateMeta(path, names, { hidden });
     }, [updateMeta]);
 
+    /**
+     * 書籍を既存または新規シリーズに割り当てる。
+     * - `id` 省略時はバックエンドで自動生成（同タイトル + 同作者なら同じ id）
+     * - 戻り値は確定した `series_id`
+     */
+    const assignSeries = useCallback(async (
+        path: string,
+        names: string[],
+        params: { title: string; index: number; id?: string }
+    ): Promise<string> => {
+        const res = await apiClient.post<unknown, { id: string; updated_count: number }>(
+            API_ENDPOINTS.SERIES_ASSIGN,
+            { path, names, ...params, source }
+        );
+        const sid = res.id;
+        // ローカル状態を即時更新
+        setMeta(prev => {
+            const next = { ...prev };
+            for (const name of names) {
+                const key = makeKey(path, name);
+                const existing = next[key] ?? { authors: [] };
+                next[key] = {
+                    ...existing,
+                    series_id: sid,
+                    series_title: params.title,
+                    series_index: params.index,
+                };
+            }
+            return next;
+        });
+        return sid;
+    }, [source, makeKey]);
+
+    /** 書籍をシリーズから外す（series_* フィールドを削除）。 */
+    const unassignSeries = useCallback(async (path: string, names: string[]): Promise<void> => {
+        await apiClient.post(API_ENDPOINTS.SERIES_UNASSIGN, { path, names, source });
+        setMeta(prev => {
+            const next = { ...prev };
+            for (const name of names) {
+                const key = makeKey(path, name);
+                const existing = next[key];
+                if (!existing) continue;
+                const { series_id: _sid, series_title: _st, series_index: _si, ...rest } = existing;
+                next[key] = rest as BookMetaEntry;
+            }
+            return next;
+        });
+    }, [source, makeKey]);
+
     /** このソースに登録されている全作者名（重複排除・ソート済み）*/
     const allAuthors: string[] = [...new Set(
         Object.values(meta).flatMap(e => e.authors)
@@ -173,12 +222,26 @@ export function useBookMeta(source: string) {
         Object.values(meta).flatMap(e => e.tags ?? [])
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
+    /** このソースに登録されている全シリーズの一覧（id, title, 作者集合付き、タイトル順） */
+    const allSeries: { id: string; title: string }[] = (() => {
+        const map = new Map<string, string>();
+        for (const e of Object.values(meta)) {
+            if (e.series_id && !map.has(e.series_id)) {
+                map.set(e.series_id, e.series_title ?? '');
+            }
+        }
+        return Array.from(map.entries())
+            .map(([id, title]) => ({ id, title }))
+            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+    })();
+
     return {
         meta,
         getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView,
         updateAuthors, updateTags, updateMeta, setHidden,
-        allAuthors, allTags,
+        assignSeries, unassignSeries,
+        allAuthors, allTags, allSeries,
         refreshMeta: fetchMeta,
     };
 }

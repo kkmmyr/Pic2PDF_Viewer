@@ -2,14 +2,20 @@
 
 `POST /api/series/resolve` でジョブ起動、`GET /api/series/resolve/status` で進捗取得。
 auto-fill と同じ非同期ジョブパターン。
+
+手動編集 API: `POST /api/series/assign` / `POST /api/series/unassign`。
 """
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
+from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.series_resolver import (
     VALID_SOURCES,
+    _stable_series_id,
     get_state,
     start_resolve_job,
 )
+from utils.path_utils import validate_safe_name, validate_safe_path
 
 router = APIRouter()
 
@@ -46,3 +52,88 @@ def get_series_resolve_status(source: str = "generated") -> dict:
         "current": state.current,
         "error": state.error,
     }
+
+
+# ---------------------------------------------------------------------------
+# 手動編集 API（Phase 4-C）
+# ---------------------------------------------------------------------------
+
+class AssignSeriesRequest(BaseModel):
+    """書籍を既存または新規シリーズに割り当てるリクエスト。"""
+    path: str = ""
+    names: list[str]
+    title: str
+    index: float
+    id: str | None = None  # 省略時はバックエンドで生成
+    source: str = "generated"
+
+
+class UnassignSeriesRequest(BaseModel):
+    """書籍をシリーズから外すリクエスト。"""
+    path: str = ""
+    names: list[str]
+    source: str = "generated"
+
+
+@router.post("/series/assign")
+def assign_series(request: AssignSeriesRequest) -> dict:
+    """書籍を既存または新規シリーズに割り当てる（手動編集）。"""
+    if request.source not in VALID_SOURCES:
+        raise HTTPException(status_code=400, detail="Invalid source")
+    if not request.title.strip():
+        raise HTTPException(status_code=400, detail="title must not be empty")
+    if not request.names:
+        raise HTTPException(status_code=400, detail="names must not be empty")
+
+    validate_safe_path(request.path, param_name="path")
+    for name in request.names:
+        validate_safe_name(name, param_name="name")
+
+    # id 省略時は title と「対象書籍のうち最初の書籍の作者集合」から生成
+    series_id = request.id
+
+    def _apply(data: MetaDict) -> None:
+        nonlocal series_id
+        if series_id is None:
+            # 最初の書籍の authors を見て id を生成（同じ title + 同じ作者なら同じ id になる）
+            first_key = make_key(request.path, request.names[0])
+            first_authors = data.get(first_key, {}).get("authors") or []
+            authors_key = tuple(sorted({a.strip() for a in first_authors if a.strip()}))
+            series_id = _stable_series_id(request.title.strip(), authors_key)
+
+        for name in request.names:
+            key = make_key(request.path, name)
+            existing = dict(data.get(key, {}))
+            existing["series_id"] = series_id
+            existing["series_title"] = request.title.strip()
+            existing["series_index"] = request.index
+            data[key] = existing
+
+    update_meta_locked(request.source, _apply)
+    return {"message": "Assigned", "id": series_id, "updated_count": len(request.names)}
+
+
+@router.post("/series/unassign")
+def unassign_series(request: UnassignSeriesRequest) -> dict:
+    """書籍をシリーズから外す（series_* フィールドを削除）。"""
+    if request.source not in VALID_SOURCES:
+        raise HTTPException(status_code=400, detail="Invalid source")
+    if not request.names:
+        raise HTTPException(status_code=400, detail="names must not be empty")
+
+    validate_safe_path(request.path, param_name="path")
+    for name in request.names:
+        validate_safe_name(name, param_name="name")
+
+    def _apply(data: MetaDict) -> None:
+        for name in request.names:
+            key = make_key(request.path, name)
+            existing = data.get(key)
+            if not existing:
+                continue
+            existing.pop("series_id", None)
+            existing.pop("series_title", None)
+            existing.pop("series_index", None)
+
+    update_meta_locked(request.source, _apply)
+    return {"message": "Unassigned", "updated_count": len(request.names)}

@@ -4,6 +4,7 @@ import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer, SeriesExpandDialog 
 import { LibraryDialogs } from './LibraryDialogs';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
+import { SeriesEditDialog } from './SeriesEditDialog';
 import {
     useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
     useSeriesGrouping,
@@ -50,6 +51,7 @@ export function LibraryPanel() {
         () => getStorageJson<boolean>(SHOW_HIDDEN_KEY, false)
     );
     const [expandedSeriesName, setExpandedSeriesName] = useState<string | null>(null);
+    const [seriesEditTarget, setSeriesEditTarget] = useState<string | null>(null);
 
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
     const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
@@ -85,8 +87,9 @@ export function LibraryPanel() {
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
     const {
-        meta, getAuthors, getTags, getViewCount, getLastViewedAt, isHidden,
-        recordView, updateAuthors, updateTags, setHidden, allAuthors, allTags, refreshMeta,
+        meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
+        recordView, updateAuthors, updateTags, setHidden,
+        assignSeries, unassignSeries, allAuthors, allTags, allSeries, refreshMeta,
     } = useBookMeta(currentSource);
     const sortedPdfs = useSortedPdfs(
         pdfs,
@@ -287,6 +290,7 @@ export function LibraryPanel() {
                         onSeriesClick={isGroupedBySeries ? setExpandedSeriesName : undefined}
                         onToggleHidden={handleToggleHiddenOne}
                         showHidden={showHidden}
+                        onEditSeries={setSeriesEditTarget}
                     />
                 </div>
             </div>
@@ -297,6 +301,32 @@ export function LibraryPanel() {
                 getIndex={(name) => meta[currentPath ? `${currentPath}/${name}` : name]?.series_index ?? 0}
                 onClose={() => setExpandedSeriesName(null)}
                 onPdfClick={handlePdfClick}
+            />
+
+            <SeriesEditDialog
+                open={seriesEditTarget !== null}
+                targetName={seriesEditTarget ?? ''}
+                current={seriesEditTarget ? getSeries(currentPath, seriesEditTarget) : null}
+                allSeries={allSeries}
+                onClose={() => setSeriesEditTarget(null)}
+                onAssign={async (params) => {
+                    if (!seriesEditTarget) return;
+                    try {
+                        await assignSeries(currentPath, [seriesEditTarget], params);
+                    } catch (e: unknown) {
+                        showToast(e instanceof Error ? e.message : 'シリーズ割り当てに失敗しました。', 'error');
+                        throw e;
+                    }
+                }}
+                onUnassign={async () => {
+                    if (!seriesEditTarget) return;
+                    try {
+                        await unassignSeries(currentPath, [seriesEditTarget]);
+                    } catch (e: unknown) {
+                        showToast(e instanceof Error ? e.message : 'シリーズ解除に失敗しました。', 'error');
+                        throw e;
+                    }
+                }}
             />
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />

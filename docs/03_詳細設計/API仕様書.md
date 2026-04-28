@@ -364,6 +364,46 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
+### `POST /api/series/assign`
+書籍を既存または新規シリーズに割り当てる（手動編集用）。複数書籍を同時に同じシリーズへ追加できる。
+
+**リクエストボディ**:
+```json
+{
+  "path": "current/relative/path",
+  "names": ["book1.pdf"],
+  "title": "シリーズタイトル",
+  "index": 1.5,
+  "id": "abc12345",
+  "source": "generated"
+}
+```
+- `names` — 対象ファイル名リスト（複数指定可）
+- `title` — シリーズ表示名（必須）
+- `index` — シリーズ内巻数（float、必須、`1.0` / `2.5` 等）
+- `id` — 既存シリーズに追加する場合の `series_id`。**省略時はバックエンドで生成**（`title` + 作者集合のハッシュ）。
+- 他のメタフィールド（authors / tags / view_count 等）は変更しない。
+
+**レスポンス**: `{"message": "Assigned", "id": "abc12345", "updated_count": 1}`
+
+---
+
+### `POST /api/series/unassign`
+書籍をシリーズから外す（series_id / series_title / series_index フィールドを削除する）。
+
+**リクエストボディ**:
+```json
+{
+  "path": "current/relative/path",
+  "names": ["book1.pdf", "book2.pdf"],
+  "source": "generated"
+}
+```
+
+**レスポンス**: `{"message": "Unassigned", "updated_count": 2}`
+
+---
+
 ### `GET /api/series/resolve/status`
 シリーズ判定ジョブの進捗を返す。
 

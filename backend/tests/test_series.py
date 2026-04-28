@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from services.series_resolver import (
     _parse_volume_index,
+    _parse_pair_volume_indexes,
     _common_prefix,
     _detect_series_in_group,
     run_resolve,
@@ -31,22 +32,27 @@ from services.series_resolver import (
 
 class TestParseVolumeIndex:
     @pytest.mark.parametrize("suffix,expected", [
-        (" 1",       1),
-        (" 2",       2),
-        (" 03",      3),
-        (" 第3巻",   3),
-        ("第10巻",   10),
-        (" vol.4",   4),
-        (" Vol 5",   5),
-        (" VOL.06",  6),
-        ("(上)",      1),
-        ("(中)",      2),
-        ("(下)",      3),
-        ("(前)",      1),
-        ("(後)",      2),
-        ("(下)",      3),
-        ("第三巻",   3),
-        ("七",        7),
+        (" 1",       1.0),
+        (" 2",       2.0),
+        (" 03",      3.0),
+        (" 第3巻",   3.0),
+        ("第10巻",   10.0),
+        (" vol.4",   4.0),
+        (" Vol 5",   5.0),
+        (" VOL.06",  6.0),
+        ("(上)",      1.0),
+        ("(中)",      2.0),
+        ("(下)",      3.0),
+        ("(前)",      1.0),
+        ("(後)",      2.0),
+        ("(下)",      3.0),
+        ("第三巻",   3.0),
+        ("七",        7.0),
+        # 小数巻
+        ("2.5",      2.5),
+        (" 4.5",     4.5),
+        (" 0.5",     0.5),
+        ("vol.3.5",  3.5),
     ])
     def test_recognized_patterns(self, suffix, expected):
         assert _parse_volume_index(suffix) == expected
@@ -66,6 +72,34 @@ class TestParseVolumeIndex:
 # ---------------------------------------------------------------------------
 # _common_prefix
 # ---------------------------------------------------------------------------
+
+class TestParsePairVolumeIndexes:
+    """ペア用「巻数なし=1巻」ルールの確認。"""
+
+    def test_blank_with_int_2_treated_as_1(self):
+        # "" と "2" → (1.0, 2.0)
+        assert _parse_pair_volume_indexes("", "2") == (1.0, 2.0)
+        assert _parse_pair_volume_indexes("2", "") == (2.0, 1.0)
+
+    def test_blank_with_int_3_treated_as_1(self):
+        assert _parse_pair_volume_indexes("", "3") == (1.0, 3.0)
+
+    def test_blank_with_fractional_not_applied(self):
+        # 小数巻には適用しない
+        assert _parse_pair_volume_indexes("", "2.5") == (None, 2.5)
+
+    def test_blank_with_int_1_not_applied(self):
+        # 1 巻同士は曖昧なので空 → 1 ルールを適用しない
+        assert _parse_pair_volume_indexes("", "1") == (None, 1.0)
+
+    def test_blank_with_blank(self):
+        assert _parse_pair_volume_indexes("", "") == (None, None)
+
+    def test_normal_pair(self):
+        # 通常の整数巻ペア
+        assert _parse_pair_volume_indexes("1", "2") == (1.0, 2.0)
+        assert _parse_pair_volume_indexes("2", "2.5") == (2.0, 2.5)
+
 
 class TestCommonPrefix:
     def test_basic(self):
@@ -132,6 +166,44 @@ class TestDetectSeriesInGroup:
         ]
         result = _detect_series_in_group(group)
         assert len(result) == 3
+
+    def test_fractional_volume_included(self):
+        """「タイトル 2」と「タイトル 2.5」は同シリーズ判定（小数巻対応）"""
+        group = [
+            ("", "ABCDEFG 1.pdf",   "ABCDEFG 1"),
+            ("", "ABCDEFG 2.pdf",   "ABCDEFG 2"),
+            ("", "ABCDEFG 2.5.pdf", "ABCDEFG 2.5"),
+        ]
+        result = _detect_series_in_group(group)
+        # 3 冊全部メンバーになる
+        assert len(result) == 3
+        indices = sorted(idx for _, (_, idx) in result.items())
+        assert indices == [1.0, 2.0, 2.5]
+
+    def test_no_volume_first_book_treated_as_one(self):
+        """「タイトル」（巻数なし）と「タイトル2」のペア → 前者を 1 巻扱い"""
+        group = [
+            ("", "ABCDEFG.pdf",  "ABCDEFG"),
+            ("", "ABCDEFG2.pdf", "ABCDEFG2"),
+            ("", "ABCDEFG3.pdf", "ABCDEFG3"),
+        ]
+        result = _detect_series_in_group(group)
+        assert len(result) == 3
+        # ABCDEFG.pdf に 1.0、ABCDEFG2.pdf に 2.0、ABCDEFG3.pdf に 3.0
+        idx_by_key = {k: idx for k, (_, idx) in result.items()}
+        assert idx_by_key["ABCDEFG.pdf"] == 1.0
+        assert idx_by_key["ABCDEFG2.pdf"] == 2.0
+        assert idx_by_key["ABCDEFG3.pdf"] == 3.0
+
+    def test_no_volume_alone_not_detected(self):
+        """巻数なし 1 冊だけではシリーズ化しない"""
+        group = [
+            ("", "ABCDEFG.pdf",  "ABCDEFG"),
+            ("", "ABCDEFG1.pdf", "ABCDEFG1"),
+        ]
+        # 「タイトル」と「タイトル1」のペアはルールから除外される（1巻同士で曖昧）
+        result = _detect_series_in_group(group)
+        assert result == {}
 
 
 # ---------------------------------------------------------------------------
@@ -369,3 +441,145 @@ class TestGemmaAugmentation:
         run_resolve("generated", use_gemma=False)
 
         assert called == []  # 一度も呼ばれない
+
+
+# ---------------------------------------------------------------------------
+# 手動編集 API（assign / unassign）
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def series_client(tmp_path, monkeypatch):
+    """assign / unassign を検証する TestClient。`meta_store.DATA_DIR` を tmp_path に。"""
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
+    from main import app
+    return TestClient(app), tmp_path
+
+
+def _read_meta_at(tmp_path, source: str = "generated") -> dict:
+    p = tmp_path / "meta" / source / "meta.json"
+    return json.loads(p.read_text(encoding="utf-8"))
+
+
+class TestAssignSeries:
+    def test_new_series_generates_id(self, series_client):
+        client, tmp_path = series_client
+        # 先に authors を登録（series_id 自動生成のため）
+        client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "generated",
+        })
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": ["book.pdf"],
+            "title": "テストシリーズ", "index": 1.0, "source": "generated",
+        })
+        assert res.status_code == 200
+        body = res.json()
+        assert body["updated_count"] == 1
+        assert body["id"]  # 自動生成された
+
+        meta = _read_meta_at(tmp_path)
+        assert meta["book.pdf"]["series_id"] == body["id"]
+        assert meta["book.pdf"]["series_title"] == "テストシリーズ"
+        assert meta["book.pdf"]["series_index"] == 1.0
+
+    def test_existing_id_reused_for_multiple_books(self, series_client):
+        client, tmp_path = series_client
+        client.patch("/api/meta", json={
+            "path": "", "names": ["a.pdf", "b.pdf"], "authors": ["A"], "source": "generated",
+        })
+        # 1 冊目を新規シリーズに登録
+        res1 = client.post("/api/series/assign", json={
+            "path": "", "names": ["a.pdf"],
+            "title": "X", "index": 1.0, "source": "generated",
+        })
+        sid = res1.json()["id"]
+        # 2 冊目を同じ id で追加
+        res2 = client.post("/api/series/assign", json={
+            "path": "", "names": ["b.pdf"],
+            "title": "X", "index": 2.0, "id": sid, "source": "generated",
+        })
+        assert res2.status_code == 200
+        assert res2.json()["id"] == sid
+
+        meta = _read_meta_at(tmp_path)
+        assert meta["a.pdf"]["series_id"] == sid
+        assert meta["b.pdf"]["series_id"] == sid
+        assert meta["a.pdf"]["series_index"] == 1.0
+        assert meta["b.pdf"]["series_index"] == 2.0
+
+    def test_assign_preserves_other_fields(self, series_client):
+        client, tmp_path = series_client
+        client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["A"], "tags": ["t1"], "source": "generated",
+        })
+        client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        client.post("/api/series/assign", json={
+            "path": "", "names": ["book.pdf"],
+            "title": "S", "index": 2.5, "source": "generated",
+        })
+
+        meta = _read_meta_at(tmp_path)
+        assert meta["book.pdf"]["authors"] == ["A"]
+        assert meta["book.pdf"]["tags"] == ["t1"]
+        assert meta["book.pdf"]["view_count"] == 1
+        assert meta["book.pdf"]["series_index"] == 2.5
+
+    def test_assign_supports_fractional_index(self, series_client):
+        client, tmp_path = series_client
+        client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "generated",
+        })
+        client.post("/api/series/assign", json={
+            "path": "", "names": ["book.pdf"],
+            "title": "Z", "index": 4.5, "source": "generated",
+        })
+        meta = _read_meta_at(tmp_path)
+        assert meta["book.pdf"]["series_index"] == 4.5
+
+    def test_assign_invalid_source_returns_400(self, series_client):
+        client, _ = series_client
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": ["book.pdf"],
+            "title": "X", "index": 1.0, "source": "invalid",
+        })
+        assert res.status_code == 400
+
+    def test_assign_empty_title_returns_400(self, series_client):
+        client, _ = series_client
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": ["book.pdf"],
+            "title": "  ", "index": 1.0, "source": "generated",
+        })
+        assert res.status_code == 400
+
+
+class TestUnassignSeries:
+    def test_unassign_removes_series_fields(self, series_client):
+        client, tmp_path = series_client
+        client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "generated",
+        })
+        client.post("/api/series/assign", json={
+            "path": "", "names": ["book.pdf"],
+            "title": "S", "index": 1.0, "source": "generated",
+        })
+        client.post("/api/series/unassign", json={
+            "path": "", "names": ["book.pdf"], "source": "generated",
+        })
+        meta = _read_meta_at(tmp_path)
+        # series_* は消えるが authors は残る
+        assert "series_id" not in meta["book.pdf"]
+        assert "series_title" not in meta["book.pdf"]
+        assert "series_index" not in meta["book.pdf"]
+        assert meta["book.pdf"]["authors"] == ["A"]
+
+    def test_unassign_no_existing_entry_is_noop(self, series_client):
+        client, _ = series_client
+        # メタなし状態で unassign してもエラーにならない
+        res = client.post("/api/series/unassign", json={
+            "path": "", "names": ["nothere.pdf"], "source": "generated",
+        })
+        assert res.status_code == 200
+        assert res.json()["updated_count"] == 1

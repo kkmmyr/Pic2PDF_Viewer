@@ -1,4 +1,4 @@
-import { CheckSquare, Square, Star, Pencil, RefreshCw, Library, EyeOff, Eye } from 'lucide-react';
+import { CheckSquare, Square, Star, Pencil, RefreshCw, Library, EyeOff, Eye, BookCopy } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
 
@@ -31,6 +31,8 @@ interface PdfGridProps {
     onToggleHidden?: (name: string) => void;
     /** ゴミ箱モード（true なら Eye アイコン、false なら EyeOff アイコンを表示） */
     showHidden?: boolean;
+    /** 「シリーズ編集」ボタンのハンドラ。指定されるとカード右下にアイコンが出る */
+    onEditSeries?: (name: string) => void;
 }
 
 /**
@@ -56,6 +58,7 @@ export function PdfGrid({
     onSeriesClick,
     onToggleHidden,
     showHidden = false,
+    onEditSeries,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -215,6 +218,15 @@ export function PdfGrid({
                                                 {showHidden
                                                     ? <Eye className="w-3 h-3" />
                                                     : <EyeOff className="w-3 h-3" />}
+                                            </button>
+                                        )}
+                                        {!isSelectionMode && onEditSeries && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onEditSeries(pdf.name); }}
+                                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
+                                                title="シリーズを編集"
+                                            >
+                                                <BookCopy className="w-3 h-3" />
                                             </button>
                                         )}
                                         {isFav && (

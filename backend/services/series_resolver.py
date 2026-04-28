@@ -30,8 +30,12 @@ _KANJI_NUMS = {
     "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
     "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
 }
-_RE_NUM    = re.compile(r"^\s*[第]?\s*(\d+)\s*[巻]?\s*$")
-_RE_VOL    = re.compile(r"^\s*[vV][oO][lL]\.?\s*(\d+)\s*$")
+# 整数巻（"3", "第3巻", "03" 等）
+_RE_INT    = re.compile(r"^\s*[第]?\s*(\d+)\s*[巻]?\s*$")
+# 小数巻（"2.5", "4.5" 等）。シリーズの間巻号を表す慣習に対応
+_RE_FLOAT  = re.compile(r"^\s*(\d+\.\d+)\s*$")
+# vol.N / vol.N.M
+_RE_VOL    = re.compile(r"^\s*[vV][oO][lL]\.?\s*(\d+(?:\.\d+)?)\s*$")
 _RE_PAREN  = re.compile(r"^\s*[(（]([上中下前後]+)[)）]\s*$")
 _RE_KANJI  = re.compile(r"^\s*第?([一二三四五六七八九十百]+)巻?\s*$")
 _PAREN_INDEX = {"上": 1, "中": 2, "下": 3, "前": 1, "後": 2}
@@ -112,29 +116,60 @@ def _ask_gemma_is_same_series(
         return False
 
 
-def _parse_volume_index(suffix: str) -> int | None:
-    """サフィックスを巻数（1始まり）に正規化する。マッチしなければ None。"""
+def _parse_volume_index(suffix: str) -> float | None:
+    """サフィックスを巻数（1 始まり、float）に正規化する。マッチしなければ None。
+
+    `series_index` を `float` で扱うことで、`2.5` のような間巻号にも対応する。
+    """
     s = suffix.strip()
     if not s:
         return None
-    if m := _RE_NUM.match(s):
-        return int(m.group(1))
+    if m := _RE_FLOAT.match(s):
+        return float(m.group(1))
+    if m := _RE_INT.match(s):
+        return float(m.group(1))
     if m := _RE_VOL.match(s):
-        return int(m.group(1))
+        return float(m.group(1))
     if m := _RE_PAREN.match(s):
         kana = m.group(1)
         # 単独文字のみ対応（「上下」のような並びは扱わない）
         if len(kana) == 1 and kana in _PAREN_INDEX:
-            return _PAREN_INDEX[kana]
+            return float(_PAREN_INDEX[kana])
         return None
     if m := _RE_KANJI.match(s):
         kanji = m.group(1)
         # 単純な漢数字のみ対応（一〜十）
         if len(kanji) == 1 and kanji in _KANJI_NUMS:
-            return _KANJI_NUMS[kanji]
+            return float(_KANJI_NUMS[kanji])
         # 二桁: 「十一」「十二」… は省略（一〜十のみ対応）
         return None
     return None
+
+
+def _parse_pair_volume_indexes(
+    suffix_a: str, suffix_b: str,
+) -> tuple[float | None, float | None]:
+    """ペアのサフィックスを巻数に変換する。
+
+    片方が空文字でもう片方が **2 以上の整数** にマッチした場合、
+    空側を 1 巻として扱う（「シリーズの 1 巻だけタイトルに巻数を付けない」慣習）。
+    `2.5` のような小数巻には適用しない（曖昧さを避けるため）。
+    """
+    a = _parse_volume_index(suffix_a)
+    b = _parse_volume_index(suffix_b)
+
+    a_blank = not suffix_a.strip()
+    b_blank = not suffix_b.strip()
+
+    def _is_int_ge_2(v: float | None) -> bool:
+        return v is not None and v >= 2.0 and v.is_integer()
+
+    if a_blank and a is None and _is_int_ge_2(b):
+        a = 1.0
+    if b_blank and b is None and _is_int_ge_2(a):
+        b = 1.0
+
+    return a, b
 
 
 def _common_prefix(a: str, b: str) -> str:
@@ -197,13 +232,14 @@ def _group_by_authors(
 
 def _detect_series_in_group(
     group: list[tuple[str, str, str]],
-) -> dict[str, tuple[str, int]]:
+) -> dict[str, tuple[str, float]]:
     """1 つの作者グループ内でシリーズ判定する。
 
     Returns:
         `{ make_key(rel_path, filename): (series_title, series_index) }` のマップ。
+        `series_index` は float（小数巻 `2.5` 等に対応）。
     """
-    result: dict[str, tuple[str, int]] = {}
+    result: dict[str, tuple[str, float]] = {}
     n = len(group)
     if n < 2:
         return result
@@ -211,15 +247,15 @@ def _detect_series_in_group(
     # 同じプレフィックスを共有するメンバーを集める。プレフィックスは
     # 「ペアごとに最大共通プレフィックス」を取ってから巻数判定が成立する組のみ採用。
     # 効率より分かりやすさ優先で全ペア O(n^2)。書籍数が数千以下なら問題ない。
-    prefix_to_members: dict[str, list[tuple[str, str, int]]] = {}
+    prefix_to_members: dict[str, list[tuple[str, str, float]]] = {}
     for i in range(n):
         for j in range(i + 1, n):
             ti, tj = group[i][2], group[j][2]
             prefix = _common_prefix(ti, tj)
             if len(prefix) < SERIES_MIN_PREFIX_LEN:
                 continue
-            idx_i = _parse_volume_index(ti[len(prefix):])
-            idx_j = _parse_volume_index(tj[len(prefix):])
+            # 「巻数なし＝1巻」ルール込みで巻数解析
+            idx_i, idx_j = _parse_pair_volume_indexes(ti[len(prefix):], tj[len(prefix):])
             if idx_i is None or idx_j is None:
                 continue
             display = _trim_prefix(prefix)
@@ -232,7 +268,7 @@ def _detect_series_in_group(
                     members.append((key, name, idx))
 
     # 同じ書籍が複数グループに属した場合は「最も長いプレフィックス」を採用
-    best_for_key: dict[str, tuple[str, int]] = {}
+    best_for_key: dict[str, tuple[str, float]] = {}
     for prefix, members in prefix_to_members.items():
         for key, _name, idx in members:
             current = best_for_key.get(key)
@@ -272,12 +308,12 @@ def _augment_with_gemma(
         title = os.path.splitext(os.path.basename(key))[0]
         m = series_members.setdefault(sid, {
             "titles": [],
-            "max_index": 0,
+            "max_index": 0.0,
             "series_title": entry.get("series_title", ""),
             "authors_key": tuple(sorted({a.strip() for a in entry.get("authors", []) if a.strip()})),
         })
         m["titles"].append(title)
-        m["max_index"] = max(m["max_index"], int(entry.get("series_index", 0)))
+        m["max_index"] = max(m["max_index"], float(entry.get("series_index", 0)))
 
     # 各作者グループから「シリーズ未割当」の書籍を抽出
     for authors_key, group in groups.items():
@@ -302,8 +338,8 @@ def _augment_with_gemma(
                 if not _ask_gemma_is_same_series(call_ollama, info["titles"], title):
                     continue
 
-                # シリーズに追加（既存 max_index + 1）
-                info["max_index"] += 1
+                # シリーズに追加（既存 max_index + 1、整数巻として割り当て）
+                info["max_index"] = float(int(info["max_index"]) + 1)
                 next_idx = info["max_index"]
                 info["titles"].append(title)
                 series_title = info["series_title"]
