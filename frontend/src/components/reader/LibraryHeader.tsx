@@ -1,4 +1,4 @@
-import { ArrowLeft, ImageIcon, Merge, Tag } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
@@ -15,6 +15,8 @@ interface LibraryHeaderProps {
     tagFilter: string;
     allAuthors: string[];
     allTags: string[];
+    /** シリーズグループ化トグルの状態 */
+    isGroupedBySeries: boolean;
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
@@ -28,6 +30,7 @@ interface LibraryHeaderProps {
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
+    onToggleGroupBySeries: () => void;
 }
 
 export function LibraryHeader({
@@ -41,6 +44,7 @@ export function LibraryHeader({
     tagFilter,
     allAuthors,
     allTags,
+    isGroupedBySeries,
     onUpClick,
     onSourceChange,
     onToggleSelectionMode,
@@ -54,6 +58,7 @@ export function LibraryHeader({
     onSearchChange,
     onAuthorFilterChange,
     onTagFilterChange,
+    onToggleGroupBySeries,
 }: LibraryHeaderProps) {
     return (
         <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-header">
@@ -157,6 +162,21 @@ export function LibraryHeader({
                             </>
                         )}
                     </div>
+
+                    {!isSelectionMode && (
+                        <button
+                            onClick={onToggleGroupBySeries}
+                            title={isGroupedBySeries ? 'シリーズグループ化をオフにする' : 'シリーズでグループ化'}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                                isGroupedBySeries
+                                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                            <Library className="w-4 h-4" />
+                            シリーズ
+                        </button>
+                    )}
 
                     {!isSelectionMode && (
                         <HeaderSortSelect sortOrder={sortOrder} onSortChange={onSortChange} />

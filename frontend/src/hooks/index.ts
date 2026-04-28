@@ -20,3 +20,7 @@ export type { Toast, ToastType } from './useToast';
 export { useSpreadMode } from './useSpreadMode';
 export { useEditMode } from './useEditMode';
 export { useFullscreen } from './useFullscreen';
+export { useSeriesResolve } from './useSeriesResolve';
+export type { SeriesResolveStatus } from './useSeriesResolve';
+export { useSeriesGrouping } from './useSeriesGrouping';
+export type { SeriesGroup, GroupedLibrary } from './useSeriesGrouping';

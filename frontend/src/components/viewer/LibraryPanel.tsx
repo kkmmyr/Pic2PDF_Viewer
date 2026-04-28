@@ -1,9 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
-import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
+import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer, SeriesExpandDialog } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
-import { useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast } from '../../hooks';
+import { SeriesResolveBar } from './SeriesResolveBar';
+import {
+    useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
+    useSeriesGrouping,
+} from '../../hooks';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -11,6 +15,7 @@ import { STORAGE_KEYS } from '../../constants';
 import { getStorageJson, setStorageJson } from '../../utils/storage';
 
 const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
+const GROUP_BY_SERIES_KEY = 'library_group_by_series';
 
 function readStoredSort(): SortOrder {
     return getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc');
@@ -37,6 +42,10 @@ export function LibraryPanel() {
     const [searchText, setSearchText] = useState('');
     const [authorFilter, setAuthorFilter] = useState('');
     const [tagFilter, setTagFilter] = useState('');
+    const [isGroupedBySeries, setIsGroupedBySeries] = useState<boolean>(
+        () => getStorageJson<boolean>(GROUP_BY_SERIES_KEY, false)
+    );
+    const [expandedSeriesName, setExpandedSeriesName] = useState<string | null>(null);
 
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
     const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
@@ -52,6 +61,14 @@ export function LibraryPanel() {
     const handleSortChange = useCallback((order: SortOrder) => {
         setSortOrder(order);
         setStorageJson(SORT_STORAGE_KEY, order);
+    }, []);
+
+    const handleToggleGroupBySeries = useCallback(() => {
+        setIsGroupedBySeries(prev => {
+            const next = !prev;
+            setStorageJson(GROUP_BY_SERIES_KEY, next);
+            return next;
+        });
     }, []);
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
@@ -91,6 +108,18 @@ export function LibraryPanel() {
         currentPath,
         meta,
     });
+
+    // シリーズグループ化（toggle ON 時のみ集約。OFF 時は filteredPdfs をそのまま）
+    const grouped = useSeriesGrouping({
+        pdfs: filteredPdfs,
+        meta,
+        currentPath,
+        enabled: isGroupedBySeries,
+    });
+
+    const expandedGroup = expandedSeriesName
+        ? grouped.seriesByRepresentativeName.get(expandedSeriesName)
+        : null;
 
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
@@ -147,6 +176,7 @@ export function LibraryPanel() {
                 tagFilter={tagFilter}
                 allAuthors={allAuthors}
                 allTags={allTags}
+                isGroupedBySeries={isGroupedBySeries}
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
@@ -160,6 +190,7 @@ export function LibraryPanel() {
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
+                onToggleGroupBySeries={handleToggleGroupBySeries}
             />
 
             <LibraryDialogs
@@ -188,6 +219,7 @@ export function LibraryPanel() {
             />
 
             <AutoFillAuthorsBar source={currentSource} onComplete={refreshMeta} />
+            <SeriesResolveBar source={currentSource} onComplete={refreshMeta} />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">
@@ -200,7 +232,7 @@ export function LibraryPanel() {
                         onRename={(name) => onOpenRename(name, true)}
                     />
                     <PdfGrid
-                        pdfs={filteredPdfs}
+                        pdfs={grouped.items}
                         onPdfClick={handlePdfClick}
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
@@ -213,9 +245,20 @@ export function LibraryPanel() {
                         onAuthorClick={setAuthorFilter}
                         getTags={(name) => getTags(currentPath, name)}
                         onTagClick={setTagFilter}
+                        getSeriesCount={(name) => grouped.memberCountByRepresentativeName.get(name) ?? 0}
+                        onSeriesClick={isGroupedBySeries ? setExpandedSeriesName : undefined}
                     />
                 </div>
             </div>
+            <SeriesExpandDialog
+                open={expandedGroup !== null && expandedGroup !== undefined}
+                seriesTitle={expandedGroup?.seriesTitle ?? ''}
+                members={expandedGroup?.members ?? []}
+                getIndex={(name) => meta[currentPath ? `${currentPath}/${name}` : name]?.series_index ?? 0}
+                onClose={() => setExpandedSeriesName(null)}
+                onPdfClick={handlePdfClick}
+            />
+
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );

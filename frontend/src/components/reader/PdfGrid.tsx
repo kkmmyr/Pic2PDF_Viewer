@@ -1,4 +1,4 @@
-import { CheckSquare, Square, Star, Pencil, RefreshCw } from 'lucide-react';
+import { CheckSquare, Square, Star, Pencil, RefreshCw, Library } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
 
@@ -20,6 +20,10 @@ interface PdfGridProps {
     getTags?: (name: string) => string[];
     /** タグクリック時に絞り込みを行うコールバック */
     onTagClick?: (tag: string) => void;
+    /** シリーズ代表のメンバー数（バッジ表示用、null/0/1 の場合は非表示） */
+    getSeriesCount?: (name: string) => number;
+    /** シリーズ代表書籍をクリックしたときのハンドラ。指定されると onPdfClick より優先される */
+    onSeriesClick?: (representativeName: string) => void;
 }
 
 /**
@@ -41,6 +45,8 @@ export function PdfGrid({
     onAuthorClick,
     getTags,
     onTagClick,
+    getSeriesCount,
+    onSeriesClick,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -58,13 +64,17 @@ export function PdfGrid({
                 {pdfs.map((pdf) => {
                     const isFav = favorites.has(pdf.name);
                     const isSelected = isSelectionMode && selectedItems.has(pdf.name);
+                    const seriesCount = getSeriesCount?.(pdf.name) ?? 0;
+                    const isSeries = seriesCount > 1 && !!onSeriesClick;
                     return (
                         <div
                             key={pdf.name}
                             className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
                                 isSelected
                                     ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
-                                    : 'border-transparent bg-white dark:bg-gray-800'
+                                    : isSeries
+                                        ? 'border-purple-300 dark:border-purple-700 bg-white dark:bg-gray-800'
+                                        : 'border-transparent bg-white dark:bg-gray-800'
                             }`}
                         >
                             <div
@@ -72,6 +82,8 @@ export function PdfGrid({
                                 onClick={() => {
                                     if (isSelectionMode && onToggleSelect) {
                                         onToggleSelect(pdf.name);
+                                    } else if (isSeries && onSeriesClick) {
+                                        onSeriesClick(pdf.name);
                                     } else {
                                         onPdfClick(pdf.name);
                                     }
@@ -85,6 +97,14 @@ export function PdfGrid({
                                         ) : (
                                             <Square className="w-6 h-6 text-gray-400 fill-white" />
                                         )}
+                                    </div>
+                                )}
+
+                                {/* シリーズバッジ（巻数表示） */}
+                                {isSeries && (
+                                    <div className="absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow">
+                                        <Library className="w-3 h-3" />
+                                        {seriesCount} 巻
                                     </div>
                                 )}
 

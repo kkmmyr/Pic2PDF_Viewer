@@ -45,6 +45,17 @@ export function useBookMeta(source: string) {
         return meta[makeKey(path, name)]?.tags ?? [];
     }, [meta, makeKey]);
 
+    /** 1冊のシリーズ情報を返す（未割当なら null） */
+    const getSeries = useCallback((path: string, name: string): { id: string; title: string; index: number } | null => {
+        const e = meta[makeKey(path, name)];
+        if (!e?.series_id) return null;
+        return {
+            id: e.series_id,
+            title: e.series_title ?? '',
+            index: e.series_index ?? 0,
+        };
+    }, [meta, makeKey]);
+
     /** 1冊の閲覧回数を返す（未記録は 0） */
     const getViewCount = useCallback((path: string, name: string): number => {
         return meta[makeKey(path, name)]?.view_count ?? 0;
@@ -146,7 +157,7 @@ export function useBookMeta(source: string) {
 
     return {
         meta,
-        getAuthors, getTags, getViewCount, getLastViewedAt,
+        getAuthors, getTags, getSeries, getViewCount, getLastViewedAt,
         recordView,
         updateAuthors, updateTags, updateMeta,
         allAuthors, allTags,

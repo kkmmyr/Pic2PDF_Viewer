@@ -55,6 +55,10 @@ export const API_ENDPOINTS = {
     REGENERATE_THUMBNAIL_BULK: '/api/thumbnails/regenerate_bulk',
     /** PDF結合 */
     MERGE_PDFS: '/api/pdfs/merge',
+    /** シリーズ判定ジョブ開始 */
+    SERIES_RESOLVE: '/api/series/resolve',
+    /** シリーズ判定ジョブ進捗取得 */
+    SERIES_RESOLVE_STATUS: '/api/series/resolve/status',
 } as const;
 
 /**

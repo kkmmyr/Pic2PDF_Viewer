@@ -146,6 +146,12 @@ export interface BookMetaEntry {
     tags?: string[];
     view_count?: number;
     last_viewed_at?: number;
+    /** シリーズ識別子（同シリーズで共通） */
+    series_id?: string;
+    /** シリーズ表示名（共通プレフィックス） */
+    series_title?: string;
+    /** シリーズ内の巻数 (1 始まり) */
+    series_index?: number;
 }
 
 /**

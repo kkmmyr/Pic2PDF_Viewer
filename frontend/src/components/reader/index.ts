@@ -9,5 +9,6 @@ export { PdfGrid } from './PdfGrid';
 export { LazyThumbnail } from './LazyThumbnail';
 export { PdfSearchBar } from './PdfSearchBar';
 export { ToastContainer } from './ToastContainer';
+export { SeriesExpandDialog } from './SeriesExpandDialog';
 export * from './MoveDialog';
 export * from './PageRenderer';
