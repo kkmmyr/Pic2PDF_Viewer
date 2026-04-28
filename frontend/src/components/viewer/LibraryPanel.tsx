@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
@@ -42,9 +43,26 @@ export function LibraryPanel() {
 
     const [sortOrder, setSortOrder] = useState<SortOrder>(readStoredSort);
     const [searchText, setSearchText] = useState('');
-    const [authorFilter, setAuthorFilter] = useState('');
-    const [tagFilter, setTagFilter] = useState('');
-    const [seriesFilter, setSeriesFilter] = useState('');
+
+    // author / series / tag フィルターは URL クエリに同期する。
+    // ドリルダウン後にブラウザの戻るボタンで元の一覧に戻れるようにするため。
+    // searchText は入力ごとに履歴汚染するので useState のまま。
+    const [searchParams, setSearchParams] = useSearchParams();
+    const authorFilter = searchParams.get('author') ?? '';
+    const tagFilter = searchParams.get('tag') ?? '';
+    const seriesFilter = searchParams.get('series') ?? '';
+
+    const updateUrlFilter = useCallback((key: 'author' | 'tag' | 'series', value: string) => {
+        const next = new URLSearchParams(searchParams);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        setSearchParams(next);
+    }, [searchParams, setSearchParams]);
+
+    const setAuthorFilter = useCallback((v: string) => updateUrlFilter('author', v), [updateUrlFilter]);
+    const setTagFilter = useCallback((v: string) => updateUrlFilter('tag', v), [updateUrlFilter]);
+    const setSeriesFilter = useCallback((v: string) => updateUrlFilter('series', v), [updateUrlFilter]);
+
     const [groupMode, setGroupMode] = useState<GroupMode>(
         () => getStorageJson<GroupMode>(GROUP_MODE_KEY, 'none')
     );
@@ -57,12 +75,12 @@ export function LibraryPanel() {
     const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
 
-    // パスまたはソース変更時に検索テキスト・フィルターをリセット
+    // パスまたはソース変更時に検索テキストをリセット。
+    // author / tag / series は URL 同期されており、useUrlState の navigate
+    // メソッドが setSearchParams({ path, source }) で全置換するため自動クリアされる。
     useEffect(() => {
         setSearchText('');
-        setAuthorFilter('');
-        setTagFilter('');
-        setSeriesFilter('');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPath, currentSource]);
 
     const handleSortChange = useCallback((order: SortOrder) => {
@@ -75,7 +93,7 @@ export function LibraryPanel() {
         setStorageJson(GROUP_MODE_KEY, mode);
         // モード切替時にドリルダウン中のシリーズフィルターは解除（一覧の意味が変わるため）
         setSeriesFilter('');
-    }, []);
+    }, [setSeriesFilter]);
 
     const handleToggleShowHidden = useCallback(() => {
         setShowHidden(prev => {
