@@ -22,5 +22,5 @@ export { useEditMode } from './useEditMode';
 export { useFullscreen } from './useFullscreen';
 export { useSeriesResolve } from './useSeriesResolve';
 export type { SeriesResolveStatus } from './useSeriesResolve';
-export { useSeriesGrouping } from './useSeriesGrouping';
-export type { SeriesGroup, GroupedLibrary } from './useSeriesGrouping';
+export { useLibraryGrouping } from './useLibraryGrouping';
+export type { GroupMode, GroupBadge, GroupedLibrary } from './useLibraryGrouping';

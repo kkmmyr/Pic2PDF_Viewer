@@ -146,6 +146,41 @@ describe('useLibraryFilter', () => {
         });
     });
 
+    describe('seriesFilter（シリーズドリルダウン）', () => {
+        const seriesPdfs: PdfFile[] = [
+            makePdf('a1.pdf'),
+            makePdf('a2.pdf'),
+            makePdf('b1.pdf'),
+        ];
+        const seriesMeta: BookMetaMap = {
+            'a1.pdf': { authors: ['A'], series_id: 'sid-a' },
+            'a2.pdf': { authors: ['A'], series_id: 'sid-a' },
+            'b1.pdf': { authors: ['B'], series_id: 'sid-b' },
+        };
+
+        it('seriesFilter で同じ series_id の書籍だけ表示する', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: seriesPdfs, directories: [],
+                    searchText: '', authorFilter: '', seriesFilter: 'sid-a',
+                    currentPath: '', meta: seriesMeta,
+                })
+            );
+            expect(result.current.filteredPdfs.map(p => p.name).sort()).toEqual(['a1.pdf', 'a2.pdf']);
+        });
+
+        it('空文字の seriesFilter は無効（フィルタしない）', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: seriesPdfs, directories: [],
+                    searchText: '', authorFilter: '', seriesFilter: '',
+                    currentPath: '', meta: seriesMeta,
+                })
+            );
+            expect(result.current.filteredPdfs).toHaveLength(3);
+        });
+    });
+
     describe('currentPath によるメタキー解決', () => {
         it('path 配下のメタを正しく取得する', () => {
             const sub = [makePdf('nested.pdf')];

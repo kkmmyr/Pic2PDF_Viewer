@@ -1,5 +1,6 @@
-import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, X } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
+import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
 import { SourceSelector } from './SourceSelector';
@@ -15,8 +16,10 @@ interface LibraryHeaderProps {
     tagFilter: string;
     allAuthors: string[];
     allTags: string[];
-    /** シリーズグループ化トグルの状態 */
-    isGroupedBySeries: boolean;
+    /** ライブラリの集約モード（none / series / author） */
+    groupMode: GroupMode;
+    /** シリーズドリルダウン中のチップ表示用情報。null なら非表示 */
+    seriesFilterChip: { id: string; title: string } | null;
     /** 非表示書籍を表示するモード（ゴミ箱モード） */
     showHidden: boolean;
     onUpClick: () => void;
@@ -33,7 +36,8 @@ interface LibraryHeaderProps {
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
-    onToggleGroupBySeries: () => void;
+    onGroupModeChange: (mode: GroupMode) => void;
+    onClearSeriesFilter: () => void;
     onToggleShowHidden: () => void;
 }
 
@@ -48,7 +52,8 @@ export function LibraryHeader({
     tagFilter,
     allAuthors,
     allTags,
-    isGroupedBySeries,
+    groupMode,
+    seriesFilterChip,
     showHidden,
     onUpClick,
     onSourceChange,
@@ -64,7 +69,8 @@ export function LibraryHeader({
     onSearchChange,
     onAuthorFilterChange,
     onTagFilterChange,
-    onToggleGroupBySeries,
+    onGroupModeChange,
+    onClearSeriesFilter,
     onToggleShowHidden,
 }: LibraryHeaderProps) {
     return (
@@ -180,18 +186,38 @@ export function LibraryHeader({
                     </div>
 
                     {!isSelectionMode && (
-                        <button
-                            onClick={onToggleGroupBySeries}
-                            title={isGroupedBySeries ? 'シリーズグループ化をオフにする' : 'シリーズでグループ化'}
-                            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                                isGroupedBySeries
-                                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700'
-                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-                            }`}
-                        >
-                            <Library className="w-4 h-4" />
-                            シリーズ
-                        </button>
+                        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                            <Library className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                            <select
+                                value={groupMode}
+                                onChange={(e) => onGroupModeChange(e.target.value as GroupMode)}
+                                title="ライブラリの集約表示"
+                                className={`border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 max-w-[140px] truncate ${
+                                    groupMode !== 'none'
+                                        ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                                }`}
+                            >
+                                <option value="none">グループ化なし</option>
+                                <option value="series">シリーズで</option>
+                                <option value="author">作者で</option>
+                            </select>
+                        </div>
+                    )}
+
+                    {!isSelectionMode && seriesFilterChip && (
+                        <div className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700">
+                            <span className="truncate max-w-[180px]" title={seriesFilterChip.title}>
+                                シリーズ: {seriesFilterChip.title}
+                            </span>
+                            <button
+                                onClick={onClearSeriesFilter}
+                                className="hover:bg-purple-200 dark:hover:bg-purple-800/60 rounded p-0.5"
+                                title="シリーズフィルターを解除"
+                            >
+                                <X className="w-3 h-3" />
+                            </button>
+                        </div>
                     )}
 
                     {!isSelectionMode && (

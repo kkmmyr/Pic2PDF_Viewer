@@ -8,6 +8,8 @@ interface UseLibraryFilterParams {
     authorFilter: string;
     /** タグフィルター（空文字なら無効） */
     tagFilter?: string;
+    /** シリーズフィルター（series_id 完全一致、空文字なら無効） */
+    seriesFilter?: string;
     /**
      * 非表示モード（ゴミ箱方式）。
      * - `false`（デフォルト）: 通常モード。`hidden=true` の書籍を完全除外。
@@ -31,6 +33,10 @@ function getTagsFromMeta(meta: BookMetaMap, path: string, name: string): string[
     return getEntryFromMeta(meta, path, name)?.tags ?? [];
 }
 
+function getSeriesIdFromMeta(meta: BookMetaMap, path: string, name: string): string | undefined {
+    return getEntryFromMeta(meta, path, name)?.series_id;
+}
+
 function isHiddenInMeta(meta: BookMetaMap, path: string, name: string): boolean {
     return getEntryFromMeta(meta, path, name)?.hidden === true;
 }
@@ -41,6 +47,7 @@ export function useLibraryFilter({
     searchText,
     authorFilter,
     tagFilter = '',
+    seriesFilter = '',
     showHidden = false,
     currentPath,
     meta,
@@ -76,8 +83,14 @@ export function useLibraryFilter({
             );
         }
 
+        if (seriesFilter) {
+            result = result.filter(p =>
+                getSeriesIdFromMeta(meta, currentPath, p.name) === seriesFilter
+            );
+        }
+
         return result;
-    }, [pdfs, searchText, authorFilter, tagFilter, showHidden, currentPath, meta]);
+    }, [pdfs, searchText, authorFilter, tagFilter, seriesFilter, showHidden, currentPath, meta]);
 
     const filteredDirs = useMemo(() => {
         const trimmed = searchText.trim();

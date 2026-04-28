@@ -1,14 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
-import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer, SeriesExpandDialog } from '../reader';
+import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
     useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
-    useSeriesGrouping,
 } from '../../hooks';
+import { useLibraryGrouping, type GroupMode } from '../../hooks/useLibraryGrouping';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -16,7 +16,7 @@ import { STORAGE_KEYS } from '../../constants';
 import { getStorageJson, setStorageJson } from '../../utils/storage';
 
 const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
-const GROUP_BY_SERIES_KEY = 'library_group_by_series';
+const GROUP_MODE_KEY = 'library_group_mode';
 const SHOW_HIDDEN_KEY = 'library_show_hidden';
 
 function readStoredSort(): SortOrder {
@@ -44,13 +44,13 @@ export function LibraryPanel() {
     const [searchText, setSearchText] = useState('');
     const [authorFilter, setAuthorFilter] = useState('');
     const [tagFilter, setTagFilter] = useState('');
-    const [isGroupedBySeries, setIsGroupedBySeries] = useState<boolean>(
-        () => getStorageJson<boolean>(GROUP_BY_SERIES_KEY, false)
+    const [seriesFilter, setSeriesFilter] = useState('');
+    const [groupMode, setGroupMode] = useState<GroupMode>(
+        () => getStorageJson<GroupMode>(GROUP_MODE_KEY, 'none')
     );
     const [showHidden, setShowHidden] = useState<boolean>(
         () => getStorageJson<boolean>(SHOW_HIDDEN_KEY, false)
     );
-    const [expandedSeriesName, setExpandedSeriesName] = useState<string | null>(null);
     const [seriesEditTarget, setSeriesEditTarget] = useState<string | null>(null);
 
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
@@ -62,6 +62,7 @@ export function LibraryPanel() {
         setSearchText('');
         setAuthorFilter('');
         setTagFilter('');
+        setSeriesFilter('');
     }, [currentPath, currentSource]);
 
     const handleSortChange = useCallback((order: SortOrder) => {
@@ -69,12 +70,11 @@ export function LibraryPanel() {
         setStorageJson(SORT_STORAGE_KEY, order);
     }, []);
 
-    const handleToggleGroupBySeries = useCallback(() => {
-        setIsGroupedBySeries(prev => {
-            const next = !prev;
-            setStorageJson(GROUP_BY_SERIES_KEY, next);
-            return next;
-        });
+    const handleGroupModeChange = useCallback((mode: GroupMode) => {
+        setGroupMode(mode);
+        setStorageJson(GROUP_MODE_KEY, mode);
+        // モード切替時にドリルダウン中のシリーズフィルターは解除（一覧の意味が変わるため）
+        setSeriesFilter('');
     }, []);
 
     const handleToggleShowHidden = useCallback(() => {
@@ -120,21 +120,32 @@ export function LibraryPanel() {
         searchText,
         authorFilter,
         tagFilter,
+        seriesFilter,
         showHidden,
         currentPath,
         meta,
     });
 
-    // シリーズグループ化（toggle ON 時のみ集約。OFF 時は filteredPdfs をそのまま）
-    const grouped = useSeriesGrouping({
+    // ドリルダウン中（authorFilter or seriesFilter 適用中）はグループ化を無効化する。
+    // 「同じ作者だけの一覧」を「作者単位で集約」してさらに 1 枚にすると意味がないため。
+    const effectiveGroupMode: GroupMode = (authorFilter || seriesFilter) ? 'none' : groupMode;
+
+    // 集約: シリーズ / 作者 / なし。none のときは filteredPdfs をそのまま返す
+    const grouped = useLibraryGrouping({
         pdfs: filteredPdfs,
         meta,
         currentPath,
-        enabled: isGroupedBySeries,
+        mode: effectiveGroupMode,
     });
 
-    const expandedGroup = expandedSeriesName
-        ? grouped.seriesByRepresentativeName.get(expandedSeriesName)
+    // シリーズフィルター中の表示用チップ情報（タイトルは meta から引く）
+    const seriesFilterChip = seriesFilter
+        ? {
+              id: seriesFilter,
+              title:
+                  Object.values(meta).find(e => e.series_id === seriesFilter)?.series_title
+                  ?? 'シリーズ',
+          }
         : null;
 
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
@@ -214,7 +225,8 @@ export function LibraryPanel() {
                 tagFilter={tagFilter}
                 allAuthors={allAuthors}
                 allTags={allTags}
-                isGroupedBySeries={isGroupedBySeries}
+                groupMode={groupMode}
+                seriesFilterChip={seriesFilterChip}
                 showHidden={showHidden}
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
@@ -230,7 +242,8 @@ export function LibraryPanel() {
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
-                onToggleGroupBySeries={handleToggleGroupBySeries}
+                onGroupModeChange={handleGroupModeChange}
+                onClearSeriesFilter={() => setSeriesFilter('')}
                 onToggleShowHidden={handleToggleShowHidden}
             />
 
@@ -286,23 +299,24 @@ export function LibraryPanel() {
                         onAuthorClick={setAuthorFilter}
                         getTags={(name) => getTags(currentPath, name)}
                         onTagClick={setTagFilter}
-                        getSeriesCount={(name) => grouped.memberCountByRepresentativeName.get(name) ?? 0}
-                        onSeriesClick={isGroupedBySeries ? setExpandedSeriesName : undefined}
+                        getBadge={(name) => grouped.badgeByRepresentativeName.get(name) ?? null}
+                        onGroupClick={(name) => {
+                            const badge = grouped.badgeByRepresentativeName.get(name);
+                            if (!badge) return;
+                            if (badge.kind === 'series') {
+                                setSeriesFilter(badge.groupId);
+                            } else {
+                                // 作者集合キーの最初の作者で絞り込む（複数作者は最初を採用）
+                                const firstAuthor = badge.groupId.split('\n')[0];
+                                setAuthorFilter(firstAuthor);
+                            }
+                        }}
                         onToggleHidden={handleToggleHiddenOne}
                         showHidden={showHidden}
                         onEditSeries={setSeriesEditTarget}
                     />
                 </div>
             </div>
-            <SeriesExpandDialog
-                open={expandedGroup !== null && expandedGroup !== undefined}
-                seriesTitle={expandedGroup?.seriesTitle ?? ''}
-                members={expandedGroup?.members ?? []}
-                getIndex={(name) => meta[currentPath ? `${currentPath}/${name}` : name]?.series_index ?? 0}
-                onClose={() => setExpandedSeriesName(null)}
-                onPdfClick={handlePdfClick}
-            />
-
             <SeriesEditDialog
                 open={seriesEditTarget !== null}
                 targetName={seriesEditTarget ?? ''}

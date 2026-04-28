@@ -1,6 +1,16 @@
-import { CheckSquare, Square, Star, Pencil, RefreshCw, Library, EyeOff, Eye, BookCopy } from 'lucide-react';
+import { CheckSquare, Square, Star, Pencil, RefreshCw, Library, EyeOff, Eye, BookCopy, Users } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
+
+/** 集約カードのバッジ情報（PdfGrid から PdfFile.name で引く想定） */
+export interface PdfCardBadge {
+    /** 集約メンバー数 */
+    count: number;
+    /** 集約種別: シリーズ / 作者 */
+    kind: 'series' | 'author';
+    /** カードのタイトル表示に使う（例: "鬼滅の刃" / "diletta コレクション"） */
+    displayTitle: string;
+}
 
 interface PdfGridProps {
     pdfs: PdfFile[];
@@ -20,10 +30,16 @@ interface PdfGridProps {
     getTags?: (name: string) => string[];
     /** タグクリック時に絞り込みを行うコールバック */
     onTagClick?: (tag: string) => void;
-    /** シリーズ代表のメンバー数（バッジ表示用、null/0/1 の場合は非表示） */
-    getSeriesCount?: (name: string) => number;
-    /** シリーズ代表書籍をクリックしたときのハンドラ。指定されると onPdfClick より優先される */
-    onSeriesClick?: (representativeName: string) => void;
+    /**
+     * 集約カードのバッジ情報。null なら通常の書籍カード。
+     * シリーズ・作者どちらの集約も同じ仕組みで扱う。
+     */
+    getBadge?: (name: string) => PdfCardBadge | null;
+    /**
+     * 集約カードをクリックしたときのハンドラ。指定されると onPdfClick より優先される。
+     * `kind` で分岐して、シリーズなら series_id でドリルダウン、作者なら作者名でドリルダウン等の挙動をする想定。
+     */
+    onGroupClick?: (representativeName: string) => void;
     /** 「非表示にする」「再表示する」ボタンのハンドラ。
      *  - showHidden=false（通常モード）の時は EyeOff アイコンで「非表示にする」
      *  - showHidden=true（ゴミ箱モード）の時は Eye アイコンで「再表示する」
@@ -54,8 +70,8 @@ export function PdfGrid({
     onAuthorClick,
     getTags,
     onTagClick,
-    getSeriesCount,
-    onSeriesClick,
+    getBadge,
+    onGroupClick,
     onToggleHidden,
     showHidden = false,
     onEditSeries,
@@ -76,15 +92,15 @@ export function PdfGrid({
                 {pdfs.map((pdf) => {
                     const isFav = favorites.has(pdf.name);
                     const isSelected = isSelectionMode && selectedItems.has(pdf.name);
-                    const seriesCount = getSeriesCount?.(pdf.name) ?? 0;
-                    const isSeries = seriesCount > 1 && !!onSeriesClick;
+                    const badge = getBadge?.(pdf.name) ?? null;
+                    const isGroup = badge !== null && !!onGroupClick;
                     return (
                         <div
                             key={pdf.name}
                             className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
                                 isSelected
                                     ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
-                                    : isSeries
+                                    : isGroup
                                         ? 'border-purple-300 dark:border-purple-700 bg-white dark:bg-gray-800'
                                         : 'border-transparent bg-white dark:bg-gray-800'
                             }`}
@@ -94,8 +110,8 @@ export function PdfGrid({
                                 onClick={() => {
                                     if (isSelectionMode && onToggleSelect) {
                                         onToggleSelect(pdf.name);
-                                    } else if (isSeries && onSeriesClick) {
-                                        onSeriesClick(pdf.name);
+                                    } else if (isGroup && onGroupClick) {
+                                        onGroupClick(pdf.name);
                                     } else {
                                         onPdfClick(pdf.name);
                                     }
@@ -112,11 +128,13 @@ export function PdfGrid({
                                     </div>
                                 )}
 
-                                {/* シリーズバッジ（巻数表示） */}
-                                {isSeries && (
+                                {/* 集約バッジ（シリーズ巻数 / 作者の作品数） */}
+                                {isGroup && badge && (
                                     <div className="absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow">
-                                        <Library className="w-3 h-3" />
-                                        {seriesCount} 巻
+                                        {badge.kind === 'series'
+                                            ? <Library className="w-3 h-3" />
+                                            : <Users className="w-3 h-3" />}
+                                        {badge.count} {badge.kind === 'series' ? '巻' : '冊'}
                                     </div>
                                 )}
 
@@ -145,8 +163,11 @@ export function PdfGrid({
                             </div>
 
                             <div className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}>
-                                <span className="font-medium text-sm text-gray-800 dark:text-gray-200 line-clamp-2" title={pdf.name}>
-                                    {pdf.name.replace('.pdf', '')}
+                                <span
+                                    className={`font-medium text-sm line-clamp-2 ${isGroup ? 'text-purple-700 dark:text-purple-300' : 'text-gray-800 dark:text-gray-200'}`}
+                                    title={isGroup && badge ? badge.displayTitle : pdf.name}
+                                >
+                                    {isGroup && badge ? badge.displayTitle : pdf.name.replace('.pdf', '')}
                                 </span>
                                 {/* 作者名タグ */}
                                 {getAuthors && (() => {
