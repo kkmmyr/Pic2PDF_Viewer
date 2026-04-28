@@ -341,6 +341,46 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
+## シリーズ管理
+
+### `POST /api/series/resolve`
+シリーズ自動グループ化ジョブを起動する。指定ソースの書籍を走査し、ルールベース（タイトル前方一致 + 作者完全一致 + 巻数パターン）で同シリーズと判定されたエントリに `series_id` / `series_title` / `series_index` を書き戻す。
+
+**クエリパラメータ**:
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**レスポンス**: `{"started": true, "source": "generated"}`
+
+**エラー**:
+- `400`: 不正な source
+- `409`: 既にジョブが実行中
+
+---
+
+### `GET /api/series/resolve/status`
+シリーズ判定ジョブの進捗を返す。
+
+**クエリパラメータ**:
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**レスポンス**:
+```json
+{
+  "status": "running",
+  "total": 120,
+  "done": 50,
+  "created": 8,
+  "current": "鬼滅の刃",
+  "error": ""
+}
+```
+- `status` の値: `idle` / `running` / `done` / `error`
+- `total`: 走査対象書籍数
+- `done`: 走査済み件数
+- `created`: 作成された（または更新された）シリーズ数
+
+---
+
 ## PDF生成
 
 ### `POST /api/generate`
