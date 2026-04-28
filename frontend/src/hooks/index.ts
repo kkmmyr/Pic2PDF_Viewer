@@ -19,3 +19,4 @@ export { useToast } from './useToast';
 export type { Toast, ToastType } from './useToast';
 export { useSpreadMode } from './useSpreadMode';
 export { useEditMode } from './useEditMode';
+export { useFullscreen } from './useFullscreen';

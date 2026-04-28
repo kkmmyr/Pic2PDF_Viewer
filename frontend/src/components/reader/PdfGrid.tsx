@@ -16,6 +16,10 @@ interface PdfGridProps {
     getAuthors?: (name: string) => string[];
     /** 作者タグクリック時に絞り込みを行うコールバック */
     onAuthorClick?: (author: string) => void;
+    /** 書籍名 → タグリスト のマップ */
+    getTags?: (name: string) => string[];
+    /** タグクリック時に絞り込みを行うコールバック */
+    onTagClick?: (tag: string) => void;
 }
 
 /**
@@ -35,6 +39,8 @@ export function PdfGrid({
     onRegenThumb,
     getAuthors,
     onAuthorClick,
+    getTags,
+    onTagClick,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -123,6 +129,24 @@ export function PdfGrid({
                                                     title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
                                                 >
                                                     {a}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null;
+                                })()}
+                                {/* タグ */}
+                                {getTags && (() => {
+                                    const tags = getTags(pdf.name);
+                                    return tags.length > 0 ? (
+                                        <div className="mt-1 flex flex-wrap gap-1">
+                                            {tags.map((t, i) => (
+                                                <span
+                                                    key={i}
+                                                    className={`text-xs px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 truncate max-w-full ${onTagClick ? 'cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-800/50' : ''}`}
+                                                    onClick={onTagClick ? (e) => { e.stopPropagation(); onTagClick(t); } : undefined}
+                                                    title={onTagClick ? `"${t}" で絞り込む` : undefined}
+                                                >
+                                                    #{t}
                                                 </span>
                                             ))}
                                         </div>

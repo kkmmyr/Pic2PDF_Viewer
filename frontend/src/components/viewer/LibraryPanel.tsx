@@ -36,14 +36,17 @@ export function LibraryPanel() {
     const [sortOrder, setSortOrder] = useState<SortOrder>(readStoredSort);
     const [searchText, setSearchText] = useState('');
     const [authorFilter, setAuthorFilter] = useState('');
+    const [tagFilter, setTagFilter] = useState('');
 
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
+    const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
 
     // パスまたはソース変更時に検索テキスト・フィルターをリセット
     useEffect(() => {
         setSearchText('');
         setAuthorFilter('');
+        setTagFilter('');
     }, [currentPath, currentSource]);
 
     const handleSortChange = useCallback((order: SortOrder) => {
@@ -52,7 +55,10 @@ export function LibraryPanel() {
     }, []);
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
-    const { meta, getAuthors, getViewCount, getLastViewedAt, recordView, updateAuthors, allAuthors, refreshMeta } = useBookMeta(currentSource);
+    const {
+        meta, getAuthors, getTags, getViewCount, getLastViewedAt,
+        recordView, updateAuthors, updateTags, allAuthors, allTags, refreshMeta,
+    } = useBookMeta(currentSource);
     const sortedPdfs = useSortedPdfs(
         pdfs,
         sortOrder,
@@ -81,6 +87,7 @@ export function LibraryPanel() {
         directories,
         searchText,
         authorFilter,
+        tagFilter,
         currentPath,
         meta,
     });
@@ -88,6 +95,18 @@ export function LibraryPanel() {
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
     }, [selectedItems, currentPath, updateAuthors]);
+
+    const handleBulkApplyTags = useCallback(async (tags: string[]) => {
+        const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+        await updateTags(currentPath, pdfNames, tags);
+    }, [selectedItems, currentPath, updateTags]);
+
+    // 1冊だけ選択中ならその書籍の現在タグを初期表示する
+    const bulkTagInitial = (() => {
+        const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+        if (pdfNames.length !== 1) return [];
+        return getTags(currentPath, pdfNames[0]);
+    })();
 
     const handleRegenThumbnailBulk = useCallback(async () => {
         const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
@@ -125,18 +144,22 @@ export function LibraryPanel() {
                 sortOrder={sortOrder}
                 searchText={searchText}
                 authorFilter={authorFilter}
+                tagFilter={tagFilter}
                 allAuthors={allAuthors}
+                allTags={allTags}
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
                 onCreateFolder={onOpenCreateFolder}
                 onMoveSelected={onMoveSelected}
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
+                onBulkSetTag={() => setIsBulkTagOpen(true)}
                 onRegenThumbnailBulk={handleRegenThumbnailBulk}
                 onMergePdfs={() => setIsMergeDialogOpen(true)}
                 onSortChange={handleSortChange}
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
+                onTagFilterChange={setTagFilter}
             />
 
             <LibraryDialogs
@@ -155,6 +178,10 @@ export function LibraryPanel() {
                 isBulkAuthorOpen={isBulkAuthorOpen}
                 onCloseBulkAuthor={() => setIsBulkAuthorOpen(false)}
                 onBulkApplyAuthors={handleBulkApplyAuthors}
+                isBulkTagOpen={isBulkTagOpen}
+                bulkTagInitial={bulkTagInitial}
+                onCloseBulkTag={() => setIsBulkTagOpen(false)}
+                onBulkApplyTags={handleBulkApplyTags}
                 isMergeDialogOpen={isMergeDialogOpen}
                 onCloseMergeDialog={() => setIsMergeDialogOpen(false)}
                 onMergePdfs={handleMergePdfs}
@@ -184,6 +211,8 @@ export function LibraryPanel() {
                         onRegenThumb={handleRegenThumb}
                         getAuthors={(name) => getAuthors(currentPath, name)}
                         onAuthorClick={setAuthorFilter}
+                        getTags={(name) => getTags(currentPath, name)}
+                        onTagClick={setTagFilter}
                     />
                 </div>
             </div>

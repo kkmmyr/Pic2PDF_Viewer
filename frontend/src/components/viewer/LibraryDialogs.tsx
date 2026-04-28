@@ -1,6 +1,7 @@
 import type { LibrarySource } from '../../types';
 import { MoveDialog } from '../reader';
 import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
+import { BulkTagDialog } from './BulkTagDialog';
 
 export interface LibraryDialogsProps {
     currentPath: string;
@@ -22,6 +23,11 @@ export interface LibraryDialogsProps {
     isBulkAuthorOpen: boolean;
     onCloseBulkAuthor: () => void;
     onBulkApplyAuthors: (authors: string[]) => Promise<void>;
+    // BulkTag
+    isBulkTagOpen: boolean;
+    bulkTagInitial: string[];
+    onCloseBulkTag: () => void;
+    onBulkApplyTags: (tags: string[]) => Promise<void>;
     // Merge
     isMergeDialogOpen: boolean;
     onCloseMergeDialog: () => void;
@@ -34,6 +40,7 @@ export function LibraryDialogs({
     renameTarget, onCloseRename, onRenameItem,
     isMoveDialogOpen, onCloseMoveDialog, onMoveItems,
     isBulkAuthorOpen, onCloseBulkAuthor, onBulkApplyAuthors,
+    isBulkTagOpen, bulkTagInitial, onCloseBulkTag, onBulkApplyTags,
     isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
 }: LibraryDialogsProps) {
     const pdfItems = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
@@ -67,6 +74,14 @@ export function LibraryDialogs({
                 targetCount={selectedItems.size}
                 onClose={onCloseBulkAuthor}
                 onApply={onBulkApplyAuthors}
+            />
+
+            <BulkTagDialog
+                open={isBulkTagOpen}
+                targetCount={selectedItems.size}
+                initialTags={bulkTagInitial}
+                onClose={onCloseBulkTag}
+                onApply={onBulkApplyTags}
             />
 
             <MergeDialog

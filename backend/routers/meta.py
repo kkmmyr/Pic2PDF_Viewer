@@ -35,10 +35,15 @@ class BookMetaEntry(BaseModel):
 
 
 class UpdateMetaRequest(BaseModel):
-    """単一書籍または複数書籍へのメタデータ更新リクエスト。"""
+    """単一書籍または複数書籍へのメタデータ更新リクエスト。
+
+    `authors` / `tags` は省略可。省略されたフィールドは変更しない。
+    両方省略するとエラー（更新する内容が無い）。
+    """
     path: str = ""
     names: list[str]
-    authors: list[str]
+    authors: list[str] | None = None
+    tags: list[str] | None = None
     source: str = "generated"
 
 
@@ -66,31 +71,46 @@ def get_meta(source: str = "generated") -> dict:
 
 @router.patch("/meta")
 def update_meta(request: UpdateMetaRequest) -> dict:
-    """1冊または複数冊の著者名を上書き保存する。"""
+    """1冊または複数冊のメタデータ（作者名 / タグ）を上書き保存する。
+
+    `authors` / `tags` は省略可。省略されたフィールドは変更しない。
+    """
     if request.source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
+    if request.authors is None and request.tags is None:
+        raise HTTPException(status_code=400, detail="authors or tags must be specified")
 
     validate_safe_path(request.path, param_name="path")
     for name in request.names:
         validate_safe_name(name, param_name="name")
 
-    authors = [a.strip() for a in request.authors if a.strip()]
+    # 各フィールドを正規化（None ならそのまま）
+    authors = [a.strip() for a in request.authors if a.strip()] if request.authors is not None else None
+    tags = [t.strip() for t in request.tags if t.strip()] if request.tags is not None else None
+
+    def _merge_field(entry: dict, field: str, value: list[str] | None) -> None:
+        """フィールドを書き換えるか削除する。`value is None` の場合は何もしない。"""
+        if value is None:
+            return
+        if value:
+            entry[field] = value
+        else:
+            # 空配列を渡された場合は空のまま残す（最後にエントリ自体を消すかは呼び出し側で判定）
+            entry[field] = []
 
     def _apply(data):
         for name in request.names:
             key = make_key(request.path, name)
-            existing = data.get(key, {})
-            if authors:
-                # 既存の view_count / last_viewed_at を保持して authors のみ更新
-                data[key] = {**existing, "authors": authors}
-            elif existing:
-                # authors を空にした場合: 他のフィールド (view_count 等) があれば
-                # authors=[] にして残し、無ければエントリごと削除
-                rest = {k: v for k, v in existing.items() if k != "authors"}
-                if rest:
-                    data[key] = {"authors": [], **rest}
-                else:
-                    data.pop(key, None)
+            existing = dict(data.get(key, {}))
+            _merge_field(existing, "authors", authors)
+            _merge_field(existing, "tags", tags)
+
+            # エントリが空（または authors/tags が空でかつ他フィールドも無い）場合は削除
+            non_empty_fields = {k: v for k, v in existing.items() if not (isinstance(v, list) and not v)}
+            if non_empty_fields:
+                data[key] = existing
+            else:
+                data.pop(key, None)
 
     update_meta_locked(request.source, _apply)
     return {"message": "Updated", "updated_count": len(request.names)}

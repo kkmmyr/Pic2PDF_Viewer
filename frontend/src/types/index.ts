@@ -143,6 +143,7 @@ export type SortOrder = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc' | 'f
  */
 export interface BookMetaEntry {
     authors: string[];
+    tags?: string[];
     view_count?: number;
     last_viewed_at?: number;
 }
@@ -153,12 +154,14 @@ export interface BookMetaEntry {
 export type BookMetaMap = Record<string, BookMetaEntry>;
 
 /**
- * メタデータ更新リクエスト
+ * メタデータ更新リクエスト。
+ * authors / tags は省略可。省略されたフィールドは変更されない。
  */
 export interface UpdateMetaRequest {
     path: string;
     names: string[];
-    authors: string[];
+    authors?: string[];
+    tags?: string[];
     source: string;
 }
 

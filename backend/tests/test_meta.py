@@ -211,6 +211,95 @@ class TestUpdateAuthorsPreservesViewCount:
 
 
 # ---------------------------------------------------------------------------
+# PATCH /api/meta — タグ機能
+# ---------------------------------------------------------------------------
+
+class TestUpdateTags:
+    def test_tags_only_create(self, view_client, tmp_path):
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "tags": ["ジャンル1", "気分A"], "source": "generated",
+        })
+        assert res.status_code == 200
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["tags"] == ["ジャンル1", "気分A"]
+        # authors は省略されたので存在しない
+        assert "authors" not in meta["book.pdf"]
+
+    def test_authors_only_does_not_clear_tags(self, view_client, tmp_path):
+        # 先に tags を登録
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "tags": ["ジャンル1"], "source": "generated",
+        })
+        # authors のみを後から登録（tags は省略）
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["サークルA"], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        # tags は保持される
+        assert meta["book.pdf"]["tags"] == ["ジャンル1"]
+        assert meta["book.pdf"]["authors"] == ["サークルA"]
+
+    def test_tags_only_does_not_clear_authors(self, view_client, tmp_path):
+        # 先に authors を登録
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "authors": ["サークルA"], "source": "generated",
+        })
+        # tags のみを後から登録
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "tags": ["ジャンル1"], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["authors"] == ["サークルA"]
+        assert meta["book.pdf"]["tags"] == ["ジャンル1"]
+
+    def test_tags_preserves_view_count(self, view_client, tmp_path):
+        # 閲覧記録 → tags 更新で view_count が保持される
+        view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "tags": ["ジャンル1"], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["view_count"] == 1
+        assert meta["book.pdf"]["tags"] == ["ジャンル1"]
+
+    def test_clear_tags_keeps_authors(self, view_client, tmp_path):
+        # authors + tags を登録
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"],
+            "authors": ["サークルA"], "tags": ["ジャンル1"], "source": "generated",
+        })
+        # tags を空配列で削除
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "tags": [], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["authors"] == ["サークルA"]
+        # tags は空配列で残る
+        assert meta["book.pdf"].get("tags") == []
+
+    def test_clear_both_removes_entry(self, view_client, tmp_path):
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"],
+            "authors": ["サークルA"], "tags": ["ジャンル1"], "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"],
+            "authors": [], "tags": [], "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        # 両方空かつ閲覧履歴も無い → エントリごと削除
+        assert "book.pdf" not in meta
+
+    def test_neither_authors_nor_tags_returns_400(self, view_client):
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "source": "generated",
+        })
+        assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
 # auto_fill_service.run_auto_fill — 既存 view_count / last_viewed_at の保持
 # ---------------------------------------------------------------------------
 

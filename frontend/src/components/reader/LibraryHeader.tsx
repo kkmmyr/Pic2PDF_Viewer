@@ -1,4 +1,4 @@
-import { ArrowLeft, ImageIcon, Merge } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
@@ -12,18 +12,22 @@ interface LibraryHeaderProps {
     sortOrder: SortOrder;
     searchText: string;
     authorFilter: string;
+    tagFilter: string;
     allAuthors: string[];
+    allTags: string[];
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
     onCreateFolder: () => void;
     onMoveSelected: () => void;
     onBulkSetAuthor: () => void;
+    onBulkSetTag: () => void;
     onRegenThumbnailBulk: () => void;
     onMergePdfs: () => void;
     onSortChange: (order: SortOrder) => void;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
+    onTagFilterChange: (tag: string) => void;
 }
 
 export function LibraryHeader({
@@ -34,18 +38,22 @@ export function LibraryHeader({
     sortOrder,
     searchText,
     authorFilter,
+    tagFilter,
     allAuthors,
+    allTags,
     onUpClick,
     onSourceChange,
     onToggleSelectionMode,
     onCreateFolder,
     onMoveSelected,
     onBulkSetAuthor,
+    onBulkSetTag,
     onRegenThumbnailBulk,
     onMergePdfs,
     onSortChange,
     onSearchChange,
     onAuthorFilterChange,
+    onTagFilterChange,
 }: LibraryHeaderProps) {
     return (
         <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-header">
@@ -69,9 +77,12 @@ export function LibraryHeader({
                         <HeaderSearchBar
                             searchText={searchText}
                             authorFilter={authorFilter}
+                            tagFilter={tagFilter}
                             allAuthors={allAuthors}
+                            allTags={allTags}
                             onSearchChange={onSearchChange}
                             onAuthorFilterChange={onAuthorFilterChange}
+                            onTagFilterChange={onTagFilterChange}
                         />
                     )}
 
@@ -87,6 +98,15 @@ export function LibraryHeader({
                                     className="px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     作者を設定
+                                </button>
+                                <button
+                                    onClick={onBulkSetTag}
+                                    disabled={selectedCount === 0}
+                                    title="選択した書籍のタグを一括設定"
+                                    className="px-3 py-1.5 bg-emerald-700 text-white rounded-md text-sm font-medium hover:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                >
+                                    <Tag className="w-4 h-4" />
+                                    タグを設定
                                 </button>
                                 <button
                                     onClick={onMergePdfs}

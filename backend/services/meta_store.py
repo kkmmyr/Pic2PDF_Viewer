@@ -11,6 +11,8 @@ from config import DATA_DIR
 
 class MetaEntry(TypedDict):
     authors: list[str]
+    # タグ（自由ラベル）。既存エントリには含まれない場合があるため任意。
+    tags: NotRequired[list[str]]
     # 閲覧回数。既存エントリには含まれない場合があるため任意。
     view_count: NotRequired[int]
     # 最終閲覧時刻 (UNIX time, float)。

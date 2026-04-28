@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { BookMetaMap } from '../types';
+import type { BookMetaMap, BookMetaEntry } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 
@@ -40,6 +40,11 @@ export function useBookMeta(source: string) {
         return meta[makeKey(path, name)]?.authors ?? [];
     }, [meta, makeKey]);
 
+    /** 1冊のタグリストを返す */
+    const getTags = useCallback((path: string, name: string): string[] => {
+        return meta[makeKey(path, name)]?.tags ?? [];
+    }, [meta, makeKey]);
+
     /** 1冊の閲覧回数を返す（未記録は 0） */
     const getViewCount = useCallback((path: string, name: string): number => {
         return meta[makeKey(path, name)]?.view_count ?? 0;
@@ -75,48 +80,76 @@ export function useBookMeta(source: string) {
     }, [source, makeKey]);
 
     /**
-     * 1冊または複数冊の作者名を上書き保存する。
-     * names に複数のファイル名を渡すと一括更新。
+     * 1冊または複数冊の作者名 / タグを上書き保存する。
+     * `authors` / `tags` のどちらか（または両方）を指定する。省略したフィールドは変更されない。
      */
-    const updateAuthors = useCallback(async (
+    const updateMeta = useCallback(async (
         path: string,
         names: string[],
-        authors: string[]
+        fields: { authors?: string[]; tags?: string[] }
     ) => {
+        if (fields.authors === undefined && fields.tags === undefined) return;
+
         await apiClient.patch(API_ENDPOINTS.META, {
             path,
             names,
-            authors,
+            ...(fields.authors !== undefined ? { authors: fields.authors } : {}),
+            ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
             source,
         });
-        // ローカル状態も即時更新（再フェッチを待たずに反映）。
-        // バックエンドの挙動に合わせて view_count / last_viewed_at は保持する。
+
+        // ローカル状態を即時更新。バックエンドのマージ規則に合わせて、
+        // 指定されたフィールドのみ書き換え、他フィールドは保持。
         setMeta(prev => {
             const next = { ...prev };
             for (const name of names) {
                 const key = makeKey(path, name);
-                const existing = next[key];
-                if (authors.length > 0) {
-                    next[key] = { ...existing, authors };
-                } else if (existing) {
-                    // authors を空にした場合: authors を消すが view_count 等は残す。
-                    // 残るフィールドが無ければエントリごと削除。
-                    const { authors: _omit, ...rest } = existing;
-                    if (Object.keys(rest).length > 0) {
-                        next[key] = { authors: [], ...rest };
-                    } else {
-                        delete next[key];
-                    }
+                const existing = next[key] ?? { authors: [] };
+                const merged: BookMetaEntry = { ...existing };
+
+                if (fields.authors !== undefined) merged.authors = fields.authors;
+                if (fields.tags !== undefined) merged.tags = fields.tags;
+
+                // 空配列のフィールドを除外して、残るフィールドが無ければエントリごと削除
+                const isEmptyArray = (v: unknown): boolean => Array.isArray(v) && v.length === 0;
+                const hasNonEmpty = Object.entries(merged).some(([_, v]) => !isEmptyArray(v));
+
+                if (hasNonEmpty) {
+                    next[key] = merged;
+                } else {
+                    delete next[key];
                 }
             }
             return next;
         });
     }, [source, makeKey]);
 
+    /** 後方互換: authors のみを更新する旧 API。内部で updateMeta に委譲。 */
+    const updateAuthors = useCallback((path: string, names: string[], authors: string[]) => {
+        return updateMeta(path, names, { authors });
+    }, [updateMeta]);
+
+    /** タグのみを更新する。 */
+    const updateTags = useCallback((path: string, names: string[], tags: string[]) => {
+        return updateMeta(path, names, { tags });
+    }, [updateMeta]);
+
     /** このソースに登録されている全作者名（重複排除・ソート済み）*/
     const allAuthors: string[] = [...new Set(
         Object.values(meta).flatMap(e => e.authors)
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
-    return { meta, getAuthors, getViewCount, getLastViewedAt, recordView, updateAuthors, allAuthors, refreshMeta: fetchMeta };
+    /** このソースに登録されている全タグ（重複排除・ソート済み）*/
+    const allTags: string[] = [...new Set(
+        Object.values(meta).flatMap(e => e.tags ?? [])
+    )].sort((a, b) => a.localeCompare(b, 'ja'));
+
+    return {
+        meta,
+        getAuthors, getTags, getViewCount, getLastViewedAt,
+        recordView,
+        updateAuthors, updateTags, updateMeta,
+        allAuthors, allTags,
+        refreshMeta: fetchMeta,
+    };
 }

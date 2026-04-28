@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, Trash2, CheckSquare, Square, Search, Wand2, BookOpen, FileText } from 'lucide-react';
+import { ArrowLeft, Trash2, CheckSquare, Square, Search, Wand2, BookOpen, FileText, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
 import type { ReadingDirection, SpreadMode } from '../../types';
 
 interface ReaderHeaderProps {
@@ -12,6 +12,9 @@ interface ReaderHeaderProps {
     selectedPagesCount: number;
     showHeader: boolean;
     isSearchOpen: boolean;
+    isFullscreen: boolean;
+    /** カウンタが増えるたびにページジャンプ入力にフォーカスする（g キー連動）*/
+    pageJumpFocusRequest: number;
     onClose: () => void;
     onToggleDirection: () => void;
     onCycleSpreadMode: () => void;
@@ -19,6 +22,8 @@ interface ReaderHeaderProps {
     onDeletePages: () => void;
     onMouseLeave: () => void;
     onToggleSearch: () => void;
+    onToggleFullscreen: () => void;
+    onOpenHelp: () => void;
     onPageJump: (page: number) => void;
 }
 
@@ -38,6 +43,8 @@ export function ReaderHeader({
     selectedPagesCount,
     showHeader,
     isSearchOpen,
+    isFullscreen,
+    pageJumpFocusRequest,
     onClose,
     onToggleDirection,
     onCycleSpreadMode,
@@ -45,6 +52,8 @@ export function ReaderHeader({
     onDeletePages,
     onMouseLeave,
     onToggleSearch,
+    onToggleFullscreen,
+    onOpenHelp,
     onPageJump,
 }: ReaderHeaderProps) {
     const [isEditingPage, setIsEditingPage] = useState(false);
@@ -60,6 +69,11 @@ export function ReaderHeader({
             }, 0);
         }
     }, [isEditingPage, pageNumber]);
+
+    // 外部からの「ページジャンプにフォーカスして」要求（g キー）に応答する
+    useEffect(() => {
+        if (pageJumpFocusRequest > 0) setIsEditingPage(true);
+    }, [pageJumpFocusRequest]);
 
     const commitPageJump = () => {
         const n = parseInt(inputValue, 10);
@@ -152,6 +166,24 @@ export function ReaderHeader({
                 >
                     <Search className="w-4 h-4" />
                     Search
+                </button>
+
+                {/* フルスクリーン切替ボタン */}
+                <button
+                    onClick={onToggleFullscreen}
+                    className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    title={isFullscreen ? 'フルスクリーン解除 (f)' : 'フルスクリーン (f)'}
+                >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+
+                {/* ショートカット一覧ボタン */}
+                <button
+                    onClick={onOpenHelp}
+                    className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    title="ショートカット一覧 (?)"
+                >
+                    <HelpCircle className="w-4 h-4" />
                 </button>
 
                 <button

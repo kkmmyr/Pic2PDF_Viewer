@@ -6,10 +6,12 @@ import type { LibrarySource, ReadingDirection } from '../../types';
 import { buildStaticUrl, STATIC_PATHS } from '../../config/api';
 import {
     useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast,
-    useSpreadMode, useEditMode,
+    useSpreadMode, useEditMode, useFullscreen,
 } from '../../hooks';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
+import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer } from '../reader';
+import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 // <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
@@ -46,6 +48,7 @@ export function ReaderPanel({
     const [pdfVersion, setPdfVersion] = useState(0);
 
     const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
+    const { isFullscreen, toggleFullscreen } = useFullscreen();
 
     const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } =
         useReaderNavigation({ numPages, isSpread, direction, isActive: true });
@@ -63,8 +66,10 @@ export function ReaderPanel({
         showError: (msg) => showToast(msg, 'error'),
     });
 
-    // 検索
+    // 検索 / ヘルプ / ページジャンプフォーカス要求
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [pageJumpFocusRequest, setPageJumpFocusRequest] = useState(0);
     const {
         searchText, setSearchText,
         matchCount, currentMatch,
@@ -74,17 +79,15 @@ export function ReaderPanel({
         onDocumentLoaded,
     } = usePdfSearch({ isSearchOpen, setPageNumber });
 
-    // Ctrl+F でサーチバーを開く
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-                e.preventDefault();
-                setIsSearchOpen(true);
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    // キーボードショートカット（Ctrl+F / f / e / g / ?）を集約
+    useReaderShortcuts({
+        isActive: true,
+        onToggleFullscreen: toggleFullscreen,
+        onToggleEditMode: toggleEditMode,
+        onFocusPageJump: () => setPageJumpFocusRequest(c => c + 1),
+        onOpenHelp: () => setIsHelpOpen(true),
+        onToggleSearch: () => setIsSearchOpen(true),
+    });
 
     const handleCloseSearch = useCallback(() => {
         setIsSearchOpen(false);
@@ -180,6 +183,8 @@ export function ReaderPanel({
                 selectedPagesCount={selectedPages.size}
                 showHeader={showHeader || isSearchOpen}
                 isSearchOpen={isSearchOpen}
+                isFullscreen={isFullscreen}
+                pageJumpFocusRequest={pageJumpFocusRequest}
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
                 onCycleSpreadMode={cycleSpreadMode}
@@ -187,6 +192,8 @@ export function ReaderPanel({
                 onDeletePages={requestDeletePages}
                 onMouseLeave={() => setShowHeader(false)}
                 onToggleSearch={() => setIsSearchOpen(s => !s)}
+                onToggleFullscreen={toggleFullscreen}
+                onOpenHelp={() => setIsHelpOpen(true)}
                 onPageJump={setPageNumber}
             />
 
@@ -238,6 +245,8 @@ export function ReaderPanel({
                 onConfirm={confirmDeletePages}
                 onCancel={cancelDeletePages}
             />
+
+            <ShortcutsHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
