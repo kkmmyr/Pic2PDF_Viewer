@@ -213,8 +213,11 @@ export function useBookMeta(source: string) {
     }, [source, makeKey]);
 
     /** このソースに登録されている全作者名（重複排除・ソート済み）*/
+    // `e.authors` 不在のエントリ（閲覧記録のみ・タグのみ・hidden のみ等）から
+    // undefined が混入しないよう `?? []` でガードする。混入すると select option の
+    // key が undefined になり React の警告が出る。
     const allAuthors: string[] = [...new Set(
-        Object.values(meta).flatMap(e => e.authors)
+        Object.values(meta).flatMap(e => e.authors ?? [])
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
     /** このソースに登録されている全タグ（重複排除・ソート済み）*/
