@@ -627,3 +627,84 @@ class TestUnassignSeries:
         })
         assert res.status_code == 200
         assert res.json()["updated_count"] == 1
+
+
+class TestReorderSeries:
+    def _setup_series(self, client, names: list[str]) -> str:
+        """3 冊を 1 つのシリーズに登録し、series_id を返すヘルパー。"""
+        client.patch("/api/meta", json={
+            "path": "", "names": names, "authors": ["A"], "source": "generated",
+        })
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": names,
+            "title": "S", "index": [float(i + 1) for i in range(len(names))],
+            "source": "generated",
+        })
+        return res.json()["id"]
+
+    def test_reorder_renumbers_in_given_order(self, series_client):
+        client, tmp_path = series_client
+        sid = self._setup_series(client, ["a.pdf", "b.pdf", "c.pdf"])
+        res = client.post("/api/series/reorder", json={
+            "path": "", "names": ["c.pdf", "a.pdf", "b.pdf"],
+            "series_id": sid, "source": "generated",
+        })
+        assert res.status_code == 200
+        assert res.json()["updated_count"] == 3
+
+        meta = _read_meta_at(tmp_path)
+        assert meta["c.pdf"]["series_index"] == 1.0
+        assert meta["a.pdf"]["series_index"] == 2.0
+        assert meta["b.pdf"]["series_index"] == 3.0
+
+    def test_reorder_preserves_other_fields(self, series_client):
+        client, tmp_path = series_client
+        sid = self._setup_series(client, ["a.pdf", "b.pdf"])
+        client.post("/api/meta/view", json={
+            "path": "", "name": "a.pdf", "source": "generated",
+        })
+        client.post("/api/series/reorder", json={
+            "path": "", "names": ["b.pdf", "a.pdf"],
+            "series_id": sid, "source": "generated",
+        })
+        meta = _read_meta_at(tmp_path)
+        assert meta["a.pdf"]["authors"] == ["A"]
+        assert meta["a.pdf"]["view_count"] == 1
+        assert meta["a.pdf"]["series_id"] == sid
+        assert meta["a.pdf"]["series_title"] == "S"
+
+    def test_reorder_rejects_book_from_different_series(self, series_client):
+        client, tmp_path = series_client
+        sid = self._setup_series(client, ["a.pdf", "b.pdf"])
+        # 別シリーズの c.pdf を作成
+        client.patch("/api/meta", json={
+            "path": "", "names": ["c.pdf"], "authors": ["B"], "source": "generated",
+        })
+        client.post("/api/series/assign", json={
+            "path": "", "names": ["c.pdf"],
+            "title": "Other", "index": 1.0, "source": "generated",
+        })
+        # series_id 不一致で 400
+        res = client.post("/api/series/reorder", json={
+            "path": "", "names": ["a.pdf", "c.pdf"],
+            "series_id": sid, "source": "generated",
+        })
+        assert res.status_code == 400
+        # 失敗時は元の順序が保たれる（中途半端な書き込みなし）
+        meta = _read_meta_at(tmp_path)
+        assert meta["a.pdf"]["series_index"] == 1.0
+        assert meta["b.pdf"]["series_index"] == 2.0
+
+    def test_reorder_empty_names_returns_400(self, series_client):
+        client, _ = series_client
+        res = client.post("/api/series/reorder", json={
+            "path": "", "names": [], "series_id": "x", "source": "generated",
+        })
+        assert res.status_code == 400
+
+    def test_reorder_invalid_source_returns_400(self, series_client):
+        client, _ = series_client
+        res = client.post("/api/series/reorder", json={
+            "path": "", "names": ["a.pdf"], "series_id": "x", "source": "invalid",
+        })
+        assert res.status_code == 400

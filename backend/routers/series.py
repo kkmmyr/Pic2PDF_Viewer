@@ -79,6 +79,14 @@ class UnassignSeriesRequest(BaseModel):
     source: str = "generated"
 
 
+class ReorderSeriesRequest(BaseModel):
+    """同じシリーズに属する書籍の `series_index` を `names` の順序で振り直すリクエスト。"""
+    path: str = ""
+    names: list[str]
+    series_id: str
+    source: str = "generated"
+
+
 @router.post("/series/assign")
 def assign_series(request: AssignSeriesRequest) -> dict:
     """書籍を既存または新規シリーズに割り当てる（手動編集）。
@@ -156,3 +164,43 @@ def unassign_series(request: UnassignSeriesRequest) -> dict:
 
     update_meta_locked(request.source, _apply)
     return {"message": "Unassigned", "updated_count": len(request.names)}
+
+
+@router.post("/series/reorder")
+def reorder_series(request: ReorderSeriesRequest) -> dict:
+    """シリーズ内の `series_index` を `names` の順序で 1.0, 2.0, 3.0, ... に振り直す（DnD 並べ替え）。
+
+    `names` には対象シリーズに属する書籍を **新しい順序で** 渡す。`series_id` が
+    一致しない書籍が混じっていれば 400。他のメタフィールドは保持する。
+    """
+    if request.source not in VALID_SOURCES:
+        raise HTTPException(status_code=400, detail="Invalid source")
+    if not request.names:
+        raise HTTPException(status_code=400, detail="names must not be empty")
+    if not request.series_id.strip():
+        raise HTTPException(status_code=400, detail="series_id must not be empty")
+
+    validate_safe_path(request.path, param_name="path")
+    for name in request.names:
+        validate_safe_name(name, param_name="name")
+
+    def _apply(data: MetaDict) -> None:
+        # 全書籍が対象シリーズに属することを先に検査（一部だけ更新して中途半端な状態に
+        # ならないように）。
+        for name in request.names:
+            key = make_key(request.path, name)
+            entry = data.get(key)
+            if not entry or entry.get("series_id") != request.series_id:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"'{name}' does not belong to series '{request.series_id}'",
+                )
+
+        for i, name in enumerate(request.names):
+            key = make_key(request.path, name)
+            existing = dict(data[key])
+            existing["series_index"] = float(i + 1)
+            data[key] = existing
+
+    update_meta_locked(request.source, _apply)
+    return {"message": "Reordered", "updated_count": len(request.names)}

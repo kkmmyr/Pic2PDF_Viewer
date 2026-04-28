@@ -109,7 +109,8 @@ export function LibraryPanel() {
     const {
         meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView, updateAuthors, updateTags, setHidden,
-        assignSeries, unassignSeries, allAuthors, allTags, allSeries, refreshMeta,
+        assignSeries, unassignSeries, reorderSeries,
+        allAuthors, allTags, allSeries, refreshMeta,
     } = useBookMeta(currentSource);
     const sortedPdfs = useSortedPdfs(
         pdfs,
@@ -164,6 +165,18 @@ export function LibraryPanel() {
         currentPath,
         mode: effectiveGroupMode,
     });
+
+    // シリーズドリルダウン中はユーザー選択ソートに関係なく series_index 昇順で表示する。
+    // DnD 並べ替えの結果を即座に反映させるため、grouped.items をその場で並べ替える。
+    const displayPdfs = (() => {
+        if (!seriesFilter) return grouped.items;
+        const sorted = [...grouped.items].sort((a, b) => {
+            const ai = getSeries(currentPath, a.name)?.index ?? 0;
+            const bi = getSeries(currentPath, b.name)?.index ?? 0;
+            return ai - bi;
+        });
+        return sorted;
+    })();
 
     // シリーズフィルター中の表示用チップ情報（タイトルは meta から引く）
     const seriesFilterTitle = seriesFilter
@@ -290,6 +303,20 @@ export function LibraryPanel() {
             .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     })();
 
+    /**
+     * シリーズドリルダウン中のドロップで呼ばれる。
+     * `newOrder` の順に series_index を 1.0, 2.0, ... に振り直す。
+     * useBookMeta.reorderSeries 内で楽観的更新 + 失敗時ロールバックを実装済み。
+     */
+    const handleSeriesReorder = useCallback(async (newOrder: string[]) => {
+        if (!seriesFilter || newOrder.length === 0) return;
+        try {
+            await reorderSeries(currentPath, newOrder, seriesFilter);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : '並べ替えに失敗しました。', 'error');
+        }
+    }, [seriesFilter, currentPath, reorderSeries, showToast]);
+
     const handleBulkAssignSeries = useCallback(async (params: { title: string; indexes: number[]; id?: string }) => {
         if (bulkSeriesNames.length === 0) return;
         if (params.indexes.length !== bulkSeriesNames.length) {
@@ -387,7 +414,7 @@ export function LibraryPanel() {
                         onRename={(name) => onOpenRename(name, true)}
                     />
                     <PdfGrid
-                        pdfs={grouped.items}
+                        pdfs={displayPdfs}
                         onPdfClick={handlePdfClick}
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
@@ -415,6 +442,8 @@ export function LibraryPanel() {
                         onToggleHidden={handleToggleHiddenOne}
                         showHidden={showHidden}
                         onEditSeries={setSeriesEditTarget}
+                        dndEnabled={!!seriesFilter}
+                        onReorder={handleSeriesReorder}
                     />
                 </div>
             </div>

@@ -415,6 +415,29 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
+### `POST /api/series/reorder`
+同じシリーズに属する書籍の `series_index` を **配列の順序どおり 1.0, 2.0, 3.0, ...** に振り直す（DnD 並べ替え用）。
+
+**リクエストボディ**:
+```json
+{
+  "path": "current/relative/path",
+  "names": ["vol3.pdf", "vol1.pdf", "vol2.pdf"],
+  "series_id": "abc12345",
+  "source": "generated"
+}
+```
+- `names` — シリーズに属する書籍を **新しい順序で** 並べたリスト
+- `series_id` — 対象シリーズ。指定 `names` の `series_id` がすべて一致しないと 400
+- 他のメタフィールド（authors / tags / view_count 等）は変更しない
+
+**レスポンス**: `{"message": "Reordered", "updated_count": 3}`
+
+**エラー**:
+- `400`: `names` が空 / `series_id` が一致しない書籍が含まれる
+
+---
+
 ### `GET /api/series/resolve/status`
 シリーズ判定ジョブの進捗を返す。
 

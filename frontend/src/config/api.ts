@@ -63,6 +63,8 @@ export const API_ENDPOINTS = {
     SERIES_ASSIGN: '/api/series/assign',
     /** シリーズ手動解除 */
     SERIES_UNASSIGN: '/api/series/unassign',
+    /** シリーズ巻数の並べ替え（DnD） */
+    SERIES_REORDER: '/api/series/reorder',
 } as const;
 
 /**

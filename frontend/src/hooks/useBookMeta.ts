@@ -206,6 +206,58 @@ export function useBookMeta(source: string) {
         return sid;
     }, [source, makeKey]);
 
+    /**
+     * 同じシリーズに属する書籍の `series_index` を `names` の順序で
+     * 1.0, 2.0, 3.0, ... に振り直す（DnD 並べ替え用）。
+     *
+     * 楽観的更新: ローカル meta を即時に書き換えてから API を投げ、
+     * 失敗時はスナップショットからロールバックする（ドロップ時に
+     * カードが元位置に戻ってチラつかないようにするため）。
+     */
+    const reorderSeries = useCallback(async (
+        path: string,
+        names: string[],
+        seriesId: string,
+    ): Promise<void> => {
+        // 楽観的更新と同時に rollback 用のスナップショットを取る。
+        // StrictMode で updater が 2 回呼ばれても結果が同じになるよう毎回再構築する。
+        let snapshot: Record<string, number | undefined> = {};
+        setMeta(prev => {
+            snapshot = {};
+            const next = { ...prev };
+            names.forEach((name, i) => {
+                const key = makeKey(path, name);
+                snapshot[key] = prev[key]?.series_index;
+                const existing = next[key];
+                if (!existing) return;
+                next[key] = { ...existing, series_index: i + 1 };
+            });
+            return next;
+        });
+
+        try {
+            await apiClient.post(API_ENDPOINTS.SERIES_REORDER, {
+                path, names, series_id: seriesId, source,
+            });
+        } catch (e) {
+            setMeta(prev => {
+                const next = { ...prev };
+                for (const [key, idx] of Object.entries(snapshot)) {
+                    const existing = next[key];
+                    if (!existing) continue;
+                    if (idx === undefined) {
+                        const { series_index: _si, ...rest } = existing;
+                        next[key] = rest as BookMetaEntry;
+                    } else {
+                        next[key] = { ...existing, series_index: idx };
+                    }
+                }
+                return next;
+            });
+            throw e;
+        }
+    }, [source, makeKey]);
+
     /** 書籍をシリーズから外す（series_* フィールドを削除）。 */
     const unassignSeries = useCallback(async (path: string, names: string[]): Promise<void> => {
         await apiClient.post(API_ENDPOINTS.SERIES_UNASSIGN, { path, names, source });
@@ -253,7 +305,7 @@ export function useBookMeta(source: string) {
         getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView,
         updateAuthors, updateTags, updateMeta, setHidden,
-        assignSeries, unassignSeries,
+        assignSeries, unassignSeries, reorderSeries,
         allAuthors, allTags, allSeries,
         refreshMeta: fetchMeta,
     };
