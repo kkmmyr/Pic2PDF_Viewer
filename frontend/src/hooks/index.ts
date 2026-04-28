@@ -24,3 +24,4 @@ export { useSeriesResolve } from './useSeriesResolve';
 export type { SeriesResolveStatus } from './useSeriesResolve';
 export { useLibraryGrouping } from './useLibraryGrouping';
 export type { GroupMode, GroupBadge, GroupedLibrary } from './useLibraryGrouping';
+export { useNextSeriesVolume } from './useNextSeriesVolume';

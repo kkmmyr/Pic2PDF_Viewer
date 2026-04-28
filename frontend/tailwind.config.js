@@ -11,6 +11,7 @@ export default {
       // 利用例: className="z-header" "z-dialog" 等
       zIndex: {
         'card-badge':    '10',  // PdfGrid / PageRenderer のチェックボックス・お気に入りバッジ
+        'floating-action': '30', // フローティングアクションボタン（「次の巻へ」など）
         'overlay-bar':   '40',  // ヘッダー下に表示する検索バー / トリガーゾーン
         'header':        '50',  // Layout / ReaderHeader / LibraryHeader
         'toast':         '60',  // トースト通知（ヘッダーより前）

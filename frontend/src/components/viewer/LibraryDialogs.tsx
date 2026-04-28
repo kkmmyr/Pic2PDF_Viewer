@@ -1,8 +1,8 @@
-import type { LibrarySource } from '../../types';
+import type { LibrarySource, ExistingSeriesOption } from '../../types';
 import { MoveDialog } from '../reader';
 import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
 import { BulkTagDialog } from './BulkTagDialog';
-import { BulkSeriesAssignDialog, type ExistingSeriesOption } from './BulkSeriesAssignDialog';
+import { BulkSeriesAssignDialog } from './BulkSeriesAssignDialog';
 
 export interface LibraryDialogsProps {
     currentPath: string;

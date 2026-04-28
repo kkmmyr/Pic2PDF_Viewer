@@ -9,6 +9,7 @@ import {
     useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast,
     useSpreadMode, useEditMode, useFullscreen, useBookMeta,
 } from '../../hooks';
+import { useNextSeriesVolume } from '../../hooks/useNextSeriesVolume';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer } from '../reader';
@@ -62,26 +63,7 @@ export function ReaderPanel({
     // 同 series_id で series_index が現在より大きい中で最小のものを次巻とする。
     // 判定範囲は同フォルダ内のみ（meta のキー prefix で path 一致をチェック）。
     const { meta, getSeries, recordView } = useBookMeta(currentSource);
-    const nextVolume: { name: string; index: number; title: string } | null = (() => {
-        const cur = getSeries(currentPath, selectedPdf);
-        if (!cur) return null;
-        const prefix = currentPath ? `${currentPath}/` : '';
-        let best: { name: string; index: number; title: string } | null = null;
-        for (const [key, e] of Object.entries(meta)) {
-            if (e.series_id !== cur.id) continue;
-            const idx = e.series_index ?? 0;
-            if (idx <= cur.index) continue;
-            // 同フォルダ判定: prefix が一致し、残部分にスラッシュがない
-            const rest = currentPath
-                ? (key.startsWith(prefix) ? key.slice(prefix.length) : null)
-                : (key.includes('/') ? null : key);
-            if (rest === null || rest.includes('/')) continue;
-            if (!best || idx < best.index) {
-                best = { name: rest, index: idx, title: e.series_title ?? '' };
-            }
-        }
-        return best;
-    })();
+    const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
 
     // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
     const isAtLastSpread = numPages > 0 && (
@@ -279,7 +261,7 @@ export function ReaderPanel({
             {nextVolume && isAtLastSpread && onSelectPdf && (
                 <button
                     onClick={handleNavigateNextVolume}
-                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-overlay-bar px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-floating-action px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
                     title={`次の巻: #${nextVolume.index} ${nextVolume.title}`}
                 >
                     <span>次の巻へ</span>

@@ -1,12 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import type { ExistingSeriesOption } from '../../types';
 
-export interface ExistingSeriesOption {
-    id: string;
-    title: string;
-    /** そのシリーズの現在の最大 series_index（一括追加時の採番開始用） */
-    maxIndex: number;
-}
+export type { ExistingSeriesOption };
 
 interface BulkSeriesAssignDialogProps {
     open: boolean;

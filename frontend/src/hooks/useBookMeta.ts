@@ -287,7 +287,7 @@ export function useBookMeta(source: string) {
         Object.values(meta).flatMap(e => e.tags ?? [])
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
-    /** このソースに登録されている全シリーズの一覧（id, title, 作者集合付き、タイトル順） */
+    /** このソースに登録されている全シリーズの一覧（id, title、タイトル順） */
     const allSeries: { id: string; title: string }[] = (() => {
         const map = new Map<string, string>();
         for (const e of Object.values(meta)) {
@@ -300,13 +300,36 @@ export function useBookMeta(source: string) {
             .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
     })();
 
+    /**
+     * 全シリーズの統計付き一覧（id, title, maxIndex, count、タイトル順）。
+     * `maxIndex`: そのシリーズの最大 series_index（一括追加の採番開始用）。
+     * `count`: そのシリーズに属する書籍数。
+     */
+    const allSeriesWithStats: { id: string; title: string; maxIndex: number; count: number }[] = (() => {
+        const map = new Map<string, { title: string; maxIndex: number; count: number }>();
+        for (const e of Object.values(meta)) {
+            if (!e.series_id) continue;
+            const idx = e.series_index ?? 0;
+            const existing = map.get(e.series_id);
+            if (existing) {
+                existing.count++;
+                if (idx > existing.maxIndex) existing.maxIndex = idx;
+            } else {
+                map.set(e.series_id, { title: e.series_title ?? '', maxIndex: idx, count: 1 });
+            }
+        }
+        return Array.from(map.entries())
+            .map(([id, { title, maxIndex, count }]) => ({ id, title, maxIndex, count }))
+            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+    })();
+
     return {
         meta,
         getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView,
         updateAuthors, updateTags, updateMeta, setHidden,
         assignSeries, unassignSeries, reorderSeries,
-        allAuthors, allTags, allSeries,
+        allAuthors, allTags, allSeries, allSeriesWithStats,
         refreshMeta: fetchMeta,
     };
 }

@@ -6,7 +6,6 @@ import { LibraryDialogs } from './LibraryDialogs';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
 import { SeriesEditDialog } from './SeriesEditDialog';
-import type { ExistingSeriesOption } from './BulkSeriesAssignDialog';
 import {
     useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
 } from '../../hooks';
@@ -110,7 +109,7 @@ export function LibraryPanel() {
         meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView, updateAuthors, updateTags, setHidden,
         assignSeries, unassignSeries, reorderSeries,
-        allAuthors, allTags, allSeries, refreshMeta,
+        allAuthors, allTags, allSeries, allSeriesWithStats, refreshMeta,
     } = useBookMeta(currentSource);
     const sortedPdfs = useSortedPdfs(
         pdfs,
@@ -290,24 +289,9 @@ export function LibraryPanel() {
     const bulkSeriesNames: string[] = Array.from(selectedItems)
         .filter(item => item.toLowerCase().endsWith('.pdf'));
 
-    // 既存シリーズの一覧を {id, title, maxIndex} に変換。maxIndex は当該シリーズの
-    // 全 series_index の最大（一括追加時に max+1 から採番するため）
-    const bulkSeriesExisting: ExistingSeriesOption[] = (() => {
-        const map = new Map<string, { title: string; maxIndex: number }>();
-        for (const e of Object.values(meta)) {
-            if (!e.series_id) continue;
-            const cur = map.get(e.series_id);
-            const idx = e.series_index ?? 0;
-            if (!cur) {
-                map.set(e.series_id, { title: e.series_title ?? '', maxIndex: idx });
-            } else if (idx > cur.maxIndex) {
-                cur.maxIndex = idx;
-            }
-        }
-        return Array.from(map.entries())
-            .map(([id, v]) => ({ id, title: v.title, maxIndex: v.maxIndex }))
-            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-    })();
+    // 既存シリーズの一覧（useBookMeta.allSeriesWithStats から取得。maxIndex は
+    // 一括追加時の採番開始用）
+    const bulkSeriesExisting = allSeriesWithStats;
 
     /**
      * シリーズドリルダウン中のドロップで呼ばれる。

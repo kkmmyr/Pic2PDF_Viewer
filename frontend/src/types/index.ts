@@ -190,3 +190,14 @@ export interface MergePdfsResponse {
     output_name: string;
     total_pages: number;
 }
+
+/**
+ * シリーズ一括登録ダイアログ用のシリーズ選択肢。
+ * `useBookMeta.allSeriesWithStats` の各エントリがこの型を満たす。
+ */
+export interface ExistingSeriesOption {
+    id: string;
+    title: string;
+    /** そのシリーズの現在の最大 series_index（一括追加時の採番開始用） */
+    maxIndex: number;
+}
