@@ -8,6 +8,12 @@ interface UseLibraryFilterParams {
     authorFilter: string;
     /** タグフィルター（空文字なら無効） */
     tagFilter?: string;
+    /**
+     * 非表示モード（ゴミ箱方式）。
+     * - `false`（デフォルト）: 通常モード。`hidden=true` の書籍を完全除外。
+     * - `true`: 非表示書籍のみを表示する。
+     */
+    showHidden?: boolean;
     currentPath: string;
     meta: BookMetaMap;
 }
@@ -25,17 +31,26 @@ function getTagsFromMeta(meta: BookMetaMap, path: string, name: string): string[
     return getEntryFromMeta(meta, path, name)?.tags ?? [];
 }
 
+function isHiddenInMeta(meta: BookMetaMap, path: string, name: string): boolean {
+    return getEntryFromMeta(meta, path, name)?.hidden === true;
+}
+
 export function useLibraryFilter({
     pdfs,
     directories,
     searchText,
     authorFilter,
     tagFilter = '',
+    showHidden = false,
     currentPath,
     meta,
 }: UseLibraryFilterParams) {
     const filteredPdfs = useMemo(() => {
-        let result = pdfs;
+        // ゴミ箱方式: showHidden=false なら hidden を全除外、true なら hidden のみ表示
+        let result = pdfs.filter(p => {
+            const hidden = isHiddenInMeta(meta, currentPath, p.name);
+            return showHidden ? hidden : !hidden;
+        });
 
         const trimmed = searchText.trim();
         if (trimmed) {
@@ -62,7 +77,7 @@ export function useLibraryFilter({
         }
 
         return result;
-    }, [pdfs, searchText, authorFilter, tagFilter, currentPath, meta]);
+    }, [pdfs, searchText, authorFilter, tagFilter, showHidden, currentPath, meta]);
 
     const filteredDirs = useMemo(() => {
         const trimmed = searchText.trim();

@@ -152,6 +152,8 @@ export interface BookMetaEntry {
     series_title?: string;
     /** シリーズ内の巻数 (1 始まり) */
     series_index?: number;
+    /** 非表示フラグ。true なら通常モードでは一覧・検索・フィルタに表示されない */
+    hidden?: boolean;
 }
 
 /**

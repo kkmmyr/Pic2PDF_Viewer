@@ -1,4 +1,4 @@
-import { CheckSquare, Square, Star, Pencil, RefreshCw, Library } from 'lucide-react';
+import { CheckSquare, Square, Star, Pencil, RefreshCw, Library, EyeOff, Eye } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
 
@@ -24,6 +24,13 @@ interface PdfGridProps {
     getSeriesCount?: (name: string) => number;
     /** シリーズ代表書籍をクリックしたときのハンドラ。指定されると onPdfClick より優先される */
     onSeriesClick?: (representativeName: string) => void;
+    /** 「非表示にする」「再表示する」ボタンのハンドラ。
+     *  - showHidden=false（通常モード）の時は EyeOff アイコンで「非表示にする」
+     *  - showHidden=true（ゴミ箱モード）の時は Eye アイコンで「再表示する」
+     */
+    onToggleHidden?: (name: string) => void;
+    /** ゴミ箱モード（true なら Eye アイコン、false なら EyeOff アイコンを表示） */
+    showHidden?: boolean;
 }
 
 /**
@@ -47,6 +54,8 @@ export function PdfGrid({
     onTagClick,
     getSeriesCount,
     onSeriesClick,
+    onToggleHidden,
+    showHidden = false,
 }: PdfGridProps) {
     if (pdfs.length === 0) {
         return (
@@ -195,6 +204,17 @@ export function PdfGrid({
                                                 title="サムネイルを再生成"
                                             >
                                                 <RefreshCw className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                        {!isSelectionMode && onToggleHidden && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onToggleHidden(pdf.name); }}
+                                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                                                title={showHidden ? '再表示する' : '非表示にする'}
+                                            >
+                                                {showHidden
+                                                    ? <Eye className="w-3 h-3" />
+                                                    : <EyeOff className="w-3 h-3" />}
                                             </button>
                                         )}
                                         {isFav && (

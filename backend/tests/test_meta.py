@@ -300,6 +300,89 @@ class TestUpdateTags:
 
 
 # ---------------------------------------------------------------------------
+# PATCH /api/meta — 非表示フラグ
+# ---------------------------------------------------------------------------
+
+class TestUpdateHidden:
+    def test_hidden_true_sets_flag(self, view_client, tmp_path):
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": True, "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["hidden"] is True
+
+    def test_hidden_false_removes_flag(self, view_client, tmp_path):
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": True, "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": False, "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        # hidden=False で再表示 → エントリは他フィールドが無いので削除
+        assert "book.pdf" not in meta
+
+    def test_hidden_preserves_authors_and_tags(self, view_client, tmp_path):
+        # authors + tags を登録
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"],
+            "authors": ["A"], "tags": ["t1"], "source": "generated",
+        })
+        # hidden=true のみ送る
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": True, "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["authors"] == ["A"]
+        assert meta["book.pdf"]["tags"] == ["t1"]
+        assert meta["book.pdf"]["hidden"] is True
+
+    def test_hidden_preserves_view_count(self, view_client, tmp_path):
+        view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": True, "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["view_count"] == 1
+        assert meta["book.pdf"]["hidden"] is True
+
+    def test_hidden_unhide_keeps_other_fields(self, view_client, tmp_path):
+        # authors + hidden を登録
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"],
+            "authors": ["A"], "hidden": True, "source": "generated",
+        })
+        # hidden=false で再表示
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": False, "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        # authors は残る、hidden だけ消える
+        assert meta["book.pdf"]["authors"] == ["A"]
+        assert "hidden" not in meta["book.pdf"]
+
+    def test_hidden_only_request_is_accepted(self, view_client):
+        """hidden だけ指定したリクエストは authors/tags 省略でも 200 を返す。"""
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "hidden": True, "source": "generated",
+        })
+        assert res.status_code == 200
+
+    def test_bulk_hide_multiple_books(self, view_client, tmp_path):
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["a.pdf", "b.pdf", "c.pdf"],
+            "hidden": True, "source": "generated",
+        })
+        assert res.status_code == 200
+        assert res.json()["updated_count"] == 3
+        meta = _read_meta(tmp_path)
+        for n in ("a.pdf", "b.pdf", "c.pdf"):
+            assert meta[n]["hidden"] is True
+
+
+# ---------------------------------------------------------------------------
 # auto_fill_service.run_auto_fill — 既存 view_count / last_viewed_at の保持
 # ---------------------------------------------------------------------------
 

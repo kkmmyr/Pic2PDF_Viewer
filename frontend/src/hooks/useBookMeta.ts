@@ -56,6 +56,11 @@ export function useBookMeta(source: string) {
         };
     }, [meta, makeKey]);
 
+    /** 1冊が非表示状態かを返す */
+    const isHidden = useCallback((path: string, name: string): boolean => {
+        return meta[makeKey(path, name)]?.hidden === true;
+    }, [meta, makeKey]);
+
     /** 1冊の閲覧回数を返す（未記録は 0） */
     const getViewCount = useCallback((path: string, name: string): number => {
         return meta[makeKey(path, name)]?.view_count ?? 0;
@@ -91,21 +96,22 @@ export function useBookMeta(source: string) {
     }, [source, makeKey]);
 
     /**
-     * 1冊または複数冊の作者名 / タグを上書き保存する。
-     * `authors` / `tags` のどちらか（または両方）を指定する。省略したフィールドは変更されない。
+     * 1冊または複数冊のメタデータ（authors / tags / hidden）を上書き保存する。
+     * 指定されたフィールドのみ変更され、他のフィールドは保持される。
      */
     const updateMeta = useCallback(async (
         path: string,
         names: string[],
-        fields: { authors?: string[]; tags?: string[] }
+        fields: { authors?: string[]; tags?: string[]; hidden?: boolean }
     ) => {
-        if (fields.authors === undefined && fields.tags === undefined) return;
+        if (fields.authors === undefined && fields.tags === undefined && fields.hidden === undefined) return;
 
         await apiClient.patch(API_ENDPOINTS.META, {
             path,
             names,
             ...(fields.authors !== undefined ? { authors: fields.authors } : {}),
             ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
+            ...(fields.hidden !== undefined ? { hidden: fields.hidden } : {}),
             source,
         });
 
@@ -120,8 +126,15 @@ export function useBookMeta(source: string) {
 
                 if (fields.authors !== undefined) merged.authors = fields.authors;
                 if (fields.tags !== undefined) merged.tags = fields.tags;
+                if (fields.hidden !== undefined) {
+                    if (fields.hidden) {
+                        merged.hidden = true;
+                    } else {
+                        delete merged.hidden;
+                    }
+                }
 
-                // 空配列のフィールドを除外して、残るフィールドが無ければエントリごと削除
+                // 空配列フィールドを除外して、意味のある値が残るか判定
                 const isEmptyArray = (v: unknown): boolean => Array.isArray(v) && v.length === 0;
                 const hasNonEmpty = Object.entries(merged).some(([_, v]) => !isEmptyArray(v));
 
@@ -145,6 +158,11 @@ export function useBookMeta(source: string) {
         return updateMeta(path, names, { tags });
     }, [updateMeta]);
 
+    /** 非表示フラグを更新する。`hidden=true` で非表示化、`false` で再表示。 */
+    const setHidden = useCallback((path: string, names: string[], hidden: boolean) => {
+        return updateMeta(path, names, { hidden });
+    }, [updateMeta]);
+
     /** このソースに登録されている全作者名（重複排除・ソート済み）*/
     const allAuthors: string[] = [...new Set(
         Object.values(meta).flatMap(e => e.authors)
@@ -157,9 +175,9 @@ export function useBookMeta(source: string) {
 
     return {
         meta,
-        getAuthors, getTags, getSeries, getViewCount, getLastViewedAt,
+        getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView,
-        updateAuthors, updateTags, updateMeta,
+        updateAuthors, updateTags, updateMeta, setHidden,
         allAuthors, allTags,
         refreshMeta: fetchMeta,
     };

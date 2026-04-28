@@ -17,6 +17,8 @@ class MetaEntry(TypedDict):
     view_count: NotRequired[int]
     # 最終閲覧時刻 (UNIX time, float)。
     last_viewed_at: NotRequired[float]
+    # 非表示フラグ。True なら通常モードでは一覧・検索・フィルタに表示されない。
+    hidden: NotRequired[bool]
 
 
 MetaDict = dict[str, MetaEntry]

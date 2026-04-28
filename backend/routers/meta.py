@@ -37,13 +37,14 @@ class BookMetaEntry(BaseModel):
 class UpdateMetaRequest(BaseModel):
     """単一書籍または複数書籍へのメタデータ更新リクエスト。
 
-    `authors` / `tags` は省略可。省略されたフィールドは変更しない。
-    両方省略するとエラー（更新する内容が無い）。
+    `authors` / `tags` / `hidden` は省略可。省略されたフィールドは変更しない。
+    すべて省略するとエラー（更新する内容が無い）。
     """
     path: str = ""
     names: list[str]
     authors: list[str] | None = None
     tags: list[str] | None = None
+    hidden: bool | None = None
     source: str = "generated"
 
 
@@ -71,14 +72,14 @@ def get_meta(source: str = "generated") -> dict:
 
 @router.patch("/meta")
 def update_meta(request: UpdateMetaRequest) -> dict:
-    """1冊または複数冊のメタデータ（作者名 / タグ）を上書き保存する。
+    """1冊または複数冊のメタデータ（作者名 / タグ / 非表示フラグ）を上書き保存する。
 
-    `authors` / `tags` は省略可。省略されたフィールドは変更しない。
+    `authors` / `tags` / `hidden` は省略可。省略されたフィールドは変更しない。
     """
     if request.source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
-    if request.authors is None and request.tags is None:
-        raise HTTPException(status_code=400, detail="authors or tags must be specified")
+    if request.authors is None and request.tags is None and request.hidden is None:
+        raise HTTPException(status_code=400, detail="authors, tags, or hidden must be specified")
 
     validate_safe_path(request.path, param_name="path")
     for name in request.names:
@@ -87,9 +88,10 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     # 各フィールドを正規化（None ならそのまま）
     authors = [a.strip() for a in request.authors if a.strip()] if request.authors is not None else None
     tags = [t.strip() for t in request.tags if t.strip()] if request.tags is not None else None
+    hidden = request.hidden  # bool | None
 
-    def _merge_field(entry: dict, field: str, value: list[str] | None) -> None:
-        """フィールドを書き換えるか削除する。`value is None` の場合は何もしない。"""
+    def _merge_list_field(entry: dict, field: str, value: list[str] | None) -> None:
+        """list フィールドを書き換える。`value is None` の場合は何もしない。"""
         if value is None:
             return
         if value:
@@ -98,16 +100,29 @@ def update_meta(request: UpdateMetaRequest) -> dict:
             # 空配列を渡された場合は空のまま残す（最後にエントリ自体を消すかは呼び出し側で判定）
             entry[field] = []
 
+    def _merge_hidden(entry: dict, value: bool | None) -> None:
+        """hidden フィールドを書き換えるか削除する。`value is None` の場合は何もしない。"""
+        if value is None:
+            return
+        if value:
+            entry["hidden"] = True
+        else:
+            entry.pop("hidden", None)
+
     def _apply(data):
         for name in request.names:
             key = make_key(request.path, name)
             existing = dict(data.get(key, {}))
-            _merge_field(existing, "authors", authors)
-            _merge_field(existing, "tags", tags)
+            _merge_list_field(existing, "authors", authors)
+            _merge_list_field(existing, "tags", tags)
+            _merge_hidden(existing, hidden)
 
-            # エントリが空（または authors/tags が空でかつ他フィールドも無い）場合は削除
-            non_empty_fields = {k: v for k, v in existing.items() if not (isinstance(v, list) and not v)}
-            if non_empty_fields:
+            # エントリ全体が「空 list だけ」「あるいは何も無い」場合は削除
+            # 非 list フィールド（view_count / hidden 等）が残っていればエントリは保持
+            has_meaningful = any(
+                not (isinstance(v, list) and not v) for v in existing.values()
+            )
+            if has_meaningful:
                 data[key] = existing
             else:
                 data.pop(key, None)

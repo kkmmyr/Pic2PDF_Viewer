@@ -1,4 +1,4 @@
-import { ArrowLeft, ImageIcon, Merge, Tag, Library } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
@@ -17,6 +17,8 @@ interface LibraryHeaderProps {
     allTags: string[];
     /** シリーズグループ化トグルの状態 */
     isGroupedBySeries: boolean;
+    /** 非表示書籍を表示するモード（ゴミ箱モード） */
+    showHidden: boolean;
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
@@ -24,6 +26,7 @@ interface LibraryHeaderProps {
     onMoveSelected: () => void;
     onBulkSetAuthor: () => void;
     onBulkSetTag: () => void;
+    onBulkToggleHidden: () => void;
     onRegenThumbnailBulk: () => void;
     onMergePdfs: () => void;
     onSortChange: (order: SortOrder) => void;
@@ -31,6 +34,7 @@ interface LibraryHeaderProps {
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
     onToggleGroupBySeries: () => void;
+    onToggleShowHidden: () => void;
 }
 
 export function LibraryHeader({
@@ -45,6 +49,7 @@ export function LibraryHeader({
     allAuthors,
     allTags,
     isGroupedBySeries,
+    showHidden,
     onUpClick,
     onSourceChange,
     onToggleSelectionMode,
@@ -52,6 +57,7 @@ export function LibraryHeader({
     onMoveSelected,
     onBulkSetAuthor,
     onBulkSetTag,
+    onBulkToggleHidden,
     onRegenThumbnailBulk,
     onMergePdfs,
     onSortChange,
@@ -59,6 +65,7 @@ export function LibraryHeader({
     onAuthorFilterChange,
     onTagFilterChange,
     onToggleGroupBySeries,
+    onToggleShowHidden,
 }: LibraryHeaderProps) {
     return (
         <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-header">
@@ -112,6 +119,15 @@ export function LibraryHeader({
                                 >
                                     <Tag className="w-4 h-4" />
                                     タグを設定
+                                </button>
+                                <button
+                                    onClick={onBulkToggleHidden}
+                                    disabled={selectedCount === 0}
+                                    title={showHidden ? '選択した書籍を再表示' : '選択した書籍を非表示'}
+                                    className="px-3 py-1.5 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                >
+                                    {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                    {showHidden ? 'まとめて再表示' : 'まとめて非表示'}
                                 </button>
                                 <button
                                     onClick={onMergePdfs}
@@ -175,6 +191,21 @@ export function LibraryHeader({
                         >
                             <Library className="w-4 h-4" />
                             シリーズ
+                        </button>
+                    )}
+
+                    {!isSelectionMode && (
+                        <button
+                            onClick={onToggleShowHidden}
+                            title={showHidden ? '通常モードに戻る' : '非表示書籍を表示する（ゴミ箱）'}
+                            className={`px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                                showHidden
+                                    ? 'bg-gray-700 text-white hover:bg-gray-800'
+                                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }`}
+                        >
+                            {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                            {showHidden ? '通常表示' : '非表示を表示'}
                         </button>
                     )}
 

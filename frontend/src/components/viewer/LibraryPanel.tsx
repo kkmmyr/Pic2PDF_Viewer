@@ -16,6 +16,7 @@ import { getStorageJson, setStorageJson } from '../../utils/storage';
 
 const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
 const GROUP_BY_SERIES_KEY = 'library_group_by_series';
+const SHOW_HIDDEN_KEY = 'library_show_hidden';
 
 function readStoredSort(): SortOrder {
     return getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc');
@@ -45,6 +46,9 @@ export function LibraryPanel() {
     const [isGroupedBySeries, setIsGroupedBySeries] = useState<boolean>(
         () => getStorageJson<boolean>(GROUP_BY_SERIES_KEY, false)
     );
+    const [showHidden, setShowHidden] = useState<boolean>(
+        () => getStorageJson<boolean>(SHOW_HIDDEN_KEY, false)
+    );
     const [expandedSeriesName, setExpandedSeriesName] = useState<string | null>(null);
 
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
@@ -71,10 +75,18 @@ export function LibraryPanel() {
         });
     }, []);
 
+    const handleToggleShowHidden = useCallback(() => {
+        setShowHidden(prev => {
+            const next = !prev;
+            setStorageJson(SHOW_HIDDEN_KEY, next);
+            return next;
+        });
+    }, []);
+
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
     const {
-        meta, getAuthors, getTags, getViewCount, getLastViewedAt,
-        recordView, updateAuthors, updateTags, allAuthors, allTags, refreshMeta,
+        meta, getAuthors, getTags, getViewCount, getLastViewedAt, isHidden,
+        recordView, updateAuthors, updateTags, setHidden, allAuthors, allTags, refreshMeta,
     } = useBookMeta(currentSource);
     const sortedPdfs = useSortedPdfs(
         pdfs,
@@ -105,6 +117,7 @@ export function LibraryPanel() {
         searchText,
         authorFilter,
         tagFilter,
+        showHidden,
         currentPath,
         meta,
     });
@@ -129,6 +142,28 @@ export function LibraryPanel() {
         const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
         await updateTags(currentPath, pdfNames, tags);
     }, [selectedItems, currentPath, updateTags]);
+
+    /** 1冊だけの非表示/再表示。`showHidden` モードに応じて自動で逆を行う */
+    const handleToggleHiddenOne = useCallback(async (name: string) => {
+        // showHidden=true（ゴミ箱）なら再表示、それ以外は非表示にする
+        try {
+            await setHidden(currentPath, [name], !showHidden);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
+        }
+    }, [setHidden, currentPath, showHidden, showToast]);
+
+    /** 選択モードでの一括非表示/再表示 */
+    const handleBulkToggleHidden = useCallback(async () => {
+        const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+        if (pdfNames.length === 0) return;
+        try {
+            await setHidden(currentPath, pdfNames, !showHidden);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
+        }
+    }, [setHidden, currentPath, selectedItems, showHidden, showToast]);
+    void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
 
     // 1冊だけ選択中ならその書籍の現在タグを初期表示する
     const bulkTagInitial = (() => {
@@ -177,6 +212,7 @@ export function LibraryPanel() {
                 allAuthors={allAuthors}
                 allTags={allTags}
                 isGroupedBySeries={isGroupedBySeries}
+                showHidden={showHidden}
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
@@ -184,6 +220,7 @@ export function LibraryPanel() {
                 onMoveSelected={onMoveSelected}
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
+                onBulkToggleHidden={handleBulkToggleHidden}
                 onRegenThumbnailBulk={handleRegenThumbnailBulk}
                 onMergePdfs={() => setIsMergeDialogOpen(true)}
                 onSortChange={handleSortChange}
@@ -191,6 +228,7 @@ export function LibraryPanel() {
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
                 onToggleGroupBySeries={handleToggleGroupBySeries}
+                onToggleShowHidden={handleToggleShowHidden}
             />
 
             <LibraryDialogs
@@ -247,6 +285,8 @@ export function LibraryPanel() {
                         onTagClick={setTagFilter}
                         getSeriesCount={(name) => grouped.memberCountByRepresentativeName.get(name) ?? 0}
                         onSeriesClick={isGroupedBySeries ? setExpandedSeriesName : undefined}
+                        onToggleHidden={handleToggleHiddenOne}
+                        showHidden={showHidden}
                     />
                 </div>
             </div>

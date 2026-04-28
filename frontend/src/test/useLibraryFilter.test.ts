@@ -92,6 +92,60 @@ describe('useLibraryFilter', () => {
         });
     });
 
+    describe('showHidden（ゴミ箱モード）', () => {
+        const pdfsWithHidden: PdfFile[] = [
+            makePdf('visible.pdf'),
+            makePdf('trashed.pdf'),
+        ];
+        const metaWithHidden: BookMetaMap = {
+            'visible.pdf': { authors: ['A'] },
+            'trashed.pdf': { authors: ['A'], hidden: true },
+        };
+
+        it('デフォルトは hidden を除外する', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: pdfsWithHidden, directories: [],
+                    searchText: '', authorFilter: '', currentPath: '', meta: metaWithHidden,
+                })
+            );
+            expect(result.current.filteredPdfs.map(p => p.name)).toEqual(['visible.pdf']);
+        });
+
+        it('showHidden=true なら hidden のみを返す', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: pdfsWithHidden, directories: [],
+                    searchText: '', authorFilter: '', currentPath: '', meta: metaWithHidden,
+                    showHidden: true,
+                })
+            );
+            expect(result.current.filteredPdfs.map(p => p.name)).toEqual(['trashed.pdf']);
+        });
+
+        it('showHidden=false で明示的に通常モード', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: pdfsWithHidden, directories: [],
+                    searchText: '', authorFilter: '', currentPath: '', meta: metaWithHidden,
+                    showHidden: false,
+                })
+            );
+            expect(result.current.filteredPdfs.map(p => p.name)).toEqual(['visible.pdf']);
+        });
+
+        it('hidden 書籍は authorFilter からも除外される', () => {
+            // 通常モードで作者 A で絞り込んでも hidden は出ない
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: pdfsWithHidden, directories: [],
+                    searchText: '', authorFilter: 'A', currentPath: '', meta: metaWithHidden,
+                })
+            );
+            expect(result.current.filteredPdfs.map(p => p.name)).toEqual(['visible.pdf']);
+        });
+    });
+
     describe('currentPath によるメタキー解決', () => {
         it('path 配下のメタを正しく取得する', () => {
             const sub = [makePdf('nested.pdf')];
