@@ -23,6 +23,15 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         });
     }, []);
 
+    /**
+     * 選択モードを終了して選択中アイテムも空にする。一括操作の成功時に
+     * カードからチェックボックスが消えて通常表示に戻すため呼ぶ。
+     */
+    const clearSelection = useCallback(() => {
+        setIsSelectionMode(false);
+        setSelectedItems(new Set());
+    }, []);
+
     const toggleSelectItem = useCallback((name: string) => {
         setSelectedItems(prev => {
             const next = new Set(prev);
@@ -92,6 +101,7 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         isCreateFolderOpen,
         renameTarget,
         toggleSelectionMode,
+        clearSelection,
         toggleSelectItem,
         openCreateFolderDialog,
         closeCreateFolderDialog,

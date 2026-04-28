@@ -4,7 +4,7 @@ import { LibraryPanel, ReaderPanel } from '../components/viewer';
 function LibraryView() {
     const {
         selectedPdf, currentPath, currentSource,
-        onClosePdf, onPdfUpdated,
+        onClosePdf, onPdfUpdated, onPdfClick,
     } = useLibraryContext();
 
     return (
@@ -16,6 +16,7 @@ function LibraryView() {
                     currentSource={currentSource}
                     onPdfUpdated={onPdfUpdated}
                     onClose={onClosePdf}
+                    onSelectPdf={onPdfClick}
                 />
             ) : (
                 <LibraryPanel />

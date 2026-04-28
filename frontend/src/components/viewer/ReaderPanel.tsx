@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Document, pdfjs } from 'react-pdf';
+import { ChevronRight } from 'lucide-react';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 import type { LibrarySource, ReadingDirection } from '../../types';
 import { buildStaticUrl, STATIC_PATHS } from '../../config/api';
 import {
     useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast,
-    useSpreadMode, useEditMode, useFullscreen,
+    useSpreadMode, useEditMode, useFullscreen, useBookMeta,
 } from '../../hooks';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
@@ -26,6 +27,8 @@ interface ReaderPanelProps {
     currentSource: LibrarySource;
     onPdfUpdated: () => void;
     onClose: () => void;
+    /** 同フォルダ内の別書籍に切り替える（「次の巻へ」遷移用） */
+    onSelectPdf?: (name: string) => void;
 }
 
 /**
@@ -36,7 +39,7 @@ interface ReaderPanelProps {
  * - 見開き Auto/Spread/Single モード切り替え（`useSpreadMode`）
  */
 export function ReaderPanel({
-    selectedPdf, currentPath, currentSource, onPdfUpdated, onClose,
+    selectedPdf, currentPath, currentSource, onPdfUpdated, onClose, onSelectPdf,
 }: ReaderPanelProps) {
     const { height: windowHeight } = useWindowSize();
     const { imageUrls, numPages: imageNumPages, isImageMode } =
@@ -54,6 +57,42 @@ export function ReaderPanel({
         useReaderNavigation({ numPages, isSpread, direction, isActive: true });
 
     const { toasts, showToast, dismissToast } = useToast();
+
+    // 「次の巻へ」用に書籍メタデータを参照する。
+    // 同 series_id で series_index が現在より大きい中で最小のものを次巻とする。
+    // 判定範囲は同フォルダ内のみ（meta のキー prefix で path 一致をチェック）。
+    const { meta, getSeries, recordView } = useBookMeta(currentSource);
+    const nextVolume: { name: string; index: number; title: string } | null = (() => {
+        const cur = getSeries(currentPath, selectedPdf);
+        if (!cur) return null;
+        const prefix = currentPath ? `${currentPath}/` : '';
+        let best: { name: string; index: number; title: string } | null = null;
+        for (const [key, e] of Object.entries(meta)) {
+            if (e.series_id !== cur.id) continue;
+            const idx = e.series_index ?? 0;
+            if (idx <= cur.index) continue;
+            // 同フォルダ判定: prefix が一致し、残部分にスラッシュがない
+            const rest = currentPath
+                ? (key.startsWith(prefix) ? key.slice(prefix.length) : null)
+                : (key.includes('/') ? null : key);
+            if (rest === null || rest.includes('/')) continue;
+            if (!best || idx < best.index) {
+                best = { name: rest, index: idx, title: e.series_title ?? '' };
+            }
+        }
+        return best;
+    })();
+
+    // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
+    const isAtLastSpread = numPages > 0 && (
+        isSpread ? pageNumber + 1 >= numPages : pageNumber >= numPages
+    );
+
+    const handleNavigateNextVolume = useCallback(() => {
+        if (!nextVolume || !onSelectPdf) return;
+        recordView(currentPath, nextVolume.name);
+        onSelectPdf(nextVolume.name);
+    }, [nextVolume, onSelectPdf, recordView, currentPath]);
 
     const {
         isEditMode, selectedPages,
@@ -236,6 +275,18 @@ export function ReaderPanel({
                     )}
                 </div>
             </div>
+            {/* 「次の巻へ」ボタン: シリーズ最終ページ到達 + 同フォルダに次巻あり + onSelectPdf 提供時に表示 */}
+            {nextVolume && isAtLastSpread && onSelectPdf && (
+                <button
+                    onClick={handleNavigateNextVolume}
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-overlay-bar px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+                    title={`次の巻: #${nextVolume.index} ${nextVolume.title}`}
+                >
+                    <span>次の巻へ</span>
+                    <ChevronRight className="w-4 h-4" />
+                </button>
+            )}
+
             <ConfirmDialog
                 open={pendingDeleteCount > 0}
                 title="ページを削除"

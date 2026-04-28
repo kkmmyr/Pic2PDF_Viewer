@@ -26,6 +26,8 @@ interface LibraryContextValue {
     onPdfUpdated: () => void;
     // 選択モード
     onToggleSelectionMode: () => void;
+    /** 選択モードを終了して選択中アイテムも空にする（一括操作の成功時に呼ぶ） */
+    onClearSelection: () => void;
     onToggleSelect: (item: string) => void;
     // フォルダ作成
     onOpenCreateFolder: () => void;
@@ -91,6 +93,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         isCreateFolderOpen,
         renameTarget,
         toggleSelectionMode,
+        clearSelection,
         toggleSelectItem,
         openCreateFolderDialog,
         closeCreateFolderDialog,
@@ -125,6 +128,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         onClosePdf: () => clearPdf(currentPath, currentSource),
         onPdfUpdated: () => setLibraryVersion(v => v + 1),
         onToggleSelectionMode: toggleSelectionMode,
+        onClearSelection: clearSelection,
         onToggleSelect: toggleSelectItem,
         onOpenCreateFolder: openCreateFolderDialog,
         onCloseCreateFolder: closeCreateFolderDialog,

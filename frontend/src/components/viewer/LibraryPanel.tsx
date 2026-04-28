@@ -36,7 +36,7 @@ export function LibraryPanel() {
         isSelectionMode, selectedItems,
         isMoveDialogOpen, isCreateFolderOpen, renameTarget,
         onPdfClick, onFolderClick, onUpClick, onSourceChange,
-        onToggleSelectionMode, onToggleSelect,
+        onToggleSelectionMode, onClearSelection, onToggleSelect,
         onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
         onMoveSelected, onCloseMoveDialog, onMoveItems,
         onOpenRename, onCloseRename, onRenameItem, onRefresh,
@@ -218,12 +218,14 @@ export function LibraryPanel() {
 
     const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
         await updateAuthors(currentPath, Array.from(selectedItems), authors);
-    }, [selectedItems, currentPath, updateAuthors]);
+        onClearSelection();
+    }, [selectedItems, currentPath, updateAuthors, onClearSelection]);
 
     const handleBulkApplyTags = useCallback(async (tags: string[]) => {
         const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
         await updateTags(currentPath, pdfNames, tags);
-    }, [selectedItems, currentPath, updateTags]);
+        onClearSelection();
+    }, [selectedItems, currentPath, updateTags, onClearSelection]);
 
     /** 1冊だけの非表示/再表示。`showHidden` モードに応じて自動で逆を行う */
     const handleToggleHiddenOne = useCallback(async (name: string) => {
@@ -241,10 +243,11 @@ export function LibraryPanel() {
         if (pdfNames.length === 0) return;
         try {
             await setHidden(currentPath, pdfNames, !showHidden);
+            onClearSelection();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
         }
-    }, [setHidden, currentPath, selectedItems, showHidden, showToast]);
+    }, [setHidden, currentPath, selectedItems, showHidden, showToast, onClearSelection]);
     void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
 
     // 1冊だけ選択中ならその書籍の現在タグを初期表示する
@@ -266,10 +269,12 @@ export function LibraryPanel() {
             if (data.failed.length > 0) {
                 showToast(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`, 'error');
             }
+            // 部分失敗があっても、成功した分はあるので選択は解除する（押し直しの意図がない）
+            onClearSelection();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : 'サムネイル再生成に失敗しました。', 'error');
         }
-    }, [selectedItems, currentPath, currentSource, onRefresh]);
+    }, [selectedItems, currentPath, currentSource, onRefresh, onClearSelection, showToast]);
 
     const handleMergePdfs = useCallback(async (outputName: string) => {
         const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
@@ -278,7 +283,8 @@ export function LibraryPanel() {
             { names, output_name: outputName, path: currentPath, source: currentSource }
         );
         onRefresh();
-    }, [selectedItems, currentPath, currentSource, onRefresh]);
+        onClearSelection();
+    }, [selectedItems, currentPath, currentSource, onRefresh, onClearSelection]);
 
     // 一括シリーズ登録: 選択順を保持するため Set のイテレーション順をそのまま使う
     const bulkSeriesNames: string[] = Array.from(selectedItems)
@@ -329,11 +335,12 @@ export function LibraryPanel() {
                 id: params.id,
             });
             showToast(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`, 'success');
+            onClearSelection();
         } catch (e: unknown) {
             showToast(e instanceof Error ? e.message : 'シリーズ登録に失敗しました。', 'error');
             throw e;
         }
-    }, [assignSeries, currentPath, bulkSeriesNames, showToast]);
+    }, [assignSeries, currentPath, bulkSeriesNames, showToast, onClearSelection]);
 
     return (
         <>
