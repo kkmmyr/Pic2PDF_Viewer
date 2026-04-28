@@ -6,6 +6,7 @@ import { LibraryDialogs } from './LibraryDialogs';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
 import { SeriesEditDialog } from './SeriesEditDialog';
+import type { ExistingSeriesOption } from './BulkSeriesAssignDialog';
 import {
     useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
 } from '../../hooks';
@@ -74,6 +75,7 @@ export function LibraryPanel() {
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
     const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
+    const [isBulkSeriesOpen, setIsBulkSeriesOpen] = useState(false);
 
     // パスまたはソース変更時に検索テキストをリセット。
     // author / tag / series は URL 同期されており、useUrlState の navigate
@@ -265,6 +267,47 @@ export function LibraryPanel() {
         onRefresh();
     }, [selectedItems, currentPath, currentSource, onRefresh]);
 
+    // 一括シリーズ登録: 選択順を保持するため Set のイテレーション順をそのまま使う
+    const bulkSeriesNames: string[] = Array.from(selectedItems)
+        .filter(item => item.toLowerCase().endsWith('.pdf'));
+
+    // 既存シリーズの一覧を {id, title, maxIndex} に変換。maxIndex は当該シリーズの
+    // 全 series_index の最大（一括追加時に max+1 から採番するため）
+    const bulkSeriesExisting: ExistingSeriesOption[] = (() => {
+        const map = new Map<string, { title: string; maxIndex: number }>();
+        for (const e of Object.values(meta)) {
+            if (!e.series_id) continue;
+            const cur = map.get(e.series_id);
+            const idx = e.series_index ?? 0;
+            if (!cur) {
+                map.set(e.series_id, { title: e.series_title ?? '', maxIndex: idx });
+            } else if (idx > cur.maxIndex) {
+                cur.maxIndex = idx;
+            }
+        }
+        return Array.from(map.entries())
+            .map(([id, v]) => ({ id, title: v.title, maxIndex: v.maxIndex }))
+            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+    })();
+
+    const handleBulkAssignSeries = useCallback(async (params: { title: string; indexes: number[]; id?: string }) => {
+        if (bulkSeriesNames.length === 0) return;
+        if (params.indexes.length !== bulkSeriesNames.length) {
+            throw new Error('採番リストが選択数と一致しません');
+        }
+        try {
+            await assignSeries(currentPath, bulkSeriesNames, {
+                title: params.title,
+                index: params.indexes,
+                id: params.id,
+            });
+            showToast(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`, 'success');
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : 'シリーズ登録に失敗しました。', 'error');
+            throw e;
+        }
+    }, [assignSeries, currentPath, bulkSeriesNames, showToast]);
+
     return (
         <>
             <LibraryHeader
@@ -288,6 +331,7 @@ export function LibraryPanel() {
                 onMoveSelected={onMoveSelected}
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
+                onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
                 onBulkToggleHidden={handleBulkToggleHidden}
                 onRegenThumbnailBulk={handleRegenThumbnailBulk}
                 onMergePdfs={() => setIsMergeDialogOpen(true)}
@@ -322,6 +366,11 @@ export function LibraryPanel() {
                 isMergeDialogOpen={isMergeDialogOpen}
                 onCloseMergeDialog={() => setIsMergeDialogOpen(false)}
                 onMergePdfs={handleMergePdfs}
+                isBulkSeriesOpen={isBulkSeriesOpen}
+                bulkSeriesNames={bulkSeriesNames}
+                bulkSeriesExisting={bulkSeriesExisting}
+                onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
+                onBulkAssignSeries={handleBulkAssignSeries}
             />
 
             <AutoFillAuthorsBar source={currentSource} onComplete={refreshMeta} />

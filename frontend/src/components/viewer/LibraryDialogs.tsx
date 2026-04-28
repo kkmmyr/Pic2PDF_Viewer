@@ -2,6 +2,7 @@ import type { LibrarySource } from '../../types';
 import { MoveDialog } from '../reader';
 import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
 import { BulkTagDialog } from './BulkTagDialog';
+import { BulkSeriesAssignDialog, type ExistingSeriesOption } from './BulkSeriesAssignDialog';
 
 export interface LibraryDialogsProps {
     currentPath: string;
@@ -32,6 +33,12 @@ export interface LibraryDialogsProps {
     isMergeDialogOpen: boolean;
     onCloseMergeDialog: () => void;
     onMergePdfs: (outputName: string) => Promise<void>;
+    // BulkSeriesAssign
+    isBulkSeriesOpen: boolean;
+    bulkSeriesNames: string[];
+    bulkSeriesExisting: ExistingSeriesOption[];
+    onCloseBulkSeries: () => void;
+    onBulkAssignSeries: (params: { title: string; indexes: number[]; id?: string }) => Promise<void>;
 }
 
 export function LibraryDialogs({
@@ -42,6 +49,7 @@ export function LibraryDialogs({
     isBulkAuthorOpen, onCloseBulkAuthor, onBulkApplyAuthors,
     isBulkTagOpen, bulkTagInitial, onCloseBulkTag, onBulkApplyTags,
     isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
+    isBulkSeriesOpen, bulkSeriesNames, bulkSeriesExisting, onCloseBulkSeries, onBulkAssignSeries,
 }: LibraryDialogsProps) {
     const pdfItems = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
 
@@ -89,6 +97,14 @@ export function LibraryDialogs({
                 selectedItems={pdfItems}
                 onClose={onCloseMergeDialog}
                 onMerge={onMergePdfs}
+            />
+
+            <BulkSeriesAssignDialog
+                open={isBulkSeriesOpen}
+                selectedNames={bulkSeriesNames}
+                existingSeries={bulkSeriesExisting}
+                onClose={onCloseBulkSeries}
+                onAssign={onBulkAssignSeries}
             />
         </>
     );

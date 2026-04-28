@@ -166,31 +166,41 @@ export function useBookMeta(source: string) {
     /**
      * 書籍を既存または新規シリーズに割り当てる。
      * - `id` 省略時はバックエンドで自動生成（同タイトル + 同作者なら同じ id）
+     * - `index` は単一 number または names と同じ長さの number 配列
      * - 戻り値は確定した `series_id`
      */
     const assignSeries = useCallback(async (
         path: string,
         names: string[],
-        params: { title: string; index: number; id?: string }
+        params: { title: string; index: number | number[]; id?: string }
     ): Promise<string> => {
+        // index 配列のときは長さチェック
+        if (Array.isArray(params.index) && params.index.length !== names.length) {
+            throw new Error('index 配列の長さが names と一致しません');
+        }
+
         const res = await apiClient.post<unknown, { id: string; updated_count: number }>(
             API_ENDPOINTS.SERIES_ASSIGN,
             { path, names, ...params, source }
         );
         const sid = res.id;
-        // ローカル状態を即時更新
+
+        // ローカル状態を即時更新（index が配列なら name ごとに個別に当てる）
+        const indexFor = (i: number): number =>
+            Array.isArray(params.index) ? params.index[i] : params.index;
+
         setMeta(prev => {
             const next = { ...prev };
-            for (const name of names) {
+            names.forEach((name, i) => {
                 const key = makeKey(path, name);
                 const existing = next[key] ?? { authors: [] };
                 next[key] = {
                     ...existing,
                     series_id: sid,
                     series_title: params.title,
-                    series_index: params.index,
+                    series_index: indexFor(i),
                 };
-            }
+            });
             return next;
         });
         return sid;

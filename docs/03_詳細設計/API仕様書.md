@@ -377,20 +377,25 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ```json
 {
   "path": "current/relative/path",
-  "names": ["book1.pdf"],
+  "names": ["book1.pdf", "book2.pdf"],
   "title": "シリーズタイトル",
-  "index": 1.5,
+  "index": [4.0, 5.0],
   "id": "abc12345",
   "source": "generated"
 }
 ```
 - `names` — 対象ファイル名リスト（複数指定可）
 - `title` — シリーズ表示名（必須）
-- `index` — シリーズ内巻数（float、必須、`1.0` / `2.5` 等）
+- `index` — シリーズ内巻数（float）。**`number` または `number[]`**:
+    - 単一 number → すべての `names` に同じ巻数を割り当て（単冊編集の従来挙動）
+    - number 配列 → `names[i]` に `index[i]` を割り当て（複数選択からの一括登録用、長さは names と一致が必須）
 - `id` — 既存シリーズに追加する場合の `series_id`。**省略時はバックエンドで生成**（`title` + 作者集合のハッシュ）。
 - 他のメタフィールド（authors / tags / view_count 等）は変更しない。
 
-**レスポンス**: `{"message": "Assigned", "id": "abc12345", "updated_count": 1}`
+**レスポンス**: `{"message": "Assigned", "id": "abc12345", "updated_count": 2}`
+
+**エラー**:
+- `400`: `index` 配列の長さが `names` と一致しない
 
 ---
 

@@ -59,11 +59,15 @@ def get_series_resolve_status(source: str = "generated") -> dict:
 # ---------------------------------------------------------------------------
 
 class AssignSeriesRequest(BaseModel):
-    """書籍を既存または新規シリーズに割り当てるリクエスト。"""
+    """書籍を既存または新規シリーズに割り当てるリクエスト。
+
+    `index` は単一の float、または `names` と同じ長さの float 配列（各書籍に
+    個別の巻数を割り当てたい一括登録ケース）を受け付ける。
+    """
     path: str = ""
     names: list[str]
     title: str
-    index: float
+    index: float | list[float]
     id: str | None = None  # 省略時はバックエンドで生成
     source: str = "generated"
 
@@ -77,13 +81,28 @@ class UnassignSeriesRequest(BaseModel):
 
 @router.post("/series/assign")
 def assign_series(request: AssignSeriesRequest) -> dict:
-    """書籍を既存または新規シリーズに割り当てる（手動編集）。"""
+    """書籍を既存または新規シリーズに割り当てる（手動編集）。
+
+    `index` が float なら全 names に同じ巻数、配列なら names[i] に index[i] を
+    割り当てる（複数選択からの一括登録用）。
+    """
     if request.source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
     if not request.title.strip():
         raise HTTPException(status_code=400, detail="title must not be empty")
     if not request.names:
         raise HTTPException(status_code=400, detail="names must not be empty")
+
+    # index を names と同じ長さの float リストに正規化
+    if isinstance(request.index, list):
+        if len(request.index) != len(request.names):
+            raise HTTPException(
+                status_code=400,
+                detail="index list must have the same length as names",
+            )
+        indexes = [float(v) for v in request.index]
+    else:
+        indexes = [float(request.index)] * len(request.names)
 
     validate_safe_path(request.path, param_name="path")
     for name in request.names:
@@ -101,12 +120,12 @@ def assign_series(request: AssignSeriesRequest) -> dict:
             authors_key = tuple(sorted({a.strip() for a in first_authors if a.strip()}))
             series_id = _stable_series_id(request.title.strip(), authors_key)
 
-        for name in request.names:
+        for name, idx in zip(request.names, indexes):
             key = make_key(request.path, name)
             existing = dict(data.get(key, {}))
             existing["series_id"] = series_id
             existing["series_title"] = request.title.strip()
-            existing["series_index"] = request.index
+            existing["series_index"] = idx
             data[key] = existing
 
     update_meta_locked(request.source, _apply)

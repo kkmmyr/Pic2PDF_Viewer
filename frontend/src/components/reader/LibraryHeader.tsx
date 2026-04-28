@@ -36,6 +36,7 @@ interface LibraryHeaderProps {
     onMoveSelected: () => void;
     onBulkSetAuthor: () => void;
     onBulkSetTag: () => void;
+    onBulkSetSeries: () => void;
     onBulkToggleHidden: () => void;
     onRegenThumbnailBulk: () => void;
     onMergePdfs: () => void;
@@ -68,6 +69,7 @@ export function LibraryHeader({
     onMoveSelected,
     onBulkSetAuthor,
     onBulkSetTag,
+    onBulkSetSeries,
     onBulkToggleHidden,
     onRegenThumbnailBulk,
     onMergePdfs,
@@ -132,6 +134,15 @@ export function LibraryHeader({
                                 >
                                     <Tag className="w-4 h-4" />
                                     タグを設定
+                                </button>
+                                <button
+                                    onClick={onBulkSetSeries}
+                                    disabled={selectedCount === 0}
+                                    title="選択した書籍をシリーズに一括登録（選択順に採番）"
+                                    className="px-3 py-1.5 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                >
+                                    <Library className="w-4 h-4" />
+                                    シリーズに登録
                                 </button>
                                 <button
                                     onClick={onBulkToggleHidden}

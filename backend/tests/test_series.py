@@ -554,6 +554,50 @@ class TestAssignSeries:
         })
         assert res.status_code == 400
 
+    def test_assign_index_array_per_book(self, series_client):
+        """index を配列で渡すと names[i] に index[i] が割り当てられる。"""
+        client, tmp_path = series_client
+        client.patch("/api/meta", json={
+            "path": "", "names": ["a.pdf", "b.pdf", "c.pdf"],
+            "authors": ["A"], "source": "generated",
+        })
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": ["a.pdf", "b.pdf", "c.pdf"],
+            "title": "Z", "index": [1.0, 2.0, 3.0], "source": "generated",
+        })
+        assert res.status_code == 200
+        assert res.json()["updated_count"] == 3
+        meta = _read_meta_at(tmp_path)
+        assert meta["a.pdf"]["series_index"] == 1.0
+        assert meta["b.pdf"]["series_index"] == 2.0
+        assert meta["c.pdf"]["series_index"] == 3.0
+        # 全部同じ series_id
+        assert meta["a.pdf"]["series_id"] == meta["b.pdf"]["series_id"] == meta["c.pdf"]["series_id"]
+
+    def test_assign_index_array_length_mismatch_returns_400(self, series_client):
+        client, _ = series_client
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": ["a.pdf", "b.pdf"],
+            "title": "Z", "index": [1.0, 2.0, 3.0], "source": "generated",
+        })
+        assert res.status_code == 400
+
+    def test_assign_index_scalar_still_applies_to_all(self, series_client):
+        """後方互換: index が単一 number なら全 names に同じ巻数を割り当て。"""
+        client, tmp_path = series_client
+        client.patch("/api/meta", json={
+            "path": "", "names": ["a.pdf", "b.pdf"],
+            "authors": ["A"], "source": "generated",
+        })
+        res = client.post("/api/series/assign", json={
+            "path": "", "names": ["a.pdf", "b.pdf"],
+            "title": "Z", "index": 5.0, "source": "generated",
+        })
+        assert res.status_code == 200
+        meta = _read_meta_at(tmp_path)
+        assert meta["a.pdf"]["series_index"] == 5.0
+        assert meta["b.pdf"]["series_index"] == 5.0
+
 
 class TestUnassignSeries:
     def test_unassign_removes_series_fields(self, series_client):
