@@ -470,7 +470,20 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 
 ## 9. Phase 別実装計画
 
-### Phase 1: 監視スクリプト単体（UI なし）
+### 進捗概観（2026-04-29 時点）
+
+| Phase | ステータス | コミット | 補足 |
+|---|---|---|---|
+| Phase 1 | ✅ 完了（運用化待ち） | `18aec89` + `f61e9c0` | サービス層 + 監視 CLI + ユニットテスト |
+| Phase 2 | ✅ 完了 | `f3d5fff` | 閲覧 API + 新着一覧 UI |
+| Phase 3 | ✅ 完了 | `ef557bf` | watchlist 編集 UI + 規約整合 |
+| 拡張: 「今すぐ取得」 | ✅ 完了 | `dd4801b` | UI から同期実行ボタン |
+| 拡張: 直近 3 日スキップ | ✅ 完了 | `5fa45f3` | 過剰アクセス抑制 + 実行統計 |
+| Phase 4: 表紙画像 | ⏸ **スキップ確定** | — | 実装コスト > 利益。`hitomi.la で開く` リンクで代替 |
+
+**Phase 1 の運用化に必要な残タスク:** Task Scheduler 登録（§10.2）+ 1 週間動作観察。
+
+### Phase 1: 監視スクリプト単体（UI なし） ✅
 
 1. `backend/services/hitomi/nozomi.py` + 単体テスト
 2. `backend/services/hitomi/metadata.py` + 単体テスト
@@ -484,7 +497,7 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 
 **完了条件:** 新着 ID が `new_arrivals.json` に蓄積される
 
-### Phase 2: 閲覧 UI
+### Phase 2: 閲覧 UI ✅
 
 1. `backend/routers/hitomi.py`（new-arrivals / dismiss / dismiss-all）
 2. `frontend/src/types/hitomi.ts`
@@ -495,7 +508,7 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 
 **完了条件:** ブラウザから新着確認 + 既読化が可能
 
-### Phase 3: 監視対象管理 UI
+### Phase 3: 監視対象管理 UI ✅
 
 1. `backend/routers/hitomi.py` に watchlist CRUD 追加
 2. `useHitomiArrivals.ts` に `addWatchlist` / `removeWatchlist` 追加
@@ -504,12 +517,28 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 
 **完了条件:** UI から作者の追加・削除が可能
 
-### Phase 4（任意）: 表紙画像表示
+### Phase 4（任意）: 表紙画像表示 ⏸ スキップ確定
 
-1. hitomi.la の画像 URL 生成ロジック解析（`common.js` のサブドメインハッシュ計算）
-2. 画像プロキシ or 直接 `<img src>`（CORS 検証）
+検討の結果、**実装コストが利益を上回るためスキップ判定**。理由:
 
-**完了条件:** カードに表紙が表示される
+1. **実装コスト**: hitomi.la の `gg.js` 画像 URL ハッシュ生成ロジックを移植する必要が
+   あり、彼らの仕様変更で容易に壊れる。CORS / Referer 制約からバックエンド画像
+   プロキシ + ローカルキャッシュの設計も必要となり、機能 1 つ分のコストが大きい
+2. **利益が小さい**: カードに表紙画像が出るだけで、既に「hitomi.la で開く」ボタン
+   から 1 クリックで原本の表紙含めて閲覧可能
+3. **負荷観点**: ブラウザキャッシュ（`Cache-Control: max-age=31536000`）が効く前提
+   なら実際の hitomi.la への負荷は誤差レベルだが、本機能の方針として `hitomi.la`
+   への直リンクで完結させることに合致
+
+**再検討トリガー**: 「どうしてもカード上で表紙を確認したい」運用シーンが出た時点で
+本セクションを更新して着手する。
+
+参考実装メモ（着手時の起点として残す）:
+1. `https://ltn.gold-usergeneratedcontent.net/common.js` + `gg.js` から `gg.b()` /
+   `gg.s()` 関数を読解しサブドメインハッシュアルゴリズムを移植
+2. 画像 URL は概ね `https://<subdomain>.gold-usergeneratedcontent.net/webp/<hash>/<id>.webp`
+3. CORS / Referer ヘッダ制約を確認し、必要なら `GET /api/hitomi/cover/{id}` の
+   バックエンドプロキシ + `backend/data/hitomi/covers/<id>.webp` ローカルキャッシュ
 
 ---
 
