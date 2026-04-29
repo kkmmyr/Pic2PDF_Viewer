@@ -1,6 +1,11 @@
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Users } from 'lucide-react';
 import { useHitomiArrivals } from '../hooks/useHitomiArrivals';
+import { useToast } from '../hooks/useToast';
 import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
+import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
+import { ToastContainer } from '../components/reader/ToastContainer';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import type { RunStatus } from '../types/hitomi';
 
 function StatusBadge({ status }: { status: RunStatus }) {
@@ -49,22 +54,25 @@ function formatDateTime(iso: string | null): string {
 export default function HitomiPage() {
     const { items, lastRunAt, lastRunStatus, lastError, loading, error, refresh, dismiss, dismissAll } =
         useHitomiArrivals();
+    const { toasts, showToast, dismissToast } = useToast();
+    const [watchlistOpen, setWatchlistOpen] = useState(false);
+    const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
 
     const handleDismiss = async (id: number) => {
         try {
             await dismiss(id);
         } catch (e) {
-            alert(`既読化に失敗しました: ${e instanceof Error ? e.message : '不明'}`);
+            showToast(`既読化に失敗しました: ${e instanceof Error ? e.message : '不明'}`, 'error');
         }
     };
 
-    const handleDismissAll = async () => {
-        if (items.length === 0) return;
-        if (!confirm(`${items.length} 件すべてを既読化します。よろしいですか？`)) return;
+    const handleDismissAllConfirmed = async () => {
+        setConfirmDismissAllOpen(false);
         try {
             await dismissAll();
+            showToast('全件を既読化しました', 'success');
         } catch (e) {
-            alert(`一括既読化に失敗しました: ${e instanceof Error ? e.message : '不明'}`);
+            showToast(`一括既読化に失敗しました: ${e instanceof Error ? e.message : '不明'}`, 'error');
         }
     };
 
@@ -79,7 +87,14 @@ export default function HitomiPage() {
                         {lastError && <span className="text-red-500 dark:text-red-400">{lastError}</span>}
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setWatchlistOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        <Users className="w-4 h-4" />
+                        監視対象を編集
+                    </button>
                     <button
                         onClick={refresh}
                         disabled={loading}
@@ -89,7 +104,7 @@ export default function HitomiPage() {
                         再読み込み
                     </button>
                     <button
-                        onClick={handleDismissAll}
+                        onClick={() => setConfirmDismissAllOpen(true)}
                         disabled={items.length === 0}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -126,6 +141,26 @@ export default function HitomiPage() {
                     </div>
                 </>
             )}
+
+            {watchlistOpen && (
+                <HitomiWatchlistDialog
+                    open
+                    onClose={() => setWatchlistOpen(false)}
+                    onError={(msg) => showToast(msg, 'error')}
+                    onSuccess={(msg) => showToast(msg, 'success')}
+                />
+            )}
+
+            <ConfirmDialog
+                open={confirmDismissAllOpen}
+                title="全件を既読化"
+                message={`${items.length} 件すべてを既読化します。よろしいですか？`}
+                confirmLabel="既読化"
+                onConfirm={handleDismissAllConfirmed}
+                onCancel={() => setConfirmDismissAllOpen(false)}
+            />
+
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </div>
     );
 }
