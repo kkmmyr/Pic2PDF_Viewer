@@ -35,8 +35,6 @@ job_store = JobStore()
 
 class GenerateRequest(BaseModel):
     source_dir: str
-    generate_compressed: bool = False
-    quality: int = 50
 
 
 def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:

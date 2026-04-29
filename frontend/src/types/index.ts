@@ -36,8 +36,6 @@ export interface DeletePagesResponse {
  */
 export interface GenerateRequest {
     source_dir: string;
-    generate_compressed?: boolean;
-    quality?: number;
 }
 
 /**

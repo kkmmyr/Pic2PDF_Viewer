@@ -465,18 +465,15 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ## PDF生成
 
 ### `POST /api/generate`
-指定ディレクトリ内の画像からPDFを生成する。
+指定ディレクトリ内の画像からPDFを生成する。生成された PDF は `backend/data/main/pdfs_compressed/` 配下に保存される（`/pdfs` 静的マウントから配信）。
 
 **リクエストボディ**:
 ```json
 {
-  "source_dir": "C:\\Absolute\\Path\\To\\Images",
-  "generate_compressed": false,
-  "quality": 50
+  "source_dir": "C:\\Absolute\\Path\\To\\Images"
 }
 ```
-- `generate_compressed` (オプション, bool) — `true` の場合、圧縮版PDFを `pdfs_compressed/` にも同時生成
-- `quality` (オプション, int 1〜95) — 圧縮品質。`generate_compressed: true` の場合のみ使用
+- 圧縮品質を指定したい場合は、生成後に `POST /api/batch_compress` を別途呼び出す（生成APIは品質パラメータを受け付けない）
 
 **レスポンス**:
 ```json

@@ -4,7 +4,6 @@ import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import { usePdfStatus } from '../hooks/usePdfStatus';
 import { useGenerateJob } from '../hooks/useGenerateJob';
-import { CompressionOptions } from '../components/generator/CompressionOptions';
 import { JobProgress } from '../components/generator/JobProgress';
 import { StatusTable } from '../components/generator/StatusTable';
 import type { GenerateJob } from '../types';
@@ -18,7 +17,6 @@ export default function GeneratorPage() {
     const [result, setResult] = useState<{ message: string; files: string[] } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const [generateCompressed, setGenerateCompressed] = useState(true);
     const [quality, setQuality] = useState(DEFAULT_QUALITY);
 
     const onCompleted = useCallback((job: GenerateJob) => {
@@ -48,7 +46,7 @@ export default function GeneratorPage() {
         try {
             const data = await apiClient.post<unknown, { job_id: string; status: string }>(
                 API_ENDPOINTS.GENERATE,
-                { source_dir: sourceDir, generate_compressed: generateCompressed, quality }
+                { source_dir: sourceDir }
             );
             startJob(data.job_id, sourceDir);
         } catch (err: unknown) {
@@ -116,12 +114,24 @@ export default function GeneratorPage() {
                         </p>
                     </div>
 
-                    <CompressionOptions
-                        enabled={generateCompressed}
-                        quality={quality}
-                        onEnabledChange={setGenerateCompressed}
-                        onQualityChange={setQuality}
-                    />
+                    {/* Batch Compress 用の品質スライダー（生成 API では未使用） */}
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800 space-y-2">
+                        <label htmlFor="quality" className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                            <Zap size={16} className="text-amber-500 fill-amber-500" />
+                            Batch Compress Quality: {quality}
+                            <span className="ml-auto text-xs font-normal text-gray-500 dark:text-gray-400">Lower = smaller</span>
+                        </label>
+                        <input
+                            id="quality"
+                            type="range"
+                            min="10"
+                            max="95"
+                            step="5"
+                            value={quality}
+                            onChange={(e) => setQuality(parseInt(e.target.value))}
+                            className="w-full h-2 bg-blue-200 dark:bg-blue-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                        />
+                    </div>
 
                     {/* Buttons */}
                     <div className="flex flex-col gap-4">
@@ -172,11 +182,6 @@ export default function GeneratorPage() {
                                     <li key={file} className="font-medium">{file}</li>
                                 ))}
                             </ul>
-                            {generateCompressed && (
-                                <p className="mt-3 text-xs text-green-600 dark:text-green-500 italic">
-                                    * 圧縮版は `pdfs_compressed` フォルダに保存されました。
-                                </p>
-                            )}
                         </div>
                     )}
                 </div>
