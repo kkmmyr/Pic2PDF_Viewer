@@ -73,6 +73,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `/check-docs` | 設計書と実装の整合性をクロスチェック |
 | `/audit` | npm audit + uv audit でセキュリティ脆弱性を確認 |
 | `/changelog` | 直近コミットから 変更履歴.md 追記の草稿を生成 |
+| `/sync-memory` | 永続メモリと git log・計画書のズレを検出して更新 |
 
 定義は [commands/](commands/) を参照。
 
