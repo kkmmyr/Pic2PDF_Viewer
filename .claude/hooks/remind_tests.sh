@@ -50,9 +50,9 @@ fi
 # .py → pytest を促す
 # .ts/.tsx/.js/.jsx → vitest + tsc 両方を促す（型エラーは再現性が高いため）
 case "$normalized" in
-    *.py)   msg="バックエンド変更を検出。テストを検討してください: /test または cd backend && uv run pytest" ;;
+    *.py)   msg="バックエンド変更を検出。テストを検討してください: cd backend && uv run pytest" ;;
     *.ts|*.tsx|*.js|*.jsx)
-            msg="フロントエンド変更を検出。型チェック + テストを検討してください: /typecheck と /test（または cd frontend && npx tsc --noEmit && npm run test）" ;;
+            msg="フロントエンド変更を検出。型チェック + テストを検討してください: cd frontend && npx tsc --noEmit && npm run test -- --run" ;;
     *)      msg="ソース変更を検出。テストを検討してください。" ;;
 esac
 

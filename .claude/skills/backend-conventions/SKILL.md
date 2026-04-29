@@ -9,7 +9,7 @@ description: backend/ 配下の Python/FastAPI コードを編集する際に発
 
 - ルーターは `backend/routers/` に配置、ビジネスロジックは `backend/services/` に分離
 - 非同期処理は `async/await` を使用
-- データディレクトリの参照は `backend/config.py` の `get_dirs_by_source()` を経由する
+- データディレクトリの参照は `backend/config.py` の `get_dirs_by_source()` を経由する。`source` パラメータの値は `generated` / `kindle` / `novel`
 - 型ヒントを必ず付ける
 
 ## ユーティリティ強制

@@ -36,8 +36,9 @@ description: pytest（バックエンド）/ vitest（フロントエンド）�
 
 ## テスト実行
 
-- `/test` コマンドで backend pytest + frontend vitest を順次実行できる
-- 個別実行: backend は `cd backend && uv run pytest tests/test_xxx.py -v`、frontend は `cd frontend && npx vitest run src/test/xxx.test.ts`
+- 全件: backend `cd backend && uv run pytest` / frontend `cd frontend && npm run test -- --run`（`--run` で vitest watch を抑止）
+- 個別: backend `cd backend && uv run pytest tests/test_xxx.py -v` / frontend `cd frontend && npx vitest run src/test/xxx.test.ts`
+- 型チェック: `cd frontend && npx tsc --noEmit`
 - バグ修正コミットには **必ず再現テストを含める**（Phase 15-4 が好例）
 
 ## 詳細なテストパターン

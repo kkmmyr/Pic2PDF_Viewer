@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Read(**)",
       "WebFetch(domain:zenn.dev)",
 
       "mcp__gemma-local__ask_gemma",
@@ -11,12 +12,14 @@
 
       "Bash(uv --version)",
       "Bash(npm --version)",
-      "Bash(npm audit)",
-      "Bash(npm audit *)",
       "Bash(pip list)",
       "Bash(pip list *)",
+      "Bash(npm audit)",
+      "Bash(npm audit *)",
+
       "Bash(where *)",
       "Bash(wmic *)",
+      "Bash(systeminfo)",
       "Bash(nvidia-smi)",
       "Bash(nvidia-smi *)",
 
@@ -34,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/check_docs_updated.sh",
+            "command": "bash .claude/hooks/remind_docs_update.sh",
             "timeout": 10
           }
         ]

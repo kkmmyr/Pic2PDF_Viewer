@@ -25,15 +25,7 @@ description: frontend/src/ 配下の React/TypeScript コードを編集する�
     - `z-card-badge`（カード内バッジ）/ `z-overlay-bar`（ヘッダー下バー）/ `z-header`（ヘッダー）/ `z-toast` / `z-dialog` / `z-dialog-nested`
 - マジックナンバーは `frontend/src/constants.ts` に集約する
 
-## 共通ルール（フロント・バック共通）
+## 関連 skill
 
-- コメントは「なぜ」が非自明な場合のみ記述する
-- 不要なエラーハンドリングや将来の拡張を見越した抽象化はしない
-
-## 変更手順
-
-ソースコードを修正する前に、必ず以下の順序で作業すること：
-
-1. 関連する設計書（`docs/`配下）を更新する
-2. `docs/05_記録/変更履歴.md` に変更内容を記録する
-3. 設計書の更新を確認してからソースを修正する
+- ソース変更時の設計書連動手順は `docs-workflow` skill が発動する
+- 全体構成・設計書の場所は `architecture-overview` skill が発動する

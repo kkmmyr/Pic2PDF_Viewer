@@ -10,10 +10,10 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 
 | パス | 役割 | 自動ロード | 更新タイミング |
 |---|---|:---:|---|
-| [CLAUDE.md](CLAUDE.md) | プロジェクトの最上位指示。MCP / 設計書リンク / 起動方法 | ✅ | 設計書追加・MCP 追加・起動方法変更時 |
+| [CLAUDE.md](CLAUDE.md) | プロジェクト概要 + 環境の癖（uv 必須）+ 起動コマンド | ✅ | 起動方法・環境変更時 |
 | [skills/](skills/) | description ベースで自動発動する規約・ノウハウ集 | △ (description のみ) | 新しい共通パターンが確立したら追加 |
 | [commands/](commands/) | スラッシュコマンド定義（`/<filename>` で呼べる） | ❌ | 頻用作業を発見したら新規作成 |
-| [hooks/check_docs_updated.sh](hooks/check_docs_updated.sh) | PreToolUse: 実装変更前に docs/ が更新されているか確認 | ❌ (実行のみ) | 判定ロジック改善時 |
+| [hooks/remind_docs_update.sh](hooks/remind_docs_update.sh) | PreToolUse: 実装変更前に docs/ の更新を**提案**する（advisory・ブロックしない） | ❌ (実行のみ) | 判定ロジック改善時 |
 | [hooks/remind_tests.sh](hooks/remind_tests.sh) | PostToolUse: 大きめの実装変更時にテスト実行を促す | ❌ (実行のみ) | 対象ファイル拡張時 |
 | [hooks/remind_deps_install.sh](hooks/remind_deps_install.sh) | PostToolUse: `pyproject.toml` / `package.json` 等の編集時に `uv sync` / `npm install` を促す | ❌ (実行のみ) | 言語追加時 |
 | [settings.json](settings.json) | hooks 登録 + 共有 permissions | ❌ | hooks 追加・共有 permission 追加時 |
@@ -53,6 +53,8 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 
 | スキル | 自動発動するタイミング |
 |---|---|
+| `architecture-overview` | 新機能追加・複数ファイル横断の変更開始時、全体構成への質問時 |
+| `docs-workflow` | 設計の意図を変えるソース編集時（設計書→変更履歴→ソースの順序を案内） |
 | `git-workflow` | git の commit / PR / branch / mv / rm 操作時 |
 | `test-writing` | pytest / vitest のテストコード追加・修正時 |
 | `frontend-conventions` | `frontend/src/` 配下の React/TypeScript コード編集時 |
@@ -66,14 +68,14 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 
 | コマンド | 用途 |
 |---|---|
-| `/test` | backend pytest + frontend vitest を順次実行 |
-| `/typecheck` | TypeScript 型チェック (`tsc --noEmit`) |
 | `/refactor-status` | リファクタ計画書の未着手 Phase をサマリ |
 | `/big-files` | 肥大化候補ファイル上位 10 件を表示 |
 | `/check-docs` | 設計書と実装の整合性をクロスチェック |
 | `/audit` | npm audit + uv audit でセキュリティ脆弱性を確認 |
 | `/changelog` | 直近コミットから 変更履歴.md 追記の草稿を生成 |
 | `/sync-memory` | 永続メモリと git log・計画書のズレを検出して更新 |
+
+通常のテスト実行・型チェックは Bash で直接呼ぶ（`cd backend && uv run pytest` 等）。コマンド化していたが、project-specific な情報量が少ないため削除済み。実行コマンド一覧は `test-writing` skill を参照。
 
 定義は [commands/](commands/) を参照。
 
