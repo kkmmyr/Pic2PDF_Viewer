@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import type { SortOrder, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '../../types';
 import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
@@ -8,26 +6,21 @@ import { SeriesResolveBar } from './SeriesResolveBar';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
     useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
+    useUrlFilters, useLibrarySettings, useLibraryBulkActions, useLibraryDisplay,
 } from '../../hooks';
-import { useLibraryGrouping, type GroupMode } from '../../hooks/useLibraryGrouping';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
-import { STORAGE_KEYS } from '../../constants';
-import { getStorageJson, setStorageJson } from '../../utils/storage';
-
-const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
-const GROUP_MODE_KEY = 'library_group_mode';
-const SHOW_HIDDEN_KEY = 'library_show_hidden';
-
-function readStoredSort(): SortOrder {
-    return getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc');
-}
 
 /**
  * ライブラリ一覧ビュー。
  * フォルダ/PDF グリッド・ヘッダー・各ダイアログを管理する。
- * お気に入り・並び替え・タイトル検索・作者フィルター・メタデータ管理もこのコンポーネントで完結させる。
+ *
+ * 大半のロジックは責務別カスタムフックに委譲し、本体は合成 + JSX に集中する:
+ * - `useUrlFilters`: author/tag/series の URL クエリ同期
+ * - `useLibrarySettings`: sort/groupMode/showHidden の localStorage 永続化
+ * - `useLibraryBulkActions`: 一括操作 7 種（authors/tags/hidden/thumbnail/merge/series）
+ * - `useLibraryDisplay`: effectiveGroupMode / displayPdfs / breadcrumbs の派生計算
  */
 export function LibraryPanel() {
     const {
@@ -41,68 +34,37 @@ export function LibraryPanel() {
         onOpenRename, onCloseRename, onRenameItem, onRefresh,
     } = useLibraryContext();
 
-    const [sortOrder, setSortOrder] = useState<SortOrder>(readStoredSort);
     const [searchText, setSearchText] = useState('');
-
-    // author / series / tag フィルターは URL クエリに同期する。
-    // ドリルダウン後にブラウザの戻るボタンで元の一覧に戻れるようにするため。
-    // searchText は入力ごとに履歴汚染するので useState のまま。
-    const [searchParams, setSearchParams] = useSearchParams();
-    const authorFilter = searchParams.get('author') ?? '';
-    const tagFilter = searchParams.get('tag') ?? '';
-    const seriesFilter = searchParams.get('series') ?? '';
-
-    const updateUrlFilter = useCallback((key: 'author' | 'tag' | 'series', value: string) => {
-        const next = new URLSearchParams(searchParams);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        setSearchParams(next);
-    }, [searchParams, setSearchParams]);
-
-    const setAuthorFilter = useCallback((v: string) => updateUrlFilter('author', v), [updateUrlFilter]);
-    const setTagFilter = useCallback((v: string) => updateUrlFilter('tag', v), [updateUrlFilter]);
-    const setSeriesFilter = useCallback((v: string) => updateUrlFilter('series', v), [updateUrlFilter]);
-
-    const [groupMode, setGroupMode] = useState<GroupMode>(
-        () => getStorageJson<GroupMode>(GROUP_MODE_KEY, 'none')
-    );
-    const [showHidden, setShowHidden] = useState<boolean>(
-        () => getStorageJson<boolean>(SHOW_HIDDEN_KEY, false)
-    );
     const [seriesEditTarget, setSeriesEditTarget] = useState<string | null>(null);
-
     const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
     const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
     const [isBulkSeriesOpen, setIsBulkSeriesOpen] = useState(false);
 
+    const {
+        authorFilter, tagFilter, seriesFilter,
+        setAuthorFilter, setTagFilter, setSeriesFilter,
+        clearAllDrilldown,
+    } = useUrlFilters();
+
+    const {
+        sortOrder, setSortOrder,
+        groupMode, setGroupMode,
+        showHidden, toggleShowHidden,
+    } = useLibrarySettings();
+
     // パスまたはソース変更時に検索テキストをリセット。
-    // author / tag / series は URL 同期されており、useUrlState の navigate
+    // author/tag/series は URL 同期されており、useUrlState の navigate
     // メソッドが setSearchParams({ path, source }) で全置換するため自動クリアされる。
     useEffect(() => {
         setSearchText('');
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentPath, currentSource]);
 
-    const handleSortChange = useCallback((order: SortOrder) => {
-        setSortOrder(order);
-        setStorageJson(SORT_STORAGE_KEY, order);
-    }, []);
-
-    const handleGroupModeChange = useCallback((mode: GroupMode) => {
+    const handleGroupModeChange = useCallback((mode: typeof groupMode) => {
         setGroupMode(mode);
-        setStorageJson(GROUP_MODE_KEY, mode);
         // モード切替時にドリルダウン中のシリーズフィルターは解除（一覧の意味が変わるため）
         setSeriesFilter('');
-    }, [setSeriesFilter]);
-
-    const handleToggleShowHidden = useCallback(() => {
-        setShowHidden(prev => {
-            const next = !prev;
-            setStorageJson(SHOW_HIDDEN_KEY, next);
-            return next;
-        });
-    }, []);
+    }, [setGroupMode, setSeriesFilter]);
 
     const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
     const {
@@ -111,6 +73,8 @@ export function LibraryPanel() {
         assignSeries, unassignSeries, reorderSeries,
         allAuthors, allTags, allSeries, allSeriesWithStats, refreshMeta,
     } = useBookMeta(currentSource);
+    const { toasts, showToast, dismissToast } = useToast();
+
     const sortedPdfs = useSortedPdfs(
         pdfs,
         sortOrder,
@@ -123,7 +87,6 @@ export function LibraryPanel() {
         recordView(currentPath, name);
         onPdfClick(name);
     }, [recordView, currentPath, onPdfClick]);
-    const { toasts, showToast, dismissToast } = useToast();
 
     const handleRegenThumb = useCallback(async (name: string) => {
         await apiClient.post(API_ENDPOINTS.REGENERATE_THUMBNAIL, {
@@ -146,185 +109,32 @@ export function LibraryPanel() {
         meta,
     });
 
-    // 集約モードの有効値を計算する。
-    // - シリーズドリルダウン中（seriesFilter）はフラット
-    // - 「作者 → シリーズ」モード時は、authorFilter の有無で 1 階層と 2 階層を切替
-    // - 単純な author / series モードでドリルダウン中は集約を無効化
-    const effectiveGroupMode: GroupMode =
-        seriesFilter
-            ? 'none'
-            : groupMode === 'author-then-series'
-                ? (authorFilter ? 'series' : 'author')
-                : (authorFilter ? 'none' : groupMode);
-
-    // 集約: シリーズ / 作者 / なし。none のときは filteredPdfs をそのまま返す
-    const grouped = useLibraryGrouping({
-        pdfs: filteredPdfs,
+    const { effectiveGroupMode: _effectiveGroupMode, grouped, displayPdfs, breadcrumbs } = useLibraryDisplay({
+        filteredPdfs,
         meta,
         currentPath,
-        mode: effectiveGroupMode,
+        groupMode,
+        authorFilter,
+        seriesFilter,
+        getSeries,
+        clearAllDrilldown,
+        setSeriesFilter,
+    });
+    void _effectiveGroupMode; // useLibraryDisplay 内で useLibraryGrouping に渡すための内部値（外には不要）
+
+    const bulkActions = useLibraryBulkActions({
+        currentPath, currentSource, selectedItems, showHidden, seriesFilter,
+        onClearSelection, onRefresh, showToast,
+        bookMeta: { updateAuthors, updateTags, setHidden, assignSeries, reorderSeries },
     });
 
-    // シリーズドリルダウン中はユーザー選択ソートに関係なく series_index 昇順で表示する。
-    // DnD 並べ替えの結果を即座に反映させるため、grouped.items をその場で並べ替える。
-    const displayPdfs = (() => {
-        if (!seriesFilter) return grouped.items;
-        const sorted = [...grouped.items].sort((a, b) => {
-            const ai = getSeries(currentPath, a.name)?.index ?? 0;
-            const bi = getSeries(currentPath, b.name)?.index ?? 0;
-            return ai - bi;
-        });
-        return sorted;
-    })();
-
-    // シリーズフィルター中の表示用チップ情報（タイトルは meta から引く）
-    const seriesFilterTitle = seriesFilter
-        ? (Object.values(meta).find(e => e.series_id === seriesFilter)?.series_title ?? 'シリーズ')
-        : null;
-
-    // ドリルダウン中はパンくずを表示する。
-    // 各クリックハンドラは setSearchParams を 1 回で済ませて履歴ノイズを抑える。
-    const clearAllDrilldown = useCallback(() => {
-        const next = new URLSearchParams(searchParams);
-        next.delete('author');
-        next.delete('series');
-        setSearchParams(next);
-    }, [searchParams, setSearchParams]);
-
-    type Crumb = { kind: 'home' | 'author' | 'series'; label: string; onClick?: () => void };
-    const breadcrumbs: Crumb[] = (() => {
-        if (!authorFilter && !seriesFilter) return [];
-        const items: Crumb[] = [
-            { kind: 'home', label: 'ライブラリ', onClick: clearAllDrilldown },
-        ];
-        if (authorFilter) {
-            items.push({
-                kind: 'author',
-                label: authorFilter,
-                // 作者階層に戻る = seriesFilter のみクリア（authorFilter は維持）。現在地ならクリック不可
-                onClick: seriesFilter ? () => setSeriesFilter('') : undefined,
-            });
-        }
-        if (seriesFilter) {
-            items.push({
-                kind: 'series',
-                label: seriesFilterTitle ?? 'シリーズ',
-                // 現在地（クリック不可）
-            });
-        }
-        return items;
-    })();
-
-    const handleBulkApplyAuthors = useCallback(async (authors: string[]) => {
-        await updateAuthors(currentPath, Array.from(selectedItems), authors);
-        onClearSelection();
-    }, [selectedItems, currentPath, updateAuthors, onClearSelection]);
-
-    const handleBulkApplyTags = useCallback(async (tags: string[]) => {
-        const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
-        await updateTags(currentPath, pdfNames, tags);
-        onClearSelection();
-    }, [selectedItems, currentPath, updateTags, onClearSelection]);
-
-    /** 1冊だけの非表示/再表示。`showHidden` モードに応じて自動で逆を行う */
-    const handleToggleHiddenOne = useCallback(async (name: string) => {
-        // showHidden=true（ゴミ箱）なら再表示、それ以外は非表示にする
-        try {
-            await setHidden(currentPath, [name], !showHidden);
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
-        }
-    }, [setHidden, currentPath, showHidden, showToast]);
-
-    /** 選択モードでの一括非表示/再表示 */
-    const handleBulkToggleHidden = useCallback(async () => {
-        const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
-        if (pdfNames.length === 0) return;
-        try {
-            await setHidden(currentPath, pdfNames, !showHidden);
-            onClearSelection();
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
-        }
-    }, [setHidden, currentPath, selectedItems, showHidden, showToast, onClearSelection]);
     void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
 
     // 1冊だけ選択中ならその書籍の現在タグを初期表示する
     const bulkTagInitial = (() => {
-        const pdfNames = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
-        if (pdfNames.length !== 1) return [];
-        return getTags(currentPath, pdfNames[0]);
+        if (bulkActions.bulkSeriesNames.length !== 1) return [];
+        return getTags(currentPath, bulkActions.bulkSeriesNames[0]);
     })();
-
-    const handleRegenThumbnailBulk = useCallback(async () => {
-        const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
-        if (names.length === 0) return;
-        try {
-            const data = await apiClient.post<unknown, RegenerateThumbnailBulkResponse>(
-                API_ENDPOINTS.REGENERATE_THUMBNAIL_BULK,
-                { names, path: currentPath, source: currentSource }
-            );
-            onRefresh();
-            if (data.failed.length > 0) {
-                showToast(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`, 'error');
-            }
-            // 部分失敗があっても、成功した分はあるので選択は解除する（押し直しの意図がない）
-            onClearSelection();
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : 'サムネイル再生成に失敗しました。', 'error');
-        }
-    }, [selectedItems, currentPath, currentSource, onRefresh, onClearSelection, showToast]);
-
-    const handleMergePdfs = useCallback(async (outputName: string) => {
-        const names = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
-        await apiClient.post<unknown, MergePdfsResponse>(
-            API_ENDPOINTS.MERGE_PDFS,
-            { names, output_name: outputName, path: currentPath, source: currentSource }
-        );
-        onRefresh();
-        onClearSelection();
-    }, [selectedItems, currentPath, currentSource, onRefresh, onClearSelection]);
-
-    // 一括シリーズ登録: 選択順を保持するため Set のイテレーション順をそのまま使う
-    const bulkSeriesNames: string[] = Array.from(selectedItems)
-        .filter(item => item.toLowerCase().endsWith('.pdf'));
-
-    // 既存シリーズの一覧（useBookMeta.allSeriesWithStats から取得。maxIndex は
-    // 一括追加時の採番開始用）
-    const bulkSeriesExisting = allSeriesWithStats;
-
-    /**
-     * シリーズドリルダウン中のドロップで呼ばれる。
-     * `newOrder` の順に series_index を 1.0, 2.0, ... に振り直す。
-     * useBookMeta.reorderSeries 内で楽観的更新 + 失敗時ロールバックを実装済み。
-     */
-    const handleSeriesReorder = useCallback(async (newOrder: string[]) => {
-        if (!seriesFilter || newOrder.length === 0) return;
-        try {
-            await reorderSeries(currentPath, newOrder, seriesFilter);
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '並べ替えに失敗しました。', 'error');
-        }
-    }, [seriesFilter, currentPath, reorderSeries, showToast]);
-
-    const handleBulkAssignSeries = useCallback(async (params: { title: string; indexes: number[]; id?: string }) => {
-        if (bulkSeriesNames.length === 0) return;
-        if (params.indexes.length !== bulkSeriesNames.length) {
-            throw new Error('採番リストが選択数と一致しません');
-        }
-        try {
-            await assignSeries(currentPath, bulkSeriesNames, {
-                title: params.title,
-                index: params.indexes,
-                id: params.id,
-            });
-            showToast(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`, 'success');
-            onClearSelection();
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : 'シリーズ登録に失敗しました。', 'error');
-            throw e;
-        }
-    }, [assignSeries, currentPath, bulkSeriesNames, showToast, onClearSelection]);
 
     return (
         <>
@@ -350,15 +160,15 @@ export function LibraryPanel() {
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
                 onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
-                onBulkToggleHidden={handleBulkToggleHidden}
-                onRegenThumbnailBulk={handleRegenThumbnailBulk}
+                onBulkToggleHidden={bulkActions.handleBulkToggleHidden}
+                onRegenThumbnailBulk={bulkActions.handleRegenThumbnailBulk}
                 onMergePdfs={() => setIsMergeDialogOpen(true)}
-                onSortChange={handleSortChange}
+                onSortChange={setSortOrder}
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
                 onGroupModeChange={handleGroupModeChange}
-                onToggleShowHidden={handleToggleShowHidden}
+                onToggleShowHidden={toggleShowHidden}
             />
 
             <LibraryDialogs
@@ -376,19 +186,19 @@ export function LibraryPanel() {
                 onMoveItems={onMoveItems}
                 isBulkAuthorOpen={isBulkAuthorOpen}
                 onCloseBulkAuthor={() => setIsBulkAuthorOpen(false)}
-                onBulkApplyAuthors={handleBulkApplyAuthors}
+                onBulkApplyAuthors={bulkActions.handleBulkApplyAuthors}
                 isBulkTagOpen={isBulkTagOpen}
                 bulkTagInitial={bulkTagInitial}
                 onCloseBulkTag={() => setIsBulkTagOpen(false)}
-                onBulkApplyTags={handleBulkApplyTags}
+                onBulkApplyTags={bulkActions.handleBulkApplyTags}
                 isMergeDialogOpen={isMergeDialogOpen}
                 onCloseMergeDialog={() => setIsMergeDialogOpen(false)}
-                onMergePdfs={handleMergePdfs}
+                onMergePdfs={bulkActions.handleMergePdfs}
                 isBulkSeriesOpen={isBulkSeriesOpen}
-                bulkSeriesNames={bulkSeriesNames}
-                bulkSeriesExisting={bulkSeriesExisting}
+                bulkSeriesNames={bulkActions.bulkSeriesNames}
+                bulkSeriesExisting={allSeriesWithStats}
                 onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
-                onBulkAssignSeries={handleBulkAssignSeries}
+                onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
             />
 
             <AutoFillAuthorsBar source={currentSource} onComplete={refreshMeta} />
@@ -430,11 +240,11 @@ export function LibraryPanel() {
                                 setAuthorFilter(firstAuthor);
                             }
                         }}
-                        onToggleHidden={handleToggleHiddenOne}
+                        onToggleHidden={bulkActions.handleToggleHiddenOne}
                         showHidden={showHidden}
                         onEditSeries={setSeriesEditTarget}
                         dndEnabled={!!seriesFilter}
-                        onReorder={handleSeriesReorder}
+                        onReorder={bulkActions.handleSeriesReorder}
                     />
                 </div>
             </div>
