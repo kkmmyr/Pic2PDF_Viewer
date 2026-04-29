@@ -188,9 +188,10 @@ export function ReaderPanel({
 
     return (
         <>
-            {/* ヘッダー表示トリガーゾーン */}
+            {/* ヘッダー表示トリガーゾーン: ヘッダー (h-14) と高さを揃え、
+                下方向にはみ出す領域でヘッダーの onMouseLeave と競合しないようにする */}
             <div
-                className="fixed top-0 left-0 right-0 h-16 z-overlay-bar"
+                className="fixed top-0 left-0 right-0 h-14 z-overlay-bar"
                 onMouseEnter={() => setShowHeader(true)}
             />
 
