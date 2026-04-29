@@ -16,8 +16,6 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from services.series_resolver import (
-    _parse_volume_index,
-    _parse_pair_volume_indexes,
     _common_prefix,
     _detect_series_in_group,
     run_resolve,
@@ -25,81 +23,12 @@ from services.series_resolver import (
     reset_state,
 )
 
-
-# ---------------------------------------------------------------------------
-# _parse_volume_index — 巻数パターンの数値化
-# ---------------------------------------------------------------------------
-
-class TestParseVolumeIndex:
-    @pytest.mark.parametrize("suffix,expected", [
-        (" 1",       1.0),
-        (" 2",       2.0),
-        (" 03",      3.0),
-        (" 第3巻",   3.0),
-        ("第10巻",   10.0),
-        (" vol.4",   4.0),
-        (" Vol 5",   5.0),
-        (" VOL.06",  6.0),
-        ("(上)",      1.0),
-        ("(中)",      2.0),
-        ("(下)",      3.0),
-        ("(前)",      1.0),
-        ("(後)",      2.0),
-        ("(下)",      3.0),
-        ("第三巻",   3.0),
-        ("七",        7.0),
-        # 小数巻
-        ("2.5",      2.5),
-        (" 4.5",     4.5),
-        (" 0.5",     0.5),
-        ("vol.3.5",  3.5),
-    ])
-    def test_recognized_patterns(self, suffix, expected):
-        assert _parse_volume_index(suffix) == expected
-
-    @pytest.mark.parametrize("suffix", [
-        "",
-        " ",
-        " 外伝",
-        " 番外編",
-        " ABC",
-        "(上下)",  # 並びは未対応
-    ])
-    def test_unrecognized_patterns(self, suffix):
-        assert _parse_volume_index(suffix) is None
+# 巻数パーサーのテストは tests/test_volume_parser.py に移動済み（Phase 21）
 
 
 # ---------------------------------------------------------------------------
 # _common_prefix
 # ---------------------------------------------------------------------------
-
-class TestParsePairVolumeIndexes:
-    """ペア用「巻数なし=1巻」ルールの確認。"""
-
-    def test_blank_with_int_2_treated_as_1(self):
-        # "" と "2" → (1.0, 2.0)
-        assert _parse_pair_volume_indexes("", "2") == (1.0, 2.0)
-        assert _parse_pair_volume_indexes("2", "") == (2.0, 1.0)
-
-    def test_blank_with_int_3_treated_as_1(self):
-        assert _parse_pair_volume_indexes("", "3") == (1.0, 3.0)
-
-    def test_blank_with_fractional_not_applied(self):
-        # 小数巻には適用しない
-        assert _parse_pair_volume_indexes("", "2.5") == (None, 2.5)
-
-    def test_blank_with_int_1_not_applied(self):
-        # 1 巻同士は曖昧なので空 → 1 ルールを適用しない
-        assert _parse_pair_volume_indexes("", "1") == (None, 1.0)
-
-    def test_blank_with_blank(self):
-        assert _parse_pair_volume_indexes("", "") == (None, None)
-
-    def test_normal_pair(self):
-        # 通常の整数巻ペア
-        assert _parse_pair_volume_indexes("1", "2") == (1.0, 2.0)
-        assert _parse_pair_volume_indexes("2", "2.5") == (2.0, 2.5)
-
 
 class TestCommonPrefix:
     def test_basic(self):
