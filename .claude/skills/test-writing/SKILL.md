@@ -1,6 +1,11 @@
-## テスト方針
+---
+name: test-writing
+description: pytest（バックエンド）/ vitest（フロントエンド）のテストコードを新規追加・修正する際に発動。何をテストすべきか、副作用ロジック追加時のチェックリスト、テスト実行方法を含む。詳細なパターン例は references/ を参照。
+---
 
-### 何をテストするか
+# テスト方針
+
+## 何をテストするか
 
 **必須テスト対象** — 副作用があり、かつ壊れると気づきにくいロジック。
 
@@ -22,66 +27,24 @@
 - 機械的なカバレッジ追求（数値ではなく「壊れやすい箇所の網羅」で評価）
 - 単純な getter / プロパティ取得のテスト
 
-### バックエンドテストパターン (pytest)
-
-#### 推奨: `TestClient` + `tmp_path` + `monkeypatch`
-
-```python
-@pytest.fixture
-def view_client(tmp_path, monkeypatch):
-    """meta_store の DATA_DIR を tmp_path に差し替えた TestClient を提供する。"""
-    monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-    from main import app
-    return TestClient(app)
-```
-
-- `tmp_path` でテストごとにディスクを隔離（cleanup 不要）
-- `monkeypatch` で外部依存（パス・関数）を差し替え
-- `TestClient` で HTTP 層も含めてエンドツーエンドに近い形でテスト
-
-#### モックは最小限
-
-- 外部 API（Web 検索 / Gemma）など決定論的でないものは `monkeypatch` でモック
-- ファイル I/O はモックせず `tmp_path` に実書き込みする
-- 「DB をモックして単体テスト」よりも「実 I/O を tmp_path に流す」を優先
-
-#### テスト命名規則
-
-- クラス名: `TestXxx`（対象メソッド・機能）
-- メソッド名: `test_<挙動>` を平文で（例: `test_overwrite_all_preserves_view_count`）
-- assert は **最小限**。1 テスト = 1 シナリオ。
-
-### フロントエンドテストパターン (vitest)
-
-#### フックのテスト: `renderHook`
-
-```ts
-import { renderHook } from '@testing-library/react';
-
-const { result } = renderHook(() =>
-    useLibraryFilter({ pdfs, directories, searchText: 'beta', ... })
-);
-expect(result.current.filteredPdfs).toEqual([...]);
-```
-
-- フックは `renderHook` で単体テスト
-- API 呼び出しは `apiClient` を `vi.fn()` でモック（`useBookMeta.test.ts` 参照）
-
-#### コンポーネントのテストは原則書かない
-
-- React コンポーネントの DOM 検証は工数対効果が悪い
-- ロジックはフックに切り出してテストする方針（既存 `useEditMode` / `useSpreadMode` 等）
-- ダイアログ等のインタラクションはユーザーが手動確認
-
-### 副作用のあるロジック追加時のチェックリスト
+## 副作用のあるロジック追加時のチェックリスト
 
 新しいロジックを追加するときは以下を考慮:
 1. 副作用があるか？（ファイル I/O・meta.json 更新・ジョブ起動）→ あればテスト必須
 2. 既存の副作用ロジックを変更したか？→ 既存テストが通るか確認 + 新パスのテスト追加
 3. 失敗時のロールバックがあるか？→ ロールバックパスもテスト
 
-### テスト実行
+## テスト実行
 
 - `/test` コマンドで backend pytest + frontend vitest を順次実行できる
 - 個別実行: backend は `cd backend && uv run pytest tests/test_xxx.py -v`、frontend は `cd frontend && npx vitest run src/test/xxx.test.ts`
 - バグ修正コミットには **必ず再現テストを含める**（Phase 15-4 が好例）
+
+## 詳細なテストパターン
+
+書こうとしているテストの種類に応じて以下を参照:
+
+- **バックエンド (pytest)** → `references/backend-patterns.md`
+  TestClient + tmp_path + monkeypatch のフィクスチャパターン、モック方針、命名規則
+- **フロントエンド (vitest)** → `references/frontend-patterns.md`
+  renderHook によるフック単体テスト、コンポーネントテストを書かない方針
