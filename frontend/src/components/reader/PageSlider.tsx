@@ -94,8 +94,8 @@ export function PageSlider({
                             <img
                                 src={thumbUrl}
                                 alt=""
-                                width={80}
-                                className="w-20 h-auto block"
+                                width={200}
+                                className="w-[200px] h-auto block"
                                 onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                             />
                             <p className="text-white text-xs text-center tabular-nums px-1.5 py-0.5">

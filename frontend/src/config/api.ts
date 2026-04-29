@@ -79,8 +79,8 @@ export const API_ENDPOINTS = {
     /** hitomi.la 監視スクリプトを同期実行 */
     HITOMI_RUN_NOW: '/api/hitomi/run-now',
     /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダープレビュー用） */
-    PAGE_THUMBNAIL: (name: string, page: number, path: string, source: LibrarySource) =>
-        `/api/thumbnails/page?name=${encodeURIComponent(name)}&page=${page}&path=${encodeURIComponent(path)}&source=${source}`,
+    PAGE_THUMBNAIL: (name: string, page: number, path: string, source: LibrarySource, width = 200) =>
+        `/api/thumbnails/page?name=${encodeURIComponent(name)}&page=${page}&path=${encodeURIComponent(path)}&source=${source}&width=${width}`,
 } as const;
 
 /**
