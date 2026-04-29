@@ -3,14 +3,17 @@
 各エンドポイントの詳細は docs/03_詳細設計/hitomi新着監視設計書.md §6 を参照。
 データは backend/data/hitomi/ 配下の JSON ファイル（個別の監視スクリプトが書き出す）。
 """
+import logging
 import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from services.hitomi import state_store, watchlist
+from services.hitomi import nozomi, state_store, watchlist
 from tools import hitomi_monitor
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -76,6 +79,19 @@ def post_watchlist(req: AddWatchlistRequest) -> dict:
         if "not found on hitomi.la" in msg:
             raise HTTPException(status_code=404, detail=msg)
         raise HTTPException(status_code=400, detail=msg)
+
+    # 登録時点の最新 ID を state.json に書き込む。
+    # これにより初回監視実行で「登録前から存在していた作品」が新着として出ない。
+    key = f"{entry['normalized']}:{entry['language']}"
+    try:
+        ids = nozomi.fetch_nozomi_head(entry["normalized"], entry["language"], count=1)
+        if ids:
+            state = state_store.load_state(DATA_DIR)
+            state.setdefault("artists", {})[key] = {"top_id": ids[0]}
+            state_store.save_state(DATA_DIR, state)
+    except nozomi.HitomiError as e:
+        _log.warning("top_id 初期化スキップ（NOZOMI 取得失敗）: %s / %s", key, e)
+
     return {"message": "Added", "normalized": entry["normalized"]}
 
 
