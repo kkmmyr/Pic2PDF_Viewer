@@ -8,6 +8,7 @@ from utils.path_utils import validate_safe_path, validate_safe_name, join_path
 from utils.file_naming import get_thumbnail_name
 from services.thumbnail_service import ThumbnailService
 from services.file_manager import FileManager
+from services.meta_store import make_key, update_meta_locked
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -179,5 +180,22 @@ def rename_item(request: RenameItemRequest):
         raise HTTPException(status_code=400, detail="Name already exists")
     except OSError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+    # meta.json のキーを旧名→新名に付け替える（作者名・タグ・シリーズを引き継ぐ）
+    old_key = make_key(request.path, request.old_name)
+    new_key = make_key(request.path, request.new_name)
+
+    def _rename_meta_key(data):
+        if request.is_folder:
+            old_prefix = old_key + "/"
+            new_prefix = new_key + "/"
+            for k in list(data.keys()):
+                if k.startswith(old_prefix):
+                    data[new_prefix + k[len(old_prefix):]] = data.pop(k)
+        else:
+            if old_key in data:
+                data[new_key] = data.pop(old_key)
+
+    update_meta_locked(request.source, _rename_meta_key)
 
     return {"message": "Item renamed", "new_name": request.new_name}
