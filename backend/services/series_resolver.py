@@ -10,11 +10,11 @@ Phase 2: `use_gemma=True` 指定時、ルール判定後に同作者でシリー
 """
 import hashlib
 import os
-import sys
 import threading
 from dataclasses import dataclass, field
 
-from config import GEMMA_TOOL_DIR, get_dirs_by_source
+from config import get_dirs_by_source
+from services.gemma_client import import_ollama_client
 from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
 from services.volume_parser import parse_pair_volume_indexes
 from utils.file_utils import is_pdf_file
@@ -55,28 +55,6 @@ def reset_state(source: str) -> None:
 # ---------------------------------------------------------------------------
 # Gemma 補助（Phase 2）
 # ---------------------------------------------------------------------------
-
-def _ensure_ollama_client():
-    """Gemma 4 ツールの ollama_client.call_ollama をインポートして返す。
-
-    失敗時は None。`author_resolver._ensure_web_extract` と同じパターンで
-    backend の `config` モジュールが Gemma 側の `config` と衝突しないよう退避する。
-    """
-    lib_dir = os.path.join(GEMMA_TOOL_DIR, "lib")
-    for p in (GEMMA_TOOL_DIR, lib_dir):
-        if p not in sys.path:
-            sys.path.insert(0, p)
-
-    saved_config = sys.modules.pop("config", None)
-    try:
-        from ollama_client import call_ollama  # type: ignore[import]
-        return call_ollama
-    except ImportError:
-        return None
-    finally:
-        if saved_config is not None:
-            sys.modules["config"] = saved_config
-
 
 def _ask_gemma_is_same_series(
     call_ollama, reference_titles: list[str], candidate_title: str
@@ -220,7 +198,7 @@ def _augment_with_gemma(
     各シリーズ（既に series_id が割り当てられたメンバー集合）に対し、
     同作者でシリーズ未割当の書籍を Gemma に問い合わせる。
     """
-    call_ollama = _ensure_ollama_client()
+    call_ollama = import_ollama_client()
     if call_ollama is None:
         logger.warning("Gemma client unavailable; skipping use_gemma phase")
         return

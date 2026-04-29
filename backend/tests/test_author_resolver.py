@@ -143,10 +143,10 @@ class TestTryFanza:
 
 
 class TestResolveAuthorFallbackOrder:
-    """resolve_author のフォールバック優先順位テスト（_ensure_tools をモック）。"""
+    """resolve_author のフォールバック優先順位テスト（import_web_extract_tools をモック）。"""
 
     def _patch_tools(self, monkeypatch, dlsite_result="", fanza_result="", direct_result="", generic_result="作者不明"):
-        """各ステップの返り値を設定して _ensure_tools をモックする。"""
+        """各ステップの返り値を設定して import_web_extract_tools をモックする。"""
         def fake_web_extract(query, extract_target, **kwargs):
             if "site:" in query:
                 return direct_result
@@ -160,7 +160,7 @@ class TestResolveAuthorFallbackOrder:
                 return json.dumps({"result": dlsite_result}) if dlsite_result else "{}"
             return json.dumps({"result": fanza_result}) if fanza_result else "{}"
 
-        monkeypatch.setattr(ar, "_ensure_tools", lambda: (fake_web_extract, None, fake_fetch, fake_ollama))
+        monkeypatch.setattr(ar, "import_web_extract_tools", lambda: (fake_web_extract, None, fake_fetch, fake_ollama))
         monkeypatch.setattr(ar, "_try_dlsite", lambda title, f, c: dlsite_result)
         monkeypatch.setattr(ar, "_try_fanza", lambda title, f, c: fanza_result)
         monkeypatch.setattr(ar, "_try_direct_sites", lambda title, w: direct_result)
@@ -180,7 +180,7 @@ class TestResolveAuthorFallbackOrder:
     def test_generic_fallback_when_all_direct_fail(self, monkeypatch):
         def fake_web_extract(query, extract_target, **kwargs):
             return "汎用サークル"
-        monkeypatch.setattr(ar, "_ensure_tools", lambda: (fake_web_extract, None, lambda u, **k: "", lambda *a, **k: "{}"))
+        monkeypatch.setattr(ar, "import_web_extract_tools", lambda: (fake_web_extract, None, lambda u, **k: "", lambda *a, **k: "{}"))
         monkeypatch.setattr(ar, "_try_dlsite", lambda *a: "")
         monkeypatch.setattr(ar, "_try_fanza", lambda *a: "")
         monkeypatch.setattr(ar, "_try_direct_sites", lambda *a: "")
@@ -194,12 +194,12 @@ class TestResolveAuthorFallbackOrder:
 
         def fake_web_extract(query, extract_target, **kwargs):
             return "漫画著者"
-        monkeypatch.setattr(ar, "_ensure_tools", lambda: (fake_web_extract, None, None, None))
+        monkeypatch.setattr(ar, "import_web_extract_tools", lambda: (fake_web_extract, None, None, None))
 
         result = ar.resolve_author("タイトル", "kindle")
         assert result == "漫画著者"
         assert len(dlsite_called) == 0
 
     def test_tools_unavailable_returns_unknown(self, monkeypatch):
-        monkeypatch.setattr(ar, "_ensure_tools", lambda: (None, None, None, None))
+        monkeypatch.setattr(ar, "import_web_extract_tools", lambda: (None, None, None, None))
         assert ar.resolve_author("タイトル", "generated") == "作者不明"

@@ -285,7 +285,7 @@ class TestGemmaAugmentation:
         # Gemma を YES だけ返すモック関数に差し替え
         fake_call = lambda prompt, source="series_resolver": "YES"
         monkeypatch.setattr(
-            "services.series_resolver._ensure_ollama_client",
+            "services.series_resolver.import_ollama_client",
             lambda: fake_call,
         )
 
@@ -312,7 +312,7 @@ class TestGemmaAugmentation:
 
         fake_call = lambda prompt, source="series_resolver": "NO"
         monkeypatch.setattr(
-            "services.series_resolver._ensure_ollama_client",
+            "services.series_resolver.import_ollama_client",
             lambda: fake_call,
         )
 
@@ -336,7 +336,7 @@ class TestGemmaAugmentation:
 
         # Gemma クライアントがインポート不可な状況を模擬
         monkeypatch.setattr(
-            "services.series_resolver._ensure_ollama_client",
+            "services.series_resolver.import_ollama_client",
             lambda: None,
         )
 
@@ -364,7 +364,7 @@ class TestGemmaAugmentation:
         def fake_ensure():
             called.append(True)
             return None
-        monkeypatch.setattr("services.series_resolver._ensure_ollama_client", fake_ensure)
+        monkeypatch.setattr("services.series_resolver.import_ollama_client", fake_ensure)
 
         reset_state("generated")
         run_resolve("generated", use_gemma=False)

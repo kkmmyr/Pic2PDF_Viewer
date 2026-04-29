@@ -9,9 +9,8 @@ generated ソースの検索フロー:
 kindle / novel ソースは 4 のみ。
 """
 import json
-import sys
 from urllib.parse import quote as _url_quote
-from config import GEMMA_TOOL_DIR
+from services.gemma_client import import_web_extract_tools
 
 # ソース別の SearXNG 汎用クエリ設定
 _QUERY_CONFIG: dict[str, dict[str, str]] = {
@@ -63,31 +62,6 @@ def _sanitize_author(value: str) -> str:
     if any(pat in lower for pat in _INVALID_PATTERNS):
         return "作者不明"
     return value
-
-
-def _ensure_tools():
-    """web_extract / searxng_search / fetch_url_content / call_ollama を一括インポート。
-    Gemma ツールが利用不可の場合はすべて None を返す。
-    """
-    import os
-    lib_dir = os.path.join(GEMMA_TOOL_DIR, "lib")
-    for p in (GEMMA_TOOL_DIR, lib_dir):
-        if p not in sys.path:
-            sys.path.insert(0, p)
-
-    # backend の config.py が sys.modules['config'] にキャッシュされているため、
-    # Gemma ライブラリが Gemma の config を読めず ImportError になる。
-    # インポート時だけ backend config を退避し、完了後に復元する。
-    saved_config = sys.modules.pop("config", None)
-    try:
-        from web_extract import web_extract, searxng_search, fetch_url_content  # type: ignore[import]
-        from ollama_client import call_ollama  # type: ignore[import]
-        return web_extract, searxng_search, fetch_url_content, call_ollama
-    except ImportError:
-        return None, None, None, None
-    finally:
-        if saved_config is not None:
-            sys.modules["config"] = saved_config
 
 
 def _extract_circle_from_page(page_text: str, title: str, call_ollama) -> str:
@@ -169,7 +143,7 @@ def resolve_author(title: str, source: str) -> str:
     Returns:
         サークル名/著者名文字列。取得失敗時は '作者不明'。
     """
-    web_extract, _, fetch_url, call_ollama = _ensure_tools()
+    web_extract, _, fetch_url, call_ollama = import_web_extract_tools()
     if web_extract is None:
         return "作者不明"
 
@@ -202,7 +176,7 @@ def resolve_author_debug(title: str, source: str) -> dict:
     resolve_author の各ステップを可視化するデバッグ用関数。
     DLsite/FANZA 直接検索・SearXNG の結果を個別に返す。
     """
-    web_extract, searxng_search, fetch_url, call_ollama = _ensure_tools()
+    web_extract, searxng_search, fetch_url, call_ollama = import_web_extract_tools()
     if web_extract is None:
         return {"error": "Gemma ツールをインポートできません。GEMMA_TOOL_DIR を確認してください。"}
 
