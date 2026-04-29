@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertCircle, CheckCircle2, Loader2, RefreshCw, Users } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Users } from 'lucide-react';
 import { useHitomiArrivals } from '../hooks/useHitomiArrivals';
 import { useToast } from '../hooks/useToast';
 import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
@@ -52,8 +52,11 @@ function formatDateTime(iso: string | null): string {
 }
 
 export default function HitomiPage() {
-    const { items, lastRunAt, lastRunStatus, lastError, loading, error, refresh, dismiss, dismissAll } =
-        useHitomiArrivals();
+    const {
+        items, lastRunAt, lastRunStatus, lastError,
+        loading, running, error,
+        refresh, dismiss, dismissAll, runNow,
+    } = useHitomiArrivals();
     const { toasts, showToast, dismissToast } = useToast();
     const [watchlistOpen, setWatchlistOpen] = useState(false);
     const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
@@ -76,6 +79,15 @@ export default function HitomiPage() {
         }
     };
 
+    const handleRunNow = async () => {
+        try {
+            await runNow();
+            showToast('新着情報を取得しました', 'success');
+        } catch (e) {
+            showToast(`取得に失敗しました: ${e instanceof Error ? e.message : '不明'}`, 'error');
+        }
+    };
+
     return (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -90,22 +102,32 @@ export default function HitomiPage() {
                 <div className="flex flex-wrap gap-2">
                     <button
                         onClick={() => setWatchlistOpen(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        disabled={running}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                     >
                         <Users className="w-4 h-4" />
                         監視対象を編集
                     </button>
                     <button
                         onClick={refresh}
-                        disabled={loading}
+                        disabled={loading || running}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
                         再読み込み
                     </button>
                     <button
+                        onClick={handleRunNow}
+                        disabled={running}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Task Scheduler を待たずに監視スクリプトを実行"
+                    >
+                        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        {running ? '取得中...' : '新着情報を取得'}
+                    </button>
+                    <button
                         onClick={() => setConfirmDismissAllOpen(true)}
-                        disabled={items.length === 0}
+                        disabled={items.length === 0 || running}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         全件既読化

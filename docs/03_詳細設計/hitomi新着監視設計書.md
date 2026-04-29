@@ -19,6 +19,7 @@ hitomi.la に登録された特定作者の **新着ギャラリーを自動的�
 - 検出した新着のメタデータ（タイトル・ページ数・公開日等）を取得して保存
 - ユーザーは UI の「新着」リンクから一覧を見て、`hitomi.la/galleries/<id>.html` を新規タブで開く
 - 既読化操作で個別 / 一括非表示。30 日経過で物理削除
+- UI から「今すぐ取得」ボタンで Task Scheduler を待たずに監視スクリプトを手動実行できる（同期処理）
 
 ### 1.3. 制約・前提
 
@@ -264,6 +265,35 @@ backend/data/hitomi/         ← .gitignore 対象（個人データ）
 監視対象を削除（state.json の該当エントリも削除）。
 
 **レスポンス**: `{"message": "Removed"}`
+
+### 6.7. `POST /api/hitomi/run-now`
+
+監視スクリプト (`tools.hitomi_monitor.main`) を **同期実行** する。Task Scheduler を
+待たずに即座に新着確認したい場合のためのエンドポイント。
+
+実行中は他の `run-now` リクエストを 409 Conflict で拒否（モジュール内 `threading.Lock`
+で排他制御）。完了後はクライアントが `GET /api/hitomi/new-arrivals` を再取得する想定。
+
+**レスポンス**:
+```json
+{
+  "exit_code": 0,
+  "last_run_at": "2026-04-29T...",
+  "last_run_status": "ok",
+  "last_error": null
+}
+```
+
+- `exit_code`: 0 = 全成功 / 1 = 部分失敗 / 2 = 致命的失敗（hitomi_monitor の終了コード）
+
+**エラー**:
+- `409`: 既に実行中
+- `500`: 致命的失敗（state.json が壊れている等）
+
+**注意点**:
+- 監視作者が多い・新着が多い初回実行では数十秒かかる場合があるため、フロントエンドは
+  HTTP タイムアウトを 120 秒に伸ばしてリクエストする
+- API としては blocking なので長時間処理用 UI（spinner / disable）を出す
 
 ---
 

@@ -76,6 +76,8 @@ export const API_ENDPOINTS = {
     /** hitomi.la 監視対象削除 */
     HITOMI_WATCHLIST_DELETE: (normalized: string, language: string = 'japanese') =>
         `/api/hitomi/watchlist/${encodeURIComponent(normalized)}?language=${encodeURIComponent(language)}`,
+    /** hitomi.la 監視スクリプトを同期実行 */
+    HITOMI_RUN_NOW: '/api/hitomi/run-now',
 } as const;
 
 /**

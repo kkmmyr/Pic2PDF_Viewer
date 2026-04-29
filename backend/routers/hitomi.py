@@ -3,16 +3,21 @@
 各エンドポイントの詳細は docs/03_詳細設計/hitomi新着監視設計書.md §6 を参照。
 データは backend/data/hitomi/ 配下の JSON ファイル（個別の監視スクリプトが書き出す）。
 """
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from services.hitomi import state_store, watchlist
+from tools import hitomi_monitor
 
 router = APIRouter()
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "hitomi"
+
+# 同期 run-now の二重起動を防ぐ排他ロック
+_run_lock = threading.Lock()
 
 
 class AddWatchlistRequest(BaseModel):
@@ -84,3 +89,29 @@ def delete_watchlist(normalized: str, language: str = "japanese") -> dict:
     if state.get("artists", {}).pop(key, None) is not None:
         state_store.save_state(DATA_DIR, state)
     return {"message": "Removed"}
+
+
+# ---------------------------------------------------------------------------
+# 監視スクリプトの同期実行
+# ---------------------------------------------------------------------------
+
+@router.post("/hitomi/run-now")
+def post_run_now() -> dict:
+    """監視スクリプトを同期実行する。完了まで待つ。
+
+    監視作者数 × 新着数に応じて数秒〜数十秒かかる。完了後は new_arrivals.json
+    が更新されるので、クライアントは GET /api/hitomi/new-arrivals を再取得する。
+    """
+    if not _run_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="監視が既に実行中です")
+    try:
+        exit_code = hitomi_monitor.main(DATA_DIR)
+        state = state_store.load_state(DATA_DIR)
+        return {
+            "exit_code": exit_code,
+            "last_run_at": state.get("last_run_at"),
+            "last_run_status": state.get("last_run_status", "never"),
+            "last_error": state.get("last_error"),
+        }
+    finally:
+        _run_lock.release()

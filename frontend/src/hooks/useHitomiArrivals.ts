@@ -9,10 +9,13 @@ interface UseHitomiArrivalsResult {
     lastRunStatus: RunStatus;
     lastError: string | null;
     loading: boolean;
+    running: boolean;
     error: string | null;
     refresh: () => Promise<void>;
     dismiss: (id: number) => Promise<void>;
     dismissAll: () => Promise<void>;
+    /** 監視スクリプトを同期実行する（完了まで待つ）。完了後は自動で refresh される。 */
+    runNow: () => Promise<void>;
 }
 
 /**
@@ -27,6 +30,7 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
     const [lastRunStatus, setLastRunStatus] = useState<RunStatus>('never');
     const [lastError, setLastError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
@@ -67,9 +71,24 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
         }
     }, [items]);
 
+    const runNow = useCallback(async () => {
+        setRunning(true);
+        try {
+            // 監視は数秒〜数十秒かかる可能性があるためタイムアウトを延長
+            await apiClient.post(API_ENDPOINTS.HITOMI_RUN_NOW, undefined, { timeout: 120_000 });
+            await refresh();
+        } finally {
+            setRunning(false);
+        }
+    }, [refresh]);
+
     useEffect(() => {
         refresh();
     }, [refresh]);
 
-    return { items, lastRunAt, lastRunStatus, lastError, loading, error, refresh, dismiss, dismissAll };
+    return {
+        items, lastRunAt, lastRunStatus, lastError,
+        loading, running, error,
+        refresh, dismiss, dismissAll, runNow,
+    };
 }
