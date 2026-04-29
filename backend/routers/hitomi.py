@@ -96,22 +96,26 @@ def delete_watchlist(normalized: str, language: str = "japanese") -> dict:
 # ---------------------------------------------------------------------------
 
 @router.post("/hitomi/run-now")
-def post_run_now() -> dict:
+def post_run_now(skip_recent_days: float = 3.0) -> dict:
     """監視スクリプトを同期実行する。完了まで待つ。
 
-    監視作者数 × 新着数に応じて数秒〜数十秒かかる。完了後は new_arrivals.json
-    が更新されるので、クライアントは GET /api/hitomi/new-arrivals を再取得する。
+    `skip_recent_days` で指定した日数以内に取得済みの作者はスキップする
+    （0 にすると全作者を強制再チェック）。デフォルトの 3 日は UI 連打や
+    watchlist 編集ごとの全件再フェッチで hitomi.la に過剰アクセスしないための
+    保険。Task Scheduler からの CLI 直接実行はこの制限を受けない。
     """
     if not _run_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="監視が既に実行中です")
     try:
-        exit_code = hitomi_monitor.main(DATA_DIR)
+        min_age = skip_recent_days * 24.0 if skip_recent_days > 0 else None
+        exit_code = hitomi_monitor.main(DATA_DIR, min_age_hours=min_age)
         state = state_store.load_state(DATA_DIR)
         return {
             "exit_code": exit_code,
             "last_run_at": state.get("last_run_at"),
             "last_run_status": state.get("last_run_status", "never"),
             "last_error": state.get("last_error"),
+            "last_run_stats": state.get("last_run_stats"),
         }
     finally:
         _run_lock.release()

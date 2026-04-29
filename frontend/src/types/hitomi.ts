@@ -5,6 +5,20 @@
 
 export type RunStatus = 'ok' | 'partial' | 'error' | 'never';
 
+export interface RunStats {
+    added: number;
+    skipped: number;
+    errors: number;
+}
+
+export interface RunNowResponse {
+    exit_code: number;
+    last_run_at: string | null;
+    last_run_status: RunStatus;
+    last_error: string | null;
+    last_run_stats: RunStats | null;
+}
+
 export interface ArrivalItem {
     id: number;
     artist: string;

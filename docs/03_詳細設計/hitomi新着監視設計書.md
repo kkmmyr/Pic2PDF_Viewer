@@ -274,21 +274,42 @@ backend/data/hitomi/         ← .gitignore 対象（個人データ）
 実行中は他の `run-now` リクエストを 409 Conflict で拒否（モジュール内 `threading.Lock`
 で排他制御）。完了後はクライアントが `GET /api/hitomi/new-arrivals` を再取得する想定。
 
+**クエリパラメータ**:
+- `skip_recent_days` (オプション、default `3.0`) — 指定日数以内に `checked_at` が
+  記録されている作者をスキップする。`0` を指定すると全作者を強制再チェック。
+  Task Scheduler からの直接実行（CLI）には適用されず、本 API 経由のみの挙動
+
 **レスポンス**:
 ```json
 {
   "exit_code": 0,
   "last_run_at": "2026-04-29T...",
   "last_run_status": "ok",
-  "last_error": null
+  "last_error": null,
+  "last_run_stats": {
+    "added": 3,
+    "skipped": 2,
+    "errors": 0
+  }
 }
 ```
 
-- `exit_code`: 0 = 全成功 / 1 = 部分失敗 / 2 = 致命的失敗（hitomi_monitor の終了コード）
+- `exit_code`: 0 = 全成功 / 1 = 部分失敗 / 2 = 致命的失敗
+- `last_run_stats.added`: 今回の実行で `new_arrivals.json` に追加された件数
+- `last_run_stats.skipped`: `skip_recent_days` により今回スキップされた作者数
+- `last_run_stats.errors`: NOZOMI / メタデータ取得で失敗した件数
 
 **エラー**:
 - `409`: 既に実行中
 - `500`: 致命的失敗（state.json が壊れている等）
+
+**設計判断:**
+
+UI から手動取得する場合、ユーザーが連打したり、watchlist の修正のたびに毎回
+全作者を再チェックすると hitomi.la への無駄な負荷になる。直近 3 日以内に取得済みの
+作者はスキップするデフォルトを設けることで、想定外の頻度アクセスを抑制する。
+Task Scheduler 経由（CLI 直接実行）はこのスキップを適用しないため、定期監視は
+これまで通り動作する。
 
 **注意点**:
 - 監視作者が多い・新着が多い初回実行では数十秒かかる場合があるため、フロントエンドは

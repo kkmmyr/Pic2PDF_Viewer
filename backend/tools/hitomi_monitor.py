@@ -11,7 +11,7 @@ Windows Task Scheduler から `python -m tools.hitomi_monitor` で単発実行�
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # backend/ をパス追加してパッケージ参照を解決
@@ -25,6 +25,23 @@ GALLERY_URL_TEMPLATE = "https://hitomi.la/galleries/{id}.html"
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+
+
+def should_skip_artist(checked_at_str: str | None, threshold: datetime | None) -> bool:
+    """`checked_at` が `threshold` より新しければスキップ判定 True。
+
+    threshold が None（CLI 直接実行など）なら常に False。
+    日付パース失敗時も False（安全側に倒して通常実行する）。
+    """
+    if threshold is None or not checked_at_str:
+        return False
+    try:
+        checked = datetime.fromisoformat(checked_at_str)
+    except ValueError:
+        return False
+    if checked.tzinfo is None:
+        checked = checked.replace(tzinfo=timezone.utc)
+    return checked > threshold
 
 
 def build_arrival_item(
@@ -51,8 +68,20 @@ def build_arrival_item(
     }
 
 
-def main(data_dir: Path = DATA_DIR) -> int:
-    print(f"[hitomi_monitor] start: data_dir={data_dir}")
+def main(
+    data_dir: Path = DATA_DIR,
+    *,
+    min_age_hours: float | None = None,
+) -> int:
+    """監視スクリプトのエントリポイント。
+
+    Args:
+        data_dir: backend/data/hitomi/ 相当のディレクトリ
+        min_age_hours: 指定すると `checked_at` が `now - min_age_hours` より
+            新しい作者をスキップする。None なら常に全作者を処理する（CLI / Task
+            Scheduler 既定の挙動）。
+    """
+    print(f"[hitomi_monitor] start: data_dir={data_dir}, min_age_hours={min_age_hours}")
 
     try:
         state = state_store.load_state(data_dir)
@@ -61,11 +90,16 @@ def main(data_dir: Path = DATA_DIR) -> int:
         print(f"[hitomi_monitor] FATAL: 初期ロード失敗: {e}", file=sys.stderr)
         return 2
 
+    threshold: datetime | None = None
+    if min_age_hours is not None and min_age_hours > 0:
+        threshold = datetime.now(timezone.utc) - timedelta(hours=min_age_hours)
+
     if not entries:
         print("[hitomi_monitor] watchlist が空です。何もしません。")
         state["last_run_at"] = _now_iso()
         state["last_run_status"] = "ok"
         state["last_error"] = None
+        state["last_run_stats"] = {"added": 0, "skipped": 0, "errors": 0}
         try:
             state_store.save_state(data_dir, state)
         except Exception as e:
@@ -75,9 +109,18 @@ def main(data_dir: Path = DATA_DIR) -> int:
 
     errors: list[str] = []
     new_items: list[state_store.ArrivalItem] = []
+    skipped = 0
 
     for entry in entries:
         key = f"{entry['normalized']}:{entry['language']}"
+
+        # 直近取得済みならスキップ（state.artists[key] を更新しない）
+        prev_artist = state.get("artists", {}).get(key, {})
+        if should_skip_artist(prev_artist.get("checked_at"), threshold):
+            print(f"[hitomi_monitor] {key}: skipped (recently checked)")
+            skipped += 1
+            continue
+
         try:
             ids = nozomi.fetch_nozomi_head(
                 entry["normalized"], entry["language"], count=20
@@ -92,7 +135,7 @@ def main(data_dir: Path = DATA_DIR) -> int:
             print(f"[hitomi_monitor] {key}: NOZOMI is empty, skip")
             continue
 
-        prev_top = state.get("artists", {}).get(key, {}).get("top_id")
+        prev_top = prev_artist.get("top_id")
         unseen = nozomi.diff_unseen_ids(ids, prev_top)
 
         new_for_artist = 0
@@ -123,6 +166,11 @@ def main(data_dir: Path = DATA_DIR) -> int:
     state["last_run_at"] = _now_iso()
     state["last_run_status"] = "partial" if errors else "ok"
     state["last_error"] = "; ".join(errors[:3]) if errors else None
+    state["last_run_stats"] = {
+        "added": added,
+        "skipped": skipped,
+        "errors": len(errors),
+    }
 
     try:
         state_store.save_state(data_dir, state)
@@ -132,7 +180,7 @@ def main(data_dir: Path = DATA_DIR) -> int:
 
     print(
         f"[hitomi_monitor] done: 新着 {added} 件追加, "
-        f"{purged} 件 purge, エラー {len(errors)} 件"
+        f"{purged} 件 purge, {skipped} 件 skip, エラー {len(errors)} 件"
     )
     return 1 if errors else 0
 

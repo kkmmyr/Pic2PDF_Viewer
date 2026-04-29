@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
-import type { ArrivalItem, NewArrivalsResponse, RunStatus } from '../types/hitomi';
+import type { ArrivalItem, NewArrivalsResponse, RunNowResponse, RunStats, RunStatus } from '../types/hitomi';
 
 interface UseHitomiArrivalsResult {
     items: ArrivalItem[];
@@ -14,8 +14,8 @@ interface UseHitomiArrivalsResult {
     refresh: () => Promise<void>;
     dismiss: (id: number) => Promise<void>;
     dismissAll: () => Promise<void>;
-    /** 監視スクリプトを同期実行する（完了まで待つ）。完了後は自動で refresh される。 */
-    runNow: () => Promise<void>;
+    /** 監視スクリプトを同期実行する。完了後は自動で refresh され、stats を返す。 */
+    runNow: () => Promise<RunStats | null>;
 }
 
 /**
@@ -75,8 +75,13 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
         setRunning(true);
         try {
             // 監視は数秒〜数十秒かかる可能性があるためタイムアウトを延長
-            await apiClient.post(API_ENDPOINTS.HITOMI_RUN_NOW, undefined, { timeout: 120_000 });
+            const resp = await apiClient.post<unknown, RunNowResponse>(
+                API_ENDPOINTS.HITOMI_RUN_NOW,
+                undefined,
+                { timeout: 120_000 },
+            );
             await refresh();
+            return resp.last_run_stats;
         } finally {
             setRunning(false);
         }
