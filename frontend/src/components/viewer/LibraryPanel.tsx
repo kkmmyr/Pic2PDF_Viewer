@@ -1,8 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
-import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
-import { SeriesResolveBar } from './SeriesResolveBar';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
     useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
@@ -169,6 +167,7 @@ export function LibraryPanel() {
                 onTagFilterChange={setTagFilter}
                 onGroupModeChange={handleGroupModeChange}
                 onToggleShowHidden={toggleShowHidden}
+                onMetaRefresh={refreshMeta}
             />
 
             <LibraryDialogs
@@ -201,9 +200,6 @@ export function LibraryPanel() {
                 onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
                 onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
             />
-
-            <AutoFillAuthorsBar source={currentSource} onComplete={refreshMeta} />
-            <SeriesResolveBar source={currentSource} onComplete={refreshMeta} />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">

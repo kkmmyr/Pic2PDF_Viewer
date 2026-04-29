@@ -1,4 +1,5 @@
 export { PageRenderer } from './PageRenderer';
+export { PageSlider } from './PageSlider';
 export { ReaderHeader } from './ReaderHeader';
 export { LibraryHeader } from './LibraryHeader';
 export { HeaderSearchBar } from './HeaderSearchBar';

@@ -12,7 +12,7 @@ import {
 import { useNextSeriesVolume } from '../../hooks/useNextSeriesVolume';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
-import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer } from '../reader';
+import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
@@ -49,6 +49,7 @@ export function ReaderPanel({
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
     const [numPages, setNumPages] = useState(0);
     const [showHeader, setShowHeader] = useState(false);
+    const [showSlider, setShowSlider] = useState(false);
     const [pdfVersion, setPdfVersion] = useState(0);
 
     const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
@@ -87,10 +88,9 @@ export function ReaderPanel({
         showError: (msg) => showToast(msg, 'error'),
     });
 
-    // 検索 / ヘルプ / ページジャンプフォーカス要求
+    // 検索 / ヘルプ
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
-    const [pageJumpFocusRequest, setPageJumpFocusRequest] = useState(0);
     const {
         searchText, setSearchText,
         matchCount, currentMatch,
@@ -100,12 +100,11 @@ export function ReaderPanel({
         onDocumentLoaded,
     } = usePdfSearch({ isSearchOpen, setPageNumber });
 
-    // キーボードショートカット（Ctrl+F / f / e / g / ?）を集約
+    // キーボードショートカット（Ctrl+F / f / e / ?）を集約
     useReaderShortcuts({
         isActive: true,
         onToggleFullscreen: toggleFullscreen,
         onToggleEditMode: toggleEditMode,
-        onFocusPageJump: () => setPageJumpFocusRequest(c => c + 1),
         onOpenHelp: () => setIsHelpOpen(true),
         onToggleSearch: () => setIsSearchOpen(true),
     });
@@ -188,11 +187,15 @@ export function ReaderPanel({
 
     return (
         <>
-            {/* ヘッダー表示トリガーゾーン: ヘッダー (h-14) と高さを揃え、
-                下方向にはみ出す領域でヘッダーの onMouseLeave と競合しないようにする */}
+            {/* ヘッダー表示トリガーゾーン: ヘッダー (h-14) と高さを揃える */}
             <div
                 className="fixed top-0 left-0 right-0 h-14 z-overlay-bar"
                 onMouseEnter={() => setShowHeader(true)}
+            />
+            {/* スライダー表示トリガーゾーン: スライダー (h-12) と高さを揃える */}
+            <div
+                className="fixed bottom-0 left-0 right-0 h-12 z-overlay-bar"
+                onMouseEnter={() => setShowSlider(true)}
             />
 
             <ReaderHeader
@@ -206,7 +209,6 @@ export function ReaderPanel({
                 showHeader={showHeader || isSearchOpen}
                 isSearchOpen={isSearchOpen}
                 isFullscreen={isFullscreen}
-                pageJumpFocusRequest={pageJumpFocusRequest}
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
                 onCycleSpreadMode={cycleSpreadMode}
@@ -216,7 +218,16 @@ export function ReaderPanel({
                 onToggleSearch={() => setIsSearchOpen(s => !s)}
                 onToggleFullscreen={toggleFullscreen}
                 onOpenHelp={() => setIsHelpOpen(true)}
+            />
+
+            <PageSlider
+                pageNumber={pageNumber}
+                numPages={numPages}
+                isSpread={isSpread}
+                direction={direction}
+                show={showSlider}
                 onPageJump={setPageNumber}
+                onMouseLeave={() => setShowSlider(false)}
             />
 
             {isSearchOpen && (

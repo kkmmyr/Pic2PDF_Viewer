@@ -5,7 +5,6 @@ interface UseReaderShortcutsProps {
     isActive: boolean;
     onToggleFullscreen: () => void;
     onToggleEditMode: () => void;
-    onFocusPageJump: () => void;
     onOpenHelp: () => void;
     onToggleSearch: () => void;
 }
@@ -31,7 +30,6 @@ export function useReaderShortcuts({
     isActive,
     onToggleFullscreen,
     onToggleEditMode,
-    onFocusPageJump,
     onOpenHelp,
     onToggleSearch,
 }: UseReaderShortcutsProps): void {
@@ -60,10 +58,6 @@ export function useReaderShortcuts({
                     e.preventDefault();
                     onToggleEditMode();
                     break;
-                case 'g':
-                    e.preventDefault();
-                    onFocusPageJump();
-                    break;
                 case '?':
                     e.preventDefault();
                     onOpenHelp();
@@ -73,5 +67,5 @@ export function useReaderShortcuts({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isActive, onToggleFullscreen, onToggleEditMode, onFocusPageJump, onOpenHelp, onToggleSearch]);
+    }, [isActive, onToggleFullscreen, onToggleEditMode, onOpenHelp, onToggleSearch]);
 }

@@ -9,7 +9,6 @@ const SHORTCUTS: { key: string; description: string }[] = [
     { key: '←  /  →',  description: 'ページ送り（綴じ方向に応じて前後）' },
     { key: 'f',         description: 'フルスクリーン切替' },
     { key: 'e',         description: '編集モード切替' },
-    { key: 'g',         description: 'ページジャンプ入力にフォーカス' },
     { key: 'Ctrl+F',    description: 'テキスト検索バーを開く' },
     { key: '?',         description: 'このショートカット一覧を開く' },
     { key: 'Esc',       description: '検索バー / フルスクリーンを閉じる' },

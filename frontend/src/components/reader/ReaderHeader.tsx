@@ -1,4 +1,3 @@
-import { useState, useRef, useEffect } from 'react';
 import { ArrowLeft, Trash2, CheckSquare, Square, Search, Wand2, BookOpen, FileText, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
 import type { ReadingDirection, SpreadMode } from '../../types';
 
@@ -13,8 +12,6 @@ interface ReaderHeaderProps {
     showHeader: boolean;
     isSearchOpen: boolean;
     isFullscreen: boolean;
-    /** カウンタが増えるたびにページジャンプ入力にフォーカスする（g キー連動）*/
-    pageJumpFocusRequest: number;
     onClose: () => void;
     onToggleDirection: () => void;
     onCycleSpreadMode: () => void;
@@ -24,7 +21,6 @@ interface ReaderHeaderProps {
     onToggleSearch: () => void;
     onToggleFullscreen: () => void;
     onOpenHelp: () => void;
-    onPageJump: (page: number) => void;
 }
 
 const SPREAD_MODE_CONFIG: Record<SpreadMode, { label: string; icon: React.ReactNode; next: SpreadMode }> = {
@@ -44,7 +40,6 @@ export function ReaderHeader({
     showHeader,
     isSearchOpen,
     isFullscreen,
-    pageJumpFocusRequest,
     onClose,
     onToggleDirection,
     onCycleSpreadMode,
@@ -54,40 +49,7 @@ export function ReaderHeader({
     onToggleSearch,
     onToggleFullscreen,
     onOpenHelp,
-    onPageJump,
 }: ReaderHeaderProps) {
-    const [isEditingPage, setIsEditingPage] = useState(false);
-    const [inputValue, setInputValue] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
-
-    useEffect(() => {
-        if (isEditingPage) {
-            setInputValue(String(pageNumber));
-            setTimeout(() => {
-                inputRef.current?.focus();
-                inputRef.current?.select();
-            }, 0);
-        }
-    }, [isEditingPage, pageNumber]);
-
-    // 外部からの「ページジャンプにフォーカスして」要求（g キー）に応答する
-    useEffect(() => {
-        if (pageJumpFocusRequest > 0) setIsEditingPage(true);
-    }, [pageJumpFocusRequest]);
-
-    const commitPageJump = () => {
-        const n = parseInt(inputValue, 10);
-        if (!isNaN(n)) {
-            onPageJump(Math.max(1, Math.min(n, numPages)));
-        }
-        setIsEditingPage(false);
-    };
-
-    const handlePageKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') commitPageJump();
-        if (e.key === 'Escape') setIsEditingPage(false);
-    };
-
     return (
         <div
             className={`fixed top-0 left-0 right-0 h-14 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm flex items-center px-4 justify-between shrink-0 z-header transition-transform duration-300 ${
@@ -126,31 +88,9 @@ export function ReaderHeader({
                     {SPREAD_MODE_CONFIG[spreadMode].label}
                 </button>
 
-                {/* ページ番号 (クリックで直接入力) */}
-                {isEditingPage ? (
-                    <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400">
-                        <input
-                            ref={inputRef}
-                            type="number"
-                            min={1}
-                            max={numPages}
-                            value={inputValue}
-                            onChange={(e) => setInputValue(e.target.value)}
-                            onKeyDown={handlePageKeyDown}
-                            onBlur={commitPageJump}
-                            className="w-14 px-1.5 py-0.5 text-sm text-center border border-blue-400 dark:border-blue-500 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-400"
-                        />
-                        <span>/ {numPages}</span>
-                    </div>
-                ) : (
-                    <button
-                        onClick={() => setIsEditingPage(true)}
-                        title="クリックでページ移動"
-                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors tabular-nums"
-                    >
-                        {pageNumber} / {numPages}
-                    </button>
-                )}
+                <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
+                    {pageNumber} / {numPages}
+                </span>
 
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2" />
 
