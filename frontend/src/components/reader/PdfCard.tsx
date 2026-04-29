@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { CheckSquare, Square, Star, Pencil, RefreshCw, Library, EyeOff, Eye, BookCopy, Users } from 'lucide-react';
+import { Check, Star, Pencil, RefreshCw, Library, EyeOff, Eye, BookCopy, Users } from 'lucide-react';
 import type { PdfFile } from '../../types';
 import { LazyThumbnail } from './LazyThumbnail';
 
@@ -71,11 +71,13 @@ export function PdfCard({
 
                 {/* 選択チェックボックス */}
                 {isSelectionMode && (
-                    <div className="absolute top-2 right-2 z-card-badge bg-white dark:bg-gray-800 rounded-full">
+                    <div className="absolute top-2 right-2 z-card-badge">
                         {isSelected ? (
-                            <CheckSquare className="w-6 h-6 text-amber-500 fill-white" />
+                            <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow-md ring-2 ring-white dark:ring-gray-800">
+                                <Check className="w-4 h-4 text-white" strokeWidth={3} />
+                            </div>
                         ) : (
-                            <Square className="w-6 h-6 text-gray-400 fill-white" />
+                            <div className="w-6 h-6 rounded-full bg-white/90 dark:bg-gray-800/90 border-2 border-gray-400 dark:border-gray-500 shadow-sm" />
                         )}
                     </div>
                 )}

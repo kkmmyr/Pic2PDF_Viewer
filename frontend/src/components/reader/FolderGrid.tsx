@@ -1,4 +1,4 @@
-import { Folder, CheckSquare, Square, Pencil } from 'lucide-react';
+import { Folder, Check, Pencil } from 'lucide-react';
 
 interface FolderGridProps {
     directories: string[];
@@ -44,11 +44,13 @@ export function FolderGrid({
                         <div className="relative">
                             <Folder className="w-12 h-12 text-yellow-500 fill-yellow-500 mb-2" />
                             {isSelectionMode && (
-                                <div className="absolute -top-2 -right-2 bg-white dark:bg-gray-800 rounded-full">
+                                <div className="absolute -top-2 -right-2">
                                     {isSelected ? (
-                                        <CheckSquare className="w-5 h-5 text-amber-500 fill-white" />
+                                        <div className="w-5 h-5 rounded-full bg-amber-500 flex items-center justify-center shadow-md ring-2 ring-white dark:ring-gray-800">
+                                            <Check className="w-3 h-3 text-white" strokeWidth={3} />
+                                        </div>
                                     ) : (
-                                        <Square className="w-5 h-5 text-gray-400 fill-white" />
+                                        <div className="w-5 h-5 rounded-full bg-white/90 dark:bg-gray-800/90 border-2 border-gray-400 dark:border-gray-500 shadow-sm" />
                                     )}
                                 </div>
                             )}
