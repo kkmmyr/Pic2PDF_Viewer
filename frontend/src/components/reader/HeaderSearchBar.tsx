@@ -1,4 +1,5 @@
 import { Search, User, Tag } from 'lucide-react';
+import { SearchableSelect } from '../ui/SearchableSelect';
 
 interface HeaderSearchBarProps {
     searchText: string;
@@ -40,16 +41,14 @@ export function HeaderSearchBar({
             {allAuthors.length > 0 && !hideAuthorSelect && (
                 <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
                     <User className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                    <select
+                    <SearchableSelect
                         value={authorFilter}
-                        onChange={(e) => onAuthorFilterChange(e.target.value)}
-                        className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 max-w-[200px] truncate"
-                    >
-                        <option value="">作者: すべて</option>
-                        {allAuthors.map(a => (
-                            <option key={a} value={a}>{a}</option>
-                        ))}
-                    </select>
+                        options={allAuthors}
+                        emptyLabel="作者: すべて"
+                        placeholder="作者名で絞り込み"
+                        onChange={onAuthorFilterChange}
+                        className="w-48"
+                    />
                 </div>
             )}
 
