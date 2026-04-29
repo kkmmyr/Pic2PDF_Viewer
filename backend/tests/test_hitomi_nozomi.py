@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.hitomi.nozomi import parse_nozomi_bytes
+from services.hitomi.nozomi import build_nozomi_url, parse_nozomi_bytes
 
 
 class TestParseNozomiBytes:
@@ -55,3 +55,40 @@ class TestParseNozomiBytes:
         else:
             data = struct.pack(f">{len(ids)}I", *ids)
         assert parse_nozomi_bytes(data) == ids
+
+
+class TestBuildNozomiUrl:
+    """NOZOMI ファイル名は実際には空白を含むため、内部 key の `_` を `%20` に変換する。
+
+    URL 仕様の詳細は docs/03_詳細設計/hitomi新着監視設計書.md §8.1 を参照。
+    """
+
+    def test_underscore_becomes_percent20(self):
+        # 内部 key 'aka_shio' → URL では 'aka%20shio'
+        url = build_nozomi_url("aka_shio", "japanese")
+        assert url == "https://ltn.gold-usergeneratedcontent.net/n/artist/aka%20shio-japanese.nozomi"
+
+    def test_no_underscore_passes_through(self):
+        url = build_nozomi_url("simple", "japanese")
+        assert url.endswith("/artist/simple-japanese.nozomi")
+
+    def test_hyphen_is_preserved(self):
+        # `-` は URL encode せずそのまま
+        url = build_nozomi_url("a-b", "japanese")
+        assert url.endswith("/artist/a-b-japanese.nozomi")
+
+    def test_multiple_underscores_all_encoded(self):
+        url = build_nozomi_url("a_b_c", "japanese")
+        assert url.endswith("/artist/a%20b%20c-japanese.nozomi")
+
+    def test_japanese_chars_are_encoded(self):
+        url = build_nozomi_url("山田_花子", "japanese")
+        # 日本語が percent-encoded される + `_` も `%20` に
+        assert "%E5%B1%B1%E7%94%B0%20%E8%8A%B1%E5%AD%90" in url
+
+    def test_language_distinguishes_url(self):
+        ja = build_nozomi_url("aka_shio", "japanese")
+        en = build_nozomi_url("aka_shio", "english")
+        assert ja != en
+        assert ja.endswith("-japanese.nozomi")
+        assert en.endswith("-english.nozomi")

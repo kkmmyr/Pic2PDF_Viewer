@@ -7,6 +7,7 @@ docs/03_詳細設計/hitomi新着監視設計書.md §8 を参照。
 from __future__ import annotations
 
 import struct
+import urllib.parse
 from typing import Final
 
 import httpx
@@ -52,8 +53,18 @@ def diff_unseen_ids(top_ids: list[int], prev_top: int | None) -> list[int]:
     return out
 
 
-def _build_nozomi_url(artist_normalized: str, language: str) -> str:
-    return f"{NOZOMI_BASE}/{artist_normalized}-{language}.nozomi"
+def build_nozomi_url(artist_key: str, language: str) -> str:
+    """`artist_key`（`_` 区切りの内部識別子）から NOZOMI URL を構築する。
+
+    hitomi.la の NOZOMI ファイル名は **空白を含む**（例: `aka shio-japanese.nozomi`）。
+    内部 key の `_` は意味的に空白を表すため、URL 構築時は空白に戻してから URL encode
+    する。結果として URL では `%20` が現れる（例: `aka_shio` → `aka%20shio`）。
+
+    `-` は NOZOMI ファイル名のセパレータと衝突しないので safe にしない。
+    """
+    artist_part = artist_key.replace("_", " ")
+    artist_url = urllib.parse.quote(artist_part, safe="")
+    return f"{NOZOMI_BASE}/{artist_url}-{language}.nozomi"
 
 
 def fetch_nozomi_head(
@@ -67,7 +78,7 @@ def fetch_nozomi_head(
 
     Range リクエストで count*4 バイトのみ取得し、big-endian 32bit int をデコード。
     """
-    url = _build_nozomi_url(artist_normalized, language)
+    url = build_nozomi_url(artist_normalized, language)
     end = count * 4 - 1
     headers = {"Range": f"bytes=0-{end}", "User-Agent": USER_AGENT}
 
@@ -99,7 +110,7 @@ def check_nozomi_exists(
     client: httpx.Client | None = None,
 ) -> bool:
     """指定作者の NOZOMI が存在するか HEAD でチェックする（watchlist 登録時の検証用）。"""
-    url = _build_nozomi_url(artist_normalized, language)
+    url = build_nozomi_url(artist_normalized, language)
     headers = {"User-Agent": USER_AGENT}
 
     owns_client = client is None

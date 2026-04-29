@@ -108,7 +108,7 @@ UI 側は GET `/api/hitomi/new-arrivals` で `new_arrivals.json` を読み、画
 ```
 
 - `display_name`: ユーザー入力そのまま（UI 表示用）
-- `normalized`: NOZOMI URL に埋め込むキー（小文字化 + 空白→`_` + URL encode）
+- `normalized`: 内部識別子（`state.json` のキー / 重複検出用）。小文字化 + 空白を `_` に置換した値。**URL とは別物**：URL に埋め込むときは `_` を空白に戻して URL encode する（§8.1 参照）
 
 ### 4.2. `state.json`
 
@@ -300,12 +300,12 @@ def fetch_metadata(gallery_id: int) -> dict:
 
 ```python
 def normalize_artist_name(display_name: str) -> str:
-    """
+    """内部識別子（state.json キー）を生成する。URL 構築には別途 build_nozomi_url を使う。
+
     'AKA SHIO' → 'aka_shio'
-    '山田 花子' → '%E5%B1%B1%E7%94%B0_%E8%8A%B1%E5%AD%90'
+    'aka shio' → 'aka_shio'
     """
-    s = display_name.strip().lower().replace(' ', '_')
-    return urllib.parse.quote(s, safe='_-')
+    return display_name.strip().lower().replace(' ', '_')
 
 def load_watchlist() -> list[WatchlistEntry]: ...
 def add_artist(display_name: str, language: str) -> WatchlistEntry: ...  # 重複 / NOZOMI 存在を検証
@@ -366,11 +366,34 @@ function useHitomiArrivals() {
 ### 8.1. URL パターン
 
 ```
-https://ltn.gold-usergeneratedcontent.net/n/artist/<artist_normalized>-<language>.nozomi
+https://ltn.gold-usergeneratedcontent.net/n/artist/<artist_url>-<language>.nozomi
 ```
 
-- `<artist_normalized>`: lowercase + 空白→`_` + URL encode した値（**ファイル名そのもの** に `_` が使われる仕様）
+- `<artist_url>`: 内部 key（`_` 区切り）を **空白に戻してから URL encode** した値。
+    - 例: 内部 key `aka_shio` → URL `aka%20shio`
+    - 例: 内部 key `山田_花子` → URL `%E5%B1%B1%E7%94%B0%20%E8%8A%B1%E5%AD%90`
 - `<language>`: `japanese` / `english` 等
+
+### 8.1.1. 内部 key と URL の使い分け（重要）
+
+hitomi.la の **NOZOMI ファイル名は実際には空白を含む**（`aka shio-japanese.nozomi`）。内部 key で
+`_` を使うのは Pic2PDF_Viewer 側の都合（state.json キーの可読性・OS パスとの相性）であり、
+hitomi.la のファイル名仕様とは別物である。
+
+| レイヤ | 例 | 仕様 |
+|---|---|---|
+| ユーザー入力 (UI) | `"AKA SHIO"` / `"aka shio"` / `"aka_shio"` | 自由（半角空白と `_` は同義として受け入れる） |
+| 内部 key (`state.json` キー / 重複検出) | `aka_shio` | `lowercase + 空白→_` |
+| NOZOMI URL | `aka%20shio` | key の `_` を空白に戻して URL encode |
+
+URL 構築は `services/hitomi/nozomi.build_nozomi_url(artist_key, language)` に集約する。
+
+### 8.1.2. なぜ `_` で URL を組むと 404 になるか
+
+検索ページの URL（`hitomi.la/search.html?artist:aka_shio`）では `_` が空白の代わりに使われる
+ため、**初見では NOZOMI URL も `_` 区切りに見える**が、実際には NOZOMI ファイル名は空白を
+そのまま含む別ストレージ。Phase 1 着手時にこの違いを誤認し、`/n/artist/aka_shio-japanese.nozomi`
+（`_` 区切り）で 404 を踏んだ。正しくは `/n/artist/aka%20shio-japanese.nozomi`（空白を URL encode）。
 
 ### 8.2. ファイル構造
 
@@ -480,6 +503,6 @@ uv run python -m tools.hitomi_monitor
 |---|---|
 | NOZOMI URL / 形式の変更 | `last_run_status` で検知、UI に状態表示。再解析の起点として §8 を残す |
 | 大量の新着で NOZOMI 取得が不足 | 先頭 20 件だけだと取りこぼす可能性。週次なら問題ないが、間隔が空く場合は count を増やす |
-| 作者名の特殊文字 | `normalize_artist_name` で URL encode するが、エッジケースは UI バリデーションで弾く |
+| 作者名の特殊文字 | `build_nozomi_url` で URL encode するが、エッジケースは UI バリデーションで弾く |
 | ToS 観点 | 個人用途・低頻度・低帯域なら現実的に問題ないと考えるが、再配布や商用利用は想定外 |
 | メタデータ取得失敗 | 個別 ID で例外を握りつぶし、他に影響させない。state に error 集約 |
