@@ -204,7 +204,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 | `page` | int | ✓ | ページ番号（1 始まり） |
 | `path` | string | - | 相対パス（デフォルト `""`） |
 | `source` | string | - | `generated` / `kindle` / `novel`（デフォルト `generated`） |
-| `width` | int | - | 出力画像幅 px（デフォルト `120`） |
+| `width` | int | - | 出力画像幅 px（デフォルト `400`） |
 
 **レスポンス**: `image/jpeg` バイナリ（`Cache-Control: max-age=3600`）
 
