@@ -1,7 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:zenn.dev)"
+      "WebFetch(domain:zenn.dev)",
+
+      "mcp__gemma-local__ask_gemma",
+      "mcp__gemma-local__explain_code",
+      "mcp__gemma-local__generate_code",
+      "mcp__gemma-local__translate_text",
+      "mcp__gemma-local__analyze_image",
+
+      "Bash(uv --version)",
+      "Bash(npm --version)",
+      "Bash(npm audit)",
+      "Bash(npm audit *)",
+      "Bash(pip list)",
+      "Bash(pip list *)",
+      "Bash(where *)",
+      "Bash(wmic *)",
+      "Bash(nvidia-smi)",
+      "Bash(nvidia-smi *)",
+
+      "Bash(uv run pytest)",
+      "Bash(uv run pytest *)",
+      "Bash(npx vitest run)",
+      "Bash(npx vitest run *)",
+      "Bash(npx tsc --noEmit)"
     ]
   },
   "hooks": {
