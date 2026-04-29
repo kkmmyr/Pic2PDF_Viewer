@@ -52,8 +52,6 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
             THUMBNAIL_DIR,
             IMAGES_DIR,
             COMPLETE_DIR,
-            compressed_output_dir=None,
-            quality=None,
             progress_callback=progress_callback,
         )
         job.update(

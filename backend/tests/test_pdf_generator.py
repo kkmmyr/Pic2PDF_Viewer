@@ -123,24 +123,6 @@ class TestScanAndGenerate:
         assert (gen_env["complete"] / "comic.zip").exists()
         assert not zip_path.exists()
 
-    def test_compressed_pdf_when_quality_specified(self, gen_env, tmp_path):
-        compressed_dir = tmp_path / "compressed"
-        compressed_dir.mkdir()
-
-        book_dir = gen_env["source"] / "book2"
-        book_dir.mkdir()
-        _make_webp(str(book_dir / "1.webp"))
-
-        scan_and_generate(
-            str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
-            str(gen_env["images"]), str(gen_env["complete"]),
-            compressed_output_dir=str(compressed_dir),
-            quality=50,
-        )
-
-        assert (gen_env["output"] / "book2.pdf").exists()
-        assert (compressed_dir / "book2.pdf").exists()
-
     def test_progress_callback_invoked(self, gen_env):
         book_dir = gen_env["source"] / "callback_book"
         book_dir.mkdir()

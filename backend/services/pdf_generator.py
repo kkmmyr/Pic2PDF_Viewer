@@ -35,20 +35,17 @@ def _collect_images(images_dir: str) -> list[str]:
 
 class PdfGenerator:
     def __init__(self, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str,
-                 compressed_output_dir: Optional[str] = None, quality: Optional[int] = None,
                  progress_callback: Optional[Callable[[str], None]] = None):
         self.output_dir = output_dir
         self.thumbnail_dir = thumbnail_dir
         self.images_dir = images_dir
         self.complete_dir = complete_dir
-        self.compressed_output_dir = compressed_output_dir
-        self.quality = quality
         self.progress_callback = progress_callback
         self.generated_files: list[str] = []
         self.moves: list[tuple[str, str, bool]] = []
 
     # ------------------------------------------------------------------
-    # 共通: images_dir に収集済みの画像から PDF・サムネイル・圧縮 PDF を生成
+    # 共通: images_dir に収集済みの画像から PDF・サムネイルを生成
     # ------------------------------------------------------------------
     def _generate_outputs(self, item_name: str, item_images_dir: str) -> str:
         image_paths = _collect_images(item_images_dir)
@@ -61,7 +58,6 @@ class PdfGenerator:
 
         generate_thumbnail(image_paths[0], thumb_path)
         self._create_pdf_file(image_paths, output_path)
-        self._create_compressed_pdf(image_paths, pdf_filename)
         self.generated_files.append(pdf_filename)
         return output_path
 
@@ -134,16 +130,6 @@ class PdfGenerator:
 
         except Exception as e:
             logger.error("Failed to generate PDF for folder %s: %s", root, e)
-
-    # ------------------------------------------------------------------
-    # 圧縮 PDF 生成
-    # ------------------------------------------------------------------
-    def _create_compressed_pdf(self, image_paths: list[str], pdf_filename: str) -> None:
-        if not (self.compressed_output_dir and self.quality):
-            return
-        compressed_path = os.path.join(self.compressed_output_dir, pdf_filename)
-        self._create_pdf_file(image_paths, compressed_path, quality=self.quality)
-        logger.info("Generated compressed PDF: %s", compressed_path)
 
     def _create_pdf_file(self, image_paths: list[str], output_path: str, quality: Optional[int] = None) -> None:
         if quality:
@@ -227,14 +213,11 @@ def scan_and_generate(
     thumbnail_dir: str,
     images_dir: str,
     complete_dir: str,
-    compressed_output_dir: Optional[str] = None,
-    quality: Optional[int] = None,
     progress_callback: Optional[Callable[[str], None]] = None,
 ) -> list[str]:
     """source_dir 内の WebP/ZIP を PDF に変換する。"""
     generator = PdfGenerator(
-        output_dir, thumbnail_dir, images_dir, complete_dir,
-        compressed_output_dir, quality, progress_callback
+        output_dir, thumbnail_dir, images_dir, complete_dir, progress_callback
     )
     return generator.run(source_dir)
 

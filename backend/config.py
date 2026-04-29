@@ -22,7 +22,6 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # Generated (default)
 MAIN_DATA_DIR      = os.path.join(DATA_DIR, "main")
-PDF_DIR            = os.path.join(MAIN_DATA_DIR, "pdfs")
 PDF_COMPRESSED_DIR = os.path.join(MAIN_DATA_DIR, "pdfs_compressed")
 THUMBNAIL_DIR      = os.path.join(MAIN_DATA_DIR, "thumbnails")
 IMAGES_DIR         = os.path.join(MAIN_DATA_DIR, "images")
@@ -78,7 +77,6 @@ CORS_ORIGINS: list[str] = os.environ.get("ALLOWED_ORIGINS", _default_origins).sp
 # ディレクトリ初期化
 # ---------------------------------------------------------------------------
 _REQUIRED_DIRS: list[str] = [
-    PDF_DIR,
     PDF_COMPRESSED_DIR,
     THUMBNAIL_DIR,
     IMAGES_DIR,
