@@ -88,7 +88,7 @@ export function PageSlider({
                 {isDragging && (
                     <div
                         className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none"
-                        style={{ left: `${tooltipLeft * 100}%`, transform: 'translateX(-50%)' }}
+                        style={{ left: `clamp(0px, calc(${tooltipLeft * 100}% - 200px), calc(100% - 400px))` }}
                     >
                         <div className="bg-gray-900/90 dark:bg-gray-700/90 rounded shadow-lg overflow-hidden">
                             <img
