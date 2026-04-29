@@ -273,7 +273,7 @@ export function ReaderPanel({
             {nextVolume && isAtLastSpread && onSelectPdf && (
                 <button
                     onClick={handleNavigateNextVolume}
-                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-floating-action px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-floating-action px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
                     title={`次の巻: #${nextVolume.index} ${nextVolume.title}`}
                 >
                     <span>次の巻へ</span>

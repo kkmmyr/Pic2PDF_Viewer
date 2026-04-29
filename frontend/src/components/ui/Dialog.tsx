@@ -94,7 +94,7 @@ export function DialogBody({ children }: { children: ReactNode }) {
 /** ダイアログ下部のボタン領域（ボーダー + 右寄せ flex）。 */
 export function DialogFooter({ children }: { children: ReactNode }) {
     return (
-        <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
             {children}
         </div>
     );
@@ -125,7 +125,7 @@ export function DialogPrimaryButton({ onClick, disabled, children }: DialogButto
         <button
             onClick={onClick}
             disabled={disabled}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-900 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 dark:disabled:bg-indigo-900 rounded-lg transition-colors"
         >
             {children}
         </button>
