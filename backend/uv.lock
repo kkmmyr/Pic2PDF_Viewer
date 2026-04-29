@@ -263,6 +263,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "img2pdf" },
     { name = "natsort" },
     { name = "pillow" },
@@ -281,6 +282,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "img2pdf" },
     { name = "natsort" },
     { name = "pillow" },
