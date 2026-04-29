@@ -56,7 +56,7 @@ GPU グループは CUDA 12.1 版 PyTorch を `https://download.pytorch.org/whl/
 ```bash
 # バックエンド（依存解決と起動を同時に実行）
 cd backend
-uv run uvicorn main:app --reload --port 8000
+uv run uvicorn main:app --reload --port 8766
 
 # テスト
 uv run pytest
