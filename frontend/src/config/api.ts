@@ -65,6 +65,17 @@ export const API_ENDPOINTS = {
     SERIES_UNASSIGN: '/api/series/unassign',
     /** シリーズ巻数の並べ替え（DnD） */
     SERIES_REORDER: '/api/series/reorder',
+    /** hitomi.la 新着一覧取得 */
+    HITOMI_NEW_ARRIVALS: '/api/hitomi/new-arrivals',
+    /** hitomi.la 新着個別既読化 */
+    HITOMI_DISMISS: (id: number) => `/api/hitomi/dismiss/${id}`,
+    /** hitomi.la 新着一括既読化 */
+    HITOMI_DISMISS_ALL: '/api/hitomi/dismiss-all',
+    /** hitomi.la 監視対象一覧 */
+    HITOMI_WATCHLIST: '/api/hitomi/watchlist',
+    /** hitomi.la 監視対象削除 */
+    HITOMI_WATCHLIST_DELETE: (normalized: string, language: string = 'japanese') =>
+        `/api/hitomi/watchlist/${encodeURIComponent(normalized)}?language=${encodeURIComponent(language)}`,
 } as const;
 
 /**

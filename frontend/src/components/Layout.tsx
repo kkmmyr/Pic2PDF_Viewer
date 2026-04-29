@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import { FileText, Library, Settings, Terminal, Moon, Sun } from 'lucide-react';
+import { FileText, Library, Settings, Terminal, Moon, Sun, Sparkles } from 'lucide-react';
 import { useDarkMode } from '../hooks';
 
 export default function Layout() {
@@ -52,6 +52,13 @@ export default function Layout() {
                                 >
                                     <Terminal className="w-4 h-4" />
                                     Novel OCR
+                                </Link>
+                                <Link
+                                    to="/hitomi"
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/hitomi')}`}
+                                >
+                                    <Sparkles className="w-4 h-4" />
+                                    新着
                                 </Link>
 
                                 {/* ダークモード切り替えボタン */}

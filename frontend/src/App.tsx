@@ -4,6 +4,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import GeneratorPage from './pages/GeneratorPage';
 import ViewerPage from './pages/ViewerPage';
 import OCRPage from './pages/OCRPage';
+import HitomiPage from './pages/HitomiPage';
 
 function App() {
     return (
@@ -25,6 +26,11 @@ function App() {
                         <Route path="ocr" element={
                             <ErrorBoundary>
                                 <OCRPage />
+                            </ErrorBoundary>
+                        } />
+                        <Route path="hitomi" element={
+                            <ErrorBoundary>
+                                <HitomiPage />
                             </ErrorBoundary>
                         } />
                     </Route>

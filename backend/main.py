@@ -12,7 +12,7 @@ from config import (
     FRONTEND_DIST_DIR,
 )
 from exceptions import FileOperationError, OcrProcessError, AutoFillError
-from routers import library, pdfs, ocr, meta, thumbnails, series
+from routers import library, pdfs, ocr, meta, thumbnails, series, hitomi
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -77,6 +77,7 @@ app.include_router(thumbnails.router, prefix="/api", tags=["thumbnails"])
 app.include_router(ocr.router,        prefix="/api", tags=["ocr"])
 app.include_router(meta.router,       prefix="/api", tags=["meta"])
 app.include_router(series.router,     prefix="/api", tags=["series"])
+app.include_router(hitomi.router,     prefix="/api", tags=["hitomi"])
 
 # ---------------------------------------------------------------------------
 # フロントエンド SPA 配信（リリースモード）
