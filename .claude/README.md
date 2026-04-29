@@ -15,6 +15,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | [commands/](commands/) | スラッシュコマンド定義（`/<filename>` で呼べる） | ❌ | 頻用作業を発見したら新規作成 |
 | [hooks/check_docs_updated.sh](hooks/check_docs_updated.sh) | PreToolUse: 実装変更前に docs/ が更新されているか確認 | ❌ (実行のみ) | 判定ロジック改善時 |
 | [hooks/remind_tests.sh](hooks/remind_tests.sh) | PostToolUse: 大きめの実装変更時にテスト実行を促す | ❌ (実行のみ) | 対象ファイル拡張時 |
+| [hooks/remind_deps_install.sh](hooks/remind_deps_install.sh) | PostToolUse: `pyproject.toml` / `package.json` 等の編集時に `uv sync` / `npm install` を促す | ❌ (実行のみ) | 言語追加時 |
 | [settings.json](settings.json) | hooks 登録 + 共有 permissions | ❌ | hooks 追加・共有 permission 追加時 |
 | `settings.local.json` | 個人別 permissions（`.gitignore` 対象） | ❌ | 個別 PC で許可を増やす時 |
 
@@ -71,6 +72,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `/big-files` | 肥大化候補ファイル上位 10 件を表示 |
 | `/check-docs` | 設計書と実装の整合性をクロスチェック |
 | `/audit` | npm audit + uv audit でセキュリティ脆弱性を確認 |
+| `/changelog` | 直近コミットから 変更履歴.md 追記の草稿を生成 |
 
 定義は [commands/](commands/) を参照。
 
