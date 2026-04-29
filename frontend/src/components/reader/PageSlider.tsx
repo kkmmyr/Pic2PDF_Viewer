@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
-import type { ReadingDirection } from '../../types';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import type { ReadingDirection, LibrarySource } from '../../types';
+import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
 
 interface PageSliderProps {
     pageNumber: number;
@@ -7,6 +8,9 @@ interface PageSliderProps {
     isSpread: boolean;
     direction: ReadingDirection;
     show: boolean;
+    selectedPdf: string;
+    currentPath: string;
+    currentSource: LibrarySource;
     onPageJump: (page: number) => void;
     onMouseLeave?: () => void;
 }
@@ -24,31 +28,40 @@ function normalizeSpreadPage(page: number, isSpread: boolean, direction: Reading
         if (page === 1) return 1;
         return page % 2 === 0 ? page : page - 1;
     }
-    // LTR: 奇数が左ページ境界
     return page % 2 === 1 ? page : Math.max(1, page - 1);
 }
 
 /**
  * リーダー画面下部に表示するページスライダーバー。
- * ReaderHeader と同じ showHeader フラグで表示/非表示をフェードさせる。
  *
  * - ドラッグ中は pendingPage をローカルで管理し、離した瞬間だけ onPageJump を呼ぶ
  *   （react-pdf の描画コストを毎 tick 発生させないため）
+ * - ドラッグ中は 150ms デバウンスで GET /api/thumbnails/page を呼び、サムネイルを表示
  * - RTL モード: slider を scaleX(-1) でビジュアルだけ反転（値は LTR のまま）
- * - tabIndex={-1}: スライダーに矢印キーを奪わせない（useReaderNavigation が担当）
- *
- * TODO: ドラッグ中サムネイルプレビュー（現状はテキストツールチップのみ）
+ * - tabIndex={-1} + onFocus blur: 矢印キーを useReaderNavigation に完全委譲
  */
 export function PageSlider({
-    pageNumber, numPages, isSpread, direction, show, onPageJump, onMouseLeave,
+    pageNumber, numPages, isSpread, direction, show,
+    selectedPdf, currentPath, currentSource,
+    onPageJump, onMouseLeave,
 }: PageSliderProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [pendingPage, setPendingPage] = useState(1);
+    const [thumbPage, setThumbPage] = useState(1);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const displayPage = isDragging ? pendingPage : pageNumber;
 
+    // pendingPage が変わるたびに 150ms デバウンスでサムネイルページを更新
+    useEffect(() => {
+        if (!isDragging) return;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => setThumbPage(pendingPage), 150);
+    }, [isDragging, pendingPage]);
+
     const commitPage = useCallback((value: number) => {
         setIsDragging(false);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
         const clamped = Math.max(1, Math.min(value, numPages));
         onPageJump(normalizeSpreadPage(clamped, isSpread, direction));
     }, [numPages, isSpread, direction, onPageJump]);
@@ -57,6 +70,9 @@ export function PageSlider({
 
     const thumbRatio = numPages > 1 ? (displayPage - 1) / (numPages - 1) : 0;
     const tooltipLeft = direction === 'rtl' ? 1 - thumbRatio : thumbRatio;
+    const thumbUrl = buildApiUrl(
+        API_ENDPOINTS.PAGE_THUMBNAIL(selectedPdf, thumbPage, currentPath, currentSource)
+    );
 
     return (
         <div
@@ -71,10 +87,21 @@ export function PageSlider({
             <div className="relative flex-1">
                 {isDragging && (
                     <div
-                        className="absolute -top-7 bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 text-xs px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap"
+                        className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none"
                         style={{ left: `${tooltipLeft * 100}%`, transform: 'translateX(-50%)' }}
                     >
-                        P. {pendingPage}
+                        <div className="bg-gray-900/90 dark:bg-gray-700/90 rounded shadow-lg overflow-hidden">
+                            <img
+                                src={thumbUrl}
+                                alt=""
+                                width={80}
+                                className="w-20 h-auto block"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                            <p className="text-white text-xs text-center tabular-nums px-1.5 py-0.5">
+                                P. {pendingPage}
+                            </p>
+                        </div>
                     </div>
                 )}
                 <input

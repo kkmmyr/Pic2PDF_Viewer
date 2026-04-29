@@ -226,6 +226,9 @@ export function ReaderPanel({
                 isSpread={isSpread}
                 direction={direction}
                 show={showSlider}
+                selectedPdf={selectedPdf}
+                currentPath={currentPath}
+                currentSource={currentSource}
                 onPageJump={setPageNumber}
                 onMouseLeave={() => setShowSlider(false)}
             />
