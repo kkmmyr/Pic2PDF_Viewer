@@ -21,11 +21,11 @@
 
     詳細...
 
-    Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
     EOF
     )"
     ```
-- 末尾には常に `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` を入れる。
+- 末尾には常に `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` を入れる。
 - タイトルは 70 文字以内。詳細は本文で書く。
 
 ### ファイル操作
