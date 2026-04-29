@@ -215,7 +215,7 @@ def series_env(tmp_path, monkeypatch):
     """run_resolve を tmp_path 配下で動かす環境を作る。"""
     pdf_dir = tmp_path / "pdfs"
     pdf_dir.mkdir()
-    monkeypatch.setattr("config.PDF_DIR", str(pdf_dir))
+    monkeypatch.setattr("config.PDF_COMPRESSED_DIR", str(pdf_dir))
     monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
     return tmp_path, pdf_dir
 

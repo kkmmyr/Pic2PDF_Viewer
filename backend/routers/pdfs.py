@@ -12,7 +12,7 @@ from services.pdf_generator import scan_and_generate, batch_compress
 from services.job_manager import GenerateJob, JobStore, JobStatus
 from config import (
     get_dirs_by_source,
-    PDF_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR, PDF_COMPRESSED_DIR,
+    PDF_COMPRESSED_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR,
 )
 from utils.path_utils import validate_safe_path, validate_safe_name
 from utils.file_utils import is_webp_file, is_zip_file, is_pdf_file
@@ -48,17 +48,14 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
     try:
         job.update(status=JobStatus.RUNNING, current_item="Starting...")
 
-        compressed_dir = PDF_COMPRESSED_DIR if request.generate_compressed else None
-        quality = request.quality if request.generate_compressed else None
-
         generated = scan_and_generate(
             request.source_dir,
-            PDF_DIR,
+            PDF_COMPRESSED_DIR,
             THUMBNAIL_DIR,
             IMAGES_DIR,
             COMPLETE_DIR,
-            compressed_output_dir=compressed_dir,
-            quality=quality,
+            compressed_output_dir=None,
+            quality=None,
             progress_callback=progress_callback,
         )
         job.update(
@@ -108,7 +105,7 @@ def get_status(source_dir: str):
             if root == source_dir:
                 folder_name = os.path.basename(source_dir)
 
-            pdf_path = os.path.join(PDF_DIR, f"{folder_name}.pdf")
+            pdf_path = os.path.join(PDF_COMPRESSED_DIR, f"{folder_name}.pdf")
 
             if current_item == folder_name:
                 status = GenerateStatus.IN_PROGRESS
@@ -123,7 +120,7 @@ def get_status(source_dir: str):
         for zip_file in zip_files:
             item_name = os.path.splitext(zip_file)[0]
 
-            pdf_path = os.path.join(PDF_DIR, f"{item_name}.pdf")
+            pdf_path = os.path.join(PDF_COMPRESSED_DIR, f"{item_name}.pdf")
 
             if current_item == item_name:
                 status = GenerateStatus.IN_PROGRESS

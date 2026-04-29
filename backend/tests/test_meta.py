@@ -389,10 +389,10 @@ class TestUpdateHidden:
 @pytest.fixture
 def auto_fill_env(tmp_path, monkeypatch):
     """run_auto_fill を tmp_path 配下で動作させるための環境を整える。"""
-    # PDF ディレクトリを tmp_path に差し替え
+    # PDF ディレクトリを tmp_path に差し替え（auto_fill_service は get_dirs_by_source 経由で PDF_COMPRESSED_DIR を参照する）
     pdf_dir = tmp_path / "pdfs"
     pdf_dir.mkdir()
-    monkeypatch.setattr("config.PDF_DIR", str(pdf_dir))
+    monkeypatch.setattr("config.PDF_COMPRESSED_DIR", str(pdf_dir))
     monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
 
     # ジョブの sleep を無効化（テスト高速化）

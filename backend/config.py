@@ -136,7 +136,7 @@ def get_dirs_by_source(source: str) -> SourceDirs:
         }
     # generated (default)
     return {
-        "pdf": PDF_DIR,
+        "pdf": PDF_COMPRESSED_DIR,
         "thumb": THUMBNAIL_DIR,
         "img": IMAGES_DIR,
         "thumb_url_prefix": "/thumbnails",
