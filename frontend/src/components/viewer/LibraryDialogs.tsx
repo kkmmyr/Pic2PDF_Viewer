@@ -22,6 +22,7 @@ export interface LibraryDialogsProps {
     onMoveItems: (destination: string) => Promise<void>;
     // BulkAuthor
     isBulkAuthorOpen: boolean;
+    bulkAuthorAllAuthors: string[];
     onCloseBulkAuthor: () => void;
     onBulkApplyAuthors: (authors: string[]) => Promise<void>;
     // BulkTag
@@ -46,7 +47,7 @@ export function LibraryDialogs({
     isCreateFolderOpen, onCloseCreateFolder, onCreateFolder,
     renameTarget, onCloseRename, onRenameItem,
     isMoveDialogOpen, onCloseMoveDialog, onMoveItems,
-    isBulkAuthorOpen, onCloseBulkAuthor, onBulkApplyAuthors,
+    isBulkAuthorOpen, bulkAuthorAllAuthors, onCloseBulkAuthor, onBulkApplyAuthors,
     isBulkTagOpen, bulkTagInitial, onCloseBulkTag, onBulkApplyTags,
     isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
     isBulkSeriesOpen, bulkSeriesNames, bulkSeriesExisting, onCloseBulkSeries, onBulkAssignSeries,
@@ -80,6 +81,7 @@ export function LibraryDialogs({
             <BulkAuthorDialog
                 open={isBulkAuthorOpen}
                 targetCount={selectedItems.size}
+                allAuthors={bulkAuthorAllAuthors}
                 onClose={onCloseBulkAuthor}
                 onApply={onBulkApplyAuthors}
             />

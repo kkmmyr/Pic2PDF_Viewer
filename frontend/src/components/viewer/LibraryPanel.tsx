@@ -185,6 +185,7 @@ export function LibraryPanel() {
                 onCloseMoveDialog={onCloseMoveDialog}
                 onMoveItems={onMoveItems}
                 isBulkAuthorOpen={isBulkAuthorOpen}
+                bulkAuthorAllAuthors={allAuthors}
                 onCloseBulkAuthor={() => setIsBulkAuthorOpen(false)}
                 onBulkApplyAuthors={bulkActions.handleBulkApplyAuthors}
                 isBulkTagOpen={isBulkTagOpen}
