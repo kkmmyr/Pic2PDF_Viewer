@@ -22,7 +22,7 @@ import apiClient from '../../config/api_client';
  */
 export function LibraryPanel() {
     const {
-        pdfs, directories, currentPath, currentSource,
+        pdfs, directories, selectedPdf, currentPath, currentSource,
         isSelectionMode, selectedItems,
         isMoveDialogOpen, isCreateFolderOpen, renameTarget,
         onPdfClick, onFolderClick, onUpClick, onSourceChange,
@@ -57,6 +57,22 @@ export function LibraryPanel() {
     useEffect(() => {
         setSearchText('');
     }, [currentPath, currentSource]);
+
+    // s キー: 選択モードをトグル（リーダーが開いている間・入力中・修飾キー付きは無効）
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (selectedPdf !== null) return;
+            if (e.key !== 's') return;
+            const target = e.target as HTMLElement;
+            const tag = target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+            e.preventDefault();
+            onToggleSelectionMode();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedPdf, onToggleSelectionMode]);
 
     const handleGroupModeChange = useCallback((mode: typeof groupMode) => {
         setGroupMode(mode);
