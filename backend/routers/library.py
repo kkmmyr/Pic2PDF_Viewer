@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import os
+from urllib.parse import quote
 
 from config import get_dirs_by_source
 from utils.file_utils import is_image_file, is_pdf_file
@@ -48,7 +49,8 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
             thumb_url = None
             if os.path.exists(thumb_path):
                 rel_path = join_path(path, thumb_name) if path else thumb_name
-                thumb_url = f"{url_prefix_thumb}/{rel_path}"
+                encoded = '/'.join(quote(seg, safe='') for seg in rel_path.replace(os.sep, '/').split('/'))
+                thumb_url = f"{url_prefix_thumb}/{encoded}"
             else:
                 background_tasks.add_task(ThumbnailService.generate_thumbnail, item_path, thumb_path)
 
@@ -87,7 +89,8 @@ def list_book_images(path: str, source: str = "generated"):
         image_urls = []
         for img in images:
             rel_path = join_path(path, img)
-            image_urls.append(f"{url_prefix}/{rel_path}")
+            encoded = '/'.join(quote(seg, safe='') for seg in rel_path.replace(os.sep, '/').split('/'))
+            image_urls.append(f"{url_prefix}/{encoded}")
 
         return {"images": image_urls}
     except Exception as e:
