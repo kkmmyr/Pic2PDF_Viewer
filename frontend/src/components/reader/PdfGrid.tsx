@@ -52,6 +52,8 @@ interface PdfGridProps {
     showHidden?: boolean;
     /** 「シリーズ編集」ボタンのハンドラ。指定されるとカード右下にアイコンが出る */
     onEditSeries?: (name: string) => void;
+    /** view_count=0 の書籍を未読と判定する関数。true なら "NEW" バッジを表示 */
+    getIsUnread?: (name: string) => boolean;
     /**
      * DnD 並べ替えモード。`true` のとき各カードがドラッグ可能になり、
      * 並べ替え確定時に `onReorder(newOrder)` が呼ばれる。
@@ -88,6 +90,7 @@ export function PdfGrid({
     onEditSeries,
     dndEnabled = false,
     onReorder,
+    getIsUnread,
 }: PdfGridProps) {
     const sensors = useSensors(
         // 8px 以上ドラッグしないと開始しない（ボタンクリックの誤検知を防ぐ）
@@ -111,6 +114,7 @@ export function PdfGrid({
         const isGroup = badge !== null && !!onGroupClick;
         return {
             pdf, isFav, isSelected, isGroup, badge, isSelectionMode, showHidden,
+            isUnread: getIsUnread?.(pdf.name) ?? false,
             onToggleSelect, onToggleFavorite, onPdfClick, onGroupClick,
             onRename, onRegenThumb, onToggleHidden, onEditSeries,
             getAuthors, onAuthorClick, getTags, onTagClick,

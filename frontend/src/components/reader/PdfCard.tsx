@@ -21,6 +21,7 @@ export interface PdfCardProps {
     badge: PdfCardBadge | null;
     isSelectionMode: boolean;
     showHidden: boolean;
+    isUnread?: boolean;
     onToggleSelect?: (name: string) => void;
     onToggleFavorite?: (name: string) => void;
     onPdfClick: (name: string) => void;
@@ -39,7 +40,7 @@ export interface PdfCardProps {
 
 /** 書籍カード本体。DnD 有効時はドラッグハンドルを外側から差し込む。 */
 export function PdfCard({
-    pdf, isFav, isSelected, isGroup, badge, isSelectionMode, showHidden,
+    pdf, isFav, isSelected, isGroup, badge, isSelectionMode, showHidden, isUnread,
     onToggleSelect, onToggleFavorite, onPdfClick, onGroupClick,
     onRename, onRegenThumb, onToggleHidden, onEditSeries,
     getAuthors, onAuthorClick, getTags, onTagClick, dragHandle,
@@ -89,6 +90,13 @@ export function PdfCard({
                             ? <Library className="w-3 h-3" />
                             : <Users className="w-3 h-3" />}
                         {badge.count} {badge.kind === 'series' ? '巻' : '冊'}
+                    </div>
+                )}
+
+                {/* 未読バッジ（view_count=0 の個別カードのみ） */}
+                {!isSelectionMode && !isGroup && isUnread && (
+                    <div className="absolute top-2 right-2 z-card-badge px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold shadow">
+                        NEW
                     </div>
                 )}
 

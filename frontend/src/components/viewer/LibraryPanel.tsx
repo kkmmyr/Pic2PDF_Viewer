@@ -255,6 +255,7 @@ export function LibraryPanel() {
                         }}
                         onToggleHidden={bulkActions.handleToggleHiddenOne}
                         showHidden={showHidden}
+                        getIsUnread={(name) => getViewCount(currentPath, name) === 0}
                         onEditSeries={setSeriesEditTarget}
                         dndEnabled={!!seriesFilter}
                         onReorder={bulkActions.handleSeriesReorder}
