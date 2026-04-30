@@ -23,10 +23,10 @@ export const API_ENDPOINTS = {
     STATUS: '/api/status',
     /** 書籍画像取得 */
     BOOK_IMAGES: (path: string, source: LibrarySource = 'generated') =>
-        `/api/books/${path}/images?source=${source}`,
+        `/api/books/${encodeURIComponent(path)}/images?source=${source}`,
     /** ページ削除 */
     DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
-        `/api/pdfs/${filename}/delete_pages?path=${path || ''}&source=${source}`,
+        `/api/pdfs/${encodeURIComponent(filename)}/delete_pages?path=${encodeURIComponent(path || '')}&source=${source}`,
     /** ディレクトリ一覧取得 */
     DIRECTORIES: '/api/directories',
     /** ファイル/ディレクトリ移動 */
@@ -89,13 +89,16 @@ export const API_ENDPOINTS = {
 export const STATIC_PATHS = {
     /** PDFファイルパス */
     PDF: (path: string, filename: string, source: LibrarySource = 'generated', version?: number) => {
-        const basePath = path ? `/${path}` : '';
+        const basePath = path
+            ? '/' + path.split('/').map(encodeURIComponent).join('/')
+            : '';
+        const encodedFilename = encodeURIComponent(filename);
         const versionParam = version !== undefined ? `?v=${version}` : '';
         let prefix = '/pdfs';
         if (source === 'kindle') prefix = '/kindle/pdfs';
         else if (source === 'novel') prefix = '/kindle_novel/pdfs';
 
-        return `${prefix}${basePath}/${filename}${versionParam}`;
+        return `${prefix}${basePath}/${encodedFilename}${versionParam}`;
     },
     /** サムネイルパス */
     THUMBNAIL: (path: string) => path,
