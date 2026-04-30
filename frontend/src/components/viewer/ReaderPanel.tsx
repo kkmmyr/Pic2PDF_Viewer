@@ -9,7 +9,7 @@ import {
     useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast,
     useSpreadMode, useEditMode, useFullscreen, useBookMeta,
 } from '../../hooks';
-import { useNextSeriesVolume } from '../../hooks/useNextSeriesVolume';
+import { useNextSeriesVolume, usePrevSeriesVolume } from '../../hooks/useNextSeriesVolume';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
@@ -65,6 +65,7 @@ export function ReaderPanel({
     // 判定範囲は同フォルダ内のみ（meta のキー prefix で path 一致をチェック）。
     const { meta, getSeries, recordView } = useBookMeta(currentSource);
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
+    const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
 
     // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
     const isAtLastSpread = numPages > 0 && (
@@ -76,6 +77,12 @@ export function ReaderPanel({
         recordView(currentPath, nextVolume.name);
         onSelectPdf(nextVolume.name);
     }, [nextVolume, onSelectPdf, recordView, currentPath]);
+
+    const handleNavigatePrevVolume = useCallback(() => {
+        if (!prevVolume || !onSelectPdf) return;
+        recordView(currentPath, prevVolume.name);
+        onSelectPdf(prevVolume.name);
+    }, [prevVolume, onSelectPdf, recordView, currentPath]);
 
     const {
         isEditMode, selectedPages,
@@ -107,6 +114,8 @@ export function ReaderPanel({
         onToggleEditMode: toggleEditMode,
         onOpenHelp: () => setIsHelpOpen(true),
         onToggleSearch: () => setIsSearchOpen(true),
+        onNavigateNextVolume: nextVolume && onSelectPdf ? handleNavigateNextVolume : null,
+        onNavigatePrevVolume: prevVolume && onSelectPdf ? handleNavigatePrevVolume : null,
     });
 
     const handleCloseSearch = useCallback(() => {

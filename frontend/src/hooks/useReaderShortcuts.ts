@@ -7,6 +7,10 @@ interface UseReaderShortcutsProps {
     onToggleEditMode: () => void;
     onOpenHelp: () => void;
     onToggleSearch: () => void;
+    /** 次巻あり時に渡す。null なら ↓ キーは無効 */
+    onNavigateNextVolume: (() => void) | null;
+    /** 前巻あり時に渡す。null なら ↑ キーは無効 */
+    onNavigatePrevVolume: (() => void) | null;
 }
 
 /**
@@ -32,6 +36,8 @@ export function useReaderShortcuts({
     onToggleEditMode,
     onOpenHelp,
     onToggleSearch,
+    onNavigateNextVolume,
+    onNavigatePrevVolume,
 }: UseReaderShortcutsProps): void {
     useEffect(() => {
         if (!isActive) return;
@@ -44,9 +50,8 @@ export function useReaderShortcuts({
                 return;
             }
 
-            // 文字キー系は入力中は無視
+            // 入力中・修飾キー付きはブラウザ操作を尊重
             if (isTypingInForm(e.target)) return;
-            // 修飾キー（Ctrl/Cmd/Alt）が押されている場合はブラウザ操作を尊重
             if (e.ctrlKey || e.metaKey || e.altKey) return;
 
             switch (e.key) {
@@ -62,10 +67,22 @@ export function useReaderShortcuts({
                     e.preventDefault();
                     onOpenHelp();
                     break;
+                case 'ArrowDown':
+                    if (onNavigateNextVolume) {
+                        e.preventDefault();
+                        onNavigateNextVolume();
+                    }
+                    break;
+                case 'ArrowUp':
+                    if (onNavigatePrevVolume) {
+                        e.preventDefault();
+                        onNavigatePrevVolume();
+                    }
+                    break;
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isActive, onToggleFullscreen, onToggleEditMode, onOpenHelp, onToggleSearch]);
+    }, [isActive, onToggleFullscreen, onToggleEditMode, onOpenHelp, onToggleSearch, onNavigateNextVolume, onNavigatePrevVolume]);
 }

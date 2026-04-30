@@ -7,6 +7,7 @@ interface ShortcutsHelpDialogProps {
 
 const SHORTCUTS: { key: string; description: string }[] = [
     { key: '←  /  →',  description: 'ページ送り（綴じ方向に応じて前後）' },
+    { key: '↓  /  ↑',  description: '次の巻 / 前の巻へ移動（シリーズ登録済みの場合）' },
     { key: 'f',         description: 'フルスクリーン切替' },
     { key: 'e',         description: '編集モード切替' },
     { key: 'Ctrl+F',    description: 'テキスト検索バーを開く' },
