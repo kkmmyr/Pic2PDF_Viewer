@@ -11,6 +11,8 @@ export interface PdfCardBadge {
     kind: 'series' | 'author';
     /** カードのタイトル表示に使う（例: "鬼滅の刃" / "diletta コレクション"） */
     displayTitle: string;
+    /** シリーズ集約のみ: view_count > 0 の既読冊数 */
+    readCount?: number;
 }
 
 export interface PdfCardProps {
@@ -83,13 +85,15 @@ export function PdfCard({
                     </div>
                 )}
 
-                {/* 集約バッジ（シリーズ巻数 / 作者の作品数） */}
+                {/* 集約バッジ（シリーズ: readCount/count巻 / 作者: count冊） */}
                 {isGroup && badge && (
                     <div className="absolute top-2 right-2 z-card-badge px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow">
                         {badge.kind === 'series'
                             ? <Library className="w-3 h-3" />
                             : <Users className="w-3 h-3" />}
-                        {badge.count} {badge.kind === 'series' ? '巻' : '冊'}
+                        {badge.kind === 'series' && badge.readCount !== undefined
+                            ? `${badge.readCount}/${badge.count}巻`
+                            : `${badge.count}${badge.kind === 'series' ? '巻' : '冊'}`}
                     </div>
                 )}
 

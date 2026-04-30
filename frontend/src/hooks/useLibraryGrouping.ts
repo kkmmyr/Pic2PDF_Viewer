@@ -20,6 +20,8 @@ export interface GroupBadge {
     groupId: string;
     /** カードのタイトルとして表示する文字列 */
     displayTitle: string;
+    /** シリーズ集約のみ: view_count > 0 の既読冊数 */
+    readCount: number;
 }
 
 export interface GroupedLibrary {
@@ -121,12 +123,17 @@ export function useLibraryGrouping({
                 sortedMembers = members;
             }
 
+            const readCount = mode === 'series'
+                ? members.filter(p => (meta[metaKey(currentPath, p.name)]?.view_count ?? 0) > 0).length
+                : 0;
+
             representatives.set(groupId, rep);
             badgeByRepresentativeName.set(rep.name, {
                 count: members.length,
                 kind: mode === 'series' ? 'series' : 'author',
                 groupId,
                 displayTitle: groupTitles.get(groupId) ?? '',
+                readCount,
             });
             membersByRepresentativeName.set(rep.name, sortedMembers);
         }
