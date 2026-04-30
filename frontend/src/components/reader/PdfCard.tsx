@@ -93,13 +93,6 @@ export function PdfCard({
                     </div>
                 )}
 
-                {/* 未読バッジ（view_count=0 の個別カードのみ） */}
-                {!isSelectionMode && !isGroup && isUnread && (
-                    <div className="absolute top-2 right-2 z-card-badge px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold shadow">
-                        NEW
-                    </div>
-                )}
-
                 {/* お気に入りボタン */}
                 {!isSelectionMode && onToggleFavorite && (
                     <button
@@ -214,6 +207,9 @@ export function PdfCard({
                         )}
                         {isFav && (
                             <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" />
+                        )}
+                        {!isGroup && isUnread && (
+                            <span className="px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold leading-none">NEW</span>
                         )}
                     </div>
                 </div>
