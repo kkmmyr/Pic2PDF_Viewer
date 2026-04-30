@@ -7,7 +7,7 @@ if %errorlevel% equ 0 (
     REM Backend is running -> kill uvicorn (start_server.bat loop will restart in same tab)
     echo Restarting Backend...
     for /f "tokens=5" %%p in ('netstat -ano ^| findstr " :8766 " ^| findstr "LISTENING"') do (
-        powershell -noprofile -command "$par=(gwmi Win32_Process -Filter 'ProcessId=%%p').ParentProcessId; Stop-Process -Id $par -Force -EA SilentlyContinue; Stop-Process -Id %%p -Force -EA SilentlyContinue"
+        powershell -noprofile -command "$par=(gwmi Win32_Process -Filter 'ProcessId=%%p').ParentProcessId; if ($par) { Stop-Process -Id $par -Force -EA SilentlyContinue }; Stop-Process -Id %%p -Force -EA SilentlyContinue"
     )
 ) else (
     REM Not running -> start Backend + Frontend
