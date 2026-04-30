@@ -591,3 +591,143 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 }
 ```
 - `status` の値: `idle` / `running` / `error`
+
+---
+
+## hitomi.la 新着監視
+
+詳細設計: [hitomi新着監視設計書.md §6](hitomi新着監視設計書.md#6-api-仕様)
+
+### `GET /api/hitomi/new-arrivals`
+
+未既読の新着ギャラリー一覧と監視ジョブのヘルス情報を取得する。
+
+**レスポンス**:
+```json
+{
+  "items": [
+    {
+      "id": 2034567,
+      "artist": "aka_shio",
+      "display_artist": "aka shio",
+      "title": "...",
+      "language": "japanese",
+      "type": "manga",
+      "page_count": 24,
+      "published_at": "2026-04-28T...",
+      "discovered_at": "2026-04-29T03:00:00+09:00",
+      "url": "https://hitomi.la/galleries/2034567.html",
+      "dismissed": false
+    }
+  ],
+  "last_run_at": "2026-04-29T03:00:00+09:00",
+  "last_run_status": "ok",
+  "last_error": null
+}
+```
+- `items`: `dismissed=false` のもののみ、新着順
+- `last_run_status` の値: `ok` / `partial` / `error` / `never`
+
+---
+
+### `POST /api/hitomi/dismiss/{gallery_id}`
+
+新着アイテムを既読化（`dismissed=true`）する。
+
+**パスパラメータ**:
+- `gallery_id` — ギャラリー ID（整数）
+
+**レスポンス**: `{"message": "Dismissed", "id": 2034567}`
+
+**エラー**:
+- `404`: 指定 ID が存在しない
+
+---
+
+### `POST /api/hitomi/dismiss-all`
+
+未読の全アイテムを一括既読化する。
+
+**レスポンス**: `{"message": "All dismissed", "dismissed_count": 12}`
+
+---
+
+### `GET /api/hitomi/watchlist`
+
+監視対象の作者一覧を取得する。
+
+**レスポンス**:
+```json
+{
+  "artists": [
+    {
+      "display_name": "aka shio",
+      "normalized": "aka_shio",
+      "language": "japanese",
+      "added_at": "2026-04-29"
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/hitomi/watchlist`
+
+監視対象の作者を追加する。NOZOMI URL の存在確認を行い、登録時に `state.json` の `top_id` を初期化する（既存作品の誤検出防止）。
+
+**リクエストボディ**:
+```json
+{ "display_name": "aka shio", "language": "japanese" }
+```
+
+**レスポンス**: `{"message": "Added", "normalized": "aka_shio"}`
+
+**エラー**:
+- `400`: 重複登録 / 不正な文字
+- `404`: hitomi.la に作者が存在しない（NOZOMI 404）
+
+---
+
+### `DELETE /api/hitomi/watchlist/{normalized}`
+
+監視対象を削除する。`state.json` の該当エントリも削除する。
+
+**パスパラメータ**:
+- `normalized` — 内部識別子（`aka_shio` 形式）
+
+**クエリパラメータ**:
+- `language` (オプション、default `japanese`)
+
+**レスポンス**: `{"message": "Removed"}`
+
+**エラー**:
+- `404`: 指定 normalized が存在しない
+
+---
+
+### `POST /api/hitomi/run-now`
+
+監視スクリプトを同期実行する（Task Scheduler を待たず即時取得）。実行中の二重起動は 409 で拒否。
+
+**クエリパラメータ**:
+- `skip_recent_days` (オプション、default `3.0`) — 指定日数以内に確認済みの作者をスキップ。`0` で全作者強制再チェック
+
+**レスポンス**:
+```json
+{
+  "exit_code": 0,
+  "last_run_at": "2026-04-29T...",
+  "last_run_status": "ok",
+  "last_error": null,
+  "last_run_stats": {
+    "added": 3,
+    "skipped": 2,
+    "errors": 0
+  }
+}
+```
+- `exit_code`: `0` = 全成功 / `1` = 部分失敗 / `2` = 致命的失敗
+
+**エラー**:
+- `409`: 既に実行中

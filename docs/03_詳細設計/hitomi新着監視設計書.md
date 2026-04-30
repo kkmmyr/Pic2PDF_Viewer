@@ -2,7 +2,7 @@
 
 特定作者の新着ギャラリーを定期監視して、ライブラリ画面から確認・hitomi.la へのリンクで遷移できる機能の設計書。本機能は **既存の Pic2PDF_Viewer 本体機能とは独立** しており、設計上も実行プロセスとしても疎結合に組む。本機能に関する仕様・実装・運用はすべて本ファイルに集約する。
 
-最終更新: 2026-04-29（登録時の既存作品除外を追加）
+最終更新: 2026-05-01（フロントエンドファイルマップを実装に合わせて修正）
 
 ---
 
@@ -178,10 +178,11 @@ UI 側は GET `/api/hitomi/new-arrivals` で `new_arrivals.json` を読み、画
 
 | パス | 役割 |
 |---|---|
-| `frontend/src/components/hitomi/HitomiNewArrivalsPage.tsx` | 新着一覧画面 |
-| `frontend/src/components/hitomi/HitomiWatchlistDialog.tsx` | 監視対象編集ダイアログ |
+| `frontend/src/pages/HitomiPage.tsx` | 新着一覧 + 監視対象管理の統合ページ（`/hitomi` ルート） |
 | `frontend/src/components/hitomi/HitomiArrivalCard.tsx` | 新着カード単体 |
-| `frontend/src/hooks/useHitomiArrivals.ts` | 一覧取得・dismiss・watchlist CRUD フック |
+| `frontend/src/components/hitomi/HitomiWatchlistDialog.tsx` | 監視対象編集ダイアログ |
+| `frontend/src/hooks/useHitomiArrivals.ts` | 新着一覧取得・dismiss・dismiss-all・run-now フック |
+| `frontend/src/hooks/useHitomiWatchlist.ts` | 監視対象の取得・追加・削除フック |
 | `frontend/src/types/hitomi.ts` | 型定義 |
 
 ### 5.3. データディレクトリ
@@ -404,7 +405,9 @@ def main() -> int:
 
 state_store / watchlist サービスを呼ぶだけの薄いラッパー。FastAPI の DI で `get_dirs_by_source()` のような既存パターンに揃える必要はない（独立データのため）。
 
-### 7.7. `hooks/useHitomiArrivals.ts`
+### 7.7. `hooks/useHitomiArrivals.ts` / `hooks/useHitomiWatchlist.ts`
+
+責務を 2 フックに分割して実装。
 
 ```typescript
 function useHitomiArrivals() {
@@ -414,7 +417,17 @@ function useHitomiArrivals() {
     lastRunStatus: 'ok' | 'partial' | 'error' | 'never',
     dismiss: (id: number) => Promise<void>,    // 楽観的更新 + サーバ反映
     dismissAll: () => Promise<void>,
+    runNow: () => Promise<void>,               // 同期実行（完了後に自動 refresh）
     refresh: () => Promise<void>,              // マウント時 + 手動 only（ポーリング無し）
+  }
+}
+
+function useHitomiWatchlist() {
+  return {
+    artists: WatchlistEntry[],
+    addArtist: (displayName: string, language: string) => Promise<void>,
+    removeArtist: (normalized: string, language: string) => Promise<void>,
+    refresh: () => Promise<void>,
   }
 }
 ```
@@ -513,7 +526,7 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 2. `frontend/src/types/hitomi.ts`
 3. `frontend/src/hooks/useHitomiArrivals.ts`
 4. `frontend/src/components/hitomi/HitomiArrivalCard.tsx`
-5. `frontend/src/components/hitomi/HitomiNewArrivalsPage.tsx`
+5. `frontend/src/pages/HitomiPage.tsx`（当初 `HitomiNewArrivalsPage.tsx` として設計、実装時に `pages/` 配下のページコンポーネントに変更）
 6. ヘッダーに「新着」リンクとバッジを追加
 
 **完了条件:** ブラウザから新着確認 + 既読化が可能
@@ -521,7 +534,7 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 ### Phase 3: 監視対象管理 UI ✅
 
 1. `backend/routers/hitomi.py` に watchlist CRUD 追加
-2. `useHitomiArrivals.ts` に `addWatchlist` / `removeWatchlist` 追加
+2. `useHitomiArrivals.ts` と分離した `useHitomiWatchlist.ts` を新規作成（監視対象の取得・追加・削除を担当）
 3. `HitomiWatchlistDialog.tsx`
 4. 不正な作者名のバリデーション（NOZOMI 404 即時試験）
 
