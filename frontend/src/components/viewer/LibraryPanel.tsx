@@ -230,6 +230,14 @@ export function LibraryPanel() {
                         selectedItems={selectedItems}
                         onToggleSelect={onToggleSelect}
                         onRename={(name) => onOpenRename(name, true)}
+                        getUnreadCount={(dir) => {
+                            const prefix = currentPath ? `${currentPath}/${dir}/` : `${dir}/`;
+                            return Object.entries(meta).reduce((count, [key, entry]) => {
+                                if (!key.startsWith(prefix)) return count;
+                                if (key.slice(prefix.length).includes('/')) return count;
+                                return (entry.view_count ?? 0) === 0 ? count + 1 : count;
+                            }, 0);
+                        }}
                     />
                     <PdfGrid
                         pdfs={displayPdfs}

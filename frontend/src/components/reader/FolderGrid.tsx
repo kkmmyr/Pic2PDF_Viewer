@@ -7,6 +7,8 @@ interface FolderGridProps {
     selectedItems?: Set<string>;
     onToggleSelect?: (name: string) => void;
     onRename?: (name: string) => void;
+    /** フォルダ直下の未読書籍数を返す関数。0 なら非表示 */
+    getUnreadCount?: (dirName: string) => number;
 }
 
 export function FolderGrid({
@@ -16,6 +18,7 @@ export function FolderGrid({
     selectedItems = new Set(),
     onToggleSelect,
     onRename,
+    getUnreadCount,
 }: FolderGridProps) {
     if (directories.length === 0) return null;
 
@@ -25,6 +28,7 @@ export function FolderGrid({
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 {directories.map((dir) => {
                     const isSelected = isSelectionMode && selectedItems.has(dir);
+                    const unreadCount = getUnreadCount?.(dir) ?? 0;
                     return (
                     <div
                         key={dir}
@@ -52,6 +56,11 @@ export function FolderGrid({
                                     ) : (
                                         <div className="w-5 h-5 rounded-full bg-white/90 dark:bg-gray-800/90 border-2 border-gray-400 dark:border-gray-500 shadow-sm" />
                                     )}
+                                </div>
+                            )}
+                            {!isSelectionMode && unreadCount > 0 && (
+                                <div className="absolute -top-2 -right-2 min-w-[1.25rem] h-5 rounded-full bg-sky-500 text-white text-xs font-semibold flex items-center justify-center px-1 shadow">
+                                    {unreadCount}
                                 </div>
                             )}
                         </div>
