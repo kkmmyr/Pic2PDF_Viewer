@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import { SearchableSelect } from '../ui/SearchableSelect';
 import type { ExistingSeriesOption } from '../../types';
 
 export type { ExistingSeriesOption };
@@ -29,7 +30,7 @@ export function BulkSeriesAssignDialog({
     open, selectedNames, existingSeries, onClose, onAssign,
 }: BulkSeriesAssignDialogProps) {
     const [mode, setMode] = useState<Mode>(existingSeries.length > 0 ? 'existing' : 'new');
-    const [selectedId, setSelectedId] = useState<string>('');
+    const [selectedTitle, setSelectedTitle] = useState<string>('');
     const [newTitle, setNewTitle] = useState<string>('');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -38,13 +39,14 @@ export function BulkSeriesAssignDialog({
         if (!open) return;
         const fallbackMode: Mode = existingSeries.length > 0 ? 'existing' : 'new';
         setMode(fallbackMode);
-        setSelectedId(existingSeries[0]?.id ?? '');
+        setSelectedTitle(existingSeries[0]?.title ?? '');
         setNewTitle('');
         setError(null);
     }, [open, existingSeries]);
 
     const noExistingSeries = existingSeries.length === 0;
-    const selected = existingSeries.find(s => s.id === selectedId);
+    const seriesTitles = existingSeries.map(s => s.title);
+    const selected = existingSeries.find(s => s.title === selectedTitle);
 
     // プレビュー表示用の巻数リスト
     const previewIndexes: number[] = (() => {
@@ -59,11 +61,11 @@ export function BulkSeriesAssignDialog({
         setSaving(true);
         try {
             if (mode === 'existing') {
-                if (!selectedId || !selected) throw new Error('既存シリーズを選択してください。');
+                if (!selectedTitle || !selected) throw new Error('既存シリーズを選択してください。');
                 await onAssign({
                     title: selected.title,
                     indexes: previewIndexes,
-                    id: selectedId,
+                    id: selected.id,
                 });
             } else {
                 if (!newTitle.trim()) throw new Error('シリーズタイトルを入力してください。');
@@ -108,19 +110,21 @@ export function BulkSeriesAssignDialog({
                                     <span className="ml-2 text-xs text-gray-400">（このソースに既存シリーズなし）</span>
                                 )}
                             </div>
-                            {mode === 'existing' && (
-                                <select
-                                    value={selectedId}
-                                    onChange={(e) => setSelectedId(e.target.value)}
-                                    disabled={noExistingSeries}
-                                    className="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200"
-                                >
-                                    {existingSeries.map(s => (
-                                        <option key={s.id} value={s.id}>
-                                            {s.title}（現在の最大巻: {s.maxIndex}）
-                                        </option>
-                                    ))}
-                                </select>
+                            {mode === 'existing' && !noExistingSeries && (
+                                <div className="mt-1.5">
+                                    <SearchableSelect
+                                        value={selectedTitle}
+                                        options={seriesTitles}
+                                        emptyLabel="シリーズを選択..."
+                                        placeholder="シリーズタイトルで絞り込み"
+                                        onChange={setSelectedTitle}
+                                    />
+                                    {selected && (
+                                        <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                                            現在の最大巻: {selected.maxIndex}
+                                        </p>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </label>
