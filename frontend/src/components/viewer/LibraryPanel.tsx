@@ -49,6 +49,7 @@ export function LibraryPanel() {
         sortOrder, setSortOrder,
         groupMode, setGroupMode,
         showHidden, toggleShowHidden,
+        showUnreadOnly, toggleShowUnreadOnly,
     } = useLibrarySettings();
 
     // パスまたはソース変更時に検索テキストをリセット。
@@ -119,6 +120,7 @@ export function LibraryPanel() {
         tagFilter,
         seriesFilter,
         showHidden,
+        showUnreadOnly,
         currentPath,
         meta,
     });
@@ -183,6 +185,8 @@ export function LibraryPanel() {
                 onTagFilterChange={setTagFilter}
                 onGroupModeChange={handleGroupModeChange}
                 onToggleShowHidden={toggleShowHidden}
+                showUnreadOnly={showUnreadOnly}
+                onToggleUnreadOnly={toggleShowUnreadOnly}
                 onMetaRefresh={refreshMeta}
             />
 

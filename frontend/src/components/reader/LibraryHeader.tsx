@@ -1,4 +1,4 @@
-import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User, BookOpen } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
@@ -47,6 +47,9 @@ interface LibraryHeaderProps {
     onTagFilterChange: (tag: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
     onToggleShowHidden: () => void;
+    /** 未読フィルター（view_count=0 のみ表示） */
+    showUnreadOnly: boolean;
+    onToggleUnreadOnly: () => void;
     /** ジョブ完了後のメタデータ再取得（ツールメニュー内で利用） */
     onMetaRefresh: () => void;
 }
@@ -92,6 +95,8 @@ export function LibraryHeader({
     onTagFilterChange,
     onGroupModeChange,
     onToggleShowHidden,
+    showUnreadOnly,
+    onToggleUnreadOnly,
     onMetaRefresh,
 }: LibraryHeaderProps) {
     return (
@@ -185,6 +190,15 @@ export function LibraryHeader({
                         <option value="author-then-series">作者 → シリーズで</option>
                     </select>
                 </div>
+
+                <button
+                    onClick={onToggleUnreadOnly}
+                    title={showUnreadOnly ? '全書籍を表示する' : '未読書籍のみを表示する'}
+                    className={showUnreadOnly ? BTN_SECONDARY_ACTIVE : BTN_SECONDARY}
+                >
+                    <BookOpen className="w-4 h-4" />
+                    未読のみ
+                </button>
 
                 <button
                     onClick={onToggleShowHidden}

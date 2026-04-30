@@ -7,9 +7,10 @@ import { getStorageJson, setStorageJson } from '../utils/storage';
 const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
 const GROUP_MODE_KEY = 'library_group_mode';
 const SHOW_HIDDEN_KEY = 'library_show_hidden';
+const SHOW_UNREAD_ONLY_KEY = 'library_show_unread_only';
 
 /**
- * ライブラリ表示設定（sort / groupMode / showHidden）を localStorage に永続化する。
+ * ライブラリ表示設定（sort / groupMode / showHidden / showUnreadOnly）を localStorage に永続化する。
  * setter は state 更新と localStorage 書き込みをまとめて行う。
  */
 export function useLibrarySettings() {
@@ -21,6 +22,9 @@ export function useLibrarySettings() {
     );
     const [showHidden, setShowHiddenState] = useState<boolean>(
         () => getStorageJson<boolean>(SHOW_HIDDEN_KEY, false)
+    );
+    const [showUnreadOnly, setShowUnreadOnlyState] = useState<boolean>(
+        () => getStorageJson<boolean>(SHOW_UNREAD_ONLY_KEY, false)
     );
 
     const setSortOrder = useCallback((order: SortOrder) => {
@@ -41,9 +45,18 @@ export function useLibrarySettings() {
         });
     }, []);
 
+    const toggleShowUnreadOnly = useCallback(() => {
+        setShowUnreadOnlyState(prev => {
+            const next = !prev;
+            setStorageJson(SHOW_UNREAD_ONLY_KEY, next);
+            return next;
+        });
+    }, []);
+
     return {
         sortOrder, setSortOrder,
         groupMode, setGroupMode,
         showHidden, toggleShowHidden,
+        showUnreadOnly, toggleShowUnreadOnly,
     };
 }
