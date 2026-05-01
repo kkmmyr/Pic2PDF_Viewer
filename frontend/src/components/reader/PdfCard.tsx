@@ -97,8 +97,8 @@ export function PdfCard({
                     </div>
                 )}
 
-                {/* ピンボタン（シリーズ集約カードのみ非表示） */}
-                {!isSelectionMode && onToggleFavorite && !(isGroup && badge?.kind === 'series') && (
+                {/* ピンボタン（作者集約カードのみ非表示） */}
+                {!isSelectionMode && onToggleFavorite && badge?.kind !== 'author' && (
                     <button
                         className="absolute top-2 left-2 z-card-badge p-1 rounded-full bg-white/80 dark:bg-gray-900/70 hover:bg-white dark:hover:bg-gray-900 transition-colors"
                         onClick={(e) => {

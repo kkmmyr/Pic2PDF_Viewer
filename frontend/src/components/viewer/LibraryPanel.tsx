@@ -297,7 +297,7 @@ export function LibraryPanel() {
                         selectedItems={selectedItems}
                         onToggleSelect={handleToggleSelect}
                         favorites={pinnedBooks}
-                        onToggleFavorite={handleTogglePin}
+                        onToggleFavorite={(authorFilter || seriesFilter) ? handleTogglePin : undefined}
                         onRename={onOpenRename}
                         onRegenThumb={handleRegenThumb}
                         getAuthors={(name) => getAuthors(currentPath, name)}
