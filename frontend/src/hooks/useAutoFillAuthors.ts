@@ -1,8 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useCallback } from 'react';
 import type { LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
-import apiClient from '../config/api_client';
-import { API_CONFIG } from '../constants';
+import { useJobPolling } from './useJobPolling';
 
 export interface AutoFillStatus {
     status: 'idle' | 'running' | 'done' | 'error';
@@ -25,62 +24,19 @@ const IDLE_STATUS: AutoFillStatus = {
 };
 
 export function useAutoFillAuthors(source: LibrarySource, onComplete?: () => void) {
-    const [jobStatus, setJobStatus] = useState<AutoFillStatus>(IDLE_STATUS);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const { jobStatus, startJob } = useJobPolling<AutoFillStatus>({
+        source,
+        statusUrl: API_ENDPOINTS.META_AUTO_FILL_STATUS,
+        startUrl: API_ENDPOINTS.META_AUTO_FILL,
+        idleStatus: IDLE_STATUS,
+        onComplete,
+    });
 
-    const clearPolling = useCallback(() => {
-        if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-        }
-    }, []);
-
-    const fetchStatus = useCallback(async () => {
-        try {
-            const data = await apiClient.get<unknown, AutoFillStatus>(
-                API_ENDPOINTS.META_AUTO_FILL_STATUS,
-                { params: { source } }
-            );
-            setJobStatus(data);
-            if (data.status !== 'running') {
-                clearPolling();
-                if (data.status === 'done') onComplete?.();
-            }
-        } catch {
-            clearPolling();
-        }
-    }, [source, clearPolling, onComplete]);
-
-    // ソース変更時に現在のジョブ状態を取得（別ソースのジョブが動いている場合もある）
-    useEffect(() => {
-        setJobStatus(IDLE_STATUS);
-        clearPolling();
-        (async () => {
-            try {
-                const data = await apiClient.get<unknown, AutoFillStatus>(
-                    API_ENDPOINTS.META_AUTO_FILL_STATUS,
-                    { params: { source } }
-                );
-                setJobStatus(data);
-                // 既に実行中なら即ポーリング開始
-                if (data.status === 'running') {
-                    intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
-                }
-            } catch {
-                // ignore
-            }
-        })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [source]);
-
-    const startAutoFill = useCallback(async (mode: 'missing_only' | 'unknown_only' | 'overwrite_all' = 'unknown_only') => {
-        await apiClient.post(API_ENDPOINTS.META_AUTO_FILL, null, { params: { source, mode } });
-        clearPolling();
-        intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
-        fetchStatus();
-    }, [source, clearPolling, fetchStatus]);
-
-    useEffect(() => () => clearPolling(), [clearPolling]);
+    const startAutoFill = useCallback(
+        (mode: 'missing_only' | 'unknown_only' | 'overwrite_all' = 'unknown_only') =>
+            startJob({ mode }),
+        [startJob]
+    );
 
     return { jobStatus, startAutoFill };
 }

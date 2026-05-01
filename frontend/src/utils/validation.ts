@@ -6,7 +6,7 @@
  */
 
 /** ファイル名・フォルダ名に使えない文字 */
-export const FORBIDDEN_FILENAME_CHARS = /[/\\:*?"<>|]/;
+const FORBIDDEN_FILENAME_CHARS = /[/\\:*?"<>|]/;
 
 /** 表示用の禁止文字一覧（エラーメッセージに使う） */
 const FORBIDDEN_CHARS_DISPLAY = '/ \\ : * ? " < > |';

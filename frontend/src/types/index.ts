@@ -8,15 +8,6 @@ export interface PdfFile {
 }
 
 /**
- * PDF一覧APIレスポンス
- */
-export interface PdfListResponse {
-    files: PdfFile[];
-    directories: string[];
-    current_path: string;
-}
-
-/**
  * 書籍画像APIレスポンス
  */
 export interface BookImagesResponse {
@@ -29,29 +20,6 @@ export interface BookImagesResponse {
 export interface DeletePagesResponse {
     message: string;
     total_pages: number;
-}
-
-/**
- * PDF生成APIリクエスト
- */
-export interface GenerateRequest {
-    source_dir: string;
-}
-
-/**
- * PDF生成APIレスポンス（POST /api/generate）
- * ジョブが非同期で開始されたことを示す。進捗は GenerateJob でポーリングして取得する。
- */
-export interface GenerateResponse {
-    job_id: string;
-    status: 'pending';
-}
-
-/**
- * 一括圧縮APIリクエスト
- */
-export interface BatchCompressRequest {
-    quality: number;
 }
 
 /**
@@ -102,19 +70,6 @@ export type PageSide = 'left' | 'right' | 'single';
  */
 export type LibrarySource = 'generated' | 'kindle' | 'novel';
 
-export interface CreateDirectoryRequest {
-    path: string;
-    name: string;
-    source: LibrarySource;
-}
-
-export interface MoveItemsRequest {
-    items: string[];
-    source_path: string;
-    destination_path: string;
-    source: LibrarySource;
-}
-
 /**
  * Generator ジョブステータス
  */
@@ -160,18 +115,6 @@ export interface BookMetaEntry {
  * meta.json 全体（キー: "{path}/{filename}" または "{filename}"）
  */
 export type BookMetaMap = Record<string, BookMetaEntry>;
-
-/**
- * メタデータ更新リクエスト。
- * authors / tags は省略可。省略されたフィールドは変更されない。
- */
-export interface UpdateMetaRequest {
-    path: string;
-    names: string[];
-    authors?: string[];
-    tags?: string[];
-    source: string;
-}
 
 /**
  * サムネイル一括再生成APIレスポンス
