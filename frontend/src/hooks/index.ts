@@ -31,4 +31,5 @@ export { useLibrarySettings } from './useLibrarySettings';
 export { useLibraryBulkActions } from './useLibraryBulkActions';
 export type { BookMetaActions } from './useLibraryBulkActions';
 export { useLibraryDisplay } from './useLibraryDisplay';
+export { useGenres } from './useGenres';
 export type { Crumb } from './useLibraryDisplay';

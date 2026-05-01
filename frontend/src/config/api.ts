@@ -80,6 +80,10 @@ export const API_ENDPOINTS = {
         `/api/hitomi/watchlist/${encodeURIComponent(normalized)}?language=${encodeURIComponent(language)}`,
     /** hitomi.la 監視スクリプトを同期実行 */
     HITOMI_RUN_NOW: '/api/hitomi/run-now',
+    /** ジャンルリスト取得・追加・削除 */
+    GENRES: '/api/genres',
+    /** ジャンル並べ替え */
+    GENRES_REORDER: '/api/genres/reorder',
     /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダープレビュー用） */
     PAGE_THUMBNAIL: (name: string, page: number, path: string, source: LibrarySource, width = 400) =>
         `/api/thumbnails/page?name=${encodeURIComponent(name)}&page=${page}&path=${encodeURIComponent(path)}&source=${source}&width=${width}`,

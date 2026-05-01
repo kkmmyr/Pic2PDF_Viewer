@@ -4,7 +4,7 @@ import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
     useLibraryPins, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
-    useUrlFilters, useLibrarySettings, useLibraryBulkActions, useLibraryDisplay,
+    useUrlFilters, useLibrarySettings, useLibraryBulkActions, useLibraryDisplay, useGenres,
 } from '../../hooks';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
@@ -89,8 +89,9 @@ export function LibraryPanel() {
         meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView, updateAuthors, updateTags, updateGenre, setHidden,
         assignSeries, unassignSeries, reorderSeries,
-        allAuthors, allTags, allGenres, allSeries, allSeriesWithStats, refreshMeta,
+        allAuthors, allTags, allSeries, allSeriesWithStats, refreshMeta,
     } = useBookMeta(currentSource);
+    const { genres, addGenre, removeGenre, reorderGenres } = useGenres(currentSource);
     const { toasts, showToast, dismissToast } = useToast();
 
     // ピン済み書籍の Set（favorites_first ソート用。シリーズ・作者ピン両方を含む）
@@ -292,15 +293,18 @@ export function LibraryPanel() {
                 onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
                 onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
                 isBulkGenreOpen={isBulkGenreOpen}
-                allGenres={allGenres}
+                allGenres={genres}
                 onCloseBulkGenre={() => setIsBulkGenreOpen(false)}
                 onBulkApplyGenre={bulkActions.handleBulkApplyGenre}
             />
 
             <GenreFilterBar
-                allGenres={allGenres}
+                genres={genres}
                 genreFilter={genreFilter}
                 onGenreFilterChange={setGenreFilter}
+                onReorder={reorderGenres}
+                onAdd={addGenre}
+                onRemove={removeGenre}
             />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">

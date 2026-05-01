@@ -1,47 +1,161 @@
-import { Layers } from 'lucide-react';
+import { useState } from 'react';
+import { Settings2 } from 'lucide-react';
+import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    SortableContext,
+    horizontalListSortingStrategy,
+    useSortable,
+    arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GenreManagerDialog } from '../viewer/GenreManagerDialog';
 
-const GENRE_ORDER = ['オリジナル', 'プリンセスコネクト', 'Voiceloid'];
-
-interface GenreFilterBarProps {
-    allGenres: string[];
-    genreFilter: string;
-    onGenreFilterChange: (genre: string) => void;
+interface SortableGenrePillProps {
+    genre: string;
+    isActive: boolean;
+    onClick: () => void;
 }
 
-export function GenreFilterBar({ allGenres, genreFilter, onGenreFilterChange }: GenreFilterBarProps) {
-    if (allGenres.length === 0) return null;
+function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: genre });
 
-    const sortedGenres = [...allGenres].sort((a, b) => {
-        const ai = GENRE_ORDER.indexOf(a);
-        const bi = GENRE_ORDER.indexOf(b);
-        if (ai !== -1 && bi !== -1) return ai - bi;
-        if (ai !== -1) return -1;
-        if (bi !== -1) return 1;
-        return a.localeCompare(b, 'ja');
-    });
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        cursor: isDragging ? 'grabbing' : 'grab',
+    };
 
-    const btnBase = 'px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border';
+    const btnBase = 'px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border select-none';
     const btnActive = 'bg-indigo-600 text-white border-indigo-600';
     const btnInactive = 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
 
     return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            {...listeners}
+            onClick={onClick}
+            className={`${btnBase} ${isActive ? btnActive : btnInactive}`}
+        >
+            {genre}
+        </div>
+    );
+}
+
+interface GenreFilterBarProps {
+    genres: string[];
+    genreFilter: string;
+    onGenreFilterChange: (genre: string) => void;
+    onReorder: (newOrder: string[]) => void;
+    onAdd: (name: string) => Promise<void>;
+    onRemove: (name: string) => Promise<void>;
+}
+
+export function GenreFilterBar({
+    genres,
+    genreFilter,
+    onGenreFilterChange,
+    onReorder,
+    onAdd,
+    onRemove,
+}: GenreFilterBarProps) {
+    const [isManagerOpen, setIsManagerOpen] = useState(false);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    );
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const oldIndex = genres.indexOf(active.id as string);
+        const newIndex = genres.indexOf(over.id as string);
+        if (oldIndex !== -1 && newIndex !== -1) {
+            onReorder(arrayMove(genres, oldIndex, newIndex));
+        }
+    };
+
+    if (genres.length === 0) {
+        return (
+            <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 flex items-center gap-2">
+                <button
+                    onClick={() => setIsManagerOpen(true)}
+                    title="ジャンルを管理"
+                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500"
+                >
+                    <Settings2 className="w-4 h-4" />
+                </button>
+                <GenreManagerDialog
+                    open={isManagerOpen}
+                    genres={genres}
+                    onClose={() => setIsManagerOpen(false)}
+                    onAdd={onAdd}
+                    onRemove={onRemove}
+                />
+            </div>
+        );
+    }
+
+    return (
         <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+            <button
+                onClick={() => setIsManagerOpen(true)}
+                title="ジャンルを管理"
+                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 shrink-0"
+            >
+                <Settings2 className="w-4 h-4" />
+            </button>
+
+            {/* すべて */}
             <button
                 onClick={() => onGenreFilterChange('')}
-                className={`${btnBase} ${!genreFilter ? btnActive : btnInactive}`}
+                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border shrink-0 ${
+                    !genreFilter
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
             >
                 すべて
             </button>
-            {sortedGenres.map(g => (
-                <button
-                    key={g}
-                    onClick={() => onGenreFilterChange(genreFilter === g ? '' : g)}
-                    className={`${btnBase} ${genreFilter === g ? btnActive : btnInactive}`}
-                >
-                    {g}
-                </button>
-            ))}
+
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={genres} strategy={horizontalListSortingStrategy}>
+                    <div className="flex items-center gap-2 overflow-x-auto">
+                        {genres.map(genre => (
+                            <SortableGenrePill
+                                key={genre}
+                                genre={genre}
+                                isActive={genreFilter === genre}
+                                onClick={() => onGenreFilterChange(genreFilter === genre ? '' : genre)}
+                            />
+                        ))}
+                    </div>
+                </SortableContext>
+            </DndContext>
+
+            <GenreManagerDialog
+                open={isManagerOpen}
+                genres={genres}
+                onClose={() => setIsManagerOpen(false)}
+                onAdd={onAdd}
+                onRemove={onRemove}
+            />
         </div>
     );
 }
