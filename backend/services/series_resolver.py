@@ -10,11 +10,11 @@ Phase 2: `use_gemma=True` 指定時、ルール判定後に同作者でシリー
 """
 import hashlib
 import os
-import threading
 from dataclasses import dataclass, field
 
 from config import get_dirs_by_source, VALID_SOURCES
 from services.gemma_client import import_ollama_client
+from services.job_state import JobStateManager
 from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
 from services.volume_parser import parse_pair_volume_indexes
 from utils.file_utils import is_pdf_file
@@ -35,20 +35,18 @@ class SeriesResolveState:
     error: str = ""
 
 
-_states: dict[str, SeriesResolveState] = {}
-_states_lock = threading.Lock()
+_manager: JobStateManager[SeriesResolveState] = JobStateManager(
+    idle_factory=SeriesResolveState,
+    running_factory=lambda: SeriesResolveState(status="running"),
+)
 
 
 def get_state(source: str) -> SeriesResolveState:
-    with _states_lock:
-        if source not in _states:
-            _states[source] = SeriesResolveState()
-        return _states[source]
+    return _manager.get(source)
 
 
 def reset_state(source: str) -> None:
-    with _states_lock:
-        _states[source] = SeriesResolveState(status="running")
+    _manager.reset(source)
 
 
 # ---------------------------------------------------------------------------

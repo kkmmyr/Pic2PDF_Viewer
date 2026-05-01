@@ -13,9 +13,8 @@ from config import get_dirs_by_source
 from utils.path_utils import validate_safe_path, validate_safe_name
 from services.author_resolver import resolve_author_debug
 from services.meta_store import make_key, load_meta, update_meta_locked
-from routers._deps import validated_source
+from routers._deps import validated_source, assert_valid_source
 from services.auto_fill_service import (
-    VALID_SOURCES,
     VALID_MODES,
     get_auto_fill_state,
     start_auto_fill_job,
@@ -76,8 +75,7 @@ def update_meta(request: UpdateMetaRequest) -> dict:
 
     `authors` / `tags` / `hidden` は省略可。省略されたフィールドは変更しない。
     """
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
     if request.authors is None and request.tags is None and request.hidden is None and request.genre is None:
         raise HTTPException(status_code=400, detail="authors, tags, hidden, or genre must be specified")
 
@@ -150,8 +148,7 @@ def record_view(request: RecordViewRequest) -> dict:
     - `view_count` は前回 last_viewed_at から VIEW_COUNT_DEBOUNCE_SEC 以上経過した場合のみ +1。
       短時間で同じ書籍を何度も開いてもカウントが膨らまないようにする。
     """
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
 
     validate_safe_path(request.path, param_name="path")
     validate_safe_name(request.name, param_name="name")

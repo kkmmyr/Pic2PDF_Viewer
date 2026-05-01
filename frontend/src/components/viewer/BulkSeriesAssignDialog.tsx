@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import type { ExistingSeriesOption } from '../../types';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 export type { ExistingSeriesOption };
 
@@ -32,8 +33,7 @@ export function BulkSeriesAssignDialog({
     const [mode, setMode] = useState<Mode>(existingSeries.length > 0 ? 'existing' : 'new');
     const [selectedTitle, setSelectedTitle] = useState<string>('');
     const [newTitle, setNewTitle] = useState<string>('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { saving, error, handleSubmit } = useDialogSubmit(onClose, '登録に失敗しました。');
 
     useEffect(() => {
         if (!open) return;
@@ -41,14 +41,12 @@ export function BulkSeriesAssignDialog({
         setMode(fallbackMode);
         setSelectedTitle(existingSeries[0]?.title ?? '');
         setNewTitle('');
-        setError(null);
     }, [open, existingSeries]);
 
     const noExistingSeries = existingSeries.length === 0;
     const seriesTitles = existingSeries.map(s => s.title);
     const selected = existingSeries.find(s => s.title === selectedTitle);
 
-    // プレビュー表示用の巻数リスト
     const previewIndexes: number[] = (() => {
         const start = mode === 'existing' && selected
             ? Math.floor(selected.maxIndex) + 1
@@ -56,30 +54,16 @@ export function BulkSeriesAssignDialog({
         return selectedNames.map((_, i) => start + i);
     })();
 
-    const handleSubmit = async () => {
-        setError(null);
-        setSaving(true);
-        try {
+    const handleSubmitWrapper = () => {
+        handleSubmit(async () => {
             if (mode === 'existing') {
                 if (!selectedTitle || !selected) throw new Error('既存シリーズを選択してください。');
-                await onAssign({
-                    title: selected.title,
-                    indexes: previewIndexes,
-                    id: selected.id,
-                });
+                await onAssign({ title: selected.title, indexes: previewIndexes, id: selected.id });
             } else {
                 if (!newTitle.trim()) throw new Error('シリーズタイトルを入力してください。');
-                await onAssign({
-                    title: newTitle.trim(),
-                    indexes: previewIndexes,
-                });
+                await onAssign({ title: newTitle.trim(), indexes: previewIndexes });
             }
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '登録に失敗しました。');
-        } finally {
-            setSaving(false);
-        }
+        });
     };
 
     const subtitle = `${selectedNames.length} 冊を選択順に登録します`;
@@ -154,7 +138,6 @@ export function BulkSeriesAssignDialog({
                     </label>
                 </div>
 
-                {/* 採番プレビュー */}
                 <div className="mb-1">
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
                         登録順 (上から #{previewIndexes[0] ?? '?'} 巻):
@@ -177,7 +160,7 @@ export function BulkSeriesAssignDialog({
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />
-                <DialogPrimaryButton onClick={handleSubmit} disabled={saving}>
+                <DialogPrimaryButton onClick={handleSubmitWrapper} disabled={saving}>
                     {saving ? '登録中...' : '登録'}
                 </DialogPrimaryButton>
             </DialogFooter>

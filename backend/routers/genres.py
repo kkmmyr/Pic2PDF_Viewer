@@ -9,8 +9,7 @@ PATCH /api/genres/reorder - 表示順を更新する
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config import VALID_SOURCES
-from routers._deps import validated_source
+from routers._deps import validated_source, assert_valid_source
 from services.genre_store import load_genres, save_genres
 
 router = APIRouter()
@@ -33,8 +32,7 @@ def get_genres(source: str = Depends(validated_source)) -> list[str]:
 
 @router.post("/genres")
 def add_genre(request: AddGenreRequest) -> dict:
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
     name = request.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Genre name cannot be empty")
@@ -58,8 +56,7 @@ def delete_genre(name: str, source: str = Depends(validated_source)) -> dict:
 
 @router.patch("/genres/reorder")
 def reorder_genres(request: ReorderGenresRequest) -> dict:
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
     existing = set(load_genres(request.source))
     if set(request.genres) != existing:
         raise HTTPException(status_code=400, detail="Genre list mismatch")

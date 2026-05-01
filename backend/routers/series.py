@@ -8,8 +8,7 @@ auto-fill と同じ非同期ジョブパターン。
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from config import VALID_SOURCES
-from routers._deps import validated_source
+from routers._deps import validated_source, assert_valid_source
 from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.series_resolver import (
     _stable_series_id,
@@ -89,8 +88,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
     `index` が float なら全 names に同じ巻数、配列なら names[i] に index[i] を
     割り当てる（複数選択からの一括登録用）。
     """
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
     if not request.title.strip():
         raise HTTPException(status_code=400, detail="title must not be empty")
     if not request.names:
@@ -138,8 +136,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
 @router.post("/series/unassign")
 def unassign_series(request: UnassignSeriesRequest) -> dict:
     """書籍をシリーズから外す（series_* フィールドを削除）。"""
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
     if not request.names:
         raise HTTPException(status_code=400, detail="names must not be empty")
 
@@ -168,8 +165,7 @@ def reorder_series(request: ReorderSeriesRequest) -> dict:
     `names` には対象シリーズに属する書籍を **新しい順序で** 渡す。`series_id` が
     一致しない書籍が混じっていれば 400。他のメタフィールドは保持する。
     """
-    if request.source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+    assert_valid_source(request.source)
     if not request.names:
         raise HTTPException(status_code=400, detail="names must not be empty")
     if not request.series_id.strip():

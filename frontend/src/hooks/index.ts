@@ -36,3 +36,4 @@ export type { Crumb } from './useLibraryDisplay';
 export { usePinnedBookSets } from './usePinnedBookSets';
 export { useSeriesAuthorFilter } from './useSeriesAuthorFilter';
 export { useMetaDerived } from './useMetaDerived';
+export { useDialogSubmit } from './useDialogSubmit';

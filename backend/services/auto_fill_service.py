@@ -1,10 +1,10 @@
 """サークル名自動登録ジョブの管理。"""
 import os
-import threading
 import time
 from dataclasses import dataclass, field
 from config import get_dirs_by_source, VALID_SOURCES
 from services.author_resolver import resolve_author
+from services.job_state import JobStateManager
 from services.meta_store import MetaDict, get_lock, load_meta, make_key, update_meta_locked
 from utils.file_utils import is_pdf_file
 
@@ -23,20 +23,18 @@ class AutoFillState:
     error: str = ""
 
 
-_auto_fill_states: dict[str, AutoFillState] = {}
-_auto_fill_states_lock = threading.Lock()
+_manager: JobStateManager[AutoFillState] = JobStateManager(
+    idle_factory=AutoFillState,
+    running_factory=lambda: AutoFillState(status="running"),
+)
 
 
 def get_auto_fill_state(source: str) -> AutoFillState:
-    with _auto_fill_states_lock:
-        if source not in _auto_fill_states:
-            _auto_fill_states[source] = AutoFillState()
-        return _auto_fill_states[source]
+    return _manager.get(source)
 
 
 def reset_auto_fill_state(source: str) -> None:
-    with _auto_fill_states_lock:
-        _auto_fill_states[source] = AutoFillState(status="running")
+    _manager.reset(source)
 
 
 def _is_missing(meta: MetaDict, key: str) -> bool:

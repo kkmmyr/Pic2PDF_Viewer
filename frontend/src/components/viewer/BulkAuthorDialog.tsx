@@ -2,6 +2,7 @@ import { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { TagsInput } from '../ui/TagsInput';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 interface BulkAuthorDialogProps {
     open: boolean;
@@ -16,23 +17,18 @@ type Mode = 'existing' | 'new';
 
 /**
  * 複数書籍への作者名一括設定ダイアログ。
- * 設定した作者名で選択中の全書籍を上書きする。
  *
- * - 既存モード: SearchableSelect から 1 名選択（同じ作者の本を増やす用途）
+ * - 既存モード: SearchableSelect から 1 名選択
  * - 新規モード: chip 入力で複数の作者名を Enter / カンマ区切りで追加
  */
 export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApply }: BulkAuthorDialogProps) {
     const noExistingAuthors = allAuthors.length === 0;
     const [mode, setMode] = useState<Mode>(noExistingAuthors ? 'new' : 'existing');
     const [selectedExisting, setSelectedExisting] = useState<string>('');
-
-    // 新規モード（chip 入力）の状態
     const [tags, setTags] = useState<string[]>([]);
     const [input, setInput] = useState('');
-
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose);
 
     useEffect(() => {
         if (!open) return;
@@ -41,7 +37,6 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
         setSelectedExisting(allAuthors[0] ?? '');
         setTags([]);
         setInput('');
-        setError(null);
         if (fallbackMode === 'new') {
             setTimeout(() => inputRef.current?.focus(), 50);
         }
@@ -69,9 +64,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
         }
     };
 
-    const handleApply = async () => {
-        setError(null);
-
+    const handleApply = () => {
         let authors: string[];
         if (mode === 'existing') {
             if (!selectedExisting) {
@@ -87,16 +80,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                 return;
             }
         }
-
-        setSaving(true);
-        try {
-            await onApply(authors);
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '保存に失敗しました。');
-        } finally {
-            setSaving(false);
-        }
+        handleSubmit(() => onApply(authors));
     };
 
     return (

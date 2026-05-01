@@ -1,6 +1,7 @@
 import { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { TagsInput } from '../ui/TagsInput';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 interface BulkTagDialogProps {
     open: boolean;
@@ -13,22 +14,18 @@ interface BulkTagDialogProps {
 
 /**
  * 複数書籍へのタグ一括設定ダイアログ。
- * `BulkAuthorDialog` と同じタグ入力 UI を採用。
  * 「一括適用」で選択中の全書籍のタグを上書きする（既存のタグは破棄）。
  */
 export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, onApply }: BulkTagDialogProps) {
     const [tags, setTags] = useState<string[]>([]);
     const [input, setInput] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { saving, error, handleSubmit } = useDialogSubmit(onClose);
 
     useEffect(() => {
         if (open) {
-            // 1冊選択時のみ既存タグを初期表示。複数冊では空から開始。
             setTags(targetCount === 1 ? [...initialTags] : []);
             setInput('');
-            setError(null);
             setTimeout(() => inputRef.current?.focus(), 50);
         }
     }, [open, targetCount, initialTags]);
@@ -55,20 +52,10 @@ export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, on
         }
     };
 
-    const handleApply = async () => {
+    const handleApply = () => {
         const finalTags = input.trim() ? [...tags, input.trim()] : tags;
         const deduped = [...new Set(finalTags)];
-
-        setSaving(true);
-        setError(null);
-        try {
-            await onApply(deduped);
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '保存に失敗しました。');
-        } finally {
-            setSaving(false);
-        }
+        handleSubmit(() => onApply(deduped));
     };
 
     const subtitle = targetCount === 1

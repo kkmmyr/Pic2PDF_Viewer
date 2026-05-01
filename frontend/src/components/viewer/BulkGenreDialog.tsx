@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 interface BulkGenreDialogProps {
     open: boolean;
@@ -13,34 +14,23 @@ export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply
     const [selected, setSelected] = useState<string>(allGenres[0] ?? '');
     const [isNew, setIsNew] = useState(false);
     const [newGenre, setNewGenre] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose);
 
     useEffect(() => {
         if (!open) return;
         setSelected(allGenres[0] ?? '');
         setIsNew(false);
         setNewGenre('');
-        setError(null);
     }, [open, allGenres]);
 
-    const handleApply = async () => {
-        setError(null);
+    const handleApply = () => {
         const genre = isNew ? newGenre.trim() : selected;
         if (!genre) {
             setError('ジャンルを選択または入力してください。');
             return;
         }
-        setSaving(true);
-        try {
-            await onApply(genre);
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '保存に失敗しました。');
-        } finally {
-            setSaving(false);
-        }
+        handleSubmit(() => onApply(genre));
     };
 
     return (
