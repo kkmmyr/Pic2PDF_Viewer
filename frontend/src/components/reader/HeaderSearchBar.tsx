@@ -1,5 +1,8 @@
-import { Search, User, Tag, Layers } from 'lucide-react';
+import { Search, User, Tag } from 'lucide-react';
 import { SearchableSelect } from '../ui/SearchableSelect';
+
+/** ジャンルボタンの表示順。リストにないジャンルはアルファベット順で末尾に追加される */
+const GENRE_ORDER = ['オリジナル', 'プリンセスコネクト', 'Voiceloid'];
 
 interface HeaderSearchBarProps {
     searchText: string;
@@ -31,6 +34,15 @@ export function HeaderSearchBar({
     onTagFilterChange,
     onGenreFilterChange,
 }: HeaderSearchBarProps) {
+    const sortedGenres = [...allGenres].sort((a, b) => {
+        const ai = GENRE_ORDER.indexOf(a);
+        const bi = GENRE_ORDER.indexOf(b);
+        if (ai !== -1 && bi !== -1) return ai - bi;
+        if (ai !== -1) return -1;
+        if (bi !== -1) return 1;
+        return a.localeCompare(b, 'ja');
+    });
+
     return (
         <>
             <div className="relative">
@@ -58,23 +70,31 @@ export function HeaderSearchBar({
                 </div>
             )}
 
-            {allGenres.length > 0 && (
-                <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                    <Layers className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                    <select
-                        value={genreFilter}
-                        onChange={(e) => onGenreFilterChange(e.target.value)}
-                        className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 max-w-[160px] truncate ${
-                            genreFilter
-                                ? 'text-blue-700 dark:text-blue-300 border-blue-400 dark:border-blue-600 ring-1 ring-blue-200 dark:ring-blue-800'
-                                : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+            {sortedGenres.length > 0 && (
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => onGenreFilterChange('')}
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                            !genreFilter
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                     >
-                        <option value="">ジャンル: すべて</option>
-                        {allGenres.map(g => (
-                            <option key={g} value={g}>{g}</option>
-                        ))}
-                    </select>
+                        すべて
+                    </button>
+                    {sortedGenres.map(g => (
+                        <button
+                            key={g}
+                            onClick={() => onGenreFilterChange(genreFilter === g ? '' : g)}
+                            className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                                genreFilter === g
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                            }`}
+                        >
+                            {g}
+                        </button>
+                    ))}
                 </div>
             )}
 
