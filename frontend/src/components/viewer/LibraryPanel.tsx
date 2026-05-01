@@ -221,6 +221,52 @@ export function LibraryPanel() {
         return getTags(currentPath, bulkActions.bulkSeriesNames[0]);
     })();
 
+    /** meta から指定作者キーに属するシリーズ ID の Set を返す */
+    const validSeriesIdsByAuthorKey = useCallback((authorKey: string): Set<string> => {
+        const ids = new Set<string>();
+        for (const entry of Object.values(meta)) {
+            if (!entry.series_id) continue;
+            const key = [...(entry.authors ?? [])].sort().join('\n');
+            if (key === authorKey) ids.add(entry.series_id);
+        }
+        return ids;
+    }, [meta]);
+
+    /** 選択書籍に複数の異なる作者セットが混在しているか */
+    const isMixedAuthors = useMemo(() => {
+        const keys = new Set<string>();
+        for (const name of Array.from(selectedItems)) {
+            if (!name.toLowerCase().endsWith('.pdf')) continue;
+            keys.add([...getAuthors(currentPath, name)].sort().join('\n'));
+        }
+        return keys.size > 1;
+    }, [selectedItems, getAuthors, currentPath]);
+
+    /** SeriesEditDialog 用: 対象書籍の作者に絞ったシリーズ一覧 */
+    const seriesEditFilteredSeries = useMemo(() => {
+        if (!seriesEditTarget) return allSeries;
+        const authors = getAuthors(currentPath, seriesEditTarget);
+        if (authors.length === 0) return allSeries;
+        const authorKey = [...authors].sort().join('\n');
+        const validIds = validSeriesIdsByAuthorKey(authorKey);
+        return allSeries.filter(s => validIds.has(s.id));
+    }, [seriesEditTarget, getAuthors, currentPath, allSeries, validSeriesIdsByAuthorKey]);
+
+    /** BulkSeriesAssignDialog 用: 選択書籍の共通作者に絞ったシリーズ一覧 */
+    const bulkSeriesFiltered = useMemo(() => {
+        if (isMixedAuthors) return allSeriesWithStats;
+        const keys = new Set<string>();
+        for (const name of Array.from(selectedItems)) {
+            if (!name.toLowerCase().endsWith('.pdf')) continue;
+            keys.add([...getAuthors(currentPath, name)].sort().join('\n'));
+        }
+        if (keys.size === 0) return allSeriesWithStats;
+        const authorKey = Array.from(keys)[0];
+        if (!authorKey) return allSeriesWithStats;
+        const validIds = validSeriesIdsByAuthorKey(authorKey);
+        return allSeriesWithStats.filter(s => validIds.has(s.id));
+    }, [isMixedAuthors, selectedItems, getAuthors, currentPath, allSeriesWithStats, validSeriesIdsByAuthorKey]);
+
     return (
         <>
             <LibraryHeader
@@ -243,6 +289,7 @@ export function LibraryPanel() {
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
                 onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
+                bulkSeriesDisabled={isMixedAuthors}
                 onBulkSetGenre={() => setIsBulkGenreOpen(true)}
                 onBulkToggleHidden={bulkActions.handleBulkToggleHidden}
                 onBulkDelete={bulkActions.handleBulkDelete}
@@ -279,7 +326,7 @@ export function LibraryPanel() {
                 onMergePdfs={bulkActions.handleMergePdfs}
                 isBulkSeriesOpen={isBulkSeriesOpen}
                 bulkSeriesNames={bulkActions.bulkSeriesNames}
-                bulkSeriesExisting={allSeriesWithStats}
+                bulkSeriesExisting={bulkSeriesFiltered}
                 onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
                 onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
                 isBulkGenreOpen={isBulkGenreOpen}
@@ -338,7 +385,7 @@ export function LibraryPanel() {
                 open={seriesEditTarget !== null}
                 targetName={seriesEditTarget ?? ''}
                 current={seriesEditTarget ? getSeries(currentPath, seriesEditTarget) : null}
-                allSeries={allSeries}
+                allSeries={seriesEditFilteredSeries}
                 onClose={() => setSeriesEditTarget(null)}
                 onAssign={async (params) => {
                     if (!seriesEditTarget) return;

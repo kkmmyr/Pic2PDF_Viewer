@@ -36,6 +36,8 @@ interface LibraryHeaderProps {
     onBulkSetAuthor: () => void;
     onBulkSetTag: () => void;
     onBulkSetSeries: () => void;
+    /** 選択書籍に複数の異なる作者が混在している場合 true。「シリーズに登録」を非活性にする */
+    bulkSeriesDisabled?: boolean;
     onBulkSetGenre: () => void;
     onBulkToggleHidden: () => void;
     /** 非表示モード専用: 選択した書籍をディスクから完全削除 */
@@ -86,6 +88,7 @@ export function LibraryHeader({
     onBulkSetAuthor,
     onBulkSetTag,
     onBulkSetSeries,
+    bulkSeriesDisabled,
     onBulkSetGenre,
     onBulkToggleHidden,
     onBulkDelete,
@@ -236,7 +239,7 @@ export function LibraryHeader({
                         <Tag className="w-4 h-4" />
                         タグを設定
                     </button>
-                    <button onClick={onBulkSetSeries} disabled={selectedCount === 0} title="選択した書籍をシリーズに一括登録（選択順に採番）" className={BTN_PRIMARY}>
+                    <button onClick={onBulkSetSeries} disabled={selectedCount === 0 || !!bulkSeriesDisabled} title={bulkSeriesDisabled ? '複数の異なる作者が混在しているためシリーズ登録できません' : '選択した書籍をシリーズに一括登録（選択順に採番）'} className={BTN_PRIMARY}>
                         <Library className="w-4 h-4" />
                         シリーズに登録
                     </button>
