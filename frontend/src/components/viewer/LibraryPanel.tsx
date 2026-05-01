@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
@@ -109,6 +109,29 @@ export function LibraryPanel() {
         }
         return set;
     })();
+
+    // 文脈別お気に入りSet（PdfGrid の isFav 表示用）
+    // seriesFilter 中はシリーズピンのみ、authorFilter 中は作者ピンのみ表示して混在を防ぐ
+    const contextualFavorites = useMemo(() => {
+        if (!seriesFilter && !authorFilter) return new Set<string>();
+        const set = new Set<string>();
+        for (const [key, entry] of Object.entries(meta)) {
+            const isDirectChild = currentPath
+                ? key.startsWith(currentPath + '/') && !key.slice(currentPath.length + 1).includes('/')
+                : !key.includes('/');
+            if (!isDirectChild) continue;
+            const name = currentPath ? key.slice(currentPath.length + 1) : key;
+            if (seriesFilter) {
+                if (entry.series_id && seriesPins[entry.series_id] === name) set.add(name);
+            } else {
+                if (entry.authors?.length) {
+                    const ak = [...entry.authors].sort().join('\n');
+                    if (authorPins[ak] === name) set.add(name);
+                }
+            }
+        }
+        return set;
+    }, [seriesFilter, authorFilter, meta, currentPath, seriesPins, authorPins]);
 
     const sortedPdfs = useSortedPdfs(
         pdfs,
@@ -290,7 +313,7 @@ export function LibraryPanel() {
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
                         onToggleSelect={handleToggleSelect}
-                        favorites={pinnedBooks}
+                        favorites={contextualFavorites}
                         onToggleFavorite={(authorFilter || seriesFilter) ? handleTogglePin : undefined}
                         onRename={onOpenRename}
                         onRegenThumb={handleRegenThumb}
