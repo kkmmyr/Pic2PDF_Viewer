@@ -55,6 +55,8 @@ export const API_ENDPOINTS = {
     REGENERATE_THUMBNAIL_BULK: '/api/thumbnails/regenerate_bulk',
     /** PDF結合 */
     MERGE_PDFS: '/api/pdfs/merge',
+    /** PDF完全削除（非表示書籍専用） */
+    DELETE_PDFS: '/api/pdfs',
     /** シリーズ判定ジョブ開始 */
     SERIES_RESOLVE: '/api/series/resolve',
     /** シリーズ判定ジョブ進捗取得 */

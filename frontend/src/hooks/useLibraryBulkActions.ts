@@ -111,6 +111,24 @@ export function useLibraryBulkActions({
         }
     }, [seriesFilter, currentPath, bookMeta, showToast]);
 
+    const handleBulkDelete = useCallback(async () => {
+        if (selectedPdfNames.length === 0) return;
+        const ok = window.confirm(
+            `選択した ${selectedPdfNames.length} 件をディスクから完全に削除しますか？\nこの操作は元に戻せません。`
+        );
+        if (!ok) return;
+        try {
+            await apiClient.delete(API_ENDPOINTS.DELETE_PDFS, {
+                data: { names: selectedPdfNames, path: currentPath, source: currentSource }
+            });
+            onRefresh();
+            onClearSelection();
+            showToast(`${selectedPdfNames.length} 件を削除しました`, 'success');
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : '削除に失敗しました。', 'error');
+        }
+    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, showToast]);
+
     const handleBulkAssignSeries = useCallback(async (params: { title: string; indexes: number[]; id?: string }) => {
         if (bulkSeriesNames.length === 0) return;
         if (params.indexes.length !== bulkSeriesNames.length) {
@@ -136,6 +154,7 @@ export function useLibraryBulkActions({
         handleBulkApplyTags,
         handleToggleHiddenOne,
         handleBulkToggleHidden,
+        handleBulkDelete,
         handleRegenThumbnailBulk,
         handleMergePdfs,
         handleSeriesReorder,

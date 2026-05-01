@@ -128,6 +128,25 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
+### `DELETE /api/pdfs`
+非表示書籍をディスクから完全削除する（PDF・サムネイル・画像ディレクトリ・メタデータを削除）。
+
+**リクエストボディ**:
+```json
+{
+  "names": ["book1.pdf", "book2.pdf"],
+  "path": "current/relative/path",
+  "source": "generated"
+}
+```
+
+**レスポンス**: `{"message": "Items deleted", "deleted_count": 2, "errors": []}`
+
+**エラー**:
+- `500`: 全件削除失敗（部分失敗の場合は 200 + errors 配列に詳細）
+
+---
+
 ### `POST /api/thumbnails/regenerate_bulk`
 選択した複数PDFのサムネイルを一括再生成する。
 

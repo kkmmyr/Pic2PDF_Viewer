@@ -144,3 +144,44 @@ class FileManager:
                 except Exception as rollback_err:
                     logger.error("Rollback failed: %s -> %s: %s", renamed_dst, original_src, rollback_err)
             raise OSError(f"Rename failed: {e}") from e
+
+    @staticmethod
+    def delete_with_assets(item: str, path: str, dirs: dict) -> None:
+        """PDF・サムネイル・画像ディレクトリをディスクから完全削除する。
+
+        Args:
+            item: 削除対象の PDF ファイル名
+            path: 対象の相対パス
+            dirs: get_dirs_by_source() が返す辞書 (pdf/thumb/img キーを持つ)
+
+        Raises:
+            FileNotFoundError: PDF ファイルが存在しない場合
+            OSError: 削除操作に失敗した場合
+        """
+        pdf_path = os.path.join(dirs["pdf"], path, item) if path else os.path.join(dirs["pdf"], item)
+        if not os.path.exists(pdf_path):
+            raise FileNotFoundError(f"Item not found: {item}")
+
+        os.remove(pdf_path)
+
+        thumb_name = get_thumbnail_name(item)
+        thumb_path = (
+            os.path.join(dirs["thumb"], path, thumb_name) if path
+            else os.path.join(dirs["thumb"], thumb_name)
+        )
+        if os.path.exists(thumb_path):
+            try:
+                os.remove(thumb_path)
+            except Exception as e:
+                logger.warning("Failed to delete thumbnail %s: %s", thumb_path, e)
+
+        book_name = os.path.splitext(item)[0]
+        img_dir = (
+            os.path.join(dirs["img"], path, book_name) if path
+            else os.path.join(dirs["img"], book_name)
+        )
+        if os.path.exists(img_dir):
+            try:
+                shutil.rmtree(img_dir)
+            except Exception as e:
+                logger.warning("Failed to delete image dir %s: %s", img_dir, e)

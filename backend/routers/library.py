@@ -202,3 +202,36 @@ def rename_item(request: RenameItemRequest):
     update_meta_locked(request.source, _rename_meta_key)
 
     return {"message": "Item renamed", "new_name": request.new_name}
+
+
+class DeletePdfsRequest(BaseModel):
+    names: list[str]
+    path: str = ""
+    source: str = "generated"
+
+
+@router.delete("/pdfs")
+def delete_pdfs(request: DeletePdfsRequest):
+    validate_safe_path(request.path, param_name="path")
+    for name in request.names:
+        validate_safe_name(name, param_name="name")
+
+    dirs = get_dirs_by_source(request.source)
+    deleted_count = 0
+    errors = []
+
+    for name in request.names:
+        try:
+            FileManager.delete_with_assets(name, request.path, dirs)
+            key = make_key(request.path, name)
+            update_meta_locked(request.source, lambda data, k=key: data.pop(k, None))
+            deleted_count += 1
+        except FileNotFoundError:
+            errors.append(f"Not found: {name}")
+        except OSError as e:
+            errors.append(str(e))
+
+    if deleted_count == 0 and errors:
+        raise HTTPException(status_code=500, detail="削除に失敗しました: " + "; ".join(errors))
+
+    return {"message": "Items deleted", "deleted_count": deleted_count, "errors": errors}

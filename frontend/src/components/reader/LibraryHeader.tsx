@@ -1,4 +1,4 @@
-import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User, BookOpen } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User, BookOpen, Trash2 } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
@@ -39,6 +39,8 @@ interface LibraryHeaderProps {
     onBulkSetTag: () => void;
     onBulkSetSeries: () => void;
     onBulkToggleHidden: () => void;
+    /** 非表示モード専用: 選択した書籍をディスクから完全削除 */
+    onBulkDelete: () => void;
     onRegenThumbnailBulk: () => void;
     onMergePdfs: () => void;
     onSortChange: (order: SortOrder) => void;
@@ -63,6 +65,7 @@ interface LibraryHeaderProps {
 const BTN_PRIMARY = 'px-3 py-1.5 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5';
 const BTN_SECONDARY = 'px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1.5';
 const BTN_SECONDARY_ACTIVE = 'px-3 py-1.5 bg-gray-700 text-white rounded-md text-sm font-medium hover:bg-gray-800 flex items-center gap-1.5';
+const BTN_DANGER = 'px-3 py-1.5 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5';
 
 export function LibraryHeader({
     currentPath,
@@ -87,6 +90,7 @@ export function LibraryHeader({
     onBulkSetTag,
     onBulkSetSeries,
     onBulkToggleHidden,
+    onBulkDelete,
     onRegenThumbnailBulk,
     onMergePdfs,
     onSortChange,
@@ -252,6 +256,17 @@ export function LibraryHeader({
                         {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         {showHidden ? 'まとめて再表示' : 'まとめて非表示'}
                     </button>
+                    {showHidden && (
+                        <button
+                            onClick={onBulkDelete}
+                            disabled={selectedCount === 0}
+                            title="選択した書籍をディスクから完全に削除する（元に戻せません）"
+                            className={BTN_DANGER}
+                        >
+                            <Trash2 className="w-4 h-4" />
+                            完全削除
+                        </button>
+                    )}
                     <button onClick={onMergePdfs} disabled={selectedCount < 2} title="選択した書籍を1つのPDFに結合" className={BTN_PRIMARY}>
                         <Merge className="w-4 h-4" />
                         結合

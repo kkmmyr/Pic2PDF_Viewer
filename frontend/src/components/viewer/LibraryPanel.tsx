@@ -244,6 +244,7 @@ export function LibraryPanel() {
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
                 onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
                 onBulkToggleHidden={bulkActions.handleBulkToggleHidden}
+                onBulkDelete={bulkActions.handleBulkDelete}
                 onRegenThumbnailBulk={bulkActions.handleRegenThumbnailBulk}
                 onMergePdfs={() => setIsMergeDialogOpen(true)}
                 onSortChange={setSortOrder}
