@@ -3,12 +3,11 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from config import get_dirs_by_source
+from config import get_dirs_by_source, VALID_SOURCES
 from services.author_resolver import resolve_author
 from services.meta_store import MetaDict, get_lock, load_meta, make_key, update_meta_locked
 from utils.file_utils import is_pdf_file
 
-VALID_SOURCES = ("generated", "kindle", "novel")
 VALID_MODES = ("missing_only", "unknown_only", "overwrite_all")
 AUTOFILL_REQUEST_DELAY_SEC = 5.0
 

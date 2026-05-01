@@ -5,12 +5,13 @@ auto-fill と同じ非同期ジョブパターン。
 
 手動編集 API: `POST /api/series/assign` / `POST /api/series/unassign`。
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from config import VALID_SOURCES
+from routers._deps import validated_source
 from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.series_resolver import (
-    VALID_SOURCES,
     _stable_series_id,
     get_state,
     start_resolve_job,
@@ -21,14 +22,11 @@ router = APIRouter()
 
 
 @router.post("/series/resolve")
-def start_series_resolve(source: str = "generated", use_gemma: bool = False) -> dict:
+def start_series_resolve(source: str = Depends(validated_source), use_gemma: bool = False) -> dict:
     """シリーズ判定ジョブを起動する。
 
     `use_gemma=true` を指定すると、ルール判定後に Gemma で曖昧ケースを再評価する。
     """
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
-
     state = get_state(source)
     if state.status == "running":
         raise HTTPException(status_code=409, detail="Series resolve job is already running")
@@ -38,11 +36,8 @@ def start_series_resolve(source: str = "generated", use_gemma: bool = False) -> 
 
 
 @router.get("/series/resolve/status")
-def get_series_resolve_status(source: str = "generated") -> dict:
+def get_series_resolve_status(source: str = Depends(validated_source)) -> dict:
     """シリーズ判定ジョブの進捗を返す。"""
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
-
     state = get_state(source)
     return {
         "status": state.status,

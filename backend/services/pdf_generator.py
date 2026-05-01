@@ -33,6 +33,20 @@ def _collect_images(images_dir: str) -> list[str]:
     return [os.path.join(images_dir, f) for f in natsorted(files)]
 
 
+def _write_compressed_pdf(image_paths: list[str], output_path: str, quality: int) -> None:
+    """画像を指定品質で JPEG 変換し img2pdf で 1 PDF に書き出す。"""
+    processed: list[bytes] = []
+    for item in image_paths:
+        img = Image.open(item)
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality)
+        processed.append(buf.getvalue())
+    with open(output_path, "wb") as f:
+        f.write(img2pdf.convert(processed))
+
+
 class PdfGenerator:
     def __init__(self, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str,
                  progress_callback: Optional[Callable[[str], None]] = None):
@@ -131,21 +145,9 @@ class PdfGenerator:
         except Exception as e:
             logger.error("Failed to generate PDF for folder %s: %s", root, e)
 
-    def _create_pdf_file(self, image_paths: list[str], output_path: str, quality: Optional[int] = None) -> None:
-        if quality:
-            processed: list[bytes] = []
-            for item in image_paths:
-                img = Image.open(item)
-                if img.mode in ("RGBA", "P"):
-                    img = img.convert("RGB")
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=quality)
-                processed.append(buf.getvalue())
-            with open(output_path, "wb") as f:
-                f.write(img2pdf.convert(processed))
-        else:
-            with open(output_path, "wb") as f:
-                f.write(img2pdf.convert(image_paths))
+    def _create_pdf_file(self, image_paths: list[str], output_path: str) -> None:
+        with open(output_path, "wb") as f:
+            f.write(img2pdf.convert(image_paths))
 
     # ------------------------------------------------------------------
     # ファイル移動（バックアップ＋ロールバック）
@@ -270,17 +272,7 @@ def batch_compress(
             logger.info("Skipping already compressed: %s", output_path)
             continue
 
-        # 内部ヘルパー: 品質指定で JPEG 化 → img2pdf
-        processed: list[bytes] = []
-        for item in image_paths:
-            img = Image.open(item)
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=quality)
-            processed.append(buf.getvalue())
-        with open(output_path, "wb") as f:
-            f.write(img2pdf.convert(processed))
+        _write_compressed_pdf(image_paths, output_path, quality)
 
         rel_pdf = os.path.join(rel_path, pdf_filename) if rel_path != "." else pdf_filename
         generated.append(rel_pdf)

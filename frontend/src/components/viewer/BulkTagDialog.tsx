@@ -1,6 +1,6 @@
 import { useState, useRef, KeyboardEvent, useEffect } from 'react';
-import { X } from 'lucide-react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import { TagsInput } from '../ui/TagsInput';
 
 interface BulkTagDialogProps {
     open: boolean;
@@ -88,38 +88,18 @@ export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, on
                     タグ
                 </label>
 
-                <div
-                    className="min-h-[2.5rem] w-full flex flex-wrap gap-1.5 px-2.5 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-text"
-                    onClick={() => inputRef.current?.focus()}
-                >
-                    {tags.map((tag, i) => (
-                        <span
-                            key={i}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200"
-                        >
-                            {tag}
-                            <button
-                                onClick={(e) => { e.stopPropagation(); removeTag(i); }}
-                                className="hover:text-emerald-600 dark:hover:text-emerald-100 transition-colors"
-                            >
-                                <X className="w-3 h-3" />
-                            </button>
-                        </span>
-                    ))}
-                    <input
-                        ref={inputRef}
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onBlur={() => { if (input.trim()) addTag(input); }}
-                        placeholder={tags.length === 0 ? 'タグを入力（Enter で確定）' : ''}
-                        className="flex-1 min-w-[8rem] text-sm bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                    />
-                </div>
-                <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                    Enter・カンマで確定、Backspace で削除。空のまま適用するとタグを全て解除します。
-                </p>
+                <TagsInput
+                    tags={tags}
+                    input={input}
+                    inputRef={inputRef}
+                    placeholder="タグを入力（Enter で確定）"
+                    chipColor="emerald"
+                    hintText="Enter・カンマで確定、Backspace で削除。空のまま適用するとタグを全て解除します。"
+                    onChange={setInput}
+                    onKeyDown={handleKeyDown}
+                    onRemove={removeTag}
+                    onBlur={() => { if (input.trim()) addTag(input); }}
+                />
                 {error && (
                     <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>
                 )}

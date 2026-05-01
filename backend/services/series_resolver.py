@@ -13,7 +13,7 @@ import os
 import threading
 from dataclasses import dataclass, field
 
-from config import get_dirs_by_source
+from config import get_dirs_by_source, VALID_SOURCES
 from services.gemma_client import import_ollama_client
 from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
 from services.volume_parser import parse_pair_volume_indexes
@@ -22,7 +22,6 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-VALID_SOURCES = ("generated", "kindle", "novel")
 SERIES_MIN_PREFIX_LEN = 5
 
 
@@ -187,6 +186,50 @@ def _detect_series_in_group(
     return result
 
 
+def _collect_series_members(meta: MetaDict) -> dict[str, dict]:
+    """meta から series_id ごとのメンバー情報（titles / max_index / series_title / authors_key）を集計して返す。"""
+    series_members: dict[str, dict] = {}
+    for key, entry in meta.items():
+        sid = entry.get("series_id")
+        if not sid:
+            continue
+        title = os.path.splitext(os.path.basename(key))[0]
+        m = series_members.setdefault(sid, {
+            "titles": [],
+            "max_index": 0.0,
+            "series_title": entry.get("series_title", ""),
+            "authors_key": tuple(sorted({a.strip() for a in entry.get("authors", []) if a.strip()})),
+        })
+        m["titles"].append(title)
+        m["max_index"] = max(m["max_index"], float(entry.get("series_index", 0)))
+    return series_members
+
+
+def _assign_book_to_series(
+    source: str,
+    target_key: str,
+    sid: str,
+    info: dict,
+    created_series: set[str],
+    state: SeriesResolveState,
+) -> None:
+    """未割当書籍を既存シリーズに追加し meta を更新する（既存 max_index + 1 で採番）。"""
+    info["max_index"] = float(int(info["max_index"]) + 1)
+    next_idx = info["max_index"]
+    series_title = info["series_title"]
+
+    def _apply(data: MetaDict, k=target_key, sid_=sid, idx=next_idx, st=series_title) -> None:
+        existing = dict(data.get(k, {}))
+        existing["series_id"] = sid_
+        existing["series_title"] = st
+        existing["series_index"] = idx
+        data[k] = existing
+
+    update_meta_locked(source, _apply)
+    created_series.add(sid)
+    state.created = len(created_series)
+
+
 def _augment_with_gemma(
     source: str,
     groups: dict[tuple[str, ...], list[tuple[str, str, str]]],
@@ -203,26 +246,9 @@ def _augment_with_gemma(
         logger.warning("Gemma client unavailable; skipping use_gemma phase")
         return
 
-    # 最新の meta を読み直して、ルール判定で割り当てられたシリーズ情報を取得
     meta = load_meta(source)
+    series_members = _collect_series_members(meta)
 
-    # series_id ごとのメンバー（タイトル・キー・現在の最大 index）を集計
-    series_members: dict[str, dict] = {}
-    for key, entry in meta.items():
-        sid = entry.get("series_id")
-        if not sid:
-            continue
-        title = os.path.splitext(os.path.basename(key))[0]
-        m = series_members.setdefault(sid, {
-            "titles": [],
-            "max_index": 0.0,
-            "series_title": entry.get("series_title", ""),
-            "authors_key": tuple(sorted({a.strip() for a in entry.get("authors", []) if a.strip()})),
-        })
-        m["titles"].append(title)
-        m["max_index"] = max(m["max_index"], float(entry.get("series_index", 0)))
-
-    # 各作者グループから「シリーズ未割当」の書籍を抽出
     for authors_key, group in groups.items():
         unassigned = [
             (rel_path, fname, title)
@@ -232,7 +258,6 @@ def _augment_with_gemma(
         if not unassigned:
             continue
 
-        # この作者の既存シリーズだけを問い合わせ対象にする
         relevant_series = {
             sid: m for sid, m in series_members.items() if m["authors_key"] == authors_key
         }
@@ -244,24 +269,8 @@ def _augment_with_gemma(
             for sid, info in relevant_series.items():
                 if not _ask_gemma_is_same_series(call_ollama, info["titles"], title):
                     continue
-
-                # シリーズに追加（既存 max_index + 1、整数巻として割り当て）
-                info["max_index"] = float(int(info["max_index"]) + 1)
-                next_idx = info["max_index"]
                 info["titles"].append(title)
-                series_title = info["series_title"]
-                target_key = make_key(rel_path, fname)
-
-                def _apply(data: MetaDict, k=target_key, sid_=sid, idx=next_idx, st=series_title) -> None:
-                    existing = dict(data.get(k, {}))
-                    existing["series_id"] = sid_
-                    existing["series_title"] = st
-                    existing["series_index"] = idx
-                    data[k] = existing
-                update_meta_locked(source, _apply)
-
-                created_series.add(sid)
-                state.created = len(created_series)
+                _assign_book_to_series(source, make_key(rel_path, fname), sid, info, created_series, state)
                 break  # 1 つのシリーズにマッチしたら以降は試さない
 
 

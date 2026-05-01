@@ -32,9 +32,11 @@ _QUERY_CONFIG: dict[str, dict[str, str]] = {
 _DIRECT_SITES_QUERY = '{title} site:dmm.co.jp OR site:dlsite.com'
 _DIRECT_SITES_EXTRACT_SUFFIX = "のサークル名（なければ著者名）"
 
-# 直接 HTTP フェッチする検索 URL（ステップ 1 / 2）
-_DLSITE_SEARCH_URL = "https://www.dlsite.com/maniax/fsr/=/language/jp/keyword/{}/"
-_FANZA_SEARCH_URL = "https://www.dmm.co.jp/dc/doujin/-/list/=/keyword={}/"
+# 直接 HTTP フェッチする検索サイト（ステップ 1 / 2）。順に試し、最初に取得できた結果を返す。
+_DIRECT_HTTP_SITES = [
+    ("dlsite", "https://www.dlsite.com/maniax/fsr/=/language/jp/keyword/{}/"),
+    ("fanza",  "https://www.dmm.co.jp/dc/doujin/-/list/=/keyword={}/"),
+]
 
 _INVALID_PATTERNS = (
     "dlsite",
@@ -86,29 +88,15 @@ def _extract_circle_from_page(page_text: str, title: str, call_ollama) -> str:
         return raw.strip()
 
 
-def _try_dlsite(title: str, fetch_url, call_ollama) -> str:
-    """DLsite 検索ページを直接 HTTP フェッチしてサークル名を取得する。
+def _try_direct_http_search(url_template: str, title: str, fetch_url, call_ollama) -> str:
+    """指定 URL テンプレートのページを HTTP フェッチしてサークル名を取得する。
     取得できない場合は空文字を返す（呼び出し側がフォールバック）。
     """
-    url = _DLSITE_SEARCH_URL.format(_url_quote(title))
+    url = url_template.format(_url_quote(title))
     page_text = fetch_url(url, max_chars=3000)
     if not page_text:
         return ""
-    result = _extract_circle_from_page(page_text, title, call_ollama)
-    sanitized = _sanitize_author(result)
-    return sanitized if sanitized != "作者不明" else ""
-
-
-def _try_fanza(title: str, fetch_url, call_ollama) -> str:
-    """FANZA 検索ページを直接 HTTP フェッチしてサークル名を取得する。
-    取得できない場合は空文字を返す（呼び出し側がフォールバック）。
-    """
-    url = _FANZA_SEARCH_URL.format(_url_quote(title))
-    page_text = fetch_url(url, max_chars=3000)
-    if not page_text:
-        return ""
-    result = _extract_circle_from_page(page_text, title, call_ollama)
-    sanitized = _sanitize_author(result)
+    sanitized = _sanitize_author(_extract_circle_from_page(page_text, title, call_ollama))
     return sanitized if sanitized != "作者不明" else ""
 
 
@@ -148,15 +136,12 @@ def resolve_author(title: str, source: str) -> str:
         return "作者不明"
 
     if source == "generated":
-        # ステップ 1: DLsite 直接
+        # ステップ 1/2: DLsite → FANZA 直接 HTTP フェッチ
         if fetch_url and call_ollama:
-            author = _try_dlsite(title, fetch_url, call_ollama)
-            if author:
-                return author
-            # ステップ 2: FANZA 直接
-            author = _try_fanza(title, fetch_url, call_ollama)
-            if author:
-                return author
+            for _name, url_template in _DIRECT_HTTP_SITES:
+                author = _try_direct_http_search(url_template, title, fetch_url, call_ollama)
+                if author:
+                    return author
         # ステップ 3: SearXNG site: フィルタ
         author = _try_direct_sites(title, web_extract)
         if author:
@@ -183,36 +168,22 @@ def resolve_author_debug(title: str, source: str) -> dict:
     result: dict = {"title": title, "source": source}
 
     if source == "generated":
-        # ステップ 1: DLsite 直接
+        # ステップ 1/2: DLsite → FANZA 直接 HTTP フェッチ（デバッグ情報付き）
         if fetch_url and call_ollama:
-            dlsite_url = _DLSITE_SEARCH_URL.format(_url_quote(title))
-            dlsite_text = fetch_url(dlsite_url, max_chars=3000)
-            dlsite_raw = _extract_circle_from_page(dlsite_text, title, call_ollama) if dlsite_text else ""
-            dlsite_result = _sanitize_author(dlsite_raw)
-            result["dlsite_url"] = dlsite_url
-            result["dlsite_fetched"] = bool(dlsite_text)
-            result["dlsite_raw"] = dlsite_raw
-            result["dlsite_result"] = dlsite_result if dlsite_result != "作者不明" else ""
-
-            if result["dlsite_result"]:
-                result["final"] = result["dlsite_result"]
-                result["used_step"] = "dlsite_direct"
-                return result
-
-            # ステップ 2: FANZA 直接
-            fanza_url = _FANZA_SEARCH_URL.format(_url_quote(title))
-            fanza_text = fetch_url(fanza_url, max_chars=3000)
-            fanza_raw = _extract_circle_from_page(fanza_text, title, call_ollama) if fanza_text else ""
-            fanza_result = _sanitize_author(fanza_raw)
-            result["fanza_url"] = fanza_url
-            result["fanza_fetched"] = bool(fanza_text)
-            result["fanza_raw"] = fanza_raw
-            result["fanza_result"] = fanza_result if fanza_result != "作者不明" else ""
-
-            if result["fanza_result"]:
-                result["final"] = result["fanza_result"]
-                result["used_step"] = "fanza_direct"
-                return result
+            for site_name, url_template in _DIRECT_HTTP_SITES:
+                url = url_template.format(_url_quote(title))
+                page_text = fetch_url(url, max_chars=3000)
+                raw = _extract_circle_from_page(page_text, title, call_ollama) if page_text else ""
+                sanitized = _sanitize_author(raw)
+                site_result = sanitized if sanitized != "作者不明" else ""
+                result[f"{site_name}_url"] = url
+                result[f"{site_name}_fetched"] = bool(page_text)
+                result[f"{site_name}_raw"] = raw
+                result[f"{site_name}_result"] = site_result
+                if site_result:
+                    result["final"] = site_result
+                    result["used_step"] = f"{site_name}_direct"
+                    return result
 
         # ステップ 3: SearXNG site: フィルタ
         direct_query = _DIRECT_SITES_QUERY.format(title=title)

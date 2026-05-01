@@ -7,12 +7,13 @@
 """
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from config import get_dirs_by_source
 from utils.path_utils import validate_safe_path, validate_safe_name
 from services.author_resolver import resolve_author_debug
 from services.meta_store import make_key, load_meta, update_meta_locked
+from routers._deps import validated_source
 from services.auto_fill_service import (
     VALID_SOURCES,
     VALID_MODES,
@@ -61,13 +62,11 @@ class RecordViewRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 @router.get("/meta")
-def get_meta(source: str = "generated") -> dict:
+def get_meta(source: str = Depends(validated_source)) -> dict:
     """
     指定ソースの meta.json 全体を返す。
     レスポンス: { "key": { "authors": [...] }, ... }
     """
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
     return load_meta(source)
 
 
@@ -185,7 +184,7 @@ def record_view(request: RecordViewRequest) -> dict:
 
 @router.post("/meta/auto-fill")
 def start_auto_fill(
-    source: str = "generated",
+    source: str = Depends(validated_source),
     mode: str = "unknown_only",
 ) -> dict:
     """
@@ -195,8 +194,6 @@ def start_auto_fill(
     - mode=overwrite_all: 登録済みを含む全件を上書き
     - 既にジョブが実行中の場合は 409 を返す。
     """
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
     if mode not in VALID_MODES:
         raise HTTPException(status_code=400, detail=f"Invalid mode. Choose from: {', '.join(VALID_MODES)}")
 
@@ -209,22 +206,17 @@ def start_auto_fill(
 
 
 @router.get("/meta/auto-fill/test")
-def test_auto_fill(title: str, source: str = "generated") -> dict:
+def test_auto_fill(title: str, source: str = Depends(validated_source)) -> dict:
     """
     1件分のサークル名解決を実行し、各ステップの中間結果を返すデバッグ用エンドポイント。
     SearXNG の検索結果と Gemma の応答を確認するために使う。
     """
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
     return resolve_author_debug(title, source)
 
 
 @router.get("/meta/auto-fill/status")
-def get_auto_fill_status(source: str = "generated") -> dict:
+def get_auto_fill_status(source: str = Depends(validated_source)) -> dict:
     """作者名自動登録ジョブの進捗を返す。"""
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
-
     state = get_auto_fill_state(source)
     return {
         "status": state.status,

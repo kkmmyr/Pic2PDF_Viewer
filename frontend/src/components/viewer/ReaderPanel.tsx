@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Document, pdfjs } from 'react-pdf';
-import { ChevronRight } from 'lucide-react';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 import type { LibrarySource, ReadingDirection } from '../../types';
@@ -13,6 +12,8 @@ import { useNextSeriesVolume, usePrevSeriesVolume } from '../../hooks/useNextSer
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
+import { EdgeHoverZones } from '../reader/EdgeHoverZones';
+import { NextVolumeBanner } from '../reader/NextVolumeBanner';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
@@ -196,15 +197,9 @@ export function ReaderPanel({
 
     return (
         <>
-            {/* ヘッダー表示トリガーゾーン: ヘッダー (h-14) と高さを揃える */}
-            <div
-                className="fixed top-0 left-0 right-0 h-14 z-overlay-bar"
-                onMouseEnter={() => setShowHeader(true)}
-            />
-            {/* スライダー表示トリガーゾーン: スライダー (h-12) と高さを揃える */}
-            <div
-                className="fixed bottom-0 left-0 right-0 h-12 z-overlay-bar"
-                onMouseEnter={() => setShowSlider(true)}
+            <EdgeHoverZones
+                onEnterTop={() => setShowHeader(true)}
+                onEnterBottom={() => setShowSlider(true)}
             />
 
             <ReaderHeader
@@ -281,16 +276,11 @@ export function ReaderPanel({
                     )}
                 </div>
             </div>
-            {/* 「次の巻へ」ボタン: シリーズ最終ページ到達 + 同フォルダに次巻あり + onSelectPdf 提供時に表示 */}
             {nextVolume && isAtLastSpread && onSelectPdf && (
-                <button
-                    onClick={handleNavigateNextVolume}
-                    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-floating-action px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+                <NextVolumeBanner
                     title={`次の巻: #${nextVolume.index} ${nextVolume.title}`}
-                >
-                    <span>次の巻へ</span>
-                    <ChevronRight className="w-4 h-4" />
-                </button>
+                    onClick={handleNavigateNextVolume}
+                />
             )}
 
             <ConfirmDialog

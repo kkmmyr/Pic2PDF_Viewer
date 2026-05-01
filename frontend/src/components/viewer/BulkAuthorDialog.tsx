@@ -1,7 +1,7 @@
 import { useState, useRef, KeyboardEvent, useEffect } from 'react';
-import { X } from 'lucide-react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';
+import { TagsInput } from '../ui/TagsInput';
 
 interface BulkAuthorDialogProps {
     open: boolean;
@@ -156,40 +156,20 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                                 新規作者を作成 / 自由入力
                             </div>
                             {mode === 'new' && (
-                                <>
-                                    <div
-                                        className="mt-1.5 min-h-[2.5rem] w-full flex flex-wrap gap-1.5 px-2.5 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 cursor-text"
-                                        onClick={() => inputRef.current?.focus()}
-                                    >
-                                        {tags.map((tag, i) => (
-                                            <span
-                                                key={i}
-                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200"
-                                            >
-                                                {tag}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); removeTag(i); }}
-                                                    className="hover:text-blue-600 dark:hover:text-blue-100 transition-colors"
-                                                >
-                                                    <X className="w-3 h-3" />
-                                                </button>
-                                            </span>
-                                        ))}
-                                        <input
-                                            ref={inputRef}
-                                            type="text"
-                                            value={input}
-                                            onChange={(e) => setInput(e.target.value)}
-                                            onKeyDown={handleKeyDown}
-                                            onBlur={() => { if (input.trim()) addTag(input); }}
-                                            placeholder={tags.length === 0 ? '作者名を入力（Enter で確定）' : ''}
-                                            className="flex-1 min-w-[8rem] text-sm bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
-                                        />
-                                    </div>
-                                    <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-                                        Enter・カンマで確定、Backspace で削除（複数指定可）
-                                    </p>
-                                </>
+                                <div className="mt-1.5">
+                                    <TagsInput
+                                        tags={tags}
+                                        input={input}
+                                        inputRef={inputRef}
+                                        placeholder="作者名を入力（Enter で確定）"
+                                        chipColor="blue"
+                                        hintText="Enter・カンマで確定、Backspace で削除（複数指定可）"
+                                        onChange={setInput}
+                                        onKeyDown={handleKeyDown}
+                                        onRemove={removeTag}
+                                        onBlur={() => { if (input.trim()) addTag(input); }}
+                                    />
+                                </div>
                             )}
                         </div>
                     </label>

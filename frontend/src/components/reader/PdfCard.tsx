@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
-import { Check, Star, Pencil, RefreshCw, Library, EyeOff, Eye, BookCopy, Users } from 'lucide-react';
 import type { PdfFile } from '../../types';
-import { LazyThumbnail } from './LazyThumbnail';
+import { PdfCardThumbnail } from './PdfCardThumbnail';
+import { PdfCardActionButtons } from './PdfCardActionButtons';
 
 /** 集約カードのバッジ情報（PdfGrid から PdfFile.name で引く想定） */
 export interface PdfCardBadge {
@@ -47,6 +47,16 @@ export function PdfCard({
     onRename, onRegenThumb, onToggleHidden, onEditSeries,
     getAuthors, onAuthorClick, getTags, onTagClick, dragHandle,
 }: PdfCardProps) {
+    const handleThumbnailClick = () => {
+        if (isSelectionMode && onToggleSelect) {
+            onToggleSelect(pdf.name);
+        } else if (isGroup && onGroupClick) {
+            onGroupClick(pdf.name);
+        } else {
+            onPdfClick(pdf.name);
+        }
+    };
+
     return (
         <div
             className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
@@ -57,69 +67,18 @@ export function PdfCard({
                         : 'border-transparent bg-white dark:bg-gray-800'
             }`}
         >
-            <div
-                className="aspect-[3/4] relative cursor-pointer"
-                onClick={() => {
-                    if (isSelectionMode && onToggleSelect) {
-                        onToggleSelect(pdf.name);
-                    } else if (isGroup && onGroupClick) {
-                        onGroupClick(pdf.name);
-                    } else {
-                        onPdfClick(pdf.name);
-                    }
-                }}
-            >
-                {/* ドラッグハンドル（DnD 有効時のみ） */}
-                {dragHandle}
-
-                {/* 選択チェックボックス */}
-                {isSelectionMode && (
-                    <div className="absolute top-2 right-2 z-card-badge">
-                        {isSelected ? (
-                            <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow-md ring-2 ring-white dark:ring-gray-800">
-                                <Check className="w-4 h-4 text-white" strokeWidth={3} />
-                            </div>
-                        ) : (
-                            <div className="w-6 h-6 rounded-full bg-white/90 dark:bg-gray-800/90 border-2 border-gray-400 dark:border-gray-500 shadow-sm" />
-                        )}
-                    </div>
-                )}
-
-                {/* 集約バッジ（シリーズ: readCount/count巻 / 作者: count冊） */}
-                {isGroup && badge && (
-                    <div className="absolute top-2 right-2 z-card-badge px-1.5 py-0.5 rounded-full bg-purple-600 text-white text-xs font-semibold flex items-center gap-1 shadow">
-                        {badge.kind === 'series'
-                            ? <Library className="w-3 h-3" />
-                            : <Users className="w-3 h-3" />}
-                        {badge.kind === 'series' && badge.readCount !== undefined
-                            ? `${badge.readCount}/${badge.count}巻`
-                            : `${badge.count}${badge.kind === 'series' ? '巻' : '冊'}`}
-                    </div>
-                )}
-
-                {/* ピンボタン（作者集約カードのみ非表示） */}
-                {!isSelectionMode && onToggleFavorite && badge?.kind !== 'author' && (
-                    <button
-                        className="absolute top-2 left-2 z-card-badge p-1 rounded-full bg-white/80 dark:bg-gray-900/70 hover:bg-white dark:hover:bg-gray-900 transition-colors"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onToggleFavorite(pdf.name);
-                        }}
-                        title={isFav ? '集約カードの表示から外す' : '集約カードの表示に設定'}
-                    >
-                        <Star
-                            className={`w-4 h-4 transition-colors ${
-                                isFav
-                                    ? 'text-amber-400 fill-amber-400'
-                                    : 'text-gray-300 dark:text-gray-500 hover:text-amber-300'
-                            }`}
-                        />
-                    </button>
-                )}
-
-                {/* 遅延読み込みサムネイル */}
-                <LazyThumbnail src={pdf.thumbnail} alt={pdf.name} className="absolute inset-0" />
-            </div>
+            <PdfCardThumbnail
+                name={pdf.name}
+                thumbnail={pdf.thumbnail}
+                isFav={isFav}
+                isSelected={isSelected}
+                isGroup={isGroup}
+                badge={badge}
+                isSelectionMode={isSelectionMode}
+                onClick={handleThumbnailClick}
+                onToggleFavorite={onToggleFavorite}
+                dragHandle={dragHandle}
+            />
 
             <div className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}>
                 <span
@@ -128,7 +87,6 @@ export function PdfCard({
                 >
                     {isGroup && badge ? badge.displayTitle : pdf.name.replace('.pdf', '')}
                 </span>
-                {/* 作者名タグ */}
                 {getAuthors && (() => {
                     const authors = getAuthors(pdf.name);
                     return authors.length > 0 ? (
@@ -146,7 +104,6 @@ export function PdfCard({
                         </div>
                     ) : null;
                 })()}
-                {/* タグ */}
                 {getTags && (() => {
                     const tags = getTags(pdf.name);
                     return tags.length > 0 ? (
@@ -170,49 +127,17 @@ export function PdfCard({
                             ? new Date(pdf.created_at * 1000).toLocaleDateString()
                             : ''}
                     </span>
-                    <div className="flex items-center gap-1">
-                        {!isSelectionMode && onRename && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onRename(pdf.name); }}
-                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
-                                title="名前を変更"
-                            >
-                                <Pencil className="w-3 h-3" />
-                            </button>
-                        )}
-                        {!isSelectionMode && onRegenThumb && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onRegenThumb(pdf.name); }}
-                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
-                                title="サムネイルを再生成"
-                            >
-                                <RefreshCw className="w-3 h-3" />
-                            </button>
-                        )}
-                        {!isSelectionMode && onToggleHidden && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onToggleHidden(pdf.name); }}
-                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
-                                title={showHidden ? '再表示する' : '非表示にする'}
-                            >
-                                {showHidden
-                                    ? <Eye className="w-3 h-3" />
-                                    : <EyeOff className="w-3 h-3" />}
-                            </button>
-                        )}
-                        {!isSelectionMode && onEditSeries && (
-                            <button
-                                onClick={(e) => { e.stopPropagation(); onEditSeries(pdf.name); }}
-                                className="p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-purple-500 dark:hover:text-purple-400 transition-colors"
-                                title="シリーズを編集"
-                            >
-                                <BookCopy className="w-3 h-3" />
-                            </button>
-                        )}
-                        {!isGroup && isUnread && (
-                            <span className="px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold leading-none">NEW</span>
-                        )}
-                    </div>
+                    <PdfCardActionButtons
+                        name={pdf.name}
+                        isSelectionMode={isSelectionMode}
+                        showHidden={showHidden}
+                        isGroup={isGroup}
+                        isUnread={isUnread}
+                        onRename={onRename}
+                        onRegenThumb={onRegenThumb}
+                        onToggleHidden={onToggleHidden}
+                        onEditSeries={onEditSeries}
+                    />
                 </div>
             </div>
         </div>

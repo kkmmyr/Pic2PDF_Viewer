@@ -6,10 +6,11 @@ POST /api/genres        - ジャンルを追加する
 DELETE /api/genres/{name} - ジャンルをリストから削除する
 PATCH /api/genres/reorder - 表示順を更新する
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from services.auto_fill_service import VALID_SOURCES
+from config import VALID_SOURCES
+from routers._deps import validated_source
 from services.genre_store import load_genres, save_genres
 
 router = APIRouter()
@@ -26,9 +27,7 @@ class ReorderGenresRequest(BaseModel):
 
 
 @router.get("/genres")
-def get_genres(source: str = "generated") -> list[str]:
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+def get_genres(source: str = Depends(validated_source)) -> list[str]:
     return load_genres(source)
 
 
@@ -48,9 +47,7 @@ def add_genre(request: AddGenreRequest) -> dict:
 
 
 @router.delete("/genres/{name}")
-def delete_genre(name: str, source: str = "generated") -> dict:
-    if source not in VALID_SOURCES:
-        raise HTTPException(status_code=400, detail="Invalid source")
+def delete_genre(name: str, source: str = Depends(validated_source)) -> dict:
     genres = load_genres(source)
     if name not in genres:
         raise HTTPException(status_code=404, detail="Genre not found")

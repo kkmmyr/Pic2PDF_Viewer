@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LibraryHeader, PdfGrid, ToastContainer, GenreFilterBar } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
@@ -6,6 +6,8 @@ import {
     useLibraryPins, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
     useUrlFilters, useLibrarySettings, useLibraryBulkActions, useLibraryDisplay, useGenres,
 } from '../../hooks';
+import { usePinnedBookSets } from '../../hooks/usePinnedBookSets';
+import { useSeriesAuthorFilter } from '../../hooks/useSeriesAuthorFilter';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -91,46 +93,9 @@ export function LibraryPanel() {
     const { genres, addGenre, removeGenre, reorderGenres } = useGenres(currentSource);
     const { toasts, showToast, dismissToast } = useToast();
 
-    // ピン済み書籍の Set（favorites_first ソート用。シリーズ・作者ピン両方を含む）
-    const pinnedBooks = useMemo(() => {
-        const set = new Set<string>();
-        for (const [key, entry] of Object.entries(meta)) {
-            const isDirectChild = currentPath
-                ? key.startsWith(currentPath + '/') && !key.slice(currentPath.length + 1).includes('/')
-                : !key.includes('/');
-            if (!isDirectChild) continue;
-            const name = currentPath ? key.slice(currentPath.length + 1) : key;
-            if (entry.series_id && seriesPins[entry.series_id] === name) { set.add(name); continue; }
-            if (entry.authors?.length) {
-                const ak = [...entry.authors].sort().join('\n');
-                if (authorPins[ak] === name) set.add(name);
-            }
-        }
-        return set;
-    }, [meta, currentPath, seriesPins, authorPins]);
-
-    // 文脈別お気に入りSet（PdfGrid の isFav 表示用）
-    // seriesFilter 中はシリーズピンのみ、authorFilter 中は作者ピンのみ表示して混在を防ぐ
-    const contextualFavorites = useMemo(() => {
-        if (!seriesFilter && !authorFilter) return new Set<string>();
-        const set = new Set<string>();
-        for (const [key, entry] of Object.entries(meta)) {
-            const isDirectChild = currentPath
-                ? key.startsWith(currentPath + '/') && !key.slice(currentPath.length + 1).includes('/')
-                : !key.includes('/');
-            if (!isDirectChild) continue;
-            const name = currentPath ? key.slice(currentPath.length + 1) : key;
-            if (seriesFilter) {
-                if (entry.series_id && seriesPins[entry.series_id] === name) set.add(name);
-            } else {
-                if (entry.authors?.length) {
-                    const ak = [...entry.authors].sort().join('\n');
-                    if (authorPins[ak] === name) set.add(name);
-                }
-            }
-        }
-        return set;
-    }, [seriesFilter, authorFilter, meta, currentPath, seriesPins, authorPins]);
+    const { pinnedBooks, contextualFavorites } = usePinnedBookSets({
+        meta, currentPath, seriesPins, authorPins, authorFilter, seriesFilter,
+    });
 
     const sortedPdfs = useSortedPdfs(
         pdfs,
@@ -221,51 +186,30 @@ export function LibraryPanel() {
         return getTags(currentPath, bulkActions.bulkSeriesNames[0]);
     })();
 
-    /** meta から指定作者キーに属するシリーズ ID の Set を返す */
-    const validSeriesIdsByAuthorKey = useCallback((authorKey: string): Set<string> => {
-        const ids = new Set<string>();
-        for (const entry of Object.values(meta)) {
-            if (!entry.series_id) continue;
-            const key = [...(entry.authors ?? [])].sort().join('\n');
-            if (key === authorKey) ids.add(entry.series_id);
-        }
-        return ids;
-    }, [meta]);
+    const { isMixedAuthors, seriesEditFilteredSeries, bulkSeriesFiltered } = useSeriesAuthorFilter({
+        meta, selectedItems, getAuthors, currentPath,
+        allSeries, allSeriesWithStats, seriesEditTarget,
+    });
 
-    /** 選択書籍に複数の異なる作者セットが混在しているか */
-    const isMixedAuthors = useMemo(() => {
-        const keys = new Set<string>();
-        for (const name of Array.from(selectedItems)) {
-            if (!name.toLowerCase().endsWith('.pdf')) continue;
-            keys.add([...getAuthors(currentPath, name)].sort().join('\n'));
+    const handleSeriesAssign = useCallback(async (params: { title: string; index: number | number[]; id?: string }) => {
+        if (!seriesEditTarget) return;
+        try {
+            await assignSeries(currentPath, [seriesEditTarget], params);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : 'シリーズ割り当てに失敗しました。', 'error');
+            throw e;
         }
-        return keys.size > 1;
-    }, [selectedItems, getAuthors, currentPath]);
+    }, [seriesEditTarget, assignSeries, currentPath, showToast]);
 
-    /** SeriesEditDialog 用: 対象書籍の作者に絞ったシリーズ一覧 */
-    const seriesEditFilteredSeries = useMemo(() => {
-        if (!seriesEditTarget) return allSeries;
-        const authors = getAuthors(currentPath, seriesEditTarget);
-        if (authors.length === 0) return allSeries;
-        const authorKey = [...authors].sort().join('\n');
-        const validIds = validSeriesIdsByAuthorKey(authorKey);
-        return allSeries.filter(s => validIds.has(s.id));
-    }, [seriesEditTarget, getAuthors, currentPath, allSeries, validSeriesIdsByAuthorKey]);
-
-    /** BulkSeriesAssignDialog 用: 選択書籍の共通作者に絞ったシリーズ一覧 */
-    const bulkSeriesFiltered = useMemo(() => {
-        if (isMixedAuthors) return allSeriesWithStats;
-        const keys = new Set<string>();
-        for (const name of Array.from(selectedItems)) {
-            if (!name.toLowerCase().endsWith('.pdf')) continue;
-            keys.add([...getAuthors(currentPath, name)].sort().join('\n'));
+    const handleSeriesUnassign = useCallback(async () => {
+        if (!seriesEditTarget) return;
+        try {
+            await unassignSeries(currentPath, [seriesEditTarget]);
+        } catch (e: unknown) {
+            showToast(e instanceof Error ? e.message : 'シリーズ解除に失敗しました。', 'error');
+            throw e;
         }
-        if (keys.size === 0) return allSeriesWithStats;
-        const authorKey = Array.from(keys)[0];
-        if (!authorKey) return allSeriesWithStats;
-        const validIds = validSeriesIdsByAuthorKey(authorKey);
-        return allSeriesWithStats.filter(s => validIds.has(s.id));
-    }, [isMixedAuthors, selectedItems, getAuthors, currentPath, allSeriesWithStats, validSeriesIdsByAuthorKey]);
+    }, [seriesEditTarget, unassignSeries, currentPath, showToast]);
 
     return (
         <>
@@ -387,24 +331,8 @@ export function LibraryPanel() {
                 current={seriesEditTarget ? getSeries(currentPath, seriesEditTarget) : null}
                 allSeries={seriesEditFilteredSeries}
                 onClose={() => setSeriesEditTarget(null)}
-                onAssign={async (params) => {
-                    if (!seriesEditTarget) return;
-                    try {
-                        await assignSeries(currentPath, [seriesEditTarget], params);
-                    } catch (e: unknown) {
-                        showToast(e instanceof Error ? e.message : 'シリーズ割り当てに失敗しました。', 'error');
-                        throw e;
-                    }
-                }}
-                onUnassign={async () => {
-                    if (!seriesEditTarget) return;
-                    try {
-                        await unassignSeries(currentPath, [seriesEditTarget]);
-                    } catch (e: unknown) {
-                        showToast(e instanceof Error ? e.message : 'シリーズ解除に失敗しました。', 'error');
-                        throw e;
-                    }
-                }}
+                onAssign={handleSeriesAssign}
+                onUnassign={handleSeriesUnassign}
             />
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />

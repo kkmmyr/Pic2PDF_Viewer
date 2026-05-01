@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { BookMetaMap, BookMetaEntry } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
+import { useMetaDerived } from './useMetaDerived';
 
 /**
  * 書籍メタデータ（作者名）を管理するフック。
@@ -287,59 +288,7 @@ export function useBookMeta(source: string) {
         });
     }, [source, makeKey]);
 
-    /** このソースに登録されている全作者名（重複排除・ソート済み）*/
-    // `e.authors` 不在のエントリ（閲覧記録のみ・タグのみ・hidden のみ等）から
-    // undefined が混入しないよう `?? []` でガードする。混入すると select option の
-    // key が undefined になり React の警告が出る。
-    const allAuthors: string[] = [...new Set(
-        Object.values(meta).flatMap(e => e.authors ?? [])
-    )].sort((a, b) => a.localeCompare(b, 'ja'));
-
-    /** このソースに登録されている全タグ（重複排除・ソート済み）*/
-    const allTags: string[] = [...new Set(
-        Object.values(meta).flatMap(e => e.tags ?? [])
-    )].sort((a, b) => a.localeCompare(b, 'ja'));
-
-    /** このソースに登録されている全ジャンル（重複排除・ソート済み）*/
-    const allGenres: string[] = [...new Set(
-        Object.values(meta).map(e => e.genre).filter((g): g is string => !!g)
-    )].sort((a, b) => a.localeCompare(b, 'ja'));
-
-    /** このソースに登録されている全シリーズの一覧（id, title、タイトル順） */
-    const allSeries: { id: string; title: string }[] = (() => {
-        const map = new Map<string, string>();
-        for (const e of Object.values(meta)) {
-            if (e.series_id && !map.has(e.series_id)) {
-                map.set(e.series_id, e.series_title ?? '');
-            }
-        }
-        return Array.from(map.entries())
-            .map(([id, title]) => ({ id, title }))
-            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-    })();
-
-    /**
-     * 全シリーズの統計付き一覧（id, title, maxIndex, count、タイトル順）。
-     * `maxIndex`: そのシリーズの最大 series_index（一括追加の採番開始用）。
-     * `count`: そのシリーズに属する書籍数。
-     */
-    const allSeriesWithStats: { id: string; title: string; maxIndex: number; count: number }[] = (() => {
-        const map = new Map<string, { title: string; maxIndex: number; count: number }>();
-        for (const e of Object.values(meta)) {
-            if (!e.series_id) continue;
-            const idx = e.series_index ?? 0;
-            const existing = map.get(e.series_id);
-            if (existing) {
-                existing.count++;
-                if (idx > existing.maxIndex) existing.maxIndex = idx;
-            } else {
-                map.set(e.series_id, { title: e.series_title ?? '', maxIndex: idx, count: 1 });
-            }
-        }
-        return Array.from(map.entries())
-            .map(([id, { title, maxIndex, count }]) => ({ id, title, maxIndex, count }))
-            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
-    })();
+    const { allAuthors, allTags, allGenres, allSeries, allSeriesWithStats } = useMetaDerived(meta);
 
     return {
         meta,
