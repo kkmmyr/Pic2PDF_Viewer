@@ -15,7 +15,7 @@ description: pytest（バックエンド）/ vitest（フロントエンド）�
 | ファイル操作 | `FileManager.move_with_assets` / `rename_with_assets` のロールバック | `tests/test_file_manager.py` |
 | パスバリデーション | `validate_safe_path` / `validate_safe_name`（セキュリティ）| `tests/test_path_utils.py` |
 | PDF 生成フロー | `_collect_images` の natsort、`scan_and_generate` の ZIP/Folder 分岐、`batch_compress` のスキップ判定 | `tests/test_pdf_generator.py` |
-| ジョブ管理 | `JobStore.get_active_current_item()` の状態遷移 | 未実装（追加候補）|
+| ジョブ管理 | `JobStore.get_active_current_item()` の状態遷移・eviction・to_dict | `tests/test_job_manager.py` |
 | auto-fill | mode 別ターゲット選別、view_count 保持 | `tests/test_meta.py` |
 | ライブラリフィルタ | searchText / authorFilter / currentPath の組み合わせ | `test/useLibraryFilter.test.ts` |
 | ソート | `useSortedPdfs` の各ソート種別 | `test/useSortedPdfs.test.ts` |

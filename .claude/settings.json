@@ -27,7 +27,19 @@
       "Bash(uv run pytest *)",
       "Bash(npx vitest run)",
       "Bash(npx vitest run *)",
-      "Bash(npx tsc --noEmit)"
+      "Bash(npx tsc --noEmit)",
+
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git show)",
+      "Bash(git show *)",
+      "Bash(git branch)",
+      "Bash(git branch *)",
+      "Bash(git stash list)"
     ]
   },
   "hooks": {
