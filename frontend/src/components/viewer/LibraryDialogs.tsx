@@ -3,6 +3,7 @@ import { MoveDialog } from '../reader';
 import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
 import { BulkTagDialog } from './BulkTagDialog';
 import { BulkSeriesAssignDialog } from './BulkSeriesAssignDialog';
+import { BulkGenreDialog } from './BulkGenreDialog';
 
 export interface LibraryDialogsProps {
     currentPath: string;
@@ -40,6 +41,11 @@ export interface LibraryDialogsProps {
     bulkSeriesExisting: ExistingSeriesOption[];
     onCloseBulkSeries: () => void;
     onBulkAssignSeries: (params: { title: string; indexes: number[]; id?: string }) => Promise<void>;
+    // BulkGenre
+    isBulkGenreOpen: boolean;
+    allGenres: string[];
+    onCloseBulkGenre: () => void;
+    onBulkApplyGenre: (genre: string) => Promise<void>;
 }
 
 export function LibraryDialogs({
@@ -51,6 +57,7 @@ export function LibraryDialogs({
     isBulkTagOpen, bulkTagInitial, onCloseBulkTag, onBulkApplyTags,
     isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
     isBulkSeriesOpen, bulkSeriesNames, bulkSeriesExisting, onCloseBulkSeries, onBulkAssignSeries,
+    isBulkGenreOpen, allGenres, onCloseBulkGenre, onBulkApplyGenre,
 }: LibraryDialogsProps) {
     const pdfItems = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
 
@@ -107,6 +114,14 @@ export function LibraryDialogs({
                 existingSeries={bulkSeriesExisting}
                 onClose={onCloseBulkSeries}
                 onAssign={onBulkAssignSeries}
+            />
+
+            <BulkGenreDialog
+                open={isBulkGenreOpen}
+                targetCount={selectedItems.size}
+                allGenres={allGenres}
+                onClose={onCloseBulkGenre}
+                onApply={onBulkApplyGenre}
             />
         </>
     );

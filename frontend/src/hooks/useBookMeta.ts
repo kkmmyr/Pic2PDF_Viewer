@@ -102,9 +102,9 @@ export function useBookMeta(source: string) {
     const updateMeta = useCallback(async (
         path: string,
         names: string[],
-        fields: { authors?: string[]; tags?: string[]; hidden?: boolean }
+        fields: { authors?: string[]; tags?: string[]; hidden?: boolean; genre?: string }
     ) => {
-        if (fields.authors === undefined && fields.tags === undefined && fields.hidden === undefined) return;
+        if (fields.authors === undefined && fields.tags === undefined && fields.hidden === undefined && fields.genre === undefined) return;
 
         await apiClient.patch(API_ENDPOINTS.META, {
             path,
@@ -112,6 +112,7 @@ export function useBookMeta(source: string) {
             ...(fields.authors !== undefined ? { authors: fields.authors } : {}),
             ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
             ...(fields.hidden !== undefined ? { hidden: fields.hidden } : {}),
+            ...(fields.genre !== undefined ? { genre: fields.genre } : {}),
             source,
         });
 
@@ -131,6 +132,13 @@ export function useBookMeta(source: string) {
                         merged.hidden = true;
                     } else {
                         delete merged.hidden;
+                    }
+                }
+                if (fields.genre !== undefined) {
+                    if (fields.genre) {
+                        merged.genre = fields.genre;
+                    } else {
+                        delete merged.genre;
                     }
                 }
 
@@ -156,6 +164,11 @@ export function useBookMeta(source: string) {
     /** タグのみを更新する。 */
     const updateTags = useCallback((path: string, names: string[], tags: string[]) => {
         return updateMeta(path, names, { tags });
+    }, [updateMeta]);
+
+    /** ジャンルのみを更新する。 */
+    const updateGenre = useCallback((path: string, names: string[], genre: string) => {
+        return updateMeta(path, names, { genre });
     }, [updateMeta]);
 
     /** 非表示フラグを更新する。`hidden=true` で非表示化、`false` で再表示。 */
@@ -332,7 +345,7 @@ export function useBookMeta(source: string) {
         meta,
         getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView,
-        updateAuthors, updateTags, updateMeta, setHidden,
+        updateAuthors, updateTags, updateMeta, updateGenre, setHidden,
         assignSeries, unassignSeries, reorderSeries,
         allAuthors, allTags, allGenres, allSeries, allSeriesWithStats,
         refreshMeta: fetchMeta,

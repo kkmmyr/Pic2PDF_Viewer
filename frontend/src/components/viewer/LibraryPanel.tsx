@@ -39,6 +39,7 @@ export function LibraryPanel() {
     const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
     const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
     const [isBulkSeriesOpen, setIsBulkSeriesOpen] = useState(false);
+    const [isBulkGenreOpen, setIsBulkGenreOpen] = useState(false);
 
     const {
         authorFilter, tagFilter, seriesFilter,
@@ -86,7 +87,7 @@ export function LibraryPanel() {
     const { seriesPins, authorPins, toggleSeriesPin, toggleAuthorPin } = useLibraryPins(currentSource);
     const {
         meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
-        recordView, updateAuthors, updateTags, setHidden,
+        recordView, updateAuthors, updateTags, updateGenre, setHidden,
         assignSeries, unassignSeries, reorderSeries,
         allAuthors, allTags, allGenres, allSeries, allSeriesWithStats, refreshMeta,
     } = useBookMeta(currentSource);
@@ -187,7 +188,7 @@ export function LibraryPanel() {
     const bulkActions = useLibraryBulkActions({
         currentPath, currentSource, selectedItems, showHidden, seriesFilter,
         onClearSelection, onRefresh, showToast,
-        bookMeta: { updateAuthors, updateTags, setHidden, assignSeries, reorderSeries },
+        bookMeta: { updateAuthors, updateTags, updateGenre, setHidden, assignSeries, reorderSeries },
     });
 
     void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
@@ -245,6 +246,7 @@ export function LibraryPanel() {
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
                 onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
+                onBulkSetGenre={() => setIsBulkGenreOpen(true)}
                 onBulkToggleHidden={bulkActions.handleBulkToggleHidden}
                 onBulkDelete={bulkActions.handleBulkDelete}
                 onRegenThumbnailBulk={bulkActions.handleRegenThumbnailBulk}
@@ -289,6 +291,10 @@ export function LibraryPanel() {
                 bulkSeriesExisting={allSeriesWithStats}
                 onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
                 onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
+                isBulkGenreOpen={isBulkGenreOpen}
+                allGenres={allGenres}
+                onCloseBulkGenre={() => setIsBulkGenreOpen(false)}
+                onBulkApplyGenre={bulkActions.handleBulkApplyGenre}
             />
 
             <GenreFilterBar

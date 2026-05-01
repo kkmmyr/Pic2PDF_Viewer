@@ -1,4 +1,4 @@
-import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User, BookOpen, Trash2 } from 'lucide-react';
+import { ArrowLeft, ImageIcon, Merge, Tag, Library, EyeOff, Eye, ChevronRight, Home, User, BookOpen, Trash2, Layers } from 'lucide-react';
 import type { LibrarySource, SortOrder } from '../../types';
 import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
@@ -38,6 +38,7 @@ interface LibraryHeaderProps {
     onBulkSetAuthor: () => void;
     onBulkSetTag: () => void;
     onBulkSetSeries: () => void;
+    onBulkSetGenre: () => void;
     onBulkToggleHidden: () => void;
     /** 非表示モード専用: 選択した書籍をディスクから完全削除 */
     onBulkDelete: () => void;
@@ -89,6 +90,7 @@ export function LibraryHeader({
     onBulkSetAuthor,
     onBulkSetTag,
     onBulkSetSeries,
+    onBulkSetGenre,
     onBulkToggleHidden,
     onBulkDelete,
     onRegenThumbnailBulk,
@@ -246,6 +248,10 @@ export function LibraryHeader({
                     <button onClick={onBulkSetSeries} disabled={selectedCount === 0} title="選択した書籍をシリーズに一括登録（選択順に採番）" className={BTN_PRIMARY}>
                         <Library className="w-4 h-4" />
                         シリーズに登録
+                    </button>
+                    <button onClick={onBulkSetGenre} disabled={selectedCount === 0} title="選択した書籍のジャンルを一括設定" className={BTN_PRIMARY}>
+                        <Layers className="w-4 h-4" />
+                        ジャンルを設定
                     </button>
                     <button
                         onClick={onBulkToggleHidden}

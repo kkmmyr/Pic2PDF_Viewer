@@ -37,7 +37,7 @@ class BookMetaEntry(BaseModel):
 class UpdateMetaRequest(BaseModel):
     """単一書籍または複数書籍へのメタデータ更新リクエスト。
 
-    `authors` / `tags` / `hidden` は省略可。省略されたフィールドは変更しない。
+    `authors` / `tags` / `hidden` / `genre` は省略可。省略されたフィールドは変更しない。
     すべて省略するとエラー（更新する内容が無い）。
     """
     path: str = ""
@@ -45,6 +45,7 @@ class UpdateMetaRequest(BaseModel):
     authors: list[str] | None = None
     tags: list[str] | None = None
     hidden: bool | None = None
+    genre: str | None = None
     source: str = "generated"
 
 
@@ -78,8 +79,8 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     """
     if request.source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")
-    if request.authors is None and request.tags is None and request.hidden is None:
-        raise HTTPException(status_code=400, detail="authors, tags, or hidden must be specified")
+    if request.authors is None and request.tags is None and request.hidden is None and request.genre is None:
+        raise HTTPException(status_code=400, detail="authors, tags, hidden, or genre must be specified")
 
     validate_safe_path(request.path, param_name="path")
     for name in request.names:
@@ -89,6 +90,7 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     authors = [a.strip() for a in request.authors if a.strip()] if request.authors is not None else None
     tags = [t.strip() for t in request.tags if t.strip()] if request.tags is not None else None
     hidden = request.hidden  # bool | None
+    genre = request.genre.strip() if request.genre is not None else None
 
     def _merge_list_field(entry: dict, field: str, value: list[str] | None) -> None:
         """list フィールドを書き換える。`value is None` の場合は何もしない。"""
@@ -109,6 +111,15 @@ def update_meta(request: UpdateMetaRequest) -> dict:
         else:
             entry.pop("hidden", None)
 
+    def _merge_genre(entry: dict, value: str | None) -> None:
+        """genre フィールドを書き換えるか削除する。`value is None` の場合は何もしない。"""
+        if value is None:
+            return
+        if value:
+            entry["genre"] = value
+        else:
+            entry.pop("genre", None)
+
     def _apply(data):
         for name in request.names:
             key = make_key(request.path, name)
@@ -116,6 +127,7 @@ def update_meta(request: UpdateMetaRequest) -> dict:
             _merge_list_field(existing, "authors", authors)
             _merge_list_field(existing, "tags", tags)
             _merge_hidden(existing, hidden)
+            _merge_genre(existing, genre)
 
             # エントリ全体が「空 list だけ」「あるいは何も無い」場合は削除
             # 非 list フィールド（view_count / hidden 等）が残っていればエントリは保持

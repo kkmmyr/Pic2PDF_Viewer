@@ -10,6 +10,7 @@ import type { ToastType } from './useToast';
 export interface BookMetaActions {
     updateAuthors: (path: string, names: string[], authors: string[]) => Promise<void>;
     updateTags: (path: string, names: string[], tags: string[]) => Promise<void>;
+    updateGenre: (path: string, names: string[], genre: string) => Promise<void>;
     setHidden: (path: string, names: string[], hidden: boolean) => Promise<void>;
     assignSeries: (path: string, names: string[], params: { title: string; index: number | number[]; id?: string }) => Promise<string>;
     reorderSeries: (path: string, names: string[], seriesId: string) => Promise<void>;
@@ -52,6 +53,11 @@ export function useLibraryBulkActions({
 
     const handleBulkApplyTags = useCallback(async (tags: string[]) => {
         await bookMeta.updateTags(currentPath, selectedPdfNames, tags);
+        onClearSelection();
+    }, [bookMeta, currentPath, selectedPdfNames, onClearSelection]);
+
+    const handleBulkApplyGenre = useCallback(async (genre: string) => {
+        await bookMeta.updateGenre(currentPath, selectedPdfNames, genre);
         onClearSelection();
     }, [bookMeta, currentPath, selectedPdfNames, onClearSelection]);
 
@@ -152,6 +158,7 @@ export function useLibraryBulkActions({
         bulkSeriesNames,
         handleBulkApplyAuthors,
         handleBulkApplyTags,
+        handleBulkApplyGenre,
         handleToggleHiddenOne,
         handleBulkToggleHidden,
         handleBulkDelete,
