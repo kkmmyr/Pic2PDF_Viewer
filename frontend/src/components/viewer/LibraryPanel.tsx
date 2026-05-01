@@ -30,6 +30,7 @@ export function LibraryPanel() {
         onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
         onMoveSelected, onCloseMoveDialog, onMoveItems,
         onOpenRename, onCloseRename, onRenameItem, onRefresh,
+        onBulkSelect,
     } = useLibraryContext();
 
     const [searchText, setSearchText] = useState('');
@@ -185,6 +186,17 @@ export function LibraryPanel() {
         }
     }, [currentPath, meta, seriesFilter, authorFilter, effectiveGroupMode, toggleSeriesPin, toggleAuthorPin]);
 
+    // 集約カードをチェックしたときは全メンバーを一括選択/解除する
+    const handleToggleSelect = useCallback((name: string) => {
+        const members = grouped.membersByRepresentativeName.get(name);
+        if (members && members.length > 0) {
+            const allSelected = members.every(m => selectedItems.has(m.name));
+            onBulkSelect(members.map(m => m.name), !allSelected);
+        } else {
+            onToggleSelect(name);
+        }
+    }, [grouped.membersByRepresentativeName, selectedItems, onBulkSelect, onToggleSelect]);
+
     // 1冊だけ選択中ならその書籍の現在タグを初期表示する
     const bulkTagInitial = (() => {
         if (bulkActions.bulkSeriesNames.length !== 1) return [];
@@ -283,7 +295,7 @@ export function LibraryPanel() {
                         onPdfClick={handlePdfClick}
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
-                        onToggleSelect={onToggleSelect}
+                        onToggleSelect={handleToggleSelect}
                         favorites={pinnedBooks}
                         onToggleFavorite={handleTogglePin}
                         onRename={onOpenRename}

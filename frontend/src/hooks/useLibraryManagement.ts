@@ -41,6 +41,17 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         });
     }, []);
 
+    const bulkSelectItems = useCallback((names: string[], select: boolean) => {
+        setSelectedItems(prev => {
+            const next = new Set(prev);
+            names.forEach(n => {
+                if (select) next.add(n);
+                else next.delete(n);
+            });
+            return next;
+        });
+    }, []);
+
     // フォルダ作成ダイアログの開閉
     const openCreateFolderDialog = useCallback(() => setIsCreateFolderOpen(true), []);
     const closeCreateFolderDialog = useCallback(() => setIsCreateFolderOpen(false), []);
@@ -103,6 +114,7 @@ export function useLibraryManagement({ currentPath, currentSource, onRefresh }: 
         toggleSelectionMode,
         clearSelection,
         toggleSelectItem,
+        bulkSelectItems,
         openCreateFolderDialog,
         closeCreateFolderDialog,
         handleCreateFolder,

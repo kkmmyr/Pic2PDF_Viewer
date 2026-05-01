@@ -29,6 +29,7 @@ interface LibraryContextValue {
     /** 選択モードを終了して選択中アイテムも空にする（一括操作の成功時に呼ぶ） */
     onClearSelection: () => void;
     onToggleSelect: (item: string) => void;
+    onBulkSelect: (names: string[], select: boolean) => void;
     // フォルダ作成
     onOpenCreateFolder: () => void;
     onCloseCreateFolder: () => void;
@@ -95,6 +96,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         toggleSelectionMode,
         clearSelection,
         toggleSelectItem,
+        bulkSelectItems,
         openCreateFolderDialog,
         closeCreateFolderDialog,
         handleCreateFolder,
@@ -130,6 +132,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         onToggleSelectionMode: toggleSelectionMode,
         onClearSelection: clearSelection,
         onToggleSelect: toggleSelectItem,
+        onBulkSelect: bulkSelectItems,
         onOpenCreateFolder: openCreateFolderDialog,
         onCloseCreateFolder: closeCreateFolderDialog,
         onCreateFolder: handleCreateFolder,
