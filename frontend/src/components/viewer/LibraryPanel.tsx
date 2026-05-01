@@ -91,9 +91,8 @@ export function LibraryPanel() {
     } = useBookMeta(currentSource);
     const { toasts, showToast, dismissToast } = useToast();
 
-    // ピン済み書籍の Set（PdfGrid の favorites prop として使用）
-    // series_id または author_key でピンされていれば含める
-    const pinnedBooks = (() => {
+    // ピン済み書籍の Set（favorites_first ソート用。シリーズ・作者ピン両方を含む）
+    const pinnedBooks = useMemo(() => {
         const set = new Set<string>();
         for (const [key, entry] of Object.entries(meta)) {
             const isDirectChild = currentPath
@@ -108,7 +107,7 @@ export function LibraryPanel() {
             }
         }
         return set;
-    })();
+    }, [meta, currentPath, seriesPins, authorPins]);
 
     // 文脈別お気に入りSet（PdfGrid の isFav 表示用）
     // seriesFilter 中はシリーズピンのみ、authorFilter 中は作者ピンのみ表示して混在を防ぐ
