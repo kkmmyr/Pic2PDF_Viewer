@@ -1,6 +1,5 @@
 import type { LibrarySource, ExistingSeriesOption } from '../../types';
-import { MoveDialog } from '../reader';
-import { CreateFolderDialog, RenameDialog, BulkAuthorDialog, MergeDialog } from './';
+import { RenameDialog, BulkAuthorDialog, MergeDialog } from './';
 import { BulkTagDialog } from './BulkTagDialog';
 import { BulkSeriesAssignDialog } from './BulkSeriesAssignDialog';
 import { BulkGenreDialog } from './BulkGenreDialog';
@@ -9,18 +8,10 @@ export interface LibraryDialogsProps {
     currentPath: string;
     currentSource: LibrarySource;
     selectedItems: Set<string>;
-    // CreateFolder
-    isCreateFolderOpen: boolean;
-    onCloseCreateFolder: () => void;
-    onCreateFolder: (name: string) => Promise<void>;
     // Rename
     renameTarget: { name: string; isFolder: boolean } | null;
     onCloseRename: () => void;
     onRenameItem: (newName: string) => Promise<void>;
-    // Move
-    isMoveDialogOpen: boolean;
-    onCloseMoveDialog: () => void;
-    onMoveItems: (destination: string) => Promise<void>;
     // BulkAuthor
     isBulkAuthorOpen: boolean;
     bulkAuthorAllAuthors: string[];
@@ -49,10 +40,8 @@ export interface LibraryDialogsProps {
 }
 
 export function LibraryDialogs({
-    currentPath, currentSource, selectedItems,
-    isCreateFolderOpen, onCloseCreateFolder, onCreateFolder,
+    selectedItems,
     renameTarget, onCloseRename, onRenameItem,
-    isMoveDialogOpen, onCloseMoveDialog, onMoveItems,
     isBulkAuthorOpen, bulkAuthorAllAuthors, onCloseBulkAuthor, onBulkApplyAuthors,
     isBulkTagOpen, bulkTagInitial, onCloseBulkTag, onBulkApplyTags,
     isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
@@ -63,26 +52,12 @@ export function LibraryDialogs({
 
     return (
         <>
-            <CreateFolderDialog
-                open={isCreateFolderOpen}
-                onClose={onCloseCreateFolder}
-                onCreate={onCreateFolder}
-            />
-
             <RenameDialog
                 open={renameTarget !== null}
                 currentName={renameTarget?.name ?? ''}
                 isFolder={renameTarget?.isFolder ?? false}
                 onClose={onCloseRename}
                 onRename={onRenameItem}
-            />
-
-            <MoveDialog
-                open={isMoveDialogOpen}
-                onClose={onCloseMoveDialog}
-                onMove={onMoveItems}
-                currentSource={currentSource}
-                sourcePath={currentPath}
             />
 
             <BulkAuthorDialog

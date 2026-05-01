@@ -20,7 +20,6 @@ PDFファイルとディレクトリの一覧を取得する。
     { "name": "file1.pdf", "thumbnail": "/thumbnails/path/to/file1.jpg", "created_at": 1713200000.0 },
     { "name": "file2.pdf", "thumbnail": null, "created_at": 1713100000.0 }
   ],
-  "directories": ["subdir1", "subdir2"],
   "current_path": "path/to/current"
 }
 ```
@@ -65,43 +64,6 @@ PDFの指定ページを削除する。
 ```json
 { "message": "Pages deleted successfully", "total_pages": 10 }
 ```
-
----
-
-### `POST /api/directories`
-フォルダを作成する。
-
-**リクエストボディ**:
-```json
-{
-  "path": "current/relative/path",
-  "name": "new_folder_name",
-  "source": "generated"
-}
-```
-
-**レスポンス**: `{"message": "Directory created"}`
-
----
-
-### `POST /api/move`
-ファイル・フォルダを移動する。
-
-**リクエストボディ**:
-```json
-{
-  "items": ["file1.pdf", "subfolder"],
-  "source_path": "current/relative/path",
-  "destination_path": "dest/relative/path",
-  "source": "generated"
-}
-```
-
-**レスポンス**:
-```json
-{ "message": "Items moved", "moved_count": 2, "errors": [] }
-```
-- `errors`: 個別アイテムのエラーメッセージリスト（成功時は空配列）
 
 ---
 

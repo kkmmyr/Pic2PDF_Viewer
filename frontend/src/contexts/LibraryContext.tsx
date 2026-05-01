@@ -8,18 +8,14 @@ import { useLibraryManagement } from '../hooks';
 interface LibraryContextValue {
     // 状態
     pdfs: PdfFile[];
-    directories: string[];
     selectedPdf: string | null;
     currentPath: string;
     currentSource: LibrarySource;
     isSelectionMode: boolean;
     selectedItems: Set<string>;
-    isMoveDialogOpen: boolean;
-    isCreateFolderOpen: boolean;
     renameTarget: { name: string; isFolder: boolean } | null;
     // ナビゲーション
     onPdfClick: (name: string) => void;
-    onFolderClick: (name: string) => void;
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onClosePdf: () => void;
@@ -30,14 +26,6 @@ interface LibraryContextValue {
     onClearSelection: () => void;
     onToggleSelect: (item: string) => void;
     onBulkSelect: (names: string[], select: boolean) => void;
-    // フォルダ作成
-    onOpenCreateFolder: () => void;
-    onCloseCreateFolder: () => void;
-    onCreateFolder: (name: string) => Promise<void>;
-    // 移動
-    onMoveSelected: () => void;
-    onCloseMoveDialog: () => void;
-    onMoveItems: (destination: string) => Promise<void>;
     // リネーム
     onOpenRename: (name: string, isFolder?: boolean) => void;
     onCloseRename: () => void;
@@ -59,7 +47,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         currentPath,
         selectedPdf,
         currentSource,
-        navigateIntoFolder,
         navigateUp,
         selectPdf,
         clearPdf,
@@ -67,17 +54,15 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     } = useUrlState();
 
     const [pdfs, setPdfs] = useState<PdfFile[]>([]);
-    const [directories, setDirectories] = useState<string[]>([]);
     const [libraryVersion, setLibraryVersion] = useState(0);
 
     const fetchPdfs = useCallback(async () => {
         try {
-            const data = await apiClient.get<unknown, { files: PdfFile[]; directories: string[] }>(
+            const data = await apiClient.get<unknown, { files: PdfFile[] }>(
                 API_ENDPOINTS.PDFS,
                 { params: { path: currentPath, source: currentSource } }
             );
             setPdfs(data.files);
-            setDirectories(data.directories ?? []);
         } catch (e) {
             console.error(e);
         }
@@ -90,19 +75,11 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     const {
         isSelectionMode,
         selectedItems,
-        isMoveDialogOpen,
-        isCreateFolderOpen,
         renameTarget,
         toggleSelectionMode,
         clearSelection,
         toggleSelectItem,
         bulkSelectItems,
-        openCreateFolderDialog,
-        closeCreateFolderDialog,
-        handleCreateFolder,
-        openMoveDialog,
-        closeMoveDialog,
-        handleMoveItems,
         openRenameDialog,
         closeRenameDialog,
         handleRename,
@@ -114,17 +91,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
     const value: LibraryContextValue = {
         pdfs,
-        directories,
         selectedPdf,
         currentPath,
         currentSource,
         isSelectionMode,
         selectedItems,
-        isMoveDialogOpen,
-        isCreateFolderOpen,
         renameTarget,
         onPdfClick: (name) => selectPdf(name, currentPath, currentSource),
-        onFolderClick: (dir) => navigateIntoFolder(dir, currentPath, currentSource),
         onUpClick: () => navigateUp(currentPath, currentSource),
         onSourceChange: setSource,
         onClosePdf: () => clearPdf(currentPath, currentSource),
@@ -133,12 +106,6 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         onClearSelection: clearSelection,
         onToggleSelect: toggleSelectItem,
         onBulkSelect: bulkSelectItems,
-        onOpenCreateFolder: openCreateFolderDialog,
-        onCloseCreateFolder: closeCreateFolderDialog,
-        onCreateFolder: handleCreateFolder,
-        onMoveSelected: openMoveDialog,
-        onCloseMoveDialog: closeMoveDialog,
-        onMoveItems: handleMoveItems,
         onOpenRename: openRenameDialog,
         onCloseRename: closeRenameDialog,
         onRenameItem: handleRename,

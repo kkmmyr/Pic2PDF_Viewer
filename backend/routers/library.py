@@ -29,19 +29,18 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
     target_thumb_dir = join_path(base_thumb_dir, path)
 
     if not os.path.exists(target_pdf_dir):
-        return {"files": [], "directories": [], "current_path": path}
+        return {"files": [], "current_path": path}
 
     if not os.path.isdir(target_pdf_dir):
         raise HTTPException(status_code=400, detail="Not a directory")
 
     items = os.listdir(target_pdf_dir)
     files = []
-    directories = []
 
     for item in items:
         item_path = join_path(target_pdf_dir, item)
         if os.path.isdir(item_path):
-            directories.append(item)
+            continue
         elif is_pdf_file(item):
             thumb_name = get_thumbnail_name(item)
             thumb_path = join_path(target_thumb_dir, thumb_name)
@@ -61,7 +60,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
                 "created_at": created_at,
             })
 
-    return {"files": files, "directories": directories, "current_path": path}
+    return {"files": files, "current_path": path}
 
 @router.get("/books/{path:path}/images")
 def list_book_images(path: str, source: str = "generated"):
@@ -96,66 +95,6 @@ def list_book_images(path: str, source: str = "generated"):
     except Exception as e:
         logger.exception("list_book_images failed: %s", path)
         raise HTTPException(status_code=500, detail=str(e))
-
-class CreateDirectoryRequest(BaseModel):
-    path: str
-    name: str
-    source: str = "generated"
-
-@router.post("/directories")
-def create_directory(request: CreateDirectoryRequest):
-    validate_safe_path(request.path, param_name="path")
-    validate_safe_name(request.name, param_name="name")
-
-    dirs = get_dirs_by_source(request.source)
-    base_pdf_dir = dirs["pdf"]
-
-    target_dir = os.path.join(base_pdf_dir, request.path, request.name)
-
-    if os.path.exists(target_dir):
-        raise HTTPException(status_code=400, detail="Directory already exists")
-
-    try:
-        os.makedirs(target_dir)
-        return {"message": "Directory created"}
-    except Exception as e:
-        logger.exception("create_directory failed: %s", target_dir)
-        raise HTTPException(status_code=500, detail=str(e))
-
-class MoveItemsRequest(BaseModel):
-    items: list[str]
-    source_path: str
-    destination_path: str
-    source: str = "generated"
-
-@router.post("/move")
-def move_items(request: MoveItemsRequest):
-    validate_safe_path(request.source_path, param_name="source_path")
-    validate_safe_path(request.destination_path, param_name="destination_path")
-    for item in request.items:
-        validate_safe_name(item, param_name="item")
-
-    dirs = get_dirs_by_source(request.source)
-
-    moved_count = 0
-    errors = []
-
-    for item in request.items:
-        try:
-            FileManager.move_with_assets(item, request.source_path, request.destination_path, dirs)
-            moved_count += 1
-        except FileNotFoundError:
-            errors.append(f"Item not found: {item}")
-        except FileExistsError:
-            errors.append(f"Destination exists: {item}")
-        except OSError as e:
-            errors.append(str(e))
-
-    if moved_count == 0 and errors:
-        raise HTTPException(status_code=500, detail="Failed to move items: " + "; ".join(errors))
-
-    return {"message": "Items moved", "moved_count": moved_count, "errors": errors}
-
 
 class RenameItemRequest(BaseModel):
     path: str

@@ -27,10 +27,6 @@ export const API_ENDPOINTS = {
     /** ページ削除 */
     DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
         `/api/pdfs/${encodeURIComponent(filename)}/delete_pages?path=${encodeURIComponent(path || '')}&source=${source}`,
-    /** ディレクトリ一覧取得 */
-    DIRECTORIES: '/api/directories',
-    /** ファイル/ディレクトリ移動 */
-    MOVE: '/api/move',
     /** PDFリネーム */
     RENAME: '/api/rename',
     /** サムネイル再生成 */

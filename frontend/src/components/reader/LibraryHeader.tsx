@@ -33,8 +33,6 @@ interface LibraryHeaderProps {
     onUpClick: () => void;
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
-    onCreateFolder: () => void;
-    onMoveSelected: () => void;
     onBulkSetAuthor: () => void;
     onBulkSetTag: () => void;
     onBulkSetSeries: () => void;
@@ -85,8 +83,6 @@ export function LibraryHeader({
     onUpClick,
     onSourceChange,
     onToggleSelectionMode,
-    onCreateFolder,
-    onMoveSelected,
     onBulkSetAuthor,
     onBulkSetTag,
     onBulkSetSeries,
@@ -220,14 +216,9 @@ export function LibraryHeader({
                 <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
 
                 {!isSelectionMode && (
-                    <>
-                        <button onClick={onCreateFolder} className={BTN_SECONDARY}>
-                            + フォルダ作成
-                        </button>
-                        <button onClick={onToggleSelectionMode} className={BTN_SECONDARY}>
-                            選択
-                        </button>
-                    </>
+                    <button onClick={onToggleSelectionMode} className={BTN_SECONDARY}>
+                        選択
+                    </button>
                 )}
             </div>
 
@@ -280,9 +271,6 @@ export function LibraryHeader({
                     <button onClick={onRegenThumbnailBulk} disabled={selectedCount === 0} title="選択した書籍のサムネイルを再生成" className={BTN_PRIMARY}>
                         <ImageIcon className="w-4 h-4" />
                         サムネイル再生成
-                    </button>
-                    <button onClick={onMoveSelected} disabled={selectedCount === 0} className={BTN_PRIMARY}>
-                        移動
                     </button>
                     <div className="flex-1" />
                     <button onClick={onToggleSelectionMode} className={BTN_SECONDARY}>

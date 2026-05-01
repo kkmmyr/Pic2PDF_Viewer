@@ -3,7 +3,6 @@ import type { PdfFile, BookMetaMap } from '../types';
 
 interface UseLibraryFilterParams {
     pdfs: PdfFile[];
-    directories: string[];
     searchText: string;
     authorFilter: string;
     /** タグフィルター（空文字なら無効） */
@@ -51,7 +50,6 @@ function getViewCountFromMeta(meta: BookMetaMap, path: string, name: string): nu
 
 export function useLibraryFilter({
     pdfs,
-    directories,
     searchText,
     authorFilter,
     tagFilter = '',
@@ -114,12 +112,5 @@ export function useLibraryFilter({
         return result;
     }, [pdfs, searchText, authorFilter, tagFilter, seriesFilter, showHidden, showUnreadOnly, genreFilter, currentPath, meta]);
 
-    const filteredDirs = useMemo(() => {
-        const trimmed = searchText.trim();
-        if (!trimmed) return directories;
-        const lower = trimmed.toLowerCase();
-        return directories.filter(d => d.toLowerCase().includes(lower));
-    }, [directories, searchText]);
-
-    return { filteredPdfs, filteredDirs };
+    return { filteredPdfs };
 }

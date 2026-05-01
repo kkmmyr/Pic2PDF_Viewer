@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer, GenreFilterBar } from '../reader';
+import { LibraryHeader, PdfGrid, ToastContainer, GenreFilterBar } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
@@ -22,13 +22,10 @@ import apiClient from '../../config/api_client';
  */
 export function LibraryPanel() {
     const {
-        pdfs, directories, selectedPdf, currentPath, currentSource,
-        isSelectionMode, selectedItems,
-        isMoveDialogOpen, isCreateFolderOpen, renameTarget,
-        onPdfClick, onFolderClick, onUpClick, onSourceChange,
+        pdfs, selectedPdf, currentPath, currentSource,
+        isSelectionMode, selectedItems, renameTarget,
+        onPdfClick, onUpClick, onSourceChange,
         onToggleSelectionMode, onClearSelection, onToggleSelect,
-        onOpenCreateFolder, onCloseCreateFolder, onCreateFolder,
-        onMoveSelected, onCloseMoveDialog, onMoveItems,
         onOpenRename, onCloseRename, onRenameItem, onRefresh,
         onBulkSelect,
     } = useLibraryContext();
@@ -157,9 +154,8 @@ export function LibraryPanel() {
         onRefresh();
     }, [currentPath, currentSource, onRefresh]);
 
-    const { filteredPdfs, filteredDirs } = useLibraryFilter({
+    const { filteredPdfs } = useLibraryFilter({
         pdfs: sortedPdfs,
-        directories,
         searchText,
         authorFilter,
         tagFilter,
@@ -171,7 +167,7 @@ export function LibraryPanel() {
         meta,
     });
 
-    const { effectiveGroupMode, grouped, displayPdfs, breadcrumbs } = useLibraryDisplay({
+    const { grouped, displayPdfs, breadcrumbs } = useLibraryDisplay({
         filteredPdfs,
         meta,
         currentPath,
@@ -242,8 +238,6 @@ export function LibraryPanel() {
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
-                onCreateFolder={onOpenCreateFolder}
-                onMoveSelected={onMoveSelected}
                 onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
                 onBulkSetTag={() => setIsBulkTagOpen(true)}
                 onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
@@ -267,15 +261,9 @@ export function LibraryPanel() {
                 currentPath={currentPath}
                 currentSource={currentSource}
                 selectedItems={selectedItems}
-                isCreateFolderOpen={isCreateFolderOpen}
-                onCloseCreateFolder={onCloseCreateFolder}
-                onCreateFolder={onCreateFolder}
                 renameTarget={renameTarget}
                 onCloseRename={onCloseRename}
                 onRenameItem={onRenameItem}
-                isMoveDialogOpen={isMoveDialogOpen}
-                onCloseMoveDialog={onCloseMoveDialog}
-                onMoveItems={onMoveItems}
                 isBulkAuthorOpen={isBulkAuthorOpen}
                 bulkAuthorAllAuthors={allAuthors}
                 onCloseBulkAuthor={() => setIsBulkAuthorOpen(false)}
@@ -309,22 +297,6 @@ export function LibraryPanel() {
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">
-                    <FolderGrid
-                        directories={filteredDirs}
-                        onFolderClick={onFolderClick}
-                        isSelectionMode={isSelectionMode}
-                        selectedItems={selectedItems}
-                        onToggleSelect={onToggleSelect}
-                        onRename={(name) => onOpenRename(name, true)}
-                        getUnreadCount={(dir) => {
-                            const prefix = currentPath ? `${currentPath}/${dir}/` : `${dir}/`;
-                            return Object.entries(meta).reduce((count, [key, entry]) => {
-                                if (!key.startsWith(prefix)) return count;
-                                if (key.slice(prefix.length).includes('/')) return count;
-                                return (entry.view_count ?? 0) === 0 ? count + 1 : count;
-                            }, 0);
-                        }}
-                    />
                     <PdfGrid
                         pdfs={displayPdfs}
                         onPdfClick={handlePdfClick}
