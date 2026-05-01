@@ -18,6 +18,8 @@ interface UseLibraryFilterParams {
     showHidden?: boolean;
     /** 未読フィルター。`true` のとき view_count === 0（または未記録）の書籍のみを表示する。 */
     showUnreadOnly?: boolean;
+    /** ジャンルフィルター（空文字なら無効） */
+    genreFilter?: string;
     currentPath: string;
     meta: BookMetaMap;
 }
@@ -56,6 +58,7 @@ export function useLibraryFilter({
     seriesFilter = '',
     showHidden = false,
     showUnreadOnly = false,
+    genreFilter = '',
     currentPath,
     meta,
 }: UseLibraryFilterParams) {
@@ -102,8 +105,14 @@ export function useLibraryFilter({
             );
         }
 
+        if (genreFilter) {
+            result = result.filter(p =>
+                (getEntryFromMeta(meta, currentPath, p.name)?.genre ?? '') === genreFilter
+            );
+        }
+
         return result;
-    }, [pdfs, searchText, authorFilter, tagFilter, seriesFilter, showHidden, showUnreadOnly, currentPath, meta]);
+    }, [pdfs, searchText, authorFilter, tagFilter, seriesFilter, showHidden, showUnreadOnly, genreFilter, currentPath, meta]);
 
     const filteredDirs = useMemo(() => {
         const trimmed = searchText.trim();

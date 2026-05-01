@@ -1,29 +1,35 @@
-import { Search, User, Tag } from 'lucide-react';
+import { Search, User, Tag, Layers } from 'lucide-react';
 import { SearchableSelect } from '../ui/SearchableSelect';
 
 interface HeaderSearchBarProps {
     searchText: string;
     authorFilter: string;
     tagFilter: string;
+    genreFilter: string;
     allAuthors: string[];
     allTags: string[];
+    allGenres: string[];
     /** ドリルダウン中はパンくずに集約するため作者 select を隠す */
     hideAuthorSelect?: boolean;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
+    onGenreFilterChange: (genre: string) => void;
 }
 
 export function HeaderSearchBar({
     searchText,
     authorFilter,
     tagFilter,
+    genreFilter,
     allAuthors,
     allTags,
+    allGenres,
     hideAuthorSelect = false,
     onSearchChange,
     onAuthorFilterChange,
     onTagFilterChange,
+    onGenreFilterChange,
 }: HeaderSearchBarProps) {
     return (
         <>
@@ -49,6 +55,26 @@ export function HeaderSearchBar({
                         onChange={onAuthorFilterChange}
                         className="w-48"
                     />
+                </div>
+            )}
+
+            {allGenres.length > 0 && (
+                <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                    <Layers className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                    <select
+                        value={genreFilter}
+                        onChange={(e) => onGenreFilterChange(e.target.value)}
+                        className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 max-w-[160px] truncate ${
+                            genreFilter
+                                ? 'text-blue-700 dark:text-blue-300 border-blue-400 dark:border-blue-600 ring-1 ring-blue-200 dark:ring-blue-800'
+                                : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                        }`}
+                    >
+                        <option value="">ジャンル: すべて</option>
+                        {allGenres.map(g => (
+                            <option key={g} value={g}>{g}</option>
+                        ))}
+                    </select>
                 </div>
             )}
 

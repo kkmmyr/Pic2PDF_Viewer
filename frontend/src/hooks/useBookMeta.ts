@@ -287,6 +287,11 @@ export function useBookMeta(source: string) {
         Object.values(meta).flatMap(e => e.tags ?? [])
     )].sort((a, b) => a.localeCompare(b, 'ja'));
 
+    /** このソースに登録されている全ジャンル（重複排除・ソート済み）*/
+    const allGenres: string[] = [...new Set(
+        Object.values(meta).map(e => e.genre).filter((g): g is string => !!g)
+    )].sort((a, b) => a.localeCompare(b, 'ja'));
+
     /** このソースに登録されている全シリーズの一覧（id, title、タイトル順） */
     const allSeries: { id: string; title: string }[] = (() => {
         const map = new Map<string, string>();
@@ -329,7 +334,7 @@ export function useBookMeta(source: string) {
         recordView,
         updateAuthors, updateTags, updateMeta, setHidden,
         assignSeries, unassignSeries, reorderSeries,
-        allAuthors, allTags, allSeries, allSeriesWithStats,
+        allAuthors, allTags, allGenres, allSeries, allSeriesWithStats,
         refreshMeta: fetchMeta,
     };
 }

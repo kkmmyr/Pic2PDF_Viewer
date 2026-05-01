@@ -8,6 +8,7 @@ const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
 const GROUP_MODE_KEY = 'library_group_mode';
 const SHOW_HIDDEN_KEY = 'library_show_hidden';
 const SHOW_UNREAD_ONLY_KEY = 'library_show_unread_only';
+const GENRE_FILTER_KEY = 'library_genre_filter';
 
 /**
  * ライブラリ表示設定（sort / groupMode / showHidden / showUnreadOnly）を localStorage に永続化する。
@@ -25,6 +26,9 @@ export function useLibrarySettings() {
     );
     const [showUnreadOnly, setShowUnreadOnlyState] = useState<boolean>(
         () => getStorageJson<boolean>(SHOW_UNREAD_ONLY_KEY, false)
+    );
+    const [genreFilter, setGenreFilterState] = useState<string>(
+        () => getStorageJson<string>(GENRE_FILTER_KEY, '')
     );
 
     const setSortOrder = useCallback((order: SortOrder) => {
@@ -53,10 +57,16 @@ export function useLibrarySettings() {
         });
     }, []);
 
+    const setGenreFilter = useCallback((genre: string) => {
+        setGenreFilterState(genre);
+        setStorageJson(GENRE_FILTER_KEY, genre);
+    }, []);
+
     return {
         sortOrder, setSortOrder,
         groupMode, setGroupMode,
         showHidden, toggleShowHidden,
         showUnreadOnly, toggleShowUnreadOnly,
+        genreFilter, setGenreFilter,
     };
 }

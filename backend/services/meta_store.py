@@ -19,6 +19,8 @@ class MetaEntry(TypedDict):
     last_viewed_at: NotRequired[float]
     # 非表示フラグ。True なら通常モードでは一覧・検索・フィルタに表示されない。
     hidden: NotRequired[bool]
+    # ジャンル（例: "プリンセスコネクト" / "Voiceloid" / "オリジナル"）。
+    genre: NotRequired[str]
 
 
 MetaDict = dict[str, MetaEntry]

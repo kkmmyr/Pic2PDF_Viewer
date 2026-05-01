@@ -51,6 +51,7 @@ export function LibraryPanel() {
         groupMode, setGroupMode,
         showHidden, toggleShowHidden,
         showUnreadOnly, toggleShowUnreadOnly,
+        genreFilter, setGenreFilter,
     } = useLibrarySettings();
 
     // パスまたはソース変更時に検索テキストをリセット。
@@ -87,7 +88,7 @@ export function LibraryPanel() {
         meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView, updateAuthors, updateTags, setHidden,
         assignSeries, unassignSeries, reorderSeries,
-        allAuthors, allTags, allSeries, allSeriesWithStats, refreshMeta,
+        allAuthors, allTags, allGenres, allSeries, allSeriesWithStats, refreshMeta,
     } = useBookMeta(currentSource);
     const { toasts, showToast, dismissToast } = useToast();
 
@@ -163,6 +164,7 @@ export function LibraryPanel() {
         seriesFilter,
         showHidden,
         showUnreadOnly,
+        genreFilter,
         currentPath,
         meta,
     });
@@ -230,8 +232,10 @@ export function LibraryPanel() {
                 searchText={searchText}
                 authorFilter={authorFilter}
                 tagFilter={tagFilter}
+                genreFilter={genreFilter}
                 allAuthors={allAuthors}
                 allTags={allTags}
+                allGenres={allGenres}
                 groupMode={groupMode}
                 breadcrumbs={breadcrumbs}
                 showHidden={showHidden}
@@ -251,6 +255,7 @@ export function LibraryPanel() {
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
+                onGenreFilterChange={setGenreFilter}
                 onGroupModeChange={handleGroupModeChange}
                 onToggleShowHidden={toggleShowHidden}
                 showUnreadOnly={showUnreadOnly}

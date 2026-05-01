@@ -152,6 +152,8 @@ export interface BookMetaEntry {
     series_index?: number;
     /** 非表示フラグ。true なら通常モードでは一覧・検索・フィルタに表示されない */
     hidden?: boolean;
+    /** ジャンル（例: "プリンセスコネクト" / "Voiceloid" / "オリジナル"） */
+    genre?: string;
 }
 
 /**

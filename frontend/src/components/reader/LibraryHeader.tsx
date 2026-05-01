@@ -22,8 +22,10 @@ interface LibraryHeaderProps {
     searchText: string;
     authorFilter: string;
     tagFilter: string;
+    genreFilter: string;
     allAuthors: string[];
     allTags: string[];
+    allGenres: string[];
     /** ライブラリの集約モード（none / series / author / author-then-series） */
     groupMode: GroupMode;
     /** ドリルダウン中のパンくず（空配列なら非表示）。先頭から順に並び、最後の要素は現在地 */
@@ -47,6 +49,7 @@ interface LibraryHeaderProps {
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
+    onGenreFilterChange: (genre: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
     onToggleShowHidden: () => void;
     /** 未読フィルター（view_count=0 のみ表示） */
@@ -76,8 +79,10 @@ export function LibraryHeader({
     searchText,
     authorFilter,
     tagFilter,
+    genreFilter,
     allAuthors,
     allTags,
+    allGenres,
     groupMode,
     breadcrumbs,
     showHidden,
@@ -97,6 +102,7 @@ export function LibraryHeader({
     onSearchChange,
     onAuthorFilterChange,
     onTagFilterChange,
+    onGenreFilterChange,
     onGroupModeChange,
     onToggleShowHidden,
     showUnreadOnly,
@@ -158,12 +164,15 @@ export function LibraryHeader({
                     searchText={searchText}
                     authorFilter={authorFilter}
                     tagFilter={tagFilter}
+                    genreFilter={genreFilter}
                     allAuthors={allAuthors}
                     allTags={allTags}
+                    allGenres={allGenres}
                     hideAuthorSelect={breadcrumbs.length > 0}
                     onSearchChange={onSearchChange}
                     onAuthorFilterChange={onAuthorFilterChange}
                     onTagFilterChange={onTagFilterChange}
+                    onGenreFilterChange={onGenreFilterChange}
                 />
 
                 <div className="flex-1" />
