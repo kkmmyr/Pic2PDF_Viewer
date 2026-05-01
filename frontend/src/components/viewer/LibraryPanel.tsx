@@ -129,7 +129,8 @@ export function LibraryPanel() {
         filteredPdfs,
         meta,
         currentPath,
-        groupMode,
+        // 検索中は集約を解除して個別書籍を直接表示する
+        groupMode: searchText.trim() ? 'none' : groupMode,
         authorFilter,
         seriesFilter,
         getSeries,
