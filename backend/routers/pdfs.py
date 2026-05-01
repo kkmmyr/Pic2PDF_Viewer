@@ -10,6 +10,7 @@ from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
 from services.pdf_generator import scan_and_generate, batch_compress
 from services.job_manager import GenerateJob, JobStore, JobStatus
+from services.meta_store import load_meta, update_meta_locked
 from config import (
     get_dirs_by_source,
     PDF_COMPRESSED_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR,
@@ -38,7 +39,7 @@ class GenerateRequest(BaseModel):
 
 
 def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
-    """バックグラウンドスレッドでPDF生成を実行する。"""
+    """Background thread: PDF generation job."""
     def progress_callback(item_name: str):
         job.update(current_item=item_name)
         logger.info("Processing: %s", item_name)
@@ -54,6 +55,15 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
             COMPLETE_DIR,
             progress_callback=progress_callback,
         )
+
+        # 新規生成ファイルにのみ genre: "オリジナル" を初期書き込み（再生成時は保持）
+        if generated:
+            def _init_genre(data):
+                for name in generated:
+                    if name not in data:
+                        data[name] = {"genre": "オリジナル"}
+            update_meta_locked("generated", _init_genre)
+
         job.update(
             status=JobStatus.COMPLETED,
             current_item=None,
