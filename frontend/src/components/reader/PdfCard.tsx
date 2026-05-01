@@ -97,8 +97,8 @@ export function PdfCard({
                     </div>
                 )}
 
-                {/* ピンボタン（集約カードには表示しない） */}
-                {!isSelectionMode && !isGroup && onToggleFavorite && (
+                {/* ピンボタン（シリーズ集約カードのみ非表示） */}
+                {!isSelectionMode && onToggleFavorite && !(isGroup && badge?.kind === 'series') && (
                     <button
                         className="absolute top-2 left-2 z-card-badge p-1 rounded-full bg-white/80 dark:bg-gray-900/70 hover:bg-white dark:hover:bg-gray-900 transition-colors"
                         onClick={(e) => {
@@ -208,9 +208,6 @@ export function PdfCard({
                             >
                                 <BookCopy className="w-3 h-3" />
                             </button>
-                        )}
-                        {!isGroup && isFav && (
-                            <Star className="w-3 h-3 text-amber-400 fill-amber-400 shrink-0" title="集約カードの表示に設定中" />
                         )}
                         {!isGroup && isUnread && (
                             <span className="px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold leading-none">NEW</span>
