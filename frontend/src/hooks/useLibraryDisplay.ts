@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { PdfFile, BookMetaMap } from '../types';
 import { useLibraryGrouping, type GroupMode, type GroupedLibrary } from './useLibraryGrouping';
+import type { PinsMap } from './useLibraryPins';
 
 export type Crumb = { kind: 'home' | 'author' | 'series'; label: string; onClick?: () => void };
 
@@ -18,6 +19,10 @@ interface UseLibraryDisplayParams {
     clearAllDrilldown: () => void;
     /** breadcrumbs の作者階層クリック用（series のみクリア） */
     setSeriesFilter: (v: string) => void;
+    /** シリーズ代表ピン（series_id → book_name） */
+    seriesPins?: PinsMap;
+    /** 作者代表ピン（author_key → book_name） */
+    authorPins?: PinsMap;
 }
 
 interface UseLibraryDisplayResult {
@@ -42,7 +47,7 @@ interface UseLibraryDisplayResult {
  */
 export function useLibraryDisplay({
     filteredPdfs, meta, currentPath, groupMode, authorFilter, seriesFilter,
-    getSeries, clearAllDrilldown, setSeriesFilter,
+    getSeries, clearAllDrilldown, setSeriesFilter, seriesPins, authorPins,
 }: UseLibraryDisplayParams): UseLibraryDisplayResult {
     const effectiveGroupMode: GroupMode =
         seriesFilter
@@ -56,6 +61,8 @@ export function useLibraryDisplay({
         meta,
         currentPath,
         mode: effectiveGroupMode,
+        seriesPins,
+        authorPins,
     });
 
     const displayPdfs = useMemo(() => {

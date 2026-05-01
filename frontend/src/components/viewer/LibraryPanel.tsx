@@ -3,7 +3,7 @@ import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
-    useFavorites, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
+    useLibraryPins, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
     useUrlFilters, useLibrarySettings, useLibraryBulkActions, useLibraryDisplay,
 } from '../../hooks';
 import { useLibraryContext } from '../../contexts/LibraryContext';
@@ -81,7 +81,7 @@ export function LibraryPanel() {
         setSeriesFilter('');
     }, [setGroupMode, setSeriesFilter]);
 
-    const { favorites, toggle: toggleFavorite } = useFavorites(currentSource);
+    const { seriesPins, authorPins, toggleSeriesPin, toggleAuthorPin } = useLibraryPins(currentSource);
     const {
         meta, getAuthors, getTags, getSeries, getViewCount, getLastViewedAt, isHidden,
         recordView, updateAuthors, updateTags, setHidden,
@@ -90,10 +90,29 @@ export function LibraryPanel() {
     } = useBookMeta(currentSource);
     const { toasts, showToast, dismissToast } = useToast();
 
+    // ピン済み書籍の Set（PdfGrid の favorites prop として使用）
+    // series_id または author_key でピンされていれば含める
+    const pinnedBooks = (() => {
+        const set = new Set<string>();
+        for (const [key, entry] of Object.entries(meta)) {
+            const isDirectChild = currentPath
+                ? key.startsWith(currentPath + '/') && !key.slice(currentPath.length + 1).includes('/')
+                : !key.includes('/');
+            if (!isDirectChild) continue;
+            const name = currentPath ? key.slice(currentPath.length + 1) : key;
+            if (entry.series_id && seriesPins[entry.series_id] === name) { set.add(name); continue; }
+            if (entry.authors?.length) {
+                const ak = [...entry.authors].sort().join('\n');
+                if (authorPins[ak] === name) set.add(name);
+            }
+        }
+        return set;
+    })();
+
     const sortedPdfs = useSortedPdfs(
         pdfs,
         sortOrder,
-        favorites,
+        pinnedBooks,
         (name) => getViewCount(currentPath, name),
         (name) => getLastViewedAt(currentPath, name),
     );
@@ -125,7 +144,7 @@ export function LibraryPanel() {
         meta,
     });
 
-    const { effectiveGroupMode: _effectiveGroupMode, grouped, displayPdfs, breadcrumbs } = useLibraryDisplay({
+    const { effectiveGroupMode, grouped, displayPdfs, breadcrumbs } = useLibraryDisplay({
         filteredPdfs,
         meta,
         currentPath,
@@ -136,8 +155,9 @@ export function LibraryPanel() {
         getSeries,
         clearAllDrilldown,
         setSeriesFilter,
+        seriesPins,
+        authorPins,
     });
-    void _effectiveGroupMode; // useLibraryDisplay 内で useLibraryGrouping に渡すための内部値（外には不要）
 
     const bulkActions = useLibraryBulkActions({
         currentPath, currentSource, selectedItems, showHidden, seriesFilter,
@@ -146,6 +166,24 @@ export function LibraryPanel() {
     });
 
     void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
+
+    // コンテキストに応じてシリーズ or 作者ピンを切り替える
+    const handleTogglePin = useCallback((name: string) => {
+        const key = currentPath ? `${currentPath}/${name}` : name;
+        const entry = meta[key];
+        if (!entry) return;
+        const isSeriesCtx = !!seriesFilter || effectiveGroupMode === 'series';
+        const isAuthorCtx = !!authorFilter || effectiveGroupMode === 'author';
+        if (isSeriesCtx && entry.series_id) {
+            toggleSeriesPin(entry.series_id, name);
+        } else if (isAuthorCtx && entry.authors?.length) {
+            toggleAuthorPin([...entry.authors].sort().join('\n'), name);
+        } else if (entry.series_id) {
+            toggleSeriesPin(entry.series_id, name);
+        } else if (entry.authors?.length) {
+            toggleAuthorPin([...entry.authors].sort().join('\n'), name);
+        }
+    }, [currentPath, meta, seriesFilter, authorFilter, effectiveGroupMode, toggleSeriesPin, toggleAuthorPin]);
 
     // 1冊だけ選択中ならその書籍の現在タグを初期表示する
     const bulkTagInitial = (() => {
@@ -246,8 +284,8 @@ export function LibraryPanel() {
                         isSelectionMode={isSelectionMode}
                         selectedItems={selectedItems}
                         onToggleSelect={onToggleSelect}
-                        favorites={favorites}
-                        onToggleFavorite={toggleFavorite}
+                        favorites={pinnedBooks}
+                        onToggleFavorite={handleTogglePin}
                         onRename={onOpenRename}
                         onRegenThumb={handleRegenThumb}
                         getAuthors={(name) => getAuthors(currentPath, name)}

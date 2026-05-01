@@ -3,6 +3,8 @@ export const STORAGE_KEYS = {
     LIBRARY_SORT: 'librarySortOrder',
     DARK_MODE: 'darkMode',
     FAVORITES_PREFIX: 'favorites_',
+    SERIES_PINS_PREFIX: 'pins_series_',
+    AUTHOR_PINS_PREFIX: 'pins_author_',
 } as const;
 
 export const API_CONFIG = {

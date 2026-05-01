@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { PdfFile, BookMetaMap } from '../types';
+import type { PinsMap } from './useLibraryPins';
 
 /**
  * ライブラリの集約モード:
@@ -39,6 +40,10 @@ interface UseLibraryGroupingParams {
     currentPath: string;
     /** 'none' のときはフラット表示。`pdfs` をそのまま返す */
     mode: GroupMode;
+    /** series_id → ピン済み book_name。指定があればその巻を代表にする */
+    seriesPins?: PinsMap;
+    /** 作者キー → ピン済み book_name */
+    authorPins?: PinsMap;
 }
 
 function metaKey(path: string, name: string): string {
@@ -53,7 +58,7 @@ function metaKey(path: string, name: string): string {
  * - メンバーが 1 冊だけのグループは集約しない（単独本のまま）。
  */
 export function useLibraryGrouping({
-    pdfs, meta, currentPath, mode,
+    pdfs, meta, currentPath, mode, seriesPins, authorPins,
 }: UseLibraryGroupingParams): GroupedLibrary {
     return useMemo(() => {
         if (mode === 'none') {
@@ -115,12 +120,17 @@ export function useLibraryGrouping({
                     return { pdf: p, index: e?.series_index ?? 0 };
                 });
                 entries.sort((a, b) => a.index - b.index);
-                rep = entries[entries.length - 1].pdf;  // 最終巻
                 sortedMembers = entries.map(x => x.pdf);
+                // ピン済みの巻があればそれを代表に、なければ最終巻
+                const pinnedName = seriesPins?.[groupId];
+                const pinned = pinnedName ? sortedMembers.find(p => p.name === pinnedName) : null;
+                rep = pinned ?? entries[entries.length - 1].pdf;
             } else {
                 // 作者モード: 入力 pdfs の順序を保つ → 「ソート 1 位」が代表
-                rep = members[0];
                 sortedMembers = members;
+                const pinnedName = authorPins?.[groupId];
+                const pinned = pinnedName ? members.find(p => p.name === pinnedName) : null;
+                rep = pinned ?? members[0];
             }
 
             const readCount = mode === 'series'
@@ -166,5 +176,5 @@ export function useLibraryGrouping({
         }
 
         return { items, badgeByRepresentativeName, membersByRepresentativeName };
-    }, [pdfs, meta, currentPath, mode]);
+    }, [pdfs, meta, currentPath, mode, seriesPins, authorPins]);
 }
