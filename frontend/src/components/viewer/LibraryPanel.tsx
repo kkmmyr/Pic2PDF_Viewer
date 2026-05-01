@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer } from '../reader';
+import { LibraryHeader, FolderGrid, PdfGrid, ToastContainer, GenreFilterBar } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
@@ -232,10 +232,8 @@ export function LibraryPanel() {
                 searchText={searchText}
                 authorFilter={authorFilter}
                 tagFilter={tagFilter}
-                genreFilter={genreFilter}
                 allAuthors={allAuthors}
                 allTags={allTags}
-                allGenres={allGenres}
                 groupMode={groupMode}
                 breadcrumbs={breadcrumbs}
                 showHidden={showHidden}
@@ -255,7 +253,6 @@ export function LibraryPanel() {
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
                 onTagFilterChange={setTagFilter}
-                onGenreFilterChange={setGenreFilter}
                 onGroupModeChange={handleGroupModeChange}
                 onToggleShowHidden={toggleShowHidden}
                 showUnreadOnly={showUnreadOnly}
@@ -292,6 +289,12 @@ export function LibraryPanel() {
                 bulkSeriesExisting={allSeriesWithStats}
                 onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
                 onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
+            />
+
+            <GenreFilterBar
+                allGenres={allGenres}
+                genreFilter={genreFilter}
+                onGenreFilterChange={setGenreFilter}
             />
 
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">

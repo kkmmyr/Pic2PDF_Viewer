@@ -3,6 +3,7 @@ export { PageSlider } from './PageSlider';
 export { ReaderHeader } from './ReaderHeader';
 export { LibraryHeader } from './LibraryHeader';
 export { HeaderSearchBar } from './HeaderSearchBar';
+export { GenreFilterBar } from './GenreFilterBar';
 export { HeaderSortSelect } from './HeaderSortSelect';
 export { SourceSelector } from './SourceSelector';
 export { FolderGrid } from './FolderGrid';

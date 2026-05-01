@@ -1,48 +1,30 @@
 import { Search, User, Tag } from 'lucide-react';
 import { SearchableSelect } from '../ui/SearchableSelect';
 
-/** ジャンルボタンの表示順。リストにないジャンルはアルファベット順で末尾に追加される */
-const GENRE_ORDER = ['オリジナル', 'プリンセスコネクト', 'Voiceloid'];
-
 interface HeaderSearchBarProps {
     searchText: string;
     authorFilter: string;
     tagFilter: string;
-    genreFilter: string;
     allAuthors: string[];
     allTags: string[];
-    allGenres: string[];
     /** ドリルダウン中はパンくずに集約するため作者 select を隠す */
     hideAuthorSelect?: boolean;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
-    onGenreFilterChange: (genre: string) => void;
 }
 
 export function HeaderSearchBar({
     searchText,
     authorFilter,
     tagFilter,
-    genreFilter,
     allAuthors,
     allTags,
-    allGenres,
     hideAuthorSelect = false,
     onSearchChange,
     onAuthorFilterChange,
     onTagFilterChange,
-    onGenreFilterChange,
 }: HeaderSearchBarProps) {
-    const sortedGenres = [...allGenres].sort((a, b) => {
-        const ai = GENRE_ORDER.indexOf(a);
-        const bi = GENRE_ORDER.indexOf(b);
-        if (ai !== -1 && bi !== -1) return ai - bi;
-        if (ai !== -1) return -1;
-        if (bi !== -1) return 1;
-        return a.localeCompare(b, 'ja');
-    });
-
     return (
         <>
             <div className="relative">
@@ -67,34 +49,6 @@ export function HeaderSearchBar({
                         onChange={onAuthorFilterChange}
                         className="w-48"
                     />
-                </div>
-            )}
-
-            {sortedGenres.length > 0 && (
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={() => onGenreFilterChange('')}
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                            !genreFilter
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                        すべて
-                    </button>
-                    {sortedGenres.map(g => (
-                        <button
-                            key={g}
-                            onClick={() => onGenreFilterChange(genreFilter === g ? '' : g)}
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
-                                genreFilter === g
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                            }`}
-                        >
-                            {g}
-                        </button>
-                    ))}
                 </div>
             )}
 
