@@ -26,6 +26,8 @@ interface UseLibraryBulkActionsOptions {
     onRefresh: () => void;
     bookMeta: BookMetaActions;
     showToast: (message: string, type?: ToastType) => void;
+    addGenre: (name: string) => Promise<void>;
+    currentGenres: string[];
 }
 
 /**
@@ -35,7 +37,7 @@ interface UseLibraryBulkActionsOptions {
  */
 export function useLibraryBulkActions({
     currentPath, currentSource, selectedItems, showHidden, seriesFilter,
-    onClearSelection, onRefresh, bookMeta, showToast,
+    onClearSelection, onRefresh, bookMeta, showToast, addGenre, currentGenres,
 }: UseLibraryBulkActionsOptions) {
     /** 選択中の PDF 名のみ抽出（`.pdf` 以外は除外） */
     const selectedPdfNames = useMemo(
@@ -57,9 +59,12 @@ export function useLibraryBulkActions({
     }, [bookMeta, currentPath, selectedPdfNames, onClearSelection]);
 
     const handleBulkApplyGenre = useCallback(async (genre: string) => {
+        if (!currentGenres.includes(genre)) {
+            await addGenre(genre);
+        }
         await bookMeta.updateGenre(currentPath, selectedPdfNames, genre);
         onClearSelection();
-    }, [bookMeta, currentPath, selectedPdfNames, onClearSelection]);
+    }, [bookMeta, currentPath, selectedPdfNames, onClearSelection, addGenre, currentGenres]);
 
     /** 1冊だけの非表示/再表示。`showHidden` モード時は逆操作（再表示） */
     const handleToggleHiddenOne = useCallback(async (name: string) => {

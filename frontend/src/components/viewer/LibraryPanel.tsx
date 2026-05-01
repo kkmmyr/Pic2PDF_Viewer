@@ -186,6 +186,8 @@ export function LibraryPanel() {
         currentPath, currentSource, selectedItems, showHidden, seriesFilter,
         onClearSelection, onRefresh, showToast,
         bookMeta: { updateAuthors, updateTags, updateGenre, setHidden, assignSeries, reorderSeries },
+        addGenre,
+        currentGenres: genres,
     });
 
     void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
