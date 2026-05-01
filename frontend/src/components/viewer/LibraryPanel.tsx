@@ -168,23 +168,17 @@ export function LibraryPanel() {
 
     void isHidden; // 将来 PdfGrid 内で個別判定する用に export 済（現状は filter 段階で除外）
 
-    // コンテキストに応じてシリーズ or 作者ピンを切り替える
+    // seriesFilter 中 → シリーズ代表巻ピン、authorFilter 中 → 作者代表カードピン
     const handleTogglePin = useCallback((name: string) => {
         const key = currentPath ? `${currentPath}/${name}` : name;
         const entry = meta[key];
         if (!entry) return;
-        const isSeriesCtx = !!seriesFilter || effectiveGroupMode === 'series';
-        const isAuthorCtx = !!authorFilter || effectiveGroupMode === 'author';
-        if (isSeriesCtx && entry.series_id) {
-            toggleSeriesPin(entry.series_id, name);
-        } else if (isAuthorCtx && entry.authors?.length) {
-            toggleAuthorPin([...entry.authors].sort().join('\n'), name);
-        } else if (entry.series_id) {
-            toggleSeriesPin(entry.series_id, name);
-        } else if (entry.authors?.length) {
-            toggleAuthorPin([...entry.authors].sort().join('\n'), name);
+        if (seriesFilter) {
+            if (entry.series_id) toggleSeriesPin(entry.series_id, name);
+        } else if (authorFilter) {
+            if (entry.authors?.length) toggleAuthorPin([...entry.authors].sort().join('\n'), name);
         }
-    }, [currentPath, meta, seriesFilter, authorFilter, effectiveGroupMode, toggleSeriesPin, toggleAuthorPin]);
+    }, [currentPath, meta, seriesFilter, authorFilter, toggleSeriesPin, toggleAuthorPin]);
 
     // 集約カードをチェックしたときは全メンバーを一括選択/解除する
     const handleToggleSelect = useCallback((name: string) => {
