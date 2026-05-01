@@ -76,7 +76,7 @@ export default function GeneratorPage() {
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
                     <FolderSearch className="text-blue-600 dark:text-blue-400" />
-                    PDF Generator
+                    PDF 生成
                 </h2>
 
                 <div className="space-y-6">
@@ -91,7 +91,7 @@ export default function GeneratorPage() {
                     {/* Source Directory Input */}
                     <div>
                         <label htmlFor="sourceDir" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            Source Directory Path
+                            変換元フォルダのパス
                         </label>
                         <div className="flex gap-2">
                             <input
@@ -99,18 +99,18 @@ export default function GeneratorPage() {
                                 id="sourceDir"
                                 value={sourceDir}
                                 onChange={(e) => setSourceDir(e.target.value)}
-                                placeholder="C:\Path\To\Images"
+                                placeholder="C:\画像フォルダ\のパスを入力"
                                 className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                             />
                             <button
                                 onClick={fetchStatus}
                                 className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 transition-colors"
                             >
-                                Check Status
+                                状態確認
                             </button>
                         </div>
                         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Enter the absolute path to the folder containing your WebP images.
+                            WebP 画像が入ったフォルダの絶対パスを入力してください。
                         </p>
                     </div>
 
@@ -118,8 +118,8 @@ export default function GeneratorPage() {
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800 space-y-2">
                         <label htmlFor="quality" className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
                             <Zap size={16} className="text-amber-500 fill-amber-500" />
-                            Batch Compress Quality: {quality}
-                            <span className="ml-auto text-xs font-normal text-gray-500 dark:text-gray-400">Lower = smaller</span>
+                            一括圧縮 品質: {quality}
+                            <span className="ml-auto text-xs font-normal text-gray-500 dark:text-gray-400">小さいほどファイルサイズ小</span>
                         </label>
                         <input
                             id="quality"
@@ -140,7 +140,7 @@ export default function GeneratorPage() {
                             disabled={isLoading || !sourceDir}
                             className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-900 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all hover:scale-[1.01] active:scale-[0.99]"
                         >
-                            {isGenerating ? <><Loader2 className="animate-spin" />Generating...</> : <><FolderSearch size={22} />Scan & Generate</>}
+                            {isGenerating ? <><Loader2 className="animate-spin" />生成中...</> : <><FolderSearch size={22} />スキャン &amp; 生成</>}
                         </button>
 
                         <div className="relative">
@@ -148,7 +148,7 @@ export default function GeneratorPage() {
                                 <span className="w-full border-t border-gray-200 dark:border-gray-700" />
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">Or manage existing</span>
+                                <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">または既存 PDF を管理</span>
                             </div>
                         </div>
 
@@ -158,7 +158,7 @@ export default function GeneratorPage() {
                             className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-50 dark:disabled:bg-gray-800/50 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-xl border border-gray-300 dark:border-gray-600 transition-all"
                         >
                             {isCompressing ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} className="text-amber-500" />}
-                            {isCompressing ? 'Compressing...' : 'Batch Compress All Existing PDFs'}
+                            {isCompressing ? '圧縮中...' : '既存 PDF を一括圧縮'}
                         </button>
                     </div>
 
@@ -167,7 +167,7 @@ export default function GeneratorPage() {
                     {/* Error Message */}
                     {error && (
                         <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800 animate-in fade-in slide-in-from-top-2">
-                            Error: {error}
+                            エラー: {error}
                         </div>
                     )}
 

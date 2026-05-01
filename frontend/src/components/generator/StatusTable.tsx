@@ -11,9 +11,9 @@ const BADGE_CLASS: Record<StatusItem['status'], string> = {
 };
 
 const STATUS_LABEL: Record<StatusItem['status'], string> = {
-    completed:   'Completed',
-    in_progress: 'In Progress',
-    not_started: 'Not Started',
+    completed:   '完了',
+    in_progress: '処理中',
+    not_started: '未着手',
 };
 
 /**
@@ -24,14 +24,14 @@ export function StatusTable({ items }: StatusTableProps) {
 
     return (
         <div className="mt-8">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">Items Status</h3>
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200 mb-4">アイテム状況</h3>
             <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 font-medium border-b border-gray-200 dark:border-gray-700">
                         <tr>
-                            <th className="px-4 py-3">Name</th>
-                            <th className="px-4 py-3">Type</th>
-                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3">名前</th>
+                            <th className="px-4 py-3">種別</th>
+                            <th className="px-4 py-3">状態</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 dark:divide-gray-700">

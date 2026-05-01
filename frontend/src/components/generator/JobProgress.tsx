@@ -33,7 +33,7 @@ export function JobProgress({ job }: JobProgressProps) {
                 <span className={`text-sm font-semibold ${textClass}`}>
                     {job.status === 'pending' && 'ジョブを開始中...'}
                     {job.status === 'running' && (job.current_item ? `処理中: ${job.current_item}` : '処理中...')}
-                    {job.status === 'completed' && 'Generation complete'}
+                    {job.status === 'completed' && '生成完了'}
                     {job.status === 'failed' && '生成に失敗しました'}
                 </span>
             </div>
