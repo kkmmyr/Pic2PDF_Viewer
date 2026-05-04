@@ -15,9 +15,11 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from services.series_detector import (
+    common_prefix as _common_prefix,
+    detect_series_in_group as _detect_series_in_group,
+)
 from services.series_resolver import (
-    _common_prefix,
-    _detect_series_in_group,
     run_resolve,
     get_state,
     reset_state,

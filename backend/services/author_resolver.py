@@ -7,6 +7,9 @@ generated ソースの検索フロー:
   3. SearXNG site: フィルタ (dmm.co.jp OR dlsite.com 限定検索)
   4. SearXNG 汎用クエリ (サークル 同人誌)
 kindle / novel ソースは 4 のみ。
+
+各ステップは `_*_step(...) -> tuple[str, dict]` 形式で `(final, debug)` を返す。
+`resolve_author` は `final` を、`resolve_author_debug` は `debug` も含む dict を返す。
 """
 import json
 from urllib.parse import quote as _url_quote
@@ -28,14 +31,17 @@ _QUERY_CONFIG: dict[str, dict[str, str]] = {
     },
 }
 
-# SearXNG site: フィルタクエリ（ステップ 3 フォールバック用）
+# SearXNG site: フィルタクエリ（ステップ 3）
 _DIRECT_SITES_QUERY = '{title} site:dmm.co.jp OR site:dlsite.com'
 _DIRECT_SITES_EXTRACT_SUFFIX = "のサークル名（なければ著者名）"
 
-# 直接 HTTP フェッチする検索サイト（ステップ 1 / 2）。順に試し、最初に取得できた結果を返す。
+# 直接 HTTP フェッチする検索サイト（ステップ 1 / 2）
+_DLSITE_URL_TEMPLATE = "https://www.dlsite.com/maniax/fsr/=/language/jp/keyword/{}/"
+_FANZA_URL_TEMPLATE = "https://www.dmm.co.jp/dc/doujin/-/list/=/keyword={}/"
+
 _DIRECT_HTTP_SITES = [
-    ("dlsite", "https://www.dlsite.com/maniax/fsr/=/language/jp/keyword/{}/"),
-    ("fanza",  "https://www.dmm.co.jp/dc/doujin/-/list/=/keyword={}/"),
+    ("dlsite", _DLSITE_URL_TEMPLATE),
+    ("fanza",  _FANZA_URL_TEMPLATE),
 ]
 
 _INVALID_PATTERNS = (
@@ -88,29 +94,101 @@ def _extract_circle_from_page(page_text: str, title: str, call_ollama) -> str:
         return raw.strip()
 
 
-def _try_direct_http_search(url_template: str, title: str, fetch_url, call_ollama) -> str:
-    """指定 URL テンプレートのページを HTTP フェッチしてサークル名を取得する。
-    取得できない場合は空文字を返す（呼び出し側がフォールバック）。
-    """
+# ---------------------------------------------------------------------------
+# 各ステップ: (final, debug) を返す純関数群
+# ---------------------------------------------------------------------------
+
+def _http_step(
+    site_name: str, url_template: str, title: str, fetch_url, call_ollama,
+) -> tuple[str, dict]:
+    """直接 HTTP フェッチで指定 site のサークル名を抽出。"""
     url = url_template.format(_url_quote(title))
     page_text = fetch_url(url, max_chars=3000)
-    if not page_text:
-        return ""
-    sanitized = _sanitize_author(_extract_circle_from_page(page_text, title, call_ollama))
-    return sanitized if sanitized != "作者不明" else ""
+    raw = _extract_circle_from_page(page_text, title, call_ollama) if page_text else ""
+    sanitized = _sanitize_author(raw)
+    final = sanitized if sanitized != "作者不明" else ""
+    return final, {
+        f"{site_name}_url": url,
+        f"{site_name}_fetched": bool(page_text),
+        f"{site_name}_raw": raw,
+        f"{site_name}_result": final,
+    }
+
+
+def _searxng_filter_step(title: str, web_extract, searxng_search) -> tuple[str, dict]:
+    """SearXNG site: フィルタで DLsite/FANZA を検索する。
+
+    `searxng_search=None` の場合（resolve_author 通常パス）は snippets を取らず
+    web_extract のみ呼ぶ。`searxng_search` 指定時（debug パス）は両方呼ぶ。
+    """
+    query = _DIRECT_SITES_QUERY.format(title=title)
+    target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
+    if searxng_search is not None:
+        snippets = searxng_search(query, num_results=5, language="ja")
+        gemma_raw = web_extract(query, target, language="ja") if snippets else ""
+    else:
+        snippets = None
+        gemma_raw = web_extract(query, target, language="ja")
+    raw_str = str(gemma_raw).strip() if gemma_raw is not None else ""
+    sanitized = _sanitize_author(raw_str)
+    final = sanitized if sanitized != "作者不明" else ""
+    debug: dict = {
+        "direct_query": query,
+        "direct_gemma_raw": gemma_raw,
+        "direct_result": final,
+    }
+    if snippets is not None:
+        debug["direct_searxng_hit"] = bool(snippets)
+        debug["direct_searxng_snippets"] = snippets[:500] if snippets else ""
+    return final, debug
+
+
+def _searxng_generic_step(title: str, source: str, web_extract, searxng_search) -> tuple[str, dict]:
+    """SearXNG 汎用クエリで検索する（最終フォールバック）。
+
+    `searxng_search=None` の場合は snippets を取らず web_extract のみ呼ぶ。
+    """
+    config = _QUERY_CONFIG.get(source, _QUERY_CONFIG["generated"])
+    query = config["query_template"].format(title=title)
+    target = f'「{title}」' + config["extract_target_suffix"]
+    if searxng_search is not None:
+        snippets = searxng_search(query, num_results=5, language="ja")
+        gemma_raw = web_extract(query, target, language="ja") if snippets else ""
+    else:
+        snippets = None
+        gemma_raw = web_extract(query, target, language="ja")
+    raw_str = str(gemma_raw).strip() if gemma_raw is not None else ""
+    final = _sanitize_author(raw_str) if raw_str else "作者不明"
+    debug: dict = {
+        "query": query,
+        "extract_target": target,
+        "gemma_raw": gemma_raw,
+    }
+    if snippets is not None:
+        debug["searxng_hit"] = bool(snippets)
+        debug["searxng_snippets"] = snippets[:500] if snippets else ""
+    return final, debug
+
+
+# ---------------------------------------------------------------------------
+# 個別ステップの薄いラッパー（テスト・デバッグから個別利用するため公開）
+# ---------------------------------------------------------------------------
+
+def _try_dlsite(title: str, fetch_url, call_ollama) -> str:
+    return _http_step("dlsite", _DLSITE_URL_TEMPLATE, title, fetch_url, call_ollama)[0]
+
+
+def _try_fanza(title: str, fetch_url, call_ollama) -> str:
+    return _http_step("fanza", _FANZA_URL_TEMPLATE, title, fetch_url, call_ollama)[0]
 
 
 def _try_direct_sites(title: str, web_extract) -> str:
-    """SearXNG の site: フィルタで DLsite/FANZA を検索してサークル名を取得する。
-    直接検索が失敗した場合のフォールバック。取得できない場合は空文字を返す。
-    """
-    query = _DIRECT_SITES_QUERY.format(title=title)
-    extract_target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
-    result = web_extract(query, extract_target, language="ja")
-    result = str(result).strip() if result is not None else ""
-    sanitized = _sanitize_author(result)
-    return sanitized if sanitized != "作者不明" else ""
+    return _searxng_filter_step(title, web_extract, None)[0]
 
+
+# ---------------------------------------------------------------------------
+# パブリック API
+# ---------------------------------------------------------------------------
 
 def resolve_author(title: str, source: str) -> str:
     """
@@ -119,48 +197,35 @@ def resolve_author(title: str, source: str) -> str:
     generated ソースは以下の順で試み、成功した時点で返す:
       1. DLsite 直接検索
       2. FANZA 直接検索
-      3. SearXNG site: フィルタ（フォールバック）
+      3. SearXNG site: フィルタ
       4. SearXNG 汎用クエリ（最終フォールバック）
 
     kindle / novel ソースは 4 のみ。
 
-    Args:
-        title: 拡張子なしのファイル名（書籍タイトル）
-        source: 'generated' | 'kindle' | 'novel'
-
     Returns:
         サークル名/著者名文字列。取得失敗時は '作者不明'。
     """
-    web_extract, _, fetch_url, call_ollama = import_web_extract_tools()
+    web_extract, searxng_search, fetch_url, call_ollama = import_web_extract_tools()
     if web_extract is None:
         return "作者不明"
 
     if source == "generated":
-        # ステップ 1/2: DLsite → FANZA 直接 HTTP フェッチ
         if fetch_url and call_ollama:
-            for _name, url_template in _DIRECT_HTTP_SITES:
-                author = _try_direct_http_search(url_template, title, fetch_url, call_ollama)
-                if author:
-                    return author
-        # ステップ 3: SearXNG site: フィルタ
+            author = _try_dlsite(title, fetch_url, call_ollama)
+            if author:
+                return author
+            author = _try_fanza(title, fetch_url, call_ollama)
+            if author:
+                return author
         author = _try_direct_sites(title, web_extract)
         if author:
             return author
 
-    # ステップ 4: SearXNG 汎用クエリ（最終フォールバック / kindle / novel）
-    config = _QUERY_CONFIG.get(source, _QUERY_CONFIG["generated"])
-    query = config["query_template"].format(title=title)
-    extract_target = f'「{title}」' + config["extract_target_suffix"]
-    result = web_extract(query, extract_target, language="ja")
-    result_str = str(result).strip() if result is not None else ""
-    return _sanitize_author(result_str) if result_str else "作者不明"
+    return _searxng_generic_step(title, source, web_extract, searxng_search)[0]
 
 
 def resolve_author_debug(title: str, source: str) -> dict:
-    """
-    resolve_author の各ステップを可視化するデバッグ用関数。
-    DLsite/FANZA 直接検索・SearXNG の結果を個別に返す。
-    """
+    """resolve_author の各ステップを可視化するデバッグ用関数。"""
     web_extract, searxng_search, fetch_url, call_ollama = import_web_extract_tools()
     if web_extract is None:
         return {"error": "Gemma ツールをインポートできません。GEMMA_TOOL_DIR を確認してください。"}
@@ -168,57 +233,27 @@ def resolve_author_debug(title: str, source: str) -> dict:
     result: dict = {"title": title, "source": source}
 
     if source == "generated":
-        # ステップ 1/2: DLsite → FANZA 直接 HTTP フェッチ（デバッグ情報付き）
+        # ステップ 1/2: DLsite → FANZA 直接 HTTP フェッチ
         if fetch_url and call_ollama:
             for site_name, url_template in _DIRECT_HTTP_SITES:
-                url = url_template.format(_url_quote(title))
-                page_text = fetch_url(url, max_chars=3000)
-                raw = _extract_circle_from_page(page_text, title, call_ollama) if page_text else ""
-                sanitized = _sanitize_author(raw)
-                site_result = sanitized if sanitized != "作者不明" else ""
-                result[f"{site_name}_url"] = url
-                result[f"{site_name}_fetched"] = bool(page_text)
-                result[f"{site_name}_raw"] = raw
-                result[f"{site_name}_result"] = site_result
-                if site_result:
-                    result["final"] = site_result
+                final, debug = _http_step(site_name, url_template, title, fetch_url, call_ollama)
+                result.update(debug)
+                if final:
+                    result["final"] = final
                     result["used_step"] = f"{site_name}_direct"
                     return result
 
         # ステップ 3: SearXNG site: フィルタ
-        direct_query = _DIRECT_SITES_QUERY.format(title=title)
-        direct_target = f'「{title}」' + _DIRECT_SITES_EXTRACT_SUFFIX
-        direct_snippets = searxng_search(direct_query, num_results=5, language="ja")
-        direct_gemma = web_extract(direct_query, direct_target, language="ja") if direct_snippets else ""
-        direct_raw = str(direct_gemma).strip() if direct_gemma is not None else ""
-        direct_sanitized = _sanitize_author(direct_raw)
-
-        result["direct_query"] = direct_query
-        result["direct_searxng_hit"] = bool(direct_snippets)
-        result["direct_searxng_snippets"] = direct_snippets[:500] if direct_snippets else ""
-        result["direct_gemma_raw"] = direct_gemma
-        result["direct_result"] = direct_sanitized if direct_sanitized != "作者不明" else ""
-
-        if result["direct_result"]:
-            result["final"] = result["direct_result"]
+        final, debug = _searxng_filter_step(title, web_extract, searxng_search)
+        result.update(debug)
+        if final:
+            result["final"] = final
             result["used_step"] = "searxng_site_filter"
             return result
 
     # ステップ 4: SearXNG 汎用クエリ
-    config = _QUERY_CONFIG.get(source, _QUERY_CONFIG["generated"])
-    query = config["query_template"].format(title=title)
-    extract_target = f'「{title}」' + config["extract_target_suffix"]
-
-    snippets = searxng_search(query, num_results=5, language="ja")
-    gemma_result = web_extract(query, extract_target, language="ja") if snippets else ""
-
-    result["query"] = query
-    result["extract_target"] = extract_target
-    result["searxng_hit"] = bool(snippets)
-    result["searxng_snippets"] = snippets[:500] if snippets else ""
-    result["gemma_raw"] = gemma_result
-    gemma_str = str(gemma_result).strip() if gemma_result is not None else ""
-    result["final"] = _sanitize_author(gemma_str) if gemma_str else "作者不明"
+    final, debug = _searxng_generic_step(title, source, web_extract, searxng_search)
+    result.update(debug)
+    result["final"] = final
     result["used_step"] = "searxng_generic"
-
     return result

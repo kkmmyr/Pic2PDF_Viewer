@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Users } from 'lucide-react';
 import { useHitomiArrivals } from '../hooks/useHitomiArrivals';
 import { useToast } from '../hooks/useToast';
+import { useAsyncToast } from '../hooks/useAsyncToast';
 import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
 import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
 import { ToastContainer } from '../components/reader/ToastContainer';
@@ -58,40 +59,36 @@ export default function HitomiPage() {
         refresh, dismiss, dismissAll, runNow,
     } = useHitomiArrivals();
     const { toasts, showToast, dismissToast } = useToast();
+    const runAsync = useAsyncToast(showToast);
     const [watchlistOpen, setWatchlistOpen] = useState(false);
     const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
 
+    const errMsg = (label: string) => (e: unknown) =>
+        `${label}: ${e instanceof Error ? e.message : '不明'}`;
+
     const handleDismiss = async (id: number) => {
-        try {
-            await dismiss(id);
-        } catch (e) {
-            showToast(`既読化に失敗しました: ${e instanceof Error ? e.message : '不明'}`, 'error');
-        }
+        await runAsync(() => dismiss(id), errMsg('既読化に失敗しました'));
     };
 
     const handleDismissAllConfirmed = async () => {
         setConfirmDismissAllOpen(false);
-        try {
-            await dismissAll();
-            showToast('全件を既読化しました', 'success');
-        } catch (e) {
-            showToast(`一括既読化に失敗しました: ${e instanceof Error ? e.message : '不明'}`, 'error');
-        }
+        const ok = await runAsync(
+            async () => { await dismissAll(); return true; },
+            errMsg('一括既読化に失敗しました'),
+        );
+        if (ok) showToast('全件を既読化しました', 'success');
     };
 
     const handleRunNow = async () => {
-        try {
-            const stats = await runNow();
-            if (stats) {
-                const parts = [`新着 ${stats.added} 件追加`];
-                if (stats.skipped > 0) parts.push(`${stats.skipped} 件スキップ（本日既に取得済み）`);
-                if (stats.errors > 0) parts.push(`エラー ${stats.errors} 件`);
-                showToast(parts.join(' / '), stats.errors > 0 ? 'error' : 'success');
-            } else {
-                showToast('新着情報を取得しました', 'success');
-            }
-        } catch (e) {
-            showToast(`取得に失敗しました: ${e instanceof Error ? e.message : '不明'}`, 'error');
+        const stats = await runAsync(() => runNow(), errMsg('取得に失敗しました'));
+        if (stats === undefined) return;  // エラー時（runAsync 内で toast 済み）
+        if (stats) {
+            const parts = [`新着 ${stats.added} 件追加`];
+            if (stats.skipped > 0) parts.push(`${stats.skipped} 件スキップ（本日既に取得済み）`);
+            if (stats.errors > 0) parts.push(`エラー ${stats.errors} 件`);
+            showToast(parts.join(' / '), stats.errors > 0 ? 'error' : 'success');
+        } else {
+            showToast('新着情報を取得しました', 'success');
         }
     };
 

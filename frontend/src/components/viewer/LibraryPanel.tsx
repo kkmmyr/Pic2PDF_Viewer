@@ -8,9 +8,13 @@ import {
 } from '../../hooks';
 import { usePinnedBookSets } from '../../hooks/usePinnedBookSets';
 import { useSeriesAuthorFilter } from '../../hooks/useSeriesAuthorFilter';
+import { useDialogToggles } from '../../hooks/useDialogToggles';
+import { useAsyncToast } from '../../hooks/useAsyncToast';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
+
+type BulkDialogKey = 'bulkAuthor' | 'bulkTag' | 'merge' | 'bulkSeries' | 'bulkGenre';
 
 /**
  * ライブラリ一覧ビュー。
@@ -34,11 +38,7 @@ export function LibraryPanel() {
 
     const [searchText, setSearchText] = useState('');
     const [seriesEditTarget, setSeriesEditTarget] = useState<string | null>(null);
-    const [isBulkAuthorOpen, setIsBulkAuthorOpen] = useState(false);
-    const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
-    const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false);
-    const [isBulkSeriesOpen, setIsBulkSeriesOpen] = useState(false);
-    const [isBulkGenreOpen, setIsBulkGenreOpen] = useState(false);
+    const dialogs = useDialogToggles<BulkDialogKey>();
 
     const {
         authorFilter, tagFilter, seriesFilter,
@@ -92,6 +92,7 @@ export function LibraryPanel() {
     } = useBookMeta(currentSource);
     const { genres, addGenre, removeGenre, reorderGenres } = useGenres(currentSource);
     const { toasts, showToast, dismissToast } = useToast();
+    const runAsync = useAsyncToast(showToast);
 
     const { pinnedBooks, contextualFavorites } = usePinnedBookSets({
         meta, currentPath, seriesPins, authorPins, authorFilter, seriesFilter,
@@ -193,23 +194,21 @@ export function LibraryPanel() {
 
     const handleSeriesAssign = useCallback(async (params: { title: string; index: number | number[]; id?: string }) => {
         if (!seriesEditTarget) return;
-        try {
-            await assignSeries(currentPath, [seriesEditTarget], params);
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : 'シリーズ割り当てに失敗しました。', 'error');
-            throw e;
-        }
-    }, [seriesEditTarget, assignSeries, currentPath, showToast]);
+        await runAsync(
+            () => assignSeries(currentPath, [seriesEditTarget], params),
+            'シリーズ割り当てに失敗しました。',
+            { rethrow: true },
+        );
+    }, [seriesEditTarget, assignSeries, currentPath, runAsync]);
 
     const handleSeriesUnassign = useCallback(async () => {
         if (!seriesEditTarget) return;
-        try {
-            await unassignSeries(currentPath, [seriesEditTarget]);
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : 'シリーズ解除に失敗しました。', 'error');
-            throw e;
-        }
-    }, [seriesEditTarget, unassignSeries, currentPath, showToast]);
+        await runAsync(
+            () => unassignSeries(currentPath, [seriesEditTarget]),
+            'シリーズ解除に失敗しました。',
+            { rethrow: true },
+        );
+    }, [seriesEditTarget, unassignSeries, currentPath, runAsync]);
 
     return (
         <>
@@ -230,15 +229,15 @@ export function LibraryPanel() {
                 onUpClick={onUpClick}
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
-                onBulkSetAuthor={() => setIsBulkAuthorOpen(true)}
-                onBulkSetTag={() => setIsBulkTagOpen(true)}
-                onBulkSetSeries={() => setIsBulkSeriesOpen(true)}
+                onBulkSetAuthor={() => dialogs.open('bulkAuthor')}
+                onBulkSetTag={() => dialogs.open('bulkTag')}
+                onBulkSetSeries={() => dialogs.open('bulkSeries')}
                 bulkSeriesDisabled={isMixedAuthors}
-                onBulkSetGenre={() => setIsBulkGenreOpen(true)}
+                onBulkSetGenre={() => dialogs.open('bulkGenre')}
                 onBulkToggleHidden={bulkActions.handleBulkToggleHidden}
                 onBulkDelete={bulkActions.handleBulkDelete}
                 onRegenThumbnailBulk={bulkActions.handleRegenThumbnailBulk}
-                onMergePdfs={() => setIsMergeDialogOpen(true)}
+                onMergePdfs={() => dialogs.open('merge')}
                 onSortChange={setSortOrder}
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
@@ -257,25 +256,25 @@ export function LibraryPanel() {
                 renameTarget={renameTarget}
                 onCloseRename={onCloseRename}
                 onRenameItem={onRenameItem}
-                isBulkAuthorOpen={isBulkAuthorOpen}
+                isBulkAuthorOpen={dialogs.isOpen('bulkAuthor')}
                 bulkAuthorAllAuthors={allAuthors}
-                onCloseBulkAuthor={() => setIsBulkAuthorOpen(false)}
+                onCloseBulkAuthor={dialogs.close}
                 onBulkApplyAuthors={bulkActions.handleBulkApplyAuthors}
-                isBulkTagOpen={isBulkTagOpen}
+                isBulkTagOpen={dialogs.isOpen('bulkTag')}
                 bulkTagInitial={bulkTagInitial}
-                onCloseBulkTag={() => setIsBulkTagOpen(false)}
+                onCloseBulkTag={dialogs.close}
                 onBulkApplyTags={bulkActions.handleBulkApplyTags}
-                isMergeDialogOpen={isMergeDialogOpen}
-                onCloseMergeDialog={() => setIsMergeDialogOpen(false)}
+                isMergeDialogOpen={dialogs.isOpen('merge')}
+                onCloseMergeDialog={dialogs.close}
                 onMergePdfs={bulkActions.handleMergePdfs}
-                isBulkSeriesOpen={isBulkSeriesOpen}
+                isBulkSeriesOpen={dialogs.isOpen('bulkSeries')}
                 bulkSeriesNames={bulkActions.bulkSeriesNames}
                 bulkSeriesExisting={bulkSeriesFiltered}
-                onCloseBulkSeries={() => setIsBulkSeriesOpen(false)}
+                onCloseBulkSeries={dialogs.close}
                 onBulkAssignSeries={bulkActions.handleBulkAssignSeries}
-                isBulkGenreOpen={isBulkGenreOpen}
+                isBulkGenreOpen={dialogs.isOpen('bulkGenre')}
                 allGenres={genres}
-                onCloseBulkGenre={() => setIsBulkGenreOpen(false)}
+                onCloseBulkGenre={dialogs.close}
                 onBulkApplyGenre={bulkActions.handleBulkApplyGenre}
             />
 

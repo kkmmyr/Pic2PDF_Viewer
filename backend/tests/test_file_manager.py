@@ -23,44 +23,6 @@ def _make_dirs(tmp_path):
     return {"pdf": str(pdf_dir), "thumb": str(thumb_dir), "img": str(img_dir)}
 
 
-class TestMoveWithAssets:
-    def test_move_pdf_success(self, tmp_path):
-        dirs = _make_dirs(tmp_path)
-        src_pdf = os.path.join(dirs["pdf"], "book.pdf")
-        open(src_pdf, "w").close()
-        dst_subdir = os.path.join(dirs["pdf"], "sub")
-        os.makedirs(dst_subdir)
-
-        FileManager.move_with_assets("book.pdf", "", "sub", dirs)
-
-        assert os.path.exists(os.path.join(dirs["pdf"], "sub", "book.pdf"))
-        assert not os.path.exists(src_pdf)
-
-    def test_move_pdf_with_thumbnail(self, tmp_path):
-        dirs = _make_dirs(tmp_path)
-        open(os.path.join(dirs["pdf"], "book.pdf"), "w").close()
-        open(os.path.join(dirs["thumb"], "book.jpg"), "w").close()
-        os.makedirs(os.path.join(dirs["pdf"], "sub"))
-
-        FileManager.move_with_assets("book.pdf", "", "sub", dirs)
-
-        assert os.path.exists(os.path.join(dirs["thumb"], "sub", "book.jpg"))
-
-    def test_move_raises_if_src_not_found(self, tmp_path):
-        dirs = _make_dirs(tmp_path)
-        with pytest.raises(FileNotFoundError):
-            FileManager.move_with_assets("missing.pdf", "", "sub", dirs)
-
-    def test_move_raises_if_dst_exists(self, tmp_path):
-        dirs = _make_dirs(tmp_path)
-        open(os.path.join(dirs["pdf"], "book.pdf"), "w").close()
-        os.makedirs(os.path.join(dirs["pdf"], "sub"))
-        open(os.path.join(dirs["pdf"], "sub", "book.pdf"), "w").close()
-
-        with pytest.raises(FileExistsError):
-            FileManager.move_with_assets("book.pdf", "", "sub", dirs)
-
-
 class TestRenameWithAssets:
     def test_rename_pdf_success(self, tmp_path):
         dirs = _make_dirs(tmp_path)

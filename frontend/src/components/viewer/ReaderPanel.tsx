@@ -11,6 +11,8 @@ import {
 import { useNextSeriesVolume, usePrevSeriesVolume } from '../../hooks/useNextSeriesVolume';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
+import { useReaderUIState } from '../../hooks/useReaderUIState';
+import { usePdfDocumentState } from '../../hooks/usePdfDocumentState';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
 import { NextVolumeBanner } from '../reader/NextVolumeBanner';
@@ -48,10 +50,16 @@ export function ReaderPanel({
         useBookImages(selectedPdf, currentPath, currentSource);
 
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
-    const [numPages, setNumPages] = useState(0);
-    const [showHeader, setShowHeader] = useState(false);
-    const [showSlider, setShowSlider] = useState(false);
-    const [pdfVersion, setPdfVersion] = useState(0);
+    const {
+        numPages, setNumPages, resetNumPages,
+        pdfVersion, bumpPdfVersion, handleDocumentLoadSuccess,
+    } = usePdfDocumentState();
+    const {
+        showHeader, showHeaderOn, showHeaderOff,
+        showSlider, showSliderOn, showSliderOff,
+        isSearchOpen, openSearch, closeSearch, toggleSearch,
+        isHelpOpen, openHelp, closeHelp,
+    } = useReaderUIState();
 
     const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
@@ -92,13 +100,11 @@ export function ReaderPanel({
     } = useEditMode({
         selectedPdf, currentPath, currentSource,
         pageNumber, setPageNumber, onPdfUpdated,
-        bumpPdfVersion: () => setPdfVersion(v => v + 1),
+        bumpPdfVersion,
         showError: (msg) => showToast(msg, 'error'),
     });
 
-    // 検索 / ヘルプ
-    const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const [isHelpOpen, setIsHelpOpen] = useState(false);
+    // PDF 内テキスト検索
     const {
         searchText, setSearchText,
         matchCount, currentMatch,
@@ -113,16 +119,16 @@ export function ReaderPanel({
         isActive: true,
         onToggleFullscreen: toggleFullscreen,
         onToggleEditMode: toggleEditMode,
-        onOpenHelp: () => setIsHelpOpen(true),
-        onToggleSearch: () => setIsSearchOpen(true),
+        onOpenHelp: openHelp,
+        onToggleSearch: openSearch,
         onNavigateNextVolume: nextVolume && onSelectPdf ? handleNavigateNextVolume : null,
         onNavigatePrevVolume: prevVolume && onSelectPdf ? handleNavigatePrevVolume : null,
     });
 
     const handleCloseSearch = useCallback(() => {
-        setIsSearchOpen(false);
+        closeSearch();
         closeSearchState();
-    }, [closeSearchState]);
+    }, [closeSearch, closeSearchState]);
 
     // プリロード (3ページ先読み)
     useImagePreloader(imageUrls, pageNumber - 1, 3);
@@ -133,11 +139,11 @@ export function ReaderPanel({
 
     useEffect(() => {
         resetEditMode();
-        setNumPages(0);
+        resetNumPages();
         resetAutoSpread();
         handleCloseSearch();
         resetPage();
-    }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread]);
+    }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread, resetNumPages]);
 
     const handleClose = useCallback(() => {
         resetPage();
@@ -152,9 +158,8 @@ export function ReaderPanel({
     }, [resetPage]);
 
     const onDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
-        setNumPages(pdf.numPages);
-        onDocumentLoaded(pdf);
-    }, [onDocumentLoaded]);
+        handleDocumentLoadSuccess(pdf, onDocumentLoaded);
+    }, [handleDocumentLoadSuccess, onDocumentLoaded]);
 
     const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => (
         <PageRenderer
@@ -198,8 +203,8 @@ export function ReaderPanel({
     return (
         <>
             <EdgeHoverZones
-                onEnterTop={() => setShowHeader(true)}
-                onEnterBottom={() => setShowSlider(true)}
+                onEnterTop={showHeaderOn}
+                onEnterBottom={showSliderOn}
             />
 
             <ReaderHeader
@@ -218,10 +223,10 @@ export function ReaderPanel({
                 onCycleSpreadMode={cycleSpreadMode}
                 onToggleEditMode={toggleEditMode}
                 onDeletePages={requestDeletePages}
-                onMouseLeave={() => setShowHeader(false)}
-                onToggleSearch={() => setIsSearchOpen(s => !s)}
+                onMouseLeave={showHeaderOff}
+                onToggleSearch={toggleSearch}
                 onToggleFullscreen={toggleFullscreen}
-                onOpenHelp={() => setIsHelpOpen(true)}
+                onOpenHelp={openHelp}
             />
 
             <PageSlider
@@ -234,7 +239,7 @@ export function ReaderPanel({
                 currentPath={currentPath}
                 currentSource={currentSource}
                 onPageJump={setPageNumber}
-                onMouseLeave={() => setShowSlider(false)}
+                onMouseLeave={showSliderOff}
             />
 
             {isSearchOpen && (
@@ -293,7 +298,7 @@ export function ReaderPanel({
                 onCancel={cancelDeletePages}
             />
 
-            <ShortcutsHelpDialog open={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+            <ShortcutsHelpDialog open={isHelpOpen} onClose={closeHelp} />
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>

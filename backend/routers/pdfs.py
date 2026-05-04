@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
+from routers._deps import validate_request_targets
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
 from utils.file_utils import is_pdf_file
@@ -66,10 +67,8 @@ class MergePdfsRequest(BaseModel):
 @router.post("/pdfs/merge")
 def merge_pdfs(request: MergePdfsRequest):
     """複数の PDF を順番に結合して新しい PDF を生成する。"""
-    validate_safe_path(request.path, param_name="path")
+    validate_request_targets(request.path, request.names)
     validate_safe_name(request.output_name, param_name="output_name")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
 
     if len(request.names) < 2:
         raise HTTPException(status_code=400, detail="At least 2 PDFs are required for merging")

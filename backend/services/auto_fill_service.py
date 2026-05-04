@@ -1,5 +1,6 @@
 """サークル名自動登録ジョブの管理。"""
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from config import get_dirs_by_source, VALID_SOURCES

@@ -69,3 +69,42 @@ def update_meta_locked(source: str, updater: Callable[[MetaDict], None]) -> None
         meta = load_meta(source)
         updater(meta)
         save_meta(source, meta)
+
+
+def merge_entry_fields(
+    entry: dict,
+    *,
+    authors: list[str] | None = None,
+    tags: list[str] | None = None,
+    hidden: bool | None = None,
+    genre: str | None = None,
+) -> dict:
+    """部分的に指定されたフィールドだけを上書きしたエントリを返す（非破壊）。
+
+    - `authors` / `tags`: list（空可）。`None` 指定なら変更しない。
+    - `hidden`: True なら設定 / False なら削除。`None` 指定なら変更しない。
+    - `genre`: 空文字なら削除、文字列なら設定。`None` 指定なら変更しない。
+    """
+    merged = dict(entry)
+    if authors is not None:
+        merged["authors"] = authors
+    if tags is not None:
+        merged["tags"] = tags
+    if hidden is True:
+        merged["hidden"] = True
+    elif hidden is False:
+        merged.pop("hidden", None)
+    if genre is not None:
+        if genre:
+            merged["genre"] = genre
+        else:
+            merged.pop("genre", None)
+    return merged
+
+
+def has_meaningful_value(entry: dict) -> bool:
+    """エントリに「空 list 以外」の意味のある値があるかを返す。
+
+    `update_meta` で全フィールドに空 list が指定された場合にエントリ自体を消すかの判定に使う。
+    """
+    return any(not (isinstance(v, list) and not v) for v in entry.values())

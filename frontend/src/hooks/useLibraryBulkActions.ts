@@ -3,6 +3,7 @@ import type { LibrarySource, RegenerateThumbnailBulkResponse, MergePdfsResponse 
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import type { ToastType } from './useToast';
+import { useAsyncToast } from './useAsyncToast';
 
 /**
  * `useBookMeta` から渡すアクション関数群（必要分のみ）。
@@ -39,6 +40,8 @@ export function useLibraryBulkActions({
     currentPath, currentSource, selectedItems, showHidden, seriesFilter,
     onClearSelection, onRefresh, bookMeta, showToast, addGenre, currentGenres,
 }: UseLibraryBulkActionsOptions) {
+    const runAsync = useAsyncToast(showToast);
+
     /** 選択中の PDF 名のみ抽出（`.pdf` 以外は除外） */
     const selectedPdfNames = useMemo(
         () => Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf')),
@@ -68,40 +71,41 @@ export function useLibraryBulkActions({
 
     /** 1冊だけの非表示/再表示。`showHidden` モード時は逆操作（再表示） */
     const handleToggleHiddenOne = useCallback(async (name: string) => {
-        try {
-            await bookMeta.setHidden(currentPath, [name], !showHidden);
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
-        }
-    }, [bookMeta, currentPath, showHidden, showToast]);
+        await runAsync(
+            () => bookMeta.setHidden(currentPath, [name], !showHidden),
+            '更新に失敗しました。',
+        );
+    }, [bookMeta, currentPath, showHidden, runAsync]);
 
     const handleBulkToggleHidden = useCallback(async () => {
         if (selectedPdfNames.length === 0) return;
-        try {
-            await bookMeta.setHidden(currentPath, selectedPdfNames, !showHidden);
-            onClearSelection();
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '更新に失敗しました。', 'error');
-        }
-    }, [bookMeta, currentPath, selectedPdfNames, showHidden, showToast, onClearSelection]);
+        const ok = await runAsync(
+            async () => {
+                await bookMeta.setHidden(currentPath, selectedPdfNames, !showHidden);
+                return true;
+            },
+            '更新に失敗しました。',
+        );
+        if (ok) onClearSelection();
+    }, [bookMeta, currentPath, selectedPdfNames, showHidden, runAsync, onClearSelection]);
 
     const handleRegenThumbnailBulk = useCallback(async () => {
         if (selectedPdfNames.length === 0) return;
-        try {
-            const data = await apiClient.post<unknown, RegenerateThumbnailBulkResponse>(
+        const data = await runAsync(
+            () => apiClient.post<unknown, RegenerateThumbnailBulkResponse>(
                 API_ENDPOINTS.REGENERATE_THUMBNAIL_BULK,
-                { names: selectedPdfNames, path: currentPath, source: currentSource }
-            );
-            onRefresh();
-            if (data.failed.length > 0) {
-                showToast(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`, 'error');
-            }
-            // 部分失敗があっても、成功した分はあるので選択は解除する（押し直しの意図がない）
-            onClearSelection();
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : 'サムネイル再生成に失敗しました。', 'error');
+                { names: selectedPdfNames, path: currentPath, source: currentSource },
+            ),
+            'サムネイル再生成に失敗しました。',
+        );
+        if (!data) return;
+        onRefresh();
+        if (data.failed.length > 0) {
+            showToast(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`, 'error');
         }
-    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, showToast]);
+        // 部分失敗があっても、成功した分はあるので選択は解除する（押し直しの意図がない）
+        onClearSelection();
+    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, runAsync, showToast]);
 
     const handleMergePdfs = useCallback(async (outputName: string) => {
         await apiClient.post<unknown, MergePdfsResponse>(
@@ -115,49 +119,50 @@ export function useLibraryBulkActions({
     /** シリーズドリルダウン中の DnD ドロップで呼ばれる。`useBookMeta.reorderSeries` 内で楽観的更新+ロールバック実装済み */
     const handleSeriesReorder = useCallback(async (newOrder: string[]) => {
         if (!seriesFilter || newOrder.length === 0) return;
-        try {
-            await bookMeta.reorderSeries(currentPath, newOrder, seriesFilter);
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '並べ替えに失敗しました。', 'error');
-        }
-    }, [seriesFilter, currentPath, bookMeta, showToast]);
+        await runAsync(
+            () => bookMeta.reorderSeries(currentPath, newOrder, seriesFilter),
+            '並べ替えに失敗しました。',
+        );
+    }, [seriesFilter, currentPath, bookMeta, runAsync]);
 
     const handleBulkDelete = useCallback(async () => {
         if (selectedPdfNames.length === 0) return;
-        const ok = window.confirm(
+        const confirmed = window.confirm(
             `選択した ${selectedPdfNames.length} 件をディスクから完全に削除しますか？\nこの操作は元に戻せません。`
         );
+        if (!confirmed) return;
+        const ok = await runAsync(
+            async () => {
+                await apiClient.delete(API_ENDPOINTS.DELETE_PDFS, {
+                    data: { names: selectedPdfNames, path: currentPath, source: currentSource }
+                });
+                return true;
+            },
+            '削除に失敗しました。',
+        );
         if (!ok) return;
-        try {
-            await apiClient.delete(API_ENDPOINTS.DELETE_PDFS, {
-                data: { names: selectedPdfNames, path: currentPath, source: currentSource }
-            });
-            onRefresh();
-            onClearSelection();
-            showToast(`${selectedPdfNames.length} 件を削除しました`, 'success');
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : '削除に失敗しました。', 'error');
-        }
-    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, showToast]);
+        onRefresh();
+        onClearSelection();
+        showToast(`${selectedPdfNames.length} 件を削除しました`, 'success');
+    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, runAsync, showToast]);
 
     const handleBulkAssignSeries = useCallback(async (params: { title: string; indexes: number[]; id?: string }) => {
         if (bulkSeriesNames.length === 0) return;
         if (params.indexes.length !== bulkSeriesNames.length) {
             throw new Error('採番リストが選択数と一致しません');
         }
-        try {
-            await bookMeta.assignSeries(currentPath, bulkSeriesNames, {
+        await runAsync(
+            () => bookMeta.assignSeries(currentPath, bulkSeriesNames, {
                 title: params.title,
                 index: params.indexes,
                 id: params.id,
-            });
-            showToast(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`, 'success');
-            onClearSelection();
-        } catch (e: unknown) {
-            showToast(e instanceof Error ? e.message : 'シリーズ登録に失敗しました。', 'error');
-            throw e;
-        }
-    }, [bookMeta, currentPath, bulkSeriesNames, showToast, onClearSelection]);
+            }),
+            'シリーズ登録に失敗しました。',
+            { rethrow: true },
+        );
+        showToast(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`, 'success');
+        onClearSelection();
+    }, [bookMeta, currentPath, bulkSeriesNames, runAsync, showToast, onClearSelection]);
 
     return {
         bulkSeriesNames,

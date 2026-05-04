@@ -7,6 +7,7 @@ from config import get_dirs_by_source
 from utils.file_utils import is_image_file, is_pdf_file
 from utils.path_utils import validate_safe_path, validate_safe_name, join_path
 from utils.file_naming import get_thumbnail_name
+from routers._deps import validate_request_targets
 from services.thumbnail_service import ThumbnailService
 from services.file_manager import FileManager
 from services.meta_store import make_key, update_meta_locked
@@ -151,9 +152,7 @@ class DeletePdfsRequest(BaseModel):
 
 @router.delete("/pdfs")
 def delete_pdfs(request: DeletePdfsRequest):
-    validate_safe_path(request.path, param_name="path")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
+    validate_request_targets(request.path, request.names)
 
     dirs = get_dirs_by_source(request.source)
     deleted_count = 0

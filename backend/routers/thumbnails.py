@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
+from routers._deps import validate_request_targets
 from services.thumbnail_service import ThumbnailService
 from utils.path_utils import validate_safe_path, validate_safe_name
 from utils.file_naming import get_thumbnail_name
@@ -100,9 +101,7 @@ def regenerate_thumbnail(request: RegenerateThumbnailRequest):
 @router.post("/thumbnails/regenerate_bulk")
 def regenerate_thumbnail_bulk(request: RegenerateThumbnailBulkRequest):
     """複数書籍のサムネイルを一括再生成する。"""
-    validate_safe_path(request.path, param_name="path")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
+    validate_request_targets(request.path, request.names)
 
     dirs = get_dirs_by_source(request.source)
     succeeded: list[str] = []

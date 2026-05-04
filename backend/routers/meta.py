@@ -10,10 +10,16 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from config import get_dirs_by_source
-from utils.path_utils import validate_safe_path, validate_safe_name
 from services.author_resolver import resolve_author_debug
-from services.meta_store import make_key, load_meta, update_meta_locked
-from routers._deps import validated_source, assert_valid_source
+from services.meta_store import (
+    has_meaningful_value,
+    load_meta,
+    make_key,
+    merge_entry_fields,
+    update_meta_locked,
+)
+from routers._deps import validated_source, assert_valid_source, validate_request_targets
+from utils.path_utils import validate_safe_name, validate_safe_path
 from services.auto_fill_service import (
     VALID_MODES,
     get_auto_fill_state,
@@ -71,68 +77,35 @@ def get_meta(source: str = Depends(validated_source)) -> dict:
 
 @router.patch("/meta")
 def update_meta(request: UpdateMetaRequest) -> dict:
-    """1冊または複数冊のメタデータ（作者名 / タグ / 非表示フラグ）を上書き保存する。
+    """1冊または複数冊のメタデータ（作者名 / タグ / 非表示フラグ / ジャンル）を上書き保存する。
 
-    `authors` / `tags` / `hidden` は省略可。省略されたフィールドは変更しない。
+    指定したフィールドのみ書き換え、省略されたフィールドは保持する。
+    すべての list フィールドが空になった場合はエントリ自体を削除する。
     """
     assert_valid_source(request.source)
     if request.authors is None and request.tags is None and request.hidden is None and request.genre is None:
         raise HTTPException(status_code=400, detail="authors, tags, hidden, or genre must be specified")
 
-    validate_safe_path(request.path, param_name="path")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
+    validate_request_targets(request.path, request.names)
 
     # 各フィールドを正規化（None ならそのまま）
     authors = [a.strip() for a in request.authors if a.strip()] if request.authors is not None else None
     tags = [t.strip() for t in request.tags if t.strip()] if request.tags is not None else None
-    hidden = request.hidden  # bool | None
     genre = request.genre.strip() if request.genre is not None else None
-
-    def _merge_list_field(entry: dict, field: str, value: list[str] | None) -> None:
-        """list フィールドを書き換える。`value is None` の場合は何もしない。"""
-        if value is None:
-            return
-        if value:
-            entry[field] = value
-        else:
-            # 空配列を渡された場合は空のまま残す（最後にエントリ自体を消すかは呼び出し側で判定）
-            entry[field] = []
-
-    def _merge_hidden(entry: dict, value: bool | None) -> None:
-        """hidden フィールドを書き換えるか削除する。`value is None` の場合は何もしない。"""
-        if value is None:
-            return
-        if value:
-            entry["hidden"] = True
-        else:
-            entry.pop("hidden", None)
-
-    def _merge_genre(entry: dict, value: str | None) -> None:
-        """genre フィールドを書き換えるか削除する。`value is None` の場合は何もしない。"""
-        if value is None:
-            return
-        if value:
-            entry["genre"] = value
-        else:
-            entry.pop("genre", None)
 
     def _apply(data):
         for name in request.names:
             key = make_key(request.path, name)
-            existing = dict(data.get(key, {}))
-            _merge_list_field(existing, "authors", authors)
-            _merge_list_field(existing, "tags", tags)
-            _merge_hidden(existing, hidden)
-            _merge_genre(existing, genre)
-
-            # エントリ全体が「空 list だけ」「あるいは何も無い」場合は削除
-            # 非 list フィールド（view_count / hidden 等）が残っていればエントリは保持
-            has_meaningful = any(
-                not (isinstance(v, list) and not v) for v in existing.values()
+            merged = merge_entry_fields(
+                data.get(key, {}),
+                authors=authors,
+                tags=tags,
+                hidden=request.hidden,
+                genre=genre,
             )
-            if has_meaningful:
-                data[key] = existing
+            # 非 list フィールド（view_count / hidden 等）が残っていればエントリは保持
+            if has_meaningful_value(merged):
+                data[key] = merged
             else:
                 data.pop(key, None)
 

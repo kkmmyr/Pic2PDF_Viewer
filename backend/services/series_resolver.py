@@ -1,28 +1,28 @@
-"""シリーズ自動グループ化サービス。
+"""シリーズ自動グループ化ジョブ実行サービス。
 
-「同じ作者 + タイトル前方一致 + 残部分が巻数パターン」を満たす書籍ペアを
-シリーズとしてグループ化し、`meta.json` に `series_id` / `series_title` /
-`series_index` を書き戻す。
+判定ロジックは `services/series_detector.py` を参照。本モジュールは
+`SeriesResolveState` 状態管理、Gemma 補助、バックグラウンドスレッド起動を担当する。
 
-Phase 1: ルールベース。
+Phase 1: ルールベース判定（detector に委譲）。
 Phase 2: `use_gemma=True` 指定時、ルール判定後に同作者でシリーズ未割当の
 書籍を Gemma に問い合わせて既存シリーズに追加するかを判定する。
 """
-import hashlib
-import os
-from dataclasses import dataclass, field
+import threading
+from dataclasses import dataclass
 
-from config import get_dirs_by_source, VALID_SOURCES
 from services.gemma_client import import_ollama_client
 from services.job_state import JobStateManager
 from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
-from services.volume_parser import parse_pair_volume_indexes
-from utils.file_utils import is_pdf_file
+from services.series_detector import (
+    collect_books,
+    collect_series_members,
+    detect_series_in_group,
+    group_by_authors,
+    stable_series_id,
+)
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-SERIES_MIN_PREFIX_LEN = 5
 
 
 @dataclass
@@ -58,8 +58,7 @@ def _ask_gemma_is_same_series(
 ) -> bool:
     """Gemma に「candidate_title は reference_titles と同じシリーズか？」を問う。
 
-    `call_ollama` は `_ensure_ollama_client()` の戻り値。応答が "YES" で
-    始まれば True を返す。タイムアウト・例外時は False（黙って除外）。
+    応答が "YES" で始まれば True。タイムアウト・例外時は False（黙って除外）。
     """
     refs = "\n".join(f"- {t}" for t in reference_titles[:5])
     prompt = (
@@ -74,133 +73,6 @@ def _ask_gemma_is_same_series(
     except Exception as e:
         logger.warning("Gemma series check failed for %r: %s", candidate_title, e)
         return False
-
-
-def _common_prefix(a: str, b: str) -> str:
-    """2 文字列の共通前方プレフィックスを返す。"""
-    n = min(len(a), len(b))
-    for i in range(n):
-        if a[i] != b[i]:
-            return a[:i]
-    return a[:n]
-
-
-def _authors_key(authors: list[str]) -> tuple[str, ...]:
-    """作者リストを順序非依存の集合キーに変換する。"""
-    return tuple(sorted({a.strip() for a in authors if a.strip()}))
-
-
-def _stable_series_id(prefix: str, authors_key: tuple[str, ...]) -> str:
-    """共通プレフィックス + 作者集合から安定したシリーズ ID を作る。"""
-    raw = prefix + "\x00" + "\x00".join(authors_key)
-    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:12]
-
-
-def _trim_prefix(prefix: str) -> str:
-    """シリーズ表示名として使うため、末尾の余分な空白・記号を除去する。"""
-    return prefix.rstrip(" 　-_:：・")
-
-
-def _collect_books(source: str) -> list[tuple[str, str, str]]:
-    """対象ソースの全 PDF を `(rel_path, filename, title)` のリストで返す。"""
-    pdf_root = get_dirs_by_source(source)["pdf"]
-    if not os.path.isdir(pdf_root):
-        return []
-    items: list[tuple[str, str, str]] = []
-    for root, _, files in os.walk(pdf_root):
-        for f in sorted(files):
-            if not is_pdf_file(f):
-                continue
-            rel = os.path.relpath(root, pdf_root)
-            rel_path = "" if rel == "." else rel.replace("\\", "/")
-            title = os.path.splitext(f)[0]
-            items.append((rel_path, f, title))
-    return items
-
-
-def _group_by_authors(
-    books: list[tuple[str, str, str]],
-    meta: MetaDict,
-) -> dict[tuple[str, ...], list[tuple[str, str, str]]]:
-    """書籍を作者集合キーごとにグループ化する。作者なしは除外。"""
-    groups: dict[tuple[str, ...], list[tuple[str, str, str]]] = {}
-    for rel_path, filename, title in books:
-        key = make_key(rel_path, filename)
-        authors = meta.get(key, {}).get("authors") or []
-        akey = _authors_key(authors)
-        if not akey:
-            continue
-        groups.setdefault(akey, []).append((rel_path, filename, title))
-    return groups
-
-
-def _detect_series_in_group(
-    group: list[tuple[str, str, str]],
-) -> dict[str, tuple[str, float]]:
-    """1 つの作者グループ内でシリーズ判定する。
-
-    Returns:
-        `{ make_key(rel_path, filename): (series_title, series_index) }` のマップ。
-        `series_index` は float（小数巻 `2.5` 等に対応）。
-    """
-    result: dict[str, tuple[str, float]] = {}
-    n = len(group)
-    if n < 2:
-        return result
-
-    # 同じプレフィックスを共有するメンバーを集める。プレフィックスは
-    # 「ペアごとに最大共通プレフィックス」を取ってから巻数判定が成立する組のみ採用。
-    # 効率より分かりやすさ優先で全ペア O(n^2)。書籍数が数千以下なら問題ない。
-    prefix_to_members: dict[str, list[tuple[str, str, float]]] = {}
-    for i in range(n):
-        for j in range(i + 1, n):
-            ti, tj = group[i][2], group[j][2]
-            prefix = _common_prefix(ti, tj)
-            if len(prefix) < SERIES_MIN_PREFIX_LEN:
-                continue
-            # 「巻数なし＝1巻」ルール込みで巻数解析
-            idx_i, idx_j = parse_pair_volume_indexes(ti[len(prefix):], tj[len(prefix):])
-            if idx_i is None or idx_j is None:
-                continue
-            display = _trim_prefix(prefix)
-            if not display:
-                continue
-            members = prefix_to_members.setdefault(display, [])
-            for path, name, idx in [(group[i][0], group[i][1], idx_i), (group[j][0], group[j][1], idx_j)]:
-                key = make_key(path, name)
-                if not any(k == key for k, _, _ in members):
-                    members.append((key, name, idx))
-
-    # 同じ書籍が複数グループに属した場合は「最も長いプレフィックス」を採用
-    best_for_key: dict[str, tuple[str, float]] = {}
-    for prefix, members in prefix_to_members.items():
-        for key, _name, idx in members:
-            current = best_for_key.get(key)
-            if current is None or len(prefix) > len(current[0]):
-                best_for_key[key] = (prefix, idx)
-
-    for key, (prefix, idx) in best_for_key.items():
-        result[key] = (prefix, idx)
-    return result
-
-
-def _collect_series_members(meta: MetaDict) -> dict[str, dict]:
-    """meta から series_id ごとのメンバー情報（titles / max_index / series_title / authors_key）を集計して返す。"""
-    series_members: dict[str, dict] = {}
-    for key, entry in meta.items():
-        sid = entry.get("series_id")
-        if not sid:
-            continue
-        title = os.path.splitext(os.path.basename(key))[0]
-        m = series_members.setdefault(sid, {
-            "titles": [],
-            "max_index": 0.0,
-            "series_title": entry.get("series_title", ""),
-            "authors_key": tuple(sorted({a.strip() for a in entry.get("authors", []) if a.strip()})),
-        })
-        m["titles"].append(title)
-        m["max_index"] = max(m["max_index"], float(entry.get("series_index", 0)))
-    return series_members
 
 
 def _assign_book_to_series(
@@ -245,9 +117,9 @@ def _augment_with_gemma(
         return
 
     meta = load_meta(source)
-    series_members = _collect_series_members(meta)
+    series_members = collect_series_members(meta)
 
-    for authors_key, group in groups.items():
+    for ak, group in groups.items():
         unassigned = [
             (rel_path, fname, title)
             for (rel_path, fname, title) in group
@@ -257,7 +129,7 @@ def _augment_with_gemma(
             continue
 
         relevant_series = {
-            sid: m for sid, m in series_members.items() if m["authors_key"] == authors_key
+            sid: m for sid, m in series_members.items() if m["authors_key"] == ak
         }
         if not relevant_series:
             continue
@@ -281,12 +153,12 @@ def run_resolve(source: str, use_gemma: bool = False) -> None:
     """
     state = get_state(source)
     try:
-        books = _collect_books(source)
+        books = collect_books(source)
         state.total = len(books)
 
         # スナップショットを取って判定（書き込みは更新時に都度ロック取得）
         meta_snapshot = load_meta(source)
-        groups = _group_by_authors(books, meta_snapshot)
+        groups = group_by_authors(books, meta_snapshot)
 
         # 既存の series_* を全部一旦クリア（再ラベルするため）
         def _clear_series(data: MetaDict) -> None:
@@ -298,17 +170,17 @@ def run_resolve(source: str, use_gemma: bool = False) -> None:
 
         created_series: set[str] = set()
         per_group_done = 0
-        for authors_key, group in groups.items():
-            detected = _detect_series_in_group(group)
+        for ak, group in groups.items():
+            detected = detect_series_in_group(group)
             if not detected:
                 per_group_done += len(group)
                 state.done = per_group_done
                 continue
 
             # まとめて 1 回のロックで書き込む
-            def _apply(data: MetaDict, det=detected, ak=authors_key) -> None:
+            def _apply(data: MetaDict, det=detected, akv=ak) -> None:
                 for key, (prefix, idx) in det.items():
-                    sid = _stable_series_id(prefix, ak)
+                    sid = stable_series_id(prefix, akv)
                     existing = dict(data.get(key, {}))
                     existing["series_id"] = sid
                     existing["series_title"] = prefix
@@ -320,7 +192,6 @@ def run_resolve(source: str, use_gemma: bool = False) -> None:
             per_group_done += len(group)
             state.done = per_group_done
             state.created = len(created_series)
-            # 1 グループあたりの最初の書籍タイトルを current に
             state.current = group[0][2] if group else ""
 
         # Phase 2: Gemma 補助

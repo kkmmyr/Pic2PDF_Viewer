@@ -8,14 +8,10 @@ auto-fill と同じ非同期ジョブパターン。
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers._deps import validated_source, assert_valid_source
+from routers._deps import validated_source, assert_valid_source, validate_request_targets
 from services.meta_store import MetaDict, make_key, update_meta_locked
-from services.series_resolver import (
-    _stable_series_id,
-    get_state,
-    start_resolve_job,
-)
-from utils.path_utils import validate_safe_name, validate_safe_path
+from services.series_detector import stable_series_id
+from services.series_resolver import get_state, start_resolve_job
 
 router = APIRouter()
 
@@ -105,9 +101,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
     else:
         indexes = [float(request.index)] * len(request.names)
 
-    validate_safe_path(request.path, param_name="path")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
+    validate_request_targets(request.path, request.names)
 
     # id 省略時は title と「対象書籍のうち最初の書籍の作者集合」から生成
     series_id = request.id
@@ -119,7 +113,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
             first_key = make_key(request.path, request.names[0])
             first_authors = data.get(first_key, {}).get("authors") or []
             authors_key = tuple(sorted({a.strip() for a in first_authors if a.strip()}))
-            series_id = _stable_series_id(request.title.strip(), authors_key)
+            series_id = stable_series_id(request.title.strip(), authors_key)
 
         for name, idx in zip(request.names, indexes):
             key = make_key(request.path, name)
@@ -140,9 +134,7 @@ def unassign_series(request: UnassignSeriesRequest) -> dict:
     if not request.names:
         raise HTTPException(status_code=400, detail="names must not be empty")
 
-    validate_safe_path(request.path, param_name="path")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
+    validate_request_targets(request.path, request.names)
 
     def _apply(data: MetaDict) -> None:
         for name in request.names:
@@ -171,9 +163,7 @@ def reorder_series(request: ReorderSeriesRequest) -> dict:
     if not request.series_id.strip():
         raise HTTPException(status_code=400, detail="series_id must not be empty")
 
-    validate_safe_path(request.path, param_name="path")
-    for name in request.names:
-        validate_safe_name(name, param_name="name")
+    validate_request_targets(request.path, request.names)
 
     def _apply(data: MetaDict) -> None:
         # 全書籍が対象シリーズに属することを先に検査（一部だけ更新して中途半端な状態に
