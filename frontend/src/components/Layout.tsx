@@ -25,7 +25,7 @@ export default function Layout() {
                                     <div className="bg-primary-600 p-1.5 rounded-lg">
                                         <FileText className="w-6 h-6 text-white" />
                                     </div>
-                                    <span className="text-xl font-bold text-primary-700 dark:text-primary-300">
+                                    <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-primary-700">
                                         Pic2PDF Viewer
                                     </span>
                                 </Link>
