@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type RefObject } from 'react';
+import React, { type KeyboardEvent, type RefObject } from 'react';
 import { X } from 'lucide-react';
 
 const CHIP_COLORS = {
@@ -60,7 +60,7 @@ export function TagsInput({
                     </span>
                 ))}
                 <input
-                    ref={inputRef}
+                    ref={inputRef as React.RefObject<HTMLInputElement>}
                     type="text"
                     value={input}
                     onChange={(e) => onChange(e.target.value)}

@@ -95,7 +95,7 @@ export type SortOrder = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc' | 'f
  * 書籍メタデータ（1冊分）
  */
 export interface BookMetaEntry {
-    authors: string[];
+    authors?: string[];
     tags?: string[];
     view_count?: number;
     last_viewed_at?: number;
