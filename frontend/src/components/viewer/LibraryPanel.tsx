@@ -102,10 +102,13 @@ export function LibraryPanel() {
         meta, currentPath, seriesPins, authorPins, authorFilter, seriesFilter,
     });
 
+    // favorites_first ソート用 favorites: ドリルダウン中は文脈別ピン、トップ階層は両ピン混在。
+    // 星の表示（contextualFavorites）と並び順の意味を一致させる。
+    const sortFavorites = (seriesFilter || authorFilter) ? contextualFavorites : pinnedBooks;
     const sortedPdfs = useSortedPdfs(
         pdfs,
         sortOrder,
-        pinnedBooks,
+        sortFavorites,
         (name) => getViewCount(currentPath, name),
         (name) => getLastViewedAt(currentPath, name),
     );
