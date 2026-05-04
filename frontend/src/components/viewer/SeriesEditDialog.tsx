@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 interface SeriesEditDialogProps {
     open: boolean;
@@ -31,23 +32,19 @@ export function SeriesEditDialog({
     const [selectedId, setSelectedId] = useState<string>(current?.id ?? '');
     const [newTitle, setNewTitle] = useState<string>('');
     const [indexStr, setIndexStr] = useState<string>(current?.index ? String(current.index) : '1');
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose, '保存に失敗しました。');
 
     useEffect(() => {
         if (!open) return;
-        // 開いた瞬間に状態をリセット
         setMode(current ? 'existing' : 'new');
         setSelectedId(current?.id ?? (allSeries[0]?.id ?? ''));
         setNewTitle('');
         setIndexStr(current?.index !== undefined ? String(current.index) : '1');
         setError(null);
-    }, [open, current, allSeries]);
+    }, [open, current, allSeries, setError]);
 
-    const handleSubmit = async () => {
-        setError(null);
-        setSaving(true);
-        try {
+    const handleSubmitWrapper = () => {
+        handleSubmit(async () => {
             if (mode === 'unassign') {
                 await onUnassign();
             } else {
@@ -65,12 +62,7 @@ export function SeriesEditDialog({
                     await onAssign({ title: newTitle.trim(), index: idx });
                 }
             }
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '保存に失敗しました。');
-        } finally {
-            setSaving(false);
-        }
+        });
     };
 
     const noExistingSeries = allSeries.length === 0;
@@ -187,7 +179,7 @@ export function SeriesEditDialog({
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />
-                <DialogPrimaryButton onClick={handleSubmit} disabled={saving}>
+                <DialogPrimaryButton onClick={handleSubmitWrapper} disabled={saving}>
                     {saving ? '保存中...' : '適用'}
                 </DialogPrimaryButton>
             </DialogFooter>
