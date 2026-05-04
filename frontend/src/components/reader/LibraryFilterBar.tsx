@@ -83,9 +83,9 @@ export function LibraryFilterBar({
                      * 紫背景にすると <option> がダークモードで読めなくなる。
                      * 紫強調は border + ring + 文字色で表現する。
                      */
-                    className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-400 max-w-[140px] truncate ${
+                    className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-accent-400 max-w-[140px] truncate ${
                         groupMode !== 'none'
-                            ? 'text-purple-700 dark:text-purple-300 border-purple-400 dark:border-purple-600 ring-1 ring-purple-200 dark:ring-purple-800'
+                            ? 'text-accent-700 dark:text-accent-300 border-accent-400 dark:border-accent-600 ring-1 ring-accent-200 dark:ring-accent-800'
                             : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
                     }`}
                 >

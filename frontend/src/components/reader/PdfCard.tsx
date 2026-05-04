@@ -63,7 +63,7 @@ export function PdfCard({
                 isSelected
                     ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
                     : isGroup
-                        ? 'border-purple-300 dark:border-purple-700 bg-white dark:bg-gray-800'
+                        ? 'border-accent-300 dark:border-accent-700 bg-white dark:bg-gray-800'
                         : 'border-transparent bg-white dark:bg-gray-800'
             }`}
         >
@@ -82,7 +82,7 @@ export function PdfCard({
 
             <div className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}>
                 <span
-                    className={`font-medium text-sm line-clamp-2 ${isGroup ? 'text-purple-700 dark:text-purple-300' : 'text-gray-800 dark:text-gray-200'}`}
+                    className={`font-medium text-sm line-clamp-2 ${isGroup ? 'text-accent-700 dark:text-accent-300' : 'text-gray-800 dark:text-gray-200'}`}
                     title={isGroup && badge ? badge.displayTitle : pdf.name}
                 >
                     {isGroup && badge ? badge.displayTitle : pdf.name.replace('.pdf', '')}

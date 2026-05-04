@@ -38,7 +38,7 @@ export function SeriesResolveBar({ source, onComplete }: SeriesResolveBarProps) 
                 <>
                     <button
                         onClick={handleStart}
-                        className="text-xs px-3 py-1 rounded bg-purple-600 hover:bg-purple-700 text-white transition-colors shrink-0"
+                        className="text-xs px-3 py-1 rounded bg-accent-600 hover:bg-accent-700 text-white transition-colors shrink-0"
                     >
                         シリーズ判定実行
                     </button>
@@ -61,7 +61,7 @@ export function SeriesResolveBar({ source, onComplete }: SeriesResolveBarProps) 
                         </div>
                         <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                             <div
-                                className="h-full bg-purple-500 rounded-full transition-all duration-500"
+                                className="h-full bg-accent-500 rounded-full transition-all duration-500"
                                 style={{ width: `${progressPct}%` }}
                             />
                         </div>

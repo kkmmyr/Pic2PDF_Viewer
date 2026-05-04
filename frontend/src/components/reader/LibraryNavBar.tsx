@@ -40,7 +40,7 @@ export function LibraryNavBar({ currentPath, currentSource, breadcrumbs, onUpCli
                             const labelEl = (
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded ${
                                     isLast
-                                        ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-medium'
+                                        ? 'bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 font-medium'
                                         : crumb.onClick
                                             ? 'hover:bg-gray-200 dark:hover:bg-gray-800 cursor-pointer'
                                             : ''

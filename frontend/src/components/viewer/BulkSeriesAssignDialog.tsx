@@ -145,7 +145,7 @@ export function BulkSeriesAssignDialog({
                     <ul className="text-sm text-gray-700 dark:text-gray-300 space-y-1 max-h-40 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-gray-50 dark:bg-gray-900">
                         {selectedNames.map((name, i) => (
                             <li key={name} className="flex items-center gap-2">
-                                <span className="text-purple-600 dark:text-purple-400 tabular-nums w-10 text-right shrink-0 font-medium">
+                                <span className="text-accent-600 dark:text-accent-400 tabular-nums w-10 text-right shrink-0 font-medium">
                                     #{previewIndexes[i]}
                                 </span>
                                 <span className="truncate">{name.replace(/\.pdf$/i, '')}</span>

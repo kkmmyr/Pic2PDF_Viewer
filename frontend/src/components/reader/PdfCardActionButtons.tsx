@@ -1,7 +1,7 @@
 import { Pencil, RefreshCw, EyeOff, Eye, BookCopy } from 'lucide-react';
 
 const BTN_ICON = 'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors';
-const BTN_ICON_SERIES = 'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-purple-500 dark:hover:text-purple-400 transition-colors';
+const BTN_ICON_SERIES = 'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-accent-500 dark:hover:text-accent-400 transition-colors';
 
 interface PdfCardActionButtonsProps {
     name: string;
