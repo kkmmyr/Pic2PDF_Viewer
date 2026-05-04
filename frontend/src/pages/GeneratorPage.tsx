@@ -143,7 +143,7 @@ export default function GeneratorPage() {
                             type="button"
                             onClick={handleGenerate}
                             disabled={isLoading || !sourceDir}
-                            className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary-200 dark:shadow-none transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white font-bold py-4 rounded-xl border border-primary-700 dark:border-primary-400 shadow-lg shadow-primary-200 dark:shadow-primary-900/30 transition-all hover:scale-[1.01] active:scale-[0.99]"
                         >
                             {isGenerating ? <><Loader2 className="animate-spin" />生成中...</> : <><FolderSearch size={22} />スキャン &amp; 生成</>}
                         </button>
