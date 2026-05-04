@@ -23,7 +23,7 @@ export function SortablePdfCard(props: PdfCardProps) {
             ref={setActivatorNodeRef}
             {...listeners}
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-2 right-2 z-20 p-1 rounded-full bg-white/90 dark:bg-gray-900/80 text-gray-500 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-300 cursor-grab active:cursor-grabbing shadow"
+            className="absolute top-2 right-2 z-card-badge p-1 rounded-full bg-white/90 dark:bg-gray-900/80 text-gray-500 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-300 cursor-grab active:cursor-grabbing shadow"
             title="ドラッグして並べ替え"
             aria-label={`${props.pdf.name} をドラッグ`}
         >

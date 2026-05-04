@@ -74,7 +74,7 @@ export function PageRenderer({
     };
 
     const selectionIndicator = isEditMode && (
-        <div className="absolute top-2 right-2 z-10 bg-white rounded-full p-1 shadow-md">
+        <div className="absolute top-2 right-2 z-card-badge bg-white rounded-full p-1 shadow-md">
             {isSelected ? (
                 <CheckSquare className="w-6 h-6 text-red-500" />
             ) : (
