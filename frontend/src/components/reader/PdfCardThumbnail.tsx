@@ -37,7 +37,7 @@ export function PdfCardThumbnail({
             )}
 
             {isGroup && badge && (
-                <div className="absolute top-2 right-2 z-card-badge px-1.5 py-0.5 rounded-full bg-accent-600 text-white text-xs font-semibold flex items-center gap-1 shadow">
+                <div className="absolute top-2 right-2 z-card-badge px-1.5 py-0.5 rounded-full bg-accent-600 text-white text-xs font-semibold flex items-center gap-1 shadow-md ring-1 ring-white/40 dark:ring-white/20">
                     {badge.kind === 'series'
                         ? <Library className="w-3 h-3" />
                         : <Users className="w-3 h-3" />}
