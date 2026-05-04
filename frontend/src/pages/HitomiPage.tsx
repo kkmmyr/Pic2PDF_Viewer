@@ -84,7 +84,7 @@ export default function HitomiPage() {
             const stats = await runNow();
             if (stats) {
                 const parts = [`新着 ${stats.added} 件追加`];
-                if (stats.skipped > 0) parts.push(`${stats.skipped} 件スキップ（直近3日以内に取得済み）`);
+                if (stats.skipped > 0) parts.push(`${stats.skipped} 件スキップ（本日既に取得済み）`);
                 if (stats.errors > 0) parts.push(`エラー ${stats.errors} 件`);
                 showToast(parts.join(' / '), stats.errors > 0 ? 'error' : 'success');
             } else {

@@ -11,7 +11,7 @@ Windows Task Scheduler から `python -m tools.hitomi_monitor` で単発実行�
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 # backend/ をパス追加してパッケージ参照を解決
@@ -71,17 +71,16 @@ def build_arrival_item(
 def main(
     data_dir: Path = DATA_DIR,
     *,
-    min_age_hours: float | None = None,
+    threshold: datetime | None = None,
 ) -> int:
     """監視スクリプトのエントリポイント。
 
     Args:
         data_dir: backend/data/hitomi/ 相当のディレクトリ
-        min_age_hours: 指定すると `checked_at` が `now - min_age_hours` より
-            新しい作者をスキップする。None なら常に全作者を処理する（CLI / Task
-            Scheduler 既定の挙動）。
+        threshold: 指定すると `checked_at` が `threshold` より新しい作者をスキップする。
+            None なら常に全作者を処理する（CLI / Task Scheduler 既定の挙動）。
     """
-    print(f"[hitomi_monitor] start: data_dir={data_dir}, min_age_hours={min_age_hours}")
+    print(f"[hitomi_monitor] start: data_dir={data_dir}, threshold={threshold}")
 
     try:
         state = state_store.load_state(data_dir)
@@ -89,10 +88,6 @@ def main(
     except Exception as e:
         print(f"[hitomi_monitor] FATAL: 初期ロード失敗: {e}", file=sys.stderr)
         return 2
-
-    threshold: datetime | None = None
-    if min_age_hours is not None and min_age_hours > 0:
-        threshold = datetime.now(timezone.utc) - timedelta(hours=min_age_hours)
 
     if not entries:
         print("[hitomi_monitor] watchlist が空です。何もしません。")

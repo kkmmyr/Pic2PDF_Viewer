@@ -5,6 +5,7 @@
 """
 import logging
 import threading
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -112,19 +113,23 @@ def delete_watchlist(normalized: str, language: str = "japanese") -> dict:
 # ---------------------------------------------------------------------------
 
 @router.post("/hitomi/run-now")
-def post_run_now(skip_recent_days: float = 3.0) -> dict:
+def post_run_now(force: bool = False) -> dict:
     """監視スクリプトを同期実行する。完了まで待つ。
 
-    `skip_recent_days` で指定した日数以内に取得済みの作者はスキップする
-    （0 にすると全作者を強制再チェック）。デフォルトの 3 日は UI 連打や
-    watchlist 編集ごとの全件再フェッチで hitomi.la に過剰アクセスしないための
-    保険。Task Scheduler からの CLI 直接実行はこの制限を受けない。
+    既定では当日 0:00（ローカルタイム）以降にチェック済みの作者をスキップし、
+    1 日 1 回までに頻度を抑える（0:00 を境にリセット）。`force=true` を渡すと
+    全作者を強制再チェック。UI 連打や watchlist 編集ごとの全件再フェッチで
+    hitomi.la に過剰アクセスしないための保険。Task Scheduler からの CLI
+    直接実行はこの制限を受けない。
     """
     if not _run_lock.acquire(blocking=False):
         raise HTTPException(status_code=409, detail="監視が既に実行中です")
     try:
-        min_age = skip_recent_days * 24.0 if skip_recent_days > 0 else None
-        exit_code = hitomi_monitor.main(DATA_DIR, min_age_hours=min_age)
+        threshold: datetime | None = None
+        if not force:
+            now_local = datetime.now().astimezone()
+            threshold = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+        exit_code = hitomi_monitor.main(DATA_DIR, threshold=threshold)
         state = state_store.load_state(DATA_DIR)
         return {
             "exit_code": exit_code,

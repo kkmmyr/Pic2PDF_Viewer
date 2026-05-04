@@ -285,9 +285,10 @@ watchlist への追加直後、NOZOMI 先頭 1 件を取得して `state.json` �
 で排他制御）。完了後はクライアントが `GET /api/hitomi/new-arrivals` を再取得する想定。
 
 **クエリパラメータ**:
-- `skip_recent_days` (オプション、default `3.0`) — 指定日数以内に `checked_at` が
-  記録されている作者をスキップする。`0` を指定すると全作者を強制再チェック。
-  Task Scheduler からの直接実行（CLI）には適用されず、本 API 経由のみの挙動
+- `force` (オプション、default `false`) — `true` を指定すると全作者を強制再チェック。
+  `false`（デフォルト）の場合、当日 0:00（ローカルタイム）以降に `checked_at` が
+  記録されている作者をスキップする。Task Scheduler からの直接実行（CLI）には
+  適用されず、本 API 経由のみの挙動
 
 **レスポンス**:
 ```json
@@ -306,7 +307,7 @@ watchlist への追加直後、NOZOMI 先頭 1 件を取得して `state.json` �
 
 - `exit_code`: 0 = 全成功 / 1 = 部分失敗 / 2 = 致命的失敗
 - `last_run_stats.added`: 今回の実行で `new_arrivals.json` に追加された件数
-- `last_run_stats.skipped`: `skip_recent_days` により今回スキップされた作者数
+- `last_run_stats.skipped`: 当日 0:00 以降のチェック済み判定により今回スキップされた作者数
 - `last_run_stats.errors`: NOZOMI / メタデータ取得で失敗した件数
 
 **エラー**:
@@ -316,8 +317,9 @@ watchlist への追加直後、NOZOMI 先頭 1 件を取得して `state.json` �
 **設計判断:**
 
 UI から手動取得する場合、ユーザーが連打したり、watchlist の修正のたびに毎回
-全作者を再チェックすると hitomi.la への無駄な負荷になる。直近 3 日以内に取得済みの
-作者はスキップするデフォルトを設けることで、想定外の頻度アクセスを抑制する。
+全作者を再チェックすると hitomi.la への無駄な負荷になる。当日 0:00 以降に取得済みの
+作者はスキップするデフォルトを設けることで、1 日 1 回までに頻度アクセスを抑制する。
+0:00 を境に判定がリセットされるため、日付が変われば再度 1 回フェッチできる。
 Task Scheduler 経由（CLI 直接実行）はこのスキップを適用しないため、定期監視は
 これまで通り動作する。
 
