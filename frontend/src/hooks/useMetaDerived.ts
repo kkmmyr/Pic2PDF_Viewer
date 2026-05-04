@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { BookMetaMap } from '../types';
+import { cmpJa } from '../utils/sort';
 
 interface UseMetaDerivedResult {
     /** 全作者名（重複排除・ソート済み）
@@ -19,17 +20,17 @@ interface UseMetaDerivedResult {
 export function useMetaDerived(meta: BookMetaMap): UseMetaDerivedResult {
     const allAuthors = useMemo(() =>
         [...new Set(Object.values(meta).flatMap(e => e.authors ?? []))]
-            .sort((a, b) => a.localeCompare(b, 'ja')),
+            .sort(cmpJa),
     [meta]);
 
     const allTags = useMemo(() =>
         [...new Set(Object.values(meta).flatMap(e => e.tags ?? []))]
-            .sort((a, b) => a.localeCompare(b, 'ja')),
+            .sort(cmpJa),
     [meta]);
 
     const allGenres = useMemo(() =>
         [...new Set(Object.values(meta).map(e => e.genre).filter((g): g is string => !!g))]
-            .sort((a, b) => a.localeCompare(b, 'ja')),
+            .sort(cmpJa),
     [meta]);
 
     const allSeries = useMemo(() => {
@@ -41,7 +42,7 @@ export function useMetaDerived(meta: BookMetaMap): UseMetaDerivedResult {
         }
         return Array.from(map.entries())
             .map(([id, title]) => ({ id, title }))
-            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+            .sort((a, b) => cmpJa(a.title, b.title));
     }, [meta]);
 
     const allSeriesWithStats = useMemo(() => {
@@ -59,7 +60,7 @@ export function useMetaDerived(meta: BookMetaMap): UseMetaDerivedResult {
         }
         return Array.from(map.entries())
             .map(([id, { title, maxIndex, count }]) => ({ id, title, maxIndex, count }))
-            .sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+            .sort((a, b) => cmpJa(a.title, b.title));
     }, [meta]);
 
     return { allAuthors, allTags, allGenres, allSeries, allSeriesWithStats };

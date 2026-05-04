@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { PdfFile, SortOrder } from '../types';
+import { cmpJa } from '../utils/sort';
 
 /**
  * PDF一覧をお気に入りと並び替え順序に基づいてソートするフック。
@@ -26,14 +27,14 @@ export function useSortedPdfs(
             if (sortOrder === 'favorites_first') {
                 if (aFav !== bFav) return aFav - bFav;
                 // 同じグループ内は名前昇順
-                return a.name.localeCompare(b.name, 'ja');
+                return cmpJa(a.name, b.name);
             }
 
             switch (sortOrder) {
                 case 'name_asc':
-                    return a.name.localeCompare(b.name, 'ja');
+                    return cmpJa(a.name, b.name);
                 case 'name_desc':
-                    return b.name.localeCompare(a.name, 'ja');
+                    return cmpJa(b.name, a.name);
                 case 'date_asc':
                     return (a.created_at ?? 0) - (b.created_at ?? 0);
                 case 'date_desc':
@@ -41,19 +42,19 @@ export function useSortedPdfs(
                 case 'view_desc': {
                     const diff = views(b.name) - views(a.name);
                     if (diff !== 0) return diff;
-                    return a.name.localeCompare(b.name, 'ja');
+                    return cmpJa(a.name, b.name);
                 }
                 case 'recent_view': {
                     // 未閲覧は末尾。同時刻は名前昇順。
                     const aT = lastViewed(a.name);
                     const bT = lastViewed(b.name);
                     if (aT === undefined && bT === undefined) {
-                        return a.name.localeCompare(b.name, 'ja');
+                        return cmpJa(a.name, b.name);
                     }
                     if (aT === undefined) return 1;
                     if (bT === undefined) return -1;
                     if (aT !== bT) return bT - aT;
-                    return a.name.localeCompare(b.name, 'ja');
+                    return cmpJa(a.name, b.name);
                 }
                 default:
                     return 0;
