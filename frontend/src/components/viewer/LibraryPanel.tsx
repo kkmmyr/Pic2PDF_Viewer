@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { LibraryHeader, PdfGrid, ToastContainer, GenreFilterBar } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
@@ -39,6 +39,10 @@ export function LibraryPanel() {
     const [searchText, setSearchText] = useState('');
     const [seriesEditTarget, setSeriesEditTarget] = useState<string | null>(null);
     const dialogs = useDialogToggles<BulkDialogKey>();
+
+    // URL 状態（path/source/author/series/selectedPdf）ごとにスクロール位置を保存し、
+    // 戻ってきた時に復元する。クリックの capture phase で navigate 前に保存する。
+    const scrollMemory = useRef(new Map<string, number>());
 
     const {
         authorFilter, tagFilter, seriesFilter,
@@ -105,6 +109,34 @@ export function LibraryPanel() {
         (name) => getViewCount(currentPath, name),
         (name) => getLastViewedAt(currentPath, name),
     );
+
+    // 現在の URL キー。navigate 前のスクロール保存・後の復元に使う
+    const urlKey = `${currentPath}|${currentSource}|${authorFilter}|${seriesFilter}|${selectedPdf ?? ''}`;
+    const currentUrlKeyRef = useRef(urlKey);
+    currentUrlKeyRef.current = urlKey;
+
+    // どのクリックでも、navigate される前のスクロール位置を現在の URL キーで保存する
+    useEffect(() => {
+        const onClickCapture = () => {
+            scrollMemory.current.set(currentUrlKeyRef.current, window.scrollY);
+        };
+        document.addEventListener('click', onClickCapture, true);
+        return () => document.removeEventListener('click', onClickCapture, true);
+    }, []);
+
+    // URL キーが変わったら、その URL キーに保存されているスクロール位置に復元する
+    const isFirstRenderRef = useRef(true);
+    useEffect(() => {
+        if (isFirstRenderRef.current) {
+            isFirstRenderRef.current = false;
+            return;
+        }
+        const targetY = scrollMemory.current.get(urlKey) ?? 0;
+        // レイアウトが安定してから復元（display 切替・コンテンツ変更後の reflow を待つ）
+        requestAnimationFrame(() => {
+            window.scrollTo(0, targetY);
+        });
+    }, [urlKey]);
 
     const handlePdfClick = useCallback((name: string) => {
         recordView(currentPath, name);

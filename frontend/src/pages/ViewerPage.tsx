@@ -9,7 +9,11 @@ function LibraryView() {
 
     return (
         <div className="h-full flex flex-col relative">
-            {selectedPdf ? (
+            {/* 常にマウントして display:none で隠すことでスクロール位置を保持する */}
+            <div className={selectedPdf ? 'hidden' : 'contents'}>
+                <LibraryPanel />
+            </div>
+            {selectedPdf && (
                 <ReaderPanel
                     selectedPdf={selectedPdf}
                     currentPath={currentPath}
@@ -18,8 +22,6 @@ function LibraryView() {
                     onClose={onClosePdf}
                     onSelectPdf={onPdfClick}
                 />
-            ) : (
-                <LibraryPanel />
             )}
         </div>
     );
