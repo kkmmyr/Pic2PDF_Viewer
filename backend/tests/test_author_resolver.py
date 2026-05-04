@@ -52,6 +52,25 @@ class TestSanitizeAuthor:
     def test_json_fragment_rejected(self):
         assert ar._sanitize_author('{"result": "サークル"}') == "作者不明"
 
+    def test_int_input_does_not_crash(self):
+        # Gemma が稀に数値型を返した場合に AttributeError で落ちないことを保証
+        result = ar._sanitize_author(123)
+        assert isinstance(result, str)
+
+    def test_none_input_returns_unknown(self):
+        assert ar._sanitize_author(None) == "作者不明"
+
+    def test_no_result_phrase_rejected(self):
+        assert ar._sanitize_author("条件に一致する作品は見つかりませんでした") == "作者不明"
+        assert ar._sanitize_author("該当する作品が見つかりません") == "作者不明"
+
+    def test_pure_numeric_rejected(self):
+        # Gemma が「該当なし」の sentinel として "-1" や "0" を返すケース
+        assert ar._sanitize_author("-1") == "作者不明"
+        assert ar._sanitize_author("0") == "作者不明"
+        assert ar._sanitize_author("123") == "作者不明"
+        assert ar._sanitize_author("3.14") == "作者不明"
+
 
 class TestExtractCircleFromPage:
     """_extract_circle_from_page のテスト（call_ollama をモック）。"""

@@ -52,19 +52,27 @@ _INVALID_PATTERNS = (
     "https://",
     "site:",
     "{",
+    "見つかりません",
 )
 _MAX_AUTHOR_LEN = 80
 
 
-def _sanitize_author(value: str) -> str:
+def _sanitize_author(value) -> str:
     """
-    Gemma が返した値が不正（URL・JSON・ブランド名・長文）な場合は '作者不明' を返す。
-    正常な値はそのまま返す。
+    Gemma が返した値が不正（URL・JSON・ブランド名・長文・「該当なし」文言）な場合は
+    '作者不明' を返す。正常な値はそのまま返す。Gemma が稀に数値型を返すケースに備え、
+    入力を str() で正規化してから判定する。
     """
-    value = value.strip()
+    if value is None:
+        return "作者不明"
+    value = str(value).strip()
     if not value or value == "None":
         return "作者不明"
     if len(value) > _MAX_AUTHOR_LEN:
+        return "作者不明"
+    # 純数値文字列（"-1", "0", "123" 等）は Gemma が「該当なし」の sentinel として
+    # 返してしまうケース。サークル名としても出現しないため一律で無効扱い。
+    if value.lstrip("-+").replace(".", "", 1).isdigit():
         return "作者不明"
     lower = value.lower()
     if any(pat in lower for pat in _INVALID_PATTERNS):
