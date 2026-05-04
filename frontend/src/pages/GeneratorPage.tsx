@@ -7,7 +7,6 @@ import { useGenerateJob } from '../hooks/useGenerateJob';
 import { JobProgress } from '../components/generator/JobProgress';
 import { StatusTable } from '../components/generator/StatusTable';
 import { Alert } from '../components/ui/Alert';
-import { Button } from '../components/ui/Button';
 import type { GenerateJob } from '../types';
 
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
@@ -140,14 +139,14 @@ export default function GeneratorPage() {
 
                     {/* Buttons */}
                     <div className="flex flex-col gap-4">
-                        <Button
-                            size="lg"
+                        <button
+                            type="button"
                             onClick={handleGenerate}
                             disabled={isLoading || !sourceDir}
-                            className="w-full"
+                            className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white font-medium text-base rounded-lg transition-colors"
                         >
                             {isGenerating ? <><Loader2 className="animate-spin" />生成中...</> : <><FolderSearch className="w-5 h-5" />スキャン &amp; 生成</>}
-                        </Button>
+                        </button>
 
                         <div className="relative">
                             <div className="absolute inset-0 flex items-center">
