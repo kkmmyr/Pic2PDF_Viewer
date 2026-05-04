@@ -6,6 +6,7 @@ import { usePdfStatus } from '../hooks/usePdfStatus';
 import { useGenerateJob } from '../hooks/useGenerateJob';
 import { JobProgress } from '../components/generator/JobProgress';
 import { StatusTable } from '../components/generator/StatusTable';
+import { Alert } from '../components/ui/Alert';
 import type { GenerateJob } from '../types';
 
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
@@ -82,10 +83,12 @@ export default function GeneratorPage() {
                 <div className="space-y-6">
                     {/* Restored job banner */}
                     {isRestoredJob && (
-                        <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg text-sm text-amber-800 dark:text-amber-300">
-                            <Loader2 size={15} className="animate-spin shrink-0" />
+                        <Alert
+                            variant="warning"
+                            icon={<Loader2 size={15} className="animate-spin shrink-0 mt-0.5" />}
+                        >
                             前回の生成ジョブが実行中です — <span className="font-medium truncate">{restoredSourceDir}</span>
-                        </div>
+                        </Alert>
                     )}
 
                     {/* Source Directory Input */}
@@ -168,23 +171,23 @@ export default function GeneratorPage() {
 
                     {/* Error Message */}
                     {error && (
-                        <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800 animate-in fade-in slide-in-from-top-2">
+                        <Alert variant="error" className="p-4 animate-in fade-in slide-in-from-top-2">
                             エラー: {error}
-                        </div>
+                        </Alert>
                     )}
 
                     <StatusTable items={statusItems} />
 
                     {/* Result Message */}
                     {result && (
-                        <div className="p-4 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg border border-green-200 dark:border-green-800 animate-in fade-in zoom-in-95">
+                        <Alert variant="success" className="p-4 animate-in fade-in zoom-in-95">
                             <p className="font-bold mb-2">{result.message}</p>
                             <ul className="list-disc list-inside text-sm space-y-1">
                                 {result.files.map((file) => (
                                     <li key={file} className="font-medium">{file}</li>
                                 ))}
                             </ul>
-                        </div>
+                        </Alert>
                     )}
                 </div>
             </div>

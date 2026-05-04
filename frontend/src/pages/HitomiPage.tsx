@@ -7,6 +7,7 @@ import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
 import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
 import { ToastContainer } from '../components/reader/ToastContainer';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
+import { Alert } from '../components/ui/Alert';
 import type { RunStatus } from '../types/hitomi';
 
 function StatusBadge({ status }: { status: RunStatus }) {
@@ -140,9 +141,7 @@ export default function HitomiPage() {
             </div>
 
             {error && (
-                <div className="mb-4 p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
-                    {error}
-                </div>
+                <Alert variant="error" className="mb-4">{error}</Alert>
             )}
 
             {loading && items.length === 0 ? (

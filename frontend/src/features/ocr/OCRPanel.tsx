@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Square, Terminal, AlertCircle } from 'lucide-react';
+import { Play, Square, Terminal } from 'lucide-react';
 import { useOcrStatus } from '../../hooks/useOcrStatus';
+import { Alert } from '../../components/ui/Alert';
 
 /**
  * Novel OCR 実行パネル (Tailwind実装)。
@@ -86,10 +87,7 @@ export const OCRPanel: React.FC = () => {
                 </div>
 
                 {error && (
-                    <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800 text-sm">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        {error}
-                    </div>
+                    <Alert variant="error" className="mt-3">{error}</Alert>
                 )}
             </div>
 
