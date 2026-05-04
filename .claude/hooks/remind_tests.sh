@@ -8,13 +8,32 @@
 set -e
 
 input=$(cat)
-file_path=$(echo "$input" | grep -oE '"file_path"\s*:\s*"[^"]+"' | head -1 | sed -E 's/.*"file_path"\s*:\s*"([^"]+)".*/\1/')
-old_string=$(echo "$input" | grep -oE '"old_string"\s*:\s*"[^"]*"' | head -1 | sed -E 's/.*"old_string"\s*:\s*"(.*)".*/\1/')
-new_string=$(echo "$input" | grep -oE '"new_string"\s*:\s*"[^"]*"' | head -1 | sed -E 's/.*"new_string"\s*:\s*"(.*)".*/\1/')
 
+# Parse JSON via Python (handles Windows path backslash-escaping correctly)
+parsed=$(echo "$input" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+fp = d.get('file_path', '')
+os_ = d.get('old_string', '')
+ns  = d.get('new_string', '')
+print(fp)
+print(os_.count('\n'))
+print(ns.count('\n'))
+print(ns)
+" 2>/dev/null) || true
+
+if [ -z "$parsed" ]; then
+    exit 0
+fi
+
+file_path=$(echo "$parsed" | sed -n '1p')
 if [ -z "$file_path" ]; then
     exit 0
 fi
+
+old_lines=$(echo "$parsed" | sed -n '2p')
+new_lines=$(echo "$parsed" | sed -n '3p')
+new_string=$(echo "$parsed" | tail -n +4)
 
 normalized=$(echo "$file_path" | tr '\\' '/')
 
@@ -31,9 +50,7 @@ case "$normalized" in
     *) exit 0 ;;
 esac
 
-# Estimate diff size by line count of new_string vs old_string
-old_lines=$(echo -n "$old_string" | grep -c '\\n' || echo 0)
-new_lines=$(echo -n "$new_string" | grep -c '\\n' || echo 0)
+# Estimate diff size by line count
 diff_lines=$((new_lines > old_lines ? new_lines - old_lines : old_lines - new_lines))
 
 # Skip small diffs
@@ -47,8 +64,6 @@ if ! echo "$new_string" | grep -qE '(def |class |function |const [A-Za-z_]+ = |@
 fi
 
 # Substantive change to source — emit a passive reminder
-# .py → pytest を促す
-# .ts/.tsx/.js/.jsx → vitest + tsc 両方を促す（型エラーは再現性が高いため）
 case "$normalized" in
     *.py)   msg="バックエンド変更を検出。テストを検討してください: cd backend && uv run pytest" ;;
     *.ts|*.tsx|*.js|*.jsx)
