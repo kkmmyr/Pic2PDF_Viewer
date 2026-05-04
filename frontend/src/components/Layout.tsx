@@ -10,7 +10,7 @@ export default function Layout() {
 
     const isActive = (path: string) => {
         return location.pathname === path
-            ? 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/30'
+            ? 'text-primary-600 bg-primary-50 dark:text-primary-400 dark:bg-primary-900/30'
             : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800';
     };
 
