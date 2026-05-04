@@ -7,6 +7,7 @@ import os
 import threading
 from typing import Callable, NotRequired, TypedDict
 from config import DATA_DIR
+from utils.locks import SourceLockManager
 
 
 class MetaEntry(TypedDict):
@@ -25,15 +26,11 @@ class MetaEntry(TypedDict):
 
 MetaDict = dict[str, MetaEntry]
 
-_locks: dict[str, threading.Lock] = {}
-_locks_lock = threading.Lock()
+_lock_manager = SourceLockManager()
 
 
 def get_lock(source: str) -> threading.Lock:
-    with _locks_lock:
-        if source not in _locks:
-            _locks[source] = threading.Lock()
-        return _locks[source]
+    return _lock_manager.get(source)
 
 
 def meta_path(source: str) -> str:

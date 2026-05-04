@@ -5,27 +5,22 @@
 形式: ["ジャンルA", "ジャンルB", ...]（順序付き文字列配列）
 
 ファイルが存在しない場合は meta.json の genre フィールドを収集して初期リストを生成する。
+
+ロック: `SourceLockManager` で source 単位に直列化。`load_genres` も
+`save_genres` もロック取得下で実行される（読み書きの整合性を保つため）。
 """
 import json
 import os
-import threading
 
 from config import DATA_DIR
 from services.meta_store import load_meta
+from utils.locks import SourceLockManager
 
 GENRE_STORE_DIR = os.path.join(DATA_DIR, "genres")
 
 _GENRE_ORDER = ["オリジナル", "プリンセスコネクト", "Voiceloid"]
 
-_locks: dict[str, threading.Lock] = {}
-_locks_mutex = threading.Lock()
-
-
-def _get_lock(source: str) -> threading.Lock:
-    with _locks_mutex:
-        if source not in _locks:
-            _locks[source] = threading.Lock()
-        return _locks[source]
+_lock_manager = SourceLockManager()
 
 
 def _store_path(source: str) -> str:
@@ -45,21 +40,27 @@ def _derive_from_meta(source: str) -> list[str]:
     return ordered + rest
 
 
+def _write_genres_unlocked(source: str, genres: list[str]) -> None:
+    """ロック取得済み前提で genres を書き込む。"""
+    os.makedirs(GENRE_STORE_DIR, exist_ok=True)
+    path = _store_path(source)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(genres, f, ensure_ascii=False, indent=2)
+
+
 def load_genres(source: str) -> list[str]:
     """genres.json を読み込む。未作成の場合は meta.json から初期リストを生成して保存する。"""
-    path = _store_path(source)
-    if os.path.exists(path):
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    genres = _derive_from_meta(source)
-    save_genres(source, genres)
-    return genres
+    with _lock_manager.get(source):
+        path = _store_path(source)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+        genres = _derive_from_meta(source)
+        _write_genres_unlocked(source, genres)
+        return genres
 
 
 def save_genres(source: str, genres: list[str]) -> None:
     """genres.json にジャンルリストを書き込む。"""
-    os.makedirs(GENRE_STORE_DIR, exist_ok=True)
-    with _get_lock(source):
-        path = _store_path(source)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(genres, f, ensure_ascii=False, indent=2)
+    with _lock_manager.get(source):
+        _write_genres_unlocked(source, genres)

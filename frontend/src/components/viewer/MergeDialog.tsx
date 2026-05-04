@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { validateFilename } from '../../utils/validation';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
+import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
 
 interface MergeDialogProps {
     open: boolean;
@@ -15,37 +17,29 @@ interface MergeDialogProps {
  */
 export function MergeDialog({ open, selectedItems, onClose, onMerge }: MergeDialogProps) {
     const [outputName, setOutputName] = useState('');
-    const [error, setError] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose, '結合に失敗しました。');
 
     useEffect(() => {
         if (open) {
             setOutputName('');
-            setError('');
-            setIsLoading(false);
-            setTimeout(() => inputRef.current?.focus(), 0);
+            setError(null);
         }
-    }, [open]);
+    }, [open, setError]);
 
-    const handleSubmit = async () => {
+    useAutoFocusInput(inputRef, open);
+
+    const handleMerge = () => {
         const trimmed = outputName.trim();
         const err = validateFilename(trimmed, 'file');
         if (err) { setError(err); return; }
 
         const nameWithExt = trimmed.endsWith('.pdf') ? trimmed : `${trimmed}.pdf`;
-        setIsLoading(true);
-        try {
-            await onMerge(nameWithExt);
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '結合に失敗しました。');
-            setIsLoading(false);
-        }
+        handleSubmit(() => onMerge(nameWithExt));
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Enter') handleMerge();
     };
 
     return (
@@ -77,7 +71,7 @@ export function MergeDialog({ open, selectedItems, onClose, onMerge }: MergeDial
                         ref={inputRef}
                         type="text"
                         value={outputName}
-                        onChange={(e) => { setOutputName(e.target.value); setError(''); }}
+                        onChange={(e) => { setOutputName(e.target.value); setError(null); }}
                         onKeyDown={handleKeyDown}
                         placeholder="例: merged_book"
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
@@ -88,9 +82,9 @@ export function MergeDialog({ open, selectedItems, onClose, onMerge }: MergeDial
                 )}
             </DialogBody>
             <DialogFooter>
-                <DialogCancelButton onClick={onClose} disabled={isLoading} />
-                <DialogPrimaryButton onClick={handleSubmit} disabled={isLoading || !outputName.trim()}>
-                    {isLoading ? (
+                <DialogCancelButton onClick={onClose} disabled={saving} />
+                <DialogPrimaryButton onClick={handleMerge} disabled={saving || !outputName.trim()}>
+                    {saving ? (
                         <span className="flex items-center gap-2">
                             <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                             結合中...

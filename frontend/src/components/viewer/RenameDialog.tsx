@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { validateFilename } from '../../utils/validation';
+import { useDialogSubmit } from '../../hooks/useDialogSubmit';
+import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
 
 interface Props {
     open: boolean;
@@ -17,37 +19,26 @@ interface Props {
 export function RenameDialog({ open, currentName, isFolder = false, onClose, onRename }: Props) {
     const stem = isFolder ? currentName : currentName.replace(/\.pdf$/i, '');
     const [name, setName] = useState(stem);
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose, 'リネームに失敗しました。');
 
     useEffect(() => {
         if (open) {
             setName(stem);
             setError(null);
-            setTimeout(() => {
-                inputRef.current?.focus();
-                inputRef.current?.select();
-            }, 50);
         }
-    }, [open, stem]);
+    }, [open, stem, setError]);
+
+    useAutoFocusInput(inputRef, open, { delay: 50, select: true });
 
     const validationError = validateFilename(name, isFolder ? 'folder' : 'file');
-    const isSubmittable = !validationError && !loading && name.trim() !== stem;
+    const isSubmittable = !validationError && !saving && name.trim() !== stem;
 
-    const handleRename = async () => {
+    const handleRename = () => {
         const err = validateFilename(name, isFolder ? 'folder' : 'file');
         if (err) { setError(err); return; }
         if (name.trim() === stem) { onClose(); return; }
-        setLoading(true);
-        try {
-            await onRename(isFolder ? name.trim() : name.trim() + '.pdf');
-            onClose();
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : 'リネームに失敗しました。');
-        } finally {
-            setLoading(false);
-        }
+        handleSubmit(() => onRename(isFolder ? name.trim() : name.trim() + '.pdf'));
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -83,9 +74,9 @@ export function RenameDialog({ open, currentName, isFolder = false, onClose, onR
                 </p>
             </DialogBody>
             <DialogFooter>
-                <DialogCancelButton onClick={onClose} disabled={loading} />
+                <DialogCancelButton onClick={onClose} disabled={saving} />
                 <DialogPrimaryButton onClick={handleRename} disabled={!isSubmittable}>
-                    {loading ? '変更中...' : '変更'}
+                    {saving ? '変更中...' : '変更'}
                 </DialogPrimaryButton>
             </DialogFooter>
         </Dialog>
