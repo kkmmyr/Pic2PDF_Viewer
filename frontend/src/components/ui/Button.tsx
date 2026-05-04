@@ -6,6 +6,8 @@ export type ButtonSize = 'sm' | 'md' | 'lg';
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
     variant?: ButtonVariant;
     size?: ButtonSize;
+    /** トグル ON 状態（secondary variant 専用）。gray-700 ベースで強調表示。 */
+    active?: boolean;
     children?: ReactNode;
 }
 
@@ -29,15 +31,23 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
         'hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50',
 };
 
+// secondary variant のトグル ON 表現（gray-700 ベース）
+const SECONDARY_ACTIVE_CLASS =
+    'bg-gray-700 dark:bg-gray-700 text-white dark:text-white ' +
+    'hover:bg-gray-800 dark:hover:bg-gray-800';
+
 const BASE_CLASS =
     'inline-flex items-center justify-center rounded-md font-medium ' +
     'transition-colors disabled:cursor-not-allowed';
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    { variant = 'primary', size = 'md', className = '', children, type = 'button', ...rest },
+    { variant = 'primary', size = 'md', active = false, className = '', children, type = 'button', ...rest },
     ref,
 ) {
-    const classes = `${BASE_CLASS} ${SIZE_CLASS[size]} ${VARIANT_CLASS[variant]} ${className}`.trim();
+    const variantClass = active && variant === 'secondary'
+        ? SECONDARY_ACTIVE_CLASS
+        : VARIANT_CLASS[variant];
+    const classes = `${BASE_CLASS} ${SIZE_CLASS[size]} ${variantClass} ${className}`.trim();
     return (
         <button ref={ref} type={type} className={classes} {...rest}>
             {children}

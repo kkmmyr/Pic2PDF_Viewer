@@ -123,7 +123,7 @@ export default function HitomiPage() {
                     <button
                         onClick={handleRunNow}
                         disabled={running}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-success-600 hover:bg-success-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Task Scheduler を待たずに監視スクリプトを実行"
                     >
                         {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
@@ -132,7 +132,7 @@ export default function HitomiPage() {
                     <button
                         onClick={() => setConfirmDismissAllOpen(true)}
                         disabled={items.length === 0 || running}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         全件既読化
                     </button>

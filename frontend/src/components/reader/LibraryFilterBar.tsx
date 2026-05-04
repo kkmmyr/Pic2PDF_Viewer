@@ -4,9 +4,7 @@ import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
 import { ToolsMenu } from '../viewer/ToolsMenu';
-
-const BTN_SECONDARY = 'px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1.5';
-const BTN_SECONDARY_ACTIVE = 'px-3 py-1.5 bg-gray-700 text-white rounded-md text-sm font-medium hover:bg-gray-800 flex items-center gap-1.5';
+import { Button } from '../ui/Button';
 
 interface LibraryFilterBarProps {
     searchText: string;
@@ -98,32 +96,34 @@ export function LibraryFilterBar({
                 </select>
             </div>
 
-            <button
+            <Button
+                variant="secondary"
+                active={showUnreadOnly}
                 onClick={onToggleUnreadOnly}
                 title={showUnreadOnly ? '全書籍を表示する' : '未読書籍のみを表示する'}
-                className={showUnreadOnly ? BTN_SECONDARY_ACTIVE : BTN_SECONDARY}
             >
                 <BookOpen className="w-4 h-4" />
                 未読のみ
-            </button>
+            </Button>
 
-            <button
+            <Button
+                variant="secondary"
+                active={showHidden}
                 onClick={onToggleShowHidden}
                 title={showHidden ? '通常モードに戻る' : '非表示書籍を表示する（ゴミ箱）'}
-                className={showHidden ? BTN_SECONDARY_ACTIVE : BTN_SECONDARY}
             >
                 {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 {showHidden ? '通常表示' : '非表示を表示'}
-            </button>
+            </Button>
 
             <HeaderSortSelect sortOrder={sortOrder} onSortChange={onSortChange} />
 
             <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
 
             {!isSelectionMode && (
-                <button onClick={onToggleSelectionMode} className={BTN_SECONDARY}>
+                <Button variant="secondary" onClick={onToggleSelectionMode}>
                     選択
-                </button>
+                </Button>
             )}
         </div>
     );

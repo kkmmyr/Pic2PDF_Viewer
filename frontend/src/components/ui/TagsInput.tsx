@@ -1,23 +1,14 @@
 import React, { type KeyboardEvent, type RefObject } from 'react';
 import { X } from 'lucide-react';
 
-const CHIP_COLORS = {
-    blue: {
-        chip: 'bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200',
-        remove: 'hover:text-blue-600 dark:hover:text-blue-100 transition-colors',
-    },
-    emerald: {
-        chip: 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-200',
-        remove: 'hover:text-emerald-600 dark:hover:text-emerald-100 transition-colors',
-    },
-} as const;
+const CHIP_CLASS = 'bg-primary-100 dark:bg-primary-900/50 text-primary-800 dark:text-primary-200';
+const REMOVE_CLASS = 'hover:text-primary-600 dark:hover:text-primary-100 transition-colors';
 
 interface TagsInputProps {
     tags: string[];
     input: string;
     inputRef: RefObject<HTMLInputElement | null>;
     placeholder?: string;
-    chipColor?: keyof typeof CHIP_COLORS;
     hintText?: string;
     onChange: (value: string) => void;
     onKeyDown: (e: KeyboardEvent<HTMLInputElement>) => void;
@@ -30,15 +21,12 @@ export function TagsInput({
     input,
     inputRef,
     placeholder = '入力（Enter で確定）',
-    chipColor = 'blue',
     hintText,
     onChange,
     onKeyDown,
     onRemove,
     onBlur,
 }: TagsInputProps) {
-    const colors = CHIP_COLORS[chipColor];
-
     return (
         <>
             <div
@@ -48,12 +36,13 @@ export function TagsInput({
                 {tags.map((tag, i) => (
                     <span
                         key={i}
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${colors.chip}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${CHIP_CLASS}`}
                     >
                         {tag}
                         <button
+                            type="button"
                             onClick={(e) => { e.stopPropagation(); onRemove(i); }}
-                            className={colors.remove}
+                            className={REMOVE_CLASS}
                         >
                             <X className="w-3 h-3" />
                         </button>

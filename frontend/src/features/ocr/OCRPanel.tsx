@@ -42,7 +42,7 @@ export const OCRPanel: React.FC = () => {
     const isRunning = status === 'running';
 
     const statusBadge = {
-        running: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-700',
+        running: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300 border border-primary-200 dark:border-primary-700',
         idle:    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
         error:   'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-700',
     }[status] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600';
@@ -62,9 +62,10 @@ export const OCRPanel: React.FC = () => {
 
                 <div className="flex gap-3">
                     <button
+                        type="button"
                         onClick={handleStart}
                         disabled={isRunning || loading}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 dark:disabled:bg-indigo-900 text-white text-sm font-medium rounded-lg transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white text-sm font-medium rounded-lg transition-colors"
                     >
                         {loading && !isRunning ? (
                             <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
@@ -74,6 +75,7 @@ export const OCRPanel: React.FC = () => {
                         Start OCR
                     </button>
                     <button
+                        type="button"
                         onClick={handleStop}
                         disabled={!isRunning || loading}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-300 dark:disabled:bg-red-900 text-white text-sm font-medium rounded-lg transition-colors"

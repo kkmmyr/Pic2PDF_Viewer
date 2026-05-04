@@ -80,7 +80,6 @@ export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, on
                     input={input}
                     inputRef={inputRef}
                     placeholder="タグを入力（Enter で確定）"
-                    chipColor="emerald"
                     hintText="Enter・カンマで確定、Backspace で削除。空のまま適用するとタグを全て解除します。"
                     onChange={setInput}
                     onKeyDown={handleKeyDown}

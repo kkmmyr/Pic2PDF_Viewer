@@ -100,9 +100,10 @@ export default function GeneratorPage() {
                                 value={sourceDir}
                                 onChange={(e) => setSourceDir(e.target.value)}
                                 placeholder="C:\画像フォルダ\のパスを入力"
-                                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
                             />
                             <button
+                                type="button"
                                 onClick={fetchStatus}
                                 className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 transition-colors"
                             >
@@ -115,7 +116,7 @@ export default function GeneratorPage() {
                     </div>
 
                     {/* Batch Compress 用の品質スライダー（生成 API では未使用） */}
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800 space-y-2">
+                    <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800 space-y-2">
                         <label htmlFor="quality" className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
                             <Zap size={16} className="text-amber-500 fill-amber-500" />
                             一括圧縮 品質: {quality}
@@ -129,16 +130,17 @@ export default function GeneratorPage() {
                             step="5"
                             value={quality}
                             onChange={(e) => setQuality(parseInt(e.target.value))}
-                            className="w-full h-2 bg-blue-200 dark:bg-blue-800 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                            className="w-full h-2 bg-primary-200 dark:bg-primary-800 rounded-lg appearance-none cursor-pointer accent-primary-600"
                         />
                     </div>
 
                     {/* Buttons */}
                     <div className="flex flex-col gap-4">
                         <button
+                            type="button"
                             onClick={handleGenerate}
                             disabled={isLoading || !sourceDir}
-                            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 dark:disabled:bg-blue-900 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            className="w-full flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white font-bold py-4 rounded-xl shadow-lg shadow-primary-200 dark:shadow-none transition-all hover:scale-[1.01] active:scale-[0.99]"
                         >
                             {isGenerating ? <><Loader2 className="animate-spin" />生成中...</> : <><FolderSearch size={22} />スキャン &amp; 生成</>}
                         </button>

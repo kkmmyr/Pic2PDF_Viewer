@@ -101,7 +101,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                             checked={mode === 'existing'}
                             onChange={() => setMode('existing')}
                             disabled={noExistingAuthors}
-                            className="mt-1 accent-blue-600"
+                            className="mt-1 accent-primary-600"
                         />
                         <div className="flex-1">
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
@@ -133,7 +133,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                                 setMode('new');
                                 setTimeout(() => inputRef.current?.focus(), 50);
                             }}
-                            className="mt-1 accent-blue-600"
+                            className="mt-1 accent-primary-600"
                         />
                         <div className="flex-1">
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
@@ -146,7 +146,6 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                                         input={input}
                                         inputRef={inputRef}
                                         placeholder="作者名を入力（Enter で確定）"
-                                        chipColor="blue"
                                         hintText="Enter・カンマで確定、Backspace で削除（複数指定可）"
                                         onChange={setInput}
                                         onKeyDown={handleKeyDown}

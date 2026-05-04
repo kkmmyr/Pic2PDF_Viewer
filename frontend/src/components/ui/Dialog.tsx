@@ -106,10 +106,11 @@ interface DialogButtonProps {
     children?: ReactNode;
 }
 
-/** キャンセル系ボタン（共通スタイル）。 */
+/** キャンセル系ボタン（ダイアログ用専用サイズ: px-4 py-2 rounded-lg）。 */
 export function DialogCancelButton({ onClick, disabled, children = 'キャンセル' }: DialogButtonProps) {
     return (
         <button
+            type="button"
             onClick={onClick}
             disabled={disabled}
             className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 transition-colors"
@@ -119,13 +120,14 @@ export function DialogCancelButton({ onClick, disabled, children = 'キャンセ
     );
 }
 
-/** プライマリ確定ボタン（共通スタイル）。 */
+/** プライマリ確定ボタン（ダイアログ用専用サイズ: px-4 py-2 rounded-lg）。色は primary token。 */
 export function DialogPrimaryButton({ onClick, disabled, children }: DialogButtonProps) {
     return (
         <button
+            type="button"
             onClick={onClick}
             disabled={disabled}
-            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 dark:disabled:bg-indigo-900 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 rounded-lg transition-colors"
         >
             {children}
         </button>

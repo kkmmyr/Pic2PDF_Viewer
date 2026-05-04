@@ -270,7 +270,7 @@ export function ReaderPanel({
                             className="flex justify-center"
                             loading={
                                 <div className="flex items-center justify-center h-96">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
                                 </div>
                             }
                         >

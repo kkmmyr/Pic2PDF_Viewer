@@ -94,7 +94,7 @@ export function PdfCard({
                             {authors.map((a, i) => (
                                 <span
                                     key={i}
-                                    className={`text-xs px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-800/50' : ''}`}
+                                    className={`text-xs px-1.5 py-0.5 rounded bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-800/50' : ''}`}
                                     onClick={onAuthorClick ? (e) => { e.stopPropagation(); onAuthorClick(a); } : undefined}
                                     title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
                                 >

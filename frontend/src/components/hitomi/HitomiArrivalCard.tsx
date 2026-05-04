@@ -41,7 +41,7 @@ export function HitomiArrivalCard({ item, onDismiss }: HitomiArrivalCardProps) {
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors"
                 >
                     <ExternalLink className="w-3.5 h-3.5" />
                     hitomi.la で開く
