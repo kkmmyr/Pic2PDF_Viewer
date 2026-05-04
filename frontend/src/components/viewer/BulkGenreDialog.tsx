@@ -51,7 +51,7 @@ export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply
                                 name="bulk-genre"
                                 checked={!isNew && selected === genre}
                                 onChange={() => { setIsNew(false); setSelected(genre); }}
-                                className="accent-indigo-600"
+                                className="accent-primary-600"
                             />
                             <span className="text-sm text-gray-800 dark:text-gray-200">{genre}</span>
                         </label>
@@ -65,7 +65,7 @@ export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply
                                 setIsNew(true);
                                 setTimeout(() => inputRef.current?.focus(), 50);
                             }}
-                            className="mt-0.5 accent-indigo-600"
+                            className="mt-0.5 accent-primary-600"
                         />
                         <div className="flex-1">
                             <span className="text-sm text-gray-800 dark:text-gray-200">新規ジャンルを入力</span>

@@ -1,8 +1,10 @@
-import { useState, useRef, KeyboardEvent, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { TagsInput } from '../ui/TagsInput';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
+import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
+import { useTagsInput } from '../../hooks/useTagsInput';
 
 interface BulkAuthorDialogProps {
     open: boolean;
@@ -25,44 +27,18 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
     const noExistingAuthors = allAuthors.length === 0;
     const [mode, setMode] = useState<Mode>(noExistingAuthors ? 'new' : 'existing');
     const [selectedExisting, setSelectedExisting] = useState<string>('');
-    const [tags, setTags] = useState<string[]>([]);
-    const [input, setInput] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
     const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose);
+    const t = useTagsInput();
+    useAutoFocusInput(t.inputRef, open && mode === 'new', { delay: 50 });
 
     useEffect(() => {
         if (!open) return;
         const fallbackMode: Mode = noExistingAuthors ? 'new' : 'existing';
         setMode(fallbackMode);
         setSelectedExisting(allAuthors[0] ?? '');
-        setTags([]);
-        setInput('');
-        if (fallbackMode === 'new') {
-            setTimeout(() => inputRef.current?.focus(), 50);
-        }
+        t.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, noExistingAuthors, allAuthors]);
-
-    const addTag = (value: string) => {
-        const trimmed = value.trim();
-        if (!trimmed) return;
-        if (!tags.includes(trimmed)) {
-            setTags(prev => [...prev, trimmed]);
-        }
-        setInput('');
-    };
-
-    const removeTag = (index: number) => {
-        setTags(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            addTag(input);
-        } else if (e.key === 'Backspace' && input === '' && tags.length > 0) {
-            removeTag(tags.length - 1);
-        }
-    };
 
     const handleApply = () => {
         let authors: string[];
@@ -73,8 +49,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
             }
             authors = [selectedExisting];
         } else {
-            const finalTags = input.trim() ? [...tags, input.trim()] : tags;
-            authors = [...new Set(finalTags)];
+            authors = t.getFinalTags();
             if (authors.length === 0) {
                 setError('作者名を 1 つ以上入力してください。');
                 return;
@@ -129,10 +104,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                             type="radio"
                             name="bulk-author-mode"
                             checked={mode === 'new'}
-                            onChange={() => {
-                                setMode('new');
-                                setTimeout(() => inputRef.current?.focus(), 50);
-                            }}
+                            onChange={() => setMode('new')}
                             className="mt-1 accent-primary-600"
                         />
                         <div className="flex-1">
@@ -142,15 +114,15 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                             {mode === 'new' && (
                                 <div className="mt-1.5">
                                     <TagsInput
-                                        tags={tags}
-                                        input={input}
-                                        inputRef={inputRef}
+                                        tags={t.tags}
+                                        input={t.input}
+                                        inputRef={t.inputRef}
                                         placeholder="作者名を入力（Enter で確定）"
                                         hintText="Enter・カンマで確定、Backspace で削除（複数指定可）"
-                                        onChange={setInput}
-                                        onKeyDown={handleKeyDown}
-                                        onRemove={removeTag}
-                                        onBlur={() => { if (input.trim()) addTag(input); }}
+                                        onChange={t.setInput}
+                                        onKeyDown={t.handleKeyDown}
+                                        onRemove={t.removeTag}
+                                        onBlur={t.handleBlur}
                                     />
                                 </div>
                             )}

@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from config import (
     PDF_COMPRESSED_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR,
 )
+from routers._deps import log_and_raise_500
 from services.job_manager import GenerateJob, JobStore, JobStatus
 from services.meta_store import update_meta_locked
 from services.pdf_generator import scan_and_generate, batch_compress
@@ -147,13 +148,9 @@ class BatchCompressRequest(BaseModel):
 
 
 @router.post("/batch_compress")
+@log_and_raise_500("batch_compress")
 def batch_compress_pdfs(request: BatchCompressRequest):
     if not os.path.exists(IMAGES_DIR):
         raise HTTPException(status_code=404, detail="Images directory not found")
-
-    try:
-        generated = batch_compress(IMAGES_DIR, PDF_COMPRESSED_DIR, request.quality)
-        return {"message": "Batch compression complete", "files": generated}
-    except Exception as e:
-        logger.exception("batch_compress failed")
-        raise HTTPException(status_code=500, detail=str(e))
+    generated = batch_compress(IMAGES_DIR, PDF_COMPRESSED_DIR, request.quality)
+    return {"message": "Batch compression complete", "files": generated}

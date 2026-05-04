@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
-from routers._deps import validate_request_targets
+from routers._deps import validate_request_targets, log_and_raise_500
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
 from utils.file_utils import is_pdf_file
@@ -27,6 +27,7 @@ class DeletePagesRequest(BaseModel):
 
 
 @router.post("/pdfs/{filename}/delete_pages")
+@log_and_raise_500("delete_pages")
 def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", source: str = "generated"):
     validate_safe_path(path)
 
@@ -40,21 +41,16 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="File not found")
 
-    try:
-        new_total = PdfService.delete_pages(pdf_path, request.page_indices)
+    new_total = PdfService.delete_pages(pdf_path, request.page_indices)
 
-        if new_total > 0:
-            thumb_name = get_thumbnail_name(filename)
-            target_thumb_dir = os.path.join(base_thumb_dir, path)
-            thumb_path = os.path.join(target_thumb_dir, thumb_name)
-            ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
-            logger.info("Regenerated thumbnail: %s", thumb_path)
+    if new_total > 0:
+        thumb_name = get_thumbnail_name(filename)
+        target_thumb_dir = os.path.join(base_thumb_dir, path)
+        thumb_path = os.path.join(target_thumb_dir, thumb_name)
+        ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
+        logger.info("Regenerated thumbnail: %s", thumb_path)
 
-        return {"message": "Pages deleted successfully", "total_pages": new_total}
-
-    except Exception as e:
-        logger.exception("delete_pages failed: %s", filename)
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"message": "Pages deleted successfully", "total_pages": new_total}
 
 
 class MergePdfsRequest(BaseModel):

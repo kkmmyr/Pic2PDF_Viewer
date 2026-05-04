@@ -7,7 +7,7 @@ from config import get_dirs_by_source
 from utils.file_utils import is_image_file, is_pdf_file
 from utils.path_utils import validate_safe_path, validate_safe_name, join_path
 from utils.file_naming import get_thumbnail_name
-from routers._deps import validate_request_targets
+from routers._deps import validate_request_targets, log_and_raise_500
 from services.thumbnail_service import ThumbnailService
 from services.file_manager import FileManager
 from services.meta_store import make_key, update_meta_locked
@@ -64,6 +64,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
     return {"files": files, "current_path": path}
 
 @router.get("/books/{path:path}/images")
+@log_and_raise_500("list_book_images")
 def list_book_images(path: str, source: str = "generated"):
     validate_safe_path(path)
 
@@ -79,23 +80,19 @@ def list_book_images(path: str, source: str = "generated"):
     if not os.path.isdir(target_dir):
         raise HTTPException(status_code=400, detail="Not a directory")
 
-    try:
-        files = os.listdir(target_dir)
-        images = [f for f in files if is_image_file(f)]
+    files = os.listdir(target_dir)
+    images = [f for f in files if is_image_file(f)]
 
-        from natsort import natsorted
-        images = natsorted(images)
+    from natsort import natsorted
+    images = natsorted(images)
 
-        image_urls = []
-        for img in images:
-            rel_path = join_path(path, img)
-            encoded = '/'.join(quote(seg, safe='') for seg in rel_path.replace(os.sep, '/').split('/'))
-            image_urls.append(f"{url_prefix}/{encoded}")
+    image_urls = []
+    for img in images:
+        rel_path = join_path(path, img)
+        encoded = '/'.join(quote(seg, safe='') for seg in rel_path.replace(os.sep, '/').split('/'))
+        image_urls.append(f"{url_prefix}/{encoded}")
 
-        return {"images": image_urls}
-    except Exception as e:
-        logger.exception("list_book_images failed: %s", path)
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"images": image_urls}
 
 class RenameItemRequest(BaseModel):
     path: str

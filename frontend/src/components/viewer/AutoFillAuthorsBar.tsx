@@ -59,7 +59,7 @@ export function AutoFillAuthorsBar({ source, onComplete }: AutoFillAuthorsBarPro
                                     value={value}
                                     checked={mode === value}
                                     onChange={() => setMode(value)}
-                                    className="accent-indigo-600"
+                                    className="accent-primary-600"
                                 />
                                 {label}
                             </label>

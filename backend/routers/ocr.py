@@ -2,34 +2,27 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from services.ocr_service import ocr_service
-from exceptions import OcrProcessError
-from utils.logger import get_logger
-
-logger = get_logger(__name__)
+from routers._deps import log_and_raise_500
 
 router = APIRouter()
 
 @router.post("/ocr/run")
+@log_and_raise_500("ocr/run")
 def run_ocr(target_dir: Optional[str] = None):
     try:
         pid = ocr_service.start_ocr(target_dir)
         return {"status": "started", "pid": pid}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception("ocr/run failed")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/ocr/stop")
+@log_and_raise_500("ocr/stop")
 def stop_ocr():
     try:
         ocr_service.stop_ocr()
         return {"status": "stopped"}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.exception("ocr/stop failed")
-        raise HTTPException(status_code=500, detail=str(e))
 
 class StatusResponse(BaseModel):
     status: str

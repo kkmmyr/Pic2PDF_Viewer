@@ -47,7 +47,7 @@ export function SeriesResolveBar({ source, onComplete }: SeriesResolveBarProps) 
                             type="checkbox"
                             checked={useGemma}
                             onChange={(e) => setUseGemma(e.target.checked)}
-                            className="accent-purple-600"
+                            className="accent-accent-600"
                         />
                         Gemma 補助も併用（曖昧な「外伝」「番外編」を AI 判定）
                     </label>

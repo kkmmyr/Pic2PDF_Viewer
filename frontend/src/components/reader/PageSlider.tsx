@@ -116,7 +116,7 @@ export function PageSlider({
                     }}
                     onPointerUp={(e) => commitPage(Number((e.target as HTMLInputElement).value))}
                     onFocus={(e) => e.target.blur()}
-                    className="w-full cursor-pointer accent-indigo-600"
+                    className="w-full cursor-pointer accent-primary-600"
                     style={direction === 'rtl' ? { transform: 'scaleX(-1)' } : undefined}
                 />
             </div>

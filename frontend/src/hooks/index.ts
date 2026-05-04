@@ -41,3 +41,4 @@ export { useScrollMemory } from './useScrollMemory';
 export { useLibrarySelectionShortcut } from './useLibrarySelectionShortcut';
 export { useSeriesEditDialog } from './useSeriesEditDialog';
 export { useAutoFocusInput } from './useAutoFocusInput';
+export { useTagsInput } from './useTagsInput';

@@ -85,7 +85,7 @@ export function BulkSeriesAssignDialog({
                             checked={mode === 'existing'}
                             onChange={() => setMode('existing')}
                             disabled={noExistingSeries}
-                            className="mt-1 accent-purple-600"
+                            className="mt-1 accent-accent-600"
                         />
                         <div className="flex-1">
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
@@ -119,7 +119,7 @@ export function BulkSeriesAssignDialog({
                             name="mode"
                             checked={mode === 'new'}
                             onChange={() => setMode('new')}
-                            className="mt-1 accent-purple-600"
+                            className="mt-1 accent-accent-600"
                         />
                         <div className="flex-1">
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">

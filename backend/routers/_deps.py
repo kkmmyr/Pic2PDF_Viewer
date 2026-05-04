@@ -1,6 +1,8 @@
 """ルーター共通 FastAPI 依存関数・ヘルパー。"""
+import functools
 from fastapi import HTTPException
 from config import VALID_SOURCES
+from utils.logger import get_logger
 from utils.path_utils import validate_safe_name, validate_safe_path
 
 
@@ -29,3 +31,44 @@ def validate_request_targets(path: str, names: list[str]) -> None:
     validate_safe_path(path, param_name="path")
     for name in names:
         validate_safe_name(name, param_name="name")
+
+
+def log_and_raise_500(operation: str):
+    """エンドポイント用デコレータ: 想定外例外を 500 に変換しつつログ記録する。
+
+    ルーター各所で重複していた以下のパターンを集約する:
+
+        try:
+            ...
+        except Exception as e:
+            logger.exception("xxx failed")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    挙動:
+    - `HTTPException` は素通し（明示的な 4xx を残す）
+    - その他の `Exception` は `logger.exception(operation + " failed")` を記録し
+      `HTTPException(500, str(e))` に変換する
+    - エンドポイント関数内の明示的な `try/except` で `RuntimeError → HTTPException(400)` などを
+      ハンドリングしている場合、その `HTTPException` は本デコレータの第 1 except 節を
+      通って素通しされる
+
+    `operation` はログメッセージのプレフィックスに使う（例: `"ocr/run"`）。
+    logger はデコレート対象関数のモジュール名から取得するため、各ルーターの既存ロガー設定を
+    そのまま継承する。
+    """
+    def decorator(func):
+        logger = get_logger(func.__module__)
+
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.exception("%s failed", operation)
+                raise HTTPException(status_code=500, detail=str(e))
+
+        return wrapper
+
+    return decorator

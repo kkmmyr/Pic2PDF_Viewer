@@ -1,7 +1,9 @@
-import { useState, useRef, KeyboardEvent, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
 import { TagsInput } from '../ui/TagsInput';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
+import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
+import { useTagsInput } from '../../hooks/useTagsInput';
 
 interface BulkTagDialogProps {
     open: boolean;
@@ -17,45 +19,19 @@ interface BulkTagDialogProps {
  * 「一括適用」で選択中の全書籍のタグを上書きする（既存のタグは破棄）。
  */
 export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, onApply }: BulkTagDialogProps) {
-    const [tags, setTags] = useState<string[]>([]);
-    const [input, setInput] = useState('');
-    const inputRef = useRef<HTMLInputElement>(null);
     const { saving, error, handleSubmit } = useDialogSubmit(onClose);
+    const t = useTagsInput();
+    useAutoFocusInput(t.inputRef, open, { delay: 50 });
 
     useEffect(() => {
         if (open) {
-            setTags(targetCount === 1 ? [...initialTags] : []);
-            setInput('');
-            setTimeout(() => inputRef.current?.focus(), 50);
+            t.reset(targetCount === 1 ? [...initialTags] : []);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, targetCount, initialTags]);
 
-    const addTag = (value: string) => {
-        const trimmed = value.trim();
-        if (!trimmed) return;
-        if (!tags.includes(trimmed)) {
-            setTags(prev => [...prev, trimmed]);
-        }
-        setInput('');
-    };
-
-    const removeTag = (index: number) => {
-        setTags(prev => prev.filter((_, i) => i !== index));
-    };
-
-    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            addTag(input);
-        } else if (e.key === 'Backspace' && input === '' && tags.length > 0) {
-            removeTag(tags.length - 1);
-        }
-    };
-
     const handleApply = () => {
-        const finalTags = input.trim() ? [...tags, input.trim()] : tags;
-        const deduped = [...new Set(finalTags)];
-        handleSubmit(() => onApply(deduped));
+        handleSubmit(() => onApply(t.getFinalTags()));
     };
 
     const subtitle = targetCount === 1
@@ -76,15 +52,15 @@ export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, on
                 </label>
 
                 <TagsInput
-                    tags={tags}
-                    input={input}
-                    inputRef={inputRef}
+                    tags={t.tags}
+                    input={t.input}
+                    inputRef={t.inputRef}
                     placeholder="タグを入力（Enter で確定）"
                     hintText="Enter・カンマで確定、Backspace で削除。空のまま適用するとタグを全て解除します。"
-                    onChange={setInput}
-                    onKeyDown={handleKeyDown}
-                    onRemove={removeTag}
-                    onBlur={() => { if (input.trim()) addTag(input); }}
+                    onChange={t.setInput}
+                    onKeyDown={t.handleKeyDown}
+                    onRemove={t.removeTag}
+                    onBlur={t.handleBlur}
                 />
                 {error && (
                     <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>
