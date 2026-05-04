@@ -1,10 +1,11 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LibraryHeader, PdfGrid, ToastContainer, GenreFilterBar } from '../reader';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
 import {
     useLibraryPins, useSortedPdfs, useBookMeta, useLibraryFilter, useToast,
     useUrlFilters, useLibrarySettings, useLibraryBulkActions, useLibraryDisplay, useGenres,
+    useScrollMemory, useLibrarySelectionShortcut, useSeriesEditDialog,
 } from '../../hooks';
 import { usePinnedBookSets } from '../../hooks/usePinnedBookSets';
 import { useSeriesAuthorFilter } from '../../hooks/useSeriesAuthorFilter';
@@ -25,6 +26,9 @@ type BulkDialogKey = 'bulkAuthor' | 'bulkTag' | 'merge' | 'bulkSeries' | 'bulkGe
  * - `useLibrarySettings`: sort/groupMode/showHidden の localStorage 永続化
  * - `useLibraryBulkActions`: 一括操作 7 種（authors/tags/hidden/thumbnail/merge/series）
  * - `useLibraryDisplay`: effectiveGroupMode / displayPdfs / breadcrumbs の派生計算
+ * - `useScrollMemory`: URL キーごとのスクロール位置保存・復元
+ * - `useLibrarySelectionShortcut`: s キーで選択モードトグル
+ * - `useSeriesEditDialog`: SeriesEditDialog の state + assign/unassign ハンドラ
  */
 export function LibraryPanel() {
     const {
@@ -37,12 +41,7 @@ export function LibraryPanel() {
     } = useLibraryContext();
 
     const [searchText, setSearchText] = useState('');
-    const [seriesEditTarget, setSeriesEditTarget] = useState<string | null>(null);
     const dialogs = useDialogToggles<BulkDialogKey>();
-
-    // URL 状態（path/source/author/series/selectedPdf）ごとにスクロール位置を保存し、
-    // 戻ってきた時に復元する。クリックの capture phase で navigate 前に保存する。
-    const scrollMemory = useRef(new Map<string, number>());
 
     const {
         authorFilter, tagFilter, seriesFilter,
@@ -65,21 +64,7 @@ export function LibraryPanel() {
         setSearchText('');
     }, [currentPath, currentSource]);
 
-    // s キー: 選択モードをトグル（リーダーが開いている間・入力中・修飾キー付きは無効）
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (selectedPdf !== null) return;
-            if (e.key !== 's') return;
-            const target = e.target as HTMLElement;
-            const tag = target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
-            if (e.ctrlKey || e.metaKey || e.altKey) return;
-            e.preventDefault();
-            onToggleSelectionMode();
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedPdf, onToggleSelectionMode]);
+    useLibrarySelectionShortcut(selectedPdf, onToggleSelectionMode);
 
     const handleGroupModeChange = useCallback((mode: typeof groupMode) => {
         setGroupMode(mode);
@@ -113,33 +98,9 @@ export function LibraryPanel() {
         (name) => getLastViewedAt(currentPath, name),
     );
 
-    // 現在の URL キー。navigate 前のスクロール保存・後の復元に使う
+    // 現在の URL キー。useScrollMemory に渡してスクロール位置を URL 単位で記憶。
     const urlKey = `${currentPath}|${currentSource}|${authorFilter}|${seriesFilter}|${selectedPdf ?? ''}`;
-    const currentUrlKeyRef = useRef(urlKey);
-    currentUrlKeyRef.current = urlKey;
-
-    // どのクリックでも、navigate される前のスクロール位置を現在の URL キーで保存する
-    useEffect(() => {
-        const onClickCapture = () => {
-            scrollMemory.current.set(currentUrlKeyRef.current, window.scrollY);
-        };
-        document.addEventListener('click', onClickCapture, true);
-        return () => document.removeEventListener('click', onClickCapture, true);
-    }, []);
-
-    // URL キーが変わったら、その URL キーに保存されているスクロール位置に復元する
-    const isFirstRenderRef = useRef(true);
-    useEffect(() => {
-        if (isFirstRenderRef.current) {
-            isFirstRenderRef.current = false;
-            return;
-        }
-        const targetY = scrollMemory.current.get(urlKey) ?? 0;
-        // レイアウトが安定してから復元（display 切替・コンテンツ変更後の reflow を待つ）
-        requestAnimationFrame(() => {
-            window.scrollTo(0, targetY);
-        });
-    }, [urlKey]);
+    useScrollMemory(urlKey);
 
     const handlePdfClick = useCallback((name: string) => {
         recordView(currentPath, name);
@@ -222,28 +183,14 @@ export function LibraryPanel() {
         return getTags(currentPath, bulkActions.bulkSeriesNames[0]);
     })();
 
-    const { isMixedAuthors, seriesEditFilteredSeries, bulkSeriesFiltered } = useSeriesAuthorFilter({
-        meta, selectedItems, getAuthors, currentPath,
-        allSeries, allSeriesWithStats, seriesEditTarget,
+    const seriesEdit = useSeriesEditDialog({
+        currentPath, assignSeries, unassignSeries, runAsync,
     });
 
-    const handleSeriesAssign = useCallback(async (params: { title: string; index: number | number[]; id?: string }) => {
-        if (!seriesEditTarget) return;
-        await runAsync(
-            () => assignSeries(currentPath, [seriesEditTarget], params),
-            'シリーズ割り当てに失敗しました。',
-            { rethrow: true },
-        );
-    }, [seriesEditTarget, assignSeries, currentPath, runAsync]);
-
-    const handleSeriesUnassign = useCallback(async () => {
-        if (!seriesEditTarget) return;
-        await runAsync(
-            () => unassignSeries(currentPath, [seriesEditTarget]),
-            'シリーズ解除に失敗しました。',
-            { rethrow: true },
-        );
-    }, [seriesEditTarget, unassignSeries, currentPath, runAsync]);
+    const { isMixedAuthors, seriesEditFilteredSeries, bulkSeriesFiltered } = useSeriesAuthorFilter({
+        meta, selectedItems, getAuthors, currentPath,
+        allSeries, allSeriesWithStats, seriesEditTarget: seriesEdit.target,
+    });
 
     return (
         <>
@@ -353,20 +300,20 @@ export function LibraryPanel() {
                         onToggleHidden={bulkActions.handleToggleHiddenOne}
                         showHidden={showHidden}
                         getIsUnread={(name) => getViewCount(currentPath, name) === 0}
-                        onEditSeries={setSeriesEditTarget}
+                        onEditSeries={seriesEdit.open}
                         dndEnabled={!!seriesFilter}
                         onReorder={bulkActions.handleSeriesReorder}
                     />
                 </div>
             </div>
             <SeriesEditDialog
-                open={seriesEditTarget !== null}
-                targetName={seriesEditTarget ?? ''}
-                current={seriesEditTarget ? getSeries(currentPath, seriesEditTarget) : null}
+                open={seriesEdit.target !== null}
+                targetName={seriesEdit.target ?? ''}
+                current={seriesEdit.target ? getSeries(currentPath, seriesEdit.target) : null}
                 allSeries={seriesEditFilteredSeries}
-                onClose={() => setSeriesEditTarget(null)}
-                onAssign={handleSeriesAssign}
-                onUnassign={handleSeriesUnassign}
+                onClose={seriesEdit.close}
+                onAssign={seriesEdit.assign}
+                onUnassign={seriesEdit.unassign}
             />
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
