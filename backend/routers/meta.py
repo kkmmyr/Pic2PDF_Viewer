@@ -5,9 +5,12 @@
 保存先: backend/data/meta/{source}/meta.json
 キー: "{path}/{filename}" の相対パス（path が空の場合は "{filename}"）
 """
+import json
 import time
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from config import get_dirs_by_source
 from services.author_resolver import resolve_author_debug
@@ -73,6 +76,23 @@ def get_meta(source: str = Depends(validated_source)) -> dict:
     レスポンス: { "key": { "authors": [...] }, ... }
     """
     return load_meta(source)
+
+
+@router.get("/meta/export")
+def export_meta(source: str = Depends(validated_source)) -> Response:
+    """
+    指定ソースの meta.json 全体を JSON ファイルとしてダウンロードする。
+    バックアップ・環境移行用。副作用なし（読み取り専用）。
+    """
+    data = load_meta(source)
+    json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    date_str = datetime.now().strftime("%Y%m%d")
+    filename = f"meta_{source}_{date_str}.json"
+    return Response(
+        content=json_bytes,
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.patch("/meta")

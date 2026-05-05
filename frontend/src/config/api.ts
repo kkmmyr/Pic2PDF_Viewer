@@ -41,6 +41,8 @@ export const API_ENDPOINTS = {
     GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
     /** 書籍メタデータ取得・更新 */
     META: '/api/meta',
+    /** メタデータ一括エクスポート（JSON ダウンロード） */
+    META_EXPORT: (source: string) => `/api/meta/export?source=${encodeURIComponent(source)}`,
     /** 閲覧記録（カウント+1） */
     META_VIEW: '/api/meta/view',
     /** 作者名自動登録ジョブ開始 */

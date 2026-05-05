@@ -338,6 +338,19 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
+### `GET /api/meta/export`
+指定ソースの書籍メタデータ全体を JSON ファイルとしてダウンロードする。バックアップ・環境移行用。
+
+**クエリパラメータ**:
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**レスポンス**: `application/json` ファイル（`Content-Disposition: attachment; filename="meta_{source}_{YYYYMMDD}.json"`）  
+ボディは `GET /api/meta` と同じ構造の JSON。
+
+**用途**: ライブラリ画面「ツール」メニューの「メタデータをエクスポート」ボタンから起動。著者名・タグ・シリーズ・閲覧回数などの積み上げデータを保護する。
+
+---
+
 ### `PATCH /api/meta`
 1冊または複数冊の作者名・タグ・非表示フラグ・ジャンルを上書き保存する。指定されたフィールドのみ更新し、他のフィールド（閲覧履歴等）は保持される。
 
