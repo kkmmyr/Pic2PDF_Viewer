@@ -82,7 +82,6 @@ CORS_ORIGINS: list[str] = os.environ.get("ALLOWED_ORIGINS", _default_origins).sp
 # ディレクトリ初期化
 # ---------------------------------------------------------------------------
 _REQUIRED_DIRS: list[str] = [
-    PDF_COMPRESSED_DIR,
     THUMBNAIL_DIR,
     IMAGES_DIR,
     COMPLETE_DIR,

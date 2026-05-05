@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 import os
 from urllib.parse import quote
+from natsort import natsorted
 
 from config import get_dirs_by_source
 from utils.file_utils import is_image_file, is_pdf_file
@@ -17,11 +18,69 @@ logger = get_logger(__name__)
 
 router = APIRouter()
 
+
+def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) -> dict:
+    """generated ソース用: images/ サブディレクトリを走査して書籍一覧を返す。
+
+    pdfs_compressed/ の代わりに images/{book}/ ディレクトリを正とする。
+    返却する name は "{dirname}.pdf" として meta.json のキー互換を保つ。
+    """
+    base_img_dir = dirs["img"]
+    base_thumb_dir = dirs["thumb"]
+    url_prefix_thumb = dirs["thumb_url_prefix"]
+
+    target_img_dir = join_path(base_img_dir, path) if path else base_img_dir
+    target_thumb_dir = join_path(base_thumb_dir, path) if path else base_thumb_dir
+
+    if not os.path.exists(target_img_dir):
+        return {"files": [], "current_path": path}
+
+    if not os.path.isdir(target_img_dir):
+        raise HTTPException(status_code=400, detail="Not a directory")
+
+    files = []
+    for item in os.listdir(target_img_dir):
+        item_path = join_path(target_img_dir, item)
+        if not os.path.isdir(item_path):
+            continue
+        webps = natsorted([f for f in os.listdir(item_path) if f.lower().endswith('.webp')])
+        if not webps:
+            continue
+
+        pdf_name = f"{item}.pdf"
+        thumb_name = get_thumbnail_name(pdf_name)
+        thumb_path = join_path(target_thumb_dir, thumb_name)
+
+        thumb_url = None
+        if os.path.exists(thumb_path):
+            rel = join_path(path, thumb_name) if path else thumb_name
+            encoded = '/'.join(quote(seg, safe='') for seg in rel.replace(os.sep, '/').split('/'))
+            thumb_url = f"{url_prefix_thumb}/{encoded}"
+        else:
+            first_webp = join_path(item_path, webps[0])
+            background_tasks.add_task(ThumbnailService.generate_thumbnail, first_webp, thumb_path)
+
+        created_at = int(os.path.getctime(item_path))
+        files.append({
+            "name": pdf_name,
+            "thumbnail": thumb_url,
+            "created_at": created_at,
+        })
+
+    return {"files": files, "current_path": path}
+
+
 @router.get("/pdfs")
 def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "generated"):
     validate_safe_path(path)
 
     dirs = get_dirs_by_source(source)
+
+    # generated ソースは images/ サブディレクトリを走査（pdfs_compressed 不要）
+    if source == "generated":
+        return _list_from_images(background_tasks, path, dirs)
+
+    # kindle / novel: 従来通り PDF ファイルを走査
     base_pdf_dir = dirs["pdf"]
     base_thumb_dir = dirs["thumb"]
     url_prefix_thumb = dirs["thumb_url_prefix"]

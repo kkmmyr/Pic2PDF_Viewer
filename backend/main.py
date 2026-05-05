@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from config import (
     CORS_ORIGINS,
-    PDF_COMPRESSED_DIR, THUMBNAIL_DIR, IMAGES_DIR,
+    THUMBNAIL_DIR, IMAGES_DIR,
     KINDLE_PDF_DIR, KINDLE_THUMBNAIL_DIR, KINDLE_IMAGES_DIR,
     KINDLE_NOVEL_PDF_DIR, KINDLE_NOVEL_THUMBNAIL_DIR, KINDLE_NOVEL_IMAGES_DIR,
     FRONTEND_DIST_DIR,
@@ -59,7 +59,6 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # 静的ファイルのマウント
 # ---------------------------------------------------------------------------
 
-app.mount("/pdfs",        StaticFiles(directory=PDF_COMPRESSED_DIR), name="pdfs")
 app.mount("/thumbnails",  StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
 app.mount("/images",      StaticFiles(directory=IMAGES_DIR),    name="images")
 

@@ -40,15 +40,18 @@ class FileManager:
 
         src = os.path.join(dirs["pdf"], path, old_name)
         dst = os.path.join(dirs["pdf"], path, new_name)
+        img_src = os.path.join(dirs["img"], path, os.path.splitext(old_name)[0])
 
-        if not os.path.exists(src):
+        # 存在チェック: PDF または images ディレクトリのどちらか一方が存在すれば OK
+        if not os.path.exists(src) and not os.path.exists(img_src):
             raise FileNotFoundError(f"Item not found: {old_name}")
         if os.path.exists(dst):
             raise FileExistsError(f"Name already exists: {new_name}")
 
         try:
-            os.rename(src, dst)
-            renamed_parts.append((dst, src))
+            if os.path.exists(src):
+                os.rename(src, dst)
+                renamed_parts.append((dst, src))
 
             if is_folder:
                 for base_dir in (dirs["thumb"], dirs["img"]):
@@ -92,10 +95,19 @@ class FileManager:
             OSError: 削除操作に失敗した場合
         """
         pdf_path = os.path.join(dirs["pdf"], path, item) if path else os.path.join(dirs["pdf"], item)
-        if not os.path.exists(pdf_path):
+        book_name = os.path.splitext(item)[0]
+        img_dir = (
+            os.path.join(dirs["img"], path, book_name) if path
+            else os.path.join(dirs["img"], book_name)
+        )
+
+        # 存在チェック: PDF または images ディレクトリのどちらか一方が存在すれば OK
+        if not os.path.exists(pdf_path) and not os.path.exists(img_dir):
             raise FileNotFoundError(f"Item not found: {item}")
 
-        os.remove(pdf_path)
+        # PDF が存在する場合のみ削除（image-only モードでは不在のため skip）
+        if os.path.exists(pdf_path):
+            os.remove(pdf_path)
 
         thumb_name = get_thumbnail_name(item)
         thumb_path = (
@@ -108,11 +120,6 @@ class FileManager:
             except Exception as e:
                 logger.warning("Failed to delete thumbnail %s: %s", thumb_path, e)
 
-        book_name = os.path.splitext(item)[0]
-        img_dir = (
-            os.path.join(dirs["img"], path, book_name) if path
-            else os.path.join(dirs["img"], book_name)
-        )
         if os.path.exists(img_dir):
             try:
                 shutil.rmtree(img_dir)
