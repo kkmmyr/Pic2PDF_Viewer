@@ -6,6 +6,7 @@ import os
 import fitz
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
+from natsort import natsorted
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
@@ -32,14 +33,34 @@ class RegenerateThumbnailBulkRequest(BaseModel):
     source: str = "generated"
 
 
-def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str) -> bool:
-    """1冊分のサムネイル再生成。成功時 True を返す。"""
-    pdf_path = os.path.join(pdf_dir, path, name)
-    if not os.path.exists(pdf_path):
-        return False
+def _get_webps(img_dir: str, book_name: str, path: str) -> list[str]:
+    """images/{path}/{book_name}/ 配下の WebP ファイルを自然順で返す。"""
+    target = os.path.join(img_dir, path, book_name) if path else os.path.join(img_dir, book_name)
+    if not os.path.isdir(target):
+        return []
+    return [os.path.join(target, f) for f in natsorted(os.listdir(target)) if f.lower().endswith('.webp')]
+
+
+def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir: str = "") -> bool:
+    """1冊分のサムネイル再生成。成功時 True を返す。
+
+    PDF が存在しない場合（generated image-only モード）は
+    img_dir 配下の先頭 WebP をソース画像として使う。
+    """
     thumb_name = get_thumbnail_name(name)
-    thumb_path = os.path.join(thumb_dir, path, thumb_name)
-    return ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
+    thumb_path = os.path.join(thumb_dir, path, thumb_name) if path else os.path.join(thumb_dir, thumb_name)
+
+    pdf_path = os.path.join(pdf_dir, path, name) if path else os.path.join(pdf_dir, name)
+    if os.path.exists(pdf_path):
+        return ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
+
+    # PDF 不在: images/ 先頭 WebP にフォールバック
+    if img_dir:
+        webps = _get_webps(img_dir, os.path.splitext(name)[0], path)
+        if webps:
+            return ThumbnailService.generate_thumbnail(webps[0], thumb_path)
+
+    return False
 
 
 @router.get("/thumbnails/page")
@@ -50,14 +71,36 @@ def get_page_thumbnail(
     source: str = Query("generated"),
     width: int = Query(120),
 ):
-    """指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。"""
+    """指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。
+
+    generated ソースは images/ 配下の WebP を直接返す。
+    kindle / novel は PDF を fitz でレンダリングして返す。
+    """
     validate_safe_path(path, param_name="path")
     validate_safe_name(name, param_name="name")
     if page < 1:
         raise HTTPException(status_code=400, detail="page must be >= 1")
 
     dirs = get_dirs_by_source(source)
-    pdf_path = os.path.join(dirs["pdf"], path, name)
+
+    # generated: images/ ディレクトリから該当ページの WebP を直接返す
+    if source == "generated":
+        book_name = os.path.splitext(name)[0]
+        webps = _get_webps(dirs["img"], book_name, path)
+        if not webps:
+            raise HTTPException(status_code=404, detail="Images not found")
+        if page > len(webps):
+            raise HTTPException(status_code=400, detail="page out of range")
+        with open(webps[page - 1], "rb") as f:
+            img_bytes = f.read()
+        return Response(
+            content=img_bytes,
+            media_type="image/webp",
+            headers={"Cache-Control": "max-age=3600"},
+        )
+
+    # kindle / novel: PDF を fitz でレンダリング
+    pdf_path = os.path.join(dirs["pdf"], path, name) if path else os.path.join(dirs["pdf"], name)
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="PDF not found")
 
@@ -88,12 +131,8 @@ def regenerate_thumbnail(request: RegenerateThumbnailRequest):
     validate_safe_name(request.name, param_name="name")
 
     dirs = get_dirs_by_source(request.source)
-    pdf_path = os.path.join(dirs["pdf"], request.path, request.name)
-    if not os.path.exists(pdf_path):
-        raise HTTPException(status_code=404, detail="PDF not found")
-
-    if not _regenerate_one(dirs["pdf"], dirs["thumb"], request.path, request.name):
-        raise HTTPException(status_code=500, detail="Failed to regenerate thumbnail")
+    if not _regenerate_one(dirs["pdf"], dirs["thumb"], request.path, request.name, dirs["img"]):
+        raise HTTPException(status_code=404, detail="Source image not found")
 
     return {"message": "Thumbnail regenerated"}
 
@@ -108,7 +147,7 @@ def regenerate_thumbnail_bulk(request: RegenerateThumbnailBulkRequest):
     failed: list[str] = []
 
     for name in request.names:
-        if _regenerate_one(dirs["pdf"], dirs["thumb"], request.path, name):
+        if _regenerate_one(dirs["pdf"], dirs["thumb"], request.path, name, dirs["img"]):
             succeeded.append(name)
             logger.info("Regenerated thumbnail: %s", name)
         else:
