@@ -216,7 +216,11 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ### `GET /api/thumbnails/page`
-指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのドラッグ中プレビュー用途。
+指定ページのサムネイル画像をオンデマンドで返す。ページスライダーのドラッグ中プレビュー用途。
+
+ソースによって取得方法が異なる:
+- `generated`: `images/{book}/` 配下の N 番目 WebP を直接返す（PDF 不要）
+- `kindle` / `novel`: PDF を fitz でレンダリングして JPEG で返す
 
 **クエリパラメータ**:
 
@@ -226,14 +230,16 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 | `page` | int | ✓ | ページ番号（1 始まり） |
 | `path` | string | - | 相対パス（デフォルト `""`） |
 | `source` | string | - | `generated` / `kindle` / `novel`（デフォルト `generated`） |
-| `width` | int | - | 出力画像幅 px（デフォルト `400`） |
+| `width` | int | - | 出力画像幅 px（`kindle`/`novel` のみ使用、デフォルト `400`） |
 
-**レスポンス**: `image/jpeg` バイナリ（`Cache-Control: max-age=3600`）
+**レスポンス**:
+- `generated`: `image/webp` バイナリ（`Cache-Control: max-age=3600`）
+- `kindle`/`novel`: `image/jpeg` バイナリ（`Cache-Control: max-age=3600`）
 
 **エラー**:
 - `400`: `page < 1` またはページが範囲外
-- `404`: 対象PDFが存在しない
-- `500`: レンダリング失敗
+- `404`: 対象画像 / PDF が存在しない
+- `500`: レンダリング失敗（`kindle`/`novel` のみ）
 
 ---
 
