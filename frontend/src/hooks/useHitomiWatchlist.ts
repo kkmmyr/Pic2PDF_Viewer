@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api_client';
-import { ApiError } from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
 import type { WatchlistEntry, WatchlistResponse } from '../types/hitomi';
 
@@ -70,5 +69,3 @@ export function useHitomiWatchlist(): UseHitomiWatchlistResult {
 
     return { artists, loading, error, refresh, addArtist, removeArtist };
 }
-
-export { ApiError };

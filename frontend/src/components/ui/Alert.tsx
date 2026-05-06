@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
 import { AlertCircle, CheckCircle, AlertTriangle, Info } from 'lucide-react';
 
-export type AlertVariant = 'error' | 'success' | 'warning' | 'info';
+type AlertVariant = 'error' | 'success' | 'warning' | 'info';
 
 interface AlertProps {
     variant: AlertVariant;

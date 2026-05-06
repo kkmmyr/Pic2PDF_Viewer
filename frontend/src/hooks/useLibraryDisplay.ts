@@ -3,7 +3,7 @@ import type { PdfFile, BookMetaMap } from '../types';
 import { useLibraryGrouping, type GroupMode, type GroupedLibrary } from './useLibraryGrouping';
 import type { PinsMap } from './useLibraryPins';
 
-export type Crumb = { kind: 'home' | 'author' | 'series'; label: string; onClick?: () => void };
+type Crumb = { kind: 'home' | 'author' | 'series'; label: string; onClick?: () => void };
 
 interface UseLibraryDisplayParams {
     filteredPdfs: PdfFile[];

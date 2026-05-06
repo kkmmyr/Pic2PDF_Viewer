@@ -11,7 +11,7 @@ const FORBIDDEN_FILENAME_CHARS = /[/\\:*?"<>|]/;
 /** 表示用の禁止文字一覧（エラーメッセージに使う） */
 const FORBIDDEN_CHARS_DISPLAY = '/ \\ : * ? " < > |';
 
-export type FilenameKind = 'file' | 'folder';
+type FilenameKind = 'file' | 'folder';
 
 /**
  * ファイル名/フォルダ名をバリデーションし、エラーがあればメッセージを返す。

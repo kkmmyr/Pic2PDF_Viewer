@@ -8,7 +8,7 @@ import { useAsyncToast } from './useAsyncToast';
 /**
  * `useBookMeta` から渡すアクション関数群（必要分のみ）。
  */
-export interface BookMetaActions {
+interface BookMetaActions {
     updateAuthors: (path: string, names: string[], authors: string[]) => Promise<void>;
     updateTags: (path: string, names: string[], tags: string[]) => Promise<void>;
     updateGenre: (path: string, names: string[], genre: string) => Promise<void>;

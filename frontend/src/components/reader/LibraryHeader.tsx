@@ -4,7 +4,6 @@ import { LibraryNavBar } from './LibraryNavBar';
 import { LibraryFilterBar } from './LibraryFilterBar';
 import { LibraryBulkActionBar } from './LibraryBulkActionBar';
 import type { LibraryBreadcrumb } from './LibraryNavBar';
-export type { LibraryBreadcrumb };
 
 interface LibraryHeaderProps {
     currentPath: string;

@@ -3,7 +3,7 @@ import type { LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import { useJobPolling } from './useJobPolling';
 
-export interface AutoFillStatus {
+interface AutoFillStatus {
     status: 'idle' | 'running' | 'done' | 'error';
     total: number;
     done: number;

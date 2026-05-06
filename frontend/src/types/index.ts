@@ -73,7 +73,7 @@ export type LibrarySource = 'generated' | 'kindle' | 'novel';
 /**
  * Generator ジョブステータス
  */
-export type GenerateJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+type GenerateJobStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export interface GenerateFailedItem {
     name: string;

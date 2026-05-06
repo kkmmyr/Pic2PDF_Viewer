@@ -13,7 +13,7 @@ interface StoredJob {
 
 const STORAGE_KEY = STORAGE_KEYS.GENERATOR_JOB;
 
-export interface UseGenerateJobReturn {
+interface UseGenerateJobReturn {
     currentJob: GenerateJob | null;
     /** 画面遷移前に実行中だったジョブのソースディレクトリ（復元時のみ非null） */
     restoredSourceDir: string | null;

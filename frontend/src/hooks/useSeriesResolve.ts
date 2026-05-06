@@ -3,7 +3,7 @@ import type { LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import { useJobPolling } from './useJobPolling';
 
-export interface SeriesResolveStatus {
+interface SeriesResolveStatus {
     status: 'idle' | 'running' | 'done' | 'error';
     total: number;
     done: number;

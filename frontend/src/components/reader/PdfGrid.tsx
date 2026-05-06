@@ -17,8 +17,6 @@ import type { PdfFile } from '../../types';
 import { PdfCard, type PdfCardProps, type PdfCardBadge } from './PdfCard';
 import { SortablePdfCard } from './SortablePdfCard';
 
-export type { PdfCardBadge };
-
 interface PdfGridProps {
     pdfs: PdfFile[];
     onPdfClick: (pdfName: string) => void;

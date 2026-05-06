@@ -4,8 +4,6 @@ import { SearchableSelect } from '../ui/SearchableSelect';
 import type { ExistingSeriesOption } from '../../types';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
-export type { ExistingSeriesOption };
-
 interface BulkSeriesAssignDialogProps {
     open: boolean;
     /** 登録対象（選択順、巻数の若い順に番号が振られる） */

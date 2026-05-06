@@ -12,7 +12,7 @@ import type { PinsMap } from './useLibraryPins';
  */
 export type GroupMode = 'none' | 'series' | 'author' | 'author-then-series';
 
-export interface GroupBadge {
+interface GroupBadge {
     /** バッジに表示するメンバー数 */
     count: number;
     /** 集約種別（カードの装飾切替用） */

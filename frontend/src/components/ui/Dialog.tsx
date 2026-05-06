@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
-export type DialogMaxWidth = 'sm' | 'md';
+type DialogMaxWidth = 'sm' | 'md';
 
 interface DialogProps {
     open: boolean;

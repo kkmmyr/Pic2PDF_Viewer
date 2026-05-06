@@ -4,7 +4,7 @@ import { BulkTagDialog } from './BulkTagDialog';
 import { BulkSeriesAssignDialog } from './BulkSeriesAssignDialog';
 import { BulkGenreDialog } from './BulkGenreDialog';
 
-export interface LibraryDialogsProps {
+interface LibraryDialogsProps {
     currentPath: string;
     currentSource: LibrarySource;
     selectedItems: Set<string>;
