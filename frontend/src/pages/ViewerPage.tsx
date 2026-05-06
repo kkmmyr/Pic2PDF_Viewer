@@ -2,10 +2,8 @@ import { LibraryProvider, useLibraryContext } from '../contexts/LibraryContext';
 import { LibraryPanel, ReaderPanel } from '../components/viewer';
 
 function LibraryView() {
-    const {
-        selectedPdf, currentPath, currentSource,
-        onClosePdf, onPdfUpdated, onPdfClick,
-    } = useLibraryContext();
+    const { selectedPdf, currentPath, currentSource, onClosePdf, onPdfUpdated, onPdfClick } =
+        useLibraryContext();
 
     return (
         <div className="h-full flex flex-col relative">

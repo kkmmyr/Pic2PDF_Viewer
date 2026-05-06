@@ -27,55 +27,61 @@ export function useReaderNavigation({
 }: UseReaderNavigationProps): UseReaderNavigationReturn {
     const [pageNumber, setPageNumber] = useState(1);
 
-    const handleNext = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
-        e?.stopPropagation?.();
+    const handleNext = useCallback(
+        (e?: React.MouseEvent | KeyboardEvent) => {
+            e?.stopPropagation?.();
 
-        if (!isSpread) {
-            // Single Page Mode
-            if (pageNumber < numPages) setPageNumber(prev => prev + 1);
-            return;
-        }
+            if (!isSpread) {
+                // Single Page Mode
+                if (pageNumber < numPages) setPageNumber((prev) => prev + 1);
+                return;
+            }
 
-        // Spread Mode
-        if (direction === 'rtl') {
-            // RTL: 
-            // Page 1 (Cover) -> Next -> Page 2 (Right) + Page 3 (Left) [Display: 3 | 2]
-            if (pageNumber === 1) {
-                if (pageNumber + 1 <= numPages) setPageNumber(2);
+            // Spread Mode
+            if (direction === 'rtl') {
+                // RTL:
+                // Page 1 (Cover) -> Next -> Page 2 (Right) + Page 3 (Left) [Display: 3 | 2]
+                if (pageNumber === 1) {
+                    if (pageNumber + 1 <= numPages) setPageNumber(2);
+                } else {
+                    if (pageNumber + 2 <= numPages) setPageNumber((prev) => prev + 2);
+                }
             } else {
-                if (pageNumber + 2 <= numPages) setPageNumber(prev => prev + 2);
+                // LTR:
+                // Page 1 (Left) + Page 2 (Right) -> Next -> Page 3 (Left) + Page 4 (Right)
+                if (pageNumber + 2 <= numPages) setPageNumber((prev) => prev + 2);
+                else if (pageNumber + 1 <= numPages) setPageNumber((prev) => prev + 1);
             }
-        } else {
-            // LTR:
-            // Page 1 (Left) + Page 2 (Right) -> Next -> Page 3 (Left) + Page 4 (Right)
-            if (pageNumber + 2 <= numPages) setPageNumber(prev => prev + 2);
-            else if (pageNumber + 1 <= numPages) setPageNumber(prev => prev + 1);
-        }
-    }, [pageNumber, numPages, isSpread, direction]);
+        },
+        [pageNumber, numPages, isSpread, direction],
+    );
 
-    const handlePrev = useCallback((e?: React.MouseEvent | KeyboardEvent) => {
-        e?.stopPropagation?.();
+    const handlePrev = useCallback(
+        (e?: React.MouseEvent | KeyboardEvent) => {
+            e?.stopPropagation?.();
 
-        if (!isSpread) {
-            // Single Page Mode
-            if (pageNumber > 1) setPageNumber(prev => prev - 1);
-            return;
-        }
-
-        // Spread Mode
-        if (direction === 'rtl') {
-            // RTL:
-            if (pageNumber === 2) {
-                setPageNumber(1);
-            } else if (pageNumber > 2) {
-                setPageNumber(prev => prev - 2);
+            if (!isSpread) {
+                // Single Page Mode
+                if (pageNumber > 1) setPageNumber((prev) => prev - 1);
+                return;
             }
-        } else {
-            // LTR:
-            if (pageNumber > 2) setPageNumber(prev => prev - 2);
-            else if (pageNumber === 2) setPageNumber(1);
-        }
-    }, [pageNumber, isSpread, direction]);
+
+            // Spread Mode
+            if (direction === 'rtl') {
+                // RTL:
+                if (pageNumber === 2) {
+                    setPageNumber(1);
+                } else if (pageNumber > 2) {
+                    setPageNumber((prev) => prev - 2);
+                }
+            } else {
+                // LTR:
+                if (pageNumber > 2) setPageNumber((prev) => prev - 2);
+                else if (pageNumber === 2) setPageNumber(1);
+            }
+        },
+        [pageNumber, isSpread, direction],
+    );
 
     const resetPage = useCallback(() => {
         setPageNumber(1);

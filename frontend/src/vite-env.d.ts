@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_DEFAULT_SOURCE_DIR: string;
+    readonly VITE_DEFAULT_SOURCE_DIR: string;
 }
 
 interface ImportMeta {
-  readonly env: ImportMetaEnv;
+    readonly env: ImportMetaEnv;
 }

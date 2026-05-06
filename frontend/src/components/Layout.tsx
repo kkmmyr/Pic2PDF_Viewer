@@ -65,9 +65,15 @@ export default function Layout() {
                                 <button
                                     onClick={toggleDark}
                                     className="ml-2 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                                    title={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+                                    title={
+                                        isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'
+                                    }
                                 >
-                                    {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                                    {isDark ? (
+                                        <Sun className="w-5 h-5" />
+                                    ) : (
+                                        <Moon className="w-5 h-5" />
+                                    )}
                                 </button>
                             </nav>
                         </div>

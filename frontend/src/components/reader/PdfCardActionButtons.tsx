@@ -1,7 +1,9 @@
 import { Pencil, RefreshCw, EyeOff, Eye, BookCopy } from 'lucide-react';
 
-const BTN_ICON = 'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors';
-const BTN_ICON_SERIES = 'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-accent-500 dark:hover:text-accent-400 transition-colors';
+const BTN_ICON =
+    'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors';
+const BTN_ICON_SERIES =
+    'p-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-300 dark:text-gray-600 hover:text-accent-500 dark:hover:text-accent-400 transition-colors';
 
 interface PdfCardActionButtonsProps {
     name: string;
@@ -16,14 +18,24 @@ interface PdfCardActionButtonsProps {
 }
 
 export function PdfCardActionButtons({
-    name, isSelectionMode, showHidden, isGroup, isUnread,
-    onRename, onRegenThumb, onToggleHidden, onEditSeries,
+    name,
+    isSelectionMode,
+    showHidden,
+    isGroup,
+    isUnread,
+    onRename,
+    onRegenThumb,
+    onToggleHidden,
+    onEditSeries,
 }: PdfCardActionButtonsProps) {
     return (
         <div className="flex items-center gap-1">
             {!isSelectionMode && onRename && (
                 <button
-                    onClick={(e) => { e.stopPropagation(); onRename(name); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRename(name);
+                    }}
                     className={BTN_ICON}
                     title="名前を変更"
                 >
@@ -32,7 +44,10 @@ export function PdfCardActionButtons({
             )}
             {!isSelectionMode && onRegenThumb && (
                 <button
-                    onClick={(e) => { e.stopPropagation(); onRegenThumb(name); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onRegenThumb(name);
+                    }}
                     className={BTN_ICON}
                     title="サムネイルを再生成"
                 >
@@ -41,7 +56,10 @@ export function PdfCardActionButtons({
             )}
             {!isSelectionMode && onToggleHidden && (
                 <button
-                    onClick={(e) => { e.stopPropagation(); onToggleHidden(name); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleHidden(name);
+                    }}
                     className={BTN_ICON}
                     title={showHidden ? '再表示する' : '非表示にする'}
                 >
@@ -50,7 +68,10 @@ export function PdfCardActionButtons({
             )}
             {!isSelectionMode && onEditSeries && (
                 <button
-                    onClick={(e) => { e.stopPropagation(); onEditSeries(name); }}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onEditSeries(name);
+                    }}
                     className={BTN_ICON_SERIES}
                     title="シリーズを編集"
                 >
@@ -58,7 +79,9 @@ export function PdfCardActionButtons({
                 </button>
             )}
             {!isGroup && isUnread && (
-                <span className="px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold leading-none">NEW</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-sky-500 text-white text-xs font-semibold leading-none">
+                    NEW
+                </span>
             )}
         </div>
     );

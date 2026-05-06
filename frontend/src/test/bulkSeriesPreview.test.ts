@@ -17,10 +17,7 @@ function calcPreviewIndexes(
     maxIndex: number | undefined,
     count: number,
 ): number[] {
-    const start =
-        mode === 'existing' && maxIndex !== undefined
-            ? Math.floor(maxIndex) + 1
-            : 1;
+    const start = mode === 'existing' && maxIndex !== undefined ? Math.floor(maxIndex) + 1 : 1;
     return Array.from({ length: count }, (_, i) => start + i);
 }
 

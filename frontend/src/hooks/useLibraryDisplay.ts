@@ -46,15 +46,27 @@ interface UseLibraryDisplayResult {
  * - `breadcrumbs`: 「ライブラリ → 作者 → シリーズ」のクリック可能な階層
  */
 export function useLibraryDisplay({
-    filteredPdfs, meta, currentPath, groupMode, authorFilter, seriesFilter,
-    getSeries, clearAllDrilldown, setSeriesFilter, seriesPins, authorPins,
+    filteredPdfs,
+    meta,
+    currentPath,
+    groupMode,
+    authorFilter,
+    seriesFilter,
+    getSeries,
+    clearAllDrilldown,
+    setSeriesFilter,
+    seriesPins,
+    authorPins,
 }: UseLibraryDisplayParams): UseLibraryDisplayResult {
-    const effectiveGroupMode: GroupMode =
-        seriesFilter
+    const effectiveGroupMode: GroupMode = seriesFilter
+        ? 'none'
+        : groupMode === 'author-then-series'
+          ? authorFilter
+              ? 'series'
+              : 'author'
+          : authorFilter
             ? 'none'
-            : groupMode === 'author-then-series'
-                ? (authorFilter ? 'series' : 'author')
-                : (authorFilter ? 'none' : groupMode);
+            : groupMode;
 
     const grouped = useLibraryGrouping({
         pdfs: filteredPdfs,
@@ -77,11 +89,10 @@ export function useLibraryDisplay({
     const breadcrumbs = useMemo<Crumb[]>(() => {
         if (!authorFilter && !seriesFilter) return [];
         const seriesTitle = seriesFilter
-            ? (Object.values(meta).find(e => e.series_id === seriesFilter)?.series_title ?? 'シリーズ')
+            ? (Object.values(meta).find((e) => e.series_id === seriesFilter)?.series_title ??
+              'シリーズ')
             : null;
-        const items: Crumb[] = [
-            { kind: 'home', label: 'ライブラリ', onClick: clearAllDrilldown },
-        ];
+        const items: Crumb[] = [{ kind: 'home', label: 'ライブラリ', onClick: clearAllDrilldown }];
         if (authorFilter) {
             items.push({
                 kind: 'author',

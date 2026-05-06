@@ -1,4 +1,16 @@
-import { ArrowLeft, Trash2, CheckSquare, Square, Search, Wand2, BookOpen, FileText, Maximize2, Minimize2, HelpCircle } from 'lucide-react';
+import {
+    ArrowLeft,
+    Trash2,
+    CheckSquare,
+    Square,
+    Search,
+    Wand2,
+    BookOpen,
+    FileText,
+    Maximize2,
+    Minimize2,
+    HelpCircle,
+} from 'lucide-react';
 import type { ReadingDirection, SpreadMode } from '../../types';
 
 interface ReaderHeaderProps {
@@ -23,10 +35,13 @@ interface ReaderHeaderProps {
     onOpenHelp: () => void;
 }
 
-const SPREAD_MODE_CONFIG: Record<SpreadMode, { label: string; icon: React.ReactNode; next: SpreadMode }> = {
-    auto:   { label: 'Auto',   icon: <Wand2     className="w-4 h-4" />, next: 'spread' },
-    spread: { label: 'Spread', icon: <BookOpen  className="w-4 h-4" />, next: 'single' },
-    single: { label: 'Single', icon: <FileText  className="w-4 h-4" />, next: 'auto'   },
+const SPREAD_MODE_CONFIG: Record<
+    SpreadMode,
+    { label: string; icon: React.ReactNode; next: SpreadMode }
+> = {
+    auto: { label: 'Auto', icon: <Wand2 className="w-4 h-4" />, next: 'spread' },
+    spread: { label: 'Spread', icon: <BookOpen className="w-4 h-4" />, next: 'single' },
+    single: { label: 'Single', icon: <FileText className="w-4 h-4" />, next: 'auto' },
 };
 
 export function ReaderHeader({
@@ -64,7 +79,9 @@ export function ReaderHeader({
                 >
                     <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
                 </button>
-                <h1 className="font-semibold truncate max-w-xl text-gray-900 dark:text-gray-100">{selectedPdf}</h1>
+                <h1 className="font-semibold truncate max-w-xl text-gray-900 dark:text-gray-100">
+                    {selectedPdf}
+                </h1>
             </div>
 
             <div className="flex items-center gap-2">
@@ -114,7 +131,11 @@ export function ReaderHeader({
                     className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                     title={isFullscreen ? 'フルスクリーン解除 (f)' : 'フルスクリーン (f)'}
                 >
-                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                    {isFullscreen ? (
+                        <Minimize2 className="w-4 h-4" />
+                    ) : (
+                        <Maximize2 className="w-4 h-4" />
+                    )}
                 </button>
 
                 {/* ショートカット一覧ボタン */}
@@ -134,7 +155,11 @@ export function ReaderHeader({
                             : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
                     }`}
                 >
-                    {isEditMode ? <CheckSquare className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                    {isEditMode ? (
+                        <CheckSquare className="w-4 h-4" />
+                    ) : (
+                        <Square className="w-4 h-4" />
+                    )}
                     {isEditMode ? 'Done' : 'Edit'}
                 </button>
                 {isEditMode && selectedPagesCount > 0 && (

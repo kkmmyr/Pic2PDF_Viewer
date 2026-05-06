@@ -24,8 +24,7 @@ const VARIANT_CLASS: Record<ButtonVariant, string> = {
     secondary:
         'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 ' +
         'hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50',
-    danger:
-        'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50',
+    danger: 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50',
     ghost:
         'bg-transparent text-gray-700 dark:text-gray-300 ' +
         'hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50',
@@ -41,12 +40,19 @@ const BASE_CLASS =
     'transition-colors disabled:cursor-not-allowed';
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    { variant = 'primary', size = 'md', active = false, className = '', children, type = 'button', ...rest },
+    {
+        variant = 'primary',
+        size = 'md',
+        active = false,
+        className = '',
+        children,
+        type = 'button',
+        ...rest
+    },
     ref,
 ) {
-    const variantClass = active && variant === 'secondary'
-        ? SECONDARY_ACTIVE_CLASS
-        : VARIANT_CLASS[variant];
+    const variantClass =
+        active && variant === 'secondary' ? SECONDARY_ACTIVE_CLASS : VARIANT_CLASS[variant];
     const classes = `${BASE_CLASS} ${SIZE_CLASS[size]} ${variantClass} ${className}`.trim();
     return (
         <button ref={ref} type={type} className={classes} {...rest}>

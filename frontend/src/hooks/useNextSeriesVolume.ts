@@ -21,8 +21,12 @@ function findAdjacentVolume(
         if (direction === 'next' ? idx <= cur.index : idx >= cur.index) continue;
         // 同フォルダ判定: prefix が一致し、残部分にスラッシュがない
         const rest = currentPath
-            ? (key.startsWith(prefix) ? key.slice(prefix.length) : null)
-            : (key.includes('/') ? null : key);
+            ? key.startsWith(prefix)
+                ? key.slice(prefix.length)
+                : null
+            : key.includes('/')
+              ? null
+              : key;
         if (rest === null || rest.includes('/')) continue;
         // next: 最小の idx / prev: 最大の idx を選ぶ
         if (!best || (direction === 'next' ? idx < best.index : idx > best.index)) {

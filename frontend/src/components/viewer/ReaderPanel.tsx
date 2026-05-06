@@ -5,8 +5,15 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import type { LibrarySource, ReadingDirection } from '../../types';
 import { buildStaticUrl, STATIC_PATHS } from '../../config/api';
 import {
-    useWindowSize, useBookImages, useImagePreloader, useReaderNavigation, useToast,
-    useSpreadMode, useEditMode, useFullscreen, useBookMeta,
+    useWindowSize,
+    useBookImages,
+    useImagePreloader,
+    useReaderNavigation,
+    useToast,
+    useSpreadMode,
+    useEditMode,
+    useFullscreen,
+    useBookMeta,
 } from '../../hooks';
 import { useNextSeriesVolume, usePrevSeriesVolume } from '../../hooks/useNextSeriesVolume';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
@@ -43,29 +50,55 @@ interface ReaderPanelProps {
  * - 見開き Auto/Spread/Single モード切り替え（`useSpreadMode`）
  */
 export function ReaderPanel({
-    selectedPdf, currentPath, currentSource, onPdfUpdated, onClose, onSelectPdf,
+    selectedPdf,
+    currentPath,
+    currentSource,
+    onPdfUpdated,
+    onClose,
+    onSelectPdf,
 }: ReaderPanelProps) {
     const { height: windowHeight } = useWindowSize();
-    const { imageUrls, numPages: imageNumPages, isImageMode } =
-        useBookImages(selectedPdf, currentPath, currentSource);
+    const {
+        imageUrls,
+        numPages: imageNumPages,
+        isImageMode,
+    } = useBookImages(selectedPdf, currentPath, currentSource);
 
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
     const {
-        numPages, setNumPages, resetNumPages,
-        pdfVersion, bumpPdfVersion, handleDocumentLoadSuccess,
+        numPages,
+        setNumPages,
+        resetNumPages,
+        pdfVersion,
+        bumpPdfVersion,
+        handleDocumentLoadSuccess,
     } = usePdfDocumentState();
     const {
-        showHeader, showHeaderOn, showHeaderOff,
-        showSlider, showSliderOn, showSliderOff,
-        isSearchOpen, openSearch, closeSearch, toggleSearch,
-        isHelpOpen, openHelp, closeHelp,
+        showHeader,
+        showHeaderOn,
+        showHeaderOff,
+        showSlider,
+        showSliderOn,
+        showSliderOff,
+        isSearchOpen,
+        openSearch,
+        closeSearch,
+        toggleSearch,
+        isHelpOpen,
+        openHelp,
+        closeHelp,
     } = useReaderUIState();
 
-    const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
+    const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } =
+        useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
 
-    const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } =
-        useReaderNavigation({ numPages, isSpread, direction, isActive: true });
+    const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } = useReaderNavigation({
+        numPages,
+        isSpread,
+        direction,
+        isActive: true,
+    });
 
     const { toasts, showToast, dismissToast } = useToast();
 
@@ -77,9 +110,8 @@ export function ReaderPanel({
     const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
 
     // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
-    const isAtLastSpread = numPages > 0 && (
-        isSpread ? pageNumber + 1 >= numPages : pageNumber >= numPages
-    );
+    const isAtLastSpread =
+        numPages > 0 && (isSpread ? pageNumber + 1 >= numPages : pageNumber >= numPages);
 
     const handleNavigateNextVolume = useCallback(() => {
         if (!nextVolume || !onSelectPdf) return;
@@ -94,22 +126,35 @@ export function ReaderPanel({
     }, [prevVolume, onSelectPdf, recordView, currentPath]);
 
     const {
-        isEditMode, selectedPages,
-        toggleEditMode, togglePageSelection, resetEditMode,
-        requestDeletePages, confirmDeletePages, cancelDeletePages, pendingDeleteCount,
+        isEditMode,
+        selectedPages,
+        toggleEditMode,
+        togglePageSelection,
+        resetEditMode,
+        requestDeletePages,
+        confirmDeletePages,
+        cancelDeletePages,
+        pendingDeleteCount,
     } = useEditMode({
-        selectedPdf, currentPath, currentSource,
-        pageNumber, setPageNumber, onPdfUpdated,
+        selectedPdf,
+        currentPath,
+        currentSource,
+        pageNumber,
+        setPageNumber,
+        onPdfUpdated,
         bumpPdfVersion,
         showError: (msg) => showToast(msg, 'error'),
     });
 
     // PDF 内テキスト検索
     const {
-        searchText, setSearchText,
-        matchCount, currentMatch,
+        searchText,
+        setSearchText,
+        matchCount,
+        currentMatch,
         handleCloseSearch: closeSearchState,
-        handlePrevMatch, handleNextMatch,
+        handlePrevMatch,
+        handleNextMatch,
         customTextRenderer,
         onDocumentLoaded,
     } = usePdfSearch({ isSearchOpen, setPageNumber });
@@ -153,13 +198,16 @@ export function ReaderPanel({
     }, [resetPage, onClose, handleCloseSearch, resetEditMode]);
 
     const toggleDirection = useCallback(() => {
-        setDirection(prev => (prev === 'rtl' ? 'ltr' : 'rtl'));
+        setDirection((prev) => (prev === 'rtl' ? 'ltr' : 'rtl'));
         resetPage();
     }, [resetPage]);
 
-    const onDocumentLoadSuccess = useCallback((pdf: pdfjs.PDFDocumentProxy) => {
-        handleDocumentLoadSuccess(pdf, onDocumentLoaded);
-    }, [handleDocumentLoadSuccess, onDocumentLoaded]);
+    const onDocumentLoadSuccess = useCallback(
+        (pdf: pdfjs.PDFDocumentProxy) => {
+            handleDocumentLoadSuccess(pdf, onDocumentLoaded);
+        },
+        [handleDocumentLoadSuccess, onDocumentLoaded],
+    );
 
     const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => (
         <PageRenderer
@@ -188,13 +236,23 @@ export function ReaderPanel({
         if (direction === 'rtl') {
             // RTL: 1ページ目（表紙）は単独表示。2ページ目を両スプレッドに出さないため
             if (pageNumber === 1) return <>{renderPageItem(p1, 'single')}</>;
-            return <>{renderPageItem(p2, 'left')}{renderPageItem(p1, 'right')}</>;
+            return (
+                <>
+                    {renderPageItem(p2, 'left')}
+                    {renderPageItem(p1, 'right')}
+                </>
+            );
         }
-        return <>{renderPageItem(p1, 'left')}{renderPageItem(p2, 'right')}</>;
+        return (
+            <>
+                {renderPageItem(p1, 'left')}
+                {renderPageItem(p2, 'right')}
+            </>
+        );
     };
 
     const pdfUrl = buildStaticUrl(
-        STATIC_PATHS.PDF(currentPath, selectedPdf, currentSource, pdfVersion)
+        STATIC_PATHS.PDF(currentPath, selectedPdf, currentSource, pdfVersion),
     );
 
     // 検索バーが開いている分だけコンテンツを下げるオフセット
@@ -202,10 +260,7 @@ export function ReaderPanel({
 
     return (
         <>
-            <EdgeHoverZones
-                onEnterTop={showHeaderOn}
-                onEnterBottom={showSliderOn}
-            />
+            <EdgeHoverZones onEnterTop={showHeaderOn} onEnterBottom={showSliderOn} />
 
             <ReaderHeader
                 selectedPdf={selectedPdf}
@@ -254,7 +309,9 @@ export function ReaderPanel({
                 />
             )}
 
-            <div className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}>
+            <div
+                className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
+            >
                 <div
                     className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
                     onClick={handleNext}
@@ -275,7 +332,9 @@ export function ReaderPanel({
                             }
                         >
                             <div className="flex shadow-2xl">
-                                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
+                                {isSpread
+                                    ? renderSpreadPages()
+                                    : renderPageItem(pageNumber, 'single')}
                             </div>
                         </Document>
                     )}

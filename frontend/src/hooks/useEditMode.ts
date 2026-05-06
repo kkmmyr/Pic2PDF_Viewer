@@ -39,21 +39,27 @@ interface UseEditModeReturn {
  * - 確認後は `confirmDeletePages()` を呼んで API 削除を実行する。
  */
 export function useEditMode({
-    selectedPdf, currentPath, currentSource,
-    pageNumber, setPageNumber, onPdfUpdated, bumpPdfVersion, showError,
+    selectedPdf,
+    currentPath,
+    currentSource,
+    pageNumber,
+    setPageNumber,
+    onPdfUpdated,
+    bumpPdfVersion,
+    showError,
 }: UseEditModeProps): UseEditModeReturn {
     const [isEditMode, setIsEditMode] = useState(false);
     const [selectedPages, setSelectedPages] = useState<Set<number>>(new Set());
     const [pendingDeleteCount, setPendingDeleteCount] = useState(0);
 
     const toggleEditMode = useCallback(() => {
-        setIsEditMode(prev => !prev);
+        setIsEditMode((prev) => !prev);
         setSelectedPages(new Set());
     }, []);
 
     const togglePageSelection = useCallback((pNum: number, e: React.MouseEvent) => {
         e.stopPropagation();
-        setSelectedPages(prev => {
+        setSelectedPages((prev) => {
             const next = new Set(prev);
             if (next.has(pNum)) next.delete(pNum);
             else next.add(pNum);
@@ -82,10 +88,10 @@ export function useEditMode({
             return;
         }
         try {
-            const pageIndices = Array.from(selectedPages).map(p => p - 1);
+            const pageIndices = Array.from(selectedPages).map((p) => p - 1);
             const data = await apiClient.post<unknown, DeletePagesResponse>(
                 API_ENDPOINTS.DELETE_PAGES(selectedPdf, currentPath, currentSource),
-                { page_indices: pageIndices }
+                { page_indices: pageIndices },
             );
             setIsEditMode(false);
             setSelectedPages(new Set());
@@ -100,12 +106,27 @@ export function useEditMode({
             setPendingDeleteCount(0);
             showError(e instanceof Error ? e.message : '削除に失敗しました。');
         }
-    }, [selectedPages, selectedPdf, currentPath, currentSource, pageNumber, setPageNumber, onPdfUpdated, bumpPdfVersion, showError]);
+    }, [
+        selectedPages,
+        selectedPdf,
+        currentPath,
+        currentSource,
+        pageNumber,
+        setPageNumber,
+        onPdfUpdated,
+        bumpPdfVersion,
+        showError,
+    ]);
 
     return {
-        isEditMode, selectedPages,
-        toggleEditMode, togglePageSelection, resetEditMode,
-        requestDeletePages, confirmDeletePages, cancelDeletePages,
+        isEditMode,
+        selectedPages,
+        toggleEditMode,
+        togglePageSelection,
+        resetEditMode,
+        requestDeletePages,
+        confirmDeletePages,
+        cancelDeletePages,
         pendingDeleteCount,
     };
 }

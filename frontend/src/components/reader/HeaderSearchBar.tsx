@@ -61,8 +61,10 @@ export function HeaderSearchBar({
                         className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 max-w-[200px] truncate"
                     >
                         <option value="">タグ: すべて</option>
-                        {allTags.map(t => (
-                            <option key={t} value={t}>#{t}</option>
+                        {allTags.map((t) => (
+                            <option key={t} value={t}>
+                                #{t}
+                            </option>
                         ))}
                     </select>
                 </div>

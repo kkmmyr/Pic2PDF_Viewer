@@ -23,22 +23,25 @@ export function useTagsInput(initialTags: string[] = []) {
     const addTag = useCallback((value: string) => {
         const trimmed = value.trim();
         if (!trimmed) return;
-        setTags(prev => prev.includes(trimmed) ? prev : [...prev, trimmed]);
+        setTags((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
         setInput('');
     }, []);
 
     const removeTag = useCallback((index: number) => {
-        setTags(prev => prev.filter((_, i) => i !== index));
+        setTags((prev) => prev.filter((_, i) => i !== index));
     }, []);
 
-    const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            addTag(input);
-        } else if (e.key === 'Backspace' && input === '' && tags.length > 0) {
-            removeTag(tags.length - 1);
-        }
-    }, [input, tags.length, addTag, removeTag]);
+    const handleKeyDown = useCallback(
+        (e: KeyboardEvent<HTMLInputElement>) => {
+            if (e.key === 'Enter' || e.key === ',') {
+                e.preventDefault();
+                addTag(input);
+            } else if (e.key === 'Backspace' && input === '' && tags.length > 0) {
+                removeTag(tags.length - 1);
+            }
+        },
+        [input, tags.length, addTag, removeTag],
+    );
 
     const handleBlur = useCallback(() => {
         if (input.trim()) addTag(input);
@@ -57,9 +60,15 @@ export function useTagsInput(initialTags: string[] = []) {
     }, []);
 
     return {
-        tags, input, inputRef,
-        setInput, addTag, removeTag,
-        handleKeyDown, handleBlur,
-        getFinalTags, reset,
+        tags,
+        input,
+        inputRef,
+        setInput,
+        addTag,
+        removeTag,
+        handleKeyDown,
+        handleBlur,
+        getFinalTags,
+        reset,
     };
 }

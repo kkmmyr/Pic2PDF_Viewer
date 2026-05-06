@@ -17,7 +17,9 @@ describe('useToast', () => {
 
     it('showToast でトーストが追加される', () => {
         const { result } = renderHook(() => useToast());
-        act(() => { result.current.showToast('保存しました', 'success'); });
+        act(() => {
+            result.current.showToast('保存しました', 'success');
+        });
         expect(result.current.toasts).toHaveLength(1);
         expect(result.current.toasts[0].message).toBe('保存しました');
         expect(result.current.toasts[0].type).toBe('success');
@@ -25,7 +27,9 @@ describe('useToast', () => {
 
     it('type を省略すると "info" になる', () => {
         const { result } = renderHook(() => useToast());
-        act(() => { result.current.showToast('情報'); });
+        act(() => {
+            result.current.showToast('情報');
+        });
         expect(result.current.toasts[0].type).toBe('info');
     });
 
@@ -36,7 +40,7 @@ describe('useToast', () => {
             result.current.showToast('B', 'error');
         });
         expect(result.current.toasts).toHaveLength(2);
-        expect(result.current.toasts.map(t => t.message)).toEqual(['A', 'B']);
+        expect(result.current.toasts.map((t) => t.message)).toEqual(['A', 'B']);
     });
 
     it('各トーストには一意な id が振られる', () => {
@@ -45,7 +49,7 @@ describe('useToast', () => {
             result.current.showToast('A');
             result.current.showToast('B');
         });
-        const ids = result.current.toasts.map(t => t.id);
+        const ids = result.current.toasts.map((t) => t.id);
         expect(new Set(ids).size).toBe(2);
     });
 
@@ -56,33 +60,49 @@ describe('useToast', () => {
             result.current.showToast('B');
         });
         const idA = result.current.toasts[0].id;
-        act(() => { result.current.dismissToast(idA); });
+        act(() => {
+            result.current.dismissToast(idA);
+        });
         expect(result.current.toasts).toHaveLength(1);
         expect(result.current.toasts[0].message).toBe('B');
     });
 
     it('4000ms 経過後にトーストが自動削除される', () => {
         const { result } = renderHook(() => useToast());
-        act(() => { result.current.showToast('自動消去'); });
+        act(() => {
+            result.current.showToast('自動消去');
+        });
         expect(result.current.toasts).toHaveLength(1);
-        act(() => { vi.advanceTimersByTime(4000); });
+        act(() => {
+            vi.advanceTimersByTime(4000);
+        });
         expect(result.current.toasts).toHaveLength(0);
     });
 
     it('4000ms 未満では自動削除されない', () => {
         const { result } = renderHook(() => useToast());
-        act(() => { result.current.showToast('残る'); });
-        act(() => { vi.advanceTimersByTime(3999); });
+        act(() => {
+            result.current.showToast('残る');
+        });
+        act(() => {
+            vi.advanceTimersByTime(3999);
+        });
         expect(result.current.toasts).toHaveLength(1);
     });
 
     it('手動 dismiss 後は自動削除タイマーが発火しても影響なし', () => {
         const { result } = renderHook(() => useToast());
-        act(() => { result.current.showToast('X'); });
+        act(() => {
+            result.current.showToast('X');
+        });
         const id = result.current.toasts[0].id;
-        act(() => { result.current.dismissToast(id); });
+        act(() => {
+            result.current.dismissToast(id);
+        });
         expect(result.current.toasts).toHaveLength(0);
-        act(() => { vi.advanceTimersByTime(4000); });
+        act(() => {
+            vi.advanceTimersByTime(4000);
+        });
         expect(result.current.toasts).toHaveLength(0);
     });
 });

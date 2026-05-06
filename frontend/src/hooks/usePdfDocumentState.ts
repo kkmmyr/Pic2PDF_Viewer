@@ -12,7 +12,7 @@ export function usePdfDocumentState() {
     const [numPages, setNumPages] = useState(0);
     const [pdfVersion, setPdfVersion] = useState(0);
 
-    const bumpPdfVersion = useCallback(() => setPdfVersion(v => v + 1), []);
+    const bumpPdfVersion = useCallback(() => setPdfVersion((v) => v + 1), []);
     const resetNumPages = useCallback(() => setNumPages(0), []);
 
     /** react-pdf の `<Document onLoadSuccess>` から呼ぶハンドラ。`onLoaded` で副作用を継続できる。 */
@@ -25,8 +25,11 @@ export function usePdfDocumentState() {
     );
 
     return {
-        numPages, setNumPages, resetNumPages,
-        pdfVersion, bumpPdfVersion,
+        numPages,
+        setNumPages,
+        resetNumPages,
+        pdfVersion,
+        bumpPdfVersion,
         handleDocumentLoadSuccess,
     };
 }

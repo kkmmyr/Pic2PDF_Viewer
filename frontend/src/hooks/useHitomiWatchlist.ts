@@ -27,7 +27,9 @@ export function useHitomiWatchlist(): UseHitomiWatchlistResult {
         setLoading(true);
         setError(null);
         try {
-            const resp = await apiClient.get<unknown, WatchlistResponse>(API_ENDPOINTS.HITOMI_WATCHLIST);
+            const resp = await apiClient.get<unknown, WatchlistResponse>(
+                API_ENDPOINTS.HITOMI_WATCHLIST,
+            );
             setArtists(resp.artists);
         } catch (e) {
             setError(e instanceof Error ? e.message : '不明なエラー');
@@ -36,32 +38,40 @@ export function useHitomiWatchlist(): UseHitomiWatchlistResult {
         }
     }, []);
 
-    const addArtist = useCallback(async (displayName: string, language: string) => {
-        const resp = await apiClient.post<unknown, { message: string; normalized: string }>(
-            API_ENDPOINTS.HITOMI_WATCHLIST,
-            { display_name: displayName, language },
-        );
-        // サーバ正規化後の値を含む新エントリを再取得
-        await refresh();
-        return {
-            display_name: displayName.trim(),
-            normalized: resp.normalized,
-            language,
-            added_at: new Date().toISOString().slice(0, 10),
-        };
-    }, [refresh]);
+    const addArtist = useCallback(
+        async (displayName: string, language: string) => {
+            const resp = await apiClient.post<unknown, { message: string; normalized: string }>(
+                API_ENDPOINTS.HITOMI_WATCHLIST,
+                { display_name: displayName, language },
+            );
+            // サーバ正規化後の値を含む新エントリを再取得
+            await refresh();
+            return {
+                display_name: displayName.trim(),
+                normalized: resp.normalized,
+                language,
+                added_at: new Date().toISOString().slice(0, 10),
+            };
+        },
+        [refresh],
+    );
 
-    const removeArtist = useCallback(async (normalized: string, language: string) => {
-        // 楽観的更新
-        const prev = artists;
-        setArtists(artists.filter(e => !(e.normalized === normalized && e.language === language)));
-        try {
-            await apiClient.delete(API_ENDPOINTS.HITOMI_WATCHLIST_DELETE(normalized, language));
-        } catch (e) {
-            setArtists(prev);
-            throw e;
-        }
-    }, [artists]);
+    const removeArtist = useCallback(
+        async (normalized: string, language: string) => {
+            // 楽観的更新
+            const prev = artists;
+            setArtists(
+                artists.filter((e) => !(e.normalized === normalized && e.language === language)),
+            );
+            try {
+                await apiClient.delete(API_ENDPOINTS.HITOMI_WATCHLIST_DELETE(normalized, language));
+            } catch (e) {
+                setArtists(prev);
+                throw e;
+            }
+        },
+        [artists],
+    );
 
     useEffect(() => {
         refresh();

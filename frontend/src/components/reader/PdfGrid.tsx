@@ -99,7 +99,9 @@ export function PdfGrid({
     if (pdfs.length === 0) {
         return (
             <div>
-                <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">PDFs</h2>
+                <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">
+                    PDFs
+                </h2>
                 <p className="text-gray-500 dark:text-gray-400">No PDFs found.</p>
             </div>
         );
@@ -111,35 +113,56 @@ export function PdfGrid({
         const badge = getBadge?.(pdf.name) ?? null;
         const isGroup = badge !== null && !!onGroupClick;
         return {
-            pdf, isFav, isSelected, isGroup, badge, isSelectionMode, showHidden,
+            pdf,
+            isFav,
+            isSelected,
+            isGroup,
+            badge,
+            isSelectionMode,
+            showHidden,
             isUnread: getIsUnread?.(pdf.name) ?? false,
-            onToggleSelect, onToggleFavorite, onPdfClick, onGroupClick,
-            onRename, onRegenThumb, onToggleHidden, onEditSeries,
-            getAuthors, onAuthorClick, getTags, onTagClick,
+            onToggleSelect,
+            onToggleFavorite,
+            onPdfClick,
+            onGroupClick,
+            onRename,
+            onRegenThumb,
+            onToggleHidden,
+            onEditSeries,
+            getAuthors,
+            onAuthorClick,
+            getTags,
+            onTagClick,
         };
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id || !onReorder) return;
-        const oldIndex = pdfs.findIndex(p => p.name === active.id);
-        const newIndex = pdfs.findIndex(p => p.name === over.id);
+        const oldIndex = pdfs.findIndex((p) => p.name === active.id);
+        const newIndex = pdfs.findIndex((p) => p.name === over.id);
         if (oldIndex < 0 || newIndex < 0) return;
         const reordered = arrayMove(pdfs, oldIndex, newIndex);
-        onReorder(reordered.map(p => p.name));
+        onReorder(reordered.map((p) => p.name));
     };
 
-    const gridClass = "grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4";
+    const gridClass = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4';
     const useDnd = dndEnabled && !isSelectionMode;
 
     if (useDnd) {
         return (
             <div>
-                <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">PDFs</h2>
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                    <SortableContext items={pdfs.map(p => p.name)} strategy={rectSortingStrategy}>
+                <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">
+                    PDFs
+                </h2>
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
+                    <SortableContext items={pdfs.map((p) => p.name)} strategy={rectSortingStrategy}>
                         <div className={gridClass}>
-                            {pdfs.map(pdf => (
+                            {pdfs.map((pdf) => (
                                 <SortablePdfCard key={pdf.name} {...buildCardProps(pdf)} />
                             ))}
                         </div>
@@ -153,7 +176,7 @@ export function PdfGrid({
         <div>
             <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">PDFs</h2>
             <div className={gridClass}>
-                {pdfs.map(pdf => (
+                {pdfs.map((pdf) => (
                     <div key={pdf.name}>
                         <PdfCard {...buildCardProps(pdf)} />
                     </div>

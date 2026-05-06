@@ -54,7 +54,11 @@ describe('useBookMeta.reorderSeries', () => {
 
         // POST は明示的に解決するまで保留にする
         let resolvePost!: (value: unknown) => void;
-        mockedPost.mockReturnValue(new Promise(r => { resolvePost = r; }));
+        mockedPost.mockReturnValue(
+            new Promise((r) => {
+                resolvePost = r;
+            }),
+        );
 
         const { result } = renderHook(() => useBookMeta('generated'));
         await waitFor(() => expect(result.current.meta['vol1.pdf']?.series_index).toBe(1));
@@ -104,8 +108,18 @@ describe('useBookMeta.reorderSeries', () => {
 
     it('ロールバック後も authors / series_title などの他フィールドが保持される', async () => {
         const metaWithAuthors = {
-            'vol1.pdf': { authors: ['作者A'], series_id: 's1', series_title: 'テスト', series_index: 1 },
-            'vol2.pdf': { authors: ['作者B'], series_id: 's1', series_title: 'テスト', series_index: 2 },
+            'vol1.pdf': {
+                authors: ['作者A'],
+                series_id: 's1',
+                series_title: 'テスト',
+                series_index: 1,
+            },
+            'vol2.pdf': {
+                authors: ['作者B'],
+                series_id: 's1',
+                series_title: 'テスト',
+                series_index: 2,
+            },
         };
         mockedGet.mockResolvedValue(metaWithAuthors);
         mockedPost.mockRejectedValue(new Error('error'));

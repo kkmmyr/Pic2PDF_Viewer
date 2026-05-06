@@ -41,7 +41,10 @@ export function TagsInput({
                         {tag}
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); onRemove(i); }}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRemove(i);
+                            }}
                             className={REMOVE_CLASS}
                         >
                             <X className="w-3 h-3" />

@@ -13,16 +13,25 @@ export function useUrlFilters() {
     const tagFilter = searchParams.get('tag') ?? '';
     const seriesFilter = searchParams.get('series') ?? '';
 
-    const updateUrlFilter = useCallback((key: 'author' | 'tag' | 'series', value: string) => {
-        const next = new URLSearchParams(searchParams);
-        if (value) next.set(key, value);
-        else next.delete(key);
-        setSearchParams(next);
-    }, [searchParams, setSearchParams]);
+    const updateUrlFilter = useCallback(
+        (key: 'author' | 'tag' | 'series', value: string) => {
+            const next = new URLSearchParams(searchParams);
+            if (value) next.set(key, value);
+            else next.delete(key);
+            setSearchParams(next);
+        },
+        [searchParams, setSearchParams],
+    );
 
-    const setAuthorFilter = useCallback((v: string) => updateUrlFilter('author', v), [updateUrlFilter]);
+    const setAuthorFilter = useCallback(
+        (v: string) => updateUrlFilter('author', v),
+        [updateUrlFilter],
+    );
     const setTagFilter = useCallback((v: string) => updateUrlFilter('tag', v), [updateUrlFilter]);
-    const setSeriesFilter = useCallback((v: string) => updateUrlFilter('series', v), [updateUrlFilter]);
+    const setSeriesFilter = useCallback(
+        (v: string) => updateUrlFilter('series', v),
+        [updateUrlFilter],
+    );
 
     /** ライブラリ階層に戻る（author / series を一括クリア。tag は残す） */
     const clearAllDrilldown = useCallback(() => {
@@ -33,8 +42,12 @@ export function useUrlFilters() {
     }, [searchParams, setSearchParams]);
 
     return {
-        authorFilter, tagFilter, seriesFilter,
-        setAuthorFilter, setTagFilter, setSeriesFilter,
+        authorFilter,
+        tagFilter,
+        seriesFilter,
+        setAuthorFilter,
+        setTagFilter,
+        setSeriesFilter,
         clearAllDrilldown,
     };
 }

@@ -15,10 +15,9 @@ export function useBookMetaCore(source: string) {
 
     const fetchMeta = useCallback(async () => {
         try {
-            const data = await apiClient.get<unknown, BookMetaMap>(
-                API_ENDPOINTS.META,
-                { params: { source } }
-            );
+            const data = await apiClient.get<unknown, BookMetaMap>(API_ENDPOINTS.META, {
+                params: { source },
+            });
             setMeta(data ?? {});
         } catch {
             setMeta({});
@@ -33,39 +32,65 @@ export function useBookMetaCore(source: string) {
         return path ? `${path}/${name}` : name;
     }, []);
 
-    const getAuthors = useCallback((path: string, name: string): string[] => {
-        return meta[makeKey(path, name)]?.authors ?? [];
-    }, [meta, makeKey]);
+    const getAuthors = useCallback(
+        (path: string, name: string): string[] => {
+            return meta[makeKey(path, name)]?.authors ?? [];
+        },
+        [meta, makeKey],
+    );
 
-    const getTags = useCallback((path: string, name: string): string[] => {
-        return meta[makeKey(path, name)]?.tags ?? [];
-    }, [meta, makeKey]);
+    const getTags = useCallback(
+        (path: string, name: string): string[] => {
+            return meta[makeKey(path, name)]?.tags ?? [];
+        },
+        [meta, makeKey],
+    );
 
-    const getSeries = useCallback((path: string, name: string): { id: string; title: string; index: number } | null => {
-        const e = meta[makeKey(path, name)];
-        if (!e?.series_id) return null;
-        return {
-            id: e.series_id,
-            title: e.series_title ?? '',
-            index: e.series_index ?? 0,
-        };
-    }, [meta, makeKey]);
+    const getSeries = useCallback(
+        (path: string, name: string): { id: string; title: string; index: number } | null => {
+            const e = meta[makeKey(path, name)];
+            if (!e?.series_id) return null;
+            return {
+                id: e.series_id,
+                title: e.series_title ?? '',
+                index: e.series_index ?? 0,
+            };
+        },
+        [meta, makeKey],
+    );
 
-    const isHidden = useCallback((path: string, name: string): boolean => {
-        return meta[makeKey(path, name)]?.hidden === true;
-    }, [meta, makeKey]);
+    const isHidden = useCallback(
+        (path: string, name: string): boolean => {
+            return meta[makeKey(path, name)]?.hidden === true;
+        },
+        [meta, makeKey],
+    );
 
-    const getViewCount = useCallback((path: string, name: string): number => {
-        return meta[makeKey(path, name)]?.view_count ?? 0;
-    }, [meta, makeKey]);
+    const getViewCount = useCallback(
+        (path: string, name: string): number => {
+            return meta[makeKey(path, name)]?.view_count ?? 0;
+        },
+        [meta, makeKey],
+    );
 
-    const getLastViewedAt = useCallback((path: string, name: string): number | undefined => {
-        return meta[makeKey(path, name)]?.last_viewed_at;
-    }, [meta, makeKey]);
+    const getLastViewedAt = useCallback(
+        (path: string, name: string): number | undefined => {
+            return meta[makeKey(path, name)]?.last_viewed_at;
+        },
+        [meta, makeKey],
+    );
 
     return {
-        meta, setMeta, makeKey, fetchMeta,
-        getAuthors, getTags, getSeries, isHidden, getViewCount, getLastViewedAt,
+        meta,
+        setMeta,
+        makeKey,
+        fetchMeta,
+        getAuthors,
+        getTags,
+        getSeries,
+        isHidden,
+        getViewCount,
+        getLastViewedAt,
     };
 }
 

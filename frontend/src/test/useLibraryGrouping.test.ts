@@ -29,7 +29,7 @@ function grouped(
     authorPins?: Record<string, string>,
 ) {
     const { result } = renderHook(() =>
-        useLibraryGrouping({ pdfs, meta, currentPath: '', mode, seriesPins, authorPins })
+        useLibraryGrouping({ pdfs, meta, currentPath: '', mode, seriesPins, authorPins }),
     );
     return result.current;
 }
@@ -39,7 +39,7 @@ describe('useLibraryGrouping', () => {
         it('pdfs をそのまま返す', () => {
             const pdfs = [pdf('a.pdf'), pdf('b.pdf')];
             const g = grouped(pdfs, {}, 'none');
-            expect(g.items.map(p => p.name)).toEqual(['a.pdf', 'b.pdf']);
+            expect(g.items.map((p) => p.name)).toEqual(['a.pdf', 'b.pdf']);
             expect(g.badgeByRepresentativeName.size).toBe(0);
         });
     });
@@ -49,7 +49,7 @@ describe('useLibraryGrouping', () => {
 
         it('デフォルトは最終巻（series_index 最大）が代表', () => {
             const g = grouped(pdfs, seriesMeta, 'series');
-            expect(g.items.map(p => p.name)).toContain('vol3.pdf');
+            expect(g.items.map((p) => p.name)).toContain('vol3.pdf');
             expect(g.badgeByRepresentativeName.has('vol3.pdf')).toBe(true);
         });
 
@@ -73,14 +73,14 @@ describe('useLibraryGrouping', () => {
 
         it('シリーズ未所属の本は集約されずそのまま残る', () => {
             const g = grouped(pdfs, seriesMeta, 'series');
-            expect(g.items.map(p => p.name)).toContain('solo.pdf');
+            expect(g.items.map((p) => p.name)).toContain('solo.pdf');
         });
 
         it('メンバーは series_index 昇順で membersByRepresentativeName に入る', () => {
             const g = grouped(pdfs, seriesMeta, 'series');
             const rep = [...g.badgeByRepresentativeName.keys()][0];
             const members = g.membersByRepresentativeName.get(rep)!;
-            const indices = members.map(p => seriesMeta[p.name]?.series_index ?? 0);
+            const indices = members.map((p) => seriesMeta[p.name]?.series_index ?? 0);
             expect(indices).toEqual([...indices].sort((a, b) => a - b));
         });
     });
@@ -120,7 +120,7 @@ describe('useLibraryGrouping', () => {
             const g = grouped(pdfs, authorMeta, 'author');
             // Author B は 1 冊なのでバッジなし
             expect(g.badgeByRepresentativeName.has('other.pdf')).toBe(false);
-            expect(g.items.map(p => p.name)).toContain('other.pdf');
+            expect(g.items.map((p) => p.name)).toContain('other.pdf');
         });
     });
 

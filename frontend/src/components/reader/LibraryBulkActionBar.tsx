@@ -40,19 +40,31 @@ export function LibraryBulkActionBar({
                 <User className="w-4 h-4" />
                 作者を設定
             </Button>
-            <Button onClick={onBulkSetTag} disabled={noSelection} title="選択した書籍のタグを一括設定">
+            <Button
+                onClick={onBulkSetTag}
+                disabled={noSelection}
+                title="選択した書籍のタグを一括設定"
+            >
                 <Tag className="w-4 h-4" />
                 タグを設定
             </Button>
             <Button
                 onClick={onBulkSetSeries}
                 disabled={noSelection || !!bulkSeriesDisabled}
-                title={bulkSeriesDisabled ? '複数の異なる作者が混在しているためシリーズ登録できません' : '選択した書籍をシリーズに一括登録（選択順に採番）'}
+                title={
+                    bulkSeriesDisabled
+                        ? '複数の異なる作者が混在しているためシリーズ登録できません'
+                        : '選択した書籍をシリーズに一括登録（選択順に採番）'
+                }
             >
                 <Library className="w-4 h-4" />
                 シリーズに登録
             </Button>
-            <Button onClick={onBulkSetGenre} disabled={noSelection} title="選択した書籍のジャンルを一括設定">
+            <Button
+                onClick={onBulkSetGenre}
+                disabled={noSelection}
+                title="選択した書籍のジャンルを一括設定"
+            >
                 <Layers className="w-4 h-4" />
                 ジャンルを設定
             </Button>
@@ -75,11 +87,19 @@ export function LibraryBulkActionBar({
                     完全削除
                 </Button>
             )}
-            <Button onClick={onMergePdfs} disabled={selectedCount < 2} title="選択した書籍を1つのPDFに結合">
+            <Button
+                onClick={onMergePdfs}
+                disabled={selectedCount < 2}
+                title="選択した書籍を1つのPDFに結合"
+            >
                 <Merge className="w-4 h-4" />
                 結合
             </Button>
-            <Button onClick={onRegenThumbnailBulk} disabled={noSelection} title="選択した書籍のサムネイルを再生成">
+            <Button
+                onClick={onRegenThumbnailBulk}
+                disabled={noSelection}
+                title="選択した書籍のサムネイルを再生成"
+            >
                 <ImageIcon className="w-4 h-4" />
                 サムネイル再生成
             </Button>

@@ -34,14 +34,20 @@ describe('Alert', () => {
     });
 
     it('showIcon=false のときアイコン svg なし', () => {
-        const { container } = render(<Alert variant="error" showIcon={false}>x</Alert>);
+        const { container } = render(
+            <Alert variant="error" showIcon={false}>
+                x
+            </Alert>,
+        );
         expect((container.firstChild as HTMLElement).querySelector('svg')).toBeNull();
     });
 
     it('icon プロップで既定アイコンを上書きできる', () => {
         const customIcon = <span data-testid="custom-icon" />;
         const { getByTestId, container } = render(
-            <Alert variant="error" icon={customIcon}>x</Alert>
+            <Alert variant="error" icon={customIcon}>
+                x
+            </Alert>,
         );
         expect(getByTestId('custom-icon')).toBeInTheDocument();
         // 既定の AlertCircle svg は描画されていない
@@ -49,7 +55,11 @@ describe('Alert', () => {
     });
 
     it('className が末尾に結合される', () => {
-        const { container } = render(<Alert variant="error" className="mt-3 p-4">x</Alert>);
+        const { container } = render(
+            <Alert variant="error" className="mt-3 p-4">
+                x
+            </Alert>,
+        );
         const cls = (container.firstChild as HTMLElement).className;
         expect(cls).toContain('mt-3');
         expect(cls).toContain('p-4');

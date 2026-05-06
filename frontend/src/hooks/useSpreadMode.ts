@@ -24,20 +24,21 @@ export function useSpreadMode(): UseSpreadModeReturn {
     // autoモード時にページサイズから計算した実効値（true=見開き、false=1ページ）
     const [autoIsSpread, setAutoIsSpread] = useState(true);
 
-    const isSpread = spreadMode === 'auto'
-        ? autoIsSpread
-        : spreadMode === 'spread';
+    const isSpread = spreadMode === 'auto' ? autoIsSpread : spreadMode === 'spread';
 
     const cycleSpreadMode = useCallback(() => {
-        setSpreadMode(prev =>
-            prev === 'auto' ? 'spread' : prev === 'spread' ? 'single' : 'auto'
+        setSpreadMode((prev) =>
+            prev === 'auto' ? 'spread' : prev === 'spread' ? 'single' : 'auto',
         );
     }, []);
 
-    const handlePageSize = useCallback((width: number, height: number) => {
-        if (spreadMode !== 'auto') return;
-        setAutoIsSpread(width <= height);
-    }, [spreadMode]);
+    const handlePageSize = useCallback(
+        (width: number, height: number) => {
+            if (spreadMode !== 'auto') return;
+            setAutoIsSpread(width <= height);
+        },
+        [spreadMode],
+    );
 
     const resetAutoSpread = useCallback(() => {
         setAutoIsSpread(true);

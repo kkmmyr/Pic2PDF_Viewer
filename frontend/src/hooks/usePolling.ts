@@ -18,7 +18,7 @@ interface UsePollingOptions {
  */
 export function usePolling(
     fetcher: () => Promise<void>,
-    options: UsePollingOptions = {}
+    options: UsePollingOptions = {},
 ): { refetch: () => Promise<void> } {
     const { interval = 2000, enabled = true, immediate = true } = options;
 

@@ -43,25 +43,17 @@ export function useLibraryContext(): LibraryContextValue {
 }
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-    const {
-        currentPath,
-        selectedPdf,
-        currentSource,
-        navigateUp,
-        selectPdf,
-        clearPdf,
-        setSource,
-    } = useUrlState();
+    const { currentPath, selectedPdf, currentSource, navigateUp, selectPdf, clearPdf, setSource } =
+        useUrlState();
 
     const [pdfs, setPdfs] = useState<PdfFile[]>([]);
     const [libraryVersion, setLibraryVersion] = useState(0);
 
     const fetchPdfs = useCallback(async () => {
         try {
-            const data = await apiClient.get<unknown, { files: PdfFile[] }>(
-                API_ENDPOINTS.PDFS,
-                { params: { path: currentPath, source: currentSource } }
-            );
+            const data = await apiClient.get<unknown, { files: PdfFile[] }>(API_ENDPOINTS.PDFS, {
+                params: { path: currentPath, source: currentSource },
+            });
             setPdfs(data.files);
         } catch (e) {
             console.error(e);
@@ -101,7 +93,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         onUpClick: () => navigateUp(currentPath, currentSource),
         onSourceChange: setSource,
         onClosePdf: () => clearPdf(currentPath, currentSource),
-        onPdfUpdated: () => setLibraryVersion(v => v + 1),
+        onPdfUpdated: () => setLibraryVersion((v) => v + 1),
         onToggleSelectionMode: toggleSelectionMode,
         onClearSelection: clearSelection,
         onToggleSelect: toggleSelectItem,
@@ -112,9 +104,5 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         onRefresh: fetchPdfs,
     };
 
-    return (
-        <LibraryContext.Provider value={value}>
-            {children}
-        </LibraryContext.Provider>
-    );
+    return <LibraryContext.Provider value={value}>{children}</LibraryContext.Provider>;
 }

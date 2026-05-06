@@ -18,20 +18,27 @@ interface UseMetaDerivedResult {
 }
 
 export function useMetaDerived(meta: BookMetaMap): UseMetaDerivedResult {
-    const allAuthors = useMemo(() =>
-        [...new Set(Object.values(meta).flatMap(e => e.authors ?? []))]
-            .sort(cmpJa),
-    [meta]);
+    const allAuthors = useMemo(
+        () => [...new Set(Object.values(meta).flatMap((e) => e.authors ?? []))].sort(cmpJa),
+        [meta],
+    );
 
-    const allTags = useMemo(() =>
-        [...new Set(Object.values(meta).flatMap(e => e.tags ?? []))]
-            .sort(cmpJa),
-    [meta]);
+    const allTags = useMemo(
+        () => [...new Set(Object.values(meta).flatMap((e) => e.tags ?? []))].sort(cmpJa),
+        [meta],
+    );
 
-    const allGenres = useMemo(() =>
-        [...new Set(Object.values(meta).map(e => e.genre).filter((g): g is string => !!g))]
-            .sort(cmpJa),
-    [meta]);
+    const allGenres = useMemo(
+        () =>
+            [
+                ...new Set(
+                    Object.values(meta)
+                        .map((e) => e.genre)
+                        .filter((g): g is string => !!g),
+                ),
+            ].sort(cmpJa),
+        [meta],
+    );
 
     const allSeries = useMemo(() => {
         const map = new Map<string, string>();

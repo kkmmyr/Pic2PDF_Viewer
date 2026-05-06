@@ -62,7 +62,7 @@ export function useLibraryFilter({
 }: UseLibraryFilterParams) {
     const filteredPdfs = useMemo(() => {
         // ゴミ箱方式: showHidden=false なら hidden を全除外、true なら hidden のみ表示
-        let result = pdfs.filter(p => {
+        let result = pdfs.filter((p) => {
             const hidden = isHiddenInMeta(meta, currentPath, p.name);
             return showHidden ? hidden : !hidden;
         });
@@ -70,47 +70,56 @@ export function useLibraryFilter({
         const trimmed = searchText.trim();
         if (trimmed) {
             const lower = trimmed.toLowerCase();
-            result = result.filter(p => {
+            result = result.filter((p) => {
                 if (p.name.toLowerCase().includes(lower)) return true;
                 const authors = getAuthorsFromMeta(meta, currentPath, p.name);
-                if (authors.some(a => a.toLowerCase().includes(lower))) return true;
+                if (authors.some((a) => a.toLowerCase().includes(lower))) return true;
                 const tags = getTagsFromMeta(meta, currentPath, p.name);
-                return tags.some(t => t.toLowerCase().includes(lower));
+                return tags.some((t) => t.toLowerCase().includes(lower));
             });
         }
 
         if (authorFilter) {
-            result = result.filter(p =>
-                getAuthorsFromMeta(meta, currentPath, p.name).includes(authorFilter)
+            result = result.filter((p) =>
+                getAuthorsFromMeta(meta, currentPath, p.name).includes(authorFilter),
             );
         }
 
         if (tagFilter) {
-            result = result.filter(p =>
-                getTagsFromMeta(meta, currentPath, p.name).includes(tagFilter)
+            result = result.filter((p) =>
+                getTagsFromMeta(meta, currentPath, p.name).includes(tagFilter),
             );
         }
 
         if (seriesFilter) {
-            result = result.filter(p =>
-                getSeriesIdFromMeta(meta, currentPath, p.name) === seriesFilter
+            result = result.filter(
+                (p) => getSeriesIdFromMeta(meta, currentPath, p.name) === seriesFilter,
             );
         }
 
         if (showUnreadOnly) {
-            result = result.filter(p =>
-                getViewCountFromMeta(meta, currentPath, p.name) === 0
-            );
+            result = result.filter((p) => getViewCountFromMeta(meta, currentPath, p.name) === 0);
         }
 
         if (genreFilter) {
-            result = result.filter(p =>
-                (getEntryFromMeta(meta, currentPath, p.name)?.genre ?? '') === genreFilter
+            result = result.filter(
+                (p) => (getEntryFromMeta(meta, currentPath, p.name)?.genre ?? '') === genreFilter,
             );
         }
 
         return result;
-    }, [pdfs, searchText, authorFilter, tagFilter, seriesFilter, showHidden, showUnreadOnly, genreFilter, currentPath, meta]);
+    }, [
+        pdfs,
+        searchText,
+        authorFilter,
+        tagFilter,
+        seriesFilter,
+        showHidden,
+        showUnreadOnly,
+        genreFilter,
+        currentPath,
+        meta,
+    ]);
 
     return { filteredPdfs };
 }

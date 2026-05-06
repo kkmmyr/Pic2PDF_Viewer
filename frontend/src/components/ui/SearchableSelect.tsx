@@ -40,10 +40,8 @@ export function SearchableSelect({
     // 表示用アイテム: 先頭に「すべて (空文字 value)」+ フィルタ済み options
     const items = useMemo(() => {
         const q = query.trim().toLowerCase();
-        const filtered = q
-            ? options.filter(o => o.toLowerCase().includes(q))
-            : options;
-        return [{ value: '', label: emptyLabel }, ...filtered.map(o => ({ value: o, label: o }))];
+        const filtered = q ? options.filter((o) => o.toLowerCase().includes(q)) : options;
+        return [{ value: '', label: emptyLabel }, ...filtered.map((o) => ({ value: o, label: o }))];
     }, [options, query, emptyLabel]);
 
     // 外クリックで閉じる
@@ -86,12 +84,18 @@ export function SearchableSelect({
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            if (!isOpen) { open(); return; }
-            setHighlight(h => Math.min(h + 1, items.length - 1));
+            if (!isOpen) {
+                open();
+                return;
+            }
+            setHighlight((h) => Math.min(h + 1, items.length - 1));
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            if (!isOpen) { open(); return; }
-            setHighlight(h => Math.max(h - 1, 0));
+            if (!isOpen) {
+                open();
+                return;
+            }
+            setHighlight((h) => Math.max(h - 1, 0));
         } else if (e.key === 'Enter') {
             if (!isOpen) return;
             e.preventDefault();
@@ -120,7 +124,9 @@ export function SearchableSelect({
                         setIsOpen(true);
                         setHighlight(0);
                     }}
-                    onFocus={() => { if (!isOpen) open(); }}
+                    onFocus={() => {
+                        if (!isOpen) open();
+                    }}
                     onKeyDown={handleKeyDown}
                     placeholder={isOpen ? (placeholder ?? '入力で絞り込み') : emptyLabel}
                     className="px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-transparent focus:outline-none flex-1 min-w-0"
@@ -149,7 +155,9 @@ export function SearchableSelect({
                     className="px-1.5 py-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                     aria-label={isOpen ? '閉じる' : '開く'}
                 >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                        className={`w-3.5 h-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                    />
                 </button>
             </div>
             {isOpen && (
@@ -158,12 +166,17 @@ export function SearchableSelect({
                     className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-auto border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 shadow-lg z-header"
                 >
                     {items.length === 1 && query.trim() ? (
-                        <li className="px-2 py-1 text-sm text-gray-400 dark:text-gray-500">該当なし</li>
+                        <li className="px-2 py-1 text-sm text-gray-400 dark:text-gray-500">
+                            該当なし
+                        </li>
                     ) : (
                         items.map((item, i) => (
                             <li
                                 key={item.value || '__empty__'}
-                                onMouseDown={(e) => { e.preventDefault(); select(item.value); }}
+                                onMouseDown={(e) => {
+                                    e.preventDefault();
+                                    select(item.value);
+                                }}
                                 onMouseEnter={() => setHighlight(i)}
                                 className={`px-2 py-1 text-sm cursor-pointer truncate ${
                                     i === highlight

@@ -30,14 +30,22 @@ function nameFromKey(key: string, currentPath: string): string {
 }
 
 export function usePinnedBookSets({
-    meta, currentPath, seriesPins, authorPins, authorFilter, seriesFilter,
+    meta,
+    currentPath,
+    seriesPins,
+    authorPins,
+    authorFilter,
+    seriesFilter,
 }: UsePinnedBookSetsParams): UsePinnedBookSetsResult {
     const pinnedBooks = useMemo(() => {
         const set = new Set<string>();
         for (const [key, entry] of Object.entries(meta)) {
             if (!isDirectChild(key, currentPath)) continue;
             const name = nameFromKey(key, currentPath);
-            if (entry.series_id && seriesPins[entry.series_id] === name) { set.add(name); continue; }
+            if (entry.series_id && seriesPins[entry.series_id] === name) {
+                set.add(name);
+                continue;
+            }
             if (entry.authors?.length) {
                 const ak = [...entry.authors].sort().join('\n');
                 if (authorPins[ak] === name) set.add(name);

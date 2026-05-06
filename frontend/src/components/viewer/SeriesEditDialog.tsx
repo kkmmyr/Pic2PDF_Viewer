@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogFooter,
+    DialogCancelButton,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 interface SeriesEditDialogProps {
@@ -26,18 +32,27 @@ type Mode = 'existing' | 'new' | 'unassign';
  * - シリーズから外す
  */
 export function SeriesEditDialog({
-    open, targetName, current, allSeries, onClose, onAssign, onUnassign,
+    open,
+    targetName,
+    current,
+    allSeries,
+    onClose,
+    onAssign,
+    onUnassign,
 }: SeriesEditDialogProps) {
     const [mode, setMode] = useState<Mode>(current ? 'existing' : 'new');
     const [selectedId, setSelectedId] = useState<string>(current?.id ?? '');
     const [newTitle, setNewTitle] = useState<string>('');
     const [indexStr, setIndexStr] = useState<string>(current?.index ? String(current.index) : '1');
-    const { saving, error, setError, handleSubmit } = useDialogSubmit(onClose, '保存に失敗しました。');
+    const { saving, error, setError, handleSubmit } = useDialogSubmit(
+        onClose,
+        '保存に失敗しました。',
+    );
 
     useEffect(() => {
         if (!open) return;
         setMode(current ? 'existing' : 'new');
-        setSelectedId(current?.id ?? (allSeries[0]?.id ?? ''));
+        setSelectedId(current?.id ?? allSeries[0]?.id ?? '');
         setNewTitle('');
         setIndexStr(current?.index !== undefined ? String(current.index) : '1');
         setError(null);
@@ -54,11 +69,12 @@ export function SeriesEditDialog({
                 }
                 if (mode === 'existing') {
                     if (!selectedId) throw new Error('既存シリーズを選択してください。');
-                    const series = allSeries.find(s => s.id === selectedId);
+                    const series = allSeries.find((s) => s.id === selectedId);
                     if (!series) throw new Error('選択したシリーズが見つかりません。');
                     await onAssign({ title: series.title, index: idx, id: selectedId });
                 } else {
-                    if (!newTitle.trim()) throw new Error('新規シリーズのタイトルを入力してください。');
+                    if (!newTitle.trim())
+                        throw new Error('新規シリーズのタイトルを入力してください。');
                     await onAssign({ title: newTitle.trim(), index: idx });
                 }
             }
@@ -95,7 +111,11 @@ export function SeriesEditDialog({
                         <div className="flex-1">
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                 既存のシリーズに追加
-                                {noExistingSeries && <span className="ml-2 text-xs text-gray-400">（このソースに既存シリーズなし）</span>}
+                                {noExistingSeries && (
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        （このソースに既存シリーズなし）
+                                    </span>
+                                )}
                             </div>
                             {mode === 'existing' && (
                                 <select
@@ -104,8 +124,10 @@ export function SeriesEditDialog({
                                     disabled={noExistingSeries}
                                     className="mt-1 w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-200"
                                 >
-                                    {allSeries.map(s => (
-                                        <option key={s.id} value={s.id}>{s.title}</option>
+                                    {allSeries.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.title}
+                                        </option>
                                     ))}
                                 </select>
                             )}
@@ -139,7 +161,8 @@ export function SeriesEditDialog({
                     {mode !== 'unassign' && (
                         <div className="pl-6">
                             <label className="text-sm text-gray-700 dark:text-gray-300">
-                                巻数 <span className="text-xs text-gray-500">（小数可、例: 2.5）</span>
+                                巻数{' '}
+                                <span className="text-xs text-gray-500">（小数可、例: 2.5）</span>
                             </label>
                             <input
                                 type="number"
@@ -166,16 +189,15 @@ export function SeriesEditDialog({
                                     シリーズから外す
                                 </div>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                    series_id / series_title / series_index を削除します（書籍ファイルや他メタは保持）。
+                                    series_id / series_title / series_index
+                                    を削除します（書籍ファイルや他メタは保持）。
                                 </p>
                             </div>
                         </label>
                     )}
                 </div>
 
-                {error && (
-                    <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />

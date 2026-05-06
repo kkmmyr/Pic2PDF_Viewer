@@ -10,11 +10,15 @@ export function getStorageJson<T>(key: string, fallback: T): T {
 export function setStorageJson<T>(key: string, value: T): void {
     try {
         localStorage.setItem(key, JSON.stringify(value));
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
 }
 
 export function removeStorage(key: string): void {
     try {
         localStorage.removeItem(key);
-    } catch { /* ignore */ }
+    } catch {
+        /* ignore */
+    }
 }

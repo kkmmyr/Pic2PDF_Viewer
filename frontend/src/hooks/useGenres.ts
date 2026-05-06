@@ -8,10 +8,9 @@ export function useGenres(source: LibrarySource) {
 
     const fetchGenres = useCallback(async () => {
         try {
-            const data = await apiClient.get<unknown, string[]>(
-                API_ENDPOINTS.GENRES,
-                { params: { source } }
-            );
+            const data = await apiClient.get<unknown, string[]>(API_ENDPOINTS.GENRES, {
+                params: { source },
+            });
             setGenres(data ?? []);
         } catch {
             setGenres([]);
@@ -22,31 +21,40 @@ export function useGenres(source: LibrarySource) {
         fetchGenres();
     }, [fetchGenres]);
 
-    const addGenre = useCallback(async (name: string): Promise<void> => {
-        const data = await apiClient.post<unknown, { genres: string[] }>(
-            API_ENDPOINTS.GENRES,
-            { source, name }
-        );
-        setGenres(data.genres);
-    }, [source]);
+    const addGenre = useCallback(
+        async (name: string): Promise<void> => {
+            const data = await apiClient.post<unknown, { genres: string[] }>(API_ENDPOINTS.GENRES, {
+                source,
+                name,
+            });
+            setGenres(data.genres);
+        },
+        [source],
+    );
 
-    const removeGenre = useCallback(async (name: string): Promise<void> => {
-        const data = await apiClient.delete<unknown, { genres: string[] }>(
-            `${API_ENDPOINTS.GENRES}/${encodeURIComponent(name)}`,
-            { params: { source } }
-        );
-        setGenres(data.genres);
-    }, [source]);
+    const removeGenre = useCallback(
+        async (name: string): Promise<void> => {
+            const data = await apiClient.delete<unknown, { genres: string[] }>(
+                `${API_ENDPOINTS.GENRES}/${encodeURIComponent(name)}`,
+                { params: { source } },
+            );
+            setGenres(data.genres);
+        },
+        [source],
+    );
 
-    const reorderGenres = useCallback(async (newOrder: string[]): Promise<void> => {
-        const prev = genres;
-        setGenres(newOrder);
-        try {
-            await apiClient.patch(API_ENDPOINTS.GENRES_REORDER, { source, genres: newOrder });
-        } catch {
-            setGenres(prev);
-        }
-    }, [source, genres]);
+    const reorderGenres = useCallback(
+        async (newOrder: string[]): Promise<void> => {
+            const prev = genres;
+            setGenres(newOrder);
+            try {
+                await apiClient.patch(API_ENDPOINTS.GENRES_REORDER, { source, genres: newOrder });
+            } catch {
+                setGenres(prev);
+            }
+        },
+        [source, genres],
+    );
 
     return { genres, addGenre, removeGenre, reorderGenres };
 }

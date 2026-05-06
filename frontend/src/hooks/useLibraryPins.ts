@@ -37,31 +37,37 @@ export function useLibraryPins(source: LibrarySource) {
         setAuthorPins(loadPins(authorKey));
     }, [seriesKey, authorKey]);
 
-    const toggleSeriesPin = useCallback((seriesId: string, bookName: string) => {
-        setSeriesPins(prev => {
-            const next = { ...prev };
-            if (prev[seriesId] === bookName) {
-                delete next[seriesId];
-            } else {
-                next[seriesId] = bookName;
-            }
-            savePins(seriesKey, next);
-            return next;
-        });
-    }, [seriesKey]);
+    const toggleSeriesPin = useCallback(
+        (seriesId: string, bookName: string) => {
+            setSeriesPins((prev) => {
+                const next = { ...prev };
+                if (prev[seriesId] === bookName) {
+                    delete next[seriesId];
+                } else {
+                    next[seriesId] = bookName;
+                }
+                savePins(seriesKey, next);
+                return next;
+            });
+        },
+        [seriesKey],
+    );
 
-    const toggleAuthorPin = useCallback((authorGroupId: string, bookName: string) => {
-        setAuthorPins(prev => {
-            const next = { ...prev };
-            if (prev[authorGroupId] === bookName) {
-                delete next[authorGroupId];
-            } else {
-                next[authorGroupId] = bookName;
-            }
-            savePins(authorKey, next);
-            return next;
-        });
-    }, [authorKey]);
+    const toggleAuthorPin = useCallback(
+        (authorGroupId: string, bookName: string) => {
+            setAuthorPins((prev) => {
+                const next = { ...prev };
+                if (prev[authorGroupId] === bookName) {
+                    delete next[authorGroupId];
+                } else {
+                    next[authorGroupId] = bookName;
+                }
+                savePins(authorKey, next);
+                return next;
+            });
+        },
+        [authorKey],
+    );
 
     return { seriesPins, authorPins, toggleSeriesPin, toggleAuthorPin };
 }

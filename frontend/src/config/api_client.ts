@@ -13,7 +13,7 @@ export class ApiError extends Error {
     constructor(
         message: string,
         public readonly status: number | undefined,
-        public readonly kind: ApiErrorKind
+        public readonly kind: ApiErrorKind,
     ) {
         super(message);
         this.name = 'ApiError';
@@ -48,7 +48,7 @@ apiClient.interceptors.response.use(
 
         console.error(`API Error [${status}]:`, detail);
         return Promise.reject(new ApiError(detail, status, kind));
-    }
+    },
 );
 
 export default apiClient;

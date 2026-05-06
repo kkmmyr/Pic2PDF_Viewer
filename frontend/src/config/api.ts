@@ -4,9 +4,7 @@
  * 開発時は VITE_API_URL または localhost:8000 を使用。
  */
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.PROD
-        ? ''
-        : (import.meta.env.VITE_API_URL || 'http://localhost:8766'),
+    BASE_URL: import.meta.env.PROD ? '' : import.meta.env.VITE_API_URL || 'http://localhost:8766',
 } as const;
 
 import { LibrarySource } from '../types';
@@ -83,7 +81,13 @@ export const API_ENDPOINTS = {
     /** ジャンル並べ替え */
     GENRES_REORDER: '/api/genres/reorder',
     /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダープレビュー用） */
-    PAGE_THUMBNAIL: (name: string, page: number, path: string, source: LibrarySource, width = 400) =>
+    PAGE_THUMBNAIL: (
+        name: string,
+        page: number,
+        path: string,
+        source: LibrarySource,
+        width = 400,
+    ) =>
         `/api/thumbnails/page?name=${encodeURIComponent(name)}&page=${page}&path=${encodeURIComponent(path)}&source=${source}&width=${width}`,
 } as const;
 
@@ -92,10 +96,13 @@ export const API_ENDPOINTS = {
  */
 export const STATIC_PATHS = {
     /** PDFファイルパス */
-    PDF: (path: string, filename: string, source: LibrarySource = 'generated', version?: number) => {
-        const basePath = path
-            ? '/' + path.split('/').map(encodeURIComponent).join('/')
-            : '';
+    PDF: (
+        path: string,
+        filename: string,
+        source: LibrarySource = 'generated',
+        version?: number,
+    ) => {
+        const basePath = path ? '/' + path.split('/').map(encodeURIComponent).join('/') : '';
         const encodedFilename = encodeURIComponent(filename);
         const versionParam = version !== undefined ? `?v=${version}` : '';
         let prefix = '/pdfs';

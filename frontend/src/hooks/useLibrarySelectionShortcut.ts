@@ -18,7 +18,13 @@ export function useLibrarySelectionShortcut(
             if (e.key !== 's') return;
             const target = e.target as HTMLElement;
             const tag = target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return;
+            if (
+                tag === 'INPUT' ||
+                tag === 'TEXTAREA' ||
+                tag === 'SELECT' ||
+                target.isContentEditable
+            )
+                return;
             if (e.ctrlKey || e.metaKey || e.altKey) return;
             e.preventDefault();
             onToggleSelectionMode();

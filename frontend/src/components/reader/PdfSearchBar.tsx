@@ -44,7 +44,8 @@ export function PdfSearchBar({
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
-            if (e.shiftKey) onPrevMatch(); else onNextMatch();
+            if (e.shiftKey) onPrevMatch();
+            else onNextMatch();
         }
         if (e.key === 'Escape') {
             onClose();

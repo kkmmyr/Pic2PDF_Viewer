@@ -23,20 +23,26 @@ import type { ToastType } from './useToast';
  * 呼び出し元で例外を再 throw したい場合はオプション `rethrow: true` を渡す。
  */
 export function useAsyncToast(showToast: (message: string, type?: ToastType) => void) {
-    return useCallback(async <T,>(
-        fn: () => Promise<T>,
-        fallback: string | ((e: unknown) => string),
-        options?: { rethrow?: boolean },
-    ): Promise<T | undefined> => {
-        try {
-            return await fn();
-        } catch (e: unknown) {
-            const message = typeof fallback === 'function'
-                ? fallback(e)
-                : (e instanceof Error ? e.message : fallback);
-            showToast(message, 'error');
-            if (options?.rethrow) throw e;
-            return undefined;
-        }
-    }, [showToast]);
+    return useCallback(
+        async <T>(
+            fn: () => Promise<T>,
+            fallback: string | ((e: unknown) => string),
+            options?: { rethrow?: boolean },
+        ): Promise<T | undefined> => {
+            try {
+                return await fn();
+            } catch (e: unknown) {
+                const message =
+                    typeof fallback === 'function'
+                        ? fallback(e)
+                        : e instanceof Error
+                          ? e.message
+                          : fallback;
+                showToast(message, 'error');
+                if (options?.rethrow) throw e;
+                return undefined;
+            }
+        },
+        [showToast],
+    );
 }

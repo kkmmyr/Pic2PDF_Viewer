@@ -55,9 +55,17 @@ function formatDateTime(iso: string | null): string {
 
 export default function HitomiPage() {
     const {
-        items, lastRunAt, lastRunStatus, lastError,
-        loading, running, error,
-        refresh, dismiss, dismissAll, runNow,
+        items,
+        lastRunAt,
+        lastRunStatus,
+        lastError,
+        loading,
+        running,
+        error,
+        refresh,
+        dismiss,
+        dismissAll,
+        runNow,
     } = useHitomiArrivals();
     const { toasts, showToast, dismissToast } = useToast();
     const runAsync = useAsyncToast(showToast);
@@ -73,16 +81,16 @@ export default function HitomiPage() {
 
     const handleDismissAllConfirmed = async () => {
         setConfirmDismissAllOpen(false);
-        const ok = await runAsync(
-            async () => { await dismissAll(); return true; },
-            errMsg('一括既読化に失敗しました'),
-        );
+        const ok = await runAsync(async () => {
+            await dismissAll();
+            return true;
+        }, errMsg('一括既読化に失敗しました'));
         if (ok) showToast('全件を既読化しました', 'success');
     };
 
     const handleRunNow = async () => {
         const stats = await runAsync(() => runNow(), errMsg('取得に失敗しました'));
-        if (stats === undefined) return;  // エラー時（runAsync 内で toast 済み）
+        if (stats === undefined) return; // エラー時（runAsync 内で toast 済み）
         if (stats) {
             const parts = [`新着 ${stats.added} 件追加`];
             if (stats.skipped > 0) parts.push(`${stats.skipped} 件スキップ（本日既に取得済み）`);
@@ -97,11 +105,15 @@ export default function HitomiPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">hitomi.la 新着</h1>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                        hitomi.la 新着
+                    </h1>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span>最終実行: {formatDateTime(lastRunAt)}</span>
                         <StatusBadge status={lastRunStatus} />
-                        {lastError && <span className="text-red-500 dark:text-red-400">{lastError}</span>}
+                        {lastError && (
+                            <span className="text-red-500 dark:text-red-400">{lastError}</span>
+                        )}
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -127,7 +139,11 @@ export default function HitomiPage() {
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-success-600 hover:bg-success-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Task Scheduler を待たずに監視スクリプトを実行"
                     >
-                        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                        {running ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4" />
+                        )}
                         {running ? '取得中...' : '新着情報を取得'}
                     </button>
                     <button
@@ -141,7 +157,9 @@ export default function HitomiPage() {
             </div>
 
             {error && (
-                <Alert variant="error" className="mb-4">{error}</Alert>
+                <Alert variant="error" className="mb-4">
+                    {error}
+                </Alert>
             )}
 
             {loading && items.length === 0 ? (
@@ -160,8 +178,12 @@ export default function HitomiPage() {
                         {items.length} 件の新着
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {items.map(item => (
-                            <HitomiArrivalCard key={item.id} item={item} onDismiss={handleDismiss} />
+                        {items.map((item) => (
+                            <HitomiArrivalCard
+                                key={item.id}
+                                item={item}
+                                onDismiss={handleDismiss}
+                            />
                         ))}
                     </div>
                 </>

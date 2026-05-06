@@ -15,17 +15,19 @@ interface AlertProps {
 }
 
 const VARIANT_CLASS: Record<AlertVariant, string> = {
-    error:   'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400',
-    success: 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400',
-    warning: 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-300',
-    info:    'bg-primary-50 border-primary-200 text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-300',
+    error: 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-800 dark:text-red-400',
+    success:
+        'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400',
+    warning:
+        'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-700 dark:text-amber-300',
+    info: 'bg-primary-50 border-primary-200 text-primary-700 dark:bg-primary-900/20 dark:border-primary-800 dark:text-primary-300',
 };
 
 const DEFAULT_ICON: Record<AlertVariant, ReactNode> = {
-    error:   <AlertCircle    className="w-4 h-4 shrink-0 mt-0.5" />,
-    success: <CheckCircle    className="w-4 h-4 shrink-0 mt-0.5" />,
-    warning: <AlertTriangle  className="w-4 h-4 shrink-0 mt-0.5" />,
-    info:    <Info           className="w-4 h-4 shrink-0 mt-0.5" />,
+    error: <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />,
+    success: <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />,
+    warning: <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />,
+    info: <Info className="w-4 h-4 shrink-0 mt-0.5" />,
 };
 
 const BASE_CLASS = 'flex items-start gap-2 p-3 rounded-lg border text-sm';

@@ -48,7 +48,9 @@ export function useJobPolling<TStatus extends { status: string }>({
         clearPolling();
         (async () => {
             try {
-                const data = await apiClient.get<unknown, TStatus>(statusUrl, { params: { source } });
+                const data = await apiClient.get<unknown, TStatus>(statusUrl, {
+                    params: { source },
+                });
                 setJobStatus(data);
                 if (data.status === 'running') {
                     intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
@@ -57,15 +59,18 @@ export function useJobPolling<TStatus extends { status: string }>({
                 // ignore
             }
         })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [source]);
 
-    const startJob = useCallback(async (extraParams?: Record<string, unknown>) => {
-        await apiClient.post(startUrl, null, { params: { source, ...extraParams } });
-        clearPolling();
-        intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
-        fetchStatus();
-    }, [source, startUrl, clearPolling, fetchStatus]);
+    const startJob = useCallback(
+        async (extraParams?: Record<string, unknown>) => {
+            await apiClient.post(startUrl, null, { params: { source, ...extraParams } });
+            clearPolling();
+            intervalRef.current = setInterval(fetchStatus, API_CONFIG.JOB_POLL_INTERVAL_MS);
+            fetchStatus();
+        },
+        [source, startUrl, clearPolling, fetchStatus],
+    );
 
     useEffect(() => () => clearPolling(), [clearPolling]);
 

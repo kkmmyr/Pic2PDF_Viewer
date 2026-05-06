@@ -16,7 +16,7 @@ interface UseBookImagesReturn {
 export function useBookImages(
     selectedPdf: string | null,
     currentPath: string,
-    source: LibrarySource = 'generated'
+    source: LibrarySource = 'generated',
 ): UseBookImagesReturn {
     const [imageUrls, setImageUrls] = useState<string[] | null>(null);
     const [numPages, setNumPages] = useState(0);
@@ -37,8 +37,9 @@ export function useBookImages(
 
         setIsLoading(true);
 
-        apiClient.get<unknown, BookImagesResponse>(API_ENDPOINTS.BOOK_IMAGES(bookPath, source))
-            .then(data => {
+        apiClient
+            .get<unknown, BookImagesResponse>(API_ENDPOINTS.BOOK_IMAGES(bookPath, source))
+            .then((data) => {
                 if (data.images && data.images.length > 0) {
                     setImageUrls(data.images);
                     setNumPages(data.images.length);
@@ -46,7 +47,7 @@ export function useBookImages(
             })
             .catch(() => {
                 // Fallback to PDF mode (do nothing, imageUrls stays null)
-                console.log("Images not found, falling back to PDF");
+                console.log('Images not found, falling back to PDF');
             })
             .finally(() => {
                 setIsLoading(false);

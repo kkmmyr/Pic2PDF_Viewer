@@ -6,8 +6,8 @@ import type { LibrarySource } from '../../types';
 type AutoFillMode = 'missing_only' | 'unknown_only' | 'overwrite_all';
 
 const MODE_OPTIONS: { value: AutoFillMode; label: string }[] = [
-    { value: 'missing_only',  label: '未登録のみ' },
-    { value: 'unknown_only',  label: '作者不明のみ' },
+    { value: 'missing_only', label: '未登録のみ' },
+    { value: 'unknown_only', label: '作者不明のみ' },
     { value: 'overwrite_all', label: '全件上書き' },
 ];
 
@@ -31,8 +31,10 @@ export function AutoFillAuthorsBar({ source, onComplete }: AutoFillAuthorsBarPro
             await startAutoFill(mode);
         } catch (e: unknown) {
             showToast(
-                e instanceof Error ? e.message : '自動登録の開始に失敗しました。Ollama と SearXNG が起動しているか確認してください。',
-                'error'
+                e instanceof Error
+                    ? e.message
+                    : '自動登録の開始に失敗しました。Ollama と SearXNG が起動しているか確認してください。',
+                'error',
             );
         }
     };
@@ -52,7 +54,10 @@ export function AutoFillAuthorsBar({ source, onComplete }: AutoFillAuthorsBarPro
                     </button>
                     <div className="flex items-center gap-3">
                         {MODE_OPTIONS.map(({ value, label }) => (
-                            <label key={value} className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">
+                            <label
+                                key={value}
+                                className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none"
+                            >
                                 <input
                                     type="radio"
                                     name="autoFillMode"
@@ -80,7 +85,9 @@ export function AutoFillAuthorsBar({ source, onComplete }: AutoFillAuthorsBarPro
                             />
                         </div>
                     </div>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">処理中…</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                        処理中…
+                    </span>
                 </div>
             )}
             {jobStatus.status === 'done' && (

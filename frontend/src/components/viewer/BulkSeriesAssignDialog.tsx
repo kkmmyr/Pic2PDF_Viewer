@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogFooter,
+    DialogCancelButton,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import type { ExistingSeriesOption } from '../../types';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
@@ -26,7 +32,11 @@ type Mode = 'existing' | 'new';
  * 巻数は **選択順** に自動採番（既存追加なら max+1 から、新規なら 1 から）。
  */
 export function BulkSeriesAssignDialog({
-    open, selectedNames, existingSeries, onClose, onAssign,
+    open,
+    selectedNames,
+    existingSeries,
+    onClose,
+    onAssign,
 }: BulkSeriesAssignDialogProps) {
     const [mode, setMode] = useState<Mode>(existingSeries.length > 0 ? 'existing' : 'new');
     const [selectedTitle, setSelectedTitle] = useState<string>('');
@@ -42,20 +52,19 @@ export function BulkSeriesAssignDialog({
     }, [open, existingSeries]);
 
     const noExistingSeries = existingSeries.length === 0;
-    const seriesTitles = existingSeries.map(s => s.title);
-    const selected = existingSeries.find(s => s.title === selectedTitle);
+    const seriesTitles = existingSeries.map((s) => s.title);
+    const selected = existingSeries.find((s) => s.title === selectedTitle);
 
     const previewIndexes: number[] = (() => {
-        const start = mode === 'existing' && selected
-            ? Math.floor(selected.maxIndex) + 1
-            : 1;
+        const start = mode === 'existing' && selected ? Math.floor(selected.maxIndex) + 1 : 1;
         return selectedNames.map((_, i) => start + i);
     })();
 
     const handleSubmitWrapper = () => {
         handleSubmit(async () => {
             if (mode === 'existing') {
-                if (!selectedTitle || !selected) throw new Error('既存シリーズを選択してください。');
+                if (!selectedTitle || !selected)
+                    throw new Error('既存シリーズを選択してください。');
                 await onAssign({ title: selected.title, indexes: previewIndexes, id: selected.id });
             } else {
                 if (!newTitle.trim()) throw new Error('シリーズタイトルを入力してください。');
@@ -89,7 +98,9 @@ export function BulkSeriesAssignDialog({
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                 既存のシリーズに追加
                                 {noExistingSeries && (
-                                    <span className="ml-2 text-xs text-gray-400">（このソースに既存シリーズなし）</span>
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        （このソースに既存シリーズなし）
+                                    </span>
                                 )}
                             </div>
                             {mode === 'existing' && !noExistingSeries && (
@@ -152,9 +163,7 @@ export function BulkSeriesAssignDialog({
                     </ul>
                 </div>
 
-                {error && (
-                    <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />

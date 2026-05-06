@@ -39,7 +39,13 @@ const MAX_WIDTH_CLASS: Record<DialogMaxWidth, string> = {
  * ```
  */
 export function Dialog({
-    open, title, subtitle, nested = false, maxWidth = 'sm', onClose, children,
+    open,
+    title,
+    subtitle,
+    nested = false,
+    maxWidth = 'sm',
+    onClose,
+    children,
 }: DialogProps) {
     // Esc キーで閉じる
     useEffect(() => {
@@ -58,9 +64,13 @@ export function Dialog({
     return (
         <div
             className={`fixed inset-0 bg-black/50 flex items-center justify-center ${zIndexClass}`}
-            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
         >
-            <div className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full ${MAX_WIDTH_CLASS[maxWidth]} mx-4 border border-gray-200 dark:border-gray-700`}>
+            <div
+                className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full ${MAX_WIDTH_CLASS[maxWidth]} mx-4 border border-gray-200 dark:border-gray-700`}
+            >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <div>
                         <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
@@ -107,7 +117,11 @@ interface DialogButtonProps {
 }
 
 /** キャンセル系ボタン（ダイアログ用専用サイズ: px-4 py-2 rounded-lg）。 */
-export function DialogCancelButton({ onClick, disabled, children = 'キャンセル' }: DialogButtonProps) {
+export function DialogCancelButton({
+    onClick,
+    disabled,
+    children = 'キャンセル',
+}: DialogButtonProps) {
     return (
         <button
             type="button"

@@ -42,11 +42,14 @@ export const OCRPanel: React.FC = () => {
 
     const isRunning = status === 'running';
 
-    const statusBadge = {
-        running: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300 border border-primary-200 dark:border-primary-700',
-        idle:    'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
-        error:   'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-700',
-    }[status] ?? 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600';
+    const statusBadge =
+        {
+            running:
+                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300 border border-primary-200 dark:border-primary-700',
+            idle: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600',
+            error: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 border border-red-200 dark:border-red-700',
+        }[status] ??
+        'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600';
 
     return (
         <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -56,7 +59,9 @@ export const OCRPanel: React.FC = () => {
                     <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
                         Novel OCR Execution
                     </h2>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide ${statusBadge}`}>
+                    <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide ${statusBadge}`}
+                    >
                         {status}
                     </span>
                 </div>
@@ -87,7 +92,9 @@ export const OCRPanel: React.FC = () => {
                 </div>
 
                 {error && (
-                    <Alert variant="error" className="mt-3">{error}</Alert>
+                    <Alert variant="error" className="mt-3">
+                        {error}
+                    </Alert>
                 )}
             </div>
 

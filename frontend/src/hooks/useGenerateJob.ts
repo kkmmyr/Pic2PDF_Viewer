@@ -32,20 +32,28 @@ export function useGenerateJob(
 
     const [currentJob, setCurrentJob] = useState<GenerateJob | null>(
         stored
-            ? { job_id: stored.job_id, status: 'pending', current_item: null, files: [], failed_items: [], message: '', error: null }
-            : null
+            ? {
+                  job_id: stored.job_id,
+                  status: 'pending',
+                  current_item: null,
+                  files: [],
+                  failed_items: [],
+                  message: '',
+                  error: null,
+              }
+            : null,
     );
     const [restoredSourceDir] = useState<string | null>(stored?.sourceDir ?? null);
 
-    const isGenerating = currentJob !== null &&
-        (currentJob.status === 'pending' || currentJob.status === 'running');
+    const isGenerating =
+        currentJob !== null && (currentJob.status === 'pending' || currentJob.status === 'running');
     const isRestoredJob = isGenerating && !!stored;
 
     const fetchJob = useCallback(async () => {
         if (!currentJob) return;
         try {
             const job = await apiClient.get<unknown, GenerateJob>(
-                API_ENDPOINTS.GENERATE_JOB(currentJob.job_id)
+                API_ENDPOINTS.GENERATE_JOB(currentJob.job_id),
             );
             setCurrentJob(job);
             if (job.status === 'completed') {
@@ -73,7 +81,15 @@ export function useGenerateJob(
 
     const startJob = useCallback((jobId: string, sourceDir: string) => {
         setStorageJson<StoredJob>(STORAGE_KEY, { job_id: jobId, sourceDir });
-        setCurrentJob({ job_id: jobId, status: 'pending', current_item: null, files: [], failed_items: [], message: '', error: null });
+        setCurrentJob({
+            job_id: jobId,
+            status: 'pending',
+            current_item: null,
+            files: [],
+            failed_items: [],
+            message: '',
+            error: null,
+        });
     }, []);
 
     const clearCurrentJob = useCallback(() => {
@@ -81,7 +97,14 @@ export function useGenerateJob(
         setCurrentJob(null);
     }, []);
 
-    return { currentJob, restoredSourceDir, isGenerating, isRestoredJob, startJob, clearCurrentJob };
+    return {
+        currentJob,
+        restoredSourceDir,
+        isGenerating,
+        isRestoredJob,
+        startJob,
+        clearCurrentJob,
+    };
 }
 
 function loadStoredJob(): StoredJob | null {

@@ -96,7 +96,14 @@ export interface GenerateJob {
 /**
  * 並び替え順序
  */
-export type SortOrder = 'name_asc' | 'name_desc' | 'date_asc' | 'date_desc' | 'favorites_first' | 'view_desc' | 'recent_view';
+export type SortOrder =
+    | 'name_asc'
+    | 'name_desc'
+    | 'date_asc'
+    | 'date_desc'
+    | 'favorites_first'
+    | 'view_desc'
+    | 'recent_view';
 
 /**
  * 書籍メタデータ（1冊分）

@@ -17,7 +17,7 @@ export function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
 
     return (
         <div className="fixed bottom-4 right-4 z-toast flex flex-col gap-2">
-            {toasts.map(toast => (
+            {toasts.map((toast) => (
                 <div
                     key={toast.id}
                     className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg text-sm max-w-sm animate-in slide-in-from-right-4 duration-200 ${TYPE_STYLES[toast.type]}`}

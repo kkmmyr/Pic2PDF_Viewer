@@ -64,9 +64,11 @@ export function PageRenderer({
             onToggleSelection(pageNumber, e);
         } else {
             if (side === 'left') {
-                if (direction === 'rtl') onNext(e); else onPrev(e);
+                if (direction === 'rtl') onNext(e);
+                else onPrev(e);
             } else if (side === 'right') {
-                if (direction === 'rtl') onPrev(e); else onNext(e);
+                if (direction === 'rtl') onPrev(e);
+                else onNext(e);
             } else {
                 onNext(e);
             }
@@ -93,7 +95,13 @@ export function PageRenderer({
                 <img
                     src={buildStaticUrl(imageUrl)}
                     alt={`Page ${pageNumber}`}
-                    style={{ height: 'auto', width: 'auto', maxWidth: '100%', maxHeight: windowHeight - 40, objectFit: 'contain' }}
+                    style={{
+                        height: 'auto',
+                        width: 'auto',
+                        maxWidth: '100%',
+                        maxHeight: windowHeight - 40,
+                        objectFit: 'contain',
+                    }}
                     className="bg-white"
                     onLoad={(e) => {
                         const img = e.currentTarget;

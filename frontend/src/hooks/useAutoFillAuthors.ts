@@ -35,7 +35,7 @@ export function useAutoFillAuthors(source: LibrarySource, onComplete?: () => voi
     const startAutoFill = useCallback(
         (mode: 'missing_only' | 'unknown_only' | 'overwrite_all' = 'unknown_only') =>
             startJob({ mode }),
-        [startJob]
+        [startJob],
     );
 
     return { jobStatus, startAutoFill };

@@ -1,5 +1,11 @@
 import { useEffect } from 'react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogFooter,
+    DialogCancelButton,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 import { TagsInput } from '../ui/TagsInput';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
@@ -7,7 +13,7 @@ import { useTagsInput } from '../../hooks/useTagsInput';
 
 interface BulkTagDialogProps {
     open: boolean;
-    targetCount: number;       // 選択中の書籍数
+    targetCount: number; // 選択中の書籍数
     /** 編集開始時の既存タグ。1冊選択時のみ参考に表示 */
     initialTags?: string[];
     onClose: () => void;
@@ -18,7 +24,13 @@ interface BulkTagDialogProps {
  * 複数書籍へのタグ一括設定ダイアログ。
  * 「一括適用」で選択中の全書籍のタグを上書きする（既存のタグは破棄）。
  */
-export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, onApply }: BulkTagDialogProps) {
+export function BulkTagDialog({
+    open,
+    targetCount,
+    initialTags = [],
+    onClose,
+    onApply,
+}: BulkTagDialogProps) {
     const { saving, error, handleSubmit } = useDialogSubmit(onClose);
     const t = useTagsInput();
     useAutoFocusInput(t.inputRef, open, { delay: 50 });
@@ -27,25 +39,18 @@ export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, on
         if (open) {
             t.reset(targetCount === 1 ? [...initialTags] : []);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, targetCount, initialTags]);
 
     const handleApply = () => {
         handleSubmit(() => onApply(t.getFinalTags()));
     };
 
-    const subtitle = targetCount === 1
-        ? '1 冊のタグを上書きします'
-        : `${targetCount} 冊のタグを上書きします`;
+    const subtitle =
+        targetCount === 1 ? '1 冊のタグを上書きします' : `${targetCount} 冊のタグを上書きします`;
 
     return (
-        <Dialog
-            open={open}
-            title="タグを一括設定"
-            subtitle={subtitle}
-            onClose={onClose}
-            nested
-        >
+        <Dialog open={open} title="タグを一括設定" subtitle={subtitle} onClose={onClose} nested>
             <DialogBody>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     タグ
@@ -62,9 +67,7 @@ export function BulkTagDialog({ open, targetCount, initialTags = [], onClose, on
                     onRemove={t.removeTag}
                     onBlur={t.handleBlur}
                 />
-                {error && (
-                    <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />

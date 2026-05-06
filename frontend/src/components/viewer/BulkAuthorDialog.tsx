@@ -1,5 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogFooter,
+    DialogCancelButton,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';
 import { TagsInput } from '../ui/TagsInput';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
@@ -8,7 +14,7 @@ import { useTagsInput } from '../../hooks/useTagsInput';
 
 interface BulkAuthorDialogProps {
     open: boolean;
-    targetCount: number;       // 選択中の書籍数
+    targetCount: number; // 選択中の書籍数
     /** 既存の作者一覧。空配列なら「既存から選択」モードは無効 */
     allAuthors: string[];
     onClose: () => void;
@@ -23,7 +29,13 @@ type Mode = 'existing' | 'new';
  * - 既存モード: SearchableSelect から 1 名選択
  * - 新規モード: chip 入力で複数の作者名を Enter / カンマ区切りで追加
  */
-export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApply }: BulkAuthorDialogProps) {
+export function BulkAuthorDialog({
+    open,
+    targetCount,
+    allAuthors,
+    onClose,
+    onApply,
+}: BulkAuthorDialogProps) {
     const noExistingAuthors = allAuthors.length === 0;
     const [mode, setMode] = useState<Mode>(noExistingAuthors ? 'new' : 'existing');
     const [selectedExisting, setSelectedExisting] = useState<string>('');
@@ -37,7 +49,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
         setMode(fallbackMode);
         setSelectedExisting(allAuthors[0] ?? '');
         t.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, noExistingAuthors, allAuthors]);
 
     const handleApply = () => {
@@ -82,7 +94,9 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                 既存の作者から選択
                                 {noExistingAuthors && (
-                                    <span className="ml-2 text-xs text-gray-400">（既存作者なし）</span>
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        （既存作者なし）
+                                    </span>
                                 )}
                             </div>
                             {mode === 'existing' && !noExistingAuthors && (
@@ -130,9 +144,7 @@ export function BulkAuthorDialog({ open, targetCount, allAuthors, onClose, onApp
                     </label>
                 </div>
 
-                {error && (
-                    <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />

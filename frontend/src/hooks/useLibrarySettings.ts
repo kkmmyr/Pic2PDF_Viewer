@@ -15,20 +15,20 @@ const GENRE_FILTER_KEY = 'library_genre_filter';
  * setter は state 更新と localStorage 書き込みをまとめて行う。
  */
 export function useLibrarySettings() {
-    const [sortOrder, setSortOrderState] = useState<SortOrder>(
-        () => getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc')
+    const [sortOrder, setSortOrderState] = useState<SortOrder>(() =>
+        getStorageJson<SortOrder>(SORT_STORAGE_KEY, 'name_asc'),
     );
-    const [groupMode, setGroupModeState] = useState<GroupMode>(
-        () => getStorageJson<GroupMode>(GROUP_MODE_KEY, 'none')
+    const [groupMode, setGroupModeState] = useState<GroupMode>(() =>
+        getStorageJson<GroupMode>(GROUP_MODE_KEY, 'none'),
     );
-    const [showHidden, setShowHiddenState] = useState<boolean>(
-        () => getStorageJson<boolean>(SHOW_HIDDEN_KEY, false)
+    const [showHidden, setShowHiddenState] = useState<boolean>(() =>
+        getStorageJson<boolean>(SHOW_HIDDEN_KEY, false),
     );
-    const [showUnreadOnly, setShowUnreadOnlyState] = useState<boolean>(
-        () => getStorageJson<boolean>(SHOW_UNREAD_ONLY_KEY, false)
+    const [showUnreadOnly, setShowUnreadOnlyState] = useState<boolean>(() =>
+        getStorageJson<boolean>(SHOW_UNREAD_ONLY_KEY, false),
     );
-    const [genreFilter, setGenreFilterState] = useState<string>(
-        () => getStorageJson<string>(GENRE_FILTER_KEY, '')
+    const [genreFilter, setGenreFilterState] = useState<string>(() =>
+        getStorageJson<string>(GENRE_FILTER_KEY, ''),
     );
 
     const setSortOrder = useCallback((order: SortOrder) => {
@@ -42,7 +42,7 @@ export function useLibrarySettings() {
     }, []);
 
     const toggleShowHidden = useCallback(() => {
-        setShowHiddenState(prev => {
+        setShowHiddenState((prev) => {
             const next = !prev;
             setStorageJson(SHOW_HIDDEN_KEY, next);
             return next;
@@ -50,7 +50,7 @@ export function useLibrarySettings() {
     }, []);
 
     const toggleShowUnreadOnly = useCallback(() => {
-        setShowUnreadOnlyState(prev => {
+        setShowUnreadOnlyState((prev) => {
             const next = !prev;
             setStorageJson(SHOW_UNREAD_ONLY_KEY, next);
             return next;
@@ -63,10 +63,15 @@ export function useLibrarySettings() {
     }, []);
 
     return {
-        sortOrder, setSortOrder,
-        groupMode, setGroupMode,
-        showHidden, toggleShowHidden,
-        showUnreadOnly, toggleShowUnreadOnly,
-        genreFilter, setGenreFilter,
+        sortOrder,
+        setSortOrder,
+        groupMode,
+        setGroupMode,
+        showHidden,
+        toggleShowHidden,
+        showUnreadOnly,
+        toggleShowUnreadOnly,
+        genreFilter,
+        setGenreFilter,
     };
 }

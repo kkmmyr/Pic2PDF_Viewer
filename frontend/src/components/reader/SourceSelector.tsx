@@ -7,8 +7,8 @@ interface SourceSelectorProps {
 
 const SOURCES: { value: LibrarySource; label: string }[] = [
     { value: 'generated', label: 'Main' },
-    { value: 'kindle',    label: 'Kindle' },
-    { value: 'novel',     label: 'Novel' },
+    { value: 'kindle', label: 'Kindle' },
+    { value: 'novel', label: 'Novel' },
 ];
 
 export function SourceSelector({ currentSource, onSourceChange }: SourceSelectorProps) {

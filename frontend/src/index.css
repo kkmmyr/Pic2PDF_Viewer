@@ -31,10 +31,10 @@ html:not(.dark) {
  * 色は Tailwind の gray-100 / gray-800 / gray-900 と揃える。
  * -------------------------------------------------------------- */
 html.dark select option {
-    background-color: rgb(31, 41, 55);  /* gray-800 */
-    color: rgb(243, 244, 246);          /* gray-100 */
+    background-color: rgb(31, 41, 55); /* gray-800 */
+    color: rgb(243, 244, 246); /* gray-100 */
 }
 html:not(.dark) select option {
     background-color: rgb(255, 255, 255);
-    color: rgb(17, 24, 39);             /* gray-900 */
+    color: rgb(17, 24, 39); /* gray-900 */
 }

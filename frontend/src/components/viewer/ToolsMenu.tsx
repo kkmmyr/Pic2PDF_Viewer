@@ -20,8 +20,9 @@ async function downloadMetaExport(source: LibrarySource): Promise<void> {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`export failed: ${res.status}`);
     const blob = await res.blob();
-    const filename = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1]
-        ?? `meta_${source}.json`;
+    const filename =
+        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
+        `meta_${source}.json`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -55,23 +56,30 @@ export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
     return (
         <div ref={containerRef} className="relative">
             <button
-                onClick={() => setOpen(o => !o)}
+                onClick={() => setOpen((o) => !o)}
                 title="自動登録・シリーズ判定などのバッチ処理"
                 className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1.5"
             >
                 <Settings className="w-4 h-4" />
                 ツール
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+                <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`}
+                />
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-[520px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
                     <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">メタデータ（著者・タグ・シリーズ等）をバックアップ</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                            メタデータ（著者・タグ・シリーズ等）をバックアップ
+                        </span>
                         <button
                             onClick={async () => {
                                 setExporting(true);
-                                try { await downloadMetaExport(source); }
-                                finally { setExporting(false); }
+                                try {
+                                    await downloadMetaExport(source);
+                                } finally {
+                                    setExporting(false);
+                                }
                             }}
                             disabled={exporting}
                             className="flex items-center gap-1.5 px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-md shrink-0"

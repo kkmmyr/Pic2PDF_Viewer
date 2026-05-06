@@ -24,7 +24,7 @@ export function SeriesResolveBar({ source, onComplete }: SeriesResolveBarProps) 
         } catch (e: unknown) {
             showToast(
                 e instanceof Error ? e.message : 'シリーズ判定の開始に失敗しました。',
-                'error'
+                'error',
             );
         }
     };
@@ -66,7 +66,9 @@ export function SeriesResolveBar({ source, onComplete }: SeriesResolveBarProps) 
                             />
                         </div>
                     </div>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">処理中…</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                        処理中…
+                    </span>
                 </div>
             )}
             {jobStatus.status === 'done' && (

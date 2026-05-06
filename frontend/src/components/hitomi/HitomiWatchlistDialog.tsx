@@ -1,11 +1,6 @@
 import { useState } from 'react';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
-import {
-    Dialog,
-    DialogBody,
-    DialogFooter,
-    DialogCancelButton,
-} from '../ui/Dialog';
+import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '../ui/Dialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useHitomiWatchlist } from '../../hooks/useHitomiWatchlist';
 import { ApiError } from '../../config/api_client';
@@ -25,7 +20,10 @@ const LANGUAGE_OPTIONS = [
 ];
 
 export function HitomiWatchlistDialog({
-    open, onClose, onError, onSuccess,
+    open,
+    onClose,
+    onError,
+    onSuccess,
 }: HitomiWatchlistDialogProps) {
     const { artists, loading, error, addArtist, removeArtist } = useHitomiWatchlist();
     const [name, setName] = useState('');
@@ -44,7 +42,9 @@ export function HitomiWatchlistDialog({
         } catch (e) {
             if (e instanceof ApiError) {
                 if (e.status === 404) {
-                    onError(`hitomi.la に「${trimmed}」が見つかりません。スペル・空白の有無を確認してください`);
+                    onError(
+                        `hitomi.la に「${trimmed}」が見つかりません。スペル・空白の有無を確認してください`,
+                    );
                 } else if (e.status === 400) {
                     onError(e.message);
                 } else {
@@ -99,8 +99,10 @@ export function HitomiWatchlistDialog({
                         className="px-2 py-1.5 text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500"
                         disabled={submitting}
                     >
-                        {LANGUAGE_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        {LANGUAGE_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                            </option>
                         ))}
                     </select>
                     <button
@@ -108,7 +110,11 @@ export function HitomiWatchlistDialog({
                         disabled={submitting || !name.trim()}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        {submitting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Plus className="w-4 h-4" />
+                        )}
                         追加
                     </button>
                 </div>

@@ -70,10 +70,11 @@ describe('useBookMeta', () => {
             await result.current.recordView('', 'book.pdf');
         });
 
-        expect(mockedPost).toHaveBeenCalledWith(
-            '/api/meta/view',
-            { path: '', name: 'book.pdf', source: 'generated' }
-        );
+        expect(mockedPost).toHaveBeenCalledWith('/api/meta/view', {
+            path: '',
+            name: 'book.pdf',
+            source: 'generated',
+        });
         expect(result.current.getViewCount('', 'book.pdf')).toBe(1);
         expect(result.current.getLastViewedAt('', 'book.pdf')).toBe(12345);
     });

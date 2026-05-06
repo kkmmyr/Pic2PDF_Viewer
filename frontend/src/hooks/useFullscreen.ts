@@ -14,7 +14,7 @@ interface UseFullscreenReturn {
  */
 export function useFullscreen(): UseFullscreenReturn {
     const [isFullscreen, setIsFullscreen] = useState(
-        () => typeof document !== 'undefined' && !!document.fullscreenElement
+        () => typeof document !== 'undefined' && !!document.fullscreenElement,
     );
 
     useEffect(() => {

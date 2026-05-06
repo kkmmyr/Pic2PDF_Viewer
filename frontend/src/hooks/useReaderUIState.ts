@@ -13,7 +13,7 @@ export function useReaderUIState() {
 
     const openSearch = useCallback(() => setIsSearchOpen(true), []);
     const closeSearch = useCallback(() => setIsSearchOpen(false), []);
-    const toggleSearch = useCallback(() => setIsSearchOpen(s => !s), []);
+    const toggleSearch = useCallback(() => setIsSearchOpen((s) => !s), []);
 
     const openHelp = useCallback(() => setIsHelpOpen(true), []);
     const closeHelp = useCallback(() => setIsHelpOpen(false), []);
@@ -24,9 +24,18 @@ export function useReaderUIState() {
     const showSliderOff = useCallback(() => setShowSlider(false), []);
 
     return {
-        showHeader, showHeaderOn, showHeaderOff,
-        showSlider, showSliderOn, showSliderOff,
-        isSearchOpen, openSearch, closeSearch, toggleSearch,
-        isHelpOpen, openHelp, closeHelp,
+        showHeader,
+        showHeaderOn,
+        showHeaderOff,
+        showSlider,
+        showSliderOn,
+        showSliderOff,
+        isSearchOpen,
+        openSearch,
+        closeSearch,
+        toggleSearch,
+        isHelpOpen,
+        openHelp,
+        closeHelp,
     };
 }

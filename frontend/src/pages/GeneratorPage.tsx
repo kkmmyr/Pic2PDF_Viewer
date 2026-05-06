@@ -15,7 +15,11 @@ const DEFAULT_QUALITY = 50;
 export default function GeneratorPage() {
     const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
     const [isCompressing, setIsCompressing] = useState(false);
-    const [result, setResult] = useState<{ message: string; files: string[]; failed_items: GenerateFailedItem[] } | null>(null);
+    const [result, setResult] = useState<{
+        message: string;
+        files: string[];
+        failed_items: GenerateFailedItem[];
+    } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const [quality, setQuality] = useState(DEFAULT_QUALITY);
@@ -30,7 +34,10 @@ export default function GeneratorPage() {
         setError(job.error ?? '生成に失敗しました。');
     }, []);
 
-    const { currentJob, restoredSourceDir, isGenerating, isRestoredJob, startJob } = useGenerateJob(onCompleted, onFailed);
+    const { currentJob, restoredSourceDir, isGenerating, isRestoredJob, startJob } = useGenerateJob(
+        onCompleted,
+        onFailed,
+    );
 
     useEffect(() => {
         if (restoredSourceDir) setSourceDir(restoredSourceDir);
@@ -47,7 +54,7 @@ export default function GeneratorPage() {
         try {
             const data = await apiClient.post<unknown, { job_id: string; status: string }>(
                 API_ENDPOINTS.GENERATE,
-                { source_dir: sourceDir }
+                { source_dir: sourceDir },
             );
             startJob(data.job_id, sourceDir);
         } catch (err: unknown) {
@@ -62,7 +69,7 @@ export default function GeneratorPage() {
         try {
             const data = await apiClient.post<unknown, { message: string; files: string[] }>(
                 API_ENDPOINTS.BATCH_COMPRESS,
-                { quality }
+                { quality },
             );
             setResult({ ...data, failed_items: [] });
         } catch (err: unknown) {
@@ -87,13 +94,17 @@ export default function GeneratorPage() {
                             variant="warning"
                             icon={<Loader2 size={15} className="animate-spin shrink-0 mt-0.5" />}
                         >
-                            前回の生成ジョブが実行中です — <span className="font-medium truncate">{restoredSourceDir}</span>
+                            前回の生成ジョブが実行中です —{' '}
+                            <span className="font-medium truncate">{restoredSourceDir}</span>
                         </Alert>
                     )}
 
                     {/* Source Directory Input */}
                     <div>
-                        <label htmlFor="sourceDir" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <label
+                            htmlFor="sourceDir"
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                        >
                             変換元フォルダのパス
                         </label>
                         <div className="flex gap-2">
@@ -120,10 +131,15 @@ export default function GeneratorPage() {
 
                     {/* Batch Compress 用の品質スライダー（生成 API では未使用） */}
                     <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800 space-y-2">
-                        <label htmlFor="quality" className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2">
+                        <label
+                            htmlFor="quality"
+                            className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2"
+                        >
                             <Zap size={16} className="text-amber-500 fill-amber-500" />
                             一括圧縮 品質: {quality}
-                            <span className="ml-auto text-xs font-normal text-gray-500 dark:text-gray-400">小さいほどファイルサイズ小</span>
+                            <span className="ml-auto text-xs font-normal text-gray-500 dark:text-gray-400">
+                                小さいほどファイルサイズ小
+                            </span>
                         </label>
                         <input
                             id="quality"
@@ -145,7 +161,17 @@ export default function GeneratorPage() {
                             disabled={isLoading || !sourceDir}
                             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white font-medium text-base rounded-lg transition-colors"
                         >
-                            {isGenerating ? <><Loader2 className="animate-spin" />生成中...</> : <><FolderSearch className="w-5 h-5" />スキャン &amp; 生成</>}
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="animate-spin" />
+                                    生成中...
+                                </>
+                            ) : (
+                                <>
+                                    <FolderSearch className="w-5 h-5" />
+                                    スキャン &amp; 生成
+                                </>
+                            )}
                         </button>
 
                         <div className="relative">
@@ -153,7 +179,9 @@ export default function GeneratorPage() {
                                 <span className="w-full border-t border-gray-200 dark:border-gray-700" />
                             </div>
                             <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">または既存 PDF を管理</span>
+                                <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">
+                                    または既存 PDF を管理
+                                </span>
                             </div>
                         </div>
 
@@ -162,7 +190,11 @@ export default function GeneratorPage() {
                             disabled={isLoading}
                             className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-50 dark:disabled:bg-gray-800/50 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-xl border border-gray-300 dark:border-gray-600 transition-all"
                         >
-                            {isCompressing ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} className="text-amber-500" />}
+                            {isCompressing ? (
+                                <Loader2 className="animate-spin" size={18} />
+                            ) : (
+                                <Zap size={18} className="text-amber-500" />
+                            )}
                             {isCompressing ? '圧縮中...' : '既存 PDF を一括圧縮'}
                         </button>
                     </div>
@@ -171,7 +203,10 @@ export default function GeneratorPage() {
 
                     {/* Error Message */}
                     {error && (
-                        <Alert variant="error" className="p-4 animate-in fade-in slide-in-from-top-2">
+                        <Alert
+                            variant="error"
+                            className="p-4 animate-in fade-in slide-in-from-top-2"
+                        >
                             エラー: {error}
                         </Alert>
                     )}
@@ -188,18 +223,24 @@ export default function GeneratorPage() {
                             {result.files.length > 0 && (
                                 <ul className="list-disc list-inside text-sm space-y-1">
                                     {result.files.map((file) => (
-                                        <li key={file} className="font-medium">{file}</li>
+                                        <li key={file} className="font-medium">
+                                            {file}
+                                        </li>
                                     ))}
                                 </ul>
                             )}
                             {result.failed_items.length > 0 && (
                                 <div className="mt-3 pt-3 border-t border-current/20">
-                                    <p className="font-bold mb-1 text-sm">失敗 ({result.failed_items.length}件):</p>
+                                    <p className="font-bold mb-1 text-sm">
+                                        失敗 ({result.failed_items.length}件):
+                                    </p>
                                     <ul className="list-disc list-inside text-sm space-y-1">
                                         {result.failed_items.map((item) => (
                                             <li key={item.name}>
                                                 <span className="font-medium">{item.name}</span>
-                                                <span className="text-xs ml-2 opacity-80">— {item.error}</span>
+                                                <span className="text-xs ml-2 opacity-80">
+                                                    — {item.error}
+                                                </span>
                                             </li>
                                         ))}
                                     </ul>

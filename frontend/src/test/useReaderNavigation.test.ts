@@ -20,9 +20,7 @@ describe('useReaderNavigation — single page mode', () => {
     });
 
     it('最終ページで handleNext しても超えない', () => {
-        const { result } = renderHook(() =>
-            useReaderNavigation({ ...defaults, numPages: 1 })
-        );
+        const { result } = renderHook(() => useReaderNavigation({ ...defaults, numPages: 1 }));
         act(() => result.current.handleNext());
         expect(result.current.pageNumber).toBe(1);
     });

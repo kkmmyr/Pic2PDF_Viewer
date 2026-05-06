@@ -44,7 +44,11 @@ describe('Button', () => {
 
     it('disabled の時 onClick は呼ばれない', () => {
         const onClick = vi.fn();
-        const { getByRole } = render(<Button disabled onClick={onClick}>OK</Button>);
+        const { getByRole } = render(
+            <Button disabled onClick={onClick}>
+                OK
+            </Button>,
+        );
         fireEvent.click(getByRole('button'));
         expect(onClick).not.toHaveBeenCalled();
     });

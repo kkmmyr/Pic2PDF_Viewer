@@ -47,7 +47,11 @@ describe('useLibraryBulkActions', () => {
             });
 
             expect(opts.addGenre).toHaveBeenCalledWith('新規ジャンル');
-            expect(opts.bookMeta.updateGenre).toHaveBeenCalledWith('', ['a.pdf', 'b.pdf'], '新規ジャンル');
+            expect(opts.bookMeta.updateGenre).toHaveBeenCalledWith(
+                '',
+                ['a.pdf', 'b.pdf'],
+                '新規ジャンル',
+            );
             expect(opts.onClearSelection).toHaveBeenCalledTimes(1);
         });
 
@@ -60,7 +64,11 @@ describe('useLibraryBulkActions', () => {
             });
 
             expect(opts.addGenre).not.toHaveBeenCalled();
-            expect(opts.bookMeta.updateGenre).toHaveBeenCalledWith('', ['a.pdf', 'b.pdf'], '既存ジャンル');
+            expect(opts.bookMeta.updateGenre).toHaveBeenCalledWith(
+                '',
+                ['a.pdf', 'b.pdf'],
+                '既存ジャンル',
+            );
             expect(opts.onClearSelection).toHaveBeenCalledTimes(1);
         });
 
@@ -101,7 +109,8 @@ describe('useLibraryBulkActions', () => {
                 await result.current.handleBulkApplyAuthors(['Author A']);
             });
 
-            const [, names] = (opts.bookMeta.updateAuthors as ReturnType<typeof vi.fn>).mock.calls[0];
+            const [, names] = (opts.bookMeta.updateAuthors as ReturnType<typeof vi.fn>).mock
+                .calls[0];
             expect(names).toContain('a.pdf');
             expect(names).toContain('folder');
             expect(opts.onClearSelection).toHaveBeenCalledTimes(1);
@@ -110,7 +119,9 @@ describe('useLibraryBulkActions', () => {
 
     describe('handleBulkApplyTags', () => {
         it('PDF のみ（非 PDF を除外）で updateTags を呼ぶ', async () => {
-            const opts = makeOptions({ selectedItems: new Set<string>(['a.pdf', 'folder', 'b.PDF']) });
+            const opts = makeOptions({
+                selectedItems: new Set<string>(['a.pdf', 'folder', 'b.PDF']),
+            });
             const { result } = renderHook(() => useLibraryBulkActions(opts));
 
             await act(async () => {

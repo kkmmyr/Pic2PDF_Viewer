@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
-import type { ArrivalItem, NewArrivalsResponse, RunNowResponse, RunStats, RunStatus } from '../types/hitomi';
+import type {
+    ArrivalItem,
+    NewArrivalsResponse,
+    RunNowResponse,
+    RunStats,
+    RunStatus,
+} from '../types/hitomi';
 
 interface UseHitomiArrivalsResult {
     items: ArrivalItem[];
@@ -37,7 +43,9 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
         setLoading(true);
         setError(null);
         try {
-            const resp = await apiClient.get<unknown, NewArrivalsResponse>(API_ENDPOINTS.HITOMI_NEW_ARRIVALS);
+            const resp = await apiClient.get<unknown, NewArrivalsResponse>(
+                API_ENDPOINTS.HITOMI_NEW_ARRIVALS,
+            );
             setItems(resp.items);
             setLastRunAt(resp.last_run_at);
             setLastRunStatus(resp.last_run_status);
@@ -49,16 +57,19 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
         }
     }, []);
 
-    const dismiss = useCallback(async (id: number) => {
-        const prev = items;
-        setItems(items.filter(it => it.id !== id));
-        try {
-            await apiClient.post(API_ENDPOINTS.HITOMI_DISMISS(id));
-        } catch (e) {
-            setItems(prev);
-            throw e;
-        }
-    }, [items]);
+    const dismiss = useCallback(
+        async (id: number) => {
+            const prev = items;
+            setItems(items.filter((it) => it.id !== id));
+            try {
+                await apiClient.post(API_ENDPOINTS.HITOMI_DISMISS(id));
+            } catch (e) {
+                setItems(prev);
+                throw e;
+            }
+        },
+        [items],
+    );
 
     const dismissAll = useCallback(async () => {
         const prev = items;
@@ -92,8 +103,16 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
     }, [refresh]);
 
     return {
-        items, lastRunAt, lastRunStatus, lastError,
-        loading, running, error,
-        refresh, dismiss, dismissAll, runNow,
+        items,
+        lastRunAt,
+        lastRunStatus,
+        lastError,
+        loading,
+        running,
+        error,
+        refresh,
+        dismiss,
+        dismissAll,
+        runNow,
     };
 }

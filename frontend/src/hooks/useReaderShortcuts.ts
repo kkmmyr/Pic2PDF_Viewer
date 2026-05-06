@@ -84,5 +84,13 @@ export function useReaderShortcuts({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isActive, onToggleFullscreen, onToggleEditMode, onOpenHelp, onToggleSearch, onNavigateNextVolume, onNavigatePrevVolume]);
+    }, [
+        isActive,
+        onToggleFullscreen,
+        onToggleEditMode,
+        onOpenHelp,
+        onToggleSearch,
+        onNavigateNextVolume,
+        onNavigatePrevVolume,
+    ]);
 }

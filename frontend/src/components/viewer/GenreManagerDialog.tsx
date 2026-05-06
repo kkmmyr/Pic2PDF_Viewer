@@ -10,7 +10,13 @@ interface GenreManagerDialogProps {
     onRemove: (name: string) => Promise<void>;
 }
 
-export function GenreManagerDialog({ open, genres, onClose, onAdd, onRemove }: GenreManagerDialogProps) {
+export function GenreManagerDialog({
+    open,
+    genres,
+    onClose,
+    onAdd,
+    onRemove,
+}: GenreManagerDialogProps) {
     const [input, setInput] = useState('');
     const [adding, setAdding] = useState(false);
     const [removing, setRemoving] = useState<string | null>(null);
@@ -67,12 +73,14 @@ export function GenreManagerDialog({ open, genres, onClose, onAdd, onRemove }: G
                             ジャンルがありません
                         </li>
                     )}
-                    {genres.map(genre => (
+                    {genres.map((genre) => (
                         <li
                             key={genre}
                             className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-gray-50 dark:bg-gray-800"
                         >
-                            <span className="text-sm text-gray-800 dark:text-gray-200">{genre}</span>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">
+                                {genre}
+                            </span>
                             <button
                                 onClick={() => handleRemove(genre)}
                                 disabled={removing === genre}
@@ -104,9 +112,7 @@ export function GenreManagerDialog({ open, genres, onClose, onAdd, onRemove }: G
                     </button>
                 </div>
 
-                {error && (
-                    <p className="mt-2 text-xs text-red-500 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="mt-2 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose}>閉じる</DialogCancelButton>

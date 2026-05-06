@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from '../ui/Dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogFooter,
+    DialogCancelButton,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 import { useDialogSubmit } from '../../hooks/useDialogSubmit';
 
 interface BulkGenreDialogProps {
@@ -10,7 +16,13 @@ interface BulkGenreDialogProps {
     onApply: (genre: string) => Promise<void>;
 }
 
-export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply }: BulkGenreDialogProps) {
+export function BulkGenreDialog({
+    open,
+    targetCount,
+    allGenres,
+    onClose,
+    onApply,
+}: BulkGenreDialogProps) {
     const [selected, setSelected] = useState<string>(allGenres[0] ?? '');
     const [isNew, setIsNew] = useState(false);
     const [newGenre, setNewGenre] = useState('');
@@ -44,16 +56,21 @@ export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply
         >
             <DialogBody>
                 <div className="space-y-2 mb-2">
-                    {allGenres.map(genre => (
+                    {allGenres.map((genre) => (
                         <label key={genre} className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="radio"
                                 name="bulk-genre"
                                 checked={!isNew && selected === genre}
-                                onChange={() => { setIsNew(false); setSelected(genre); }}
+                                onChange={() => {
+                                    setIsNew(false);
+                                    setSelected(genre);
+                                }}
                                 className="accent-primary-600"
                             />
-                            <span className="text-sm text-gray-800 dark:text-gray-200">{genre}</span>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">
+                                {genre}
+                            </span>
                         </label>
                     ))}
                     <label className="flex items-start gap-2 cursor-pointer">
@@ -68,14 +85,18 @@ export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply
                             className="mt-0.5 accent-primary-600"
                         />
                         <div className="flex-1">
-                            <span className="text-sm text-gray-800 dark:text-gray-200">新規ジャンルを入力</span>
+                            <span className="text-sm text-gray-800 dark:text-gray-200">
+                                新規ジャンルを入力
+                            </span>
                             {isNew && (
                                 <input
                                     ref={inputRef}
                                     type="text"
                                     value={newGenre}
                                     onChange={(e) => setNewGenre(e.target.value)}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') handleApply(); }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') handleApply();
+                                    }}
                                     placeholder="ジャンル名"
                                     className="mt-1.5 block w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                 />
@@ -84,9 +105,7 @@ export function BulkGenreDialog({ open, targetCount, allGenres, onClose, onApply
                     </label>
                 </div>
 
-                {error && (
-                    <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>
-                )}
+                {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}
             </DialogBody>
             <DialogFooter>
                 <DialogCancelButton onClick={onClose} disabled={saving} />

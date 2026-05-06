@@ -6,7 +6,15 @@ import { PdfCard, type PdfCardProps } from './PdfCard';
 
 /** @dnd-kit useSortable ラッパー。ドラッグハンドルを右上に差し込む。 */
 export function SortablePdfCard(props: PdfCardProps) {
-    const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        setActivatorNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({
         id: props.pdf.name,
     });
     const style: CSSProperties = {

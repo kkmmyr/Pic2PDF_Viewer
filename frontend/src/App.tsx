@@ -13,26 +13,38 @@ function App() {
                 <Routes>
                     <Route path="/" element={<Layout />}>
                         <Route index element={<Navigate to="/viewer" replace />} />
-                        <Route path="viewer" element={
-                            <ErrorBoundary>
-                                <ViewerPage />
-                            </ErrorBoundary>
-                        } />
-                        <Route path="generator" element={
-                            <ErrorBoundary>
-                                <GeneratorPage />
-                            </ErrorBoundary>
-                        } />
-                        <Route path="ocr" element={
-                            <ErrorBoundary>
-                                <OCRPage />
-                            </ErrorBoundary>
-                        } />
-                        <Route path="hitomi" element={
-                            <ErrorBoundary>
-                                <HitomiPage />
-                            </ErrorBoundary>
-                        } />
+                        <Route
+                            path="viewer"
+                            element={
+                                <ErrorBoundary>
+                                    <ViewerPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="generator"
+                            element={
+                                <ErrorBoundary>
+                                    <GeneratorPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="ocr"
+                            element={
+                                <ErrorBoundary>
+                                    <OCRPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="hitomi"
+                            element={
+                                <ErrorBoundary>
+                                    <HitomiPage />
+                                </ErrorBoundary>
+                            }
+                        />
                     </Route>
                 </Routes>
             </ErrorBoundary>

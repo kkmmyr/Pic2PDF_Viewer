@@ -1,4 +1,10 @@
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton, DialogPrimaryButton } from './Dialog';
+import {
+    Dialog,
+    DialogBody,
+    DialogFooter,
+    DialogCancelButton,
+    DialogPrimaryButton,
+} from './Dialog';
 
 interface ConfirmDialogProps {
     open: boolean;
@@ -18,11 +24,14 @@ interface ConfirmDialogProps {
  * `Dialog` 共通シェルをベースに、ユーザーへ「実行/キャンセル」の選択を求める。
  */
 export function ConfirmDialog({
-    open, title, message,
+    open,
+    title,
+    message,
     confirmLabel = '実行',
     cancelLabel = 'キャンセル',
     danger = false,
-    onConfirm, onCancel,
+    onConfirm,
+    onCancel,
 }: ConfirmDialogProps) {
     return (
         <Dialog open={open} title={title} onClose={onCancel} nested>

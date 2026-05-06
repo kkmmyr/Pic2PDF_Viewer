@@ -41,9 +41,16 @@ function normalizeSpreadPage(page: number, isSpread: boolean, direction: Reading
  * - tabIndex={-1} + onFocus blur: 矢印キーを useReaderNavigation に完全委譲
  */
 export function PageSlider({
-    pageNumber, numPages, isSpread, direction, show,
-    selectedPdf, currentPath, currentSource,
-    onPageJump, onMouseLeave,
+    pageNumber,
+    numPages,
+    isSpread,
+    direction,
+    show,
+    selectedPdf,
+    currentPath,
+    currentSource,
+    onPageJump,
+    onMouseLeave,
 }: PageSliderProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [pendingPage, setPendingPage] = useState(1);
@@ -59,19 +66,22 @@ export function PageSlider({
         debounceRef.current = setTimeout(() => setThumbPage(pendingPage), 150);
     }, [isDragging, pendingPage]);
 
-    const commitPage = useCallback((value: number) => {
-        setIsDragging(false);
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        const clamped = Math.max(1, Math.min(value, numPages));
-        onPageJump(normalizeSpreadPage(clamped, isSpread, direction));
-    }, [numPages, isSpread, direction, onPageJump]);
+    const commitPage = useCallback(
+        (value: number) => {
+            setIsDragging(false);
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            const clamped = Math.max(1, Math.min(value, numPages));
+            onPageJump(normalizeSpreadPage(clamped, isSpread, direction));
+        },
+        [numPages, isSpread, direction, onPageJump],
+    );
 
     if (numPages === 0) return null;
 
     const thumbRatio = numPages > 1 ? (displayPage - 1) / (numPages - 1) : 0;
     const tooltipLeft = direction === 'rtl' ? 1 - thumbRatio : thumbRatio;
     const thumbUrl = buildApiUrl(
-        API_ENDPOINTS.PAGE_THUMBNAIL(selectedPdf, thumbPage, currentPath, currentSource)
+        API_ENDPOINTS.PAGE_THUMBNAIL(selectedPdf, thumbPage, currentPath, currentSource),
     );
 
     return (
@@ -88,7 +98,9 @@ export function PageSlider({
                 {isDragging && (
                     <div
                         className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none"
-                        style={{ left: `clamp(0px, calc(${tooltipLeft * 100}% - 200px), calc(100% - 400px))` }}
+                        style={{
+                            left: `clamp(0px, calc(${tooltipLeft * 100}% - 200px), calc(100% - 400px))`,
+                        }}
                     >
                         <div className="bg-gray-900/90 dark:bg-gray-700/90 rounded shadow-lg overflow-hidden">
                             <img
@@ -96,7 +108,9 @@ export function PageSlider({
                                 alt=""
                                 width={400}
                                 className="w-[400px] h-auto block"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                }}
                             />
                             <p className="text-white text-xs text-center tabular-nums px-1.5 py-0.5">
                                 P. {pendingPage}

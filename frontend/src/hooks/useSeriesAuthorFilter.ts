@@ -23,18 +23,26 @@ interface UseSeriesAuthorFilterResult {
 }
 
 export function useSeriesAuthorFilter({
-    meta, selectedItems, getAuthors, currentPath,
-    allSeries, allSeriesWithStats, seriesEditTarget,
+    meta,
+    selectedItems,
+    getAuthors,
+    currentPath,
+    allSeries,
+    allSeriesWithStats,
+    seriesEditTarget,
 }: UseSeriesAuthorFilterParams): UseSeriesAuthorFilterResult {
-    const validSeriesIdsByAuthorKey = useCallback((authorKey: string): Set<string> => {
-        const ids = new Set<string>();
-        for (const entry of Object.values(meta)) {
-            if (!entry.series_id) continue;
-            const key = [...(entry.authors ?? [])].sort().join('\n');
-            if (key === authorKey) ids.add(entry.series_id);
-        }
-        return ids;
-    }, [meta]);
+    const validSeriesIdsByAuthorKey = useCallback(
+        (authorKey: string): Set<string> => {
+            const ids = new Set<string>();
+            for (const entry of Object.values(meta)) {
+                if (!entry.series_id) continue;
+                const key = [...(entry.authors ?? [])].sort().join('\n');
+                if (key === authorKey) ids.add(entry.series_id);
+            }
+            return ids;
+        },
+        [meta],
+    );
 
     const isMixedAuthors = useMemo(() => {
         const keys = new Set<string>();
@@ -51,7 +59,7 @@ export function useSeriesAuthorFilter({
         if (authors.length === 0) return allSeries;
         const authorKey = [...authors].sort().join('\n');
         const validIds = validSeriesIdsByAuthorKey(authorKey);
-        return allSeries.filter(s => validIds.has(s.id));
+        return allSeries.filter((s) => validIds.has(s.id));
     }, [seriesEditTarget, getAuthors, currentPath, allSeries, validSeriesIdsByAuthorKey]);
 
     const bulkSeriesFiltered = useMemo(() => {
@@ -65,8 +73,20 @@ export function useSeriesAuthorFilter({
         const authorKey = Array.from(keys)[0];
         if (!authorKey) return allSeriesWithStats;
         const validIds = validSeriesIdsByAuthorKey(authorKey);
-        return allSeriesWithStats.filter(s => validIds.has(s.id));
-    }, [isMixedAuthors, selectedItems, getAuthors, currentPath, allSeriesWithStats, validSeriesIdsByAuthorKey]);
+        return allSeriesWithStats.filter((s) => validIds.has(s.id));
+    }, [
+        isMixedAuthors,
+        selectedItems,
+        getAuthors,
+        currentPath,
+        allSeriesWithStats,
+        validSeriesIdsByAuthorKey,
+    ]);
 
-    return { isMixedAuthors, validSeriesIdsByAuthorKey, seriesEditFilteredSeries, bulkSeriesFiltered };
+    return {
+        isMixedAuthors,
+        validSeriesIdsByAuthorKey,
+        seriesEditFilteredSeries,
+        bulkSeriesFiltered,
+    };
 }

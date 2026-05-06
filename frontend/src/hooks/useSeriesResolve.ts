@@ -33,7 +33,7 @@ export function useSeriesResolve(source: LibrarySource, onComplete?: () => void)
 
     const startResolve = useCallback(
         (useGemma = false) => startJob({ use_gemma: useGemma }),
-        [startJob]
+        [startJob],
     );
 
     return { jobStatus, startResolve };

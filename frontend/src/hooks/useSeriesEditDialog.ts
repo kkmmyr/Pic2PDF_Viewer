@@ -25,21 +25,27 @@ interface Options {
  * - `assign(params)` / `unassign()`: 対象書籍に対する操作（失敗時は `runAsync` 経由で toast 表示）
  */
 export function useSeriesEditDialog({
-    currentPath, assignSeries, unassignSeries, runAsync,
+    currentPath,
+    assignSeries,
+    unassignSeries,
+    runAsync,
 }: Options) {
     const [target, setTarget] = useState<string | null>(null);
 
     const open = useCallback((name: string) => setTarget(name), []);
     const close = useCallback(() => setTarget(null), []);
 
-    const assign = useCallback(async (params: AssignParams) => {
-        if (!target) return;
-        await runAsync(
-            () => assignSeries(currentPath, [target], params),
-            'シリーズ割り当てに失敗しました。',
-            { rethrow: true },
-        );
-    }, [target, assignSeries, currentPath, runAsync]);
+    const assign = useCallback(
+        async (params: AssignParams) => {
+            if (!target) return;
+            await runAsync(
+                () => assignSeries(currentPath, [target], params),
+                'シリーズ割り当てに失敗しました。',
+                { rethrow: true },
+            );
+        },
+        [target, assignSeries, currentPath, runAsync],
+    );
 
     const unassign = useCallback(async () => {
         if (!target) return;

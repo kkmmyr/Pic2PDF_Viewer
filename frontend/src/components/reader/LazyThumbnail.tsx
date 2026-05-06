@@ -29,14 +29,17 @@ export function LazyThumbnail({ src, alt, className = '' }: LazyThumbnailProps) 
                     observer.disconnect();
                 }
             },
-            { rootMargin: UI_CONFIG.PRELOAD_MARGIN }
+            { rootMargin: UI_CONFIG.PRELOAD_MARGIN },
         );
         observer.observe(el);
         return () => observer.disconnect();
     }, []);
 
     return (
-        <div ref={ref} className={`w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 ${className}`}>
+        <div
+            ref={ref}
+            className={`w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-700 ${className}`}
+        >
             {isVisible && src && !hasError ? (
                 <img
                     src={buildStaticUrl(src)}

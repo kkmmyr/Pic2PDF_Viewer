@@ -31,7 +31,11 @@ interface LibraryDialogsProps {
     bulkSeriesNames: string[];
     bulkSeriesExisting: ExistingSeriesOption[];
     onCloseBulkSeries: () => void;
-    onBulkAssignSeries: (params: { title: string; indexes: number[]; id?: string }) => Promise<void>;
+    onBulkAssignSeries: (params: {
+        title: string;
+        indexes: number[];
+        id?: string;
+    }) => Promise<void>;
     // BulkGenre
     isBulkGenreOpen: boolean;
     allGenres: string[];
@@ -41,14 +45,33 @@ interface LibraryDialogsProps {
 
 export function LibraryDialogs({
     selectedItems,
-    renameTarget, onCloseRename, onRenameItem,
-    isBulkAuthorOpen, bulkAuthorAllAuthors, onCloseBulkAuthor, onBulkApplyAuthors,
-    isBulkTagOpen, bulkTagInitial, onCloseBulkTag, onBulkApplyTags,
-    isMergeDialogOpen, onCloseMergeDialog, onMergePdfs,
-    isBulkSeriesOpen, bulkSeriesNames, bulkSeriesExisting, onCloseBulkSeries, onBulkAssignSeries,
-    isBulkGenreOpen, allGenres, onCloseBulkGenre, onBulkApplyGenre,
+    renameTarget,
+    onCloseRename,
+    onRenameItem,
+    isBulkAuthorOpen,
+    bulkAuthorAllAuthors,
+    onCloseBulkAuthor,
+    onBulkApplyAuthors,
+    isBulkTagOpen,
+    bulkTagInitial,
+    onCloseBulkTag,
+    onBulkApplyTags,
+    isMergeDialogOpen,
+    onCloseMergeDialog,
+    onMergePdfs,
+    isBulkSeriesOpen,
+    bulkSeriesNames,
+    bulkSeriesExisting,
+    onCloseBulkSeries,
+    onBulkAssignSeries,
+    isBulkGenreOpen,
+    allGenres,
+    onCloseBulkGenre,
+    onBulkApplyGenre,
 }: LibraryDialogsProps) {
-    const pdfItems = Array.from(selectedItems).filter(item => item.toLowerCase().endsWith('.pdf'));
+    const pdfItems = Array.from(selectedItems).filter((item) =>
+        item.toLowerCase().endsWith('.pdf'),
+    );
 
     return (
         <>

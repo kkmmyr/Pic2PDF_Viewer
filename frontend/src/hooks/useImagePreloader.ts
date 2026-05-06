@@ -10,7 +10,7 @@ import { buildStaticUrl } from '../config/api';
 export function useImagePreloader(
     imageUrls: string[] | null,
     currentIndex: number,
-    preloadCount: number = 2
+    preloadCount: number = 2,
 ) {
     useEffect(() => {
         if (!imageUrls) return;

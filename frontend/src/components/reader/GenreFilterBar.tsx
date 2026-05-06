@@ -24,14 +24,9 @@ interface SortableGenrePillProps {
 }
 
 function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: genre });
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+        id: genre,
+    });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -40,9 +35,11 @@ function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps)
         cursor: isDragging ? 'grabbing' : 'grab',
     };
 
-    const btnBase = 'px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border select-none';
+    const btnBase =
+        'px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border select-none';
     const btnActive = 'bg-indigo-600 text-white border-indigo-600';
-    const btnInactive = 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
+    const btnInactive =
+        'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
 
     return (
         <div
@@ -77,9 +74,7 @@ export function GenreFilterBar({
 }: GenreFilterBarProps) {
     const [isManagerOpen, setIsManagerOpen] = useState(false);
 
-    const sensors = useSensors(
-        useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-    );
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
@@ -134,15 +129,21 @@ export function GenreFilterBar({
                 すべて
             </button>
 
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+            >
                 <SortableContext items={genres} strategy={horizontalListSortingStrategy}>
                     <div className="flex items-center gap-2 overflow-x-auto">
-                        {genres.map(genre => (
+                        {genres.map((genre) => (
                             <SortableGenrePill
                                 key={genre}
                                 genre={genre}
                                 isActive={genreFilter === genre}
-                                onClick={() => onGenreFilterChange(genreFilter === genre ? '' : genre)}
+                                onClick={() =>
+                                    onGenreFilterChange(genreFilter === genre ? '' : genre)
+                                }
                             />
                         ))}
                     </div>

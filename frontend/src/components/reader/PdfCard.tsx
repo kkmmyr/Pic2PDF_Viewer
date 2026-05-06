@@ -42,10 +42,27 @@ export interface PdfCardProps {
 
 /** 書籍カード本体。DnD 有効時はドラッグハンドルを外側から差し込む。 */
 export function PdfCard({
-    pdf, isFav, isSelected, isGroup, badge, isSelectionMode, showHidden, isUnread,
-    onToggleSelect, onToggleFavorite, onPdfClick, onGroupClick,
-    onRename, onRegenThumb, onToggleHidden, onEditSeries,
-    getAuthors, onAuthorClick, getTags, onTagClick, dragHandle,
+    pdf,
+    isFav,
+    isSelected,
+    isGroup,
+    badge,
+    isSelectionMode,
+    showHidden,
+    isUnread,
+    onToggleSelect,
+    onToggleFavorite,
+    onPdfClick,
+    onGroupClick,
+    onRename,
+    onRegenThumb,
+    onToggleHidden,
+    onEditSeries,
+    getAuthors,
+    onAuthorClick,
+    getTags,
+    onTagClick,
+    dragHandle,
 }: PdfCardProps) {
     const handleThumbnailClick = () => {
         if (isSelectionMode && onToggleSelect) {
@@ -63,8 +80,8 @@ export function PdfCard({
                 isSelected
                     ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
                     : isGroup
-                        ? 'border-accent-300 dark:border-accent-700 bg-white dark:bg-gray-800'
-                        : 'border-transparent bg-white dark:bg-gray-800'
+                      ? 'border-accent-300 dark:border-accent-700 bg-white dark:bg-gray-800'
+                      : 'border-transparent bg-white dark:bg-gray-800'
             }`}
         >
             <PdfCardThumbnail
@@ -80,52 +97,68 @@ export function PdfCard({
                 dragHandle={dragHandle}
             />
 
-            <div className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}>
+            <div
+                className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}
+            >
                 <span
                     className={`font-medium text-sm line-clamp-2 ${isGroup ? 'text-accent-700 dark:text-accent-300' : 'text-gray-800 dark:text-gray-200'}`}
                     title={isGroup && badge ? badge.displayTitle : pdf.name}
                 >
                     {isGroup && badge ? badge.displayTitle : pdf.name.replace('.pdf', '')}
                 </span>
-                {getAuthors && (() => {
-                    const authors = getAuthors(pdf.name);
-                    return authors.length > 0 ? (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                            {authors.map((a, i) => (
-                                <span
-                                    key={i}
-                                    className={`text-xs px-1.5 py-0.5 rounded bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-800/50' : ''}`}
-                                    onClick={onAuthorClick ? (e) => { e.stopPropagation(); onAuthorClick(a); } : undefined}
-                                    title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
-                                >
-                                    {a}
-                                </span>
-                            ))}
-                        </div>
-                    ) : null;
-                })()}
-                {getTags && (() => {
-                    const tags = getTags(pdf.name);
-                    return tags.length > 0 ? (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                            {tags.map((t, i) => (
-                                <span
-                                    key={i}
-                                    className={`text-xs px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 truncate max-w-full ${onTagClick ? 'cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-800/50' : ''}`}
-                                    onClick={onTagClick ? (e) => { e.stopPropagation(); onTagClick(t); } : undefined}
-                                    title={onTagClick ? `"${t}" で絞り込む` : undefined}
-                                >
-                                    #{t}
-                                </span>
-                            ))}
-                        </div>
-                    ) : null;
-                })()}
+                {getAuthors &&
+                    (() => {
+                        const authors = getAuthors(pdf.name);
+                        return authors.length > 0 ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                                {authors.map((a, i) => (
+                                    <span
+                                        key={i}
+                                        className={`text-xs px-1.5 py-0.5 rounded bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-800/50' : ''}`}
+                                        onClick={
+                                            onAuthorClick
+                                                ? (e) => {
+                                                      e.stopPropagation();
+                                                      onAuthorClick(a);
+                                                  }
+                                                : undefined
+                                        }
+                                        title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
+                                    >
+                                        {a}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null;
+                    })()}
+                {getTags &&
+                    (() => {
+                        const tags = getTags(pdf.name);
+                        return tags.length > 0 ? (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                                {tags.map((t, i) => (
+                                    <span
+                                        key={i}
+                                        className={`text-xs px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 truncate max-w-full ${onTagClick ? 'cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-800/50' : ''}`}
+                                        onClick={
+                                            onTagClick
+                                                ? (e) => {
+                                                      e.stopPropagation();
+                                                      onTagClick(t);
+                                                  }
+                                                : undefined
+                                        }
+                                        title={onTagClick ? `"${t}" で絞り込む` : undefined}
+                                    >
+                                        #{t}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null;
+                    })()}
                 <div className="mt-2 flex items-center justify-between">
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {pdf.created_at
-                            ? new Date(pdf.created_at * 1000).toLocaleDateString()
-                            : ''}
+                        {pdf.created_at ? new Date(pdf.created_at * 1000).toLocaleDateString() : ''}
                     </span>
                     <PdfCardActionButtons
                         name={pdf.name}
