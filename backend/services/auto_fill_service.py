@@ -3,7 +3,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from config import get_dirs_by_source, VALID_SOURCES
+from config import get_dirs_by_source
 from services.author_resolver import resolve_author
 from services.job_state import JobStateManager
 from services.meta_store import MetaDict, get_lock, load_meta, make_key, update_meta_locked

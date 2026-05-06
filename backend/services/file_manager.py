@@ -1,7 +1,6 @@
 import os
 import shutil
 from utils.file_naming import get_thumbnail_name
-from utils.file_utils import is_pdf_file
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

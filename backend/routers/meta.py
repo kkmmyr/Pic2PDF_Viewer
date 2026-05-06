@@ -12,7 +12,6 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
-from config import get_dirs_by_source
 from services.author_resolver import resolve_author_debug
 from services.meta_store import (
     has_meaningful_value,
@@ -38,10 +37,6 @@ VIEW_COUNT_DEBOUNCE_SEC = 300
 # ---------------------------------------------------------------------------
 # リクエスト/レスポンスモデル
 # ---------------------------------------------------------------------------
-
-class BookMetaEntry(BaseModel):
-    authors: list[str]
-
 
 class UpdateMetaRequest(BaseModel):
     """単一書籍または複数書籍へのメタデータ更新リクエスト。

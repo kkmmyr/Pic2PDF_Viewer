@@ -110,25 +110,3 @@ class TestDeletePages:
         new_total = PdfService.delete_pages(str(pdf), [0, 1])
 
         assert new_total == 1
-
-
-# ---------------------------------------------------------------------------
-# get_page_count
-# ---------------------------------------------------------------------------
-
-class TestGetPageCount:
-    def test_returns_page_count(self, tmp_path):
-        pdf = tmp_path / "book.pdf"
-        _make_pdf(str(pdf), 7)
-
-        assert PdfService.get_page_count(str(pdf)) == 7
-
-    def test_single_page_pdf(self, tmp_path):
-        pdf = tmp_path / "book.pdf"
-        _make_pdf(str(pdf), 1)
-
-        assert PdfService.get_page_count(str(pdf)) == 1
-
-    def test_missing_file_returns_zero(self, tmp_path):
-        """存在しないパスで例外を投げず 0 を返す。"""
-        assert PdfService.get_page_count(str(tmp_path / "nope.pdf")) == 0

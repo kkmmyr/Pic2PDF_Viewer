@@ -58,11 +58,3 @@ class PdfService:
                     os.remove(temp_path)
                 except OSError:
                     pass
-
-    @staticmethod
-    def get_page_count(pdf_path: str) -> int:
-        """PDF のページ数を返す。ファイルが存在しない場合は 0 を返す。"""
-        if not os.path.exists(pdf_path):
-            return 0
-        with fitz.open(pdf_path) as doc:
-            return len(doc)
