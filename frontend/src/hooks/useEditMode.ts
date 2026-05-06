@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import type { LibrarySource, DeletePagesResponse } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
+import { errorMessage } from '../utils/error';
 
 interface UseEditModeProps {
     selectedPdf: string;
@@ -104,7 +105,7 @@ export function useEditMode({
             }
         } catch (e: unknown) {
             setPendingDeleteCount(0);
-            showError(e instanceof Error ? e.message : '削除に失敗しました。');
+            showError(errorMessage(e, '削除に失敗しました。'));
         }
     }, [
         selectedPages,

@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import type { BookMetaMap } from '../types';
+import { authorsKey } from '../utils/authors';
 
 interface UseSeriesAuthorFilterParams {
     meta: BookMetaMap;
@@ -36,7 +37,7 @@ export function useSeriesAuthorFilter({
             const ids = new Set<string>();
             for (const entry of Object.values(meta)) {
                 if (!entry.series_id) continue;
-                const key = [...(entry.authors ?? [])].sort().join('\n');
+                const key = authorsKey(entry.authors);
                 if (key === authorKey) ids.add(entry.series_id);
             }
             return ids;
@@ -48,7 +49,7 @@ export function useSeriesAuthorFilter({
         const keys = new Set<string>();
         for (const name of Array.from(selectedItems)) {
             if (!name.toLowerCase().endsWith('.pdf')) continue;
-            keys.add([...getAuthors(currentPath, name)].sort().join('\n'));
+            keys.add(authorsKey(getAuthors(currentPath, name)));
         }
         return keys.size > 1;
     }, [selectedItems, getAuthors, currentPath]);
@@ -57,7 +58,7 @@ export function useSeriesAuthorFilter({
         if (!seriesEditTarget) return allSeries;
         const authors = getAuthors(currentPath, seriesEditTarget);
         if (authors.length === 0) return allSeries;
-        const authorKey = [...authors].sort().join('\n');
+        const authorKey = authorsKey(authors);
         const validIds = validSeriesIdsByAuthorKey(authorKey);
         return allSeries.filter((s) => validIds.has(s.id));
     }, [seriesEditTarget, getAuthors, currentPath, allSeries, validSeriesIdsByAuthorKey]);
@@ -67,7 +68,7 @@ export function useSeriesAuthorFilter({
         const keys = new Set<string>();
         for (const name of Array.from(selectedItems)) {
             if (!name.toLowerCase().endsWith('.pdf')) continue;
-            keys.add([...getAuthors(currentPath, name)].sort().join('\n'));
+            keys.add(authorsKey(getAuthors(currentPath, name)));
         }
         if (keys.size === 0) return allSeriesWithStats;
         const authorKey = Array.from(keys)[0];

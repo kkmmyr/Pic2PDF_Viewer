@@ -1,6 +1,7 @@
 import { useState, useRef, KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
 import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '../ui/Dialog';
+import { errorMessage } from '../../utils/error';
 
 interface GenreManagerDialogProps {
     open: boolean;
@@ -33,7 +34,7 @@ export function GenreManagerDialog({
             setInput('');
             inputRef.current?.focus();
         } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '追加に失敗しました。');
+            setError(errorMessage(e, '追加に失敗しました。'));
         } finally {
             setAdding(false);
         }
@@ -45,7 +46,7 @@ export function GenreManagerDialog({
         try {
             await onRemove(name);
         } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '削除に失敗しました。');
+            setError(errorMessage(e, '削除に失敗しました。'));
         } finally {
             setRemoving(null);
         }

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { PdfFile, BookMetaMap } from '../types';
 import type { PinsMap } from './useLibraryPins';
+import { authorsKey } from '../utils/authors';
 
 /**
  * ライブラリの集約モード:
@@ -96,9 +97,9 @@ export function useLibraryGrouping({
                 const authors = entry.authors ?? [];
                 if (authors.length === 0) continue;
                 // 作者集合をキーとして使う（順序非依存）
-                const sortedAuthors = [...authors].sort();
-                const groupId = sortedAuthors.join('\n');
+                const groupId = authorsKey(authors);
                 if (!groupTitles.has(groupId)) {
+                    const sortedAuthors = [...authors].sort();
                     groupTitles.set(groupId, `${sortedAuthors.join(', ')} コレクション`);
                 }
                 const arr = buckets.get(groupId) ?? [];
@@ -168,7 +169,7 @@ export function useLibraryGrouping({
                 if (mode === 'series' && entry.series_id) {
                     groupId = entry.series_id;
                 } else if (mode === 'author' && (entry.authors ?? []).length > 0) {
-                    groupId = [...(entry.authors ?? [])].sort().join('\n');
+                    groupId = authorsKey(entry.authors);
                 }
             }
 

@@ -4,6 +4,7 @@ import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '../ui/Dial
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useHitomiWatchlist } from '../../hooks/useHitomiWatchlist';
 import { ApiError } from '../../config/api_client';
+import { errorMessage } from '../../utils/error';
 import type { WatchlistEntry } from '../../types/hitomi';
 
 interface HitomiWatchlistDialogProps {
@@ -51,7 +52,7 @@ export function HitomiWatchlistDialog({
                     onError(`追加に失敗しました: ${e.message}`);
                 }
             } else {
-                onError(e instanceof Error ? e.message : '追加に失敗しました');
+                onError(errorMessage(e, '追加に失敗しました'));
             }
         } finally {
             setSubmitting(false);
@@ -66,7 +67,7 @@ export function HitomiWatchlistDialog({
             await removeArtist(target.normalized, target.language);
             onSuccess(`${target.display_name} を削除しました`);
         } catch (e) {
-            onError(e instanceof Error ? e.message : '削除に失敗しました');
+            onError(errorMessage(e, '削除に失敗しました'));
         }
     };
 

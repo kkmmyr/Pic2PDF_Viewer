@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Settings, ChevronDown, Download } from 'lucide-react';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
-import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
+import { API_ENDPOINTS } from '../../config/api';
+import apiClient from '../../config/api_client';
 import type { LibrarySource } from '../../types';
 
 interface ToolsMenuProps {
@@ -16,13 +17,18 @@ interface ToolsMenuProps {
  * 常時表示で画面を圧迫しないようにする。
  */
 async function downloadMetaExport(source: LibrarySource): Promise<void> {
-    const url = buildApiUrl(API_ENDPOINTS.META_EXPORT(source));
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`export failed: ${res.status}`);
-    const blob = await res.blob();
-    const filename =
-        res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ??
-        `meta_${source}.json`;
+    // apiClient のレスポンスインターセプタは response.data を返すため、blob が直接得られる。
+    // Content-Disposition ヘッダは参照できなくなるが、バックエンドの命名規則
+    // (`meta_{source}_{YYYYMMDD}.json`) と同形式をフロント側で生成する。
+    const blob = await apiClient.get<unknown, Blob>(API_ENDPOINTS.META_EXPORT(source), {
+        responseType: 'blob',
+    });
+    const today = new Date();
+    const dateStr =
+        today.getFullYear().toString() +
+        String(today.getMonth() + 1).padStart(2, '0') +
+        String(today.getDate()).padStart(2, '0');
+    const filename = `meta_${source}_${dateStr}.json`;
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;

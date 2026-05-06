@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import apiClient from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
+import { errorMessage } from '../utils/error';
 import type { WatchlistEntry, WatchlistResponse } from '../types/hitomi';
 
 interface UseHitomiWatchlistResult {
@@ -32,7 +33,7 @@ export function useHitomiWatchlist(): UseHitomiWatchlistResult {
             );
             setArtists(resp.artists);
         } catch (e) {
-            setError(e instanceof Error ? e.message : '不明なエラー');
+            setError(errorMessage(e, '不明なエラー'));
         } finally {
             setLoading(false);
         }

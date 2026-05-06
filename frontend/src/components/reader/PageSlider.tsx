@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import type { ReadingDirection, LibrarySource } from '../../types';
 import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface PageSliderProps {
     pageNumber: number;
@@ -54,22 +55,16 @@ export function PageSlider({
 }: PageSliderProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [pendingPage, setPendingPage] = useState(1);
-    const [thumbPage, setThumbPage] = useState(1);
-    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // pendingPage を 150ms デバウンスしたページ番号。サムネイルプレビュー画像の URL に使う。
+    // ドラッグ終了後も続けて debounce が解決するが、tooltip 自体は isDragging で
+    // 条件レンダーされるため余分な fetch は発生しない。
+    const thumbPage = useDebouncedValue(pendingPage, 150);
 
     const displayPage = isDragging ? pendingPage : pageNumber;
-
-    // pendingPage が変わるたびに 150ms デバウンスでサムネイルページを更新
-    useEffect(() => {
-        if (!isDragging) return;
-        if (debounceRef.current) clearTimeout(debounceRef.current);
-        debounceRef.current = setTimeout(() => setThumbPage(pendingPage), 150);
-    }, [isDragging, pendingPage]);
 
     const commitPage = useCallback(
         (value: number) => {
             setIsDragging(false);
-            if (debounceRef.current) clearTimeout(debounceRef.current);
             const clamped = Math.max(1, Math.min(value, numPages));
             onPageJump(normalizeSpreadPage(clamped, isSpread, direction));
         },

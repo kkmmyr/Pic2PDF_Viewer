@@ -1,22 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { LibrarySource } from '../types';
 import { STORAGE_KEYS } from '../constants';
+import { getStorageJson, setStorageJson } from '../utils/storage';
 
 /** groupId → ピン留めされた book_name。1グループにつき1冊のみ */
 export type PinsMap = Record<string, string>;
 
-function loadPins(key: string): PinsMap {
-    try {
-        const raw = localStorage.getItem(key);
-        return raw ? (JSON.parse(raw) as PinsMap) : {};
-    } catch {
-        return {};
-    }
-}
-
-function savePins(key: string, pins: PinsMap): void {
-    localStorage.setItem(key, JSON.stringify(pins));
-}
+const EMPTY_PINS: PinsMap = {};
 
 /**
  * シリーズ/作者集約カードの代表ピン管理。
@@ -29,12 +19,16 @@ export function useLibraryPins(source: LibrarySource) {
     const seriesKey = `${STORAGE_KEYS.SERIES_PINS_PREFIX}${source}`;
     const authorKey = `${STORAGE_KEYS.AUTHOR_PINS_PREFIX}${source}`;
 
-    const [seriesPins, setSeriesPins] = useState<PinsMap>(() => loadPins(seriesKey));
-    const [authorPins, setAuthorPins] = useState<PinsMap>(() => loadPins(authorKey));
+    const [seriesPins, setSeriesPins] = useState<PinsMap>(() =>
+        getStorageJson<PinsMap>(seriesKey, EMPTY_PINS),
+    );
+    const [authorPins, setAuthorPins] = useState<PinsMap>(() =>
+        getStorageJson<PinsMap>(authorKey, EMPTY_PINS),
+    );
 
     useEffect(() => {
-        setSeriesPins(loadPins(seriesKey));
-        setAuthorPins(loadPins(authorKey));
+        setSeriesPins(getStorageJson<PinsMap>(seriesKey, EMPTY_PINS));
+        setAuthorPins(getStorageJson<PinsMap>(authorKey, EMPTY_PINS));
     }, [seriesKey, authorKey]);
 
     const toggleSeriesPin = useCallback(
@@ -46,7 +40,7 @@ export function useLibraryPins(source: LibrarySource) {
                 } else {
                     next[seriesId] = bookName;
                 }
-                savePins(seriesKey, next);
+                setStorageJson(seriesKey, next);
                 return next;
             });
         },
@@ -62,7 +56,7 @@ export function useLibraryPins(source: LibrarySource) {
                 } else {
                     next[authorGroupId] = bookName;
                 }
-                savePins(authorKey, next);
+                setStorageJson(authorKey, next);
                 return next;
             });
         },

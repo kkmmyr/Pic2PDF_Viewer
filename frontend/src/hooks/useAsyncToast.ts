@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import type { ToastType } from './useToast';
+import { errorMessage } from '../utils/error';
 
 /**
  * 非同期処理の例外を catch してトースト通知に流すヘルパーフック。
@@ -35,9 +36,7 @@ export function useAsyncToast(showToast: (message: string, type?: ToastType) => 
                 const message =
                     typeof fallback === 'function'
                         ? fallback(e)
-                        : e instanceof Error
-                          ? e.message
-                          : fallback;
+                        : errorMessage(e, fallback);
                 showToast(message, 'error');
                 if (options?.rethrow) throw e;
                 return undefined;

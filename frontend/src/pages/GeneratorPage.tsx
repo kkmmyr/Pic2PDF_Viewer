@@ -7,6 +7,7 @@ import { useGenerateJob } from '../hooks/useGenerateJob';
 import { JobProgress } from '../components/generator/JobProgress';
 import { StatusTable } from '../components/generator/StatusTable';
 import { Alert } from '../components/ui/Alert';
+import { errorMessage } from '../utils/error';
 import type { GenerateJob, GenerateFailedItem } from '../types';
 
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
@@ -58,7 +59,7 @@ export default function GeneratorPage() {
             );
             startJob(data.job_id, sourceDir);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : '生成に失敗しました。');
+            setError(errorMessage(err, '生成に失敗しました。'));
         }
     };
 
@@ -73,7 +74,7 @@ export default function GeneratorPage() {
             );
             setResult({ ...data, failed_items: [] });
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : '一括圧縮に失敗しました。');
+            setError(errorMessage(err, '一括圧縮に失敗しました。'));
         } finally {
             setIsCompressing(false);
         }

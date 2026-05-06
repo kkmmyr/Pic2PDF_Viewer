@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSeriesResolve, useToast } from '../../hooks';
+import { useAsyncToast } from '../../hooks/useAsyncToast';
 import { ToastContainer } from '../reader';
 import type { LibrarySource } from '../../types';
 
@@ -17,17 +18,10 @@ export function SeriesResolveBar({ source, onComplete }: SeriesResolveBarProps) 
     const [useGemma, setUseGemma] = useState(false);
     const { jobStatus, startResolve } = useSeriesResolve(source, onComplete);
     const { toasts, showToast, dismissToast } = useToast();
+    const runAsync = useAsyncToast(showToast);
 
-    const handleStart = async () => {
-        try {
-            await startResolve(useGemma);
-        } catch (e: unknown) {
-            showToast(
-                e instanceof Error ? e.message : 'シリーズ判定の開始に失敗しました。',
-                'error',
-            );
-        }
-    };
+    const handleStart = () =>
+        runAsync(() => startResolve(useGemma), 'シリーズ判定の開始に失敗しました。');
 
     const isRunning = jobStatus.status === 'running';
     const progressPct = jobStatus.total > 0 ? (jobStatus.done / jobStatus.total) * 100 : 0;

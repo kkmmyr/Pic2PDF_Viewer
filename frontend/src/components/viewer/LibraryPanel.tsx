@@ -23,6 +23,7 @@ import { useDialogToggles } from '../../hooks/useDialogToggles';
 import { useAsyncToast } from '../../hooks/useAsyncToast';
 import { useLibraryContext } from '../../contexts/LibraryContext';
 import { API_ENDPOINTS } from '../../config/api';
+import { authorsKey } from '../../utils/authors';
 import apiClient from '../../config/api_client';
 
 type BulkDialogKey = 'bulkAuthor' | 'bulkTag' | 'merge' | 'bulkSeries' | 'bulkGenre';
@@ -238,8 +239,7 @@ export function LibraryPanel() {
             if (seriesFilter) {
                 if (entry.series_id) toggleSeriesPin(entry.series_id, name);
             } else if (authorFilter) {
-                if (entry.authors?.length)
-                    toggleAuthorPin([...entry.authors].sort().join('\n'), name);
+                if (entry.authors?.length) toggleAuthorPin(authorsKey(entry.authors), name);
             }
         },
         [currentPath, meta, seriesFilter, authorFilter, toggleSeriesPin, toggleAuthorPin],

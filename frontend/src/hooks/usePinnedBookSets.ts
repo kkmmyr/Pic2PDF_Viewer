@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { BookMetaMap } from '../types';
 import type { PinsMap } from './useLibraryPins';
+import { authorsKey } from '../utils/authors';
 
 interface UsePinnedBookSetsParams {
     meta: BookMetaMap;
@@ -47,7 +48,7 @@ export function usePinnedBookSets({
                 continue;
             }
             if (entry.authors?.length) {
-                const ak = [...entry.authors].sort().join('\n');
+                const ak = authorsKey(entry.authors);
                 if (authorPins[ak] === name) set.add(name);
             }
         }
@@ -64,7 +65,7 @@ export function usePinnedBookSets({
                 if (entry.series_id && seriesPins[entry.series_id] === name) set.add(name);
             } else {
                 if (entry.authors?.length) {
-                    const ak = [...entry.authors].sort().join('\n');
+                    const ak = authorsKey(entry.authors);
                     if (authorPins[ak] === name) set.add(name);
                 }
             }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { UI_CONFIG } from '../../constants';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 
 interface PdfSearchBarProps {
     /** 検索テキスト */
@@ -28,19 +29,17 @@ export function PdfSearchBar({
 }: PdfSearchBarProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const [localText, setLocalText] = useState(searchText);
+    const debouncedText = useDebouncedValue(localText, UI_CONFIG.SEARCH_DEBOUNCE_MS);
 
     // 開いた瞬間にフォーカス
     useEffect(() => {
         inputRef.current?.focus();
     }, []);
 
-    // localText が変わったら 300ms デバウンスして親へ通知
+    // デバウンスされた値を親へ通知
     useEffect(() => {
-        const timer = setTimeout(() => {
-            onSearchChange(localText);
-        }, UI_CONFIG.SEARCH_DEBOUNCE_MS);
-        return () => clearTimeout(timer);
-    }, [localText, onSearchChange]);
+        onSearchChange(debouncedText);
+    }, [debouncedText, onSearchChange]);
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {

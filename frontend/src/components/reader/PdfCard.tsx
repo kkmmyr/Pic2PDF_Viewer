@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import type { PdfFile } from '../../types';
 import { PdfCardThumbnail } from './PdfCardThumbnail';
 import { PdfCardActionButtons } from './PdfCardActionButtons';
+import { formatTimestampJa } from '../../utils/date';
 
 /** 集約カードのバッジ情報（PdfGrid から PdfFile.name で引く想定） */
 export interface PdfCardBadge {
@@ -158,7 +159,7 @@ export function PdfCard({
                     })()}
                 <div className="mt-2 flex items-center justify-between">
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {pdf.created_at ? new Date(pdf.created_at * 1000).toLocaleDateString() : ''}
+                        {formatTimestampJa(pdf.created_at)}
                     </span>
                     <PdfCardActionButtons
                         name={pdf.name}

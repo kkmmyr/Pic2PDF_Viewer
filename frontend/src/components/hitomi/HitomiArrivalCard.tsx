@@ -1,20 +1,10 @@
 import { ExternalLink, EyeOff, FileText } from 'lucide-react';
 import type { ArrivalItem } from '../../types/hitomi';
+import { formatDateJa } from '../../utils/date';
 
 interface HitomiArrivalCardProps {
     item: ArrivalItem;
     onDismiss: (id: number) => void;
-}
-
-function formatDate(iso: string): string {
-    if (!iso) return '';
-    try {
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return iso;
-        return d.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    } catch {
-        return iso;
-    }
 }
 
 export function HitomiArrivalCard({ item, onDismiss }: HitomiArrivalCardProps) {
@@ -32,9 +22,9 @@ export function HitomiArrivalCard({ item, onDismiss }: HitomiArrivalCardProps) {
                 </span>
             </div>
             <div className="text-xs text-gray-400 dark:text-gray-500">
-                {item.published_at && <span>公開: {formatDate(item.published_at)}</span>}
+                {item.published_at && <span>公開: {formatDateJa(item.published_at)}</span>}
                 {item.published_at && item.discovered_at && <span> / </span>}
-                {item.discovered_at && <span>検出: {formatDate(item.discovered_at)}</span>}
+                {item.discovered_at && <span>検出: {formatDateJa(item.discovered_at)}</span>}
             </div>
             <div className="flex gap-2 mt-1">
                 <a

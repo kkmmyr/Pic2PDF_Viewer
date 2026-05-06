@@ -8,6 +8,8 @@ import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialo
 import { ToastContainer } from '../components/reader/ToastContainer';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Alert } from '../components/ui/Alert';
+import { errorMessage } from '../utils/error';
+import { formatDateTimeJa } from '../utils/date';
 import type { RunStatus } from '../types/hitomi';
 
 function StatusBadge({ status }: { status: RunStatus }) {
@@ -42,16 +44,6 @@ function StatusBadge({ status }: { status: RunStatus }) {
     );
 }
 
-function formatDateTime(iso: string | null): string {
-    if (!iso) return '—';
-    try {
-        const d = new Date(iso);
-        if (isNaN(d.getTime())) return iso;
-        return d.toLocaleString('ja-JP');
-    } catch {
-        return iso;
-    }
-}
 
 export default function HitomiPage() {
     const {
@@ -73,7 +65,7 @@ export default function HitomiPage() {
     const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
 
     const errMsg = (label: string) => (e: unknown) =>
-        `${label}: ${e instanceof Error ? e.message : '不明'}`;
+        `${label}: ${errorMessage(e, '不明')}`;
 
     const handleDismiss = async (id: number) => {
         await runAsync(() => dismiss(id), errMsg('既読化に失敗しました'));
@@ -109,7 +101,7 @@ export default function HitomiPage() {
                         hitomi.la 新着
                     </h1>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span>最終実行: {formatDateTime(lastRunAt)}</span>
+                        <span>最終実行: {formatDateTimeJa(lastRunAt)}</span>
                         <StatusBadge status={lastRunStatus} />
                         {lastError && (
                             <span className="text-red-500 dark:text-red-400">{lastError}</span>

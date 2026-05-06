@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Play, Square, Terminal } from 'lucide-react';
 import { useOcrStatus } from '../../hooks/useOcrStatus';
 import { Alert } from '../../components/ui/Alert';
+import { errorMessage } from '../../utils/error';
 
 /**
  * Novel OCR 実行パネル (Tailwind実装)。
@@ -23,7 +24,7 @@ export const OCRPanel: React.FC = () => {
         try {
             await startOcr();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'OCR開始に失敗しました。');
+            setError(errorMessage(err, 'OCR開始に失敗しました。'));
         } finally {
             setLoading(false);
         }
@@ -34,7 +35,7 @@ export const OCRPanel: React.FC = () => {
         try {
             await stopOcr();
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'OCR停止に失敗しました。');
+            setError(errorMessage(err, 'OCR停止に失敗しました。'));
         } finally {
             setLoading(false);
         }

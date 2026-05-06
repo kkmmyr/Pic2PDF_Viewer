@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { errorMessage } from '../utils/error';
 
 /**
  * ダイアログの saving / error 状態と非同期送信ハンドラを共通化するフック。
@@ -17,7 +18,7 @@ export function useDialogSubmit(onClose: () => void, fallbackErrorMsg = '保存�
                 await action();
                 onClose();
             } catch (e: unknown) {
-                setError(e instanceof Error ? e.message : fallbackErrorMsg);
+                setError(errorMessage(e, fallbackErrorMsg));
             } finally {
                 setSaving(false);
             }
