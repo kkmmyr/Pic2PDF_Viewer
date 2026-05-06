@@ -69,3 +69,27 @@ describe('useReaderNavigation — spread mode RTL', () => {
         expect(result.current.pageNumber).toBe(1);
     });
 });
+
+describe('useReaderNavigation — spread mode LTR', () => {
+    const spread = { numPages: 10, isSpread: true, direction: 'ltr' as const, isActive: false };
+
+    it('1ページ目から Next で 3 へ（LTR の見開きは奇数ページ単位）', () => {
+        const { result } = renderHook(() => useReaderNavigation(spread));
+        act(() => result.current.handleNext());
+        expect(result.current.pageNumber).toBe(3);
+    });
+
+    it('3ページ目から Prev で 1 へ', () => {
+        const { result } = renderHook(() => useReaderNavigation(spread));
+        act(() => result.current.setPageNumber(3));
+        act(() => result.current.handlePrev());
+        expect(result.current.pageNumber).toBe(1);
+    });
+
+    it('5ページ目から Next で 7 へ（2 ページ進む）', () => {
+        const { result } = renderHook(() => useReaderNavigation(spread));
+        act(() => result.current.setPageNumber(5));
+        act(() => result.current.handleNext());
+        expect(result.current.pageNumber).toBe(7);
+    });
+});

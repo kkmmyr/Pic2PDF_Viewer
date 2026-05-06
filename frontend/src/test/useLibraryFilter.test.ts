@@ -257,4 +257,92 @@ describe('useLibraryFilter', () => {
             expect(result.current.filteredPdfs).toHaveLength(0);
         });
     });
+
+    describe('追補: genreFilter / showUnreadOnly', () => {
+        const genrePdfs: PdfFile[] = [
+            makePdf('action.pdf'),
+            makePdf('comedy.pdf'),
+            makePdf('nogenre.pdf'),
+        ];
+        const genreMeta: BookMetaMap = {
+            'action.pdf': { authors: ['A'], genre: 'アクション' },
+            'comedy.pdf': { authors: ['A'], genre: 'コメディ' },
+            'nogenre.pdf': { authors: ['A'] },
+        };
+
+        it('genreFilter で同ジャンルの書籍だけ表示', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: genrePdfs,
+                    searchText: '',
+                    authorFilter: '',
+                    genreFilter: 'アクション',
+                    currentPath: '',
+                    meta: genreMeta,
+                }),
+            );
+            expect(result.current.filteredPdfs.map((p) => p.name)).toEqual(['action.pdf']);
+        });
+
+        it('genreFilter は他フィルタと AND 結合', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: genrePdfs,
+                    searchText: 'comedy',
+                    authorFilter: '',
+                    genreFilter: 'アクション',
+                    currentPath: '',
+                    meta: genreMeta,
+                }),
+            );
+            expect(result.current.filteredPdfs).toHaveLength(0);
+        });
+
+        it('空文字 genreFilter は無効', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: genrePdfs,
+                    searchText: '',
+                    authorFilter: '',
+                    genreFilter: '',
+                    currentPath: '',
+                    meta: genreMeta,
+                }),
+            );
+            expect(result.current.filteredPdfs).toHaveLength(3);
+        });
+
+        const unreadPdfs: PdfFile[] = [makePdf('read.pdf'), makePdf('unread.pdf')];
+        const unreadMeta: BookMetaMap = {
+            'read.pdf': { authors: ['A'], view_count: 5 },
+            'unread.pdf': { authors: ['A'] },
+        };
+
+        it('showUnreadOnly=true で view_count=0/未設定の書籍のみ表示', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: unreadPdfs,
+                    searchText: '',
+                    authorFilter: '',
+                    currentPath: '',
+                    meta: unreadMeta,
+                    showUnreadOnly: true,
+                }),
+            );
+            expect(result.current.filteredPdfs.map((p) => p.name)).toEqual(['unread.pdf']);
+        });
+
+        it('showUnreadOnly=false（既定）では既読・未読両方', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: unreadPdfs,
+                    searchText: '',
+                    authorFilter: '',
+                    currentPath: '',
+                    meta: unreadMeta,
+                }),
+            );
+            expect(result.current.filteredPdfs).toHaveLength(2);
+        });
+    });
 });

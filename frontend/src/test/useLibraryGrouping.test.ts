@@ -139,4 +139,43 @@ describe('useLibraryGrouping', () => {
             expect(g.badgeByRepresentativeName.has('vol3.pdf')).toBe(true);
         });
     });
+
+    describe('追補: mode 切替とエッジケース', () => {
+        const mixedPdfs = [pdf('vol1.pdf'), pdf('vol2.pdf'), pdf('vol3.pdf'), pdf('solo.pdf')];
+
+        it('mode=series → mode=none に切替で集約が解除される', () => {
+            const series = grouped(mixedPdfs, seriesMeta, 'series');
+            expect(series.badgeByRepresentativeName.size).toBeGreaterThan(0);
+
+            const none = grouped(mixedPdfs, seriesMeta, 'none');
+            expect(none.badgeByRepresentativeName.size).toBe(0);
+            // mode=none では pdfs そのまま 4 件
+            expect(none.items).toHaveLength(4);
+        });
+
+        it('series_index が無いメンバーは index=0 として扱われ、他より前に並ぶ', () => {
+            const meta: BookMetaMap = {
+                'a.pdf': { series_id: 's1', series_title: 'X', series_index: 2 },
+                'b.pdf': { series_id: 's1', series_title: 'X' }, // index 欠落
+                'c.pdf': { series_id: 's1', series_title: 'X', series_index: 5 },
+            };
+            const g = grouped([pdf('a.pdf'), pdf('b.pdf'), pdf('c.pdf')], meta, 'series');
+            const rep = [...g.badgeByRepresentativeName.keys()][0];
+            const members = g.membersByRepresentativeName.get(rep)!;
+            const indices = members.map((p) => meta[p.name]?.series_index ?? 0);
+            // 0, 2, 5 の昇順
+            expect(indices).toEqual([0, 2, 5]);
+        });
+
+        it('mode=series で同じ series_id がフォルダ縛り（path）で別グループになる', () => {
+            // 同じ series_id でも階層が違えば別グループ（実装は currentPath 直下のみ）
+            const meta: BookMetaMap = {
+                'vol1.pdf': { series_id: 's1', series_title: 'X', series_index: 1 },
+                'vol2.pdf': { series_id: 's1', series_title: 'X', series_index: 2 },
+            };
+            const g = grouped([pdf('vol1.pdf'), pdf('vol2.pdf')], meta, 'series');
+            // 同 series_id → 1 グループ
+            expect(g.badgeByRepresentativeName.size).toBe(1);
+        });
+    });
 });

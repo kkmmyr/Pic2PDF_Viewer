@@ -171,4 +171,76 @@ describe('useBookMeta', () => {
         expect(result.current.getAuthors('', 'book.pdf')).toEqual(['ルート']);
         expect(result.current.getAuthors('sub', 'book.pdf')).toEqual(['サブ']);
     });
+
+    it('updateTags でも view_count が保持される', async () => {
+        mockedGet.mockResolvedValue({
+            'book.pdf': { authors: ['X'], view_count: 8, last_viewed_at: 500 },
+        });
+        mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
+
+        const { result } = renderHook(() => useBookMeta('generated'));
+        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
+
+        await act(async () => {
+            await result.current.updateTags('', ['book.pdf'], ['新タグ']);
+        });
+
+        expect(result.current.getTags('', 'book.pdf')).toEqual(['新タグ']);
+        expect(result.current.getViewCount('', 'book.pdf')).toBe(8);
+        expect(result.current.getLastViewedAt('', 'book.pdf')).toBe(500);
+    });
+
+    it('updateGenre でも他フィールドが保持される', async () => {
+        mockedGet.mockResolvedValue({
+            'book.pdf': { authors: ['X'], tags: ['T'], view_count: 2 },
+        });
+        mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
+
+        const { result } = renderHook(() => useBookMeta('generated'));
+        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
+
+        await act(async () => {
+            await result.current.updateGenre('', ['book.pdf'], 'アクション');
+        });
+
+        expect(result.current.meta['book.pdf']?.genre).toBe('アクション');
+        expect(result.current.getAuthors('', 'book.pdf')).toEqual(['X']);
+        expect(result.current.getTags('', 'book.pdf')).toEqual(['T']);
+        expect(result.current.getViewCount('', 'book.pdf')).toBe(2);
+    });
+
+    it('setHidden(true) で hidden=true、他フィールドは保持', async () => {
+        mockedGet.mockResolvedValue({
+            'book.pdf': { authors: ['X'], view_count: 1 },
+        });
+        mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
+
+        const { result } = renderHook(() => useBookMeta('generated'));
+        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
+
+        await act(async () => {
+            await result.current.setHidden('', ['book.pdf'], true);
+        });
+
+        expect(result.current.isHidden('', 'book.pdf')).toBe(true);
+        expect(result.current.getAuthors('', 'book.pdf')).toEqual(['X']);
+        expect(result.current.getViewCount('', 'book.pdf')).toBe(1);
+    });
+
+    it('setHidden(false) で hidden が削除される', async () => {
+        mockedGet.mockResolvedValue({
+            'book.pdf': { authors: ['X'], hidden: true, view_count: 1 },
+        });
+        mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
+
+        const { result } = renderHook(() => useBookMeta('generated'));
+        await waitFor(() => expect(result.current.isHidden('', 'book.pdf')).toBe(true));
+
+        await act(async () => {
+            await result.current.setHidden('', ['book.pdf'], false);
+        });
+
+        expect(result.current.isHidden('', 'book.pdf')).toBe(false);
+        expect(result.current.getViewCount('', 'book.pdf')).toBe(1);
+    });
 });

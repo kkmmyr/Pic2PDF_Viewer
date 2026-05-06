@@ -124,4 +124,45 @@ describe('useSortedPdfs', () => {
         sortedNames(pdfs, 'name_asc');
         expect(pdfs.map((p) => p.name)).toEqual(originalNames);
     });
+
+    describe('追補: お気に入りの併用挙動', () => {
+        it('favorites_first 内のお気に入り同士は名前昇順', () => {
+            const pdfs = [pdf('zebra'), pdf('apple'), pdf('mango'), pdf('banana')];
+            const favorites = new Set(['zebra', 'apple']);
+            // お気に入り 2 件は apple, zebra（asc）。残り banana, mango。
+            expect(sortedNames(pdfs, 'favorites_first', favorites)).toEqual([
+                'apple',
+                'zebra',
+                'banana',
+                'mango',
+            ]);
+        });
+
+        it('view_desc では favorites の優先はなく view_count のみ', () => {
+            const pdfs = [pdf('a'), pdf('b'), pdf('c')];
+            const counts = new Map([
+                ['a', 0],
+                ['b', 5],
+                ['c', 1],
+            ]);
+            const favorites = new Set(['a']); // a がお気に入りでも view=0 なら末尾
+            expect(sortedNames(pdfs, 'view_desc', favorites, (n) => counts.get(n) ?? 0)).toEqual([
+                'b',
+                'c',
+                'a',
+            ]);
+        });
+
+        it('recent_view も favorites を優先しない', () => {
+            const pdfs = [pdf('a'), pdf('b')];
+            const times = new Map<string, number | undefined>([
+                ['a', undefined], // 未閲覧
+                ['b', 100],
+            ]);
+            const favorites = new Set(['a']);
+            expect(
+                sortedNames(pdfs, 'recent_view', favorites, undefined, (n) => times.get(n)),
+            ).toEqual(['b', 'a']);
+        });
+    });
 });
