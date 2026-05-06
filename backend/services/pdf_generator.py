@@ -36,9 +36,9 @@ def _collect_images(images_dir: str) -> list[str]:
 
 
 class PdfGenerator:
-    def __init__(self, output_dir: str, thumbnail_dir: str, images_dir: str, complete_dir: str,
+    def __init__(self, output_dir: str | None, thumbnail_dir: str, images_dir: str, complete_dir: str,
                  progress_callback: Optional[Callable[[str], None]] = None):
-        self.output_dir = output_dir
+        self.output_dir = output_dir  # None = image-only モード（PDF 生成をスキップ）
         self.thumbnail_dir = thumbnail_dir
         self.images_dir = images_dir
         self.complete_dir = complete_dir
@@ -55,13 +55,15 @@ class PdfGenerator:
             raise ValueError(f"No images found in {item_images_dir}")
 
         pdf_filename = f"{item_name}.pdf"
-        output_path = os.path.join(self.output_dir, pdf_filename)
         thumb_path = os.path.join(self.thumbnail_dir, f"{item_name}.jpg")
 
         generate_thumbnail(image_paths[0], thumb_path)
-        self._create_pdf_file(image_paths, output_path)
+        if self.output_dir is not None:
+            output_path = os.path.join(self.output_dir, pdf_filename)
+            self._create_pdf_file(image_paths, output_path)
+
         self.generated_files.append(pdf_filename)
-        return output_path
+        return pdf_filename
 
     # ------------------------------------------------------------------
     # ZIP 処理: images_dir に展開 → 共通フローへ
@@ -199,7 +201,7 @@ class PdfGenerator:
 
 def scan_and_generate(
     source_dir: str,
-    output_dir: str,
+    output_dir: str | None,
     thumbnail_dir: str,
     images_dir: str,
     complete_dir: str,
