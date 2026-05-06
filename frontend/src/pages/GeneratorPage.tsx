@@ -7,7 +7,7 @@ import { useGenerateJob } from '../hooks/useGenerateJob';
 import { JobProgress } from '../components/generator/JobProgress';
 import { StatusTable } from '../components/generator/StatusTable';
 import { Alert } from '../components/ui/Alert';
-import type { GenerateJob } from '../types';
+import type { GenerateJob, GenerateFailedItem } from '../types';
 
 const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
 const DEFAULT_QUALITY = 50;
@@ -15,13 +15,13 @@ const DEFAULT_QUALITY = 50;
 export default function GeneratorPage() {
     const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
     const [isCompressing, setIsCompressing] = useState(false);
-    const [result, setResult] = useState<{ message: string; files: string[] } | null>(null);
+    const [result, setResult] = useState<{ message: string; files: string[]; failed_items: GenerateFailedItem[] } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const [quality, setQuality] = useState(DEFAULT_QUALITY);
 
     const onCompleted = useCallback((job: GenerateJob) => {
-        setResult({ message: job.message, files: job.files });
+        setResult({ message: job.message, files: job.files, failed_items: job.failed_items ?? [] });
         fetchStatus();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -64,7 +64,7 @@ export default function GeneratorPage() {
                 API_ENDPOINTS.BATCH_COMPRESS,
                 { quality }
             );
-            setResult(data);
+            setResult({ ...data, failed_items: [] });
         } catch (err: unknown) {
             setError(err instanceof Error ? err.message : '一括圧縮に失敗しました。');
         } finally {
@@ -180,13 +180,31 @@ export default function GeneratorPage() {
 
                     {/* Result Message */}
                     {result && (
-                        <Alert variant="success" className="p-4 animate-in fade-in zoom-in-95">
+                        <Alert
+                            variant={result.failed_items.length > 0 ? 'warning' : 'success'}
+                            className="p-4 animate-in fade-in zoom-in-95"
+                        >
                             <p className="font-bold mb-2">{result.message}</p>
-                            <ul className="list-disc list-inside text-sm space-y-1">
-                                {result.files.map((file) => (
-                                    <li key={file} className="font-medium">{file}</li>
-                                ))}
-                            </ul>
+                            {result.files.length > 0 && (
+                                <ul className="list-disc list-inside text-sm space-y-1">
+                                    {result.files.map((file) => (
+                                        <li key={file} className="font-medium">{file}</li>
+                                    ))}
+                                </ul>
+                            )}
+                            {result.failed_items.length > 0 && (
+                                <div className="mt-3 pt-3 border-t border-current/20">
+                                    <p className="font-bold mb-1 text-sm">失敗 ({result.failed_items.length}件):</p>
+                                    <ul className="list-disc list-inside text-sm space-y-1">
+                                        {result.failed_items.map((item) => (
+                                            <li key={item.name}>
+                                                <span className="font-medium">{item.name}</span>
+                                                <span className="text-xs ml-2 opacity-80">— {item.error}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
                         </Alert>
                     )}
                 </div>

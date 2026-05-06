@@ -20,6 +20,8 @@ class GenerateJob:
         self.status: JobStatus = JobStatus.PENDING
         self.current_item: Optional[str] = None
         self.files: list[str] = []
+        # サイレント失敗を防ぐため、書籍単位の失敗を {name, error} で保持しレスポンスに含める
+        self.failed_items: list[dict[str, str]] = []
         self.message: str = ""
         self.error: Optional[str] = None
         self._lock = threading.Lock()
@@ -31,6 +33,7 @@ class GenerateJob:
                 "status": self.status.value,
                 "current_item": self.current_item,
                 "files": list(self.files),
+                "failed_items": list(self.failed_items),
                 "message": self.message,
                 "error": self.error,
             }

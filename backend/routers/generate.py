@@ -49,7 +49,7 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
     try:
         job.update(status=JobStatus.RUNNING, current_item="Starting...")
 
-        generated = scan_and_generate(
+        result = scan_and_generate(
             request.source_dir,
             None,           # image-only モード: PDF 生成をスキップ
             THUMBNAIL_DIR,
@@ -59,20 +59,28 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
         )
 
         # 新規生成ファイルにのみ genre: "オリジナル" を初期書き込み（再生成時は保持）
-        if generated:
+        if result.generated:
             def _init_genre(data):
-                for name in generated:
+                for name in result.generated:
                     if name not in data:
                         data[name] = {"genre": "オリジナル"}
             update_meta_locked("generated", _init_genre)
 
+        failed_dicts = [{"name": n, "error": e} for n, e in result.failed_items]
+        if failed_dicts:
+            message = f"Generation complete: {len(result.generated)} succeeded, {len(failed_dicts)} failed"
+        else:
+            message = "Generation complete"
+
         job.update(
             status=JobStatus.COMPLETED,
             current_item=None,
-            files=generated,
-            message="Generation complete",
+            files=result.generated,
+            failed_items=failed_dicts,
+            message=message,
         )
-        logger.info("Job %s completed: %d files", job.job_id, len(generated))
+        logger.info("Job %s completed: %d files, %d failed",
+                    job.job_id, len(result.generated), len(failed_dicts))
     except Exception as e:
         logger.exception("Job %s failed", job.job_id)
         job.update(status=JobStatus.FAILED, current_item=None, error=str(e))

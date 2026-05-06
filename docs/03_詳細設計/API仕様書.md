@@ -567,6 +567,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "status": "running",
   "current_item": "folder_name",
   "files": [],
+  "failed_items": [],
   "message": "",
   "error": null
 }
@@ -574,8 +575,9 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 - `status` の値: `pending` / `running` / `completed` / `failed`
 - `current_item`: 現在処理中のアイテム名（未処理時は `null`）
 - `files`: 完了時に生成されたファイル名リスト
-- `message`: 完了・失敗時のサマリーメッセージ
-- `error`: 失敗時のエラーメッセージ
+- `failed_items`: 完了時に書籍単位で失敗したものの一覧。`[{name: string, error: string}, ...]`。サイレント失敗を防ぎフロントで「○件失敗」と表示するために使用。
+- `message`: 完了・失敗時のサマリーメッセージ。失敗があれば `"Generation complete: N succeeded, M failed"` の形式。
+- `error`: ジョブ全体としての失敗メッセージ（書籍単位の失敗ではなく、ジョブ自体が `FAILED` になった場合）
 
 ---
 

@@ -32,7 +32,7 @@ export function useGenerateJob(
 
     const [currentJob, setCurrentJob] = useState<GenerateJob | null>(
         stored
-            ? { job_id: stored.job_id, status: 'pending', current_item: null, files: [], message: '', error: null }
+            ? { job_id: stored.job_id, status: 'pending', current_item: null, files: [], failed_items: [], message: '', error: null }
             : null
     );
     const [restoredSourceDir] = useState<string | null>(stored?.sourceDir ?? null);
@@ -73,7 +73,7 @@ export function useGenerateJob(
 
     const startJob = useCallback((jobId: string, sourceDir: string) => {
         setStorageJson<StoredJob>(STORAGE_KEY, { job_id: jobId, sourceDir });
-        setCurrentJob({ job_id: jobId, status: 'pending', current_item: null, files: [], message: '', error: null });
+        setCurrentJob({ job_id: jobId, status: 'pending', current_item: null, files: [], failed_items: [], message: '', error: null });
     }, []);
 
     const clearCurrentJob = useCallback(() => {

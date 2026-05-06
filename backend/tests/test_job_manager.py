@@ -142,7 +142,18 @@ class TestGenerateJobUpdate:
         assert d["current_item"] == "a.pdf"
         assert d["message"] == "処理中"
         assert d["files"] == ["a.pdf"]
+        assert d["failed_items"] == []
         assert d["error"] is None
+
+    def test_to_dict_includes_failed_items(self):
+        """サイレント失敗を防ぐため、書籍単位の失敗が to_dict に含まれる。"""
+        store = JobStore()
+        job = store.create()
+        failed = [{"name": "broken", "error": "ZIP 展開エラー"}]
+        job.update(status=JobStatus.COMPLETED, files=["good.pdf"], failed_items=failed)
+        d = job.to_dict()
+        assert d["files"] == ["good.pdf"]
+        assert d["failed_items"] == failed
 
     def test_to_dict_on_failure(self):
         store = JobStore()

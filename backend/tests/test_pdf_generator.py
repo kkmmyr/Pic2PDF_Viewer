@@ -95,12 +95,13 @@ class TestScanAndGenerate:
         _make_webp(str(book_dir / "1.webp"))
         _make_webp(str(book_dir / "2.webp"))
 
-        generated = scan_and_generate(
+        result = scan_and_generate(
             str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
             str(gen_env["images"]), str(gen_env["complete"]),
         )
 
-        assert "book1.pdf" in generated
+        assert "book1.pdf" in result.generated
+        assert result.failed_items == []
         assert (gen_env["output"] / "book1.pdf").exists()
         assert (gen_env["thumb"] / "book1.jpg").exists()
         # 元フォルダは complete/ に移動されている
@@ -112,12 +113,13 @@ class TestScanAndGenerate:
         zip_path = gen_env["source"] / "comic.zip"
         _make_zip_of_webps(str(zip_path), ["1.webp", "2.webp"])
 
-        generated = scan_and_generate(
+        result = scan_and_generate(
             str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
             str(gen_env["images"]), str(gen_env["complete"]),
         )
 
-        assert "comic.pdf" in generated
+        assert "comic.pdf" in result.generated
+        assert result.failed_items == []
         assert (gen_env["output"] / "comic.pdf").exists()
         # ZIP は complete/ に移動されている
         assert (gen_env["complete"] / "comic.zip").exists()
@@ -140,11 +142,73 @@ class TestScanAndGenerate:
         # source/ に WebP/ZIP がなければ PDF は生成されない
         (gen_env["source"] / "ignored.txt").write_text("hi")
 
-        generated = scan_and_generate(
+        result = scan_and_generate(
             str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
             str(gen_env["images"]), str(gen_env["complete"]),
         )
-        assert generated == []
+        assert result.generated == []
+        assert result.failed_items == []
+
+    # 回帰テスト: image-only モード (output_dir=None) でも complete/ への移動が発生する
+    # 過去バグ: pdfs_compressed/ 削除後、process_zip/process_directory の except に
+    # 例外が吸収され self.moves が空のまま、complete/ への移動が起きなかった。
+    def test_image_only_mode_zip_moves_to_complete(self, gen_env):
+        zip_path = gen_env["source"] / "comic.zip"
+        _make_zip_of_webps(str(zip_path), ["1.webp", "2.webp"])
+
+        result = scan_and_generate(
+            str(gen_env["source"]), None,  # ← image-only モード
+            str(gen_env["thumb"]), str(gen_env["images"]), str(gen_env["complete"]),
+        )
+
+        assert "comic.pdf" in result.generated
+        assert result.failed_items == []
+        # PDF は生成されない
+        assert not (gen_env["output"] / "comic.pdf").exists()
+        # サムネイル / images / complete 移動はすべて発生する
+        assert (gen_env["thumb"] / "comic.jpg").exists()
+        assert (gen_env["images"] / "comic").is_dir()
+        assert (gen_env["complete"] / "comic.zip").exists()
+        assert not zip_path.exists()
+
+    def test_image_only_mode_directory_moves_to_complete(self, gen_env):
+        book_dir = gen_env["source"] / "book1"
+        book_dir.mkdir()
+        _make_webp(str(book_dir / "1.webp"))
+
+        result = scan_and_generate(
+            str(gen_env["source"]), None,
+            str(gen_env["thumb"]), str(gen_env["images"]), str(gen_env["complete"]),
+        )
+
+        assert "book1.pdf" in result.generated
+        assert result.failed_items == []
+        assert not (gen_env["output"] / "book1.pdf").exists()
+        assert (gen_env["complete"] / "book1").exists()
+        assert not book_dir.exists()
+
+    # 回帰テスト: 個別書籍の失敗が failed_items に集約され、サイレント失敗にならない
+    def test_failure_is_recorded_in_failed_items(self, gen_env):
+        # 不正な ZIP（中身が壊れている）→ ZipFile 展開で例外
+        bad_zip = gen_env["source"] / "broken.zip"
+        bad_zip.write_bytes(b"not a real zip file")
+        # 正常な ZIP も同時に処理される
+        good_zip = gen_env["source"] / "good.zip"
+        _make_zip_of_webps(str(good_zip), ["1.webp"])
+
+        result = scan_and_generate(
+            str(gen_env["source"]), None,
+            str(gen_env["thumb"]), str(gen_env["images"]), str(gen_env["complete"]),
+        )
+
+        # 正常分は生成、失敗分は failed_items に記録される（黙殺されない）
+        assert "good.pdf" in result.generated
+        assert len(result.failed_items) == 1
+        assert result.failed_items[0][0] == "broken"
+        assert isinstance(result.failed_items[0][1], str) and result.failed_items[0][1]
+        # 失敗した ZIP は complete/ には移動しない（元のまま）
+        assert bad_zip.exists()
+        assert (gen_env["complete"] / "good.zip").exists()
 
 
 # ---------------------------------------------------------------------------

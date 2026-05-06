@@ -4,7 +4,7 @@ import zipfile
 import shutil
 from natsort import natsorted
 from PIL import Image
-from typing import Optional, Callable
+from typing import Optional, Callable, NamedTuple
 from config import THUMBNAIL_HEIGHT
 from services.batch_compressor import batch_compress  # 後方互換 re-export
 from utils.file_utils import is_webp_file, is_zip_file
@@ -12,7 +12,17 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-__all__ = ["generate_thumbnail", "PdfGenerator", "scan_and_generate", "batch_compress"]
+__all__ = ["generate_thumbnail", "PdfGenerator", "scan_and_generate", "batch_compress", "GenerateResult"]
+
+
+class GenerateResult(NamedTuple):
+    """`scan_and_generate` の戻り値。
+
+    - `generated`: 正常生成された書籍ファイル名（".pdf" 付き）のリスト
+    - `failed_items`: 失敗した書籍とエラーメッセージの組 `(item_name, error_msg)`
+    """
+    generated: list[str]
+    failed_items: list[tuple[str, str]]
 
 
 def generate_thumbnail(image_path: str, output_path: str) -> None:
@@ -45,6 +55,8 @@ class PdfGenerator:
         self.progress_callback = progress_callback
         self.generated_files: list[str] = []
         self.moves: list[tuple[str, str, bool]] = []
+        # サイレント失敗を防ぐため、process_zip / process_directory の例外をここに集約する
+        self.failed_items: list[tuple[str, str]] = []
 
     # ------------------------------------------------------------------
     # 共通: images_dir に収集済みの画像から PDF・サムネイルを生成
@@ -102,6 +114,7 @@ class PdfGenerator:
 
         except Exception as e:
             logger.error("Failed to generate PDF for ZIP %s: %s", zip_path, e)
+            self.failed_items.append((item_name, str(e)))
 
     # ------------------------------------------------------------------
     # ディレクトリ処理: images_dir にコピー → 共通フローへ
@@ -134,6 +147,7 @@ class PdfGenerator:
 
         except Exception as e:
             logger.error("Failed to generate PDF for folder %s: %s", root, e)
+            self.failed_items.append((folder_name, str(e)))
 
     def _create_pdf_file(self, image_paths: list[str], output_path: str) -> None:
         with open(output_path, "wb") as f:
@@ -206,9 +220,14 @@ def scan_and_generate(
     images_dir: str,
     complete_dir: str,
     progress_callback: Optional[Callable[[str], None]] = None,
-) -> list[str]:
-    """source_dir 内の WebP/ZIP を PDF に変換する。"""
+) -> GenerateResult:
+    """source_dir 内の WebP/ZIP を処理し、生成成功・失敗を `GenerateResult` として返す。
+
+    `output_dir=None` を渡すと PDF 生成をスキップ（image-only モード）。
+    例外で失敗した書籍は `result.failed_items` に集約され、ジョブ結果として可視化される。
+    """
     generator = PdfGenerator(
         output_dir, thumbnail_dir, images_dir, complete_dir, progress_callback
     )
-    return generator.run(source_dir)
+    generated = generator.run(source_dir)
+    return GenerateResult(generated=generated, failed_items=generator.failed_items)

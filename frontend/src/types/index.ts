@@ -75,6 +75,11 @@ export type LibrarySource = 'generated' | 'kindle' | 'novel';
  */
 export type GenerateJobStatus = 'pending' | 'running' | 'completed' | 'failed';
 
+export interface GenerateFailedItem {
+    name: string;
+    error: string;
+}
+
 export interface GenerateJob {
     job_id: string;
     status: GenerateJobStatus;
@@ -82,6 +87,8 @@ export interface GenerateJob {
     current_item: string | null;
     /** 生成済みファイル一覧（完了後に設定） */
     files: string[];
+    /** 失敗した書籍とエラー内容（完了後に設定）。サイレント失敗の可視化用 */
+    failed_items: GenerateFailedItem[];
     message: string;
     error: string | null;
 }
