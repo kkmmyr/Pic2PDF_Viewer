@@ -64,9 +64,9 @@ export function PageRenderer({
             onToggleSelection(pageNumber, e);
         } else {
             if (side === 'left') {
-                direction === 'rtl' ? onNext(e) : onPrev(e);
+                if (direction === 'rtl') onNext(e); else onPrev(e);
             } else if (side === 'right') {
-                direction === 'rtl' ? onPrev(e) : onNext(e);
+                if (direction === 'rtl') onPrev(e); else onNext(e);
             } else {
                 onNext(e);
             }

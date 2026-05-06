@@ -37,7 +37,7 @@ export function useBookImages(
 
         setIsLoading(true);
 
-        apiClient.get<any, BookImagesResponse>(API_ENDPOINTS.BOOK_IMAGES(bookPath, source))
+        apiClient.get<unknown, BookImagesResponse>(API_ENDPOINTS.BOOK_IMAGES(bookPath, source))
             .then(data => {
                 if (data.images && data.images.length > 0) {
                     setImageUrls(data.images);

@@ -135,7 +135,7 @@ export function ReaderPanel({
 
     useEffect(() => {
         if (isImageMode) setNumPages(imageNumPages);
-    }, [isImageMode, imageNumPages]);
+    }, [isImageMode, imageNumPages, setNumPages]);
 
     useEffect(() => {
         resetEditMode();
