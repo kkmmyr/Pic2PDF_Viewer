@@ -162,3 +162,92 @@ class TestGenerateJobUpdate:
         d = job.to_dict()
         assert d["status"] == "failed"
         assert d["error"] == "変換失敗"
+
+
+# ---------------------------------------------------------------------------
+# 並行性テスト
+# ---------------------------------------------------------------------------
+
+import threading
+
+
+class TestConcurrency:
+    def test_concurrent_creates_produce_unique_ids(self):
+        """100 件並行 create で全件異なる UUID が振られ、最大件数まで保持される。"""
+        store = JobStore()
+        store._MAX_JOBS = 1000
+        jobs: list[GenerateJob] = []
+        lock = threading.Lock()
+
+        def _create_one():
+            j = store.create()
+            with lock:
+                jobs.append(j)
+
+        threads = [threading.Thread(target=_create_one) for _ in range(100)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        ids = {j.job_id for j in jobs}
+        assert len(ids) == 100  # 全件 UUID がユニーク
+
+    def test_concurrent_updates_no_corruption(self):
+        """同一ジョブを並行 update してもフィールドが破壊されない。"""
+        store = JobStore()
+        job = store.create()
+
+        def _set_running():
+            job.update(status=JobStatus.RUNNING, current_item="x.pdf")
+
+        def _set_completed():
+            job.update(status=JobStatus.COMPLETED, files=["x.pdf"])
+
+        threads = (
+            [threading.Thread(target=_set_running) for _ in range(20)]
+            + [threading.Thread(target=_set_completed) for _ in range(20)]
+        )
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # 最後の update がどちらかの状態になっていればOK（lock があれば壊れない）
+        assert job.status in (JobStatus.RUNNING, JobStatus.COMPLETED)
+
+    def test_eviction_boundary_n_plus_1(self):
+        """N+1 件目の create で先頭 1 件が確実に evict される。"""
+        store = JobStore()
+        store._MAX_JOBS = 5
+        jobs = [store.create() for _ in range(5)]
+
+        # 5 件すべて取得可能
+        for j in jobs:
+            assert store.get(j.job_id) is j
+
+        # 6 件目で先頭が消える
+        store.create()
+        assert store.get(jobs[0].job_id) is None
+        # 残り 4 件は残っている
+        for j in jobs[1:]:
+            assert store.get(j.job_id) is j
+
+    def test_eviction_concurrent(self):
+        """並行 create 時も MAX_JOBS を超えない。"""
+        store = JobStore()
+        store._MAX_JOBS = 10
+
+        def _create():
+            for _ in range(5):
+                store.create()
+
+        threads = [threading.Thread(target=_create) for _ in range(10)]  # 50 件
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        # _order と _jobs の長さは MAX_JOBS 以下
+        assert len(store._order) <= store._MAX_JOBS
+        assert len(store._jobs) <= store._MAX_JOBS

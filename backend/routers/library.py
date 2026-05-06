@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 import os
 from urllib.parse import quote
@@ -8,8 +8,9 @@ from config import get_dirs_by_source
 from utils.file_utils import is_image_file, is_pdf_file
 from utils.path_utils import validate_safe_path, validate_safe_name, join_path
 from utils.file_naming import get_thumbnail_name
-from routers._deps import validate_request_targets, log_and_raise_500
+from routers._deps import validate_request_targets, log_and_raise_500, validated_source, assert_valid_source
 from services.thumbnail_service import ThumbnailService
+from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from services.file_manager import FileManager
 from services.meta_store import make_key, update_meta_locked
 from utils.logger import get_logger
@@ -57,8 +58,9 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) 
             encoded = '/'.join(quote(seg, safe='') for seg in rel.replace(os.sep, '/').split('/'))
             thumb_url = f"{url_prefix_thumb}/{encoded}"
         else:
+            # generated は image-only モード。fitz では WebP を読めないため PIL 経路を使う。
             first_webp = join_path(item_path, webps[0])
-            background_tasks.add_task(ThumbnailService.generate_thumbnail, first_webp, thumb_path)
+            background_tasks.add_task(generate_thumbnail_from_image, first_webp, thumb_path)
 
         created_at = int(os.path.getctime(item_path))
         files.append({
@@ -71,7 +73,7 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) 
 
 
 @router.get("/pdfs")
-def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "generated"):
+def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = Depends(validated_source)):
     validate_safe_path(path)
 
     dirs = get_dirs_by_source(source)
@@ -124,7 +126,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = "
 
 @router.get("/books/{path:path}/images")
 @log_and_raise_500("list_book_images")
-def list_book_images(path: str, source: str = "generated"):
+def list_book_images(path: str, source: str = Depends(validated_source)):
     validate_safe_path(path)
 
     dirs = get_dirs_by_source(source)
@@ -163,6 +165,7 @@ class RenameItemRequest(BaseModel):
 
 @router.patch("/rename")
 def rename_item(request: RenameItemRequest):
+    assert_valid_source(request.source)
     validate_safe_path(request.path, param_name="path")
     validate_safe_name(request.old_name, param_name="old_name")
     validate_safe_name(request.new_name, param_name="new_name")
@@ -208,6 +211,7 @@ class DeletePdfsRequest(BaseModel):
 
 @router.delete("/pdfs")
 def delete_pdfs(request: DeletePdfsRequest):
+    assert_valid_source(request.source)
     validate_request_targets(request.path, request.names)
 
     dirs = get_dirs_by_source(request.source)

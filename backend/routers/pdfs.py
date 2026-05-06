@@ -5,11 +5,11 @@ generate/status/batch_compress は routers/generate.py に分離済み。
 import os
 
 import fitz
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
-from routers._deps import validate_request_targets, log_and_raise_500
+from routers._deps import validate_request_targets, log_and_raise_500, validated_source, assert_valid_source
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
 from utils.file_utils import is_pdf_file
@@ -28,7 +28,7 @@ class DeletePagesRequest(BaseModel):
 
 @router.post("/pdfs/{filename}/delete_pages")
 @log_and_raise_500("delete_pages")
-def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", source: str = "generated"):
+def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", source: str = Depends(validated_source)):
     validate_safe_path(path)
 
     dirs = get_dirs_by_source(source)
@@ -63,6 +63,7 @@ class MergePdfsRequest(BaseModel):
 @router.post("/pdfs/merge")
 def merge_pdfs(request: MergePdfsRequest):
     """複数の PDF を順番に結合して新しい PDF を生成する。"""
+    assert_valid_source(request.source)
     validate_request_targets(request.path, request.names)
     validate_safe_name(request.output_name, param_name="output_name")
 

@@ -4,7 +4,8 @@
 保存先: backend/data/genres/{source}.json
 形式: ["ジャンルA", "ジャンルB", ...]（順序付き文字列配列）
 
-ファイルが存在しない場合は meta.json の genre フィールドを収集して初期リストを生成する。
+ファイルが存在しない場合は meta.json の genre フィールドを収集して初期リストを生成する
+（migration 用途）。並び順は UI からの `PATCH /api/genres/reorder` で更新される。
 
 ロック: `SourceLockManager` で source 単位に直列化。`load_genres` も
 `save_genres` もロック取得下で実行される（読み書きの整合性を保つため）。
@@ -18,8 +19,6 @@ from utils.locks import SourceLockManager
 
 GENRE_STORE_DIR = os.path.join(DATA_DIR, "genres")
 
-_GENRE_ORDER = ["オリジナル", "プリンセスコネクト", "Voiceloid"]
-
 _lock_manager = SourceLockManager()
 
 
@@ -28,16 +27,18 @@ def _store_path(source: str) -> str:
 
 
 def _derive_from_meta(source: str) -> list[str]:
-    """meta.json の genre フィールドを収集して GENRE_ORDER 順に並べた初期リストを返す。"""
+    """meta.json の genre フィールドを収集して名前順にソートした初期リストを返す。
+
+    `genres/{source}.json` 不在時の初回読み込みでのみ呼ばれる migration 用途。
+    並び順は UI 側で並び替え後に保存されるので、ここでは単純にソートするだけでよい。
+    """
     meta = load_meta(source)
     found: set[str] = set()
     for entry in meta.values():
         g = entry.get("genre")
         if g and isinstance(g, str):
             found.add(g)
-    ordered = [g for g in _GENRE_ORDER if g in found]
-    rest = sorted(found - set(ordered), key=lambda x: x)
-    return ordered + rest
+    return sorted(found)
 
 
 def _write_genres_unlocked(source: str, genres: list[str]) -> None:

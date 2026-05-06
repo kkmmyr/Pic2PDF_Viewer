@@ -4,14 +4,15 @@ PDF サムネイルの単発再生成・一括再生成、および任意ペー�
 """
 import os
 import fitz
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import Response
 from natsort import natsorted
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
-from routers._deps import validate_request_targets
+from routers._deps import validate_request_targets, validated_source, assert_valid_source
 from services.thumbnail_service import ThumbnailService
+from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from utils.path_utils import validate_safe_path, validate_safe_name
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
@@ -45,7 +46,8 @@ def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir:
     """1冊分のサムネイル再生成。成功時 True を返す。
 
     PDF が存在しない場合（generated image-only モード）は
-    img_dir 配下の先頭 WebP をソース画像として使う。
+    img_dir 配下の先頭 WebP を `pdf_generator.generate_thumbnail`（PIL ベース）で処理する。
+    fitz は WebP を読めないため、画像→JPG は PIL 経路を使う必要がある。
     """
     thumb_name = get_thumbnail_name(name)
     thumb_path = os.path.join(thumb_dir, path, thumb_name) if path else os.path.join(thumb_dir, thumb_name)
@@ -54,11 +56,11 @@ def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir:
     if os.path.exists(pdf_path):
         return ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
 
-    # PDF 不在: images/ 先頭 WebP にフォールバック
+    # PDF 不在: images/ 先頭 WebP を PIL ベースで処理（image-only モード）
     if img_dir:
         webps = _get_webps(img_dir, os.path.splitext(name)[0], path)
         if webps:
-            return ThumbnailService.generate_thumbnail(webps[0], thumb_path)
+            return generate_thumbnail_from_image(webps[0], thumb_path)
 
     return False
 
@@ -68,7 +70,7 @@ def get_page_thumbnail(
     name: str = Query(...),
     page: int = Query(...),
     path: str = Query(""),
-    source: str = Query("generated"),
+    source: str = Depends(validated_source),
     width: int = Query(120),
 ):
     """指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。
@@ -127,6 +129,7 @@ def get_page_thumbnail(
 
 @router.post("/thumbnails/regenerate")
 def regenerate_thumbnail(request: RegenerateThumbnailRequest):
+    assert_valid_source(request.source)
     validate_safe_path(request.path, param_name="path")
     validate_safe_name(request.name, param_name="name")
 
@@ -140,6 +143,7 @@ def regenerate_thumbnail(request: RegenerateThumbnailRequest):
 @router.post("/thumbnails/regenerate_bulk")
 def regenerate_thumbnail_bulk(request: RegenerateThumbnailBulkRequest):
     """複数書籍のサムネイルを一括再生成する。"""
+    assert_valid_source(request.source)
     validate_request_targets(request.path, request.names)
 
     dirs = get_dirs_by_source(request.source)

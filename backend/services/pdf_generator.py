@@ -25,8 +25,18 @@ class GenerateResult(NamedTuple):
     failed_items: list[tuple[str, str]]
 
 
-def generate_thumbnail(image_path: str, output_path: str) -> None:
+def generate_thumbnail(image_path: str, output_path: str) -> bool:
+    """画像ファイル（WebP / JPEG / PNG など PIL が読める形式）からサムネイル JPG を生成する。
+
+    fitz は WebP を読めないため、generated ソース（image-only モード）の
+    サムネイル生成・再生成はこの関数を使う必要がある。PDF からの生成は
+    `services.thumbnail_service.ThumbnailService.generate_thumbnail` を使う。
+
+    Returns:
+        生成に成功した場合 True、失敗時は False（例外はキャッチしてログ出力）
+    """
     try:
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
         img = Image.open(image_path)
         h_percent = THUMBNAIL_HEIGHT / float(img.size[1])
         w_size = int(float(img.size[0]) * h_percent)
@@ -35,8 +45,10 @@ def generate_thumbnail(image_path: str, output_path: str) -> None:
             img = img.convert("RGB")
         img.save(output_path, "JPEG")
         logger.info("Generated thumbnail: %s", output_path)
+        return True
     except Exception as e:
         logger.error("Failed to generate thumbnail %s: %s", output_path, e)
+        return False
 
 
 def _collect_images(images_dir: str) -> list[str]:
