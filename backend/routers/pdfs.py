@@ -5,17 +5,17 @@ generate/status/batch_compress は routers/generate.py に分離済み。
 import os
 
 import fitz
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
-from routers._deps import validate_request_targets, log_and_raise_500, validated_source, assert_valid_source
+from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
-from utils.file_utils import is_pdf_file
 from utils.file_naming import get_thumbnail_name
+from utils.file_utils import is_pdf_file
 from utils.logger import get_logger
-from utils.path_utils import validate_safe_path, validate_safe_name
+from utils.path_utils import validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 

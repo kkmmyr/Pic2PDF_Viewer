@@ -3,19 +3,20 @@
 PDF サムネイルの単発再生成・一括再生成、および任意ページのオンデマンド生成を提供する。
 """
 import os
+
 import fitz
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from natsort import natsorted
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
-from routers._deps import validate_request_targets, validated_source, assert_valid_source
-from services.thumbnail_service import ThumbnailService
+from routers._deps import assert_valid_source, validate_request_targets, validated_source
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
-from utils.path_utils import validate_safe_path, validate_safe_name
+from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
+from utils.path_utils import validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 
@@ -118,7 +119,7 @@ def get_page_thumbnail(
         raise
     except Exception as e:
         logger.error("Failed to render page thumbnail for %s page %d: %s", name, page, e)
-        raise HTTPException(status_code=500, detail="Failed to render thumbnail")
+        raise HTTPException(status_code=500, detail="Failed to render thumbnail") from e
 
     return Response(
         content=img_bytes,

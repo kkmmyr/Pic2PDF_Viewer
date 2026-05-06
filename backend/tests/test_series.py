@@ -7,9 +7,9 @@ services.series_resolver のユニットテスト。
     cd backend
     uv run pytest tests/test_series.py -v
 """
-import sys
-import os
 import json
+import os
+import sys
 
 import pytest
 
@@ -17,12 +17,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from services.series_detector import (
     common_prefix as _common_prefix,
+)
+from services.series_detector import (
     detect_series_in_group as _detect_series_in_group,
 )
 from services.series_resolver import (
-    run_resolve,
     get_state,
     reset_state,
+    run_resolve,
 )
 
 # 巻数パーサーのテストは tests/test_volume_parser.py に移動済み（Phase 21）
@@ -285,7 +287,8 @@ class TestGemmaAugmentation:
         })
 
         # Gemma を YES だけ返すモック関数に差し替え
-        fake_call = lambda prompt, source="series_resolver": "YES"
+        def fake_call(prompt, source="series_resolver"):
+            return "YES"
         monkeypatch.setattr(
             "services.series_resolver.import_ollama_client",
             lambda: fake_call,
@@ -312,7 +315,8 @@ class TestGemmaAugmentation:
             "進撃の巨人.pdf": {"authors": ["A"]},
         })
 
-        fake_call = lambda prompt, source="series_resolver": "NO"
+        def fake_call(prompt, source="series_resolver"):
+            return "NO"
         monkeypatch.setattr(
             "services.series_resolver.import_ollama_client",
             lambda: fake_call,

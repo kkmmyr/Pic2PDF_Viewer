@@ -9,7 +9,7 @@ PATCH /api/genres/reorder - 表示順を更新する
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers._deps import validated_source, assert_valid_source
+from routers._deps import assert_valid_source, validated_source
 from services.genre_store import load_genres, save_genres
 
 router = APIRouter()

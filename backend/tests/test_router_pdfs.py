@@ -8,10 +8,9 @@ PDF 結合（POST /api/pdfs/merge）を検証する。
     cd backend
     uv run pytest tests/test_router_pdfs.py -v
 """
-import sys
 import os
+import sys
 
-import pytest
 import fitz
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))

@@ -1,12 +1,9 @@
 """ソース別ジョブ状態をスレッドセーフに管理する汎用マネージャー。"""
 import threading
 from collections.abc import Callable
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
 
 
-class JobStateManager(Generic[T]):
+class JobStateManager[T]:
     """ソース文字列をキーにジョブ状態を保持し、get/reset をスレッドセーフに提供する。
 
     Args:

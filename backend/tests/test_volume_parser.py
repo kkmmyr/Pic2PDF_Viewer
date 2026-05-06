@@ -5,7 +5,7 @@
 """
 import pytest
 
-from services.volume_parser import parse_volume_index, parse_pair_volume_indexes
+from services.volume_parser import parse_pair_volume_indexes, parse_volume_index
 
 
 class TestParseVolumeIndex:

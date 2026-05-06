@@ -1,19 +1,20 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
-from pydantic import BaseModel
 import os
 from urllib.parse import quote
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from natsort import natsorted
+from pydantic import BaseModel
 
 from config import get_dirs_by_source
-from utils.file_utils import is_image_file, is_pdf_file
-from utils.path_utils import validate_safe_path, validate_safe_name, join_path
-from utils.file_naming import get_thumbnail_name
-from routers._deps import validate_request_targets, log_and_raise_500, validated_source, assert_valid_source
-from services.thumbnail_service import ThumbnailService
-from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
+from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
 from services.file_manager import FileManager
 from services.meta_store import make_key, update_meta_locked
+from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
+from services.thumbnail_service import ThumbnailService
+from utils.file_naming import get_thumbnail_name
+from utils.file_utils import is_image_file, is_pdf_file
 from utils.logger import get_logger
+from utils.path_utils import join_path, validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 
@@ -176,12 +177,12 @@ def rename_item(request: RenameItemRequest):
         FileManager.rename_with_assets(
             request.path, request.old_name, request.new_name, request.is_folder, dirs
         )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Item not found")
-    except FileExistsError:
-        raise HTTPException(status_code=400, detail="Name already exists")
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail="Item not found") from e
+    except FileExistsError as e:
+        raise HTTPException(status_code=400, detail="Name already exists") from e
     except OSError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
     # meta.json のキーを旧名→新名に付け替える（作者名・タグ・シリーズを引き継ぐ）
     old_key = make_key(request.path, request.old_name)

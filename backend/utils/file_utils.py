@@ -1,5 +1,5 @@
 """ファイル種別判定ユーティリティ。"""
-from config import SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT, SUPPORTED_IMAGE_FORMATS
+from config import SUPPORTED_IMAGE_FORMATS, SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT
 
 
 def is_webp_file(name: str) -> bool:

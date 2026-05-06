@@ -11,7 +11,7 @@ Windows Task Scheduler から `python -m tools.hitomi_monitor` で単発実行�
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # backend/ をパス追加してパッケージ参照を解決
@@ -24,7 +24,7 @@ GALLERY_URL_TEMPLATE = "https://hitomi.la/galleries/{id}.html"
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+    return datetime.now(UTC).astimezone().isoformat(timespec="seconds")
 
 
 def should_skip_artist(checked_at_str: str | None, threshold: datetime | None) -> bool:
@@ -40,7 +40,7 @@ def should_skip_artist(checked_at_str: str | None, threshold: datetime | None) -
     except ValueError:
         return False
     if checked.tzinfo is None:
-        checked = checked.replace(tzinfo=timezone.utc)
+        checked = checked.replace(tzinfo=UTC)
     return checked > threshold
 
 

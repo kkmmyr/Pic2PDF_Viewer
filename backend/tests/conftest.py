@@ -7,8 +7,8 @@ router テスト・統合テストで使う `tmp_data_dir` / `client` / `make_pd
 import os
 import sys
 
-import pytest
 import fitz
+import pytest
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -101,6 +101,7 @@ def _patch_imported_paths(monkeypatch, paths: dict) -> None:
 def client(tmp_data_dir):
     """`TestClient(app)` を返す。tmp_data_dir 適用済み。"""
     from fastapi.testclient import TestClient
+
     from main import app
 
     return TestClient(app)

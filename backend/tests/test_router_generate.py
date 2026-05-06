@@ -8,17 +8,14 @@ PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証�
     cd backend
     uv run pytest tests/test_router_generate.py -v
 """
-import sys
-import os
-import time
 import json
-
-import pytest
+import os
+import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from services.pdf_generator import GenerateResult
-
 
 # ---------------------------------------------------------------------------
 # POST /api/generate

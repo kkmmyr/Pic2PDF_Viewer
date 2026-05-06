@@ -1,10 +1,13 @@
 import os
-import img2pdf
-import zipfile
 import shutil
+import zipfile
+from collections.abc import Callable
+from typing import NamedTuple
+
+import img2pdf
 from natsort import natsorted
 from PIL import Image
-from typing import Optional, Callable, NamedTuple
+
 from config import THUMBNAIL_HEIGHT
 from services.batch_compressor import batch_compress  # 後方互換 re-export
 from utils.file_utils import is_webp_file, is_zip_file
@@ -59,7 +62,7 @@ def _collect_images(images_dir: str) -> list[str]:
 
 class PdfGenerator:
     def __init__(self, output_dir: str | None, thumbnail_dir: str, images_dir: str, complete_dir: str,
-                 progress_callback: Optional[Callable[[str], None]] = None):
+                 progress_callback: Callable[[str], None] | None = None):
         self.output_dir = output_dir  # None = image-only モード（PDF 生成をスキップ）
         self.thumbnail_dir = thumbnail_dir
         self.images_dir = images_dir
@@ -200,7 +203,7 @@ class PdfGenerator:
     def run(self, source_dir: str) -> list[str]:
         cleanups: list[str] = []
 
-        for root, dirs, files in os.walk(source_dir, topdown=False):
+        for root, _dirs, files in os.walk(source_dir, topdown=False):
             for zip_filename in [f for f in files if is_zip_file(f)]:
                 self.process_zip(root, zip_filename)
 
@@ -231,7 +234,7 @@ def scan_and_generate(
     thumbnail_dir: str,
     images_dir: str,
     complete_dir: str,
-    progress_callback: Optional[Callable[[str], None]] = None,
+    progress_callback: Callable[[str], None] | None = None,
 ) -> GenerateResult:
     """source_dir 内の WebP/ZIP を処理し、生成成功・失敗を `GenerateResult` として返す。
 

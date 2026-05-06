@@ -8,8 +8,9 @@ config を退避し、完了後に復元する処理を `_gemma_import_context()
 """
 import os
 import sys
+from collections.abc import Callable
 from contextlib import contextmanager
-from typing import Any, Callable, Optional
+from typing import Any
 
 from config import GEMMA_TOOL_DIR
 
@@ -34,7 +35,7 @@ def _gemma_import_context():
             sys.modules["config"] = saved_config
 
 
-def import_ollama_client() -> Optional[Callable[..., Any]]:
+def import_ollama_client() -> Callable[..., Any] | None:
     """`ollama_client.call_ollama` をインポートして返す。失敗時は None。"""
     with _gemma_import_context():
         try:
@@ -45,10 +46,10 @@ def import_ollama_client() -> Optional[Callable[..., Any]]:
 
 
 def import_web_extract_tools() -> tuple[
-    Optional[Callable[..., Any]],
-    Optional[Callable[..., Any]],
-    Optional[Callable[..., Any]],
-    Optional[Callable[..., Any]],
+    Callable[..., Any] | None,
+    Callable[..., Any] | None,
+    Callable[..., Any] | None,
+    Callable[..., Any] | None,
 ]:
     """web_extract / searxng_search / fetch_url_content / call_ollama を一括インポート。
 
@@ -58,8 +59,8 @@ def import_web_extract_tools() -> tuple[
     """
     with _gemma_import_context():
         try:
-            from web_extract import web_extract, searxng_search, fetch_url_content  # type: ignore[import]
             from ollama_client import call_ollama  # type: ignore[import]
+            from web_extract import fetch_url_content, searxng_search, web_extract  # type: ignore[import]
             return web_extract, searxng_search, fetch_url_content, call_ollama
         except ImportError:
             return None, None, None, None

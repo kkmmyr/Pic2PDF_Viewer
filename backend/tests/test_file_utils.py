@@ -7,12 +7,12 @@ utils.file_utils のユニットテスト。
     cd backend
     uv run pytest tests/test_file_utils.py -v
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from utils.file_utils import is_webp_file, is_zip_file, is_image_file, is_pdf_file
+from utils.file_utils import is_image_file, is_pdf_file, is_webp_file, is_zip_file
 
 
 class TestIsWebpFile:

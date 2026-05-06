@@ -5,14 +5,13 @@ services.job_manager のユニットテスト。
     cd backend
     uv run pytest tests/test_job_manager.py -v
 """
-import sys
 import os
-
-import pytest
+import sys
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.job_manager import JobStore, JobStatus
+from services.job_manager import GenerateJob, JobStatus, JobStore
 
 
 class TestJobStoreGetActiveCurrentItem:
@@ -107,7 +106,7 @@ class TestJobStoreCreate:
         store._MAX_JOBS = 3
         j1 = store.create()
         j2 = store.create()
-        j3 = store.create()
+        store.create()
         j4 = store.create()  # j1 が押し出される
         assert store.get(j1.job_id) is None
         assert store.get(j2.job_id) is j2
@@ -167,8 +166,6 @@ class TestGenerateJobUpdate:
 # ---------------------------------------------------------------------------
 # 並行性テスト
 # ---------------------------------------------------------------------------
-
-import threading
 
 
 class TestConcurrency:

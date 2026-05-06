@@ -8,8 +8,8 @@ OCRService 自体は test_ocr_service.py で検証済みなので、
     cd backend
     uv run pytest tests/test_router_ocr.py -v
 """
-import sys
 import os
+import sys
 
 import pytest
 

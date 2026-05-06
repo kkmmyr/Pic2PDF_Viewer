@@ -7,9 +7,9 @@ services.genre_store のユニットテスト。
     cd backend
     uv run pytest tests/test_genre_store.py -v
 """
-import sys
-import os
 import json
+import os
+import sys
 import threading
 
 import pytest
@@ -95,7 +95,7 @@ class TestLoadGenres:
 
 class TestSaveGenres:
     def test_save_then_load_roundtrip(self, store_env):
-        from services.genre_store import save_genres, load_genres
+        from services.genre_store import load_genres, save_genres
         save_genres("generated", ["A", "B", "C"])
         assert load_genres("generated") == ["A", "B", "C"]
 
@@ -113,7 +113,7 @@ class TestSaveGenres:
         assert "プリンセスコネクト" in content
 
     def test_independent_per_source(self, store_env):
-        from services.genre_store import save_genres, load_genres
+        from services.genre_store import load_genres, save_genres
         save_genres("generated", ["A"])
         save_genres("kindle", ["B"])
 
@@ -128,7 +128,7 @@ class TestSaveGenres:
 class TestConcurrency:
     def test_concurrent_save_no_corruption(self, store_env):
         """並行 save でファイルが壊れない（最後の書き込みが残ればOK）。"""
-        from services.genre_store import save_genres, load_genres
+        from services.genre_store import load_genres, save_genres
 
         def _save(value):
             save_genres("generated", [value])

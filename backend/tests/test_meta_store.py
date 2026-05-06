@@ -9,24 +9,19 @@ services.meta_store の純関数ユニットテスト。
     cd backend
     uv run pytest tests/test_meta_store.py -v
 """
-import sys
 import os
-import json
+import sys
 import threading
-
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from services.meta_store import (
-    make_key,
-    merge_entry_fields,
     has_meaningful_value,
-    update_meta_locked,
     load_meta,
+    merge_entry_fields,
     save_meta,
+    update_meta_locked,
 )
-
 
 # ---------------------------------------------------------------------------
 # merge_entry_fields

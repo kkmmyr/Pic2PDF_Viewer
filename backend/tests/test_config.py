@@ -7,14 +7,12 @@ config モジュールのユニットテスト。
     cd backend
     uv run pytest tests/test_config.py -v
 """
-import sys
 import os
-
-import pytest
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from config import get_dirs_by_source, VALID_SOURCES
+from config import VALID_SOURCES, get_dirs_by_source
 
 
 class TestGetDirsBySource:

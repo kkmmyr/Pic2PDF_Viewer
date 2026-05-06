@@ -7,10 +7,9 @@ main のユニットテスト。
     cd backend
     uv run pytest tests/test_main.py -v
 """
-import sys
 import os
+import sys
 
-import pytest
 from fastapi import APIRouter
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -24,8 +23,8 @@ class TestExceptionHandlers:
     """各カスタム例外がハンドラ経由で適切な status / detail に変換されるか。"""
 
     def test_file_operation_error_returns_500(self, client):
-        from main import app
         from exceptions import FileOperationError
+        from main import app
 
         # テスト専用ルーターを動的に追加
         router = APIRouter()
@@ -44,8 +43,8 @@ class TestExceptionHandlers:
             app.router.routes = [r for r in app.router.routes if getattr(r, "path", "") != "/api/__test_file_op_error"]
 
     def test_ocr_process_error_returns_400(self, client):
-        from main import app
         from exceptions import OcrProcessError
+        from main import app
 
         router = APIRouter()
 
@@ -62,8 +61,8 @@ class TestExceptionHandlers:
             app.router.routes = [r for r in app.router.routes if getattr(r, "path", "") != "/api/__test_ocr_error"]
 
     def test_auto_fill_error_returns_500(self, client):
-        from main import app
         from exceptions import AutoFillError
+        from main import app
 
         router = APIRouter()
 
@@ -82,6 +81,7 @@ class TestExceptionHandlers:
     def test_unhandled_exception_masked_as_500(self, tmp_data_dir):
         """未捕捉例外は status=500 / detail="Internal server error" にマスクされる。"""
         from fastapi.testclient import TestClient
+
         from main import app
 
         router = APIRouter()

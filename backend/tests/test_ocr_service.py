@@ -8,10 +8,10 @@ OCRService は singleton（`__new__` キャッシュ）なので、テスト間�
     cd backend
     uv run pytest tests/test_ocr_service.py -v
 """
-import sys
 import os
-import time
+import sys
 import threading
+import time
 from unittest.mock import MagicMock
 
 import pytest

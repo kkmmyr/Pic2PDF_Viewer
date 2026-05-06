@@ -4,15 +4,21 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+
 from config import (
     CORS_ORIGINS,
-    THUMBNAIL_DIR, IMAGES_DIR,
-    KINDLE_PDF_DIR, KINDLE_THUMBNAIL_DIR, KINDLE_IMAGES_DIR,
-    KINDLE_NOVEL_PDF_DIR, KINDLE_NOVEL_THUMBNAIL_DIR, KINDLE_NOVEL_IMAGES_DIR,
     FRONTEND_DIST_DIR,
+    IMAGES_DIR,
+    KINDLE_IMAGES_DIR,
+    KINDLE_NOVEL_IMAGES_DIR,
+    KINDLE_NOVEL_PDF_DIR,
+    KINDLE_NOVEL_THUMBNAIL_DIR,
+    KINDLE_PDF_DIR,
+    KINDLE_THUMBNAIL_DIR,
+    THUMBNAIL_DIR,
 )
-from exceptions import FileOperationError, OcrProcessError, AutoFillError
-from routers import library, pdfs, generate, ocr, meta, thumbnails, series, hitomi, genres
+from exceptions import AutoFillError, FileOperationError, OcrProcessError
+from routers import generate, genres, hitomi, library, meta, ocr, pdfs, series, thumbnails
 from utils.logger import get_logger
 
 logger = get_logger(__name__)

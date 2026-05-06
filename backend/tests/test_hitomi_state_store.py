@@ -4,9 +4,7 @@
 """
 import os
 import sys
-from datetime import datetime, timedelta, timezone
-
-import pytest
+from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -106,7 +104,7 @@ class TestDismiss:
 
 class TestPurgeExpired:
     def _now(self):
-        return datetime(2026, 4, 29, 0, 0, 0, tzinfo=timezone.utc)
+        return datetime(2026, 4, 29, 0, 0, 0, tzinfo=UTC)
 
     def test_purges_dismissed_older_than_threshold(self, tmp_path):
         old = (self._now() - timedelta(days=31)).isoformat()

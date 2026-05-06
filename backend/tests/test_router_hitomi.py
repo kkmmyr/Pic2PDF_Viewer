@@ -8,9 +8,9 @@ HTTP 層のフロー（パラメータ伝達・例外マッピング・ロック
     cd backend
     uv run pytest tests/test_router_hitomi.py -v
 """
-import sys
-import os
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest

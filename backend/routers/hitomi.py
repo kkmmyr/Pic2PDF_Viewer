@@ -78,8 +78,8 @@ def post_watchlist(req: AddWatchlistRequest) -> dict:
         msg = str(e)
         # NOZOMI に存在しない作者は 404、それ以外（重複・空文字）は 400
         if "not found on hitomi.la" in msg:
-            raise HTTPException(status_code=404, detail=msg)
-        raise HTTPException(status_code=400, detail=msg)
+            raise HTTPException(status_code=404, detail=msg) from e
+        raise HTTPException(status_code=400, detail=msg) from e
 
     # 登録時点の最新 ID を state.json に書き込む。
     # これにより初回監視実行で「登録前から存在していた作品」が新着として出ない。

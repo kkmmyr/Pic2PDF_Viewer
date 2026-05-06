@@ -5,7 +5,9 @@
 import json
 import os
 import threading
-from typing import Callable, NotRequired, TypedDict
+from collections.abc import Callable
+from typing import NotRequired, TypedDict
+
 from config import DATA_DIR
 from utils.locks import SourceLockManager
 
@@ -44,7 +46,7 @@ def load_meta(source: str) -> MetaDict:
     if not os.path.exists(path):
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}

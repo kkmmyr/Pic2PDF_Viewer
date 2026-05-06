@@ -7,9 +7,9 @@ routers._deps のユニットテスト。
     cd backend
     uv run pytest tests/test_router_deps.py -v
 """
-import sys
-import os
 import logging
+import os
+import sys
 
 import pytest
 from fastapi import HTTPException
@@ -17,12 +17,11 @@ from fastapi import HTTPException
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from routers._deps import (
-    validated_source,
     assert_valid_source,
-    validate_request_targets,
     log_and_raise_500,
+    validate_request_targets,
+    validated_source,
 )
-
 
 # ---------------------------------------------------------------------------
 # validated_source (Depends 用)
@@ -202,7 +201,7 @@ class TestLogAndRaise500:
             try:
                 raise RuntimeError("conflict")
             except RuntimeError as e:
-                raise HTTPException(status_code=400, detail=str(e))
+                raise HTTPException(status_code=400, detail=str(e)) from e
 
         with pytest.raises(HTTPException) as exc:
             func()

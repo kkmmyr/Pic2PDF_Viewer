@@ -7,11 +7,9 @@ utils.locks.SourceLockManager のユニットテスト。
     cd backend
     uv run pytest tests/test_locks.py -v
 """
-import sys
 import os
+import sys
 import threading
-
-import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

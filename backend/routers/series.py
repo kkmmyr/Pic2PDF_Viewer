@@ -8,7 +8,7 @@ auto-fill と同じ非同期ジョブパターン。
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from routers._deps import validated_source, assert_valid_source, validate_request_targets
+from routers._deps import assert_valid_source, validate_request_targets, validated_source
 from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.series_detector import stable_series_id
 from services.series_resolver import get_state, start_resolve_job
@@ -115,7 +115,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
             authors_key = tuple(sorted({a.strip() for a in first_authors if a.strip()}))
             series_id = stable_series_id(request.title.strip(), authors_key)
 
-        for name, idx in zip(request.names, indexes):
+        for name, idx in zip(request.names, indexes, strict=True):
             key = make_key(request.path, name)
             existing = dict(data.get(key, {}))
             existing["series_id"] = series_id

@@ -1,6 +1,8 @@
 """ルーター共通 FastAPI 依存関数・ヘルパー。"""
 import functools
+
 from fastapi import HTTPException
+
 from config import VALID_SOURCES
 from utils.logger import get_logger
 from utils.path_utils import validate_safe_name, validate_safe_path
@@ -67,7 +69,7 @@ def log_and_raise_500(operation: str):
                 raise
             except Exception as e:
                 logger.exception("%s failed", operation)
-                raise HTTPException(status_code=500, detail=str(e))
+                raise HTTPException(status_code=500, detail=str(e)) from e
 
         return wrapper
 

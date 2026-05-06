@@ -12,7 +12,14 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
+
+from routers._deps import assert_valid_source, validate_request_targets, validated_source
 from services.author_resolver import resolve_author_debug
+from services.auto_fill_service import (
+    VALID_MODES,
+    get_auto_fill_state,
+    start_auto_fill_job,
+)
 from services.meta_store import (
     has_meaningful_value,
     load_meta,
@@ -20,13 +27,7 @@ from services.meta_store import (
     merge_entry_fields,
     update_meta_locked,
 )
-from routers._deps import validated_source, assert_valid_source, validate_request_targets
 from utils.path_utils import validate_safe_name, validate_safe_path
-from services.auto_fill_service import (
-    VALID_MODES,
-    get_auto_fill_state,
-    start_auto_fill_job,
-)
 
 router = APIRouter()
 

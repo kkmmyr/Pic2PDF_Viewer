@@ -5,9 +5,9 @@ services.meta_store / services.auto_fill_service / routers.meta のユニット�
     cd backend
     uv run pytest tests/test_meta.py -v
 """
-import sys
-import os
 import json
+import os
+import sys
 import time
 
 import pytest
@@ -15,8 +15,8 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.meta_store import make_key
 from services.auto_fill_service import _is_missing, _is_unknown
+from services.meta_store import make_key
 
 
 class TestMakeKey:
@@ -427,7 +427,7 @@ class TestRunAutoFillPreservesViewCount:
         }
         (meta_dir / "meta.json").write_text(json.dumps(existing), encoding="utf-8")
 
-        from services.auto_fill_service import run_auto_fill, get_auto_fill_state, reset_auto_fill_state
+        from services.auto_fill_service import get_auto_fill_state, reset_auto_fill_state, run_auto_fill
         reset_auto_fill_state("generated")
         run_auto_fill("generated", "overwrite_all")
 
@@ -458,7 +458,7 @@ class TestRunAutoFillPreservesViewCount:
         }
         (meta_dir / "meta.json").write_text(json.dumps(existing), encoding="utf-8")
 
-        from services.auto_fill_service import run_auto_fill, reset_auto_fill_state
+        from services.auto_fill_service import reset_auto_fill_state, run_auto_fill
         reset_auto_fill_state("generated")
         run_auto_fill("generated", "unknown_only")
 
@@ -473,7 +473,7 @@ class TestRunAutoFillPreservesViewCount:
         (pdf_dir / "fresh.pdf").write_bytes(b"")
 
         # meta.json なし（完全未登録）
-        from services.auto_fill_service import run_auto_fill, reset_auto_fill_state
+        from services.auto_fill_service import reset_auto_fill_state, run_auto_fill
         reset_auto_fill_state("generated")
         run_auto_fill("generated", "missing_only")
 

@@ -11,8 +11,6 @@ kindle / novel ソースは 4 のみ。
 各ステップの実装と判定ヘルパーは `services.author_steps` に分離済み。
 本ファイルはオーケストレーション（フォールバック順序）と debug 用の集約のみ持つ。
 """
-from services.gemma_client import import_web_extract_tools
-
 # ステップ実装と定数を re-export（テストの monkeypatch 互換のためモジュール属性として保持）
 from services.author_steps import (  # noqa: F401
     _DIRECT_HTTP_SITES,
@@ -26,6 +24,7 @@ from services.author_steps import (  # noqa: F401
     _try_dlsite,
     _try_fanza,
 )
+from services.gemma_client import import_web_extract_tools
 
 
 def resolve_author(title: str, source: str) -> str:

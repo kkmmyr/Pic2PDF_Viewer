@@ -8,10 +8,8 @@ routers.thumbnails のユニットテスト。
     cd backend
     uv run pytest tests/test_router_thumbnails.py -v
 """
-import sys
 import os
-
-import pytest
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

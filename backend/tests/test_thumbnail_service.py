@@ -7,10 +7,9 @@ PDF / WebP からサムネイル JPG を生成する純関数の挙動を確認�
     cd backend
     uv run pytest tests/test_thumbnail_service.py -v
 """
-import sys
 import os
+import sys
 
-import pytest
 import fitz
 from PIL import Image
 

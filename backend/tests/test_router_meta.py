@@ -13,11 +13,9 @@ routers.meta の追補ユニットテスト。
     cd backend
     uv run pytest tests/test_router_meta.py -v
 """
-import sys
-import os
 import json
-
-import pytest
+import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -189,7 +187,6 @@ class TestStartAutoFill:
 
         monkeypatch.setattr("routers.meta.start_auto_fill_job", _fake_start)
         # 既存ジョブを idle にしておく
-        from services.auto_fill_service import reset_auto_fill_state
         # 簡易: state は running でなければよい — monkeypatch で get を idle 返却
 
         res = client.post("/api/meta/auto-fill?source=generated")

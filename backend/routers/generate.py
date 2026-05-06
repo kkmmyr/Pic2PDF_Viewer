@@ -7,18 +7,21 @@ POST /batch_compress   — 既存 PDF を一括圧縮
 """
 import os
 import threading
-from enum import Enum
+from enum import StrEnum
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import (
-    PDF_COMPRESSED_DIR, THUMBNAIL_DIR, IMAGES_DIR, COMPLETE_DIR,
+    COMPLETE_DIR,
+    IMAGES_DIR,
+    PDF_COMPRESSED_DIR,
+    THUMBNAIL_DIR,
 )
 from routers._deps import log_and_raise_500
-from services.job_manager import GenerateJob, JobStore, JobStatus
+from services.job_manager import GenerateJob, JobStatus, JobStore
 from services.meta_store import update_meta_locked
-from services.pdf_generator import scan_and_generate, batch_compress
+from services.pdf_generator import batch_compress, scan_and_generate
 from utils.file_utils import is_webp_file, is_zip_file
 from utils.logger import get_logger
 
@@ -27,7 +30,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-class GenerateStatus(str, Enum):
+class GenerateStatus(StrEnum):
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -115,7 +118,7 @@ def get_status(source_dir: str):
     current_item = job_store.get_active_current_item()
     items_status = []
 
-    for root, dirs, files in os.walk(source_dir):
+    for root, _dirs, files in os.walk(source_dir):
         webp_files = [f for f in files if is_webp_file(f)]
         if webp_files:
             folder_name = os.path.basename(root)

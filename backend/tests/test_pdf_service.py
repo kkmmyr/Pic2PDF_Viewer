@@ -7,11 +7,11 @@ PdfService.delete_pages / get_page_count を実際の PDF ファイルで検証�
     cd backend
     uv run pytest tests/test_pdf_service.py -v
 """
-import sys
 import os
+import sys
 
-import pytest
 import fitz
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

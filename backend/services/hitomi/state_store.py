@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -147,7 +147,7 @@ def purge_expired(
 ) -> int:
     """dismissed=true かつ discovered_at が threshold_days 以前のエントリを物理削除する。"""
     if now is None:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
     threshold = now - timedelta(days=threshold_days)
 
     arrivals = load_arrivals(data_dir)
@@ -168,7 +168,7 @@ def purge_expired(
             continue
         # naive datetime はローカルタイムとみなして比較可能にする
         if discovered.tzinfo is None:
-            discovered = discovered.replace(tzinfo=timezone.utc)
+            discovered = discovered.replace(tzinfo=UTC)
         if discovered < threshold:
             removed += 1
         else:

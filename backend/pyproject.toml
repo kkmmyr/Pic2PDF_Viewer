@@ -19,7 +19,37 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "httpx",
+    "ruff>=0.15.12",
 ]
 
 [tool.uv]
 package = false
+
+# ----------------------------------------------------------------------------
+# Ruff (linter)
+# 実行: cd backend && uv run ruff check .
+# ----------------------------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = [
+    ".venv",
+    "__pycache__",
+    "data",
+]
+
+[tool.ruff.lint]
+# F: Pyflakes (未使用 import / 未定義変数 等)
+# E/W: pycodestyle のエラー・警告
+# I: isort (import 順序)
+# B: flake8-bugbear (mutable default など意図せぬバグ)
+# UP: pyupgrade (古い構文の自動更新)
+select = ["F", "E", "W", "I", "B", "UP"]
+ignore = [
+    "E501",  # 行長は line-length で別管理（formatter 任せにしたいので警告は抑止）
+    "B008",  # FastAPI の Depends(...) を引数デフォルトに置くため
+]
+
+[tool.ruff.lint.per-file-ignores]
+# テストではダミー変数や長い fixture 名が出るので一部緩める
+"tests/**" = ["B011"]

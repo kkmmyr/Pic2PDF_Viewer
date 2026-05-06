@@ -1,11 +1,11 @@
 import threading
 import uuid
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
+
 from config import JOB_MAX_JOBS
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -18,12 +18,12 @@ class GenerateJob:
     def __init__(self, job_id: str):
         self.job_id = job_id
         self.status: JobStatus = JobStatus.PENDING
-        self.current_item: Optional[str] = None
+        self.current_item: str | None = None
         self.files: list[str] = []
         # サイレント失敗を防ぐため、書籍単位の失敗を {name, error} で保持しレスポンスに含める
         self.failed_items: list[dict[str, str]] = []
         self.message: str = ""
-        self.error: Optional[str] = None
+        self.error: str | None = None
         self._lock = threading.Lock()
 
     def to_dict(self) -> dict[str, object]:
@@ -64,11 +64,11 @@ class JobStore:
                 self._jobs.pop(old_id, None)
         return job
 
-    def get(self, job_id: str) -> Optional[GenerateJob]:
+    def get(self, job_id: str) -> GenerateJob | None:
         with self._lock:
             return self._jobs.get(job_id)
 
-    def get_active_current_item(self) -> Optional[str]:
+    def get_active_current_item(self) -> str | None:
         """最新の RUNNING ジョブの current_item を返す。
 
         `/api/status` で「現在処理中のアイテム名」を取得するために使う。

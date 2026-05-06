@@ -7,12 +7,10 @@ services.job_state.JobStateManager のユニットテスト。
     cd backend
     uv run pytest tests/test_job_state.py -v
 """
-import sys
 import os
+import sys
 import threading
-from dataclasses import dataclass, field
-
-import pytest
+from dataclasses import dataclass
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

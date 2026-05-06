@@ -6,10 +6,8 @@ services.author_resolver のユニットテスト。
     uv run pytest tests/test_author_resolver.py -v
 """
 import json
-import sys
 import os
-
-import pytest
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

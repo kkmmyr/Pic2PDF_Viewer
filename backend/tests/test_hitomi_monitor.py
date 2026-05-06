@@ -5,7 +5,7 @@ main() 全体のテストはネットワーク + ファイル I/O が絡むた�
 """
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -14,7 +14,7 @@ from tools.hitomi_monitor import should_skip_artist
 
 class TestShouldSkipArtist:
     def _now(self):
-        return datetime(2026, 4, 29, 12, 0, 0, tzinfo=timezone.utc)
+        return datetime(2026, 4, 29, 12, 0, 0, tzinfo=UTC)
 
     def test_no_threshold_never_skips(self):
         # CLI 直接実行は threshold=None で常に通常処理

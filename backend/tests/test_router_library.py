@@ -8,11 +8,9 @@ routers.library のユニットテスト。
     cd backend
     uv run pytest tests/test_router_library.py -v
 """
-import sys
-import os
 import json
-
-import pytest
+import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

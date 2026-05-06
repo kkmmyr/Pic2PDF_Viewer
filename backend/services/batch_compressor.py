@@ -5,7 +5,7 @@ PdfGenerator の private API には依存せず、PIL/img2pdf を直接使う最
 """
 import io
 import os
-from typing import Callable, Optional
+from collections.abc import Callable
 
 import img2pdf
 from natsort import natsorted
@@ -35,7 +35,7 @@ def batch_compress(
     images_dir: str,
     output_dir: str,
     quality: int,
-    progress_callback: Optional[Callable[[str], None]] = None,
+    progress_callback: Callable[[str], None] | None = None,
 ) -> list[str]:
     """`images_dir` 配下の各サブフォルダを走査し、WebP 画像から圧縮 PDF を生成する。
 

@@ -1,8 +1,9 @@
-import subprocess
 import os
+import subprocess
 import threading
 from collections import deque
-from typing import Optional, Dict, Any
+from typing import Any
+
 from config import BATCH_OCR_LAUNCHER, OCR_LOG_MAXLEN
 from utils.logger import get_logger
 
@@ -18,11 +19,11 @@ class OCRService:
     def __new__(cls):
         with cls._class_lock:
             if cls._instance is None:
-                instance = super(OCRService, cls).__new__(cls)
+                instance = super().__new__(cls)
                 instance.process = None
                 instance.status = "idle"  # idle, running, error
                 instance.logs: deque = deque(maxlen=OCR_LOG_MAXLEN)
-                instance.last_return_code: Optional[int] = None
+                instance.last_return_code: int | None = None
                 instance._lock = threading.Lock()
                 cls._instance = instance
         return cls._instance
@@ -37,7 +38,7 @@ class OCRService:
                 self.status = "idle"
         return False
 
-    def start_ocr(self, target_dir: Optional[str] = None) -> int:
+    def start_ocr(self, target_dir: str | None = None) -> int:
         with self._lock:
             if self.is_running:
                 raise RuntimeError("OCR process is already running")
@@ -99,7 +100,7 @@ class OCRService:
         with self._lock:
             self.status = "idle"
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "status": self.status,

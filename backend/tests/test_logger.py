@@ -7,11 +7,9 @@ utils.logger のユニットテスト。
     cd backend
     uv run pytest tests/test_logger.py -v
 """
-import sys
-import os
 import logging
-
-import pytest
+import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 

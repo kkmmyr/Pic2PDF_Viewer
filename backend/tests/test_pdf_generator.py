@@ -8,8 +8,8 @@ services.pdf_generator のユニットテスト。
     cd backend
     uv run pytest tests/test_pdf_generator.py -v
 """
-import sys
 import os
+import sys
 import zipfile
 from io import BytesIO
 
@@ -18,8 +18,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.pdf_generator import _collect_images, scan_and_generate, batch_compress
-
+from services.pdf_generator import _collect_images, batch_compress, scan_and_generate
 
 # ---------------------------------------------------------------------------
 # ヘルパー

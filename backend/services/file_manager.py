@@ -1,5 +1,6 @@
 import os
 import shutil
+
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
 
