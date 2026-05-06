@@ -13,9 +13,10 @@ input=$(cat)
 parsed=$(echo "$input" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-fp = d.get('file_path', '')
-os_ = d.get('old_string', '')
-ns  = d.get('new_string', '')
+ti = d.get('tool_input') or {}
+fp  = ti.get('file_path', '')
+os_ = ti.get('old_string', '')
+ns  = ti.get('new_string', '')
 print(fp)
 print(os_.count('\n'))
 print(ns.count('\n'))

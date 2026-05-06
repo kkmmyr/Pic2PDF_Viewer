@@ -19,9 +19,7 @@ input=$(cat)
 file_path=$(echo "$input" | python3 -c "
 import json, sys
 d = json.load(sys.stdin)
-# Claude Code の新形式 (tool_input.file_path) と旧形式 (file_path) 両方に対応
-fp = (d.get('tool_input') or {}).get('file_path') or d.get('file_path') or ''
-print(fp)
+print((d.get('tool_input') or {}).get('file_path') or '')
 " 2>/dev/null || true)
 
 if [ -z "$file_path" ]; then
