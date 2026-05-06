@@ -133,8 +133,10 @@ describe('useGenres', () => {
 
     it('source 変化で再フェッチされる', async () => {
         mockedGet.mockResolvedValueOnce(['gen']).mockResolvedValueOnce(['kin']);
-        const { result, rerender } = renderHook(({ src }: { src: 'generated' | 'kindle' }) =>
-            useGenres(src), { initialProps: { src: 'generated' } });
+        const { result, rerender } = renderHook(
+            ({ src }: { src: 'generated' | 'kindle' }) => useGenres(src),
+            { initialProps: { src: 'generated' } },
+        );
 
         await waitFor(() => expect(result.current.genres).toEqual(['gen']));
 

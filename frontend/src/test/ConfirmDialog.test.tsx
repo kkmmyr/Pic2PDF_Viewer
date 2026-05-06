@@ -32,13 +32,7 @@ describe('ConfirmDialog', () => {
 
     it('既定の confirmLabel/cancelLabel は "実行" / "キャンセル"', () => {
         const { getByText } = render(
-            <ConfirmDialog
-                open
-                title="t"
-                message="m"
-                onConfirm={() => {}}
-                onCancel={() => {}}
-            />,
+            <ConfirmDialog open title="t" message="m" onConfirm={() => {}} onCancel={() => {}} />,
         );
         expect(getByText('実行')).toBeInTheDocument();
         expect(getByText('キャンセル')).toBeInTheDocument();
@@ -63,13 +57,7 @@ describe('ConfirmDialog', () => {
     it('confirm ラベルクリックで onConfirm が呼ばれる', () => {
         const onConfirm = vi.fn();
         const { getByText } = render(
-            <ConfirmDialog
-                open
-                title="t"
-                message="m"
-                onConfirm={onConfirm}
-                onCancel={() => {}}
-            />,
+            <ConfirmDialog open title="t" message="m" onConfirm={onConfirm} onCancel={() => {}} />,
         );
         fireEvent.click(getByText('実行'));
         expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -78,13 +66,7 @@ describe('ConfirmDialog', () => {
     it('cancel ラベルクリックで onCancel が呼ばれる', () => {
         const onCancel = vi.fn();
         const { getByText } = render(
-            <ConfirmDialog
-                open
-                title="t"
-                message="m"
-                onConfirm={() => {}}
-                onCancel={onCancel}
-            />,
+            <ConfirmDialog open title="t" message="m" onConfirm={() => {}} onCancel={onCancel} />,
         );
         fireEvent.click(getByText('キャンセル'));
         expect(onCancel).toHaveBeenCalledTimes(1);
@@ -93,13 +75,7 @@ describe('ConfirmDialog', () => {
     it('Esc キーで onCancel が呼ばれる（Dialog の onClose=onCancel として渡している）', () => {
         const onCancel = vi.fn();
         render(
-            <ConfirmDialog
-                open
-                title="t"
-                message="m"
-                onConfirm={() => {}}
-                onCancel={onCancel}
-            />,
+            <ConfirmDialog open title="t" message="m" onConfirm={() => {}} onCancel={onCancel} />,
         );
         fireEvent.keyDown(window, { key: 'Escape' });
         expect(onCancel).toHaveBeenCalledTimes(1);
@@ -121,13 +97,7 @@ describe('ConfirmDialog', () => {
 
     it('danger=false（既定）で OK ボタンは primary 系', () => {
         const { getByText } = render(
-            <ConfirmDialog
-                open
-                title="t"
-                message="m"
-                onConfirm={() => {}}
-                onCancel={() => {}}
-            />,
+            <ConfirmDialog open title="t" message="m" onConfirm={() => {}} onCancel={() => {}} />,
         );
         expect(getByText('実行').className).toContain('bg-primary-600');
     });

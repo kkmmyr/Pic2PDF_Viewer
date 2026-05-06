@@ -2,9 +2,8 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../config/api_client', async () => {
-    const actual = await vi.importActual<typeof import('../config/api_client')>(
-        '../config/api_client',
-    );
+    const actual =
+        await vi.importActual<typeof import('../config/api_client')>('../config/api_client');
     return {
         default: { get: vi.fn() },
         ApiError: actual.ApiError,
@@ -75,10 +74,7 @@ describe('useGenerateJob', () => {
     });
 
     it('clearCurrentJob で localStorage と state が消える', () => {
-        localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({ job_id: 'jid-1', sourceDir: '/x' }),
-        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ job_id: 'jid-1', sourceDir: '/x' }));
         const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()));
         expect(result.current.currentJob).not.toBeNull();
 

@@ -17,7 +17,10 @@ describe('useAutoFocusInput', () => {
         input.remove();
     });
 
-    const renderWithRef = (shouldFocus: boolean, options: { delay?: number; select?: boolean } = {}) =>
+    const renderWithRef = (
+        shouldFocus: boolean,
+        options: { delay?: number; select?: boolean } = {},
+    ) =>
         renderHook(
             ({ flag }: { flag: boolean }) => {
                 const ref = useRef<HTMLInputElement | null>(input);
