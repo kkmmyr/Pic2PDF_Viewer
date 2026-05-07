@@ -23,6 +23,10 @@ cd frontend && npm run dev                                   # :5176
 cd backend && uv run pytest -q
 cd frontend && npm run test
 
+# テスト + カバレッジ計測（HTML レポート: backend/htmlcov/ または frontend/coverage/）
+cd backend && uv run pytest --cov
+cd frontend && npm run test:coverage
+
 # リント・フォーマット
 cd backend && uv run ruff check . && uv run ruff format .
 cd frontend && npm run lint && npm run format

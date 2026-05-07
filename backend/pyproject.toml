@@ -20,10 +20,43 @@ dev = [
     "pytest-asyncio",
     "httpx",
     "ruff>=0.15.12",
+    "pytest-cov>=7.1.0",
 ]
 
 [tool.uv]
 package = false
+
+# ----------------------------------------------------------------------------
+# Pytest + coverage 設定
+# 通常実行: cd backend && uv run pytest
+# カバレッジ計測: cd backend && uv run pytest --cov
+# HTML レポート: 計測後 backend/htmlcov/index.html を開く
+# ----------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["."]
+omit = [
+    "tests/*",
+    ".venv/*",
+    "data/*",
+    "__pycache__/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 # ----------------------------------------------------------------------------
 # Ruff (linter)
