@@ -8,7 +8,12 @@ import img2pdf
 from natsort import natsorted
 from PIL import Image
 
-from config import THUMBNAIL_HEIGHT
+from config import (
+    THUMBNAIL_HEIGHT,
+    ZIP_MAX_ENTRIES,
+    ZIP_MAX_PER_FILE_BYTES,
+    ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES,
+)
 from services.batch_compressor import batch_compress  # 後方互換 re-export
 from utils.file_utils import is_webp_file, is_zip_file
 from utils.logger import get_logger
@@ -58,6 +63,29 @@ def _collect_images(images_dir: str) -> list[str]:
     """ディレクトリ内の WebP 画像を自然順で収集する。"""
     files = [f for f in os.listdir(images_dir) if is_webp_file(f)]
     return [os.path.join(images_dir, f) for f in natsorted(files)]
+
+
+def _check_zip_safety(webp_infos: list[zipfile.ZipInfo], zip_filename: str) -> None:
+    """ZIP 内 WebP エントリのサイズ／件数が上限以内かを検査する（zip bomb 対策）。
+
+    超過時は ValueError を投げ、呼び出し側の except 節で `failed_items` に集約させる。
+    """
+    if len(webp_infos) > ZIP_MAX_ENTRIES:
+        raise ValueError(
+            f"ZIP entry count {len(webp_infos)} exceeds limit {ZIP_MAX_ENTRIES}"
+        )
+    total = 0
+    for info in webp_infos:
+        if info.file_size > ZIP_MAX_PER_FILE_BYTES:
+            raise ValueError(
+                f"ZIP entry {os.path.basename(info.filename)!r} uncompressed size "
+                f"{info.file_size} exceeds per-file limit {ZIP_MAX_PER_FILE_BYTES}"
+            )
+        total += info.file_size
+        if total > ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES:
+            raise ValueError(
+                f"ZIP total uncompressed size exceeds limit {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES}"
+            )
 
 
 class PdfGenerator:
@@ -110,25 +138,28 @@ class PdfGenerator:
 
         try:
             with zipfile.ZipFile(zip_path, 'r') as zf:
-                webp_in_zip = natsorted(
-                    [f for f in zf.namelist() if is_webp_file(f)]
-                )
-                if not webp_in_zip:
+                webp_infos = [info for info in zf.infolist() if is_webp_file(info.filename)]
+                if not webp_infos:
                     return
 
-                for image_name in webp_in_zip:
-                    with zf.open(image_name) as image_file:
+                # zip bomb 対策: 解凍前に WebP エントリの件数・サイズを検査
+                _check_zip_safety(webp_infos, zip_filename)
+
+                webp_infos = natsorted(webp_infos, key=lambda i: i.filename)
+
+                for info in webp_infos:
+                    with zf.open(info) as image_file:
                         data = image_file.read()
-                    image_out_path = os.path.join(target_images_dir, os.path.basename(image_name))
+                    image_out_path = os.path.join(target_images_dir, os.path.basename(info.filename))
                     with open(image_out_path, "wb") as img_f:
                         img_f.write(data)
 
-            output_path = self._generate_outputs(item_name, target_images_dir)
-            logger.info("Generated from ZIP: %s", output_path)
+            self._generate_outputs(item_name, target_images_dir)
+            logger.info("Generated from ZIP: %s", zip_filename)
             self.moves.append((zip_path, os.path.join(self.complete_dir, zip_filename), False))
 
         except Exception as e:
-            logger.error("Failed to generate PDF for ZIP %s: %s", zip_path, e)
+            logger.error("Failed to generate PDF for ZIP %s: %s", zip_filename, e)
             self.failed_items.append((item_name, str(e)))
 
     # ------------------------------------------------------------------
@@ -161,7 +192,7 @@ class PdfGenerator:
                     ))
 
         except Exception as e:
-            logger.error("Failed to generate PDF for folder %s: %s", root, e)
+            logger.error("Failed to generate PDF for folder %s: %s", folder_name, e)
             self.failed_items.append((folder_name, str(e)))
 
     def _create_pdf_file(self, image_paths: list[str], output_path: str) -> None:

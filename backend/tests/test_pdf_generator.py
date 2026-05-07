@@ -18,7 +18,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.pdf_generator import _collect_images, batch_compress, scan_and_generate
+from services.pdf_generator import _check_zip_safety, _collect_images, batch_compress, scan_and_generate
 
 # ---------------------------------------------------------------------------
 # ヘルパー
@@ -65,6 +65,48 @@ class TestCollectImages:
 
     def test_empty_dir_returns_empty_list(self, tmp_path):
         assert _collect_images(str(tmp_path)) == []
+
+
+# ---------------------------------------------------------------------------
+# _check_zip_safety — zip bomb 対策
+# ---------------------------------------------------------------------------
+
+class TestCheckZipSafety:
+    """_check_zip_safety は ZIP 内の WebP エントリ数・サイズが上限を
+    超えたら ValueError を投げる。process_zip の except 節に集約され、
+    ジョブの failed_items に記録される。"""
+
+    def _make_info(self, name: str, size: int) -> zipfile.ZipInfo:
+        info = zipfile.ZipInfo(filename=name)
+        info.file_size = size
+        return info
+
+    def test_normal_size_passes(self):
+        infos = [self._make_info(f"{i}.webp", 1024) for i in range(10)]
+        # 例外なく通る
+        _check_zip_safety(infos, "ok.zip")
+
+    def test_too_many_entries_raises(self, monkeypatch):
+        from services import pdf_generator as pg
+        monkeypatch.setattr(pg, "ZIP_MAX_ENTRIES", 5)
+        infos = [self._make_info(f"{i}.webp", 100) for i in range(6)]
+        with pytest.raises(ValueError, match="entry count"):
+            _check_zip_safety(infos, "many.zip")
+
+    def test_per_file_limit_raises(self, monkeypatch):
+        from services import pdf_generator as pg
+        monkeypatch.setattr(pg, "ZIP_MAX_PER_FILE_BYTES", 1024)
+        infos = [self._make_info("big.webp", 2048)]
+        with pytest.raises(ValueError, match="per-file limit"):
+            _check_zip_safety(infos, "big.zip")
+
+    def test_total_size_limit_raises(self, monkeypatch):
+        from services import pdf_generator as pg
+        monkeypatch.setattr(pg, "ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES", 5000)
+        # 各 1500 バイト × 4 件 = 6000 バイト > 5000
+        infos = [self._make_info(f"{i}.webp", 1500) for i in range(4)]
+        with pytest.raises(ValueError, match="total uncompressed"):
+            _check_zip_safety(infos, "total.zip")
 
 
 # ---------------------------------------------------------------------------

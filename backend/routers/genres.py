@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validated_source
 from services.genre_store import load_genres, save_genres
+from utils.path_utils import validate_safe_name
 
 router = APIRouter()
 
@@ -46,6 +47,7 @@ def add_genre(request: AddGenreRequest) -> dict:
 
 @router.delete("/genres/{name}")
 def delete_genre(name: str, source: str = Depends(validated_source)) -> dict:
+    validate_safe_name(name, param_name="name")
     genres = load_genres(source)
     if name not in genres:
         raise HTTPException(status_code=404, detail="Genre not found")

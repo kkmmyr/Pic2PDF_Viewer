@@ -62,7 +62,12 @@ class OCRService:
                 self.status = "running"
                 self.last_return_code = None
                 self.logs.clear()
-                self.logs.append(f"Starting OCR process: {' '.join(cmd)}")
+                # 絶対パス露出を避けるため launcher と target を basename で記録
+                launcher_name = os.path.basename(cmd[0])
+                target_part = ""
+                if target_dir:
+                    target_part = f" --target-dir {os.path.basename(target_dir)}"
+                self.logs.append(f"Starting OCR process: {launcher_name}{target_part}")
                 pid = self.process.pid
                 logger.info("OCR process started (PID: %d)", pid)
 

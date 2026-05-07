@@ -96,6 +96,13 @@ class TestDeleteGenre:
         res = client.delete("/api/genres/X?source=invalid")
         assert res.status_code == 400
 
+    def test_400_when_name_contains_path_traversal(self, client, tmp_data_dir):
+        """ジャンル名に '..' が URL エンコードで埋め込まれた場合は 400 で拒否する。"""
+        _seed_genres(tmp_data_dir, "generated", ["A"])
+        # %2E%2E = '..'
+        res = client.delete("/api/genres/%2E%2E?source=generated")
+        assert res.status_code == 400
+
 
 # ---------------------------------------------------------------------------
 # PATCH /api/genres/reorder
