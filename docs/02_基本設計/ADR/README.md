@@ -17,6 +17,7 @@
 | [0003](0003_generated-image-only-mode.md) | `generated` ソースを image-only モードに切替 | Accepted | 2026-05-05 |
 | [0004](0004_hitomi-standalone-script.md) | hitomi 監視を独立スクリプト + Task Scheduler で実行 | Accepted | 2026-04-29 |
 | [0005](0005_uv-python-package-manager.md) | Python パッケージ管理を `uv` に移行 | Accepted | 2026-04-26 |
+| [0006](0006_backend-log-file-persistence.md) | バックエンドログを RotatingFileHandler でファイル永続化 | Accepted | 2026-05-07 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順
