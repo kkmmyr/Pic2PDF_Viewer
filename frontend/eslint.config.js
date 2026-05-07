@@ -41,7 +41,6 @@ export default tseslint.config(
                 },
             ],
             // catch (error) で型を指定しない unknown はデフォルト OK
-            '@typescript-eslint/no-explicit-any': 'error',
         },
     },
     // テストファイルは緩める

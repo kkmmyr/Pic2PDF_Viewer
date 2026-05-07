@@ -98,7 +98,7 @@ describe('RenameDialog', () => {
     it('元の名前と同じ trim 値で変更すると onClose のみ呼ばれる', () => {
         const onClose = vi.fn();
         const onRename = vi.fn();
-        const { getByText, getByLabelText } = renderDialog({
+        const { getByLabelText } = renderDialog({
             currentName: 'same.pdf',
             onClose,
             onRename,
