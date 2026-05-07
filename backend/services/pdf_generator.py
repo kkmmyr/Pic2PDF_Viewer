@@ -69,22 +69,27 @@ def _check_zip_safety(webp_infos: list[zipfile.ZipInfo], zip_filename: str) -> N
     """ZIP 内 WebP エントリのサイズ／件数が上限以内かを検査する（zip bomb 対策）。
 
     超過時は ValueError を投げ、呼び出し側の except 節で `failed_items` に集約させる。
+    違反検出時は `logger.warning` で監査用ログ（`Security: ...` プレフィックス）も残し、
+    一般的な I/O エラー (`logger.error("Failed to generate PDF for ZIP %s ...")`)
+    と区別できるようにする。
     """
+    def _reject(reason: str) -> None:
+        logger.warning("Security: ZIP rejected (%s) — %s", zip_filename, reason)
+        raise ValueError(reason)
+
     if len(webp_infos) > ZIP_MAX_ENTRIES:
-        raise ValueError(
-            f"ZIP entry count {len(webp_infos)} exceeds limit {ZIP_MAX_ENTRIES}"
-        )
+        _reject(f"entry count {len(webp_infos)} exceeds limit {ZIP_MAX_ENTRIES}")
     total = 0
     for info in webp_infos:
         if info.file_size > ZIP_MAX_PER_FILE_BYTES:
-            raise ValueError(
-                f"ZIP entry {os.path.basename(info.filename)!r} uncompressed size "
+            _reject(
+                f"entry {os.path.basename(info.filename)!r} uncompressed size "
                 f"{info.file_size} exceeds per-file limit {ZIP_MAX_PER_FILE_BYTES}"
             )
         total += info.file_size
         if total > ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES:
-            raise ValueError(
-                f"ZIP total uncompressed size exceeds limit {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES}"
+            _reject(
+                f"total uncompressed size exceeds limit {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES}"
             )
 
 
