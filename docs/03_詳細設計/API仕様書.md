@@ -4,9 +4,59 @@
 
 ---
 
-## PDFライブラリ・ファイル操作
+## 目次
 
-### `GET /api/pdfs`
+- [§1. PDFライブラリ・ファイル操作](#1-pdfライブラリファイル操作)
+  - §1.1 `GET /api/pdfs` — PDF / ディレクトリ一覧
+  - §1.2 `GET /api/books/{path}/images` — 書籍の画像リスト
+  - §1.3 `POST /api/pdfs/{filename}/delete_pages` — ページ削除
+  - §1.4 `PATCH /api/rename` — ファイル / フォルダ名変更
+  - §1.5 `DELETE /api/pdfs` — 非表示書籍の完全削除
+  - §1.6 `GET /api/genres` — ジャンルリスト取得
+  - §1.7 `POST /api/genres` — ジャンル追加
+  - §1.8 `DELETE /api/genres/{name}` — ジャンル削除
+  - §1.9 `PATCH /api/genres/reorder` — ジャンル並べ替え
+  - §1.10 `POST /api/thumbnails/regenerate_bulk` — サムネイル一括再生成
+  - §1.11 `POST /api/pdfs/merge` — PDF 結合
+  - §1.12 `POST /api/thumbnails/regenerate` — サムネイル単体再生成
+  - §1.13 `GET /api/thumbnails/page` — ページサムネイル
+- [§2. 書籍メタデータ](#2-書籍メタデータ)
+  - §2.1 `POST /api/meta/auto-fill` — サークル名自動登録ジョブ起動
+  - §2.2 `GET /api/meta/auto-fill/status` — 自動登録ジョブ進捗
+  - §2.3 `GET /api/meta/auto-fill/test` — 1件デバッグ実行
+  - §2.4 `GET /api/meta` — メタデータ全件取得
+  - §2.5 `GET /api/meta/export` — メタデータエクスポート
+  - §2.6 `PATCH /api/meta` — メタデータ更新
+  - §2.7 `POST /api/meta/view` — 閲覧記録
+- [§3. シリーズ管理](#3-シリーズ管理)
+  - §3.1 `POST /api/series/resolve` — 自動グループ化ジョブ起動
+  - §3.2 `POST /api/series/assign` — シリーズ割り当て
+  - §3.3 `POST /api/series/unassign` — シリーズ解除
+  - §3.4 `POST /api/series/reorder` — シリーズ内並べ替え
+  - §3.5 `GET /api/series/resolve/status` — シリーズジョブ進捗
+- [§4. PDF生成](#4-pdf生成)
+  - §4.1 `POST /api/generate` — PDF 生成ジョブ起動
+  - §4.2 `GET /api/generate/job/{job_id}` — 生成ジョブ進捗
+  - §4.3 `GET /api/status` — ソースディレクトリスキャン状況
+  - §4.4 `POST /api/batch_compress` — 一括圧縮
+- [§5. OCR](#5-ocr)
+  - §5.1 `POST /api/ocr/run` — OCR 開始
+  - §5.2 `POST /api/ocr/stop` — OCR 停止
+  - §5.3 `GET /api/ocr/status` — OCR 状態
+- [§6. hitomi.la 新着監視](#6-hitomila-新着監視)
+  - §6.1 `GET /api/hitomi/new-arrivals` — 新着一覧
+  - §6.2 `POST /api/hitomi/dismiss/{gallery_id}` — 既読化
+  - §6.3 `POST /api/hitomi/dismiss-all` — 一括既読化
+  - §6.4 `GET /api/hitomi/watchlist` — 監視対象作者一覧
+  - §6.5 `POST /api/hitomi/watchlist` — 監視作者追加
+  - §6.6 `DELETE /api/hitomi/watchlist/{normalized}` — 監視作者削除
+  - §6.7 `POST /api/hitomi/run-now` — 監視即時実行
+
+---
+
+## §1. PDFライブラリ・ファイル操作
+
+### §1.1 `GET /api/pdfs`
 PDFファイルとディレクトリの一覧を取得する。
 
 **クエリパラメータ**:
@@ -27,7 +77,7 @@ PDFファイルとディレクトリの一覧を取得する。
 
 ---
 
-### `GET /api/books/{path}/images`
+### §1.2 `GET /api/books/{path}/images`
 指定された書籍（フォルダまたはZIP）の画像リストを取得する。
 
 **パスパラメータ**:
@@ -48,7 +98,7 @@ PDFファイルとディレクトリの一覧を取得する。
 
 ---
 
-### `POST /api/pdfs/{filename}/delete_pages`
+### §1.3 `POST /api/pdfs/{filename}/delete_pages`
 PDFの指定ページを削除する。
 
 **クエリパラメータ**:
@@ -67,7 +117,7 @@ PDFの指定ページを削除する。
 
 ---
 
-### `PATCH /api/rename`
+### §1.4 `PATCH /api/rename`
 PDF ファイルまたはフォルダの名前を変更する。PDF の場合はサムネイル・画像ディレクトリも連動してリネームする。
 
 **リクエストボディ**:
@@ -90,7 +140,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `DELETE /api/pdfs`
+### §1.5 `DELETE /api/pdfs`
 非表示書籍をディスクから完全削除する（PDF・サムネイル・画像ディレクトリ・メタデータを削除）。
 
 **リクエストボディ**:
@@ -109,7 +159,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/genres`
+### §1.6 `GET /api/genres`
 ソース別のジャンルリスト（表示順）を返す。ファイルが未作成の場合は meta.json から既存 `genre` フィールドを収集して初期リストを返す。
 
 **クエリパラメータ**: `source=generated`（省略可）
@@ -118,7 +168,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/genres`
+### §1.7 `POST /api/genres`
 ジャンルを追加する。
 
 **リクエストボディ**: `{"source": "generated", "name": "新ジャンル"}`
@@ -129,7 +179,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `DELETE /api/genres/{name}`
+### §1.8 `DELETE /api/genres/{name}`
 指定ジャンルをリストから削除する（既存書籍の `genre` フィールドは変更しない）。
 
 **クエリパラメータ**: `source=generated`
@@ -140,7 +190,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `PATCH /api/genres/reorder`
+### §1.9 `PATCH /api/genres/reorder`
 ジャンルの表示順を更新する。
 
 **リクエストボディ**: `{"source": "generated", "genres": ["Voiceloid", "オリジナル", "プリンセスコネクト"]}`
@@ -150,7 +200,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/thumbnails/regenerate_bulk`
+### §1.10 `POST /api/thumbnails/regenerate_bulk`
 選択した複数PDFのサムネイルを一括再生成する。
 
 **リクエストボディ**:
@@ -169,7 +219,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/pdfs/merge`
+### §1.11 `POST /api/pdfs/merge`
 複数のPDFを順番に結合して新しいPDFを生成する。
 
 **リクエストボディ**:
@@ -195,7 +245,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/thumbnails/regenerate`
+### §1.12 `POST /api/thumbnails/regenerate`
 指定PDFのサムネイルを再生成する。
 
 **リクエストボディ**:
@@ -215,7 +265,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/thumbnails/page`
+### §1.13 `GET /api/thumbnails/page`
 指定ページのサムネイル画像をオンデマンドで返す。ページスライダーのドラッグ中プレビュー用途。
 
 ソースによって取得方法が異なる:
@@ -243,9 +293,9 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-## 書籍メタデータ
+## §2. 書籍メタデータ
 
-### `POST /api/meta/auto-fill`
+### §2.1 `POST /api/meta/auto-fill`
 指定ソースの書籍に対してサークル名自動登録ジョブを開始する。
 
 **クエリパラメータ**:
@@ -262,7 +312,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/meta/auto-fill/status`
+### §2.2 `GET /api/meta/auto-fill/status`
 自動登録ジョブの進捗を取得する。クライアントは 1500ms 間隔でポーリングする。
 
 **クエリパラメータ**:
@@ -286,7 +336,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/meta/auto-fill/test`
+### §2.3 `GET /api/meta/auto-fill/test`
 1件分の自動登録をデバッグ実行する。ジョブを起動せず同期的に、各ステップ（DLsite/Fanza 直接検索 / 汎用クエリへのフォールバック / Gemma 抽出結果）の中間状態を返す。SearXNG・Gemma の挙動確認用。
 
 **クエリパラメータ**:
@@ -312,7 +362,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/meta`
+### §2.4 `GET /api/meta`
 指定ソースの書籍メタデータを全件取得する。各エントリは作者名・タグ・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグなどを含む。
 
 **クエリパラメータ**:
@@ -344,7 +394,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/meta/export`
+### §2.5 `GET /api/meta/export`
 指定ソースの書籍メタデータ全体を JSON ファイルとしてダウンロードする。バックアップ・環境移行用。
 
 **クエリパラメータ**:
@@ -357,7 +407,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `PATCH /api/meta`
+### §2.6 `PATCH /api/meta`
 1冊または複数冊の作者名・タグ・非表示フラグ・ジャンルを上書き保存する。指定されたフィールドのみ更新し、他のフィールド（閲覧履歴等）は保持される。
 
 **リクエストボディ**:
@@ -395,7 +445,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/meta/view`
+### §2.7 `POST /api/meta/view`
 書籍の閲覧を記録する。`last_viewed_at` は呼び出し毎に常に更新されるが、`view_count` は前回の閲覧から `VIEW_COUNT_DEBOUNCE_SEC = 300`（5分）以上経過した場合のみ +1 される（連打抑制）。`authors` 等の他フィールドは保持される。
 
 **リクエストボディ**:
@@ -421,9 +471,9 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-## シリーズ管理
+## §3. シリーズ管理
 
-### `POST /api/series/resolve`
+### §3.1 `POST /api/series/resolve`
 シリーズ自動グループ化ジョブを起動する。指定ソースの書籍を走査し、ルールベース（タイトル前方一致 + 作者完全一致 + 巻数パターン）で同シリーズと判定されたエントリに `series_id` / `series_title` / `series_index` を書き戻す。
 
 **クエリパラメータ**:
@@ -438,7 +488,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/series/assign`
+### §3.2 `POST /api/series/assign`
 書籍を既存または新規シリーズに割り当てる（手動編集用）。複数書籍を同時に同じシリーズへ追加できる。
 
 **リクエストボディ**:
@@ -467,7 +517,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/series/unassign`
+### §3.3 `POST /api/series/unassign`
 書籍をシリーズから外す（series_id / series_title / series_index フィールドを削除する）。
 
 **リクエストボディ**:
@@ -483,7 +533,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `POST /api/series/reorder`
+### §3.4 `POST /api/series/reorder`
 同じシリーズに属する書籍の `series_index` を **配列の順序どおり 1.0, 2.0, 3.0, ...** に振り直す（DnD 並べ替え用）。
 
 **リクエストボディ**:
@@ -506,7 +556,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/series/resolve/status`
+### §3.5 `GET /api/series/resolve/status`
 シリーズ判定ジョブの進捗を返す。
 
 **クエリパラメータ**:
@@ -530,9 +580,9 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-## PDF生成
+## §4. PDF生成
 
-### `POST /api/generate`
+### §4.1 `POST /api/generate`
 指定ディレクトリ内の画像からPDFを生成する。生成された PDF は `backend/data/main/pdfs_compressed/` 配下に保存される（`/pdfs` 静的マウントから配信）。
 
 **リクエストボディ**:
@@ -554,7 +604,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/generate/job/{job_id}`
+### §4.2 `GET /api/generate/job/{job_id}`
 非同期PDF生成ジョブの進捗・結果を取得する。クライアントは 1500ms 間隔でポーリングする。
 
 **パスパラメータ**:
@@ -581,7 +631,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ---
 
-### `GET /api/status`
+### §4.3 `GET /api/status`
 PDF生成処理の進捗状況を取得する。
 
 **クエリパラメータ**:
@@ -600,7 +650,7 @@ PDF生成処理の進捗状況を取得する。
 
 ---
 
-### `POST /api/batch_compress`
+### §4.4 `POST /api/batch_compress`
 `data/main/images/` 配下の全WebP画像を一括で圧縮PDFに変換する。既存ファイルはスキップ。
 
 **リクエストボディ**:
@@ -612,9 +662,9 @@ PDF生成処理の進捗状況を取得する。
 
 ---
 
-## OCR
+## §5. OCR
 
-### `POST /api/ocr/run`
+### §5.1 `POST /api/ocr/run`
 Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 **クエリパラメータ**:
@@ -622,12 +672,12 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `POST /api/ocr/stop`
+### §5.2 `POST /api/ocr/stop`
 実行中のOCRプロセスを停止する。
 
 ---
 
-### `GET /api/ocr/status`
+### §5.3 `GET /api/ocr/status`
 現在のOCRプロセスのステータスとログを取得する。
 
 **レスポンス**:
@@ -642,11 +692,11 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-## hitomi.la 新着監視
+## §6. hitomi.la 新着監視
 
 詳細設計: [hitomi新着監視設計書.md §6](hitomi新着監視設計書.md#6-api-仕様)
 
-### `GET /api/hitomi/new-arrivals`
+### §6.1 `GET /api/hitomi/new-arrivals`
 
 未既読の新着ギャラリー一覧と監視ジョブのヘルス情報を取得する。
 
@@ -678,7 +728,7 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `POST /api/hitomi/dismiss/{gallery_id}`
+### §6.2 `POST /api/hitomi/dismiss/{gallery_id}`
 
 新着アイテムを既読化（`dismissed=true`）する。
 
@@ -692,7 +742,7 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `POST /api/hitomi/dismiss-all`
+### §6.3 `POST /api/hitomi/dismiss-all`
 
 未読の全アイテムを一括既読化する。
 
@@ -700,7 +750,7 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `GET /api/hitomi/watchlist`
+### §6.4 `GET /api/hitomi/watchlist`
 
 監視対象の作者一覧を取得する。
 
@@ -720,7 +770,7 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `POST /api/hitomi/watchlist`
+### §6.5 `POST /api/hitomi/watchlist`
 
 監視対象の作者を追加する。NOZOMI URL の存在確認を行い、登録時に `state.json` の `top_id` を初期化する（既存作品の誤検出防止）。
 
@@ -737,7 +787,7 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `DELETE /api/hitomi/watchlist/{normalized}`
+### §6.6 `DELETE /api/hitomi/watchlist/{normalized}`
 
 監視対象を削除する。`state.json` の該当エントリも削除する。
 
@@ -754,7 +804,7 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 ---
 
-### `POST /api/hitomi/run-now`
+### §6.7 `POST /api/hitomi/run-now`
 
 監視スクリプトを同期実行する（Task Scheduler を待たず即時取得）。実行中の二重起動は 409 で拒否。
 

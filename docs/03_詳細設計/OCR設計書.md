@@ -2,6 +2,9 @@
 
 縦書き小説OCR（yomitoku）を用いたSearchable PDF生成の設計と改善記録。
 
+- 最終更新: 2026-05-07（鮮度確認済み: 設計内容に変更なし、参照パス・モジュール構成も実装と整合）
+- 関連: [ADR-0003: image-only モード](../02_基本設計/ADR/0003_generated-image-only-mode.md)（`generated` ソースは OCR 対象外）、[GPU環境セットアップ.md](../04_環境構築/GPU環境セットアップ.md)（`uv` ベースに更新済み）
+
 ---
 
 ## アーキテクチャ概要
