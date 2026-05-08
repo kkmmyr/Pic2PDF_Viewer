@@ -6,7 +6,6 @@
 """
 import hashlib
 import os
-from typing import Literal, TypedDict
 
 from config import get_dirs_by_source
 from services.meta_store import MetaDict, make_key
@@ -14,24 +13,6 @@ from services.volume_parser import parse_pair_volume_indexes
 from utils.file_utils import is_pdf_file
 
 SERIES_MIN_PREFIX_LEN = 5
-# A-6: 未分類候補レポート用、自動判定よりゆるい下限（短すぎてカットされたペアを拾う）
-SERIES_CANDIDATE_MIN_PREFIX_LEN = 3
-SERIES_UNRESOLVED_MAX_CANDIDATES = 200
-
-UnresolvedReason = Literal["short_prefix", "volume_parse_failed"]
-
-
-class CandidateBook(TypedDict):
-    path: str
-    name: str
-    title: str
-
-
-class UnresolvedCandidate(TypedDict):
-    reason: UnresolvedReason
-    score: float
-    common_prefix: str
-    books: list[CandidateBook]
 
 
 def common_prefix(a: str, b: str) -> str:
@@ -140,72 +121,6 @@ def detect_series_in_group(
     for key, (prefix, idx) in best_for_key.items():
         result[key] = (prefix, idx)
     return result
-
-
-def unresolved_candidates(source: str, meta: MetaDict) -> list[UnresolvedCandidate]:
-    """シリーズ自動判定で漏れた候補ペアを抽出する（A-6 / 機能追加候補.md）。
-
-    既存の `detect_series_in_group` の閾値（SERIES_MIN_PREFIX_LEN=5 + 巻数パース成功）
-    を意図的に緩めた debug 抽出。書き込み副作用なし。
-
-    抽出ルール:
-    - 既に `series_id` を持つ書籍はペアの両側で除外
-    - reason='short_prefix': プレフィックス長 [3, 5) かつ巻数パース成功
-    - reason='volume_parse_failed': プレフィックス長 >= 5 かつ巻数パース失敗
-
-    Returns:
-        score 降順で最大 SERIES_UNRESOLVED_MAX_CANDIDATES 件のリスト。
-    """
-    books = collect_books(source)
-    groups = group_by_authors(books, meta)
-
-    candidates: list[UnresolvedCandidate] = []
-    for group in groups.values():
-        # 既に series_id 割当済みの書籍を除外
-        unassigned = [
-            (path, name, title)
-            for (path, name, title) in group
-            if not meta.get(make_key(path, name), {}).get("series_id")
-        ]
-        n = len(unassigned)
-        if n < 2:
-            continue
-        for i in range(n):
-            for j in range(i + 1, n):
-                path_i, name_i, title_i = unassigned[i]
-                path_j, name_j, title_j = unassigned[j]
-                prefix = common_prefix(title_i, title_j)
-                pl = len(prefix)
-                idx_i, idx_j = parse_pair_volume_indexes(
-                    title_i[pl:], title_j[pl:]
-                )
-                parse_ok = idx_i is not None and idx_j is not None
-
-                reason: UnresolvedReason | None = None
-                if SERIES_CANDIDATE_MIN_PREFIX_LEN <= pl < SERIES_MIN_PREFIX_LEN and parse_ok:
-                    reason = "short_prefix"
-                elif pl >= SERIES_MIN_PREFIX_LEN and not parse_ok:
-                    reason = "volume_parse_failed"
-                if reason is None:
-                    continue
-
-                display_prefix = trim_prefix(prefix)
-                if not display_prefix:
-                    continue
-                shorter_len = min(len(title_i), len(title_j))
-                score = pl / shorter_len if shorter_len > 0 else 0.0
-                candidates.append({
-                    "reason": reason,
-                    "score": round(score, 4),
-                    "common_prefix": display_prefix,
-                    "books": [
-                        {"path": path_i, "name": name_i, "title": title_i},
-                        {"path": path_j, "name": name_j, "title": title_j},
-                    ],
-                })
-
-    candidates.sort(key=lambda c: c["score"], reverse=True)
-    return candidates[:SERIES_UNRESOLVED_MAX_CANDIDATES]
 
 
 def collect_series_members(meta: MetaDict) -> dict[str, dict]:

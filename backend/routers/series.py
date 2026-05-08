@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
-from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
-from services.series_detector import stable_series_id, unresolved_candidates
+from services.meta_store import MetaDict, make_key, update_meta_locked
+from services.series_detector import stable_series_id
 from services.series_resolver import get_state, start_resolve_job
 
 router = APIRouter()
@@ -42,19 +42,6 @@ def get_series_resolve_status(source: str = Depends(validated_source)) -> dict:
         "current": state.current,
         "error": state.error,
     }
-
-
-@router.get("/series/unresolved-candidates")
-def get_unresolved_series_candidates(source: str = Depends(validated_source)) -> dict:
-    """シリーズ自動判定で漏れた候補ペアをレポートする（A-6 / 機能追加候補.md）。
-
-    既存の自動判定（POST /api/series/resolve）の閾値を意図的に緩めた debug 抽出。
-    書き込み副作用なし。フロントの「未分類シリーズ候補をレビュー」ダイアログから
-    呼び出され、結果は POST /api/series/assign で手動シリーズ化される。
-    """
-    meta = load_meta(source)
-    candidates = unresolved_candidates(source, meta)
-    return {"candidates": candidates}
 
 
 # ---------------------------------------------------------------------------

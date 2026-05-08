@@ -57,8 +57,6 @@ export const API_ENDPOINTS = {
     SERIES_RESOLVE: '/api/series/resolve',
     /** シリーズ判定ジョブ進捗取得 */
     SERIES_RESOLVE_STATUS: '/api/series/resolve/status',
-    /** 未分類シリーズ候補レポート（A-6） */
-    SERIES_UNRESOLVED_CANDIDATES: '/api/series/unresolved-candidates',
     /** シリーズ手動割り当て */
     SERIES_ASSIGN: '/api/series/assign',
     /** シリーズ手動解除 */
