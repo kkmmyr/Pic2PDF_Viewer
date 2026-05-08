@@ -24,6 +24,8 @@ interface ReaderHeaderProps {
     showHeader: boolean;
     isSearchOpen: boolean;
     isFullscreen: boolean;
+    /** 関連書籍ページ中はページ番号インジケータを非表示にする */
+    hidePageIndicator?: boolean;
     onClose: () => void;
     onToggleDirection: () => void;
     onCycleSpreadMode: () => void;
@@ -55,6 +57,7 @@ export function ReaderHeader({
     showHeader,
     isSearchOpen,
     isFullscreen,
+    hidePageIndicator = false,
     onClose,
     onToggleDirection,
     onCycleSpreadMode,
@@ -105,9 +108,11 @@ export function ReaderHeader({
                     {SPREAD_MODE_CONFIG[spreadMode].label}
                 </button>
 
-                <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
-                    {pageNumber} / {numPages}
-                </span>
+                {!hidePageIndicator && (
+                    <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
+                        {pageNumber} / {numPages}
+                    </span>
+                )}
 
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2" />
 

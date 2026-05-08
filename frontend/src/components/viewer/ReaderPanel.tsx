@@ -23,7 +23,7 @@ import { useReaderUIState } from '../../hooks/useReaderUIState';
 import { usePdfDocumentState } from '../../hooks/usePdfDocumentState';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
-import { RelatedBooksPanel } from '../reader/RelatedBooksPanel';
+import { RelatedBooksPage } from '../reader/RelatedBooksPage';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
@@ -94,13 +94,6 @@ export function ReaderPanel({
         useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
 
-    const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } = useReaderNavigation({
-        numPages,
-        isSpread,
-        direction,
-        isActive: true,
-    });
-
     const { toasts, showToast, dismissToast } = useToast();
 
     // 「次の巻へ」用に書籍メタデータを参照する。
@@ -110,6 +103,32 @@ export function ReaderPanel({
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const relatedBooks = useRelatedBooks(meta, currentPath, selectedPdf);
+
+    // 関連書籍ページ（最終ページの次の仮想ページ）に居るかどうか。
+    // 最終ページから next で true、関連書籍ページで prev で false、本切替で false。
+    const [isOnRelatedPage, setIsOnRelatedPage] = useState(false);
+
+    const handleNextAtEnd = useCallback(() => {
+        // 末尾で次へ送られたら関連書籍ページに切替（候補が 1 件以上ある場合のみ）
+        if (relatedBooks.series.length === 0 && relatedBooks.authors.length === 0) return;
+        if (!onSelectPdf) return;
+        setIsOnRelatedPage(true);
+    }, [relatedBooks, onSelectPdf]);
+
+    const handlePrevIntercept = useCallback(() => {
+        if (!isOnRelatedPage) return false;
+        setIsOnRelatedPage(false);
+        return true;
+    }, [isOnRelatedPage]);
+
+    const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } = useReaderNavigation({
+        numPages,
+        isSpread,
+        direction,
+        isActive: true,
+        onNextAtEnd: handleNextAtEnd,
+        onPrevIntercept: handlePrevIntercept,
+    });
 
     const handleSelectRelated = useCallback(
         (name: string) => {
@@ -221,6 +240,7 @@ export function ReaderPanel({
         resetAutoSpread();
         handleCloseSearch();
         resetPage();
+        setIsOnRelatedPage(false);
     }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread, resetNumPages]);
 
     const handleClose = useCallback(() => {
@@ -306,6 +326,7 @@ export function ReaderPanel({
                 showHeader={showHeader || isSearchOpen}
                 isSearchOpen={isSearchOpen}
                 isFullscreen={isFullscreen}
+                hidePageIndicator={isOnRelatedPage}
                 onClose={handleClose}
                 onToggleDirection={toggleDirection}
                 onCycleSpreadMode={cycleSpreadMode}
@@ -322,7 +343,7 @@ export function ReaderPanel({
                 numPages={numPages}
                 isSpread={isSpread}
                 direction={direction}
-                show={showSlider}
+                show={showSlider && !isOnRelatedPage}
                 selectedPdf={selectedPdf}
                 currentPath={currentPath}
                 currentSource={currentSource}
@@ -342,39 +363,51 @@ export function ReaderPanel({
                 />
             )}
 
-            <div
-                className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
-            >
+            {isOnRelatedPage ? (
                 <div
-                    className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
-                    onClick={handleNext}
+                    className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
                 >
-                    {isImageMode ? (
-                        <div className="flex gap-0 shadow-2xl justify-center bg-gray-900">
-                            {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
-                        </div>
-                    ) : (
-                        <Document
-                            file={pdfUrl}
-                            onLoadSuccess={onDocumentLoadSuccess}
-                            className="flex justify-center"
-                            loading={
-                                <div className="flex items-center justify-center h-96">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
-                                </div>
-                            }
-                        >
-                            <div className="flex shadow-2xl">
+                    <RelatedBooksPage
+                        related={relatedBooks}
+                        currentPath={currentPath}
+                        currentSource={currentSource}
+                        onSelect={handleSelectRelated}
+                    />
+                </div>
+            ) : (
+                <div
+                    className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
+                >
+                    <div
+                        className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
+                        onClick={handleNext}
+                    >
+                        {isImageMode ? (
+                            <div className="flex gap-0 shadow-2xl justify-center bg-gray-900">
                                 {isSpread
                                     ? renderSpreadPages()
                                     : renderPageItem(pageNumber, 'single')}
                             </div>
-                        </Document>
-                    )}
+                        ) : (
+                            <Document
+                                file={pdfUrl}
+                                onLoadSuccess={onDocumentLoadSuccess}
+                                className="flex justify-center"
+                                loading={
+                                    <div className="flex items-center justify-center h-96">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
+                                    </div>
+                                }
+                            >
+                                <div className="flex shadow-2xl">
+                                    {isSpread
+                                        ? renderSpreadPages()
+                                        : renderPageItem(pageNumber, 'single')}
+                                </div>
+                            </Document>
+                        )}
+                    </div>
                 </div>
-            </div>
-            {isAtLastSpread && onSelectPdf && (
-                <RelatedBooksPanel related={relatedBooks} onSelect={handleSelectRelated} />
             )}
 
             <ConfirmDialog
