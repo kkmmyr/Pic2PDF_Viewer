@@ -1,10 +1,12 @@
 import { Library, BookOpen, Eye, EyeOff } from 'lucide-react';
-import type { LibrarySource, SortOrder } from '../../types';
+import type { LibrarySource, ReadState, SortOrder } from '../../types';
 import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
 import { ToolsMenu } from '../viewer/ToolsMenu';
 import { Button } from '../ui/Button';
+
+type ReadStateFilter = '' | ReadState;
 
 interface LibraryFilterBarProps {
     searchText: string;
@@ -13,7 +15,7 @@ interface LibraryFilterBarProps {
     allAuthors: string[];
     allTags: string[];
     groupMode: GroupMode;
-    showUnreadOnly: boolean;
+    readStateFilter: ReadStateFilter;
     showHidden: boolean;
     sortOrder: SortOrder;
     currentSource: LibrarySource;
@@ -23,7 +25,7 @@ interface LibraryFilterBarProps {
     onAuthorFilterChange: (author: string) => void;
     onTagFilterChange: (tag: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
-    onToggleUnreadOnly: () => void;
+    onReadStateFilterChange: (value: ReadStateFilter) => void;
     onToggleShowHidden: () => void;
     onSortChange: (order: SortOrder) => void;
     onMetaRefresh: () => void;
@@ -37,7 +39,7 @@ export function LibraryFilterBar({
     allAuthors,
     allTags,
     groupMode,
-    showUnreadOnly,
+    readStateFilter,
     showHidden,
     sortOrder,
     currentSource,
@@ -47,7 +49,7 @@ export function LibraryFilterBar({
     onAuthorFilterChange,
     onTagFilterChange,
     onGroupModeChange,
-    onToggleUnreadOnly,
+    onReadStateFilterChange,
     onToggleShowHidden,
     onSortChange,
     onMetaRefresh,
@@ -96,15 +98,25 @@ export function LibraryFilterBar({
                 </select>
             </div>
 
-            <Button
-                variant="secondary"
-                active={showUnreadOnly}
-                onClick={onToggleUnreadOnly}
-                title={showUnreadOnly ? '全書籍を表示する' : '未読書籍のみを表示する'}
-            >
-                <BookOpen className="w-4 h-4" />
-                未読のみ
-            </Button>
+            {/* 読書状態フィルタ。空文字 = 全件表示 / unread = 未読 / reading = 読書中 / done = 読了。 */}
+            <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
+                <BookOpen className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                <select
+                    value={readStateFilter}
+                    onChange={(e) => onReadStateFilterChange(e.target.value as ReadStateFilter)}
+                    title="読書状態で絞り込む"
+                    className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-accent-400 ${
+                        readStateFilter
+                            ? 'text-accent-700 dark:text-accent-300 border-accent-400 dark:border-accent-600 ring-1 ring-accent-200 dark:ring-accent-800'
+                            : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
+                    }`}
+                >
+                    <option value="">読書状態すべて</option>
+                    <option value="unread">未読のみ</option>
+                    <option value="reading">読書中のみ</option>
+                    <option value="done">読了のみ</option>
+                </select>
+            </div>
 
             <Button
                 variant="secondary"

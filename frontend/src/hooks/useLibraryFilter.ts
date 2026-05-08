@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { PdfFile, BookMetaMap } from '../types';
+import type { PdfFile, BookMetaMap, ReadState } from '../types';
 
 interface UseLibraryFilterParams {
     pdfs: PdfFile[];
@@ -15,8 +15,11 @@ interface UseLibraryFilterParams {
      * - `true`: 非表示書籍のみを表示する。
      */
     showHidden?: boolean;
-    /** 未読フィルター。`true` のとき view_count === 0（または未記録）の書籍のみを表示する。 */
-    showUnreadOnly?: boolean;
+    /**
+     * 読書状態フィルター（空文字なら無効）。
+     * `meta[key].read_state` が無いエントリは `view_count` から派生して扱う。
+     */
+    readStateFilter?: '' | ReadState;
     /** ジャンルフィルター（空文字なら無効） */
     genreFilter?: string;
     currentPath: string;
@@ -44,8 +47,10 @@ function isHiddenInMeta(meta: BookMetaMap, path: string, name: string): boolean 
     return getEntryFromMeta(meta, path, name)?.hidden === true;
 }
 
-function getViewCountFromMeta(meta: BookMetaMap, path: string, name: string): number {
-    return getEntryFromMeta(meta, path, name)?.view_count ?? 0;
+function getReadStateFromMeta(meta: BookMetaMap, path: string, name: string): ReadState {
+    const entry = getEntryFromMeta(meta, path, name);
+    if (entry?.read_state) return entry.read_state;
+    return (entry?.view_count ?? 0) > 0 ? 'reading' : 'unread';
 }
 
 export function useLibraryFilter({
@@ -55,7 +60,7 @@ export function useLibraryFilter({
     tagFilter = '',
     seriesFilter = '',
     showHidden = false,
-    showUnreadOnly = false,
+    readStateFilter = '',
     genreFilter = '',
     currentPath,
     meta,
@@ -97,8 +102,10 @@ export function useLibraryFilter({
             );
         }
 
-        if (showUnreadOnly) {
-            result = result.filter((p) => getViewCountFromMeta(meta, currentPath, p.name) === 0);
+        if (readStateFilter) {
+            result = result.filter(
+                (p) => getReadStateFromMeta(meta, currentPath, p.name) === readStateFilter,
+            );
         }
 
         if (genreFilter) {
@@ -115,7 +122,7 @@ export function useLibraryFilter({
         tagFilter,
         seriesFilter,
         showHidden,
-        showUnreadOnly,
+        readStateFilter,
         genreFilter,
         currentPath,
         meta,

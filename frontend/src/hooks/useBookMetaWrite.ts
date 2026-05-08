@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { BookMetaEntry } from '../types';
+import type { BookMetaEntry, ReadState } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import type { SetBookMeta, MakeBookMetaKey } from './useBookMetaCore';
@@ -15,13 +15,21 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
         async (
             path: string,
             names: string[],
-            fields: { authors?: string[]; tags?: string[]; hidden?: boolean; genre?: string },
+            fields: {
+                authors?: string[];
+                tags?: string[];
+                hidden?: boolean;
+                genre?: string;
+                /** 'unread' | 'reading' | 'done' | '' （空文字でクリア＝派生に戻す） */
+                read_state?: ReadState | '';
+            },
         ) => {
             if (
                 fields.authors === undefined &&
                 fields.tags === undefined &&
                 fields.hidden === undefined &&
-                fields.genre === undefined
+                fields.genre === undefined &&
+                fields.read_state === undefined
             )
                 return;
 
@@ -32,6 +40,7 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
                 ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
                 ...(fields.hidden !== undefined ? { hidden: fields.hidden } : {}),
                 ...(fields.genre !== undefined ? { genre: fields.genre } : {}),
+                ...(fields.read_state !== undefined ? { read_state: fields.read_state } : {}),
                 source,
             });
 
@@ -58,6 +67,13 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
                             merged.genre = fields.genre;
                         } else {
                             delete merged.genre;
+                        }
+                    }
+                    if (fields.read_state !== undefined) {
+                        if (fields.read_state === '') {
+                            delete merged.read_state;
+                        } else {
+                            merged.read_state = fields.read_state;
                         }
                     }
 
@@ -106,5 +122,12 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
         [updateMeta],
     );
 
-    return { updateMeta, updateAuthors, updateTags, updateGenre, setHidden };
+    const setReadState = useCallback(
+        (path: string, names: string[], state: ReadState | '') => {
+            return updateMeta(path, names, { read_state: state });
+        },
+        [updateMeta],
+    );
+
+    return { updateMeta, updateAuthors, updateTags, updateGenre, setHidden, setReadState };
 }

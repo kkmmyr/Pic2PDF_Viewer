@@ -83,8 +83,8 @@ export function LibraryPanel() {
         setGroupMode,
         showHidden,
         toggleShowHidden,
-        showUnreadOnly,
-        toggleShowUnreadOnly,
+        readStateFilter,
+        setReadStateFilter,
         genreFilter,
         setGenreFilter,
     } = useLibrarySettings();
@@ -116,6 +116,7 @@ export function LibraryPanel() {
         getSeries,
         getViewCount,
         getLastViewedAt,
+        getReadState,
         isHidden,
         recordView,
         updateAuthors,
@@ -186,7 +187,7 @@ export function LibraryPanel() {
         tagFilter,
         seriesFilter,
         showHidden,
-        showUnreadOnly,
+        readStateFilter,
         genreFilter,
         currentPath,
         meta,
@@ -319,8 +320,8 @@ export function LibraryPanel() {
                 onTagFilterChange={setTagFilter}
                 onGroupModeChange={handleGroupModeChange}
                 onToggleShowHidden={toggleShowHidden}
-                showUnreadOnly={showUnreadOnly}
-                onToggleUnreadOnly={toggleShowUnreadOnly}
+                readStateFilter={readStateFilter}
+                onReadStateFilterChange={setReadStateFilter}
                 onMetaRefresh={refreshMeta}
             />
 
@@ -394,7 +395,7 @@ export function LibraryPanel() {
                         }}
                         onToggleHidden={bulkActions.handleToggleHiddenOne}
                         showHidden={showHidden}
-                        getIsUnread={(name) => getViewCount(currentPath, name) === 0}
+                        getReadState={(name) => getReadState(currentPath, name)}
                         onEditSeries={seriesEdit.open}
                         dndEnabled={!!seriesFilter}
                         onReorder={bulkActions.handleSeriesReorder}

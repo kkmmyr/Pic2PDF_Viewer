@@ -147,6 +147,51 @@ describe('useBookMetaWrite', () => {
         });
     });
 
+    describe('setReadState', () => {
+        it('setReadState("done") で merged.read_state="done"', async () => {
+            const { result } = renderCombined({ 'a.pdf': { authors: ['X'], view_count: 1 } });
+            await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
+
+            await act(async () => {
+                await result.current.setReadState('', ['a.pdf'], 'done');
+            });
+            expect(result.current.meta['a.pdf']?.read_state).toBe('done');
+            expect(mockedPatch).toHaveBeenCalledWith('/api/meta', expect.objectContaining({
+                read_state: 'done',
+                names: ['a.pdf'],
+            }));
+        });
+
+        it('setReadState("") で read_state フィールドが削除される', async () => {
+            const { result } = renderCombined({
+                'a.pdf': { authors: ['X'], read_state: 'reading' },
+            });
+            await waitFor(() => expect(result.current.meta['a.pdf']?.read_state).toBe('reading'));
+
+            await act(async () => {
+                await result.current.setReadState('', ['a.pdf'], '');
+            });
+            expect(result.current.meta['a.pdf']?.read_state).toBeUndefined();
+        });
+
+        it('setReadState は authors / view_count 等を保持する', async () => {
+            const { result } = renderCombined({
+                'a.pdf': { authors: ['X'], view_count: 3, last_viewed_at: 12345 },
+            });
+            await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
+
+            await act(async () => {
+                await result.current.setReadState('', ['a.pdf'], 'reading');
+            });
+            expect(result.current.meta['a.pdf']).toMatchObject({
+                authors: ['X'],
+                view_count: 3,
+                last_viewed_at: 12345,
+                read_state: 'reading',
+            });
+        });
+    });
+
     describe('updateMeta（直接呼び出し）', () => {
         it('全フィールド undefined だと no-op（PATCH 呼ばない）', async () => {
             const { result } = renderCombined();

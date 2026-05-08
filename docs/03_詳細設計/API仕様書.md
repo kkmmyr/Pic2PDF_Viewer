@@ -363,7 +363,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ### §2.4 `GET /api/meta`
-指定ソースの書籍メタデータを全件取得する。各エントリは作者名・タグ・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグなどを含む。
+指定ソースの書籍メタデータを全件取得する。各エントリは作者名・タグ・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグ・読書状態などを含む。
 
 **クエリパラメータ**:
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
@@ -378,7 +378,8 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
     "last_viewed_at": 1714200000.0,
     "series_id": "abc12345",
     "series_title": "シリーズタイトル",
-    "series_index": 1.5
+    "series_index": 1.5,
+    "read_state": "reading"
   },
   "subdir/another.pdf": {
     "authors": ["作者A", "作者B"],
@@ -387,10 +388,11 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 }
 ```
 - キー: `"{path}/{filename}"` または `"{filename}"`（path が空の場合）
-- すべての追加フィールド（`tags` / `view_count` / `last_viewed_at` / `series_id` / `series_title` / `series_index` / `hidden`）は登録があった場合のみ含まれる任意フィールド。
+- すべての追加フィールド（`tags` / `view_count` / `last_viewed_at` / `series_id` / `series_title` / `series_index` / `hidden` / `read_state`）は登録があった場合のみ含まれる任意フィールド。
 - `last_viewed_at` は UNIX タイムスタンプ（秒、float）。
 - `series_index` は `float`（小数巻 `2.5` 等に対応）。
 - `hidden=true` の書籍は通常モードでは UI 上非表示（API レスポンスには含まれる）。
+- `read_state` は `'unread' | 'reading' | 'done'` のいずれか。**未設定の既存エントリは `view_count` から派生**（0 → unread / >0 → reading）するため、フロント側で「フィールド有無」を意識する必要はない。詳細は §2.6 / §2.7 / [詳細設計書_バックエンド編 §1.4 読書状態](詳細設計書_バックエンド編.md)。
 
 ---
 
@@ -419,6 +421,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "tags": ["ジャンル1"],
   "hidden": true,
   "genre": "オリジナル",
+  "read_state": "done",
   "source": "generated"
 }
 ```
@@ -427,7 +430,8 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 - `tags` — 上書きするタグリスト（**省略時は変更しない**）
 - `hidden` — 非表示フラグ（**省略時は変更しない**、`true` で非表示化、`false` で再表示してフィールド削除）
 - `genre` — ジャンル文字列（**省略時は変更しない**、空文字でフィールド削除）
-- `authors` / `tags` / `hidden` / `genre` のいずれかは指定が必要。
+- `read_state` — 読書状態 (`'unread' | 'reading' | 'done'`)。**省略時は変更しない**、空文字でフィールド削除（=`view_count` 由来の派生に戻す）
+- `authors` / `tags` / `hidden` / `genre` / `read_state` のいずれかは指定が必要。
 
 **マージ規則**:
 - `authors` / `tags`:
@@ -439,6 +443,10 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 - `genre`:
     - 非空文字列: フィールドを上書き保存。
     - 空文字列 `""`: フィールドを削除。
+- `read_state`:
+    - `'unread'` / `'reading'` / `'done'`: フィールドを上書き保存。
+    - 空文字列 `""`: フィールドを削除（以後は `view_count` 由来の派生で扱われる）。
+    - 上記以外の文字列は 400。
 - 省略した場合 (`undefined`): 該当フィールドは変更しない。
 
 **レスポンス**: `{"message": "Updated", "updated_count": 2}`
@@ -462,12 +470,14 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "view_count": 6,
   "last_viewed_at": 1714200300.5,
-  "incremented": true
+  "incremented": true,
+  "read_state": "reading"
 }
 ```
 - `incremented`: 連打抑制によりカウントが据え置かれた場合は `false`、+1 した場合は `true`。
+- `read_state`: 自動遷移後の読書状態。`incremented=true` のときに既存値が `done` でなければ `'reading'` に自動遷移する（連打抑制でカウントが据え置かれた場合は変更しない）。
 
-**用途**: ライブラリ画面で書籍カードをクリックした瞬間にフロントエンドが呼び出す。「最近見た順」ソート (`recent_view`) と「よく見る順」ソート (`view_desc`) のためのデータを蓄積する。
+**用途**: ライブラリ画面で書籍カードをクリックした瞬間にフロントエンドが呼び出す。「最近見た順」ソート (`recent_view`) と「よく見る順」ソート (`view_desc`) のためのデータを蓄積する。読書状態の自動遷移（unread → reading）もここで行う。最終ページ到達時の `done` 遷移は §2.6 `PATCH /api/meta` で行う。
 
 ---
 

@@ -1,4 +1,6 @@
-import type { LibrarySource, SortOrder } from '../../types';
+import type { LibrarySource, ReadState, SortOrder } from '../../types';
+
+type ReadStateFilter = '' | ReadState;
 import type { GroupMode } from '../../hooks/useLibraryGrouping';
 import { LibraryNavBar } from './LibraryNavBar';
 import { LibraryFilterBar } from './LibraryFilterBar';
@@ -37,8 +39,8 @@ interface LibraryHeaderProps {
     onTagFilterChange: (tag: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
     onToggleShowHidden: () => void;
-    showUnreadOnly: boolean;
-    onToggleUnreadOnly: () => void;
+    readStateFilter: ReadStateFilter;
+    onReadStateFilterChange: (value: ReadStateFilter) => void;
     onMetaRefresh: () => void;
 }
 
@@ -74,8 +76,8 @@ export function LibraryHeader({
     onTagFilterChange,
     onGroupModeChange,
     onToggleShowHidden,
-    showUnreadOnly,
-    onToggleUnreadOnly,
+    readStateFilter,
+    onReadStateFilterChange,
     onMetaRefresh,
 }: LibraryHeaderProps) {
     return (
@@ -94,7 +96,7 @@ export function LibraryHeader({
                 allAuthors={allAuthors}
                 allTags={allTags}
                 groupMode={groupMode}
-                showUnreadOnly={showUnreadOnly}
+                readStateFilter={readStateFilter}
                 showHidden={showHidden}
                 sortOrder={sortOrder}
                 currentSource={currentSource}
@@ -104,7 +106,7 @@ export function LibraryHeader({
                 onAuthorFilterChange={onAuthorFilterChange}
                 onTagFilterChange={onTagFilterChange}
                 onGroupModeChange={onGroupModeChange}
-                onToggleUnreadOnly={onToggleUnreadOnly}
+                onReadStateFilterChange={onReadStateFilterChange}
                 onToggleShowHidden={onToggleShowHidden}
                 onSortChange={onSortChange}
                 onMetaRefresh={onMetaRefresh}

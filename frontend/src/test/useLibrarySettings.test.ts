@@ -6,7 +6,8 @@ const KEYS = {
     sort: 'librarySortOrder',
     groupMode: 'library_group_mode',
     showHidden: 'library_show_hidden',
-    showUnread: 'library_show_unread_only',
+    readStateFilter: 'library_read_state_filter',
+    legacyShowUnread: 'library_show_unread_only',
     genreFilter: 'library_genre_filter',
 } as const;
 
@@ -21,7 +22,7 @@ describe('useLibrarySettings', () => {
             expect(result.current.sortOrder).toBe('name_asc');
             expect(result.current.groupMode).toBe('none');
             expect(result.current.showHidden).toBe(false);
-            expect(result.current.showUnreadOnly).toBe(false);
+            expect(result.current.readStateFilter).toBe('');
             expect(result.current.genreFilter).toBe('');
         });
 
@@ -29,15 +30,32 @@ describe('useLibrarySettings', () => {
             localStorage.setItem(KEYS.sort, JSON.stringify('created_desc'));
             localStorage.setItem(KEYS.groupMode, JSON.stringify('series'));
             localStorage.setItem(KEYS.showHidden, JSON.stringify(true));
-            localStorage.setItem(KEYS.showUnread, JSON.stringify(true));
+            localStorage.setItem(KEYS.readStateFilter, JSON.stringify('reading'));
             localStorage.setItem(KEYS.genreFilter, JSON.stringify('アクション'));
 
             const { result } = renderHook(() => useLibrarySettings());
             expect(result.current.sortOrder).toBe('created_desc');
             expect(result.current.groupMode).toBe('series');
             expect(result.current.showHidden).toBe(true);
-            expect(result.current.showUnreadOnly).toBe(true);
+            expect(result.current.readStateFilter).toBe('reading');
             expect(result.current.genreFilter).toBe('アクション');
+        });
+    });
+
+    describe('legacy migration (library_show_unread_only)', () => {
+        it('旧 true は readStateFilter="unread" に移行され、旧キーは削除される', () => {
+            localStorage.setItem(KEYS.legacyShowUnread, JSON.stringify(true));
+            const { result } = renderHook(() => useLibrarySettings());
+            expect(result.current.readStateFilter).toBe('unread');
+            expect(JSON.parse(localStorage.getItem(KEYS.readStateFilter)!)).toBe('unread');
+            expect(localStorage.getItem(KEYS.legacyShowUnread)).toBeNull();
+        });
+
+        it('旧 false は readStateFilter="" になり、旧キーは削除される', () => {
+            localStorage.setItem(KEYS.legacyShowUnread, JSON.stringify(false));
+            const { result } = renderHook(() => useLibrarySettings());
+            expect(result.current.readStateFilter).toBe('');
+            expect(localStorage.getItem(KEYS.legacyShowUnread)).toBeNull();
         });
     });
 
@@ -95,23 +113,23 @@ describe('useLibrarySettings', () => {
         });
     });
 
-    describe('toggleShowUnreadOnly', () => {
-        it('false → true にトグルして localStorage に書き込む', () => {
+    describe('setReadStateFilter', () => {
+        it('値を切り替えて localStorage に書き込む', () => {
             const { result } = renderHook(() => useLibrarySettings());
             act(() => {
-                result.current.toggleShowUnreadOnly();
+                result.current.setReadStateFilter('done');
             });
-            expect(result.current.showUnreadOnly).toBe(true);
-            expect(JSON.parse(localStorage.getItem(KEYS.showUnread)!)).toBe(true);
+            expect(result.current.readStateFilter).toBe('done');
+            expect(JSON.parse(localStorage.getItem(KEYS.readStateFilter)!)).toBe('done');
         });
 
-        it('true → false にトグルする', () => {
-            localStorage.setItem(KEYS.showUnread, JSON.stringify(true));
+        it('空文字でフィルター解除', () => {
+            localStorage.setItem(KEYS.readStateFilter, JSON.stringify('reading'));
             const { result } = renderHook(() => useLibrarySettings());
             act(() => {
-                result.current.toggleShowUnreadOnly();
+                result.current.setReadStateFilter('');
             });
-            expect(result.current.showUnreadOnly).toBe(false);
+            expect(result.current.readStateFilter).toBe('');
         });
     });
 

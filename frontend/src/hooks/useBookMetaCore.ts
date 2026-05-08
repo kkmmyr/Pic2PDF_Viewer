@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { BookMetaMap } from '../types';
+import type { BookMetaMap, ReadState } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 
@@ -80,6 +80,16 @@ export function useBookMetaCore(source: string) {
         [meta, makeKey],
     );
 
+    const getReadState = useCallback(
+        (path: string, name: string): ReadState => {
+            const entry = meta[makeKey(path, name)];
+            // 明示フィールドを優先、無ければ view_count から派生（後方互換）
+            if (entry?.read_state) return entry.read_state;
+            return (entry?.view_count ?? 0) > 0 ? 'reading' : 'unread';
+        },
+        [meta, makeKey],
+    );
+
     return {
         meta,
         setMeta,
@@ -91,6 +101,7 @@ export function useBookMetaCore(source: string) {
         isHidden,
         getViewCount,
         getLastViewedAt,
+        getReadState,
     };
 }
 

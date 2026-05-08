@@ -6,10 +6,13 @@ import json
 import os
 import threading
 from collections.abc import Callable
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 from config import DATA_DIR
 from utils.locks import SourceLockManager
+
+ReadState = Literal["unread", "reading", "done"]
+VALID_READ_STATES: tuple[ReadState, ...] = ("unread", "reading", "done")
 
 
 class MetaEntry(TypedDict):
@@ -24,6 +27,8 @@ class MetaEntry(TypedDict):
     hidden: NotRequired[bool]
     # ジャンル（例: "プリンセスコネクト" / "Voiceloid" / "オリジナル"）。
     genre: NotRequired[str]
+    # 読書状態。未設定の既存エントリは view_count から派生（0→unread / >0→reading）。
+    read_state: NotRequired[ReadState]
 
 
 MetaDict = dict[str, MetaEntry]
@@ -77,12 +82,15 @@ def merge_entry_fields(
     tags: list[str] | None = None,
     hidden: bool | None = None,
     genre: str | None = None,
+    read_state: str | None = None,
 ) -> dict:
     """部分的に指定されたフィールドだけを上書きしたエントリを返す（非破壊）。
 
     - `authors` / `tags`: list（空可）。`None` 指定なら変更しない。
     - `hidden`: True なら設定 / False なら削除。`None` 指定なら変更しない。
     - `genre`: 空文字なら削除、文字列なら設定。`None` 指定なら変更しない。
+    - `read_state`: 空文字なら削除、`'unread' | 'reading' | 'done'` なら設定。`None` 指定なら変更しない。
+      不正値はバリデーションエラーとして ValueError。
     """
     merged = dict(entry)
     if authors is not None:
@@ -98,6 +106,13 @@ def merge_entry_fields(
             merged["genre"] = genre
         else:
             merged.pop("genre", None)
+    if read_state is not None:
+        if read_state == "":
+            merged.pop("read_state", None)
+        elif read_state in VALID_READ_STATES:
+            merged["read_state"] = read_state
+        else:
+            raise ValueError(f"Invalid read_state: {read_state!r}")
     return merged
 
 

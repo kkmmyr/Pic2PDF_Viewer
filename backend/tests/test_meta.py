@@ -383,6 +383,94 @@ class TestUpdateHidden:
 
 
 # ---------------------------------------------------------------------------
+# read_state — 自動遷移と手動操作
+# ---------------------------------------------------------------------------
+
+class TestReadStateAutoTransition:
+    def test_first_view_sets_reading(self, view_client, tmp_path):
+        res = view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        assert res.json()["read_state"] == "reading"
+        assert _read_meta(tmp_path)["book.pdf"]["read_state"] == "reading"
+
+    def test_debounced_view_does_not_change_state(self, view_client, tmp_path):
+        # 1 回目で reading になる → 直後の連打は据え置き（reading のまま）
+        view_client.post("/api/meta/view", json={"path": "", "name": "book.pdf", "source": "generated"})
+        # 手動で done に上げる
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "done", "source": "generated",
+        })
+        # 連打抑制中（5 分以内）に再閲覧しても read_state は据え置き＝done のまま
+        res = view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        assert res.json()["incremented"] is False
+        assert res.json()["read_state"] == "done"
+        assert _read_meta(tmp_path)["book.pdf"]["read_state"] == "done"
+
+    def test_done_is_preserved_on_increment(self, view_client, tmp_path):
+        """連打抑制を抜けた再閲覧でも done は維持される（読了済み書籍の再読）。"""
+        view_client.post("/api/meta/view", json={"path": "", "name": "book.pdf", "source": "generated"})
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "done", "source": "generated",
+        })
+        # last_viewed_at を 6 分前に巻き戻して連打抑制を外す
+        meta_path = tmp_path / "meta" / "generated" / "meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["book.pdf"]["last_viewed_at"] = time.time() - 360
+        meta_path.write_text(json.dumps(meta), encoding="utf-8")
+
+        res = view_client.post("/api/meta/view", json={
+            "path": "", "name": "book.pdf", "source": "generated",
+        })
+        assert res.json()["incremented"] is True
+        assert res.json()["read_state"] == "done"
+        assert _read_meta(tmp_path)["book.pdf"]["read_state"] == "done"
+
+
+class TestReadStateManualUpdate:
+    def test_set_done_via_patch(self, view_client, tmp_path):
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "done", "source": "generated",
+        })
+        assert res.status_code == 200
+        assert _read_meta(tmp_path)["book.pdf"]["read_state"] == "done"
+
+    def test_clear_via_empty_string(self, view_client, tmp_path):
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "done", "source": "generated",
+        })
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "", "source": "generated",
+        })
+        # 他フィールドが無いのでエントリごと消える（has_meaningful_value=False）
+        assert "book.pdf" not in _read_meta(tmp_path)
+
+    def test_invalid_read_state_returns_400(self, view_client):
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "finished", "source": "generated",
+        })
+        assert res.status_code == 400
+
+    def test_read_state_only_request_is_accepted(self, view_client):
+        """read_state だけ指定したリクエストは authors/tags/hidden/genre 省略でも 200。"""
+        res = view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "reading", "source": "generated",
+        })
+        assert res.status_code == 200
+
+    def test_read_state_preserves_view_count(self, view_client, tmp_path):
+        view_client.post("/api/meta/view", json={"path": "", "name": "book.pdf", "source": "generated"})
+        view_client.patch("/api/meta", json={
+            "path": "", "names": ["book.pdf"], "read_state": "done", "source": "generated",
+        })
+        meta = _read_meta(tmp_path)
+        assert meta["book.pdf"]["view_count"] == 1
+        assert meta["book.pdf"]["read_state"] == "done"
+
+
+# ---------------------------------------------------------------------------
 # auto_fill_service.run_auto_fill — 既存 view_count / last_viewed_at の保持
 # ---------------------------------------------------------------------------
 

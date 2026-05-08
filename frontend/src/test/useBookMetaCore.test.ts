@@ -140,6 +140,31 @@ describe('useBookMetaCore', () => {
             expect(result.current.getLastViewedAt('', 'missing.pdf')).toBeUndefined();
         });
 
+        it('getReadState: 明示 read_state があれば優先', async () => {
+            mockedGet.mockResolvedValue({
+                'done.pdf': { view_count: 0, read_state: 'done' },
+                'unread.pdf': { view_count: 5, read_state: 'unread' },
+            });
+            const { result } = renderHook(() => useBookMetaCore('generated'));
+            await waitFor(() => expect(result.current.meta['done.pdf']).toBeDefined());
+            expect(result.current.getReadState('', 'done.pdf')).toBe('done');
+            expect(result.current.getReadState('', 'unread.pdf')).toBe('unread');
+        });
+
+        it('getReadState: 派生は view_count から (0 → unread, >0 → reading)', async () => {
+            mockedGet.mockResolvedValue({
+                'fresh.pdf': {},
+                'started.pdf': { view_count: 1 },
+                'often.pdf': { view_count: 10 },
+            });
+            const { result } = renderHook(() => useBookMetaCore('generated'));
+            await waitFor(() => expect(result.current.meta['fresh.pdf']).toBeDefined());
+            expect(result.current.getReadState('', 'fresh.pdf')).toBe('unread');
+            expect(result.current.getReadState('', 'started.pdf')).toBe('reading');
+            expect(result.current.getReadState('', 'often.pdf')).toBe('reading');
+            expect(result.current.getReadState('', 'missing.pdf')).toBe('unread');
+        });
+
         it('path 指定でキーが正しく解決される', async () => {
             mockedGet.mockResolvedValue({
                 'a.pdf': { authors: ['ルート'] },

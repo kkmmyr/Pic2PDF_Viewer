@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -105,13 +105,35 @@ export function ReaderPanel({
     // 「次の巻へ」用に書籍メタデータを参照する。
     // 同 series_id で series_index が現在より大きい中で最小のものを次巻とする。
     // 判定範囲は同フォルダ内のみ（meta のキー prefix で path 一致をチェック）。
-    const { meta, getSeries, recordView } = useBookMeta(currentSource);
+    const { meta, getSeries, recordView, getReadState, setReadState } = useBookMeta(currentSource);
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
 
     // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
     const isAtLastSpread =
         numPages > 0 && (isSpread ? pageNumber + 1 >= numPages : pageNumber >= numPages);
+
+    // 最終ページ到達時に read_state='done' を 1 度だけ立てる。
+    // 多重発火（再描画・状態切替）を useRef で抑止し、selectedPdf 切替時にリセット。
+    const doneSentForRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (!isAtLastSpread) return;
+        if (doneSentForRef.current === selectedPdf) return;
+        if (getReadState(currentPath, selectedPdf) === 'done') {
+            doneSentForRef.current = selectedPdf;
+            return;
+        }
+        doneSentForRef.current = selectedPdf;
+        setReadState(currentPath, [selectedPdf], 'done').catch(() => {
+            // PATCH 失敗時はガードを外し次回再試行可能にする
+            doneSentForRef.current = null;
+        });
+    }, [isAtLastSpread, selectedPdf, currentPath, getReadState, setReadState]);
+
+    useEffect(() => {
+        // 別書籍を開いたらガードをリセット
+        doneSentForRef.current = null;
+    }, [selectedPdf]);
 
     const handleNavigateNextVolume = useCallback(() => {
         if (!nextVolume || !onSelectPdf) return;

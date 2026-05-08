@@ -258,7 +258,7 @@ describe('useLibraryFilter', () => {
         });
     });
 
-    describe('追補: genreFilter / showUnreadOnly', () => {
+    describe('追補: genreFilter / readStateFilter', () => {
         const genrePdfs: PdfFile[] = [
             makePdf('action.pdf'),
             makePdf('comedy.pdf'),
@@ -312,37 +312,76 @@ describe('useLibraryFilter', () => {
             expect(result.current.filteredPdfs).toHaveLength(3);
         });
 
-        const unreadPdfs: PdfFile[] = [makePdf('read.pdf'), makePdf('unread.pdf')];
-        const unreadMeta: BookMetaMap = {
-            'read.pdf': { authors: ['A'], view_count: 5 },
-            'unread.pdf': { authors: ['A'] },
+        // read_state は派生 / 明示 / done の 3 ケース
+        const stateFilterPdfs: PdfFile[] = [
+            makePdf('a.pdf'), // 派生 unread (view_count=0)
+            makePdf('b.pdf'), // 派生 reading (view_count>0)
+            makePdf('c.pdf'), // 明示 done
+            makePdf('d.pdf'), // 明示 unread (view_count>0 だが手動で unread）
+        ];
+        const stateFilterMeta: BookMetaMap = {
+            'a.pdf': { authors: ['A'] },
+            'b.pdf': { authors: ['A'], view_count: 3 },
+            'c.pdf': { authors: ['A'], view_count: 7, read_state: 'done' },
+            'd.pdf': { authors: ['A'], view_count: 1, read_state: 'unread' },
         };
 
-        it('showUnreadOnly=true で view_count=0/未設定の書籍のみ表示', () => {
+        it('readStateFilter="unread" は派生 unread と明示 unread の両方を表示', () => {
             const { result } = renderHook(() =>
                 useLibraryFilter({
-                    pdfs: unreadPdfs,
+                    pdfs: stateFilterPdfs,
                     searchText: '',
                     authorFilter: '',
                     currentPath: '',
-                    meta: unreadMeta,
-                    showUnreadOnly: true,
+                    meta: stateFilterMeta,
+                    readStateFilter: 'unread',
                 }),
             );
-            expect(result.current.filteredPdfs.map((p) => p.name)).toEqual(['unread.pdf']);
+            expect(result.current.filteredPdfs.map((p) => p.name).sort()).toEqual([
+                'a.pdf',
+                'd.pdf',
+            ]);
         });
 
-        it('showUnreadOnly=false（既定）では既読・未読両方', () => {
+        it('readStateFilter="reading" は派生 reading のみ', () => {
             const { result } = renderHook(() =>
                 useLibraryFilter({
-                    pdfs: unreadPdfs,
+                    pdfs: stateFilterPdfs,
                     searchText: '',
                     authorFilter: '',
                     currentPath: '',
-                    meta: unreadMeta,
+                    meta: stateFilterMeta,
+                    readStateFilter: 'reading',
                 }),
             );
-            expect(result.current.filteredPdfs).toHaveLength(2);
+            expect(result.current.filteredPdfs.map((p) => p.name)).toEqual(['b.pdf']);
+        });
+
+        it('readStateFilter="done" は明示 done のみ', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: stateFilterPdfs,
+                    searchText: '',
+                    authorFilter: '',
+                    currentPath: '',
+                    meta: stateFilterMeta,
+                    readStateFilter: 'done',
+                }),
+            );
+            expect(result.current.filteredPdfs.map((p) => p.name)).toEqual(['c.pdf']);
+        });
+
+        it('readStateFilter="" （既定）はすべて表示', () => {
+            const { result } = renderHook(() =>
+                useLibraryFilter({
+                    pdfs: stateFilterPdfs,
+                    searchText: '',
+                    authorFilter: '',
+                    currentPath: '',
+                    meta: stateFilterMeta,
+                }),
+            );
+            expect(result.current.filteredPdfs).toHaveLength(4);
         });
     });
 });

@@ -21,6 +21,7 @@ from services.auto_fill_service import (
     start_auto_fill_job,
 )
 from services.meta_store import (
+    VALID_READ_STATES,
     has_meaningful_value,
     load_meta,
     make_key,
@@ -42,7 +43,7 @@ VIEW_COUNT_DEBOUNCE_SEC = 300
 class UpdateMetaRequest(BaseModel):
     """単一書籍または複数書籍へのメタデータ更新リクエスト。
 
-    `authors` / `tags` / `hidden` / `genre` は省略可。省略されたフィールドは変更しない。
+    `authors` / `tags` / `hidden` / `genre` / `read_state` は省略可。省略されたフィールドは変更しない。
     すべて省略するとエラー（更新する内容が無い）。
     """
     path: str = ""
@@ -51,6 +52,7 @@ class UpdateMetaRequest(BaseModel):
     tags: list[str] | None = None
     hidden: bool | None = None
     genre: str | None = None
+    read_state: str | None = None
     source: str = "generated"
 
 
@@ -99,8 +101,26 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     すべての list フィールドが空になった場合はエントリ自体を削除する。
     """
     assert_valid_source(request.source)
-    if request.authors is None and request.tags is None and request.hidden is None and request.genre is None:
-        raise HTTPException(status_code=400, detail="authors, tags, hidden, or genre must be specified")
+    if (
+        request.authors is None
+        and request.tags is None
+        and request.hidden is None
+        and request.genre is None
+        and request.read_state is None
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="authors, tags, hidden, genre, or read_state must be specified",
+        )
+    if (
+        request.read_state is not None
+        and request.read_state != ""
+        and request.read_state not in VALID_READ_STATES
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid read_state. Choose from: {', '.join(VALID_READ_STATES)} or '' to clear",
+        )
 
     validate_request_targets(request.path, request.names)
 
@@ -118,6 +138,7 @@ def update_meta(request: UpdateMetaRequest) -> dict:
                 tags=tags,
                 hidden=request.hidden,
                 genre=genre,
+                read_state=request.read_state,
             )
             # 非 list フィールド（view_count / hidden 等）が残っていればエントリは保持
             if has_meaningful_value(merged):
@@ -155,10 +176,16 @@ def record_view(request: RecordViewRequest) -> dict:
             or (now - float(prev_viewed_at)) >= VIEW_COUNT_DEBOUNCE_SEC
         )
         new_count = prev_count + 1 if should_increment else prev_count
-        data[key] = {**existing, "view_count": new_count, "last_viewed_at": now}
+        merged = {**existing, "view_count": new_count, "last_viewed_at": now}
+        # 読書状態の自動遷移: カウント増加時のみ unread/未設定 → reading に書き換える。
+        # done は維持（読了済みの再読でも done を保つ）。連打抑制で据え置き時は変更しない。
+        if should_increment and existing.get("read_state") != "done":
+            merged["read_state"] = "reading"
+        data[key] = merged
         result["view_count"] = new_count
         result["last_viewed_at"] = now
         result["incremented"] = should_increment
+        result["read_state"] = merged.get("read_state")
 
     update_meta_locked(request.source, _apply)
     return result

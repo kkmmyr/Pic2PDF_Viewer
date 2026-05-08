@@ -103,4 +103,38 @@ describe('useBookView', () => {
         expect(result.current.meta['a.pdf']?.view_count).toBe(10);
         expect(result.current.meta['a.pdf']?.last_viewed_at).toBe(999);
     });
+
+    it('recordView レスポンスの read_state がローカル meta に反映される (unread → reading)', async () => {
+        mockedPost.mockResolvedValue({
+            view_count: 1,
+            last_viewed_at: 1,
+            incremented: true,
+            read_state: 'reading',
+        });
+        const { result } = renderCombined();
+        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
+
+        await act(async () => {
+            await result.current.recordView('', 'a.pdf');
+        });
+        expect(result.current.meta['a.pdf']?.read_state).toBe('reading');
+    });
+
+    it('recordView レスポンスに read_state が無いとローカルの read_state は保持される', async () => {
+        // 連打抑制でカウント据え置き時はバックエンドが read_state を返さないケースを想定
+        mockedPost.mockResolvedValue({
+            view_count: 5,
+            last_viewed_at: 200,
+            incremented: false,
+        });
+        const { result } = renderCombined({
+            'a.pdf': { authors: ['X'], view_count: 5, read_state: 'done' },
+        });
+        await waitFor(() => expect(result.current.meta['a.pdf']?.read_state).toBe('done'));
+
+        await act(async () => {
+            await result.current.recordView('', 'a.pdf');
+        });
+        expect(result.current.meta['a.pdf']?.read_state).toBe('done');
+    });
 });

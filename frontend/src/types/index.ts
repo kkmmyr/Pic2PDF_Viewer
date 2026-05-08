@@ -106,6 +106,18 @@ export type SortOrder =
     | 'recent_view';
 
 /**
+ * 読書状態。
+ *
+ * - 'unread'  : 未読（NEW バッジ）
+ * - 'reading' : 読書中（📖 バッジ）
+ * - 'done'    : 読了（✓ バッジ）
+ *
+ * `meta.json` に未設定の既存エントリは `view_count` から派生する（0 → unread / >0 → reading）。
+ * 詳細は API 仕様書 §2.4 / §2.6 / §2.7。
+ */
+export type ReadState = 'unread' | 'reading' | 'done';
+
+/**
  * 書籍メタデータ（1冊分）
  */
 export interface BookMetaEntry {
@@ -123,6 +135,8 @@ export interface BookMetaEntry {
     hidden?: boolean;
     /** ジャンル（例: "プリンセスコネクト" / "Voiceloid" / "オリジナル"） */
     genre?: string;
+    /** 読書状態。未設定なら view_count から派生（getReadState で吸収） */
+    read_state?: ReadState;
 }
 
 /**

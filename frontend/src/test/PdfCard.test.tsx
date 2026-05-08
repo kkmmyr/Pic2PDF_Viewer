@@ -77,6 +77,30 @@ describe('PdfCard', () => {
         expect(onTagClick).toHaveBeenCalledWith('t1');
     });
 
+    it('readState="unread" で NEW バッジを表示', () => {
+        const { getByText } = render(<PdfCard {...baseProps} readState="unread" />);
+        expect(getByText('NEW')).toBeInTheDocument();
+    });
+
+    it('readState="reading" で 読書中 バッジを表示（aria-label）', () => {
+        const { getByLabelText } = render(<PdfCard {...baseProps} readState="reading" />);
+        expect(getByLabelText('読書中')).toBeInTheDocument();
+    });
+
+    it('readState="done" で 読了 バッジを表示（aria-label）', () => {
+        const { getByLabelText } = render(<PdfCard {...baseProps} readState="done" />);
+        expect(getByLabelText('読了')).toBeInTheDocument();
+    });
+
+    it('集約カード (isGroup=true) では readState バッジは表示されない', () => {
+        const badge: PdfCardBadge = { count: 3, kind: 'series', displayTitle: 'シリーズX' };
+        const { queryByText, queryByLabelText } = render(
+            <PdfCard {...baseProps} isGroup badge={badge} readState="unread" />,
+        );
+        expect(queryByText('NEW')).toBeNull();
+        expect(queryByLabelText('読書中')).toBeNull();
+    });
+
     it('isSelected で amber の枠線スタイルが付く', () => {
         const { container } = render(<PdfCard {...baseProps} isSelected />);
         const root = container.firstChild as HTMLElement;

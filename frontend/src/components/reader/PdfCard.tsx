@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import type { PdfFile } from '../../types';
+import type { PdfFile, ReadState } from '../../types';
 import { PdfCardThumbnail } from './PdfCardThumbnail';
 import { PdfCardActionButtons } from './PdfCardActionButtons';
 import { formatTimestampJa } from '../../utils/date';
@@ -24,7 +24,7 @@ export interface PdfCardProps {
     badge: PdfCardBadge | null;
     isSelectionMode: boolean;
     showHidden: boolean;
-    isUnread?: boolean;
+    readState?: ReadState;
     onToggleSelect?: (name: string) => void;
     onToggleFavorite?: (name: string) => void;
     onPdfClick: (name: string) => void;
@@ -50,7 +50,7 @@ export function PdfCard({
     badge,
     isSelectionMode,
     showHidden,
-    isUnread,
+    readState,
     onToggleSelect,
     onToggleFavorite,
     onPdfClick,
@@ -166,7 +166,7 @@ export function PdfCard({
                         isSelectionMode={isSelectionMode}
                         showHidden={showHidden}
                         isGroup={isGroup}
-                        isUnread={isUnread}
+                        readState={readState}
                         onRename={onRename}
                         onRegenThumb={onRegenThumb}
                         onToggleHidden={onToggleHidden}
