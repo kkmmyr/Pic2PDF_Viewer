@@ -44,7 +44,6 @@ function StatusBadge({ status }: { status: RunStatus }) {
     );
 }
 
-
 export default function HitomiPage() {
     const {
         items,
@@ -64,8 +63,7 @@ export default function HitomiPage() {
     const [watchlistOpen, setWatchlistOpen] = useState(false);
     const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
 
-    const errMsg = (label: string) => (e: unknown) =>
-        `${label}: ${errorMessage(e, '不明')}`;
+    const errMsg = (label: string) => (e: unknown) => `${label}: ${errorMessage(e, '不明')}`;
 
     const handleDismiss = async (id: number) => {
         await runAsync(() => dismiss(id), errMsg('既読化に失敗しました'));

@@ -34,9 +34,7 @@ export function useAsyncToast(showToast: (message: string, type?: ToastType) => 
                 return await fn();
             } catch (e: unknown) {
                 const message =
-                    typeof fallback === 'function'
-                        ? fallback(e)
-                        : errorMessage(e, fallback);
+                    typeof fallback === 'function' ? fallback(e) : errorMessage(e, fallback);
                 showToast(message, 'error');
                 if (options?.rethrow) throw e;
                 return undefined;
