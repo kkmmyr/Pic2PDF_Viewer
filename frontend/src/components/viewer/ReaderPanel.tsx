@@ -16,6 +16,7 @@ import {
     useBookMeta,
 } from '../../hooks';
 import { useNextSeriesVolume, usePrevSeriesVolume } from '../../hooks/useNextSeriesVolume';
+import { useRelatedBooks } from '../../hooks/useRelatedBooks';
 import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
 import { useReaderUIState } from '../../hooks/useReaderUIState';
@@ -23,6 +24,7 @@ import { usePdfDocumentState } from '../../hooks/usePdfDocumentState';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
 import { NextVolumeBanner } from '../reader/NextVolumeBanner';
+import { RelatedBooksPanel } from '../reader/RelatedBooksPanel';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
@@ -108,6 +110,16 @@ export function ReaderPanel({
     const { meta, getSeries, recordView, getReadState, setReadState } = useBookMeta(currentSource);
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
+    const relatedBooks = useRelatedBooks(meta, currentPath, selectedPdf);
+
+    const handleSelectRelated = useCallback(
+        (name: string) => {
+            if (!onSelectPdf) return;
+            recordView(currentPath, name);
+            onSelectPdf(name);
+        },
+        [onSelectPdf, recordView, currentPath],
+    );
 
     // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
     const isAtLastSpread =
@@ -367,6 +379,9 @@ export function ReaderPanel({
                     title={`次の巻: #${nextVolume.index} ${nextVolume.title}`}
                     onClick={handleNavigateNextVolume}
                 />
+            )}
+            {isAtLastSpread && onSelectPdf && (
+                <RelatedBooksPanel related={relatedBooks} onSelect={handleSelectRelated} />
             )}
 
             <ConfirmDialog
