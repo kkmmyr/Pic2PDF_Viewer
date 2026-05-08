@@ -45,8 +45,8 @@ export function useLibrarySettings() {
     const [showHidden, setShowHiddenState] = useState<boolean>(() =>
         getStorageJson<boolean>(SHOW_HIDDEN_KEY, false),
     );
-    const [readStateFilter, setReadStateFilterState] = useState<ReadStateFilter>(
-        () => migrateLegacyUnreadFilter(),
+    const [readStateFilter, setReadStateFilterState] = useState<ReadStateFilter>(() =>
+        migrateLegacyUnreadFilter(),
     );
     const [genreFilter, setGenreFilterState] = useState<string>(() =>
         getStorageJson<string>(GENRE_FILTER_KEY, ''),

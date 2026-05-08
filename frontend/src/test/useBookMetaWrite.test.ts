@@ -156,10 +156,13 @@ describe('useBookMetaWrite', () => {
                 await result.current.setReadState('', ['a.pdf'], 'done');
             });
             expect(result.current.meta['a.pdf']?.read_state).toBe('done');
-            expect(mockedPatch).toHaveBeenCalledWith('/api/meta', expect.objectContaining({
-                read_state: 'done',
-                names: ['a.pdf'],
-            }));
+            expect(mockedPatch).toHaveBeenCalledWith(
+                '/api/meta',
+                expect.objectContaining({
+                    read_state: 'done',
+                    names: ['a.pdf'],
+                }),
+            );
         });
 
         it('setReadState("") で read_state フィールドが削除される', async () => {
