@@ -12,7 +12,6 @@ export { useToast } from './useToast';
 export { useSpreadMode } from './useSpreadMode';
 export { useEditMode } from './useEditMode';
 export { useFullscreen } from './useFullscreen';
-export { useSeriesResolve } from './useSeriesResolve';
 export { useUrlFilters } from './useUrlFilters';
 export { useLibrarySettings } from './useLibrarySettings';
 export { useLibraryBulkActions } from './useLibraryBulkActions';

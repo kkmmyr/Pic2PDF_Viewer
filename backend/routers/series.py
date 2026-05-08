@@ -1,51 +1,20 @@
-"""シリーズ自動グループ化ルーター。
+"""シリーズ手動編集ルーター。
 
-`POST /api/series/resolve` でジョブ起動、`GET /api/series/resolve/status` で進捗取得。
-auto-fill と同じ非同期ジョブパターン。
-
-手動編集 API: `POST /api/series/assign` / `POST /api/series/unassign`。
+`POST /api/series/assign` / `POST /api/series/unassign` / `POST /api/series/reorder`。
+シリーズ自動グループ化は撤去済み（2026-05-09、Phase 6）。
 """
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from routers._deps import assert_valid_source, validate_request_targets, validated_source
+from routers._deps import assert_valid_source, validate_request_targets
 from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.series_detector import stable_series_id
-from services.series_resolver import get_state, start_resolve_job
 
 router = APIRouter()
 
 
-@router.post("/series/resolve")
-def start_series_resolve(source: str = Depends(validated_source), use_gemma: bool = False) -> dict:
-    """シリーズ判定ジョブを起動する。
-
-    `use_gemma=true` を指定すると、ルール判定後に Gemma で曖昧ケースを再評価する。
-    """
-    state = get_state(source)
-    if state.status == "running":
-        raise HTTPException(status_code=409, detail="Series resolve job is already running")
-
-    start_resolve_job(source, use_gemma=use_gemma)
-    return {"started": True, "source": source, "use_gemma": use_gemma}
-
-
-@router.get("/series/resolve/status")
-def get_series_resolve_status(source: str = Depends(validated_source)) -> dict:
-    """シリーズ判定ジョブの進捗を返す。"""
-    state = get_state(source)
-    return {
-        "status": state.status,
-        "total": state.total,
-        "done": state.done,
-        "created": state.created,
-        "current": state.current,
-        "error": state.error,
-    }
-
-
 # ---------------------------------------------------------------------------
-# 手動編集 API（Phase 4-C）
+# 手動編集 API
 # ---------------------------------------------------------------------------
 
 class AssignSeriesRequest(BaseModel):

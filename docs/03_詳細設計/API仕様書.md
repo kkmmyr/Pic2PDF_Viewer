@@ -26,11 +26,9 @@
   - §2.6 `PATCH /api/meta` — メタデータ更新
   - §2.7 `POST /api/meta/view` — 閲覧記録
 - [§3. シリーズ管理](#3-シリーズ管理)
-  - §3.1 `POST /api/series/resolve` — 自動グループ化ジョブ起動
   - §3.2 `POST /api/series/assign` — シリーズ割り当て
   - §3.3 `POST /api/series/unassign` — シリーズ解除
   - §3.4 `POST /api/series/reorder` — シリーズ内並べ替え
-  - §3.5 `GET /api/series/resolve/status` — シリーズジョブ進捗
 - [§4. PDF生成](#4-pdf生成)
   - §4.1 `POST /api/generate` — PDF 生成ジョブ起動
   - §4.2 `GET /api/generate/job/{job_id}` — 生成ジョブ進捗
@@ -411,21 +409,6 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 ## §3. シリーズ管理
 
-### §3.1 `POST /api/series/resolve`
-シリーズ自動グループ化ジョブを起動する。指定ソースの書籍を走査し、ルールベース（タイトル前方一致 + 作者完全一致 + 巻数パターン）で同シリーズと判定されたエントリに `series_id` / `series_title` / `series_index` を書き戻す。
-
-**クエリパラメータ**:
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
-- `use_gemma` (オプション、`true` / `false`、default `false`) — ルールベース判定後に Gemma を使った曖昧ケース判定を実行するかどうか。`true` の場合、同作者でシリーズ未割当の書籍（巻数パターンでないが同プレフィックスを持つ「外伝」「番外編」など）を 1 件ずつ Gemma に問い合わせ、`YES` 応答ならシリーズに追加する。
-
-**レスポンス**: `{"started": true, "source": "generated", "use_gemma": false}`
-
-**エラー**:
-- `400`: 不正な source
-- `409`: 既にジョブが実行中
-
----
-
 ### §3.2 `POST /api/series/assign`
 書籍を既存または新規シリーズに割り当てる（手動編集用）。複数書籍を同時に同じシリーズへ追加できる。
 
@@ -493,31 +476,6 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 - `400`: `names` が空 / `series_id` が一致しない書籍が含まれる
 
 ---
-
-### §3.5 `GET /api/series/resolve/status`
-シリーズ判定ジョブの進捗を返す。
-
-**クエリパラメータ**:
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
-
-**レスポンス**:
-```json
-{
-  "status": "running",
-  "total": 120,
-  "done": 50,
-  "created": 8,
-  "current": "鬼滅の刃",
-  "error": ""
-}
-```
-- `status` の値: `idle` / `running` / `done` / `error`
-- `total`: 走査対象書籍数
-- `done`: 走査済み件数
-- `created`: 作成された（または更新された）シリーズ数
-
----
-
 
 ## §4. PDF生成
 

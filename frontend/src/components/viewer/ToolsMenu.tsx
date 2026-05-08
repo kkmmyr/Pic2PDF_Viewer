@@ -1,19 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings, ChevronDown, Download } from 'lucide-react';
-import { SeriesResolveBar } from './SeriesResolveBar';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import type { LibrarySource } from '../../types';
 
 interface ToolsMenuProps {
     source: LibrarySource;
-    onComplete: () => void;
+    /** 後方互換のため受け取るが現状は未使用（ジョブ系撤去後に残置） */
+    onComplete?: () => void;
 }
 
 /**
  * Library 画面ヘッダーの「ツール ▼」ドロップダウン。
- * 滅多に使わないジョブ起動 UI（サークル名自動登録 / シリーズ判定）を集約し、
- * 常時表示で画面を圧迫しないようにする。
+ * メタデータエクスポートを集約する。
  */
 async function downloadMetaExport(source: LibrarySource): Promise<void> {
     // apiClient のレスポンスインターセプタは response.data を返すため、blob が直接得られる。
@@ -35,7 +34,7 @@ async function downloadMetaExport(source: LibrarySource): Promise<void> {
     URL.revokeObjectURL(a.href);
 }
 
-export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
+export function ToolsMenu({ source }: ToolsMenuProps) {
     const [open, setOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -62,7 +61,7 @@ export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
         <div ref={containerRef} className="relative">
             <button
                 onClick={() => setOpen((o) => !o)}
-                title="自動登録・シリーズ判定などのバッチ処理"
+                title="メタデータのエクスポート"
                 className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1.5"
             >
                 <Settings className="w-4 h-4" />
@@ -73,7 +72,7 @@ export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
             </button>
             {open && (
                 <div className="absolute right-0 top-full mt-1 w-[520px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
-                    <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between gap-3 px-4 py-2.5">
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                             メタデータ（著者・シリーズ等）をバックアップ
                         </span>
@@ -93,7 +92,6 @@ export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
                             {exporting ? 'エクスポート中...' : 'エクスポート'}
                         </button>
                     </div>
-                    <SeriesResolveBar source={source} onComplete={onComplete} />
                 </div>
             )}
         </div>

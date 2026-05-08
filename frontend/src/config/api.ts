@@ -49,10 +49,6 @@ export const API_ENDPOINTS = {
     MERGE_PDFS: '/api/pdfs/merge',
     /** PDF完全削除（非表示書籍専用） */
     DELETE_PDFS: '/api/pdfs',
-    /** シリーズ判定ジョブ開始 */
-    SERIES_RESOLVE: '/api/series/resolve',
-    /** シリーズ判定ジョブ進捗取得 */
-    SERIES_RESOLVE_STATUS: '/api/series/resolve/status',
     /** シリーズ手動割り当て */
     SERIES_ASSIGN: '/api/series/assign',
     /** シリーズ手動解除 */
