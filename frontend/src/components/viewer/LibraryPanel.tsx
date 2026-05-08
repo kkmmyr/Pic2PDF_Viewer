@@ -26,16 +26,16 @@ import { API_ENDPOINTS } from '../../config/api';
 import { authorsKey } from '../../utils/authors';
 import apiClient from '../../config/api_client';
 
-type BulkDialogKey = 'bulkAuthor' | 'bulkTag' | 'merge' | 'bulkSeries' | 'bulkGenre';
+type BulkDialogKey = 'bulkAuthor' | 'merge' | 'bulkSeries' | 'bulkGenre';
 
 /**
  * ライブラリ一覧ビュー。
  * フォルダ/PDF グリッド・ヘッダー・各ダイアログを管理する。
  *
  * 大半のロジックは責務別カスタムフックに委譲し、本体は合成 + JSX に集中する:
- * - `useUrlFilters`: author/tag/series の URL クエリ同期
+ * - `useUrlFilters`: author/series の URL クエリ同期
  * - `useLibrarySettings`: sort/groupMode/showHidden の localStorage 永続化
- * - `useLibraryBulkActions`: 一括操作 7 種（authors/tags/hidden/thumbnail/merge/series）
+ * - `useLibraryBulkActions`: 一括操作（authors/hidden/thumbnail/merge/series）
  * - `useLibraryDisplay`: effectiveGroupMode / displayPdfs / breadcrumbs の派生計算
  * - `useScrollMemory`: URL キーごとのスクロール位置保存・復元
  * - `useLibrarySelectionShortcut`: s キーで選択モードトグル
@@ -66,15 +66,8 @@ export function LibraryPanel() {
     const [searchText, setSearchText] = useState('');
     const dialogs = useDialogToggles<BulkDialogKey>();
 
-    const {
-        authorFilter,
-        tagFilter,
-        seriesFilter,
-        setAuthorFilter,
-        setTagFilter,
-        setSeriesFilter,
-        clearAllDrilldown,
-    } = useUrlFilters();
+    const { authorFilter, seriesFilter, setAuthorFilter, setSeriesFilter, clearAllDrilldown } =
+        useUrlFilters();
 
     const {
         sortOrder,
@@ -90,7 +83,7 @@ export function LibraryPanel() {
     } = useLibrarySettings();
 
     // パスまたはソース変更時に検索テキストをリセット。
-    // author/tag/series は URL 同期されており、useUrlState の navigate
+    // author/series は URL 同期されており、useUrlState の navigate
     // メソッドが setSearchParams({ path, source }) で全置換するため自動クリアされる。
     useEffect(() => {
         setSearchText('');
@@ -112,7 +105,6 @@ export function LibraryPanel() {
     const {
         meta,
         getAuthors,
-        getTags,
         getSeries,
         getViewCount,
         getLastViewedAt,
@@ -120,14 +112,12 @@ export function LibraryPanel() {
         isHidden,
         recordView,
         updateAuthors,
-        updateTags,
         updateGenre,
         setHidden,
         assignSeries,
         unassignSeries,
         reorderSeries,
         allAuthors,
-        allTags,
         allSeries,
         allSeriesWithStats,
         refreshMeta,
@@ -184,7 +174,6 @@ export function LibraryPanel() {
         pdfs: sortedPdfs,
         searchText,
         authorFilter,
-        tagFilter,
         seriesFilter,
         showHidden,
         readStateFilter,
@@ -219,7 +208,6 @@ export function LibraryPanel() {
         showToast,
         bookMeta: {
             updateAuthors,
-            updateTags,
             updateGenre,
             setHidden,
             assignSeries,
@@ -263,12 +251,6 @@ export function LibraryPanel() {
         [grouped.membersByRepresentativeName, selectedItems, onBulkSelect, onToggleSelect],
     );
 
-    // 1冊だけ選択中ならその書籍の現在タグを初期表示する
-    const bulkTagInitial = (() => {
-        if (bulkActions.bulkSeriesNames.length !== 1) return [];
-        return getTags(currentPath, bulkActions.bulkSeriesNames[0]);
-    })();
-
     const seriesEdit = useSeriesEditDialog({
         currentPath,
         assignSeries,
@@ -296,9 +278,7 @@ export function LibraryPanel() {
                 sortOrder={sortOrder}
                 searchText={searchText}
                 authorFilter={authorFilter}
-                tagFilter={tagFilter}
                 allAuthors={allAuthors}
-                allTags={allTags}
                 groupMode={groupMode}
                 breadcrumbs={breadcrumbs}
                 showHidden={showHidden}
@@ -306,7 +286,6 @@ export function LibraryPanel() {
                 onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
                 onBulkSetAuthor={() => dialogs.open('bulkAuthor')}
-                onBulkSetTag={() => dialogs.open('bulkTag')}
                 onBulkSetSeries={() => dialogs.open('bulkSeries')}
                 bulkSeriesDisabled={isMixedAuthors}
                 onBulkSetGenre={() => dialogs.open('bulkGenre')}
@@ -317,7 +296,6 @@ export function LibraryPanel() {
                 onSortChange={setSortOrder}
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
-                onTagFilterChange={setTagFilter}
                 onGroupModeChange={handleGroupModeChange}
                 onToggleShowHidden={toggleShowHidden}
                 readStateFilter={readStateFilter}
@@ -336,10 +314,6 @@ export function LibraryPanel() {
                 bulkAuthorAllAuthors={allAuthors}
                 onCloseBulkAuthor={dialogs.close}
                 onBulkApplyAuthors={bulkActions.handleBulkApplyAuthors}
-                isBulkTagOpen={dialogs.isOpen('bulkTag')}
-                bulkTagInitial={bulkTagInitial}
-                onCloseBulkTag={dialogs.close}
-                onBulkApplyTags={bulkActions.handleBulkApplyTags}
                 isMergeDialogOpen={dialogs.isOpen('merge')}
                 onCloseMergeDialog={dialogs.close}
                 onMergePdfs={bulkActions.handleMergePdfs}
@@ -379,8 +353,6 @@ export function LibraryPanel() {
                         onRegenThumb={handleRegenThumb}
                         getAuthors={(name) => getAuthors(currentPath, name)}
                         onAuthorClick={setAuthorFilter}
-                        getTags={(name) => getTags(currentPath, name)}
-                        onTagClick={setTagFilter}
                         getBadge={(name) => grouped.badgeByRepresentativeName.get(name) ?? null}
                         onGroupClick={(name) => {
                             const badge = grouped.badgeByRepresentativeName.get(name);

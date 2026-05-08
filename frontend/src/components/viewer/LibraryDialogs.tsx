@@ -1,6 +1,5 @@
 import type { LibrarySource, ExistingSeriesOption } from '../../types';
 import { RenameDialog, BulkAuthorDialog, MergeDialog } from './';
-import { BulkTagDialog } from './BulkTagDialog';
 import { BulkSeriesAssignDialog } from './BulkSeriesAssignDialog';
 import { BulkGenreDialog } from './BulkGenreDialog';
 
@@ -17,11 +16,6 @@ interface LibraryDialogsProps {
     bulkAuthorAllAuthors: string[];
     onCloseBulkAuthor: () => void;
     onBulkApplyAuthors: (authors: string[]) => Promise<void>;
-    // BulkTag
-    isBulkTagOpen: boolean;
-    bulkTagInitial: string[];
-    onCloseBulkTag: () => void;
-    onBulkApplyTags: (tags: string[]) => Promise<void>;
     // Merge
     isMergeDialogOpen: boolean;
     onCloseMergeDialog: () => void;
@@ -52,10 +46,6 @@ export function LibraryDialogs({
     bulkAuthorAllAuthors,
     onCloseBulkAuthor,
     onBulkApplyAuthors,
-    isBulkTagOpen,
-    bulkTagInitial,
-    onCloseBulkTag,
-    onBulkApplyTags,
     isMergeDialogOpen,
     onCloseMergeDialog,
     onMergePdfs,
@@ -89,14 +79,6 @@ export function LibraryDialogs({
                 allAuthors={bulkAuthorAllAuthors}
                 onClose={onCloseBulkAuthor}
                 onApply={onBulkApplyAuthors}
-            />
-
-            <BulkTagDialog
-                open={isBulkTagOpen}
-                targetCount={selectedItems.size}
-                initialTags={bulkTagInitial}
-                onClose={onCloseBulkTag}
-                onApply={onBulkApplyTags}
             />
 
             <MergeDialog

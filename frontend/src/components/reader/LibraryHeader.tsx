@@ -15,9 +15,7 @@ interface LibraryHeaderProps {
     sortOrder: SortOrder;
     searchText: string;
     authorFilter: string;
-    tagFilter: string;
     allAuthors: string[];
-    allTags: string[];
     groupMode: GroupMode;
     breadcrumbs: LibraryBreadcrumb[];
     showHidden: boolean;
@@ -25,7 +23,6 @@ interface LibraryHeaderProps {
     onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
     onBulkSetAuthor: () => void;
-    onBulkSetTag: () => void;
     onBulkSetSeries: () => void;
     bulkSeriesDisabled?: boolean;
     onBulkSetGenre: () => void;
@@ -36,7 +33,6 @@ interface LibraryHeaderProps {
     onSortChange: (order: SortOrder) => void;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
-    onTagFilterChange: (tag: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
     onToggleShowHidden: () => void;
     readStateFilter: ReadStateFilter;
@@ -52,9 +48,7 @@ export function LibraryHeader({
     sortOrder,
     searchText,
     authorFilter,
-    tagFilter,
     allAuthors,
-    allTags,
     groupMode,
     breadcrumbs,
     showHidden,
@@ -62,7 +56,6 @@ export function LibraryHeader({
     onSourceChange,
     onToggleSelectionMode,
     onBulkSetAuthor,
-    onBulkSetTag,
     onBulkSetSeries,
     bulkSeriesDisabled,
     onBulkSetGenre,
@@ -73,7 +66,6 @@ export function LibraryHeader({
     onSortChange,
     onSearchChange,
     onAuthorFilterChange,
-    onTagFilterChange,
     onGroupModeChange,
     onToggleShowHidden,
     readStateFilter,
@@ -92,9 +84,7 @@ export function LibraryHeader({
             <LibraryFilterBar
                 searchText={searchText}
                 authorFilter={authorFilter}
-                tagFilter={tagFilter}
                 allAuthors={allAuthors}
-                allTags={allTags}
                 groupMode={groupMode}
                 readStateFilter={readStateFilter}
                 showHidden={showHidden}
@@ -104,7 +94,6 @@ export function LibraryHeader({
                 isSelectionMode={isSelectionMode}
                 onSearchChange={onSearchChange}
                 onAuthorFilterChange={onAuthorFilterChange}
-                onTagFilterChange={onTagFilterChange}
                 onGroupModeChange={onGroupModeChange}
                 onReadStateFilterChange={onReadStateFilterChange}
                 onToggleShowHidden={onToggleShowHidden}
@@ -118,7 +107,6 @@ export function LibraryHeader({
                     showHidden={showHidden}
                     bulkSeriesDisabled={bulkSeriesDisabled}
                     onBulkSetAuthor={onBulkSetAuthor}
-                    onBulkSetTag={onBulkSetTag}
                     onBulkSetSeries={onBulkSetSeries}
                     onBulkSetGenre={onBulkSetGenre}
                     onBulkToggleHidden={onBulkToggleHidden}

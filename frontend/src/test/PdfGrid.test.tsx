@@ -62,17 +62,11 @@ describe('PdfGrid', () => {
         expect(getByText('シリーズ X')).toBeInTheDocument();
     });
 
-    it('getAuthors / getTags が指定されると chip が表示される', () => {
+    it('getAuthors が指定されると chip が表示される', () => {
         const pdfs = [pdf('a.pdf')];
         const { getByText } = render(
-            <PdfGrid
-                pdfs={pdfs}
-                onPdfClick={vi.fn()}
-                getAuthors={() => ['作者A']}
-                getTags={() => ['タグA']}
-            />,
+            <PdfGrid pdfs={pdfs} onPdfClick={vi.fn()} getAuthors={() => ['作者A']} />,
         );
         expect(getByText('作者A')).toBeInTheDocument();
-        expect(getByText('#タグA')).toBeInTheDocument();
     });
 });

@@ -10,7 +10,6 @@ import { useAsyncToast } from './useAsyncToast';
  */
 interface BookMetaActions {
     updateAuthors: (path: string, names: string[], authors: string[]) => Promise<void>;
-    updateTags: (path: string, names: string[], tags: string[]) => Promise<void>;
     updateGenre: (path: string, names: string[], genre: string) => Promise<void>;
     setHidden: (path: string, names: string[], hidden: boolean) => Promise<void>;
     assignSeries: (
@@ -36,9 +35,9 @@ interface UseLibraryBulkActionsOptions {
 }
 
 /**
- * ライブラリの一括操作 7 種をまとめて提供する。
+ * ライブラリの一括操作をまとめて提供する。
  * - エラー時はトーストで通知し、成功時は選択モードを解除する（共通の後処理）
- * - PDF 限定の操作（tags / hidden bulk / thumbnail / merge / series）はファイル名で `.pdf` フィルタを掛ける
+ * - PDF 限定の操作（hidden bulk / thumbnail / merge / series）はファイル名で `.pdf` フィルタを掛ける
  */
 export function useLibraryBulkActions({
     currentPath,
@@ -70,14 +69,6 @@ export function useLibraryBulkActions({
             onClearSelection();
         },
         [bookMeta, currentPath, selectedItems, onClearSelection],
-    );
-
-    const handleBulkApplyTags = useCallback(
-        async (tags: string[]) => {
-            await bookMeta.updateTags(currentPath, selectedPdfNames, tags);
-            onClearSelection();
-        },
-        [bookMeta, currentPath, selectedPdfNames, onClearSelection],
     );
 
     const handleBulkApplyGenre = useCallback(
@@ -218,7 +209,6 @@ export function useLibraryBulkActions({
     return {
         bulkSeriesNames,
         handleBulkApplyAuthors,
-        handleBulkApplyTags,
         handleBulkApplyGenre,
         handleToggleHiddenOne,
         handleBulkToggleHidden,

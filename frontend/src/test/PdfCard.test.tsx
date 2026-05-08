@@ -63,20 +63,6 @@ describe('PdfCard', () => {
         expect(onPdfClick).not.toHaveBeenCalled();
     });
 
-    it('getTags 値が返ると # 付き chip が表示される', () => {
-        const { getByText } = render(<PdfCard {...baseProps} getTags={() => ['アクション']} />);
-        expect(getByText('#アクション')).toBeInTheDocument();
-    });
-
-    it('タグ chip クリックで onTagClick が呼ばれる', () => {
-        const onTagClick = vi.fn();
-        const { getByText } = render(
-            <PdfCard {...baseProps} getTags={() => ['t1']} onTagClick={onTagClick} />,
-        );
-        fireEvent.click(getByText('#t1'));
-        expect(onTagClick).toHaveBeenCalledWith('t1');
-    });
-
     it('readState="unread" で NEW バッジを表示', () => {
         const { getByText } = render(<PdfCard {...baseProps} readState="unread" />);
         expect(getByText('NEW')).toBeInTheDocument();

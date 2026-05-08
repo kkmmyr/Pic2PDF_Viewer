@@ -39,13 +39,6 @@ export function useBookMetaCore(source: string) {
         [meta, makeKey],
     );
 
-    const getTags = useCallback(
-        (path: string, name: string): string[] => {
-            return meta[makeKey(path, name)]?.tags ?? [];
-        },
-        [meta, makeKey],
-    );
-
     const getSeries = useCallback(
         (path: string, name: string): { id: string; title: string; index: number } | null => {
             const e = meta[makeKey(path, name)];
@@ -96,7 +89,6 @@ export function useBookMetaCore(source: string) {
         makeKey,
         fetchMeta,
         getAuthors,
-        getTags,
         getSeries,
         isHidden,
         getViewCount,

@@ -86,19 +86,6 @@ describe('useBookMetaWrite', () => {
         });
     });
 
-    describe('updateTags', () => {
-        it('PATCH の body に tags が含まれる', async () => {
-            const { result } = renderCombined();
-            await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-
-            await act(async () => {
-                await result.current.updateTags('', ['a.pdf'], ['t1']);
-            });
-            expect(mockedPatch.mock.calls[0][1].tags).toEqual(['t1']);
-            expect(result.current.meta['a.pdf']?.tags).toEqual(['t1']);
-        });
-    });
-
     describe('updateGenre', () => {
         it('genre 文字列で merged.genre が設定される', async () => {
             const { result } = renderCombined();
@@ -213,13 +200,11 @@ describe('useBookMetaWrite', () => {
             await act(async () => {
                 await result.current.updateMeta('', ['a.pdf'], {
                     authors: ['X'],
-                    tags: ['t'],
                     genre: 'G',
                 });
             });
             expect(result.current.meta['a.pdf']).toMatchObject({
                 authors: ['X'],
-                tags: ['t'],
                 genre: 'G',
             });
         });

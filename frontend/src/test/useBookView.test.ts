@@ -48,10 +48,10 @@ describe('useBookView', () => {
         expect(result.current.meta['a.pdf']?.last_viewed_at).toBe(1700000000);
     });
 
-    it('既存エントリの authors / tags は保持される', async () => {
+    it('既存エントリの authors は保持される', async () => {
         mockedPost.mockResolvedValue({ view_count: 1, last_viewed_at: 100 });
         const { result } = renderCombined({
-            'a.pdf': { authors: ['作者A'], tags: ['タグ1'] },
+            'a.pdf': { authors: ['作者A'] },
         });
         await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
 
@@ -60,7 +60,6 @@ describe('useBookView', () => {
         });
 
         expect(result.current.meta['a.pdf']?.authors).toEqual(['作者A']);
-        expect(result.current.meta['a.pdf']?.tags).toEqual(['タグ1']);
         expect(result.current.meta['a.pdf']?.view_count).toBe(1);
     });
 

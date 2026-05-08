@@ -364,7 +364,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ### §2.4 `GET /api/meta`
-指定ソースの書籍メタデータを全件取得する。各エントリは作者名・タグ・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグ・読書状態などを含む。
+指定ソースの書籍メタデータを全件取得する。各エントリは作者名・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグ・ジャンル・読書状態などを含む。
 
 **クエリパラメータ**:
 - `source` (オプション) — `generated`(default) / `kindle` / `novel`
@@ -374,12 +374,12 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "book.pdf": {
     "authors": ["作者A"],
-    "tags": ["ジャンル1", "気分A"],
     "view_count": 5,
     "last_viewed_at": 1714200000.0,
     "series_id": "abc12345",
     "series_title": "シリーズタイトル",
     "series_index": 1.5,
+    "genre": "オリジナル",
     "read_state": "reading"
   },
   "subdir/another.pdf": {
@@ -389,7 +389,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 }
 ```
 - キー: `"{path}/{filename}"` または `"{filename}"`（path が空の場合）
-- すべての追加フィールド（`tags` / `view_count` / `last_viewed_at` / `series_id` / `series_title` / `series_index` / `hidden` / `read_state`）は登録があった場合のみ含まれる任意フィールド。
+- すべての追加フィールド（`view_count` / `last_viewed_at` / `series_id` / `series_title` / `series_index` / `hidden` / `genre` / `read_state`）は登録があった場合のみ含まれる任意フィールド。
 - `last_viewed_at` は UNIX タイムスタンプ（秒、float）。
 - `series_index` は `float`（小数巻 `2.5` 等に対応）。
 - `hidden=true` の書籍は通常モードでは UI 上非表示（API レスポンスには含まれる）。
@@ -406,12 +406,12 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 **レスポンス**: `application/json` ファイル（`Content-Disposition: attachment; filename="meta_{source}_{YYYYMMDD}.json"`）  
 ボディは `GET /api/meta` と同じ構造の JSON。
 
-**用途**: ライブラリ画面「ツール」メニューの「メタデータをエクスポート」ボタンから起動。著者名・タグ・シリーズ・閲覧回数などの積み上げデータを保護する。
+**用途**: ライブラリ画面「ツール」メニューの「メタデータをエクスポート」ボタンから起動。著者名・シリーズ・閲覧回数などの積み上げデータを保護する。
 
 ---
 
 ### §2.6 `PATCH /api/meta`
-1冊または複数冊の作者名・タグ・非表示フラグ・ジャンルを上書き保存する。指定されたフィールドのみ更新し、他のフィールド（閲覧履歴等）は保持される。
+1冊または複数冊の作者名・非表示フラグ・ジャンル・読書状態を上書き保存する。指定されたフィールドのみ更新し、他のフィールド（閲覧履歴等）は保持される。
 
 **リクエストボディ**:
 ```json
@@ -419,7 +419,6 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "path": "current/relative/path",
   "names": ["book1.pdf", "book2.pdf"],
   "authors": ["作者A", "作者B"],
-  "tags": ["ジャンル1"],
   "hidden": true,
   "genre": "オリジナル",
   "read_state": "done",
@@ -428,16 +427,15 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ```
 - `names` — 更新対象のファイル名リスト（複数指定で一括更新）
 - `authors` — 上書きする作者名リスト（**省略時は変更しない**）
-- `tags` — 上書きするタグリスト（**省略時は変更しない**）
 - `hidden` — 非表示フラグ（**省略時は変更しない**、`true` で非表示化、`false` で再表示してフィールド削除）
 - `genre` — ジャンル文字列（**省略時は変更しない**、空文字でフィールド削除）
 - `read_state` — 読書状態 (`'unread' | 'reading' | 'done'`)。**省略時は変更しない**、空文字でフィールド削除（=`view_count` 由来の派生に戻す）
-- `authors` / `tags` / `hidden` / `genre` / `read_state` のいずれかは指定が必要。
+- `authors` / `hidden` / `genre` / `read_state` のいずれかは指定が必要。
 
 **マージ規則**:
-- `authors` / `tags`:
-    - 非空配列を渡した場合: 該当フィールドのみ上書き。他フィールド（`view_count` / `last_viewed_at` / もう一方のリスト / `hidden` 等）は保持。
-    - 空配列 (`[]`) を渡した場合: 該当フィールドを「空配列のまま残す」。エントリ全体に他フィールドが何もなければエントリ自体を削除。
+- `authors`:
+    - 非空配列を渡した場合: フィールドのみ上書き。他フィールド（`view_count` / `last_viewed_at` / `hidden` 等）は保持。
+    - 空配列 (`[]`) を渡した場合: フィールドを「空配列のまま残す」。エントリ全体に他フィールドが何もなければエントリ自体を削除。
 - `hidden`:
     - `true`: フィールドを保存（非表示化）。
     - `false`: フィールドを削除（再表示）。
@@ -519,7 +517,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
     - 単一 number → すべての `names` に同じ巻数を割り当て（単冊編集の従来挙動）
     - number 配列 → `names[i]` に `index[i]` を割り当て（複数選択からの一括登録用、長さは names と一致が必須）
 - `id` — 既存シリーズに追加する場合の `series_id`。**省略時はバックエンドで生成**（`title` + 作者集合のハッシュ）。
-- 他のメタフィールド（authors / tags / view_count 等）は変更しない。
+- 他のメタフィールド（authors / view_count 等）は変更しない。
 
 **レスポンス**: `{"message": "Assigned", "id": "abc12345", "updated_count": 2}`
 
@@ -558,7 +556,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ```
 - `names` — シリーズに属する書籍を **新しい順序で** 並べたリスト
 - `series_id` — 対象シリーズ。指定 `names` の `series_id` がすべて一致しないと 400
-- 他のメタフィールド（authors / tags / view_count 等）は変更しない
+- 他のメタフィールド（authors / view_count 等）は変更しない
 
 **レスポンス**: `{"message": "Reordered", "updated_count": 3}`
 

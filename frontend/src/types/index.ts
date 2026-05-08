@@ -122,7 +122,6 @@ export type ReadState = 'unread' | 'reading' | 'done';
  */
 export interface BookMetaEntry {
     authors?: string[];
-    tags?: string[];
     view_count?: number;
     last_viewed_at?: number;
     /** シリーズ識別子（同シリーズで共通） */

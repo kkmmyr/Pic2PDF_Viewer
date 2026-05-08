@@ -17,8 +17,6 @@ VALID_READ_STATES: tuple[ReadState, ...] = ("unread", "reading", "done")
 
 class MetaEntry(TypedDict):
     authors: list[str]
-    # タグ（自由ラベル）。既存エントリには含まれない場合があるため任意。
-    tags: NotRequired[list[str]]
     # 閲覧回数。既存エントリには含まれない場合があるため任意。
     view_count: NotRequired[int]
     # 最終閲覧時刻 (UNIX time, float)。
@@ -79,14 +77,13 @@ def merge_entry_fields(
     entry: dict,
     *,
     authors: list[str] | None = None,
-    tags: list[str] | None = None,
     hidden: bool | None = None,
     genre: str | None = None,
     read_state: str | None = None,
 ) -> dict:
     """部分的に指定されたフィールドだけを上書きしたエントリを返す（非破壊）。
 
-    - `authors` / `tags`: list（空可）。`None` 指定なら変更しない。
+    - `authors`: list（空可）。`None` 指定なら変更しない。
     - `hidden`: True なら設定 / False なら削除。`None` 指定なら変更しない。
     - `genre`: 空文字なら削除、文字列なら設定。`None` 指定なら変更しない。
     - `read_state`: 空文字なら削除、`'unread' | 'reading' | 'done'` なら設定。`None` 指定なら変更しない。
@@ -95,8 +92,6 @@ def merge_entry_fields(
     merged = dict(entry)
     if authors is not None:
         merged["authors"] = authors
-    if tags is not None:
-        merged["tags"] = tags
     if hidden is True:
         merged["hidden"] = True
     elif hidden is False:

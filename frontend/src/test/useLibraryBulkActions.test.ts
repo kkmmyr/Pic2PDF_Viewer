@@ -20,7 +20,6 @@ const makeOptions = (overrides: Record<string, unknown> = {}) => ({
     onRefresh: vi.fn(),
     bookMeta: {
         updateAuthors: vi.fn().mockResolvedValue(undefined),
-        updateTags: vi.fn().mockResolvedValue(undefined),
         updateGenre: vi.fn().mockResolvedValue(undefined),
         setHidden: vi.fn().mockResolvedValue(undefined),
         assignSeries: vi.fn().mockResolvedValue('sid'),
@@ -113,25 +112,6 @@ describe('useLibraryBulkActions', () => {
                 .calls[0];
             expect(names).toContain('a.pdf');
             expect(names).toContain('folder');
-            expect(opts.onClearSelection).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('handleBulkApplyTags', () => {
-        it('PDF のみ（非 PDF を除外）で updateTags を呼ぶ', async () => {
-            const opts = makeOptions({
-                selectedItems: new Set<string>(['a.pdf', 'folder', 'b.PDF']),
-            });
-            const { result } = renderHook(() => useLibraryBulkActions(opts));
-
-            await act(async () => {
-                await result.current.handleBulkApplyTags(['タグA']);
-            });
-
-            const [, names] = (opts.bookMeta.updateTags as ReturnType<typeof vi.fn>).mock.calls[0];
-            expect(names).toContain('a.pdf');
-            expect(names).toContain('b.PDF');
-            expect(names).not.toContain('folder');
             expect(opts.onClearSelection).toHaveBeenCalledTimes(1);
         });
     });

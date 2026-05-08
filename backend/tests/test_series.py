@@ -445,7 +445,7 @@ class TestAssignSeries:
     def test_assign_preserves_other_fields(self, series_client):
         client, tmp_path = series_client
         client.patch("/api/meta", json={
-            "path": "", "names": ["book.pdf"], "authors": ["A"], "tags": ["t1"], "source": "generated",
+            "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "generated",
         })
         client.post("/api/meta/view", json={
             "path": "", "name": "book.pdf", "source": "generated",
@@ -457,7 +457,6 @@ class TestAssignSeries:
 
         meta = _read_meta_at(tmp_path)
         assert meta["book.pdf"]["authors"] == ["A"]
-        assert meta["book.pdf"]["tags"] == ["t1"]
         assert meta["book.pdf"]["view_count"] == 1
         assert meta["book.pdf"]["series_index"] == 2.5
 

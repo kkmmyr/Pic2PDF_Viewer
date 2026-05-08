@@ -7,7 +7,6 @@ describe('useMetaDerived', () => {
     it('空 meta なら全派生値が空', () => {
         const { result } = renderHook(() => useMetaDerived({}));
         expect(result.current.allAuthors).toEqual([]);
-        expect(result.current.allTags).toEqual([]);
         expect(result.current.allGenres).toEqual([]);
         expect(result.current.allSeries).toEqual([]);
         expect(result.current.allSeriesWithStats).toEqual([]);
@@ -30,15 +29,6 @@ describe('useMetaDerived', () => {
         };
         const { result } = renderHook(() => useMetaDerived(meta));
         expect(result.current.allAuthors).toEqual(['A', 'B']);
-    });
-
-    it('allTags も重複排除 + ソート', () => {
-        const meta: BookMetaMap = {
-            'a.pdf': { tags: ['x', 'y'] },
-            'b.pdf': { tags: ['y', 'z'] },
-        };
-        const { result } = renderHook(() => useMetaDerived(meta));
-        expect(result.current.allTags).toEqual(['x', 'y', 'z']);
     });
 
     it('allGenres は falsy 値（undefined / 空文字）を除外', () => {

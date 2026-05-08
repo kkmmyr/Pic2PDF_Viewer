@@ -1,4 +1,4 @@
-import { User, Tag, Library, Layers, Eye, EyeOff, Merge, ImageIcon, Trash2 } from 'lucide-react';
+import { User, Library, Layers, Eye, EyeOff, Merge, ImageIcon, Trash2 } from 'lucide-react';
 import { Button } from '../ui/Button';
 
 interface LibraryBulkActionBarProps {
@@ -6,7 +6,6 @@ interface LibraryBulkActionBarProps {
     showHidden: boolean;
     bulkSeriesDisabled?: boolean;
     onBulkSetAuthor: () => void;
-    onBulkSetTag: () => void;
     onBulkSetSeries: () => void;
     onBulkSetGenre: () => void;
     onBulkToggleHidden: () => void;
@@ -21,7 +20,6 @@ export function LibraryBulkActionBar({
     showHidden,
     bulkSeriesDisabled,
     onBulkSetAuthor,
-    onBulkSetTag,
     onBulkSetSeries,
     onBulkSetGenre,
     onBulkToggleHidden,
@@ -39,14 +37,6 @@ export function LibraryBulkActionBar({
             <Button onClick={onBulkSetAuthor} disabled={noSelection}>
                 <User className="w-4 h-4" />
                 作者を設定
-            </Button>
-            <Button
-                onClick={onBulkSetTag}
-                disabled={noSelection}
-                title="選択した書籍のタグを一括設定"
-            >
-                <Tag className="w-4 h-4" />
-                タグを設定
             </Button>
             <Button
                 onClick={onBulkSetSeries}

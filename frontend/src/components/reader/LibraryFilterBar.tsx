@@ -11,9 +11,7 @@ type ReadStateFilter = '' | ReadState;
 interface LibraryFilterBarProps {
     searchText: string;
     authorFilter: string;
-    tagFilter: string;
     allAuthors: string[];
-    allTags: string[];
     groupMode: GroupMode;
     readStateFilter: ReadStateFilter;
     showHidden: boolean;
@@ -23,7 +21,6 @@ interface LibraryFilterBarProps {
     isSelectionMode: boolean;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
-    onTagFilterChange: (tag: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
     onReadStateFilterChange: (value: ReadStateFilter) => void;
     onToggleShowHidden: () => void;
@@ -35,9 +32,7 @@ interface LibraryFilterBarProps {
 export function LibraryFilterBar({
     searchText,
     authorFilter,
-    tagFilter,
     allAuthors,
-    allTags,
     groupMode,
     readStateFilter,
     showHidden,
@@ -47,7 +42,6 @@ export function LibraryFilterBar({
     isSelectionMode,
     onSearchChange,
     onAuthorFilterChange,
-    onTagFilterChange,
     onGroupModeChange,
     onReadStateFilterChange,
     onToggleShowHidden,
@@ -60,13 +54,10 @@ export function LibraryFilterBar({
             <HeaderSearchBar
                 searchText={searchText}
                 authorFilter={authorFilter}
-                tagFilter={tagFilter}
                 allAuthors={allAuthors}
-                allTags={allTags}
                 hideAuthorSelect={hideAuthorSelect}
                 onSearchChange={onSearchChange}
                 onAuthorFilterChange={onAuthorFilterChange}
-                onTagFilterChange={onTagFilterChange}
             />
 
             <div className="flex-1" />

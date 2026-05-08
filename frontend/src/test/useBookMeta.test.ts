@@ -172,27 +172,9 @@ describe('useBookMeta', () => {
         expect(result.current.getAuthors('sub', 'book.pdf')).toEqual(['サブ']);
     });
 
-    it('updateTags でも view_count が保持される', async () => {
-        mockedGet.mockResolvedValue({
-            'book.pdf': { authors: ['X'], view_count: 8, last_viewed_at: 500 },
-        });
-        mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
-
-        const { result } = renderHook(() => useBookMeta('generated'));
-        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-
-        await act(async () => {
-            await result.current.updateTags('', ['book.pdf'], ['新タグ']);
-        });
-
-        expect(result.current.getTags('', 'book.pdf')).toEqual(['新タグ']);
-        expect(result.current.getViewCount('', 'book.pdf')).toBe(8);
-        expect(result.current.getLastViewedAt('', 'book.pdf')).toBe(500);
-    });
-
     it('updateGenre でも他フィールドが保持される', async () => {
         mockedGet.mockResolvedValue({
-            'book.pdf': { authors: ['X'], tags: ['T'], view_count: 2 },
+            'book.pdf': { authors: ['X'], view_count: 2 },
         });
         mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
 
@@ -205,7 +187,6 @@ describe('useBookMeta', () => {
 
         expect(result.current.meta['book.pdf']?.genre).toBe('アクション');
         expect(result.current.getAuthors('', 'book.pdf')).toEqual(['X']);
-        expect(result.current.getTags('', 'book.pdf')).toEqual(['T']);
         expect(result.current.getViewCount('', 'book.pdf')).toBe(2);
     });
 

@@ -10,19 +10,17 @@ const wrapper =
     );
 
 describe('useUrlFilters', () => {
-    it('初期 URL クエリから author / tag / series が読み出される', () => {
+    it('初期 URL クエリから author / series が読み出される', () => {
         const { result } = renderHook(() => useUrlFilters(), {
-            wrapper: wrapper('/?author=A&tag=T&series=S'),
+            wrapper: wrapper('/?author=A&series=S'),
         });
         expect(result.current.authorFilter).toBe('A');
-        expect(result.current.tagFilter).toBe('T');
         expect(result.current.seriesFilter).toBe('S');
     });
 
     it('クエリ無しなら全部空文字', () => {
         const { result } = renderHook(() => useUrlFilters(), { wrapper: wrapper('/') });
         expect(result.current.authorFilter).toBe('');
-        expect(result.current.tagFilter).toBe('');
         expect(result.current.seriesFilter).toBe('');
     });
 
@@ -32,11 +30,9 @@ describe('useUrlFilters', () => {
         expect(result.current.authorFilter).toBe('サークルA');
     });
 
-    it('setTagFilter / setSeriesFilter も同様に反映', () => {
+    it('setSeriesFilter も同様に反映', () => {
         const { result } = renderHook(() => useUrlFilters(), { wrapper: wrapper('/') });
-        act(() => result.current.setTagFilter('TagX'));
         act(() => result.current.setSeriesFilter('SidY'));
-        expect(result.current.tagFilter).toBe('TagX');
         expect(result.current.seriesFilter).toBe('SidY');
     });
 
@@ -49,23 +45,21 @@ describe('useUrlFilters', () => {
         expect(result.current.authorFilter).toBe('');
     });
 
-    it('他のクエリは保持される（author 設定で tag / series が消えない）', () => {
+    it('他のクエリは保持される（author 設定で series が消えない）', () => {
         const { result } = renderHook(() => useUrlFilters(), {
-            wrapper: wrapper('/?tag=T&series=S'),
+            wrapper: wrapper('/?series=S'),
         });
         act(() => result.current.setAuthorFilter('A'));
         expect(result.current.authorFilter).toBe('A');
-        expect(result.current.tagFilter).toBe('T');
         expect(result.current.seriesFilter).toBe('S');
     });
 
-    it('clearAllDrilldown で author / series が消え、tag は残る', () => {
+    it('clearAllDrilldown で author / series が消える', () => {
         const { result } = renderHook(() => useUrlFilters(), {
-            wrapper: wrapper('/?author=A&tag=T&series=S'),
+            wrapper: wrapper('/?author=A&series=S'),
         });
         act(() => result.current.clearAllDrilldown());
         expect(result.current.authorFilter).toBe('');
         expect(result.current.seriesFilter).toBe('');
-        expect(result.current.tagFilter).toBe('T'); // 維持
     });
 });

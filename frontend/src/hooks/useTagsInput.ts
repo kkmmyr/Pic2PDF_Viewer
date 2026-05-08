@@ -1,19 +1,17 @@
 import { useCallback, useRef, useState, KeyboardEvent } from 'react';
 
 /**
- * chip 形式のタグ入力 UI で必要な state とイベントハンドラを共通化する。
- *
- * 旧来は `BulkAuthorDialog` / `BulkTagDialog` でほぼ同一の `addTag` / `removeTag` /
- * `handleKeyDown`（Enter / `,` で確定、Backspace で末尾削除）が再実装されていた。
+ * chip 形式の複数値入力 UI で必要な state とイベントハンドラを共通化する。
+ * 命名は歴史的経緯（タグ機能撤去後も汎用 chip UI として残置、`BulkAuthorDialog` で利用）。
  *
  * 利用側の使い方:
- *   const tags = useTagsInput();
+ *   const t = useTagsInput();
  *   <TagsInput
- *     tags={tags.tags} input={tags.input} inputRef={tags.inputRef}
- *     onChange={tags.setInput} onKeyDown={tags.handleKeyDown}
- *     onRemove={tags.removeTag} onBlur={tags.handleBlur}
+ *     tags={t.tags} input={t.input} inputRef={t.inputRef}
+ *     onChange={t.setInput} onKeyDown={t.handleKeyDown}
+ *     onRemove={t.removeTag} onBlur={t.handleBlur}
  *   />
- *   const submit = () => onApply(tags.getFinalTags());
+ *   const submit = () => onApply(t.getFinalTags());
  */
 export function useTagsInput(initialTags: string[] = []) {
     const [tags, setTags] = useState<string[]>(initialTags);

@@ -6,8 +6,6 @@ interface UseMetaDerivedResult {
     /** 全作者名（重複排除・ソート済み）
      * authors 不在エントリからの undefined 混入を ?? [] でガード */
     allAuthors: string[];
-    /** 全タグ（重複排除・ソート済み） */
-    allTags: string[];
     /** 全ジャンル（重複排除・ソート済み） */
     allGenres: string[];
     /** 全シリーズ一覧（id, title、タイトル順） */
@@ -20,11 +18,6 @@ interface UseMetaDerivedResult {
 export function useMetaDerived(meta: BookMetaMap): UseMetaDerivedResult {
     const allAuthors = useMemo(
         () => [...new Set(Object.values(meta).flatMap((e) => e.authors ?? []))].sort(cmpJa),
-        [meta],
-    );
-
-    const allTags = useMemo(
-        () => [...new Set(Object.values(meta).flatMap((e) => e.tags ?? []))].sort(cmpJa),
         [meta],
     );
 
@@ -70,5 +63,5 @@ export function useMetaDerived(meta: BookMetaMap): UseMetaDerivedResult {
             .sort((a, b) => cmpJa(a.title, b.title));
     }, [meta]);
 
-    return { allAuthors, allTags, allGenres, allSeries, allSeriesWithStats };
+    return { allAuthors, allGenres, allSeries, allSeriesWithStats };
 }

@@ -43,13 +43,12 @@ VIEW_COUNT_DEBOUNCE_SEC = 300
 class UpdateMetaRequest(BaseModel):
     """単一書籍または複数書籍へのメタデータ更新リクエスト。
 
-    `authors` / `tags` / `hidden` / `genre` / `read_state` は省略可。省略されたフィールドは変更しない。
+    `authors` / `hidden` / `genre` / `read_state` は省略可。省略されたフィールドは変更しない。
     すべて省略するとエラー（更新する内容が無い）。
     """
     path: str = ""
     names: list[str]
     authors: list[str] | None = None
-    tags: list[str] | None = None
     hidden: bool | None = None
     genre: str | None = None
     read_state: str | None = None
@@ -95,7 +94,7 @@ def export_meta(source: str = Depends(validated_source)) -> Response:
 
 @router.patch("/meta")
 def update_meta(request: UpdateMetaRequest) -> dict:
-    """1冊または複数冊のメタデータ（作者名 / タグ / 非表示フラグ / ジャンル）を上書き保存する。
+    """1冊または複数冊のメタデータ（作者名 / 非表示フラグ / ジャンル / 読書状態）を上書き保存する。
 
     指定したフィールドのみ書き換え、省略されたフィールドは保持する。
     すべての list フィールドが空になった場合はエントリ自体を削除する。
@@ -103,14 +102,13 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     assert_valid_source(request.source)
     if (
         request.authors is None
-        and request.tags is None
         and request.hidden is None
         and request.genre is None
         and request.read_state is None
     ):
         raise HTTPException(
             status_code=400,
-            detail="authors, tags, hidden, genre, or read_state must be specified",
+            detail="authors, hidden, genre, or read_state must be specified",
         )
     if (
         request.read_state is not None
@@ -126,7 +124,6 @@ def update_meta(request: UpdateMetaRequest) -> dict:
 
     # 各フィールドを正規化（None ならそのまま）
     authors = [a.strip() for a in request.authors if a.strip()] if request.authors is not None else None
-    tags = [t.strip() for t in request.tags if t.strip()] if request.tags is not None else None
     genre = request.genre.strip() if request.genre is not None else None
 
     def _apply(data):
@@ -135,7 +132,6 @@ def update_meta(request: UpdateMetaRequest) -> dict:
             merged = merge_entry_fields(
                 data.get(key, {}),
                 authors=authors,
-                tags=tags,
                 hidden=request.hidden,
                 genre=genre,
                 read_state=request.read_state,

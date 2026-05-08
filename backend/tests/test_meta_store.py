@@ -32,18 +32,10 @@ class TestMergeEntryFields:
         result = merge_entry_fields({"authors": ["A"]}, authors=["B", "C"])
         assert result["authors"] == ["B", "C"]
 
-    def test_tags_overwritten(self):
-        result = merge_entry_fields({"tags": ["x"]}, tags=["y"])
-        assert result["tags"] == ["y"]
-
     def test_none_authors_preserves_existing(self):
-        result = merge_entry_fields({"authors": ["A"]}, authors=None, tags=["t"])
+        result = merge_entry_fields({"authors": ["A"]}, authors=None, genre="G")
         assert result["authors"] == ["A"]
-        assert result["tags"] == ["t"]
-
-    def test_none_tags_preserves_existing(self):
-        result = merge_entry_fields({"tags": ["x"]}, tags=None, authors=["A"])
-        assert result["tags"] == ["x"]
+        assert result["genre"] == "G"
 
     def test_hidden_true_sets_field(self):
         result = merge_entry_fields({}, hidden=True)
@@ -59,7 +51,7 @@ class TestMergeEntryFields:
         assert result["authors"] == ["A"]
 
     def test_hidden_none_preserves_existing(self):
-        result = merge_entry_fields({"hidden": True}, hidden=None, tags=["t"])
+        result = merge_entry_fields({"hidden": True}, hidden=None, authors=["A"])
         assert result["hidden"] is True
 
     def test_genre_set(self):
@@ -75,7 +67,7 @@ class TestMergeEntryFields:
         assert result["genre"] == "X"
 
     def test_view_count_preserved(self):
-        """authors / tags 等を更新しても view_count / last_viewed_at は保持される。"""
+        """authors 等を更新しても view_count / last_viewed_at は保持される。"""
         result = merge_entry_fields(
             {"view_count": 5, "last_viewed_at": 1700000000.0, "authors": ["A"]},
             authors=["B"],
@@ -92,11 +84,10 @@ class TestMergeEntryFields:
     def test_combined_update(self):
         result = merge_entry_fields(
             {"authors": ["old"], "view_count": 3},
-            authors=["new"], tags=["t1"], hidden=True, genre="G",
+            authors=["new"], hidden=True, genre="G",
         )
         assert result == {
             "authors": ["new"],
-            "tags": ["t1"],
             "hidden": True,
             "genre": "G",
             "view_count": 3,
@@ -112,7 +103,7 @@ class TestHasMeaningfulValue:
         assert has_meaningful_value({}) is False
 
     def test_only_empty_lists_is_false(self):
-        assert has_meaningful_value({"authors": [], "tags": []}) is False
+        assert has_meaningful_value({"authors": []}) is False
 
     def test_view_count_makes_it_true(self):
         assert has_meaningful_value({"view_count": 1}) is True
@@ -196,7 +187,7 @@ class TestLoadSaveMeta:
 
     def test_save_load_roundtrip(self, tmp_path, monkeypatch):
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-        data = {"book.pdf": {"authors": ["A"], "tags": ["t1"], "view_count": 3}}
+        data = {"book.pdf": {"authors": ["A"], "view_count": 3}}
         save_meta("generated", data)
 
         loaded = load_meta("generated")

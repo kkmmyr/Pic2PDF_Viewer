@@ -1,4 +1,4 @@
-import { BookCopy, User, Tag } from 'lucide-react';
+import { BookCopy, User } from 'lucide-react';
 import type { RelatedBooks } from '../../hooks/useRelatedBooks';
 
 interface RelatedBooksPanelProps {
@@ -13,12 +13,12 @@ function stripPdfExt(name: string): string {
 /**
  * 関連書籍パネル（最終ページ到達時の右下フローティングカード）。
  *
- * 同シリーズ / 同作者 / 共通タグ の 3 セクションを表示。
+ * 同シリーズ / 同作者 の 2 セクションを表示。
  * 全セクションが空なら何も描画しない（呼び出し側の条件分岐は不要）。
  */
 export function RelatedBooksPanel({ related, onSelect }: RelatedBooksPanelProps) {
-    const { series, authors, tags } = related;
-    if (series.length === 0 && authors.length === 0 && tags.length === 0) return null;
+    const { series, authors } = related;
+    if (series.length === 0 && authors.length === 0) return null;
 
     return (
         <aside
@@ -55,7 +55,7 @@ export function RelatedBooksPanel({ related, onSelect }: RelatedBooksPanelProps)
             )}
 
             {authors.length > 0 && (
-                <section className="mb-3">
+                <section>
                     <h3 className="flex items-center gap-1.5 text-xs font-semibold text-primary-700 dark:text-primary-300 mb-1.5">
                         <User className="w-3.5 h-3.5" />
                         同じ作者
@@ -66,28 +66,6 @@ export function RelatedBooksPanel({ related, onSelect }: RelatedBooksPanelProps)
                                 <button
                                     onClick={() => onSelect(b.name)}
                                     className="w-full text-left px-2 py-1 rounded hover:bg-primary-50 dark:hover:bg-primary-900/30 text-gray-800 dark:text-gray-200 truncate"
-                                    title={stripPdfExt(b.name)}
-                                >
-                                    {stripPdfExt(b.name)}
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            )}
-
-            {tags.length > 0 && (
-                <section>
-                    <h3 className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-1.5">
-                        <Tag className="w-3.5 h-3.5" />
-                        共通タグ
-                    </h3>
-                    <ul className="space-y-1">
-                        {tags.map((b) => (
-                            <li key={`tag-${b.name}`}>
-                                <button
-                                    onClick={() => onSelect(b.name)}
-                                    className="w-full text-left px-2 py-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-gray-800 dark:text-gray-200 truncate"
                                     title={stripPdfExt(b.name)}
                                 >
                                     {stripPdfExt(b.name)}

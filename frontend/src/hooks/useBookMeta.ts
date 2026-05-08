@@ -5,11 +5,11 @@ import { useBookView } from './useBookView';
 import { useMetaDerived } from './useMetaDerived';
 
 /**
- * 書籍メタデータ（作者名 / タグ / ジャンル / 非表示 / シリーズ / 閲覧履歴）を
+ * 書籍メタデータ（作者名 / ジャンル / 非表示 / シリーズ / 閲覧履歴 / 読書状態）を
  * 管理する合成フック。
  *
  * 責務別の 4 フックに分離されており、本フックはそれらを合成して既存 API
- * （getter 群 + updateAuthors / updateTags / updateGenre / setHidden /
+ * （getter 群 + updateAuthors / updateGenre / setHidden /
  * assignSeries / unassignSeries / reorderSeries / recordView /
  * 派生集計 + refreshMeta）を維持する。
  */
@@ -23,7 +23,6 @@ export function useBookMeta(source: string) {
     return {
         meta: core.meta,
         getAuthors: core.getAuthors,
-        getTags: core.getTags,
         getSeries: core.getSeries,
         isHidden: core.isHidden,
         getViewCount: core.getViewCount,
@@ -31,7 +30,6 @@ export function useBookMeta(source: string) {
         getReadState: core.getReadState,
         recordView: view.recordView,
         updateAuthors: write.updateAuthors,
-        updateTags: write.updateTags,
         updateMeta: write.updateMeta,
         updateGenre: write.updateGenre,
         setHidden: write.setHidden,

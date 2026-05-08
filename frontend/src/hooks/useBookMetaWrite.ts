@@ -5,7 +5,7 @@ import apiClient from '../config/api_client';
 import type { SetBookMeta, MakeBookMetaKey } from './useBookMetaCore';
 
 /**
- * 書籍メタデータ（authors / tags / hidden / genre）の書き込み系フック。
+ * 書籍メタデータ（authors / hidden / genre / read_state）の書き込み系フック。
  *
  * `useBookMetaCore` から `setMeta` / `makeKey` を受け取り、PATCH /api/meta に
  * 送信した上でローカル状態をバックエンドのマージ規則に合わせて即時更新する。
@@ -17,7 +17,6 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
             names: string[],
             fields: {
                 authors?: string[];
-                tags?: string[];
                 hidden?: boolean;
                 genre?: string;
                 /** 'unread' | 'reading' | 'done' | '' （空文字でクリア＝派生に戻す） */
@@ -26,7 +25,6 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
         ) => {
             if (
                 fields.authors === undefined &&
-                fields.tags === undefined &&
                 fields.hidden === undefined &&
                 fields.genre === undefined &&
                 fields.read_state === undefined
@@ -37,7 +35,6 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
                 path,
                 names,
                 ...(fields.authors !== undefined ? { authors: fields.authors } : {}),
-                ...(fields.tags !== undefined ? { tags: fields.tags } : {}),
                 ...(fields.hidden !== undefined ? { hidden: fields.hidden } : {}),
                 ...(fields.genre !== undefined ? { genre: fields.genre } : {}),
                 ...(fields.read_state !== undefined ? { read_state: fields.read_state } : {}),
@@ -54,7 +51,6 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
                     const merged: BookMetaEntry = { ...existing };
 
                     if (fields.authors !== undefined) merged.authors = fields.authors;
-                    if (fields.tags !== undefined) merged.tags = fields.tags;
                     if (fields.hidden !== undefined) {
                         if (fields.hidden) {
                             merged.hidden = true;
@@ -101,13 +97,6 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
         [updateMeta],
     );
 
-    const updateTags = useCallback(
-        (path: string, names: string[], tags: string[]) => {
-            return updateMeta(path, names, { tags });
-        },
-        [updateMeta],
-    );
-
     const updateGenre = useCallback(
         (path: string, names: string[], genre: string) => {
             return updateMeta(path, names, { genre });
@@ -129,5 +118,5 @@ export function useBookMetaWrite(source: string, setMeta: SetBookMeta, makeKey: 
         [updateMeta],
     );
 
-    return { updateMeta, updateAuthors, updateTags, updateGenre, setHidden, setReadState };
+    return { updateMeta, updateAuthors, updateGenre, setHidden, setReadState };
 }

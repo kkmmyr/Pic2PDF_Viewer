@@ -35,8 +35,6 @@ export interface PdfCardProps {
     onEditSeries?: (name: string) => void;
     getAuthors?: (name: string) => string[];
     onAuthorClick?: (author: string) => void;
-    getTags?: (name: string) => string[];
-    onTagClick?: (tag: string) => void;
     /** DnD: ドラッグハンドル要素（指定時はカード内に表示） */
     dragHandle?: ReactNode;
 }
@@ -61,8 +59,6 @@ export function PdfCard({
     onEditSeries,
     getAuthors,
     onAuthorClick,
-    getTags,
-    onTagClick,
     dragHandle,
 }: PdfCardProps) {
     const handleThumbnailClick = () => {
@@ -127,31 +123,6 @@ export function PdfCard({
                                         title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
                                     >
                                         {a}
-                                    </span>
-                                ))}
-                            </div>
-                        ) : null;
-                    })()}
-                {getTags &&
-                    (() => {
-                        const tags = getTags(pdf.name);
-                        return tags.length > 0 ? (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                                {tags.map((t, i) => (
-                                    <span
-                                        key={i}
-                                        className={`text-xs px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 truncate max-w-full ${onTagClick ? 'cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-800/50' : ''}`}
-                                        onClick={
-                                            onTagClick
-                                                ? (e) => {
-                                                      e.stopPropagation();
-                                                      onTagClick(t);
-                                                  }
-                                                : undefined
-                                        }
-                                        title={onTagClick ? `"${t}" で絞り込む` : undefined}
-                                    >
-                                        #{t}
                                     </span>
                                 ))}
                             </div>

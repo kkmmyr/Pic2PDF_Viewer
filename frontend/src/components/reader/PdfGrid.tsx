@@ -29,12 +29,8 @@ interface PdfGridProps {
     onRegenThumb?: (name: string) => void;
     /** 書籍名 → 作者名リスト のマップ（カード下部に表示） */
     getAuthors?: (name: string) => string[];
-    /** 作者タグクリック時に絞り込みを行うコールバック */
+    /** 作者ラベルクリック時に絞り込みを行うコールバック */
     onAuthorClick?: (author: string) => void;
-    /** 書籍名 → タグリスト のマップ */
-    getTags?: (name: string) => string[];
-    /** タグクリック時に絞り込みを行うコールバック */
-    onTagClick?: (tag: string) => void;
     /**
      * 集約カードのバッジ情報。null なら通常の書籍カード。
      * シリーズ・作者どちらの集約も同じ仕組みで扱う。
@@ -79,8 +75,6 @@ export function PdfGrid({
     onRegenThumb,
     getAuthors,
     onAuthorClick,
-    getTags,
-    onTagClick,
     getBadge,
     onGroupClick,
     onToggleHidden,
@@ -131,8 +125,6 @@ export function PdfGrid({
             onEditSeries,
             getAuthors,
             onAuthorClick,
-            getTags,
-            onTagClick,
         };
     };
 

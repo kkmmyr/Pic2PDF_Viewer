@@ -4,23 +4,22 @@ import { useRelatedBooks } from '../hooks/useRelatedBooks';
 import type { BookMetaMap } from '../types';
 
 describe('useRelatedBooks', () => {
-    it('全 input が空なら 3 セクションすべて空', () => {
+    it('全 input が空なら 2 セクションすべて空', () => {
         const { result } = renderHook(() => useRelatedBooks({}, '', 'self.pdf'));
-        expect(result.current).toEqual({ series: [], authors: [], tags: [] });
+        expect(result.current).toEqual({ series: [], authors: [] });
     });
 
     it('自分自身は結果に含まれない', () => {
         const meta: BookMetaMap = {
             'self.pdf': {
                 authors: ['A'],
-                tags: ['t'],
                 series_id: 's1',
                 series_index: 1,
                 series_title: 'シリーズ',
             },
         };
         const { result } = renderHook(() => useRelatedBooks(meta, '', 'self.pdf'));
-        expect(result.current).toEqual({ series: [], authors: [], tags: [] });
+        expect(result.current).toEqual({ series: [], authors: [] });
     });
 
     it('同シリーズは series_index 昇順、自分を除いて返す', () => {
@@ -70,18 +69,6 @@ describe('useRelatedBooks', () => {
         ]);
     });
 
-    it('共通タグは tags 交差 ≧ 1 の書籍、ただしシリーズ・作者ヒット済みは除く', () => {
-        const meta: BookMetaMap = {
-            'self.pdf': { authors: ['A'], tags: ['t1', 't2'] },
-            'sameAuthorAndTag.pdf': { authors: ['A'], tags: ['t1'] }, // authors で消化
-            'tagOnly.pdf': { authors: ['Z'], tags: ['t2', 't3'] },
-            'unrelated.pdf': { authors: ['Z'], tags: ['x'] },
-        };
-        const { result } = renderHook(() => useRelatedBooks(meta, '', 'self.pdf'));
-        expect(result.current.authors.map((b) => b.name)).toEqual(['sameAuthorAndTag.pdf']);
-        expect(result.current.tags.map((b) => b.name)).toEqual(['tagOnly.pdf']);
-    });
-
     it('別フォルダの書籍は除外される', () => {
         const meta: BookMetaMap = {
             'self.pdf': { authors: ['A'] },
@@ -103,7 +90,7 @@ describe('useRelatedBooks', () => {
         expect(result.current.authors.map((b) => b.name)).toEqual(['sibling.pdf']);
     });
 
-    it('シリーズ最大 8 件 / 作者・タグ最大 5 件で切る', () => {
+    it('シリーズ最大 8 件 / 作者最大 5 件で切る', () => {
         const meta: BookMetaMap = {
             'self.pdf': { authors: ['A'], series_id: 's1', series_index: 0 },
         };
@@ -117,18 +104,10 @@ describe('useRelatedBooks', () => {
         for (let i = 1; i <= 8; i++) {
             meta[`author${i}.pdf`] = { authors: ['A'] };
         }
-        for (let i = 1; i <= 8; i++) {
-            meta[`tag${i}.pdf`] = { authors: ['Z'], tags: ['shared'] };
-        }
-        const metaWithSelfTag: BookMetaMap = {
-            ...meta,
-            'self.pdf': { authors: ['A'], tags: ['shared'], series_id: 's1', series_index: 0 },
-        };
 
-        const { result } = renderHook(() => useRelatedBooks(metaWithSelfTag, '', 'self.pdf'));
+        const { result } = renderHook(() => useRelatedBooks(meta, '', 'self.pdf'));
         expect(result.current.series).toHaveLength(8);
         expect(result.current.authors).toHaveLength(5);
-        expect(result.current.tags).toHaveLength(5);
     });
 
     it('currentPath サブフォルダで自分自身を除外', () => {

@@ -38,14 +38,14 @@ class TestGetMeta:
     def test_returns_full_meta(self, client, tmp_data_dir):
         _seed_meta(tmp_data_dir, "generated", {
             "a.pdf": {"authors": ["A"]},
-            "b.pdf": {"authors": ["B"], "tags": ["t"]},
+            "b.pdf": {"authors": ["B"], "genre": "G"},
         })
 
         res = client.get("/api/meta?source=generated")
         assert res.status_code == 200
         body = res.json()
         assert body["a.pdf"]["authors"] == ["A"]
-        assert body["b.pdf"]["tags"] == ["t"]
+        assert body["b.pdf"]["genre"] == "G"
 
     def test_returns_empty_dict_when_no_meta(self, client, tmp_data_dir):
         res = client.get("/api/meta?source=kindle")
@@ -124,9 +124,9 @@ class TestUpdateMetaGenre:
 
 class TestUpdateMetaEntryDeletion:
     def test_empty_lists_remove_entry(self, client, tmp_data_dir):
-        """authors=[] / tags=[] で他に意味のあるフィールドが無ければエントリ自体が消える。"""
+        """authors=[] で他に意味のあるフィールドが無ければエントリ自体が消える。"""
         _seed_meta(tmp_data_dir, "generated", {
-            "victim.pdf": {"authors": ["A"], "tags": ["t"]},
+            "victim.pdf": {"authors": ["A"]},
             "alive.pdf": {"authors": ["B"]},
         })
 
@@ -134,7 +134,6 @@ class TestUpdateMetaEntryDeletion:
             "path": "",
             "names": ["victim.pdf"],
             "authors": [],
-            "tags": [],
             "source": "generated",
         })
 

@@ -24,7 +24,7 @@ describe('useBookMetaCore', () => {
 
     it('レスポンスを meta に反映する', async () => {
         mockedGet.mockResolvedValue({
-            'a.pdf': { authors: ['作者A'], tags: ['t1'], view_count: 5 },
+            'a.pdf': { authors: ['作者A'], view_count: 5 },
         });
         const { result } = renderHook(() => useBookMetaCore('generated'));
         await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
@@ -65,7 +65,6 @@ describe('useBookMetaCore', () => {
         const META = {
             'a.pdf': {
                 authors: ['作者A'],
-                tags: ['t1', 't2'],
                 series_id: 's1',
                 series_title: 'シリーズX',
                 series_index: 3,
@@ -81,14 +80,6 @@ describe('useBookMetaCore', () => {
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getAuthors('', 'a.pdf')).toEqual(['作者A']);
             expect(result.current.getAuthors('', 'missing.pdf')).toEqual([]);
-        });
-
-        it('getTags: エントリありで配列、不在で空配列', async () => {
-            mockedGet.mockResolvedValue(META);
-            const { result } = renderHook(() => useBookMetaCore('generated'));
-            await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
-            expect(result.current.getTags('', 'a.pdf')).toEqual(['t1', 't2']);
-            expect(result.current.getTags('', 'missing.pdf')).toEqual([]);
         });
 
         it('getSeries: series_id ありで {id, title, index}、無しで null', async () => {
