@@ -55,6 +55,8 @@ export const API_ENDPOINTS = {
     SERIES_UNASSIGN: '/api/series/unassign',
     /** シリーズ巻数の並べ替え（DnD） */
     SERIES_REORDER: '/api/series/reorder',
+    /** 既存シリーズへの紐付け候補提案（A-1） */
+    SERIES_SUGGEST: '/api/series/suggest',
     /** hitomi.la 新着一覧取得 */
     HITOMI_NEW_ARRIVALS: '/api/hitomi/new-arrivals',
     /** hitomi.la 新着個別既読化 */

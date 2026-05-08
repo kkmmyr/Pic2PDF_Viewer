@@ -1,14 +1,16 @@
 """シリーズ手動編集ルーター。
 
 `POST /api/series/assign` / `POST /api/series/unassign` / `POST /api/series/reorder`。
+`POST /api/series/suggest` で既存シリーズへの紐付け候補を提案（A-1、書き込みなし）。
 シリーズ自動グループ化は撤去済み（2026-05-09、Phase 6）。
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validate_request_targets
-from services.meta_store import MetaDict, make_key, update_meta_locked
+from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
 from services.series_detector import stable_series_id
+from services.series_suggester import suggest_series
 
 router = APIRouter()
 
@@ -154,3 +156,31 @@ def reorder_series(request: ReorderSeriesRequest) -> dict:
 
     update_meta_locked(request.source, _apply)
     return {"message": "Reordered", "updated_count": len(request.names)}
+
+
+# ---------------------------------------------------------------------------
+# AI 提案 API（A-1）
+# ---------------------------------------------------------------------------
+
+class SuggestSeriesRequest(BaseModel):
+    """選択された書籍に対する既存シリーズの紐付け候補を取得するリクエスト。"""
+    path: str = ""
+    names: list[str]
+    source: str = "generated"
+
+
+@router.post("/series/suggest")
+def suggest_series_endpoint(request: SuggestSeriesRequest) -> dict:
+    """選択書籍に対する既存シリーズへの紐付け候補を返す（A-1、書き込みなし）。
+
+    `services.series_suggester.suggest_series` のラッパー。
+    """
+    assert_valid_source(request.source)
+    if not request.names:
+        raise HTTPException(status_code=400, detail="names must not be empty")
+
+    validate_request_targets(request.path, request.names)
+
+    meta = load_meta(request.source)
+    candidates = suggest_series(meta, request.path, request.names)
+    return {"candidates": candidates}

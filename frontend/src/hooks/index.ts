@@ -12,6 +12,7 @@ export { useToast } from './useToast';
 export { useSpreadMode } from './useSpreadMode';
 export { useEditMode } from './useEditMode';
 export { useFullscreen } from './useFullscreen';
+export { useSeriesSuggestion } from './useSeriesSuggestion';
 export { useUrlFilters } from './useUrlFilters';
 export { useLibrarySettings } from './useLibrarySettings';
 export { useLibraryBulkActions } from './useLibraryBulkActions';

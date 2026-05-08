@@ -171,3 +171,17 @@ export interface ExistingSeriesOption {
     /** そのシリーズの現在の最大 series_index（一括追加時の採番開始用） */
     maxIndex: number;
 }
+
+/**
+ * 既存シリーズへの紐付け候補（A-1）。
+ * `POST /api/series/suggest` のレスポンスに含まれる各候補。
+ */
+export interface SuggestedSeries {
+    series_id: string;
+    series_title: string;
+    series_max_index: number;
+    /** 0.0〜1.0、降順ソートで返却される */
+    score: number;
+    /** マッチ理由のカンマ区切りキー（"title_match" / "title_match,author_match"） */
+    reason: string;
+}

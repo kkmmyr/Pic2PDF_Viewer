@@ -29,6 +29,7 @@
   - §3.2 `POST /api/series/assign` — シリーズ割り当て
   - §3.3 `POST /api/series/unassign` — シリーズ解除
   - §3.4 `POST /api/series/reorder` — シリーズ内並べ替え
+  - §3.7 `POST /api/series/suggest` — 既存シリーズへの紐付け候補提案（A-1）
 - [§4. PDF生成](#4-pdf生成)
   - §4.1 `POST /api/generate` — PDF 生成ジョブ起動
   - §4.2 `GET /api/generate/job/{job_id}` — 生成ジョブ進捗
@@ -474,6 +475,54 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 
 **エラー**:
 - `400`: `names` が空 / `series_id` が一致しない書籍が含まれる
+
+---
+
+### §3.7 `POST /api/series/suggest`
+選択された書籍に対して、**既存シリーズへの紐付け候補**を提案する（A-1）。書き込み副作用なしの読み取り専用エンドポイント。新規シリーズを発見するわけではなく、既に登録されているシリーズへの追加候補だけを返す。
+
+**リクエストボディ**:
+```json
+{
+  "path": "current/relative/path",
+  "names": ["book1.pdf", "book2.pdf"],
+  "source": "generated"
+}
+```
+
+**レスポンス**:
+```json
+{
+  "candidates": [
+    {
+      "series_id": "abc12345",
+      "series_title": "鬼滅の刃",
+      "series_max_index": 5.0,
+      "score": 0.85,
+      "reason": "title_match,author_match"
+    },
+    {
+      "series_id": "def67890",
+      "series_title": "炎柱外伝",
+      "series_max_index": 2.0,
+      "score": 0.62,
+      "reason": "title_match"
+    }
+  ]
+}
+```
+
+**マッチング戦略（ルールベース）**:
+- 既存シリーズの `series_title` から末尾の巻数表記を除いた本体で比較
+- 各選択書籍タイトルとの **共通プレフィックス長 / min(タイトル長, シリーズ本体長)** をスコア化
+- 全選択書籍の **平均スコア** を採用（複数冊が同一シリーズに属するかを評価）
+- 全書籍で作者集合が一致した場合のみ +0.2 加点（最大 1.0 にクランプ）
+- スコア `0.4` 以上の上位 5 件を降順で返す
+
+**エラー**:
+- `400`: `names` が空 / 不正な source
+
+**用途**: フロントエンドの「シリーズに一括登録」ダイアログ内に「AI が提案するシリーズに追加」モードを追加し、モード選択時に自動で本エンドポイントを呼び出して候補をラジオで表示する。ユーザー確認後、既存の `POST /api/series/assign` で書き込みを行う（自動実行はしない）。
 
 ---
 

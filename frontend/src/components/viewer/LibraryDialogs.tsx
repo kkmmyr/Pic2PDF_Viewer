@@ -38,6 +38,8 @@ interface LibraryDialogsProps {
 }
 
 export function LibraryDialogs({
+    currentPath,
+    currentSource,
     selectedItems,
     renameTarget,
     onCloseRename,
@@ -92,6 +94,8 @@ export function LibraryDialogs({
                 open={isBulkSeriesOpen}
                 selectedNames={bulkSeriesNames}
                 existingSeries={bulkSeriesExisting}
+                source={currentSource}
+                path={currentPath}
                 onClose={onCloseBulkSeries}
                 onAssign={onBulkAssignSeries}
             />
