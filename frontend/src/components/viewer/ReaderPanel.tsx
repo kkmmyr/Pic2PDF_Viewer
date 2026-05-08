@@ -23,7 +23,6 @@ import { useReaderUIState } from '../../hooks/useReaderUIState';
 import { usePdfDocumentState } from '../../hooks/usePdfDocumentState';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
-import { NextVolumeBanner } from '../reader/NextVolumeBanner';
 import { RelatedBooksPanel } from '../reader/RelatedBooksPanel';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -374,12 +373,6 @@ export function ReaderPanel({
                     )}
                 </div>
             </div>
-            {nextVolume && isAtLastSpread && onSelectPdf && (
-                <NextVolumeBanner
-                    title={`次の巻: #${nextVolume.index} ${nextVolume.title}`}
-                    onClick={handleNavigateNextVolume}
-                />
-            )}
             {isAtLastSpread && onSelectPdf && (
                 <RelatedBooksPanel related={relatedBooks} onSelect={handleSelectRelated} />
             )}
