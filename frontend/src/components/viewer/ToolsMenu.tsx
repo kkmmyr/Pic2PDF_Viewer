@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Settings, ChevronDown, Download } from 'lucide-react';
+import { Settings, ChevronDown, Download, ListTree } from 'lucide-react';
 import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
+import { UnresolvedSeriesDialog } from './UnresolvedSeriesDialog';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import type { LibrarySource } from '../../types';
@@ -39,6 +40,7 @@ async function downloadMetaExport(source: LibrarySource): Promise<void> {
 export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
     const [open, setOpen] = useState(false);
     const [exporting, setExporting] = useState(false);
+    const [unresolvedOpen, setUnresolvedOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -96,8 +98,29 @@ export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
                     </div>
                     <AutoFillAuthorsBar source={source} onComplete={onComplete} />
                     <SeriesResolveBar source={source} onComplete={onComplete} />
+                    <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800">
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                            自動判定で漏れたシリーズ候補をレビュー
+                        </span>
+                        <button
+                            onClick={() => {
+                                setOpen(false);
+                                setUnresolvedOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1 text-sm bg-accent-600 hover:bg-accent-700 text-white rounded-md shrink-0"
+                        >
+                            <ListTree className="w-3.5 h-3.5" />
+                            未分類候補
+                        </button>
+                    </div>
                 </div>
             )}
+            <UnresolvedSeriesDialog
+                open={unresolvedOpen}
+                source={source}
+                onClose={() => setUnresolvedOpen(false)}
+                onComplete={onComplete}
+            />
         </div>
     );
 }

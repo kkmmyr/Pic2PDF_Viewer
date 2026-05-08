@@ -643,3 +643,123 @@ class TestReorderSeries:
             "path": "", "names": ["a.pdf"], "series_id": "x", "source": "invalid",
         })
         assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# unresolved_candidates（A-6）
+# ---------------------------------------------------------------------------
+
+from services.series_detector import unresolved_candidates  # noqa: E402
+
+
+class TestUnresolvedCandidates:
+    def test_returns_short_prefix_pair(self, series_env):
+        """共通プレフィックスが 3 文字以上 5 文字未満のペアは reason='short_prefix'。"""
+        tmp_path, pdf_dir = series_env
+        # "ABC1" / "ABC2" → common_prefix="ABC" (3 文字), suffix=1/2 でパース成功
+        for name in ("ABC1.pdf", "ABC2.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "ABC1.pdf": {"authors": ["A"]},
+            "ABC2.pdf": {"authors": ["A"]},
+        })
+
+        from services.meta_store import load_meta
+        candidates = unresolved_candidates("generated", load_meta("generated"))
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert c["reason"] == "short_prefix"
+        assert c["common_prefix"] == "ABC"
+        names = sorted(b["name"] for b in c["books"])
+        assert names == ["ABC1.pdf", "ABC2.pdf"]
+
+    def test_returns_volume_parse_failed_pair(self, series_env):
+        """共通プレフィックス >= 5 でも巻数パース失敗なら reason='volume_parse_failed'。"""
+        tmp_path, pdf_dir = series_env
+        for name in ("鋼の錬金術師 完全版.pdf", "鋼の錬金術師 番外編.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "鋼の錬金術師 完全版.pdf": {"authors": ["A"]},
+            "鋼の錬金術師 番外編.pdf": {"authors": ["A"]},
+        })
+
+        from services.meta_store import load_meta
+        candidates = unresolved_candidates("generated", load_meta("generated"))
+        assert len(candidates) == 1
+        assert candidates[0]["reason"] == "volume_parse_failed"
+        assert candidates[0]["common_prefix"] == "鋼の錬金術師"
+
+    def test_excludes_books_already_in_series(self, series_env):
+        """series_id 割当済み書籍はペアの両側で除外される。"""
+        tmp_path, pdf_dir = series_env
+        for name in ("ABC1.pdf", "ABC2.pdf", "ABC3.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "ABC1.pdf": {"authors": ["A"], "series_id": "x", "series_title": "ABC", "series_index": 1.0},
+            "ABC2.pdf": {"authors": ["A"], "series_id": "x", "series_title": "ABC", "series_index": 2.0},
+            "ABC3.pdf": {"authors": ["A"]},
+        })
+
+        from services.meta_store import load_meta
+        candidates = unresolved_candidates("generated", load_meta("generated"))
+        # 1 と 2 は割当済みで除外、3 だけ残るのでペアが組めない
+        assert candidates == []
+
+    def test_excludes_books_without_authors(self, series_env):
+        """authors なしは group_by_authors で除外される。"""
+        tmp_path, pdf_dir = series_env
+        for name in ("ABC1.pdf", "ABC2.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "ABC1.pdf": {"authors": []},
+            "ABC2.pdf": {},
+        })
+
+        from services.meta_store import load_meta
+        candidates = unresolved_candidates("generated", load_meta("generated"))
+        assert candidates == []
+
+    def test_score_descending_order(self, series_env):
+        """score が高い候補ほど先頭に来る。"""
+        tmp_path, pdf_dir = series_env
+        # ペア1: 共通プレフィックス "ABC" (3 文字) / 短い方 "ABC1" 長さ 4 → score=3/4=0.75 (short_prefix)
+        # ペア2: 共通プレフィックス "AAAAAAAAAA " (11 文字) → volume_parse_failed
+        #         短い方 "AAAAAAAAAA 番外編" 長さ 14 → score=11/14 ≈ 0.786
+        # → ペア2 が先頭、ペア1 が次
+        files = ["ABC1.pdf", "ABC2.pdf", "AAAAAAAAAA 番外編.pdf", "AAAAAAAAAA 完全版.pdf"]
+        for f in files:
+            (pdf_dir / f).write_bytes(b"")
+        _seed_meta(tmp_path, {f: {"authors": ["A"]} for f in files})
+
+        from services.meta_store import load_meta
+        candidates = unresolved_candidates("generated", load_meta("generated"))
+        assert len(candidates) == 2
+        assert candidates[0]["score"] >= candidates[1]["score"]
+        assert candidates[0]["common_prefix"] == "AAAAAAAAAA"
+        assert candidates[1]["common_prefix"] == "ABC"
+
+    def test_route_returns_candidates(self, series_client):
+        """GET /api/series/unresolved-candidates エンドポイントが候補を返す。"""
+        client, tmp_path = series_client
+        pdf_dir = tmp_path / "pdfs"
+        pdf_dir.mkdir()
+        from unittest.mock import patch
+        for name in ("ABC1.pdf", "ABC2.pdf"):
+            (pdf_dir / name).write_bytes(b"")
+        _seed_meta(tmp_path, {
+            "ABC1.pdf": {"authors": ["A"]},
+            "ABC2.pdf": {"authors": ["A"]},
+        })
+
+        with patch("config.PDF_COMPRESSED_DIR", str(pdf_dir)):
+            res = client.get("/api/series/unresolved-candidates", params={"source": "generated"})
+        assert res.status_code == 200
+        body = res.json()
+        assert "candidates" in body
+        assert len(body["candidates"]) == 1
+        assert body["candidates"][0]["reason"] == "short_prefix"
+
+    def test_route_invalid_source_returns_400(self, series_client):
+        client, _ = series_client
+        res = client.get("/api/series/unresolved-candidates", params={"source": "invalid"})
+        assert res.status_code == 400

@@ -34,6 +34,7 @@
   - §3.3 `POST /api/series/unassign` — シリーズ解除
   - §3.4 `POST /api/series/reorder` — シリーズ内並べ替え
   - §3.5 `GET /api/series/resolve/status` — シリーズジョブ進捗
+  - §3.6 `GET /api/series/unresolved-candidates` — 未分類シリーズ候補レポート
 - [§4. PDF生成](#4-pdf生成)
   - §4.1 `POST /api/generate` — PDF 生成ジョブ起動
   - §4.2 `GET /api/generate/job/{job_id}` — 生成ジョブ進捗
@@ -587,6 +588,49 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 - `total`: 走査対象書籍数
 - `done`: 走査済み件数
 - `created`: 作成された（または更新された）シリーズ数
+
+---
+
+### §3.6 `GET /api/series/unresolved-candidates`
+シリーズ自動判定で**漏れた候補**（`series_id` 未割当のまま）を返す。`POST /api/series/resolve` の閾値（`SERIES_MIN_PREFIX_LEN=5` + 巻数パース成功）を意図的に緩めた debug 抽出で、書き込み副作用は無い。フロントエンドからレビューして手動シリーズ化（`POST /api/series/assign`）に繋げる用途。
+
+**クエリパラメータ**:
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**レスポンス**:
+```json
+{
+  "candidates": [
+    {
+      "reason": "short_prefix",
+      "score": 0.42,
+      "common_prefix": "鬼滅",
+      "books": [
+        { "path": "", "name": "鬼滅の刃 1.pdf", "title": "鬼滅の刃 1" },
+        { "path": "", "name": "鬼滅の刃 2.pdf", "title": "鬼滅の刃 2" }
+      ]
+    },
+    {
+      "reason": "volume_parse_failed",
+      "score": 0.58,
+      "common_prefix": "鋼の錬金術師",
+      "books": [
+        { "path": "", "name": "鋼の錬金術師 完全版.pdf", "title": "鋼の錬金術師 完全版" },
+        { "path": "", "name": "鋼の錬金術師 番外編.pdf", "title": "鋼の錬金術師 番外編" }
+      ]
+    }
+  ]
+}
+```
+- `reason` の値:
+    - `short_prefix`: 共通プレフィックスが `SERIES_MIN_PREFIX_LEN=5` 未満（3 以上 5 未満）だが、巻数パースは成功するペア
+    - `volume_parse_failed`: 共通プレフィックス ≥ 5 だが巻数パースが失敗するペア
+- `score`: `len(common_prefix) / min(len(title_a), len(title_b))`。1.0 に近いほど類似度が高い。降順で返却
+- `books`: ペアの 2 冊。同フォルダ・同作者グループ内に限定
+- 既に `series_id` が割り当て済みの書籍はペアに含めない
+- 候補が膨大になるのを避けるため**最大 200 件**で打ち切る
+
+**用途**: ライブラリ画面「ツール」メニューに「未分類シリーズ候補をレビュー」を追加。レビュー後は既存の `POST /api/series/assign` フローでシリーズ化する。
 
 ---
 
