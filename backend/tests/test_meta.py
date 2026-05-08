@@ -1,5 +1,5 @@
 """
-services.meta_store / services.auto_fill_service / routers.meta のユニットテスト。
+services.meta_store / routers.meta のユニットテスト。
 
 実行方法:
     cd backend
@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.auto_fill_service import _is_missing, _is_unknown
 from services.meta_store import make_key
 
 
@@ -28,46 +27,6 @@ class TestMakeKey:
 
     def test_nested_path(self):
         assert make_key("a/b/c", "x.pdf") == "a/b/c/x.pdf"
-
-
-class TestIsMissing:
-    def test_key_not_in_meta(self):
-        assert _is_missing({}, "missing.pdf") is True
-
-    def test_empty_authors(self):
-        meta = {"book.pdf": {"authors": []}}
-        assert _is_missing(meta, "book.pdf") is True
-
-    def test_with_real_author(self):
-        meta = {"book.pdf": {"authors": ["サークルA"]}}
-        assert _is_missing(meta, "book.pdf") is False
-
-    def test_unknown_author_not_missing(self):
-        # 「作者不明」は登録済みなので missing ではない
-        meta = {"book.pdf": {"authors": ["作者不明"]}}
-        assert _is_missing(meta, "book.pdf") is False
-
-
-class TestIsUnknown:
-    def test_unknown_author(self):
-        meta = {"book.pdf": {"authors": ["作者不明"]}}
-        assert _is_unknown(meta, "book.pdf") is True
-
-    def test_real_author_not_unknown(self):
-        meta = {"book.pdf": {"authors": ["サークルA"]}}
-        assert _is_unknown(meta, "book.pdf") is False
-
-    def test_empty_authors_not_unknown(self):
-        meta = {"book.pdf": {"authors": []}}
-        assert _is_unknown(meta, "book.pdf") is False
-
-    def test_key_not_in_meta(self):
-        assert _is_unknown({}, "missing.pdf") is False
-
-    def test_multiple_authors_with_unknown(self):
-        # ["作者不明", "Author2"] は完全一致しないので unknown ではない
-        meta = {"book.pdf": {"authors": ["作者不明", "Author2"]}}
-        assert _is_unknown(meta, "book.pdf") is False
 
 
 # ---------------------------------------------------------------------------
@@ -393,103 +352,3 @@ class TestReadStateManualUpdate:
         assert meta["book.pdf"]["read_state"] == "done"
 
 
-# ---------------------------------------------------------------------------
-# auto_fill_service.run_auto_fill — 既存 view_count / last_viewed_at の保持
-# ---------------------------------------------------------------------------
-
-@pytest.fixture
-def auto_fill_env(tmp_path, monkeypatch):
-    """run_auto_fill を tmp_path 配下で動作させるための環境を整える。"""
-    # PDF ディレクトリを tmp_path に差し替え（auto_fill_service は get_dirs_by_source 経由で PDF_COMPRESSED_DIR を参照する）
-    pdf_dir = tmp_path / "pdfs"
-    pdf_dir.mkdir()
-    monkeypatch.setattr("config.PDF_COMPRESSED_DIR", str(pdf_dir))
-    monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-
-    # ジョブの sleep を無効化（テスト高速化）
-    monkeypatch.setattr("services.auto_fill_service.AUTOFILL_REQUEST_DELAY_SEC", 0)
-
-    # resolve_author をモック化（外部 API 呼び出しを回避）
-    monkeypatch.setattr(
-        "services.auto_fill_service.resolve_author",
-        lambda title, source: f"サークル_{title}",
-    )
-
-    return tmp_path, pdf_dir
-
-
-class TestRunAutoFillPreservesViewCount:
-    def test_overwrite_all_preserves_view_count(self, auto_fill_env):
-        """overwrite_all モードでも既存の view_count / last_viewed_at は保持される。"""
-        tmp_path, pdf_dir = auto_fill_env
-
-        # ダミー PDF を作成
-        (pdf_dir / "book.pdf").write_bytes(b"")
-
-        # 既存メタデータ（閲覧履歴あり、作者は不明）を準備
-        meta_dir = tmp_path / "meta" / "generated"
-        meta_dir.mkdir(parents=True)
-        existing = {
-            "book.pdf": {
-                "authors": ["作者不明"],
-                "view_count": 5,
-                "last_viewed_at": 1700000000.0,
-            }
-        }
-        (meta_dir / "meta.json").write_text(json.dumps(existing), encoding="utf-8")
-
-        from services.auto_fill_service import get_auto_fill_state, reset_auto_fill_state, run_auto_fill
-        reset_auto_fill_state("generated")
-        run_auto_fill("generated", "overwrite_all")
-
-        meta = _read_meta(tmp_path)
-        # authors は更新される
-        assert meta["book.pdf"]["authors"] == ["サークル_book"]
-        # view_count / last_viewed_at は保持される（バグ修正の検証）
-        assert meta["book.pdf"]["view_count"] == 5
-        assert meta["book.pdf"]["last_viewed_at"] == 1700000000.0
-
-        state = get_auto_fill_state("generated")
-        assert state.status == "done"
-        assert state.done == 1
-
-    def test_unknown_only_preserves_view_count(self, auto_fill_env):
-        """unknown_only モードで「作者不明」を更新するときも view_count を保持する。"""
-        tmp_path, pdf_dir = auto_fill_env
-        (pdf_dir / "novel.pdf").write_bytes(b"")
-
-        meta_dir = tmp_path / "meta" / "generated"
-        meta_dir.mkdir(parents=True)
-        existing = {
-            "novel.pdf": {
-                "authors": ["作者不明"],
-                "view_count": 12,
-                "last_viewed_at": 1700001234.5,
-            }
-        }
-        (meta_dir / "meta.json").write_text(json.dumps(existing), encoding="utf-8")
-
-        from services.auto_fill_service import reset_auto_fill_state, run_auto_fill
-        reset_auto_fill_state("generated")
-        run_auto_fill("generated", "unknown_only")
-
-        meta = _read_meta(tmp_path)
-        assert meta["novel.pdf"]["authors"] == ["サークル_novel"]
-        assert meta["novel.pdf"]["view_count"] == 12
-        assert meta["novel.pdf"]["last_viewed_at"] == 1700001234.5
-
-    def test_missing_only_creates_entry_without_view_count(self, auto_fill_env):
-        """missing_only で初登録の書籍は view_count なしで authors のみ設定される。"""
-        tmp_path, pdf_dir = auto_fill_env
-        (pdf_dir / "fresh.pdf").write_bytes(b"")
-
-        # meta.json なし（完全未登録）
-        from services.auto_fill_service import reset_auto_fill_state, run_auto_fill
-        reset_auto_fill_state("generated")
-        run_auto_fill("generated", "missing_only")
-
-        meta = _read_meta(tmp_path)
-        assert meta["fresh.pdf"]["authors"] == ["サークル_fresh"]
-        # 閲覧履歴は未記録なのでフィールドも存在しない
-        assert "view_count" not in meta["fresh.pdf"]
-        assert "last_viewed_at" not in meta["fresh.pdf"]

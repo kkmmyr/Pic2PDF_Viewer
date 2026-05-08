@@ -7,7 +7,6 @@ export { useLibraryPins } from './useLibraryPins';
 export { useSortedPdfs } from './useSortedPdfs';
 export { useDarkMode } from './useDarkMode';
 export { useBookMeta } from './useBookMeta';
-export { useAutoFillAuthors } from './useAutoFillAuthors';
 export { useLibraryFilter } from './useLibraryFilter';
 export { useToast } from './useToast';
 export { useSpreadMode } from './useSpreadMode';

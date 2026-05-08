@@ -17,7 +17,7 @@ from config import (
     KINDLE_THUMBNAIL_DIR,
     THUMBNAIL_DIR,
 )
-from exceptions import AutoFillError, FileOperationError, OcrProcessError
+from exceptions import FileOperationError, OcrProcessError
 from routers import generate, genres, hitomi, library, meta, ocr, pdfs, series, thumbnails
 from utils.logger import get_logger
 
@@ -47,12 +47,6 @@ async def file_operation_error_handler(request: Request, exc: FileOperationError
 async def ocr_process_error_handler(request: Request, exc: OcrProcessError):
     logger.exception("OcrProcessError at %s: %s", request.url, exc)
     return JSONResponse(status_code=400, content={"detail": str(exc)})
-
-
-@app.exception_handler(AutoFillError)
-async def auto_fill_error_handler(request: Request, exc: AutoFillError):
-    logger.exception("AutoFillError at %s: %s", request.url, exc)
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)

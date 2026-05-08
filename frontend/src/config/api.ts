@@ -43,10 +43,6 @@ export const API_ENDPOINTS = {
     META_EXPORT: (source: string) => `/api/meta/export?source=${encodeURIComponent(source)}`,
     /** 閲覧記録（カウント+1） */
     META_VIEW: '/api/meta/view',
-    /** 作者名自動登録ジョブ開始 */
-    META_AUTO_FILL: '/api/meta/auto-fill',
-    /** 作者名自動登録ジョブ進捗取得 */
-    META_AUTO_FILL_STATUS: '/api/meta/auto-fill/status',
     /** サムネイル一括再生成 */
     REGENERATE_THUMBNAIL_BULK: '/api/thumbnails/regenerate_bulk',
     /** PDF結合 */

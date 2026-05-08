@@ -37,7 +37,7 @@ WebP / ZIP → PDF 変換 + ライブラリ管理 + OCR 起動を行う Web API 
 ## 結果
 
 ### ポジティブ
-- ジョブ系エンドポイント（generate / ocr / auto-fill / hitomi）の async 設計が自然
+- ジョブ系エンドポイント（generate / ocr / hitomi）の async 設計が自然
 - Pydantic モデルと TypeScript 型の対応関係が見えやすい
 - 起動・記述ともに軽量（個人ツールの開発体験に合う）
 

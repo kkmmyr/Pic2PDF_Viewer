@@ -14,12 +14,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
-from services.author_resolver import resolve_author_debug
-from services.auto_fill_service import (
-    VALID_MODES,
-    get_auto_fill_state,
-    start_auto_fill_job,
-)
 from services.meta_store import (
     VALID_READ_STATES,
     has_meaningful_value,
@@ -185,54 +179,3 @@ def record_view(request: RecordViewRequest) -> dict:
 
     update_meta_locked(request.source, _apply)
     return result
-
-
-# ---------------------------------------------------------------------------
-# 作者名自動登録ジョブ
-# ---------------------------------------------------------------------------
-
-@router.post("/meta/auto-fill")
-def start_auto_fill(
-    source: str = Depends(validated_source),
-    mode: str = "unknown_only",
-) -> dict:
-    """
-    サークル名自動登録ジョブを開始する。
-    - mode=missing_only : 作者名エントリが存在しない書籍のみ
-    - mode=unknown_only : 「作者不明」の書籍のみ（デフォルト）
-    - mode=overwrite_all: 登録済みを含む全件を上書き
-    - 既にジョブが実行中の場合は 409 を返す。
-    """
-    if mode not in VALID_MODES:
-        raise HTTPException(status_code=400, detail=f"Invalid mode. Choose from: {', '.join(VALID_MODES)}")
-
-    state = get_auto_fill_state(source)
-    if state.status == "running":
-        raise HTTPException(status_code=409, detail="Auto-fill job is already running")
-
-    start_auto_fill_job(source, mode)
-    return {"started": True, "source": source, "mode": mode}
-
-
-@router.get("/meta/auto-fill/test")
-def test_auto_fill(title: str, source: str = Depends(validated_source)) -> dict:
-    """
-    1件分のサークル名解決を実行し、各ステップの中間結果を返すデバッグ用エンドポイント。
-    SearXNG の検索結果と Gemma の応答を確認するために使う。
-    """
-    return resolve_author_debug(title, source)
-
-
-@router.get("/meta/auto-fill/status")
-def get_auto_fill_status(source: str = Depends(validated_source)) -> dict:
-    """作者名自動登録ジョブの進捗を返す。"""
-    state = get_auto_fill_state(source)
-    return {
-        "status": state.status,
-        "total": state.total,
-        "done": state.done,
-        "skipped": state.skipped,
-        "current": state.current,
-        "results": state.results,
-        "error": state.error,
-    }

@@ -60,23 +60,6 @@ class TestExceptionHandlers:
         finally:
             app.router.routes = [r for r in app.router.routes if getattr(r, "path", "") != "/api/__test_ocr_error"]
 
-    def test_auto_fill_error_returns_500(self, client):
-        from exceptions import AutoFillError
-        from main import app
-
-        router = APIRouter()
-
-        @router.post("/api/__test_autofill_error")
-        def _raise():
-            raise AutoFillError("autofill broken")
-
-        app.include_router(router)
-        try:
-            res = client.post("/api/__test_autofill_error")
-            assert res.status_code == 500
-            assert "autofill broken" in res.json()["detail"]
-        finally:
-            app.router.routes = [r for r in app.router.routes if getattr(r, "path", "") != "/api/__test_autofill_error"]
 
     def test_unhandled_exception_masked_as_500(self, tmp_data_dir):
         """未捕捉例外は status=500 / detail="Internal server error" にマスクされる。"""

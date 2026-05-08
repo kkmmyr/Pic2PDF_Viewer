@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings, ChevronDown, Download } from 'lucide-react';
-import { AutoFillAuthorsBar } from './AutoFillAuthorsBar';
 import { SeriesResolveBar } from './SeriesResolveBar';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
@@ -94,7 +93,6 @@ export function ToolsMenu({ source, onComplete }: ToolsMenuProps) {
                             {exporting ? 'エクスポート中...' : 'エクスポート'}
                         </button>
                     </div>
-                    <AutoFillAuthorsBar source={source} onComplete={onComplete} />
                     <SeriesResolveBar source={source} onComplete={onComplete} />
                 </div>
             )}

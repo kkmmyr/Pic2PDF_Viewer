@@ -1,7 +1,7 @@
 """
 services.job_state.JobStateManager のユニットテスト。
 
-汎用ジェネリクス（auto_fill_service / series_resolver で使用）の挙動を確認する。
+汎用ジェネリクス（series_resolver で使用）の挙動を確認する。
 
 実行方法:
     cd backend
