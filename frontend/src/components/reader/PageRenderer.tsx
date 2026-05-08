@@ -14,6 +14,8 @@ interface PageRendererProps {
     onToggleSelection: (pageNum: number, e: React.MouseEvent) => void;
     onNext: (e: React.MouseEvent) => void;
     onPrev: (e: React.MouseEvent) => void;
+    /** 現在の実効見開き状態。1 ページ表示時は max-width を全幅に拡大して表示する */
+    isSpread: boolean;
     // Image mode props
     imageUrl?: string | null;
     isImageMode?: boolean;
@@ -41,12 +43,15 @@ export function PageRenderer({
     onToggleSelection,
     onNext,
     onPrev,
+    isSpread,
     imageUrl,
     isImageMode = false,
     searchText,
     customTextRenderer,
     onPageSize,
 }: PageRendererProps) {
+    // 1 ページ表示時は画面幅を広く使う（横長見開き原稿が画面幅一杯に表示される）
+    const maxWidthClass = isSpread ? 'max-w-[calc(50vw-2rem)]' : 'max-w-[calc(100vw-4rem)]';
     if (pageNumber > numPages) {
         return (
             <div
@@ -117,7 +122,7 @@ export function PageRenderer({
 
     return (
         <div
-            className={`shadow-2xl cursor-pointer shrink-0 max-w-[calc(50vw-2rem)] flex justify-center relative ${
+            className={`shadow-2xl cursor-pointer shrink-0 ${maxWidthClass} flex justify-center relative ${
                 isSelected ? 'ring-4 ring-red-500' : ''
             }`}
             onClick={handleClick}

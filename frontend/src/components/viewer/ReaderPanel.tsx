@@ -243,6 +243,12 @@ export function ReaderPanel({
         setIsOnRelatedPage(false);
     }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread, resetNumPages]);
 
+    // ページペア切替時に Auto 見開き判定をリセット。直後に PageRenderer の onRenderSuccess
+    // で左右両ページの寸法が通知され、片方でも横長なら 1 ページ表示に確定する。
+    useEffect(() => {
+        resetAutoSpread();
+    }, [pageNumber, resetAutoSpread]);
+
     const handleClose = useCallback(() => {
         resetPage();
         resetEditMode();
@@ -279,7 +285,8 @@ export function ReaderPanel({
             imageUrl={imageUrls ? imageUrls[pNum - 1] : null}
             searchText={searchText}
             customTextRenderer={!isImageMode && searchText ? customTextRenderer : undefined}
-            onPageSize={side === 'right' || side === 'single' ? handlePageSize : undefined}
+            isSpread={isSpread}
+            onPageSize={handlePageSize}
         />
     );
 
