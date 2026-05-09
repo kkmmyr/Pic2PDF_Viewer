@@ -33,6 +33,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
     import.meta.url,
 ).toString();
 
+// Searchable PDF（ReportLab 生成）に含まれる ASCII85 ストリーム中の `<` を pdf.js の lenient parser が
+// hex string 開始と誤読し getHexString warning を大量に出すため、verbosity を ERRORS に下げる。
+// Document の options は識別性が変わると再読込を誘発するためモジュールスコープで固定する。
+const PDF_DOCUMENT_OPTIONS = {
+    verbosity: pdfjs.VerbosityLevel.ERRORS,
+};
+
 interface ReaderPanelProps {
     selectedPdf: string;
     currentPath: string;
@@ -398,6 +405,7 @@ export function ReaderPanel({
                         ) : (
                             <Document
                                 file={pdfUrl}
+                                options={PDF_DOCUMENT_OPTIONS}
                                 onLoadSuccess={onDocumentLoadSuccess}
                                 className="flex justify-center"
                                 loading={
