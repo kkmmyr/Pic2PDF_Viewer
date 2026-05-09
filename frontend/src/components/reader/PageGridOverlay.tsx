@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { X, Trash2, CheckSquare, Square } from 'lucide-react';
-import { API_ENDPOINTS } from '../../config/api';
+import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
 import type { LibrarySource } from '../../types';
 
 interface PageGridOverlayProps {
@@ -106,13 +106,15 @@ export function PageGridOverlay({
                 >
                     {pages.map((pNum) => {
                         const isSelected = selectedPages.has(pNum);
-                        const url = API_ENDPOINTS.PAGE_THUMBNAIL(
-                            selectedPdf,
-                            pNum,
-                            currentPath,
-                            currentSource,
-                            THUMB_WIDTH,
-                            pdfVersion,
+                        const url = buildApiUrl(
+                            API_ENDPOINTS.PAGE_THUMBNAIL(
+                                selectedPdf,
+                                pNum,
+                                currentPath,
+                                currentSource,
+                                THUMB_WIDTH,
+                                pdfVersion,
+                            ),
                         );
                         return (
                             <button
