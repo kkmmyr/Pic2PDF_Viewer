@@ -48,7 +48,12 @@ export function PageRenderer({
 }: PageRendererProps) {
     // 1 ページ表示時は画面幅を広く使う（横長見開き原稿が画面幅一杯に表示される）
     const maxWidthClass = isSpread ? 'max-w-[calc(50vw-2rem)]' : 'max-w-[calc(100vw-4rem)]';
-    if (pageNumber > numPages) {
+
+    // ページ範囲外、または画像モードで該当 URL が無い（削除直後に
+    // imageUrls.length が numPages の同期より一瞬先に縮むケース）は End を返す。
+    // これをやらないと画像モードのまま PDF 経路の <Page> が <Document> 無しで
+    // 描画され "Attempted to load a page, but no document was specified" になる。
+    if (pageNumber > numPages || (isImageMode && !imageUrl)) {
         return (
             <div
                 style={{ height: windowHeight - 40, width: (windowHeight - 40) * 0.7 }}
