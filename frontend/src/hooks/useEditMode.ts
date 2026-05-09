@@ -21,6 +21,8 @@ interface UseEditModeReturn {
     selectedPages: Set<number>;
     toggleEditMode: () => void;
     togglePageSelection: (pNum: number, e: React.MouseEvent) => void;
+    /** 範囲を選択に追加（Shift+クリック用、from/to は順不同） */
+    selectRange: (from: number, to: number) => void;
     /** 編集モード状態を完全リセット（PDF切り替え時用） */
     resetEditMode: () => void;
     /** 削除を要求（確認ダイアログを開かせる）。表示は呼び出し側で */
@@ -64,6 +66,16 @@ export function useEditMode({
             const next = new Set(prev);
             if (next.has(pNum)) next.delete(pNum);
             else next.add(pNum);
+            return next;
+        });
+    }, []);
+
+    const selectRange = useCallback((from: number, to: number) => {
+        const min = Math.min(from, to);
+        const max = Math.max(from, to);
+        setSelectedPages((prev) => {
+            const next = new Set(prev);
+            for (let p = min; p <= max; p++) next.add(p);
             return next;
         });
     }, []);
@@ -124,6 +136,7 @@ export function useEditMode({
         selectedPages,
         toggleEditMode,
         togglePageSelection,
+        selectRange,
         resetEditMode,
         requestDeletePages,
         confirmDeletePages,

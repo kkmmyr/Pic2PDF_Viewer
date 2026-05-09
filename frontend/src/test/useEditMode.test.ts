@@ -64,6 +64,25 @@ describe('useEditMode', () => {
         expect(result.current.selectedPages.has(3)).toBe(false);
     });
 
+    it('selectRange で from..to の範囲が一括追加される（順序逆でも同じ）', () => {
+        const { result } = renderEM();
+        act(() => result.current.selectRange(3, 6));
+        expect([...result.current.selectedPages].sort((a, b) => a - b)).toEqual([3, 4, 5, 6]);
+
+        act(() => result.current.selectRange(10, 8));
+        expect([...result.current.selectedPages].sort((a, b) => a - b)).toEqual([
+            3, 4, 5, 6, 8, 9, 10,
+        ]);
+    });
+
+    it('selectRange は既存の選択を残す（add 動作、replace ではない）', () => {
+        const { result } = renderEM();
+        const e = { stopPropagation: () => {} } as React.MouseEvent;
+        act(() => result.current.togglePageSelection(1, e));
+        act(() => result.current.selectRange(5, 7));
+        expect([...result.current.selectedPages].sort((a, b) => a - b)).toEqual([1, 5, 6, 7]);
+    });
+
     it('resetEditMode で全状態がリセット', () => {
         const { result } = renderEM();
         act(() =>

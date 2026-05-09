@@ -1,4 +1,5 @@
 export { PageRenderer } from './PageRenderer';
+export { PageGridOverlay } from './PageGridOverlay';
 export { PageSlider } from './PageSlider';
 export { ReaderHeader } from './ReaderHeader';
 export { LibraryHeader } from './LibraryHeader';

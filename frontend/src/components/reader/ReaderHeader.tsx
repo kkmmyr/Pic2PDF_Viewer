@@ -1,6 +1,5 @@
 import {
     ArrowLeft,
-    Trash2,
     CheckSquare,
     Square,
     Search,
@@ -20,7 +19,6 @@ interface ReaderHeaderProps {
     pageNumber: number;
     numPages: number;
     isEditMode: boolean;
-    selectedPagesCount: number;
     showHeader: boolean;
     isSearchOpen: boolean;
     isFullscreen: boolean;
@@ -30,7 +28,6 @@ interface ReaderHeaderProps {
     onToggleDirection: () => void;
     onCycleSpreadMode: () => void;
     onToggleEditMode: () => void;
-    onDeletePages: () => void;
     onMouseLeave: () => void;
     onToggleSearch: () => void;
     onToggleFullscreen: () => void;
@@ -53,7 +50,6 @@ export function ReaderHeader({
     pageNumber,
     numPages,
     isEditMode,
-    selectedPagesCount,
     showHeader,
     isSearchOpen,
     isFullscreen,
@@ -62,7 +58,6 @@ export function ReaderHeader({
     onToggleDirection,
     onCycleSpreadMode,
     onToggleEditMode,
-    onDeletePages,
     onMouseLeave,
     onToggleSearch,
     onToggleFullscreen,
@@ -154,6 +149,7 @@ export function ReaderHeader({
 
                 <button
                     onClick={onToggleEditMode}
+                    title="編集モード (e) — ページ削除グリッドを開く"
                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                         isEditMode
                             ? 'bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300'
@@ -167,15 +163,6 @@ export function ReaderHeader({
                     )}
                     {isEditMode ? 'Done' : 'Edit'}
                 </button>
-                {isEditMode && selectedPagesCount > 0 && (
-                    <button
-                        onClick={onDeletePages}
-                        className="px-3 py-1.5 text-sm font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/60 rounded-md transition-colors flex items-center gap-2"
-                    >
-                        <Trash2 className="w-4 h-4" />
-                        Delete ({selectedPagesCount})
-                    </button>
-                )}
             </div>
         </div>
     );

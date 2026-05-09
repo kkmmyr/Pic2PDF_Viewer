@@ -74,15 +74,18 @@ export const API_ENDPOINTS = {
     GENRES: '/api/genres',
     /** ジャンル並べ替え */
     GENRES_REORDER: '/api/genres/reorder',
-    /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダープレビュー用） */
+    /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダー / 編集モードグリッド用） */
     PAGE_THUMBNAIL: (
         name: string,
         page: number,
         path: string,
         source: LibrarySource,
         width = 400,
-    ) =>
-        `/api/thumbnails/page?name=${encodeURIComponent(name)}&page=${page}&path=${encodeURIComponent(path)}&source=${source}&width=${width}`,
+        version?: number,
+    ) => {
+        const versionParam = version !== undefined ? `&v=${version}` : '';
+        return `/api/thumbnails/page?name=${encodeURIComponent(name)}&page=${page}&path=${encodeURIComponent(path)}&source=${source}&width=${width}${versionParam}`;
+    },
 } as const;
 
 /**

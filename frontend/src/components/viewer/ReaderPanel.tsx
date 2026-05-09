@@ -23,6 +23,7 @@ import { useReaderUIState } from '../../hooks/useReaderUIState';
 import { usePdfDocumentState } from '../../hooks/usePdfDocumentState';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
+import { PageGridOverlay } from '../reader/PageGridOverlay';
 import { RelatedBooksPage } from '../reader/RelatedBooksPage';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
@@ -189,6 +190,7 @@ export function ReaderPanel({
         selectedPages,
         toggleEditMode,
         togglePageSelection,
+        selectRange,
         resetEditMode,
         requestDeletePages,
         confirmDeletePages,
@@ -281,11 +283,8 @@ export function ReaderPanel({
             pageNumber={pNum}
             numPages={numPages}
             windowHeight={windowHeight}
-            isEditMode={isEditMode}
-            isSelected={selectedPages.has(pNum)}
             side={side}
             direction={direction}
-            onToggleSelection={togglePageSelection}
             onNext={handleNext}
             onPrev={handlePrev}
             isImageMode={isImageMode}
@@ -336,7 +335,6 @@ export function ReaderPanel({
                 pageNumber={pageNumber}
                 numPages={numPages}
                 isEditMode={isEditMode}
-                selectedPagesCount={selectedPages.size}
                 showHeader={showHeader || isSearchOpen}
                 isSearchOpen={isSearchOpen}
                 isFullscreen={isFullscreen}
@@ -345,7 +343,6 @@ export function ReaderPanel({
                 onToggleDirection={toggleDirection}
                 onCycleSpreadMode={cycleSpreadMode}
                 onToggleEditMode={toggleEditMode}
-                onDeletePages={requestDeletePages}
                 onMouseLeave={showHeaderOff}
                 onToggleSearch={toggleSearch}
                 onToggleFullscreen={toggleFullscreen}
@@ -424,6 +421,20 @@ export function ReaderPanel({
                     </div>
                 </div>
             )}
+
+            <PageGridOverlay
+                open={isEditMode && numPages > 0}
+                selectedPdf={selectedPdf}
+                currentPath={currentPath}
+                currentSource={currentSource}
+                numPages={numPages}
+                pdfVersion={pdfVersion}
+                selectedPages={selectedPages}
+                onClose={toggleEditMode}
+                onTogglePage={togglePageSelection}
+                onSelectRange={selectRange}
+                onRequestDelete={requestDeletePages}
+            />
 
             <ConfirmDialog
                 open={pendingDeleteCount > 0}
