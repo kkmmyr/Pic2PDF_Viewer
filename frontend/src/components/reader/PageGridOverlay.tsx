@@ -123,7 +123,9 @@ export function PageGridOverlay({
                 const movedIndices = localOrder
                     .map((p, i) => (selectedPages.has(p) ? i : -1))
                     .filter((i) => i >= 0);
-                newOrder = moveMultipleByIndex(localOrder, movedIndices, overIdx);
+                // AT 方式: active が targetIndex に着地するようグループ全体を配置する
+                // （単独移動の場合 arrayMove と等価になる）
+                newOrder = moveMultipleByIndex(localOrder, movedIndices, activeIdx, overIdx);
             } else {
                 newOrder = arrayMove(localOrder, activeIdx, overIdx);
             }
