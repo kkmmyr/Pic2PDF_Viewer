@@ -10,6 +10,8 @@ from pydantic import BaseModel
 
 from config import get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
+from services.image_service import delete_book_image_pages, list_book_images
+from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
@@ -30,13 +32,35 @@ class DeletePagesRequest(BaseModel):
 @log_and_raise_500("delete_pages")
 def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", source: str = Depends(validated_source)):
     validate_safe_path(path)
+    validate_safe_name(filename)
 
     dirs = get_dirs_by_source(source)
-    base_pdf_dir = dirs["pdf"]
     base_thumb_dir = dirs["thumb"]
+    thumb_name = get_thumbnail_name(filename)
+    thumb_path = os.path.join(base_thumb_dir, path, thumb_name) if path else os.path.join(base_thumb_dir, thumb_name)
 
-    target_pdf_dir = os.path.join(base_pdf_dir, path)
-    pdf_path = os.path.join(target_pdf_dir, filename)
+    # generated は image-only モード: images/{book_name}/ から WebP を削除する
+    if source == "generated":
+        book_name = os.path.splitext(filename)[0]
+        base_img_dir = dirs["img"]
+        book_img_dir = os.path.join(base_img_dir, path, book_name) if path else os.path.join(base_img_dir, book_name)
+        if not os.path.isdir(book_img_dir):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        new_total = delete_book_image_pages(book_img_dir, request.page_indices)
+
+        # 表紙が削除された可能性があるため、削除後の先頭 WebP から PIL ベースで再生成
+        if new_total > 0:
+            webps = list_book_images(base_img_dir, book_name, path)
+            if webps:
+                generate_thumbnail_from_image(webps[0], thumb_path)
+                logger.info("Regenerated thumbnail: %s", thumb_path)
+
+        return {"message": "Pages deleted successfully", "total_pages": new_total}
+
+    # kindle / novel: 従来通り PDF から fitz でページ削除
+    base_pdf_dir = dirs["pdf"]
+    pdf_path = os.path.join(base_pdf_dir, path, filename) if path else os.path.join(base_pdf_dir, filename)
 
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -44,9 +68,6 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     new_total = PdfService.delete_pages(pdf_path, request.page_indices)
 
     if new_total > 0:
-        thumb_name = get_thumbnail_name(filename)
-        target_thumb_dir = os.path.join(base_thumb_dir, path)
-        thumb_path = os.path.join(target_thumb_dir, thumb_name)
         ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
         logger.info("Regenerated thumbnail: %s", thumb_path)
 

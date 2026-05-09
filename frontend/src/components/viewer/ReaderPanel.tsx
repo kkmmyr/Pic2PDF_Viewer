@@ -67,12 +67,6 @@ export function ReaderPanel({
     onSelectPdf,
 }: ReaderPanelProps) {
     const { height: windowHeight } = useWindowSize();
-    const {
-        imageUrls,
-        numPages: imageNumPages,
-        isImageMode,
-    } = useBookImages(selectedPdf, currentPath, currentSource);
-
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
     const {
         numPages,
@@ -82,6 +76,11 @@ export function ReaderPanel({
         bumpPdfVersion,
         handleDocumentLoadSuccess,
     } = usePdfDocumentState();
+    const {
+        imageUrls,
+        numPages: imageNumPages,
+        isImageMode,
+    } = useBookImages(selectedPdf, currentPath, currentSource, pdfVersion);
     const {
         showHeader,
         showHeaderOn,

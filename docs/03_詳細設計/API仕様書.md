@@ -95,7 +95,10 @@ PDFファイルとディレクトリの一覧を取得する。
 ---
 
 ### §1.3 `POST /api/pdfs/{filename}/delete_pages`
-PDFの指定ページを削除する。
+書籍の指定ページを削除する。ソースによって動作が異なる:
+
+- **`generated`**: image-only モード。`images/{book_name}/` 配下の WebP を natsort 順に並べて、N 番目を削除する（ファイルが残った WebP の natsort 順に「ページ N」が再マッピングされる）。表紙サムネイルは削除後の先頭 WebP から PIL ベースで再生成。
+- **`kindle` / `novel`**: PDF モード。fitz で PDF を開いて該当ページを削除し、上書き保存。表紙サムネイルは削除後の PDF 先頭ページから fitz ベースで再生成。
 
 **クエリパラメータ**:
 - `path` (オプション) — 対象ファイルの親ディレクトリ相対パス
@@ -110,6 +113,11 @@ PDFの指定ページを削除する。
 ```json
 { "message": "Pages deleted successfully", "total_pages": 10 }
 ```
+
+**エラー**:
+- `404`: 対象書籍が見つからない（generated は `images/{book_name}/` ディレクトリ不在、kindle/novel は PDF 不在）
+- `400`: ページインデックス範囲外
+- `400`: パストラバーサル拒否
 
 ---
 

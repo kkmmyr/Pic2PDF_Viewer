@@ -7,11 +7,11 @@ import os
 import fitz
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from natsort import natsorted
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
+from services.image_service import list_book_images
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
@@ -35,14 +35,6 @@ class RegenerateThumbnailBulkRequest(BaseModel):
     source: str = "generated"
 
 
-def _get_webps(img_dir: str, book_name: str, path: str) -> list[str]:
-    """images/{path}/{book_name}/ 配下の WebP ファイルを自然順で返す。"""
-    target = os.path.join(img_dir, path, book_name) if path else os.path.join(img_dir, book_name)
-    if not os.path.isdir(target):
-        return []
-    return [os.path.join(target, f) for f in natsorted(os.listdir(target)) if f.lower().endswith('.webp')]
-
-
 def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir: str = "") -> bool:
     """1冊分のサムネイル再生成。成功時 True を返す。
 
@@ -59,7 +51,7 @@ def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir:
 
     # PDF 不在: images/ 先頭 WebP を PIL ベースで処理（image-only モード）
     if img_dir:
-        webps = _get_webps(img_dir, os.path.splitext(name)[0], path)
+        webps = list_book_images(img_dir, os.path.splitext(name)[0], path)
         if webps:
             return generate_thumbnail_from_image(webps[0], thumb_path)
 
@@ -89,7 +81,7 @@ def get_page_thumbnail(
     # generated: images/ ディレクトリから該当ページの WebP を直接返す
     if source == "generated":
         book_name = os.path.splitext(name)[0]
-        webps = _get_webps(dirs["img"], book_name, path)
+        webps = list_book_images(dirs["img"], book_name, path)
         if not webps:
             raise HTTPException(status_code=404, detail="Images not found")
         if page > len(webps):

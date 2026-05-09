@@ -12,11 +12,15 @@ interface UseBookImagesReturn {
 
 /**
  * 書籍画像を取得するカスタムフック
+ *
+ * `version` が変化すると画像リストを再フェッチする。ページ削除（`useEditMode`）後に
+ * `pdfVersion` を渡すことで、image-only モード（generated）でも削除直後に表示が追従する。
  */
 export function useBookImages(
     selectedPdf: string | null,
     currentPath: string,
     source: LibrarySource = 'generated',
+    version: number = 0,
 ): UseBookImagesReturn {
     const [imageUrls, setImageUrls] = useState<string[] | null>(null);
     const [numPages, setNumPages] = useState(0);
@@ -52,7 +56,7 @@ export function useBookImages(
             .finally(() => {
                 setIsLoading(false);
             });
-    }, [selectedPdf, currentPath, source]);
+    }, [selectedPdf, currentPath, source, version]);
 
     return {
         imageUrls,

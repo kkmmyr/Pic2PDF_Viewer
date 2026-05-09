@@ -95,6 +95,53 @@ class TestDeletePages:
         )
         assert res.status_code == 400
 
+    # -----------------------------------------------------------------------
+    # generated ソース（image-only モード）の削除経路
+    # -----------------------------------------------------------------------
+
+    def test_delete_generated_image_only(self, client, tmp_data_dir, make_webp):
+        """generated は images/{book_name}/ から WebP を削除する。"""
+        img_dir = tmp_data_dir["IMAGES_DIR"]
+        book_dir = os.path.join(img_dir, "book")
+        for i in range(5):
+            make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
+
+        res = client.post(
+            "/api/pdfs/book.pdf/delete_pages?source=generated",
+            json={"page_indices": [0, 2]},
+        )
+        assert res.status_code == 200
+        assert res.json()["total_pages"] == 3
+        assert sorted(os.listdir(book_dir)) == ["02.webp", "04.webp", "05.webp"]
+
+    def test_delete_generated_404_when_book_missing(self, client, tmp_data_dir):
+        res = client.post(
+            "/api/pdfs/nope.pdf/delete_pages?source=generated",
+            json={"page_indices": [0]},
+        )
+        assert res.status_code == 404
+
+    def test_delete_generated_regenerates_thumbnail(self, client, tmp_data_dir, make_webp):
+        img_dir = tmp_data_dir["IMAGES_DIR"]
+        thumb_dir = tmp_data_dir["THUMBNAIL_DIR"]
+        book_dir = os.path.join(img_dir, "book")
+        for i in range(3):
+            make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
+        # 古いサムネイルを置く
+        os.makedirs(thumb_dir, exist_ok=True)
+        old_thumb = os.path.join(thumb_dir, "book.jpg")
+        with open(old_thumb, "wb") as f:
+            f.write(b"old")
+
+        res = client.post(
+            "/api/pdfs/book.pdf/delete_pages?source=generated",
+            json={"page_indices": [0]},
+        )
+        assert res.status_code == 200
+        assert os.path.exists(old_thumb)
+        # 上書きされている（"old" よりサイズが大きいはず）
+        assert os.path.getsize(old_thumb) > 3
+
 
 # ---------------------------------------------------------------------------
 # POST /api/pdfs/merge
