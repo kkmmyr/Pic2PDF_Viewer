@@ -10,7 +10,11 @@ from pydantic import BaseModel
 
 from config import get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
-from services.image_service import delete_book_image_pages, list_book_images
+from services.image_service import (
+    delete_book_image_pages,
+    list_book_images,
+    reorder_book_image_pages,
+)
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from services.pdf_service import PdfService
 from services.thumbnail_service import ThumbnailService
@@ -26,6 +30,20 @@ router = APIRouter()
 
 class DeletePagesRequest(BaseModel):
     page_indices: list[int]
+
+
+class ReorderPagesRequest(BaseModel):
+    page_indices: list[int]
+
+
+def _validate_permutation(page_indices: list[int], total_pages: int) -> None:
+    """`page_indices` が `[0..total_pages-1]` の完全なパーミュテーションかチェックして
+    違反時は HTTP 400 を投げる。"""
+    if sorted(page_indices) != list(range(total_pages)):
+        raise HTTPException(
+            status_code=400,
+            detail=f"page_indices must be a permutation of [0..{total_pages - 1}]",
+        )
 
 
 @router.post("/pdfs/{filename}/delete_pages")
@@ -72,6 +90,57 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
         logger.info("Regenerated thumbnail: %s", thumb_path)
 
     return {"message": "Pages deleted successfully", "total_pages": new_total}
+
+
+@router.post("/pdfs/{filename}/reorder_pages")
+@log_and_raise_500("reorder_pages")
+def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", source: str = Depends(validated_source)):
+    validate_safe_path(path)
+    validate_safe_name(filename)
+
+    dirs = get_dirs_by_source(source)
+    base_thumb_dir = dirs["thumb"]
+    thumb_name = get_thumbnail_name(filename)
+    thumb_path = os.path.join(base_thumb_dir, path, thumb_name) if path else os.path.join(base_thumb_dir, thumb_name)
+
+    # generated は image-only モード: images/{book_name}/ の WebP を再採番リネーム
+    if source == "generated":
+        book_name = os.path.splitext(filename)[0]
+        base_img_dir = dirs["img"]
+        book_img_dir = os.path.join(base_img_dir, path, book_name) if path else os.path.join(base_img_dir, book_name)
+        if not os.path.isdir(book_img_dir):
+            raise HTTPException(status_code=404, detail="File not found")
+
+        # 現在のページ数を取って先にバリデーション
+        current_pages = list_book_images(base_img_dir, book_name, path)
+        _validate_permutation(request.page_indices, len(current_pages))
+
+        new_total = reorder_book_image_pages(book_img_dir, request.page_indices)
+
+        # 並び替え後の先頭 WebP から表紙再生成
+        webps = list_book_images(base_img_dir, book_name, path)
+        if webps:
+            generate_thumbnail_from_image(webps[0], thumb_path)
+            logger.info("Regenerated thumbnail: %s", thumb_path)
+
+        return {"message": "Pages reordered successfully", "total_pages": new_total}
+
+    # kindle / novel: PDF を fitz で再構築
+    base_pdf_dir = dirs["pdf"]
+    pdf_path = os.path.join(base_pdf_dir, path, filename) if path else os.path.join(base_pdf_dir, filename)
+
+    if not os.path.exists(pdf_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    with fitz.open(pdf_path) as doc:
+        _validate_permutation(request.page_indices, len(doc))
+
+    new_total = PdfService.reorder_pages(pdf_path, request.page_indices)
+
+    ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
+    logger.info("Regenerated thumbnail: %s", thumb_path)
+
+    return {"message": "Pages reordered successfully", "total_pages": new_total}
 
 
 class MergePdfsRequest(BaseModel):

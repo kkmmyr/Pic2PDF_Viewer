@@ -15,6 +15,7 @@ const renderOverlay = (overrides: Partial<React.ComponentProps<typeof PageGridOv
         onTogglePage: vi.fn(),
         onSelectRange: vi.fn(),
         onRequestDelete: vi.fn(),
+        onApplyReorder: vi.fn().mockResolvedValue(true),
         ...overrides,
     };
     return { props, ...render(<PageGridOverlay {...props} />) };
@@ -26,11 +27,13 @@ describe('PageGridOverlay', () => {
         expect(container.firstChild).toBeNull();
     });
 
-    it('numPages 件分のページボタンを描画する', () => {
-        const { getAllByRole } = renderOverlay({ numPages: 5 });
-        // ヘッダーの「閉じる」+ フッターの「削除実行」+ ページ数 の合計
-        const buttons = getAllByRole('button');
-        expect(buttons.length).toBe(5 + 2);
+    it('numPages 件分のページサムネイルを描画する', () => {
+        const { getAllByAltText } = renderOverlay({ numPages: 5 });
+        // alt="Page N" のサムネイル <img> がページ数分ある（DnD 周りの role="button" 増加に依存しない数え方）
+        // 5 ページなら "Page 1" .. "Page 5" の 5 件
+        for (let i = 1; i <= 5; i++) {
+            expect(getAllByAltText(`Page ${i}`).length).toBe(1);
+        }
     });
 
     it('サムネイル URL に pdfVersion が含まれる（キャッシュ無効化）', () => {

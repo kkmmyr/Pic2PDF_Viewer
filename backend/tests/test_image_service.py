@@ -11,7 +11,11 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.image_service import delete_book_image_pages, list_book_images
+from services.image_service import (
+    delete_book_image_pages,
+    list_book_images,
+    reorder_book_image_pages,
+)
 
 
 def _make_webp(path: str) -> None:
@@ -112,3 +116,93 @@ class TestDeleteBookImagePages:
 
         with pytest.raises(ValueError):
             delete_book_image_pages(str(book), [-1])
+
+
+# ---------------------------------------------------------------------------
+# reorder_book_image_pages
+# ---------------------------------------------------------------------------
+
+def _populate_with_distinct_colors(book_dir: str, count: int) -> list[tuple[int, int, int]]:
+    """N 枚の WebP を異なる色で作って色リストを返す（順序検証用）。"""
+    colors = [(i * 30 % 256, (i * 50) % 256, (i * 70) % 256) for i in range(count)]
+    for i, c in enumerate(colors):
+        _make_webp_with_color(os.path.join(book_dir, f"{i + 1:02d}.webp"), c)
+    return colors
+
+
+def _make_webp_with_color(path: str, color: tuple[int, int, int]) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    # lossless=True にしないと WebP のデフォルトの非可逆圧縮で色が微妙にずれる
+    Image.new("RGB", (10, 10), color).save(path, "WEBP", lossless=True)
+
+
+def _read_color_at(path: str) -> tuple[int, int, int]:
+    return Image.open(path).convert("RGB").getpixel((0, 0))
+
+
+class TestReorderBookImagePages:
+    def test_reorder_swap_first_and_last(self, tmp_path):
+        book = tmp_path / "book"
+        colors = _populate_with_distinct_colors(str(book), 5)
+        # 4,1,2,3,0 に並び替え
+        new_total = reorder_book_image_pages(str(book), [4, 1, 2, 3, 0])
+        assert new_total == 5
+
+        # ファイル名は page_0001..page_0005.webp になる
+        assert sorted(os.listdir(book)) == [f"page_{i:04d}.webp" for i in range(1, 6)]
+        # 新先頭は元の最終（color[4]）
+        assert _read_color_at(str(book / "page_0001.webp")) == colors[4]
+        # 新末尾は元の先頭（color[0]）
+        assert _read_color_at(str(book / "page_0005.webp")) == colors[0]
+        # 中央は色がそのまま
+        assert _read_color_at(str(book / "page_0002.webp")) == colors[1]
+
+    def test_reorder_identity_renames_files(self, tmp_path):
+        """identity を渡しても全ファイルが page_NNNN.webp 形式に揃う。"""
+        book = tmp_path / "book"
+        _populate_book(str(book), 3)
+        new_total = reorder_book_image_pages(str(book), [0, 1, 2])
+        assert new_total == 3
+        assert sorted(os.listdir(book)) == ["page_0001.webp", "page_0002.webp", "page_0003.webp"]
+
+    def test_reorder_full_reverse(self, tmp_path):
+        book = tmp_path / "book"
+        colors = _populate_with_distinct_colors(str(book), 4)
+        reorder_book_image_pages(str(book), [3, 2, 1, 0])
+        assert _read_color_at(str(book / "page_0001.webp")) == colors[3]
+        assert _read_color_at(str(book / "page_0004.webp")) == colors[0]
+
+    def test_reorder_rejects_duplicate(self, tmp_path):
+        book = tmp_path / "book"
+        _populate_book(str(book), 3)
+        with pytest.raises(ValueError):
+            reorder_book_image_pages(str(book), [0, 0, 1])
+
+    def test_reorder_rejects_missing_index(self, tmp_path):
+        book = tmp_path / "book"
+        _populate_book(str(book), 3)
+        with pytest.raises(ValueError):
+            reorder_book_image_pages(str(book), [0, 1])  # 2 が欠落
+
+    def test_reorder_rejects_out_of_range(self, tmp_path):
+        book = tmp_path / "book"
+        _populate_book(str(book), 3)
+        with pytest.raises(ValueError):
+            reorder_book_image_pages(str(book), [0, 1, 99])
+
+    def test_reorder_raises_when_directory_missing(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            reorder_book_image_pages(str(tmp_path / "nope"), [0])
+
+    def test_reorder_handles_collision_with_existing_names(self, tmp_path):
+        """初期ファイル名と新採番が衝突するケース（既存に page_0001.webp があっても OK）。"""
+        book = tmp_path / "book"
+        # 既に page_NNNN.webp 形式の名前で作成
+        _make_webp_with_color(str(book / "page_0001.webp"), (255, 0, 0))
+        _make_webp_with_color(str(book / "page_0002.webp"), (0, 255, 0))
+        _make_webp_with_color(str(book / "page_0003.webp"), (0, 0, 255))
+        # 逆順に並び替え
+        reorder_book_image_pages(str(book), [2, 1, 0])
+        # 新先頭は元 page_0003 = 青
+        assert _read_color_at(str(book / "page_0001.webp")) == (0, 0, 255)
+        assert _read_color_at(str(book / "page_0003.webp")) == (255, 0, 0)

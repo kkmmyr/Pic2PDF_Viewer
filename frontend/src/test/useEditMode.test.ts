@@ -185,4 +185,74 @@ describe('useEditMode', () => {
         expect(mockedPost).not.toHaveBeenCalled();
         expect(result.current.pendingDeleteCount).toBe(0);
     });
+
+    // -----------------------------------------------------------------------
+    // applyReorder（B-3）
+    // -----------------------------------------------------------------------
+
+    it('applyReorder: API 成功で 1-indexed → 0-indexed 変換し POST、bumpPdfVersion を呼ぶ', async () => {
+        mockedPost.mockResolvedValue({ message: 'ok', total_pages: 5 });
+        const bumpPdfVersion = vi.fn();
+        const onPdfUpdated = vi.fn();
+        const { result } = renderEM({ bumpPdfVersion, onPdfUpdated });
+
+        let ok = false;
+        await act(async () => {
+            ok = await result.current.applyReorder([3, 1, 2, 4, 5]);
+        });
+        expect(ok).toBe(true);
+        const [_url, body] = mockedPost.mock.calls[0];
+        expect((body as { page_indices: number[] }).page_indices).toEqual([2, 0, 1, 3, 4]);
+        expect(bumpPdfVersion).toHaveBeenCalled();
+        expect(onPdfUpdated).toHaveBeenCalled();
+    });
+
+    it('applyReorder: 既存の selectedPages を新位置に追従させる', async () => {
+        mockedPost.mockResolvedValue({ message: 'ok', total_pages: 5 });
+        const { result } = renderEM();
+        const e = { stopPropagation: () => {} } as React.MouseEvent;
+        // 旧ページ 1 と 3 を選択
+        act(() => result.current.togglePageSelection(1, e));
+        act(() => result.current.togglePageSelection(3, e));
+        expect(result.current.selectedPages.has(1)).toBe(true);
+        expect(result.current.selectedPages.has(3)).toBe(true);
+
+        // 並び替え: 旧 [1,2,3,4,5] → 新 [3,1,2,4,5]（newOrder[i] = i+1 番目に置く旧ページ番号）
+        await act(async () => {
+            await result.current.applyReorder([3, 1, 2, 4, 5]);
+        });
+        // 旧ページ 1 は新位置 2、旧ページ 3 は新位置 1
+        expect([...result.current.selectedPages].sort((a, b) => a - b)).toEqual([1, 2]);
+    });
+
+    it('applyReorder: API 失敗時は false を返し state は変えない', async () => {
+        mockedPost.mockRejectedValue(new Error('reorder failed'));
+        const showError = vi.fn();
+        const bumpPdfVersion = vi.fn();
+        const { result } = renderEM({ showError, bumpPdfVersion });
+        const e = { stopPropagation: () => {} } as React.MouseEvent;
+        act(() => result.current.togglePageSelection(2, e));
+
+        let ok = true;
+        await act(async () => {
+            ok = await result.current.applyReorder([2, 1, 3]);
+        });
+        expect(ok).toBe(false);
+        expect(showError).toHaveBeenCalledWith('reorder failed');
+        expect(bumpPdfVersion).not.toHaveBeenCalled();
+        // selectedPages は触られない（旧ページ番号 2 のまま）
+        expect(result.current.selectedPages.has(2)).toBe(true);
+    });
+
+    it('applyReorder: 選択が無くても normally に動作する', async () => {
+        mockedPost.mockResolvedValue({ message: 'ok', total_pages: 3 });
+        const { result } = renderEM();
+
+        let ok = false;
+        await act(async () => {
+            ok = await result.current.applyReorder([3, 2, 1]);
+        });
+        expect(ok).toBe(true);
+        expect(result.current.selectedPages.size).toBe(0);
+    });
 });

@@ -195,6 +195,7 @@ export function ReaderPanel({
         confirmDeletePages,
         cancelDeletePages,
         pendingDeleteCount,
+        applyReorder,
     } = useEditMode({
         selectedPdf,
         currentPath,
@@ -433,6 +434,7 @@ export function ReaderPanel({
                 onTogglePage={togglePageSelection}
                 onSelectRange={selectRange}
                 onRequestDelete={requestDeletePages}
+                onApplyReorder={applyReorder}
             />
 
             <ConfirmDialog

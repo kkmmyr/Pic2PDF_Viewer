@@ -25,6 +25,9 @@ export const API_ENDPOINTS = {
     /** ページ削除 */
     DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
         `/api/pdfs/${encodeURIComponent(filename)}/delete_pages?path=${encodeURIComponent(path || '')}&source=${source}`,
+    /** ページ並び替え（B-3） */
+    REORDER_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
+        `/api/pdfs/${encodeURIComponent(filename)}/reorder_pages?path=${encodeURIComponent(path || '')}&source=${source}`,
     /** PDFリネーム */
     RENAME: '/api/rename',
     /** サムネイル再生成 */

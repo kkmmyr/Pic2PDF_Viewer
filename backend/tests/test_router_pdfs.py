@@ -144,6 +144,107 @@ class TestDeletePages:
 
 
 # ---------------------------------------------------------------------------
+# POST /api/pdfs/{filename}/reorder_pages
+# ---------------------------------------------------------------------------
+
+class TestReorderPages:
+    def test_reorder_kindle_pdf(self, client, tmp_data_dir, make_pdf):
+        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=4)
+
+        res = client.post(
+            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            json={"page_indices": [3, 2, 1, 0]},
+        )
+        assert res.status_code == 200
+        assert res.json()["total_pages"] == 4
+
+    def test_reorder_kindle_404_when_missing(self, client, tmp_data_dir):
+        res = client.post(
+            "/api/pdfs/nope.pdf/reorder_pages?source=kindle",
+            json={"page_indices": [0]},
+        )
+        assert res.status_code == 404
+
+    def test_reorder_kindle_400_for_bad_permutation(self, client, tmp_data_dir, make_pdf):
+        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=3)
+
+        # 重複
+        res = client.post(
+            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            json={"page_indices": [0, 0, 1]},
+        )
+        assert res.status_code == 400
+
+        # 範囲外
+        res = client.post(
+            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            json={"page_indices": [0, 1, 5]},
+        )
+        assert res.status_code == 400
+
+        # 欠落
+        res = client.post(
+            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            json={"page_indices": [0, 1]},
+        )
+        assert res.status_code == 400
+
+    def test_reorder_generated_image_only(self, client, tmp_data_dir, make_webp):
+        img_dir = tmp_data_dir["IMAGES_DIR"]
+        book_dir = os.path.join(img_dir, "book")
+        for i in range(3):
+            make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
+
+        res = client.post(
+            "/api/pdfs/book.pdf/reorder_pages?source=generated",
+            json={"page_indices": [2, 0, 1]},
+        )
+        assert res.status_code == 200
+        assert res.json()["total_pages"] == 3
+        # 並び替え後のファイル名は page_NNNN.webp 採番
+        assert sorted(os.listdir(book_dir)) == [
+            "page_0001.webp",
+            "page_0002.webp",
+            "page_0003.webp",
+        ]
+
+    def test_reorder_generated_404_when_book_missing(self, client, tmp_data_dir):
+        res = client.post(
+            "/api/pdfs/nope.pdf/reorder_pages?source=generated",
+            json={"page_indices": [0]},
+        )
+        assert res.status_code == 404
+
+    def test_reorder_generated_400_for_bad_permutation(self, client, tmp_data_dir, make_webp):
+        img_dir = tmp_data_dir["IMAGES_DIR"]
+        book_dir = os.path.join(img_dir, "book")
+        for i in range(3):
+            make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
+
+        res = client.post(
+            "/api/pdfs/book.pdf/reorder_pages?source=generated",
+            json={"page_indices": [0, 1]},
+        )
+        assert res.status_code == 400
+
+    def test_reorder_path_traversal_rejected(self, client, tmp_data_dir):
+        res = client.post(
+            "/api/pdfs/x.pdf/reorder_pages?path=../etc&source=kindle",
+            json={"page_indices": [0]},
+        )
+        assert res.status_code == 400
+
+    def test_reorder_invalid_source_returns_400(self, client, tmp_data_dir):
+        res = client.post(
+            "/api/pdfs/x.pdf/reorder_pages?source=invalid",
+            json={"page_indices": [0]},
+        )
+        assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
 # POST /api/pdfs/merge
 # ---------------------------------------------------------------------------
 

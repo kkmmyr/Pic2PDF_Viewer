@@ -110,3 +110,77 @@ class TestDeletePages:
         new_total = PdfService.delete_pages(str(pdf), [0, 1])
 
         assert new_total == 1
+
+
+# ---------------------------------------------------------------------------
+# reorder_pages
+# ---------------------------------------------------------------------------
+
+def _page_text(pdf_path: str, page_idx: int) -> str:
+    """`pdf_path` の `page_idx`（0 始まり）のテキストを返す。順序検証用。"""
+    with fitz.open(pdf_path) as doc:
+        return doc[page_idx].get_text().strip()
+
+
+class TestReorderPages:
+    def test_reorder_swap_first_and_last(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 5)
+        # ページ 0,1,2,3,4 → 4,1,2,3,0 に並び替え
+        new_total = PdfService.reorder_pages(str(pdf), [4, 1, 2, 3, 0])
+        assert new_total == 5
+        # 新しい先頭は元の Page 5
+        assert "Page 5" in _page_text(str(pdf), 0)
+        # 新しい末尾は元の Page 1
+        assert "Page 1" in _page_text(str(pdf), 4)
+        # 中間は変わらず
+        assert "Page 2" in _page_text(str(pdf), 1)
+
+    def test_reorder_full_reverse(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 4)
+        new_total = PdfService.reorder_pages(str(pdf), [3, 2, 1, 0])
+        assert new_total == 4
+        assert "Page 4" in _page_text(str(pdf), 0)
+        assert "Page 1" in _page_text(str(pdf), 3)
+
+    def test_reorder_identity_does_not_break(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 3)
+        new_total = PdfService.reorder_pages(str(pdf), [0, 1, 2])
+        assert new_total == 3
+        assert "Page 1" in _page_text(str(pdf), 0)
+        assert "Page 2" in _page_text(str(pdf), 1)
+        assert "Page 3" in _page_text(str(pdf), 2)
+
+    def test_reorder_rejects_duplicate_indices(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 3)
+        with pytest.raises(ValueError):
+            PdfService.reorder_pages(str(pdf), [0, 0, 1])
+
+    def test_reorder_rejects_missing_indices(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 3)
+        with pytest.raises(ValueError):
+            PdfService.reorder_pages(str(pdf), [0, 1])  # 2 が欠落
+
+    def test_reorder_rejects_out_of_range(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 3)
+        with pytest.raises(ValueError):
+            PdfService.reorder_pages(str(pdf), [0, 1, 5])
+
+    def test_reorder_missing_file_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            PdfService.reorder_pages(str(tmp_path / "nope.pdf"), [0])
+
+    def test_reorder_cleans_up_tmp_on_error(self, tmp_path):
+        pdf = tmp_path / "book.pdf"
+        _make_pdf(str(pdf), 3)
+        with pytest.raises(ValueError):
+            PdfService.reorder_pages(str(pdf), [0, 0, 0])
+        # 元 PDF は無傷
+        with fitz.open(str(pdf)) as doc:
+            assert len(doc) == 3
+        assert not (tmp_path / "book.pdf.tmp").exists()

@@ -10,6 +10,7 @@
   - §1.1 `GET /api/pdfs` — PDF / ディレクトリ一覧
   - §1.2 `GET /api/books/{path}/images` — 書籍の画像リスト
   - §1.3 `POST /api/pdfs/{filename}/delete_pages` — ページ削除
+  - §1.3.1 `POST /api/pdfs/{filename}/reorder_pages` — ページ並び替え
   - §1.4 `PATCH /api/rename` — ファイル / フォルダ名変更
   - §1.5 `DELETE /api/pdfs` — 非表示書籍の完全削除
   - §1.6 `GET /api/genres` — ジャンルリスト取得
@@ -117,6 +118,36 @@ PDFファイルとディレクトリの一覧を取得する。
 **エラー**:
 - `404`: 対象書籍が見つからない（generated は `images/{book_name}/` ディレクトリ不在、kindle/novel は PDF 不在）
 - `400`: ページインデックス範囲外
+- `400`: パストラバーサル拒否
+
+---
+
+### §1.3.1 `POST /api/pdfs/{filename}/reorder_pages`
+書籍のページ順序を入れ替える。`page_indices[i]` は「新しい位置 `i` に配置する元ページの 0 始まりインデックス」を表す。`page_indices` は `[0..N-1]` の **完全なパーミュテーション** であること（重複・欠落は 400）。
+
+ソースによって動作が異なる:
+
+- **`generated`**: `images/{book_name}/` 配下の WebP を natsort 順に並べ、`page_indices` の指す順で `page_0001.webp` / `page_0002.webp` / ... という採番に物理リネーム。一時名（`__reorder_tmp_*`）経由で 2 段階リネームを行い、衝突を回避する。表紙サムネイルは並び替え後の先頭 WebP から PIL ベースで再生成。
+- **`kindle` / `novel`**: fitz の `Document.select(page_indices)` で PDF を再構築して上書き保存。表紙サムネイルは fitz ベースで再生成。
+
+**クエリパラメータ**:
+- `path` (オプション) — 対象ファイルの親ディレクトリ相対パス
+- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+
+**リクエストボディ**:
+```json
+{ "page_indices": [2, 0, 1, 3, 4] }
+```
+↑ 元の 5 ページを「元 page 3 → 新 page 1」「元 page 1 → 新 page 2」「元 page 2 → 新 page 3」… の順に並び替える。
+
+**レスポンス**:
+```json
+{ "message": "Pages reordered successfully", "total_pages": 5 }
+```
+
+**エラー**:
+- `404`: 対象書籍が見つからない
+- `400`: `page_indices` が `[0..N-1]` のパーミュテーションでない（重複・範囲外・欠落）
 - `400`: パストラバーサル拒否
 
 ---

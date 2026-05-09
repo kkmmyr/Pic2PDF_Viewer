@@ -33,6 +33,13 @@ interface UseEditModeReturn {
     cancelDeletePages: () => void;
     /** 0 でない場合は削除確認ダイアログを開くべき */
     pendingDeleteCount: number;
+    /**
+     * ページを並び替える（B-3）。
+     * `newOrder[i]` は新しい位置 i+1 に配置する元の 1 始まりページ番号。
+     * 成功時に selectedPages を新位置に追従させ、`bumpPdfVersion()` を呼ぶ。
+     * 戻り値: 成功なら true / 失敗（API エラー）なら false
+     */
+    applyReorder: (newOrder: number[]) => Promise<boolean>;
 }
 
 /**
@@ -131,6 +138,35 @@ export function useEditMode({
         showError,
     ]);
 
+    const applyReorder = useCallback(
+        async (newOrder: number[]): Promise<boolean> => {
+            try {
+                await apiClient.post(
+                    API_ENDPOINTS.REORDER_PAGES(selectedPdf, currentPath, currentSource),
+                    { page_indices: newOrder.map((p) => p - 1) },
+                );
+                // selectedPages を新位置に追従させる:
+                // 旧ページ番号 P が選択されていたら、新位置 newOrder.indexOf(P) + 1 に置き換える
+                setSelectedPages((prev) => {
+                    if (prev.size === 0) return prev;
+                    const next = new Set<number>();
+                    for (const oldPage of prev) {
+                        const newPos = newOrder.indexOf(oldPage) + 1;
+                        if (newPos > 0) next.add(newPos);
+                    }
+                    return next;
+                });
+                bumpPdfVersion();
+                onPdfUpdated();
+                return true;
+            } catch (e: unknown) {
+                showError(errorMessage(e, '並び替えに失敗しました。'));
+                return false;
+            }
+        },
+        [selectedPdf, currentPath, currentSource, bumpPdfVersion, onPdfUpdated, showError],
+    );
+
     return {
         isEditMode,
         selectedPages,
@@ -142,5 +178,6 @@ export function useEditMode({
         confirmDeletePages,
         cancelDeletePages,
         pendingDeleteCount,
+        applyReorder,
     };
 }
