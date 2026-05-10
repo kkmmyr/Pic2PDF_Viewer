@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
-import { FileText, Library, Settings, Terminal, Moon, Sun, Sparkles } from 'lucide-react';
+import { FileText, Library, Settings, Terminal, Moon, Sun, Sparkles, BookOpen } from 'lucide-react';
 import { useDarkMode } from '../hooks';
 
 export default function Layout() {
@@ -59,6 +59,13 @@ export default function Layout() {
                                 >
                                     <Sparkles className="w-4 h-4" />
                                     新着
+                                </Link>
+                                <Link
+                                    to="/novel-db"
+                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/novel-db')}`}
+                                >
+                                    <BookOpen className="w-4 h-4" />
+                                    小説検索
                                 </Link>
 
                                 {/* ダークモード切り替えボタン */}

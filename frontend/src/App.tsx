@@ -5,6 +5,7 @@ import GeneratorPage from './pages/GeneratorPage';
 import ViewerPage from './pages/ViewerPage';
 import OCRPage from './pages/OCRPage';
 import HitomiPage from './pages/HitomiPage';
+import NovelDbPage from './pages/NovelDbPage';
 
 function App() {
     return (
@@ -42,6 +43,14 @@ function App() {
                             element={
                                 <ErrorBoundary>
                                     <HitomiPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="novel-db"
+                            element={
+                                <ErrorBoundary>
+                                    <NovelDbPage />
                                 </ErrorBoundary>
                             }
                         />

@@ -17,3 +17,10 @@ export const UI_CONFIG = {
     SEARCH_DEBOUNCE_MS: 300,
     PRELOAD_MARGIN: '200px',
 } as const;
+
+export const NOVEL_DB_CONFIG = {
+    SEARCH_DEBOUNCE_MS: 300,
+    SEARCH_PAGE_SIZE: 20,
+    REBUILD_POLL_INTERVAL_MS: 5000,
+    QUESTION_MAX_LENGTH: 500,
+} as const;
