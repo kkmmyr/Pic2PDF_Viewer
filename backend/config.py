@@ -40,6 +40,38 @@ KINDLE_NOVEL_PDF_DIR       = os.path.join(KINDLE_NOVEL_DIR, "pdfs")
 KINDLE_NOVEL_THUMBNAIL_DIR = os.path.join(KINDLE_NOVEL_DIR, "thumbnails")
 KINDLE_NOVEL_IMAGES_DIR    = os.path.join(KINDLE_NOVEL_DIR, "images")
 
+# Novel DB（小説テキスト検索・RAG 機能の SQLite ファイル格納）
+NOVEL_DB_DIR  = os.path.join(DATA_DIR, "novel_db")
+NOVEL_DB_PATH = os.path.join(NOVEL_DB_DIR, "novel.db")
+
+# Novel DB の埋め込みモデル / LLM（Ollama）
+NOVEL_DB_OLLAMA_BASE_URL = os.environ.get("NOVEL_DB_OLLAMA_BASE_URL", "http://localhost:11434")
+NOVEL_DB_EMBED_MODEL     = os.environ.get("NOVEL_DB_EMBED_MODEL", "bge-m3")
+NOVEL_DB_EMBED_DIM       = 1024  # bge-m3 の出力次元
+NOVEL_DB_LLM_MODEL       = os.environ.get("NOVEL_DB_LLM_MODEL", "qwen3.6:35b-a3b")
+# 主要登場人物抽出用の軽量モデル（短答型タスク。thinking で num_predict を
+# 消費する 26b と異なり、e4b は応答が速く character 抽出に向く）
+NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gemma4:e4b")
+
+# B-9 Contextual Retrieval のチャンクコンテキスト生成モデル。
+# Anthropic の Contextual Retrieval blog では「位置説明は単純なタスクなので
+# 軽量モデルで十分」と推奨されており、gemma4:e4b で代用する。
+# 品質不足が確認されたら NOVEL_DB_LLM_MODEL（qwen3.6:35b-a3b）にフォールバック。
+NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
+
+# Novel DB 検索のデフォルト値
+# - MIN_BODY_CHARS: 章扉・目次・人物紹介・あとがき等の薄いページを検索対象から除外する閾値
+# - QA_TOP_K: RAG 質問応答で Gemma に渡すページ数（多いほど深い回答だが応答時間も伸びる）
+# - QA_MAX_PER_BOOK: scope=all / series での書籍ごと取得上限（ざっくり質問が特定冊に偏らないよう均等化）
+# - BODY_PAGE_MARGIN: 各書籍の先頭 / 末尾の除外ページ数（表紙・目次・あとがき・解説・奥付）
+NOVEL_DB_MIN_BODY_CHARS    = 300
+NOVEL_DB_QA_TOP_K          = 16
+NOVEL_DB_QA_MAX_PER_BOOK   = 2
+NOVEL_DB_BODY_PAGE_MARGIN  = 5
+# B-8: scope=all / scope=series で QA プロンプトに含める書籍サマリの上限件数。
+# 現状 11 冊なので 11 でほぼ全冊カバー。書籍数が増えたら適宜下げる
+NOVEL_DB_QA_TOP_SUMMARIES  = 11
+
 # OCR 起動スクリプト
 BATCH_OCR_LAUNCHER = os.path.join(PROJECT_ROOT, "kindle-pdf", "start_batch_ocr.bat")
 
@@ -101,6 +133,7 @@ _REQUIRED_DIRS: list[str] = [
     KINDLE_NOVEL_PDF_DIR,
     KINDLE_NOVEL_THUMBNAIL_DIR,
     KINDLE_NOVEL_IMAGES_DIR,
+    NOVEL_DB_DIR,
 ]
 
 

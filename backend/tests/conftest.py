@@ -46,6 +46,8 @@ def tmp_data_dir(tmp_path, monkeypatch):
         "KINDLE_NOVEL_PDF_DIR": str(novel / "pdfs"),
         "KINDLE_NOVEL_THUMBNAIL_DIR": str(novel / "thumbnails"),
         "KINDLE_NOVEL_IMAGES_DIR": str(novel / "images"),
+        "NOVEL_DB_DIR": str(tmp_path / "novel_db"),
+        "NOVEL_DB_PATH": str(tmp_path / "novel_db" / "novel.db"),
     }
 
     # 必要ディレクトリを作成
@@ -82,6 +84,13 @@ def _patch_imported_paths(monkeypatch, paths: dict) -> None:
         ("routers.generate", "THUMBNAIL_DIR", paths["THUMBNAIL_DIR"]),
         ("routers.generate", "IMAGES_DIR", paths["IMAGES_DIR"]),
         ("routers.generate", "COMPLETE_DIR", paths["COMPLETE_DIR"]),
+        # novel_db: 各モジュールが `from config import` でキャプチャしている定数
+        ("services.novel_db.connection", "NOVEL_DB_DIR", paths["NOVEL_DB_DIR"]),
+        ("services.novel_db.connection", "NOVEL_DB_PATH", paths["NOVEL_DB_PATH"]),
+        ("services.novel_db.builder", "KINDLE_NOVEL_PDF_DIR", paths["KINDLE_NOVEL_PDF_DIR"]),
+        ("services.novel_db.builder", "KINDLE_NOVEL_IMAGES_DIR", paths["KINDLE_NOVEL_IMAGES_DIR"]),
+        ("services.novel_db.library", "KINDLE_NOVEL_PDF_DIR", paths["KINDLE_NOVEL_PDF_DIR"]),
+        ("services.novel_db.job_queue", "KINDLE_NOVEL_PDF_DIR", paths["KINDLE_NOVEL_PDF_DIR"]),
     ]
     for module, attr, value in targets:
         try:

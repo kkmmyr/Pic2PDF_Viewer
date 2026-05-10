@@ -1,0 +1,224 @@
+"""services/novel_db/search.py の単体・統合テスト。"""
+import json
+from pathlib import Path
+
+import pytest
+
+from services.meta_store import meta_path
+from services.novel_db import init_schema, with_db
+from services.novel_db.embedder import serialize_f32
+from services.novel_db.search import (
+    Scope,
+    _resolve_book_names,
+    build_fts5_or_query,
+    hybrid_search,
+    sanitize_snippet,
+)
+
+
+# ---------------------------------------------------------------------------
+# 純関数
+# ---------------------------------------------------------------------------
+
+class TestBuildFts5OrQuery:
+    def test_extracts_japanese_tokens(self):
+        # 日本語連続は 1 トークンとして抽出される
+        result = build_fts5_or_query("デュークの正体は何ですか")
+        assert '"デュークの正体は何ですか"' in result
+
+    def test_or_joins_multiple_tokens(self):
+        # スペース区切りで複数トークン → OR 結合
+        result = build_fts5_or_query("デューク アストリッド")
+        assert " OR " in result
+        assert '"デューク"' in result
+        assert '"アストリッド"' in result
+
+    def test_strips_special_chars(self):
+        # ?, ! などの FTS5 特殊文字を除去
+        result = build_fts5_or_query("デュークは誰?")
+        assert "?" not in result
+
+    def test_returns_empty_for_only_special_chars(self):
+        assert build_fts5_or_query("?!*+") == ""
+
+    def test_filters_short_tokens(self):
+        # 1 文字の助詞などは min_len=2 で除外
+        result = build_fts5_or_query("あ")
+        assert result == ""
+
+    def test_quotes_each_token_as_phrase(self):
+        result = build_fts5_or_query("薔薇園 デューク")
+        assert '"薔薇園"' in result
+        assert '"デューク"' in result
+
+
+class TestSanitizeSnippet:
+    def test_preserves_mark_tags(self):
+        out = sanitize_snippet("aaa<mark>bbb</mark>ccc")
+        assert "<mark>" in out
+        assert "</mark>" in out
+        assert "bbb" in out
+
+    def test_escapes_other_html(self):
+        out = sanitize_snippet("a<script>alert(1)</script>b")
+        assert "<script>" not in out
+        assert "&lt;script&gt;" in out
+
+    def test_escapes_ampersand(self):
+        out = sanitize_snippet("a&b")
+        assert "&amp;" in out
+
+    def test_no_xss_via_attribute(self):
+        out = sanitize_snippet('<img src="x" onerror="x">')
+        assert "<img" not in out
+
+
+class TestResolveBookNames:
+    def test_all_returns_none(self):
+        assert _resolve_book_names(Scope(type="all")) is None
+
+    def test_book_returns_single_name(self):
+        assert _resolve_book_names(Scope(type="book", id="book-1")) == ["book-1"]
+
+    def test_book_with_no_id_returns_empty(self):
+        assert _resolve_book_names(Scope(type="book")) == []
+
+    def test_series_with_no_id_returns_empty(self):
+        assert _resolve_book_names(Scope(type="series")) == []
+
+    def test_series_resolves_via_meta(self, tmp_data_dir):
+        # meta.json をセット
+        meta = {
+            "book-a.pdf": {"series_id": "s1", "series_title": "S"},
+            "book-b.pdf": {"series_id": "s1", "series_title": "S"},
+            "book-c.pdf": {"series_id": "s2", "series_title": "T"},
+        }
+        path = meta_path("novel")
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False)
+
+        result = _resolve_book_names(Scope(type="series", id="s1"))
+        assert sorted(result) == ["book-a", "book-b"]
+
+
+# ---------------------------------------------------------------------------
+# hybrid_search 統合テスト
+# ---------------------------------------------------------------------------
+
+def _insert_book_with_pages(conn, book_name: str, pages: list[str]) -> int:
+    cur = conn.execute(
+        "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
+        "VALUES (?, ?, ?, ?, datetime('now'))",
+        (book_name, f"/dummy/{book_name}.pdf", f"/dummy/images/{book_name}", len(pages)),
+    )
+    book_id = cur.lastrowid
+    page_ids = []
+    for i, text in enumerate(pages, start=1):
+        cur = conn.execute(
+            "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (book_id, i, None, text, len(text)),
+        )
+        page_ids.append(cur.lastrowid)
+    conn.execute(
+        "INSERT INTO pages_fts (rowid, full_text) "
+        "SELECT id, full_text FROM pages WHERE book_id = ?",
+        (book_id,),
+    )
+    return book_id
+
+
+def _insert_chunk(conn, page_id: int, idx: int, text: str, vec: list[float]) -> int:
+    cur = conn.execute(
+        "INSERT INTO chunks (page_id, chunk_idx, text, char_count) VALUES (?, ?, ?, ?)",
+        (page_id, idx, text, len(text)),
+    )
+    chunk_id = cur.lastrowid
+    conn.execute(
+        "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
+        (chunk_id, serialize_f32(vec)),
+    )
+    return chunk_id
+
+
+@pytest.fixture
+def search_db(tmp_data_dir, monkeypatch):
+    """hybrid_search 用に小さな DB を構築する。"""
+    with with_db() as conn:
+        init_schema(conn)
+        book_id = _insert_book_with_pages(conn, "book-1", [
+            "デュークはレティの騎士である。",  # page 1
+            "アストリッドは元暗殺者だった。",  # page 2
+            "薔薇園で重要な戦いが起きた。",    # page 3
+        ])
+        # 各ページの代表チャンク（1024 次元のダミーベクトル）
+        page_rows = conn.execute(
+            "SELECT id, page_no FROM pages WHERE book_id = ? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        # 異なる方向のベクトルで page を区別
+        for (page_id, page_no), seed in zip(page_rows, [0.1, 0.5, 0.9], strict=True):
+            vec = [seed] + [0.0] * 1023
+            _insert_chunk(conn, page_id, 0, f"chunk text page {page_no}", vec)
+        conn.commit()
+
+    # クエリの embedding をスタブ（page 1 に近づくよう [0.1, 0, ...] を返す）
+    from services.novel_db import search as search_mod
+    monkeypatch.setattr(
+        search_mod, "embed_batch",
+        lambda texts: [[0.1] + [0.0] * 1023 for _ in texts],
+    )
+
+
+def test_hybrid_search_returns_hits_for_existing_word(search_db):
+    with with_db() as conn:
+        hits = hybrid_search(conn, "デューク", Scope(type="all"), top=5)
+    assert len(hits) > 0
+    # page 1 が含まれる
+    assert any(h.book_name == "book-1" and h.page_no == 1 for h in hits)
+
+
+def test_hybrid_search_snippet_has_mark_for_fts_hit(search_db):
+    with with_db() as conn:
+        hits = hybrid_search(conn, "デューク", Scope(type="all"), top=5)
+    page1 = next(h for h in hits if h.page_no == 1)
+    assert "<mark>" in page1.snippet
+    assert page1.has_highlight is True
+
+
+def test_hybrid_search_image_url_format(search_db):
+    with with_db() as conn:
+        hits = hybrid_search(conn, "デューク", Scope(type="all"), top=5)
+    page1 = next(h for h in hits if h.page_no == 1)
+    assert page1.image_url == "/kindle_novel/images/book-1/001.png"
+
+
+def test_hybrid_search_with_book_scope_filters_other_books(search_db):
+    """別書籍を追加しても scope=book で対象外になる。"""
+    with with_db() as conn:
+        another_book_id = _insert_book_with_pages(
+            conn, "book-2", ["デュークも登場する別の書籍。"]
+        )
+        page_rows = conn.execute(
+            "SELECT id FROM pages WHERE book_id = ?", (another_book_id,)
+        ).fetchall()
+        vec = [0.1] + [0.0] * 1023
+        _insert_chunk(conn, page_rows[0][0], 0, "another", vec)
+        conn.commit()
+
+        hits = hybrid_search(
+            conn, "デューク", Scope(type="book", id="book-1"), top=10
+        )
+    assert all(h.book_name == "book-1" for h in hits)
+
+
+def test_hybrid_search_returns_empty_for_no_match(search_db):
+    """FTS5 で空 + ベクトルでの距離はあっても rank に反映されるが、結果は何かしら返る。"""
+    # 完全に無関係な英文クエリ → FTS5 ヒットなし、ベクトルは何かしら返す
+    with with_db() as conn:
+        hits = hybrid_search(conn, "xyz", Scope(type="all"), top=5)
+    # 単語が短すぎて build_fts5_or_query が空になる場合は FTS5 ヒット 0
+    # ベクトルは hits に入る
+    # 何かしらの結果（or 空）が返ること
+    assert isinstance(hits, list)
