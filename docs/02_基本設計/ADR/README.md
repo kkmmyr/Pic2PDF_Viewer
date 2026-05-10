@@ -19,6 +19,7 @@
 | [0005](0005_uv-python-package-manager.md) | Python パッケージ管理を `uv` に移行 | Accepted | 2026-04-26 |
 | [0006](0006_backend-log-file-persistence.md) | バックエンドログを RotatingFileHandler でファイル永続化 | Accepted | 2026-05-07 |
 | [0007](0007_llm-extraction-qwen-adoption.md) | 小説 RAG の LLM を Qwen3.6 に切替 + 共通モジュールに切り出し | Accepted | 2026-05-10 |
+| [0008](0008_design-docs-html-build.md) | 設計ドキュメントを Markdown 編集 + mkdocs-material で HTML 配信 | Accepted | 2026-05-11 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順

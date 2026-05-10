@@ -2,7 +2,7 @@
 
 novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は [要件定義: 小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
 
-最終更新: 2026-05-10（Qwen 共通モジュール抽出 + 主要登場人物抽出 + 検索フィルタ追記）
+最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加）
 
 ---
 
@@ -58,6 +58,10 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                                   ├─ chunker.py              (句点境界チャンク)
                                   ├─ embedder.py             (Ollama bge-m3)
                                   └─ character_extractor.py  (Ollama gemma4:e4b: 主要登場人物)
+
+                          [別 CLI 経由で後追い実行する補助処理]
+                          ├─→ services/novel_db/summarizer.py     (Qwen 1-shot: 書籍俯瞰サマリ B-5)
+                          └─→ services/novel_db/contextualizer.py (gemma4:e4b: チャンク位置説明 B-9)
                                           │
                                           ▼
                             [SQLite] backend/data/novel_db/novel.db
@@ -66,8 +70,8 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                                           ▼
                             [Ollama localhost:11434]
                             ├─ bge-m3              (embedding)
-                            ├─ gemma4:e4b          (主要登場人物抽出: 短答型)
-                            └─ qwen3.6:35b-a3b     (RAG 質問応答: thinking モデル)
+                            ├─ gemma4:e4b          (主要登場人物 + チャンク位置説明: 短答型)
+                            └─ qwen3.6:35b-a3b     (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル)
                                   ▲
                                   │ 共通モジュール経由
                               [D:\61.tool\common\Qwen\lib\qwen_client.py]
@@ -116,17 +120,19 @@ backend/
         ├── chunker.py               # 句点境界チャンク（800 字 / overlap 50）
         ├── embedder.py              # Ollama bge-m3 ラッパー
         ├── character_extractor.py   # Ollama gemma4:e4b で主要登場人物を抽出
-        ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN
+        ├── contextualizer.py        # gemma4:e4b でチャンクごとの位置説明を生成（B-9）
+        ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN + サマリ vec 検索
         ├── llm.py                   # 共通 Qwen モジュール経由のストリーミング（薄いラッパ）
         ├── builder.py               # 1 冊の DB 構築フロー（再構築含む）
-        ├── summarizer.py            # 1 冊の俯瞰サマリ生成（Qwen で map-reduce 要約）
+        ├── summarizer.py            # 1 冊の俯瞰サマリ生成（Qwen 1-shot、num_ctx=131072）
         ├── job_queue.py             # 再構築ジョブの全体ロック + キュー
         └── library.py               # 書籍一覧取得・DB 状態問い合わせ
 
 backend/scripts/                     # CLI 用ツール
 ├── build_novel_db.py                # 全件 / 個別書籍を CLI から再構築
 ├── extract_characters.py            # 主要登場人物の一括抽出
-└── build_novel_summaries.py         # 書籍ごとの俯瞰サマリの一括生成
+├── build_novel_summaries.py         # 書籍ごとの俯瞰サマリの一括生成（B-5）
+└── build_chunk_contexts.py          # チャンク位置説明の一括生成 + 再 embedding（B-9）
 ```
 
 ---
@@ -179,15 +185,19 @@ CREATE VIRTUAL TABLE pages_fts USING fts5(
 
 -- チャンク単位（ベクトル検索の対象）
 CREATE TABLE chunks (
-    id         INTEGER PRIMARY KEY,
-    page_id    INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-    chunk_idx  INTEGER NOT NULL,
-    text       TEXT NOT NULL,
-    char_count INTEGER NOT NULL
+    id                       INTEGER PRIMARY KEY,
+    page_id                  INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+    chunk_idx                INTEGER NOT NULL,
+    text                     TEXT NOT NULL,
+    char_count               INTEGER NOT NULL,
+    contextual_text          TEXT,        -- B-9: チャンクの位置説明（80 字程度、contextualizer 生成）
+    contextual_generated_at  TIMESTAMP
 );
 CREATE INDEX idx_chunks_page ON chunks(page_id);
 
 -- ベクトル（chunks.id とリンク）
+-- B-9 適用後の embedding は (contextual_text + text) で再計算済。contextual_text
+-- が NULL のチャンクは text のみで embedding（後方互換）
 CREATE VIRTUAL TABLE chunks_vec USING vec0(embedding FLOAT[1024]);
 
 -- 質問履歴
@@ -312,6 +322,9 @@ def rebuild_book(conn, book_name: str) -> None:
         raise FileNotFoundError(pdf_path)
 
     # 既存レコード削除（CASCADE で pages / chunks / chunks_vec も連動）
+    # ⚠️ pages.main_characters / chunks.contextual_text / books.summary / books.summary_generated_at /
+    #    book_summaries_vec の該当行も道連れに消える。再構築後に extract_characters /
+    #    build_novel_summaries / build_chunk_contexts を CLI で再実行する必要がある
     conn.execute("DELETE FROM books WHERE name = ?", (book_name,))
 
     pages = extract_pages(pdf_path)
@@ -396,8 +409,8 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = "gemma4:e4b"   # 短答型タスクは軽量モデ
 **スキーマ**: `pages.main_characters TEXT` 列に `["デューク", "レティ", ...]` 形式の JSON 文字列。未抽出ページは `NULL`。
 
 **抽出のタイミング**:
-- `builder.rebuild_book` の embedding フェーズ後に逐次呼び出し
-- 1 ページごとに 1〜3 秒、1300 ページで 30〜60 分（`gemma4:26b` の thinking 暴走を避けるため `e4b` を採用した結果として現実的時間に収まった）
+- 別 CLI（`extract_characters.py`）でユーザーが任意のタイミングで実行する。`builder.rebuild_book` には組み込まない（再構築のたびに数十分かかるのを避けるため）
+- 1 ページごとに 1〜3 秒、1359 ページで 30〜60 分（`gemma4:26b` の thinking 暴走を避けるため `e4b` を採用した結果として現実的時間に収まった）
 
 **フォールバック**: 抽出失敗（接続エラー / 空応答 / JSON パース失敗）時は `NULL` のまま続行し、次ページに進む。検索 / 質問応答は `main_characters IS NULL` を許容する（プロンプトに「主要登場人物: ...」のヒント行が出ないだけ）。
 
@@ -407,31 +420,64 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = "gemma4:e4b"   # 短答型タスクは軽量モデ
 
 **なぜ必要か:** ハイブリッド検索が拾える `top_k=16` 件のページ抜粋では、全 11 冊・1359 ページを俯瞰しきれない構造。Qwen 切替で踏み込みは改善したが、検索コンテキスト依存である限り、シリーズ全体を網羅した回答は本質的に難しい。事前に各冊の要約を作っておけば、scope=all/series 時に「全冊のあらすじ + ヒットページの抜粋」をコンテキストとして Qwen に渡せる。
 
-**生成方式（map-reduce）:**
+**生成方式（B-6 検証で 1-shot 化、2026-05-10）:**
 
 | フェーズ | 内容 | LLM オプション |
 |---|---|---|
 | 入力フィルタ | `min_chars` / `body_page_margin` で前付け・後付けを除外 | — |
-| 分割（chunk） | 改行境界優先で `_MAP_CHUNK_TARGET_CHARS=20000` 字／チャンクに分割。最大 `_MAP_MAX_CHUNKS=8` チャンク | — |
-| Map | 各チャンクを 400 字程度の中間要約に | `num_predict=768`, `num_ctx=16384` |
-| Reduce | 中間要約を統合し、最終 1500 字サマリへ | `num_predict=2560`, `num_ctx=16384` |
-| 単一チャンクの場合 | Map / Reduce をスキップして 1-shot 要約 | `num_predict=2560`, `num_ctx=16384` |
+| **1-shot（既定）** | 全文をそのまま Qwen に渡し、1500 字サマリへ | `num_predict=2560`, `num_ctx=131072` |
+| フォールバック（>200,000 字） | map: 各 ~20000 字チャンクを 400 字に / reduce: 統合して 1500 字に | map: `num_ctx=16384`, reduce: `num_ctx=16384` |
 
-**スキーマ**: `books.summary TEXT`（NULL = 未生成）/ `books.summary_generated_at TIMESTAMP`。
+実機検証で `num_ctx=131072` が VRAM ~22GB 環境で OOM なく動作することを確認（[小説RAG_技術知見.md §1.2](../05_記録/小説RAG_技術知見.md)）。1 冊あたり 1.6 chars/token 換算で 113k 字 = ~71k tokens のため、131k ctx に余裕で収まる。
 
-**生成タイミング**: 別 CLI（[§5.8](#58-cli) の `build_novel_summaries.py`）でユーザーが任意のタイミングで実行する。`builder.rebuild_book` には組み込まない（再構築のたびに数十分かかるのを避けるため）。
+**スキーマ**: `books.summary TEXT`（NULL = 未生成）/ `books.summary_generated_at TIMESTAMP`。`update_book_summary()` 内で `book_summaries_vec`（B-8）への upsert も同時に行う。
 
-**所要時間**: 1 冊あたり 5〜15 分（Qwen3.6:35b-a3b、~120 ページの本で map 6〜8 回 + reduce 1 回）。11 冊で 1.5〜2 時間。
+**生成タイミング**: 別 CLI（[§5.9](#59-cli) の `build_novel_summaries.py`）でユーザーが任意のタイミングで実行する。`builder.rebuild_book` には組み込まない（再構築のたびに数十分かかるのを避けるため）。
+
+**所要時間**: 1 冊あたり **4〜6 分**（1-shot 経路、Qwen3.6:35b-a3b）。11 冊で **約 40〜60 分**。map-reduce フォールバック経路では 1 冊 ~10 分。
 
 **フォールバック**: `summary IS NULL` の書籍は QA プロンプトに含めない（後方互換）。検索 / QA は summary が無くても従前通り動作する。
 
-### 5.8. CLI
+### 5.8. チャンク位置説明生成（`contextualizer.py`）（2026-05-11 追加: B-9）
+
+Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チャンクに対して書籍俯瞰サマリ（B-5）をコンテキストとして与え、LLM に「このチャンクが書籍内のどの場面か」を 1 文（~80 字）で生成させる。`(contextual_text + chunk_text)` を bge-m3 で再 embedding すると、retrieval の recall が大きく改善する（Anthropic 計測で 35〜49% 改善）。
+
+**なぜ必要か:** 現状 `chunks.text` は「ページから 800 字を切り出しただけ」で、書籍内での位置づけ（巻 / シーン / 登場キャラ群）が embedding に含まれない。「父王が次期女王を発表する場面」のような抽象的な質問が、該当ページに直接の語彙的一致がなくても、位置説明（「page 11 で父親が奇策を講じる宣言の場面」）込みの embedding なら top に来る。
+
+**生成方式:**
+
+| 項目 | 値 |
+|---|---|
+| モデル | `gemma4:e4b`（軽量、`NOVEL_DB_CONTEXT_MODEL` で切替可）|
+| プロンプト | 書名 + 書籍俯瞰サマリ + チャンク先頭 1200 字 → 80 字程度の位置説明 |
+| 出力長 | `num_predict=256`, `num_ctx=8192` |
+| 1 チャンク所要 | ~2.8 秒（実機計測） |
+| 全件（2,230 チャンク） | 約 100〜110 分 |
+
+**スキーマ**: `chunks.contextual_text TEXT`（NULL = 未生成）/ `chunks.contextual_generated_at TIMESTAMP`。
+
+**embedding 再構築**: 生成完了後、`(contextual_text + "\n\n" + chunk_text)` を bge-m3 でバッチ 16 で embedding し、`chunks_vec` を DELETE → INSERT で更新する（`make_embedding_input` ヘルパ）。
+
+**生成タイミング**: 別 CLI（[§5.9](#59-cli) の `build_chunk_contexts.py`）でユーザーが任意のタイミングで実行する。B-5 のサマリが前提（プロンプトのコンテキストに使う）。
+
+**フォールバック**:
+- `book.summary IS NULL` の書籍はスキップ（コンテキスト無しでは位置説明が薄くなるため）
+- LLM 接続エラーや空応答時は `contextual_text` を NULL のまま続行 → そのチャンクの embedding は text のみで計算（後方互換）
+- 重量モデルにフォールバックしたい場合は `NOVEL_DB_CONTEXT_MODEL=qwen3.6:35b-a3b` 等で切替
+
+**実機検証**: 書籍 1 巻（202 チャンク）のパイロットで以下を確認:
+- avg 63 字 / min 29 字 / max 88 字 の位置説明が生成される
+- サンプル 5 件すべて本文の内容と整合
+- 「父王が次期女王を発表する場面」→ p11 が distance 最良で top 1 に来る retrieval 結果
+
+### 5.9. CLI
 
 | スクリプト | 用途 |
 |---|---|
 | `backend/scripts/build_novel_db.py` | 全件 / 個別書籍の DB 再構築（PDF テキスト抽出 + チャンク + embedding）|
 | `backend/scripts/extract_characters.py` | 主要登場人物の一括抽出（`pages.main_characters` を埋める）|
 | `backend/scripts/build_novel_summaries.py` | 書籍俯瞰サマリの一括生成（`books.summary` を埋める）|
+| `backend/scripts/build_chunk_contexts.py` | チャンク位置説明の一括生成 + 再 embedding（`chunks.contextual_text` を埋め、`chunks_vec` を更新）|
 
 ```bash
 uv run python scripts/build_novel_db.py --all                      # 全件
@@ -443,10 +489,15 @@ uv run python scripts/extract_characters.py --book "..." --redo    # 既存値�
 
 uv run python scripts/build_novel_summaries.py --all               # 全冊の俯瞰サマリ生成
 uv run python scripts/build_novel_summaries.py --book "..." --redo # 既存値を上書き
+
+uv run python scripts/build_chunk_contexts.py --all                # 全チャンクに位置説明 + 再 embedding
+uv run python scripts/build_chunk_contexts.py --book "..." --redo  # 既存値を上書き
 ```
 
 `build_novel_db.py` は内部的に `services/novel_db/job_queue.py` を経由（同時実行禁止）。
-`extract_characters.py` / `build_novel_summaries.py` はジョブキューを使わず逐次実行（再構築と並行しない前提）。
+`extract_characters.py` / `build_novel_summaries.py` / `build_chunk_contexts.py` はジョブキューを使わず逐次実行（再構築と並行しない前提）。
+
+**処理順序の推奨**: `build_novel_db` → `extract_characters` → `build_novel_summaries` → `build_chunk_contexts`。`build_chunk_contexts` は `book.summary` を要求するため、サマリ生成より後に実行する必要がある。
 
 ---
 
@@ -455,6 +506,8 @@ uv run python scripts/build_novel_summaries.py --book "..." --redo # 既存値�
 ### 6.1. ハイブリッド検索（FTS5 OR + ベクトル + RRF）
 
 PoC スクリプト（旧 `tmp_poc/search.py`）の `hybrid_search()` を本実装に昇格。
+
+**ベクトル embedding の構成（B-9 適用後）**: `chunks_vec.embedding` は `(contextual_text + "\n\n" + chunk_text)` を bge-m3 で計算した値。`contextual_text` が NULL の chunk は `chunk_text` のみで計算する（後方互換）。これにより「該当ページに直接の語彙的一致がない抽象的なクエリ」でも、位置説明込みの semantic 距離で top に来るようになる。
 
 ```python
 def hybrid_search(
@@ -1018,7 +1071,10 @@ embedding / LLM の Ollama 呼び出しは `responses` ライブラリ等でモ�
 - **キャラ帰属誤統合（残存課題）**: `main_characters` ヒント付与で誤統合率を下げたが、ゼロにはできていない（PoC 計測で ~18%）。完全防止には RAG ではなく書籍ごとの fine-tuning が必要で、ローカル小説向け個人ツールとしてはコスト超過。許容範囲として運用
 - **シリーズ未所属書籍のグルーピング表示**: 全件スコープのライブラリ画面で「未所属」セクションを設けるかは [要件定義 §10 TBD-7](../01_要件定義/小説テキスト検索・RAG機能.md) の通り、シリーズスコープからは除外（全件・単冊では含む）
 - **複数モデル対応**: 質問応答は `qwen3.6:35b-a3b`、主要登場人物抽出は `gemma4:e4b` を採用。`backend/config.py` の `NOVEL_DB_LLM_MODEL` / `NOVEL_DB_CHAR_EXTRACT_MODEL` で切替可。将来 UI からのモデル切替は要件定義 §9 「将来検討事項」を参照
-- **俯瞰質問の天井（B-5 で対応済み）**: `scope=all` / `scope=series` での「シリーズ全体のテーマ」のような概括質問は、ハイブリッド検索が拾える `top_k=16` 件のページ抜粋に依存するため、全 11 冊・1359 ページを俯瞰しきれない構造だった。**B-5（書籍俯瞰サマリ事前生成）を 2026-05-10 に実装**（`books.summary` カラム + `summarizer.py` + `build_novel_summaries.py` CLI）。scope=all/series 時にプロンプト先頭へサマリ群を埋め込むことで、Qwen に全冊横断の俯瞰を持たせるようにした。詳細は §5.7 / §7.2
+- **俯瞰質問の天井（B-5 / B-8 / B-9 で 3 段の対応済み）**: `scope=all` / `scope=series` での「シリーズ全体のテーマ」のような概括質問は、ハイブリッド検索が拾える `top_k=16` 件のページ抜粋に依存するため、全 11 冊・1359 ページを俯瞰しきれない構造だった。3 段の改善を順次適用:
+    - **B-5（2026-05-10）**: `books.summary` を Qwen 1-shot で事前生成し、QA プロンプトの先頭に「書籍俯瞰サマリ」ブロックとして埋め込む（§5.7 / §7.2）
+    - **B-8（2026-05-10）**: `book_summaries_vec` にサマリの bge-m3 ベクトルを格納し、`scope=all` / `scope=series` で `search_book_summaries` でサマリ自体を retrieval 候補に。ページに引っかからなかった書籍も俯瞰サマリで Qwen に伝わる（§6.5）
+    - **B-9（2026-05-11）**: Anthropic 流の Contextual Retrieval。各チャンクに 80 字の位置説明を gemma4:e4b で生成し、`(contextual_text + chunk_text)` を再 embedding。検索 recall を 35〜49% 改善（§5.8）
 - **書籍単位の再 OCR 機能（将来）**: 検索結果や質問回答を見て「この書籍の OCR が壊れている」と気づいた際に、UI から「この本を再 OCR」ボタンで **元画像 (`data/kindle_novel/images/{書籍名}/*.png`) を yomitoku に流して新しい OCR テキストを得る → その書籍の DB レコード（pages / chunks / chunks_vec）を丸ごと作り直す** 機能。
   - 実装方針: `services/novel_db/builder.py` に `mode` 引数を追加し、`mode='pdf_text'`（現行: PDF テキスト層から抽出、数分）と `mode='reocr'`（画像から yomitoku で再 OCR、GPU 必須・数十分）を切替できるようにする
   - スキーマ変更: `rebuild_jobs.mode` カラムを追加（`'pdf_text' | 'reocr'`、デフォルト `'pdf_text'`）

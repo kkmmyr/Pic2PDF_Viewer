@@ -16,6 +16,7 @@ from config import (
     KINDLE_NOVEL_THUMBNAIL_DIR,
     KINDLE_PDF_DIR,
     KINDLE_THUMBNAIL_DIR,
+    PROJECT_ROOT,
     THUMBNAIL_DIR,
 )
 from exceptions import FileOperationError, OcrProcessError
@@ -93,6 +94,22 @@ app.include_router(series.router,     prefix="/api", tags=["series"])
 app.include_router(hitomi.router,     prefix="/api", tags=["hitomi"])
 app.include_router(genres.router,     prefix="/api", tags=["genres"])
 app.include_router(novel_db.router,   prefix="/api", tags=["novel_db"])
+
+# ---------------------------------------------------------------------------
+# 設計ドキュメント HTML 配信（mkdocs ビルド成果物）
+# ---------------------------------------------------------------------------
+# プロジェクトルートの site/ ディレクトリ（`mkdocs build` で生成）を /docs-html に
+# マウントする。site/ が存在しない場合はマウントしない（後方互換）。
+# html=True により /docs-html/ で index.html を自動配信する。
+# SPA catch-all より前に登録することで、/docs-html/* が優先的にこちらへ届く。
+
+_DOCS_HTML_DIR = os.path.join(PROJECT_ROOT, "site")
+if os.path.isdir(_DOCS_HTML_DIR):
+    app.mount(
+        "/docs-html",
+        StaticFiles(directory=_DOCS_HTML_DIR, html=True),
+        name="docs_html",
+    )
 
 # ---------------------------------------------------------------------------
 # フロントエンド SPA 配信（リリースモード）

@@ -1,0 +1,88 @@
+# Pic2PDF_Viewer 設計ドキュメントの HTML ビルド設定
+#
+# - ソース: docs/ 配下の Markdown
+# - 出力先: site/（.gitignore）
+# - ビルド: mkdocs build  →  site/index.html 以下が生成される
+# - プレビュー: mkdocs serve  →  http://localhost:8000
+# - リリースビルド時: FastAPI が site/ を /docs-html にマウントする
+#
+# 詳細は CLAUDE.md「設計ドキュメントの HTML 配信」セクション。
+
+site_name: Pic2PDF_Viewer 設計ドキュメント
+site_description: WebP/ZIP → PDF ビューア（OCR + 小説 RAG 機能含む）の設計ドキュメント
+
+docs_dir: docs
+site_dir: site
+
+# ローカルファイルとして直接開く前提。ナビゲーション内のリンクが file:// でも動くよう、
+# use_directory_urls=false でフラットに *.html を吐く（site/01_要件定義/foo.html 形式）。
+use_directory_urls: false
+
+theme:
+  name: material
+  language: ja
+  features:
+    - navigation.tabs       # 上部に大区分タブ
+    - navigation.sections   # 左サイドバーをグルーピング
+    - navigation.indexes    # 各セクション直下の index.md を見出しに
+    - navigation.top        # トップへ戻るボタン
+    - search.suggest        # 検索サジェスト
+    - content.code.copy     # コードブロックにコピーボタン
+    - content.tabs.link     # タブ式ブロックのリンク同期
+  palette:
+    # ライトモード
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: ダークモードに切替
+    # ダークモード
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: ライトモードに切替
+
+markdown_extensions:
+  # 表 / 注釈 / 折りたたみ等の基本拡張
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  # pymdown-extensions（mkdocs-material と一緒に入る）
+  - pymdownx.details      # <details> 折りたたみ
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.superfences:
+      # Mermaid を ```mermaid フェンスで描画できるよう設定
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search:
+      lang:
+        - ja
+        - en
+  # Mermaid 描画（CDN から mermaid.js を読み込む）
+  - mermaid2
+
+# サイト内検索が日本語でも効くよう、CJK tokenizer を有効化
+extra:
+  generator: false  # フッタの "Made with Material for MkDocs" を非表示
+
+# nav は明示せず docs/ 配下を自動探索（ファイル名ベース）。
+# 必要になったら ここに手書きナビを追加可能（例: nav: [docs/01_要件定義/index.md, ...]）。

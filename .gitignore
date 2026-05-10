@@ -41,3 +41,7 @@ Thumbs.db
 
 # Processed source files
 backend/complete/
+
+# mkdocs HTML build output（docs/ の Markdown を HTML 化したもの）
+# ソースは docs/ 配下の MD、site/ はビルド成果物なので git 管理しない
+site/
