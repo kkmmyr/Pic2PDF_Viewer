@@ -48,6 +48,17 @@
   - §6.5 `POST /api/hitomi/watchlist` — 監視作者追加
   - §6.6 `DELETE /api/hitomi/watchlist/{normalized}` — 監視作者削除
   - §6.7 `POST /api/hitomi/run-now` — 監視即時実行
+- [§7. 小説テキスト検索・RAG（novel_db）](#7-小説テキスト検索ragnovel_db)
+  - §7.1 `GET /api/novel_db/books` — 書籍一覧 + DB 状態
+  - §7.2 `GET /api/novel_db/series` — novel シリーズ一覧
+  - §7.3 `POST /api/novel_db/search` — ハイブリッド検索（FTS5 + ベクトル + RRF）
+  - §7.4 `POST /api/novel_db/qa` — RAG 質問応答（SSE）
+  - §7.5 `GET /api/novel_db/qa/history` — 履歴一覧
+  - §7.6 `GET /api/novel_db/qa/history/{id}` — 履歴詳細
+  - §7.7 `DELETE /api/novel_db/qa/history/{id}` — 履歴削除
+  - §7.8 `POST /api/novel_db/rebuild` — 再構築ジョブ起動
+  - §7.9 `GET /api/novel_db/rebuild/status` — ジョブキュー状態
+  - §7.10 `DELETE /api/novel_db/rebuild/{job_id}` — 待機中ジョブのキャンセル
 
 ---
 
@@ -814,3 +825,330 @@ Novel用OCR処理 (`batch_ocr.py`) を開始する。
 
 **エラー**:
 - `409`: 既に実行中
+
+---
+
+## §7. 小説テキスト検索・RAG（novel_db）
+
+novel タブのテキスト DB ビューア機能。設計の詳細は [小説テキスト検索・RAG機能_バックエンド設計.md](小説テキスト検索・RAG機能_バックエンド設計.md)、要件は [小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
+
+### 共通仕様
+
+- すべてのエンドポイントは `prefix=/api/novel_db`、`tags=["novel_db"]` で登録
+- **再構築ジョブ実行中の検索 / 質問**: `503 Service Unavailable` を `Retry-After: 10` ヘッダ付きで返す（[バックエンド設計 §8.2](小説テキスト検索・RAG機能_バックエンド設計.md)）
+- **共通エラーレスポンス**: `{"detail": "<message>"}` 形式（FastAPI 標準）
+- **スコープオブジェクト** (`Scope`): 検索 / 質問 / 履歴 で共通の構造
+    ```json
+    { "type": "all" }                               // 全件
+    { "type": "series", "id": "oko-kishi" }         // シリーズ単位
+    { "type": "book", "name": "おこぼれ姫と..." }     // 単冊
+    ```
+    シリーズ未所属書籍は `type=series` の選択肢に含めない（[要件定義 TBD-7](../01_要件定義/小説テキスト検索・RAG機能.md)）。
+
+---
+
+### §7.1 `GET /api/novel_db/books`
+
+novel ソースに登録された書籍一覧と DB 状態を返す。`data/kindle_novel/pdfs/` 配下の PDF を起点とし、`data/meta/novel/meta.json` の作者・シリーズ情報と `novel.db` の DB 状態を結合。
+
+**クエリパラメータ**: なし
+
+**レスポンス**:
+```json
+[
+  {
+    "name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+    "authors": ["田中啓子"],
+    "series_id": "oko-kishi",
+    "series_name": "おこぼれ姫と円卓の騎士",
+    "is_indexed": true,
+    "page_count": 118,
+    "indexed_at": "2026-05-09T11:30:00Z",
+    "thumbnail_url": "/kindle_novel/images/おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)/001.png"
+  }
+]
+```
+
+- `is_indexed=false` のとき、`page_count` / `indexed_at` は `null`
+- `series_id` / `series_name` はシリーズ未所属の場合 `null`
+- `thumbnail_url` は連番 `001.png` をそのまま縮小表示用に返す（事前生成しない）
+
+---
+
+### §7.2 `GET /api/novel_db/series`
+
+novel ソースのシリーズ一覧。書籍が 1 件以上紐付いているシリーズのみ返す（未所属書籍は §7.1 で取得）。
+
+**レスポンス**:
+```json
+[
+  { "id": "oko-kishi", "name": "おこぼれ姫と円卓の騎士", "book_count": 11 }
+]
+```
+
+---
+
+### §7.3 `POST /api/novel_db/search`
+
+ハイブリッド検索（FTS5 OR + ベクトル検索 + RRF 融合）。
+
+**リクエストボディ**:
+```json
+{
+  "query": "デューク",
+  "scope": { "type": "all" },
+  "offset": 0,
+  "limit": 20
+}
+```
+
+| フィールド | 必須 | デフォルト | 説明 |
+|---|---|---|---|
+| `query` | ○ | — | 検索クエリ（自然文 / キーワードどちらでも可、長さ 1-200 字） |
+| `scope` | ○ | — | スコープオブジェクト |
+| `offset` | × | 0 | スキップ件数（無限スクロール用） |
+| `limit` | × | 20 | 取得上限（最大 50） |
+
+**レスポンス**:
+```json
+{
+  "hits": [
+    {
+      "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+      "page_no": 50,
+      "snippet": "…そう、俺は<mark>デューク</mark>。お前の…",
+      "has_highlight": true,
+      "image_url": "/kindle_novel/images/おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)/050.png",
+      "rrf_score": 0.0312
+    }
+  ],
+  "total": 42,
+  "offset": 0,
+  "limit": 20
+}
+```
+
+- `snippet` は `<mark>` タグのみ許可（バックエンドで HTML エスケープ済み、フロントは `dangerouslySetInnerHTML` で安全に描画可能、[バックエンド設計 §6.3.1](小説テキスト検索・RAG機能_バックエンド設計.md)）
+- `has_highlight=false` の場合は FTS5 ヒットなし、ベクトル検索のみのチャンク先頭 200 字（HTML エスケープのみ）
+- `image_url` は `null` 可（元画像が無い場合）
+
+**エラー**:
+- `422`: `query` が空 / 200 字超 / `scope` が不正
+- `503`: 再構築ジョブ実行中（`Retry-After: 10`）
+
+---
+
+### §7.4 `POST /api/novel_db/qa`（SSE）
+
+ハイブリッド検索 → Gemma で質問応答。Server-Sent Events でトークンを逐次配信。
+
+**Content-Type**: リクエスト `application/json` / レスポンス `text/event-stream`
+
+**リクエストボディ**:
+```json
+{
+  "question": "デュークはどのような人物ですか?",
+  "scope": { "type": "all" }
+}
+```
+
+| フィールド | 必須 | 説明 |
+|---|---|---|
+| `question` | ○ | 質問文（1-500 字） |
+| `scope` | ○ | スコープオブジェクト |
+
+**レスポンス（イベントストリーム）**:
+
+```
+data: {"token": "デュ"}
+
+data: {"token": "ーク"}
+
+data: {"token": "は"}
+
+…
+
+data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"}
+```
+
+- `token` イベント: 生成された 1 単位（モデル依存、概ね数文字 〜 数十文字）
+- `done` イベント: 生成完了。`history_id` は `qa_history` テーブルに保存された履歴 ID
+- `done_reason`: `"stop"`（自然終了） / `"length"`（num_predict に達した） / `"canceled"`（クライアント切断）
+- クライアントが接続切断（`AbortController.abort()`）した場合、サーバ側で `done_reason='canceled'` として途中までの応答を `qa_history.answer` に保存（[バックエンド設計 §7.6](小説テキスト検索・RAG機能_バックエンド設計.md)）
+
+**エラー**:
+- `422`: `question` が空 / 500 字超 / `scope` 不正
+- `503`: 再構築ジョブ実行中（`Retry-After: 10`、SSE 確立前に通常 HTTP レスポンスで返す）
+
+---
+
+### §7.5 `GET /api/novel_db/qa/history`
+
+質問履歴一覧（時系列降順）。各エントリは要約のみ。詳細は §7.6。
+
+**クエリパラメータ**:
+- `offset` (default `0`)
+- `limit` (default `20`、最大 100)
+
+**レスポンス**:
+```json
+{
+  "items": [
+    {
+      "id": 42,
+      "asked_at": "2026-05-09T11:45:00Z",
+      "finished_at": "2026-05-09T11:46:30Z",
+      "scope": { "type": "all" },
+      "question": "デュークはどのような人物ですか?",
+      "answer_preview": "デュークはレティの騎士であり、ナイツオブラウンドの第一席として…",
+      "done_reason": "stop"
+    }
+  ],
+  "total": 50
+}
+```
+
+- `answer_preview`: `answer` の先頭 120 字 + `…`（hung up 時は途中まで）
+- `done_reason='canceled'` のエントリも履歴に含まれる
+
+---
+
+### §7.6 `GET /api/novel_db/qa/history/{id}`
+
+履歴詳細（プロンプト全文 / コンテキスト / モデル設定 / 応答メタを含む）。チューニング材料として全項目を保持（[要件定義 TBD-2](../01_要件定義/小説テキスト検索・RAG機能.md)）。
+
+**レスポンス**:
+```json
+{
+  "id": 42,
+  "asked_at": "2026-05-09T11:45:00Z",
+  "finished_at": "2026-05-09T11:46:30Z",
+  "scope": { "type": "all" },
+  "question": "デュークはどのような人物ですか?",
+  "answer": "デュークはレティの騎士であり…",
+  "prompt": "以下は小説『…』からの抜粋です。…",
+  "context": [
+    {
+      "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+      "page_no": 50,
+      "chunk_idx": 1,
+      "score": 0.0312,
+      "text": "そう、俺は殿下の騎士。…"
+    }
+  ],
+  "model": "qwen3.6:35b-a3b",
+  "options": {
+    "temperature": 0.2,
+    "repeat_penalty": 1.2,
+    "num_predict": 4096,
+    "num_ctx": 8192,
+    "think": false
+  },
+  "eval_count": 1240,
+  "done_reason": "stop",
+  "error_message": null
+}
+```
+
+**エラー**:
+- `404`: 該当 `id` の履歴なし
+
+---
+
+### §7.7 `DELETE /api/novel_db/qa/history/{id}`
+
+履歴 1 件を削除。
+
+**レスポンス**: `204 No Content`
+
+**エラー**:
+- `404`: 該当 `id` の履歴なし
+
+---
+
+### §7.8 `POST /api/novel_db/rebuild`
+
+再構築ジョブをキューに登録。即座に `job_id` を返し、worker スレッドが順次処理する（[バックエンド設計 §8](小説テキスト検索・RAG機能_バックエンド設計.md)）。
+
+**リクエストボディ**:
+```json
+{
+  "type": "book",
+  "target_id": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+  "mode": "pdf_text"
+}
+```
+
+| フィールド | 必須 | 値 / デフォルト | 説明 |
+|---|---|---|---|
+| `type` | ○ | `"book"` / `"series"` / `"all"` | ジョブ単位 |
+| `target_id` | △ | — | `type='book'` のとき書籍名、`type='series'` のときシリーズ ID。`type='all'` では省略 |
+| `mode` | × | `"pdf_text"` (default) / `"reocr"` | `pdf_text` = 既存 PDF テキスト層から抽出、`reocr` = 元画像から yomitoku 再 OCR（将来機能、現状未実装） |
+
+**レスポンス**:
+```json
+{
+  "job_id": 7,
+  "queued_position": 1
+}
+```
+
+- `queued_position`: キュー内の順番（1 = 次に実行）
+
+**エラー**:
+- `422`: 不正な `type` / `target_id` 不一致 / `mode='reocr'` を未実装段階で指定
+
+---
+
+### §7.9 `GET /api/novel_db/rebuild/status`
+
+現在のジョブキュー状態を返す。フロントは 5 秒間隔でポーリング（[フロントエンド設計 §6.6](小説テキスト検索・RAG機能_フロントエンド設計.md)）。
+
+**レスポンス**:
+```json
+{
+  "is_running": true,
+  "current_job": {
+    "id": 7,
+    "type": "all",
+    "target_id": null,
+    "mode": "pdf_text",
+    "started_at": "2026-05-09T11:50:00Z",
+    "progress_total": 11,
+    "progress_done": 4
+  },
+  "queued_jobs": [
+    {
+      "id": 8,
+      "type": "book",
+      "target_id": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+      "mode": "pdf_text",
+      "enqueued_at": "2026-05-09T11:55:00Z"
+    }
+  ],
+  "recent_finished": [
+    {
+      "id": 6,
+      "type": "book",
+      "target_id": "おこぼれ姫と円卓の騎士 3 (ビーズログ文庫)",
+      "state": "completed",
+      "finished_at": "2026-05-09T11:48:00Z"
+    }
+  ]
+}
+```
+
+- `is_running=false` のとき `current_job` は `null`
+- `recent_finished` は直近 5 件（`completed` / `failed` / `canceled` を含む）
+
+---
+
+### §7.10 `DELETE /api/novel_db/rebuild/{job_id}`
+
+待機中ジョブをキャンセル（`state='canceled'` に更新）。
+
+**レスポンス**: `204 No Content`
+
+**エラー**:
+- `404`: 該当 `job_id` なし
+- `409`: ジョブが実行中（実行中ジョブはキャンセル不可、[バックエンド設計 §8.4](小説テキスト検索・RAG機能_バックエンド設計.md)）
