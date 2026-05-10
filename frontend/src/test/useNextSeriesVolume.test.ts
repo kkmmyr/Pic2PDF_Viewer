@@ -67,7 +67,7 @@ describe('useNextSeriesVolume', () => {
             'b.pdf': { series_id: 's', series_index: 5 },
             'c.pdf': { series_id: 's', series_index: 10 },
         };
-        const gs = (path: string, name: string): SeriesRef => {
+        const gs = (_path: string, name: string): SeriesRef => {
             const e = meta[name];
             if (!e?.series_id || e.series_index === undefined) return null;
             return { id: e.series_id, title: '', index: e.series_index };
@@ -107,7 +107,7 @@ describe('usePrevSeriesVolume', () => {
             'b.pdf': { series_id: 's', series_index: 5 },
             'c.pdf': { series_id: 's', series_index: 10 },
         };
-        const gs = (path: string, name: string): SeriesRef => {
+        const gs = (_path: string, name: string): SeriesRef => {
             const e = meta[name];
             if (!e?.series_id || e.series_index === undefined) return null;
             return { id: e.series_id, title: '', index: e.series_index };

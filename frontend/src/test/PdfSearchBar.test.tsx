@@ -2,7 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
 import { PdfSearchBar } from '../components/reader/PdfSearchBar';
 
-const renderBar = (overrides: Partial<Parameters<typeof PdfSearchBar>[0]> = {}) => {
+type RenderOverrides = {
+    searchText?: string;
+    matchCount?: number;
+    currentMatch?: number;
+};
+
+const renderBar = (overrides: RenderOverrides = {}) => {
     const props = {
         searchText: '',
         matchCount: 0,
@@ -40,8 +46,9 @@ describe('PdfSearchBar', () => {
         act(() => {
             vi.advanceTimersByTime(300);
         });
-        expect(props.onSearchChange.mock.calls.length).toBeGreaterThan(callsBefore);
-        const lastCall = props.onSearchChange.mock.calls.at(-1);
+        const calls = props.onSearchChange.mock.calls;
+        expect(calls.length).toBeGreaterThan(callsBefore);
+        const lastCall = calls[calls.length - 1];
         expect(lastCall?.[0]).toBe('hello');
     });
 

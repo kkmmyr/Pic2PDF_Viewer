@@ -5,21 +5,29 @@ import { useSeriesEditDialog } from '../hooks/useSeriesEditDialog';
 const setup = () => {
     const assignSeries = vi.fn().mockResolvedValue('sid');
     const unassignSeries = vi.fn().mockResolvedValue(undefined);
-    // runAsync は本物の挙動を模擬: fn を await して、エラーは rethrow=true で再スロー
-    const runAsync = vi.fn(async <T>(fn: () => Promise<T>) => {
-        try {
-            return await fn();
-        } catch {
-            return undefined;
-        }
-    });
+    // runAsync は本物の挙動を模擬: fn を await して、エラーは握り潰す（呼び出し元で rethrow:true 指定可）
+    const runAsync = vi.fn(
+        async <T>(
+            fn: () => Promise<T>,
+            _errorMessage: string,
+            _opts?: { rethrow?: boolean },
+        ): Promise<T | undefined> => {
+            try {
+                return await fn();
+            } catch {
+                return undefined;
+            }
+        },
+    );
 
+    type RunAsync = Parameters<typeof useSeriesEditDialog>[0]['runAsync'];
     const hook = renderHook(() =>
         useSeriesEditDialog({
             currentPath: 'sub',
             assignSeries,
             unassignSeries,
-            runAsync,
+            // vi.fn() の Mock 型は <T> 付きジェネリック関数型に直接代入できないため cast
+            runAsync: runAsync as unknown as RunAsync,
         }),
     );
 
