@@ -80,6 +80,13 @@ NOVEL_DB_QA_TOP_SUMMARIES  = 11
 # 環境変数 NOVEL_DB_QA_NUM_CTX で上書き可（段階 B=32768 / C=131072 への切替に使う）
 NOVEL_DB_QA_NUM_CTX        = int(os.environ.get("NOVEL_DB_QA_NUM_CTX", "16384"))
 
+# B-11 Query Expansion（2026-05-11 採用）: ユーザーの質問を gemma4:e4b で複数の検索
+# クエリに展開して hybrid_search を多角的に実行する。抽象質問の recall 改善が狙い。
+# 応答時間は +3〜5 秒（gemma4:e4b の短答呼び出し）。
+NOVEL_DB_QA_EXPAND_ENABLED = os.environ.get("NOVEL_DB_QA_EXPAND_ENABLED", "true").lower() in ("1", "true", "yes")
+NOVEL_DB_QA_EXPAND_N       = int(os.environ.get("NOVEL_DB_QA_EXPAND_N", "3"))
+NOVEL_DB_QA_EXPAND_MODEL   = os.environ.get("NOVEL_DB_QA_EXPAND_MODEL", "gemma4:e4b")
+
 # OCR 起動スクリプト
 BATCH_OCR_LAUNCHER = os.path.join(PROJECT_ROOT, "kindle-pdf", "start_batch_ocr.bat")
 

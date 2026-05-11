@@ -121,6 +121,7 @@ backend/
         ├── embedder.py              # Ollama bge-m3 ラッパー
         ├── character_extractor.py   # Ollama gemma4:e4b で主要登場人物を抽出
         ├── contextualizer.py        # gemma4:e4b でチャンクごとの位置説明を生成（B-9）
+        ├── query_expander.py        # gemma4:e4b で QA 質問を 3 個の検索クエリに展開（B-11）
         ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN + サマリ vec 検索
         ├── llm.py                   # 共通 Qwen モジュール経由のストリーミング（薄いラッパ）
         ├── builder.py               # 1 冊の DB 構築フロー（再構築含む）
@@ -771,19 +772,59 @@ LLM_OPTIONS = {
 
 後続の段階 B / C（`num_ctx=32768` / `131072` 等）は機能追加候補 B-13 を参照。`NOVEL_DB_QA_NUM_CTX` 環境変数で切替可能。
 
-### 7.4. SSE エンドポイント
+### 7.4. Query Expansion（`query_expander.py`、B-11、2026-05-11 採用）
+
+QA エンドポイントでハイブリッド検索を実行する前に、軽量 LLM（gemma4:e4b、`NOVEL_DB_QA_EXPAND_MODEL` で切替可）でユーザーの質問から **追加の検索クエリを 3 個生成** し、元の質問と合わせて **合計 4 つのクエリで `hybrid_search` を並列実行**。結果を `(book_name, page_no)` でデデュープ、RRF スコア最大値で並べ替えて top_k に絞る。
+
+**なぜ必要か**: 「主人公の成長」「キャラ A と B の関係性」のような **抽象質問・関係質問** では、ユーザーの 1 クエリだけだと semantic 距離が遠い page を取り逃すことがある。複数の角度（場面 / キャラ / 行動 / 関係性 / 時期）から検索することで retrieval recall を改善する。
+
+**B-9（Contextual Retrieval）との直交関係**:
+- B-9: chunk 側 embedding を強化（位置説明を含める）
+- B-11: query 側を強化（複数の検索角度を生成）
+- 両方適用で「クエリ ↔ チャンク」の両端から retrieval 堅牢性が累積
+
+**プロンプト**（gemma4:e4b に渡す）:
+```
+次の質問に対し、小説の本文を全文検索 / 意味検索するための短い検索クエリを N 個生成。
+- 各クエリは異なる切り口（場面 / キャラ / 行動 / 関係性 / 時期 など）
+- 各クエリは 10〜20 字程度のキーワード列
+- 元のキーワードを含めても可
+- 前置きや番号付けは不要、1 行 1 クエリ
+
+質問: {question}
+検索クエリ（N 行）:
+```
+
+**設定（環境変数で切替可）**:
+- `NOVEL_DB_QA_EXPAND_ENABLED`（デフォルト `true`、品質優先方針）
+- `NOVEL_DB_QA_EXPAND_N`（デフォルト 3）
+- `NOVEL_DB_QA_EXPAND_MODEL`（デフォルト `gemma4:e4b`、Qwen を使いたい場合は変更）
+
+**応答時間ペナルティ**: gemma4:e4b の短答呼び出しで **実測 +3〜5 秒**。`expand_query` が失敗（接続エラー / 空応答）した場合は元の質問のみで通常検索（後方互換）。
+
+### 7.5. SSE エンドポイント
 
 ```python
 @router.post("/qa")
 async def qa_endpoint(req: QaRequest) -> StreamingResponse:
-    """ハイブリッド検索 → Qwen ストリーミング → 履歴保存"""
-    rows = hybrid_search(
-        conn, req.question, scope=req.scope,
-        top=NOVEL_DB_QA_TOP_K,
-        min_chars=NOVEL_DB_MIN_BODY_CHARS,
-        body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
-        max_per_book=NOVEL_DB_QA_MAX_PER_BOOK,
-    )
+    """[Query Expansion →] ハイブリッド検索 → Qwen ストリーミング → 履歴保存"""
+    # B-11: 質問を gemma4:e4b で複数クエリに展開（無効時は [question] だけ）
+    queries = expand_query(req.question) if NOVEL_DB_QA_EXPAND_ENABLED else [req.question]
+
+    rows_by_key: dict[tuple[str, int], SearchHit] = {}
+    for q in queries:
+        sub_rows = hybrid_search(
+            conn, q, scope=req.scope,
+            top=NOVEL_DB_QA_TOP_K,
+            min_chars=NOVEL_DB_MIN_BODY_CHARS,
+            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+            max_per_book=NOVEL_DB_QA_MAX_PER_BOOK,
+        )
+        for h in sub_rows:
+            key = (h.book_name, h.page_no)
+            if key not in rows_by_key or h.rrf_score > rows_by_key[key].rrf_score:
+                rows_by_key[key] = h
+    rows = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[:NOVEL_DB_QA_TOP_K]
     # B-8: scope=all/series ではサマリベクトル検索の hit も合流させる
     if req.scope.type in ("all", "series"):
         hit_books = {r.book_name for r in rows}
@@ -813,11 +854,11 @@ async def qa_endpoint(req: QaRequest) -> StreamingResponse:
 
 ジョブキューが running 状態のときは 503 + Retry-After を返す（後述 §8）。
 
-### 7.5. 連投警告
+### 7.6. 連投警告
 
 連投警告（直前と完全一致）はフロントエンド側のチェックで行い、バックエンド側ではチェックしない。フロントから常に送ってもよい設計（API はステートレス）。
 
-### 7.6. 質問の停止（クライアント切断）
+### 7.7. 質問の停止（クライアント切断）
 
 - フロントの「停止」ボタンで `AbortController.abort()` → fetch コネクションが切断される
 - FastAPI 側は `request.is_disconnected()` を SSE ループ内で監視し、切断検知時に Ollama リクエストを `aclose()` してリソース解放

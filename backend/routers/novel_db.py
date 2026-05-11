@@ -18,6 +18,7 @@ from config import (
     NOVEL_DB_BODY_PAGE_MARGIN,
     NOVEL_DB_LLM_MODEL,
     NOVEL_DB_MIN_BODY_CHARS,
+    NOVEL_DB_QA_EXPAND_ENABLED,
     NOVEL_DB_QA_MAX_PER_BOOK,
     NOVEL_DB_QA_TOP_K,
     NOVEL_DB_QA_TOP_SUMMARIES,
@@ -35,7 +36,8 @@ from services.novel_db.qa_history import (
     save_finish,
     save_start,
 )
-from services.novel_db.search import search_book_summaries
+from services.novel_db.query_expander import expand_query
+from services.novel_db.search import SearchHit, search_book_summaries
 from services.novel_db.summarizer import load_summaries_for_books
 
 router = APIRouter()
@@ -193,16 +195,36 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
     max_per_book = (
         NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
     )
+
+    # B-11 Query Expansion: 元の質問 + 展開クエリで multi-query 検索する。
+    # 展開無効時 / 失敗時は元の質問のみのリストが返るので、結果は従来と同じになる。
+    if NOVEL_DB_QA_EXPAND_ENABLED:
+        queries = expand_query(request.question)
+    else:
+        queries = [request.question]
+
     with with_db() as conn:
-        hits = hybrid_search(
-            conn,
-            request.question,
-            scope,
-            top=NOVEL_DB_QA_TOP_K,
-            min_chars=NOVEL_DB_MIN_BODY_CHARS,
-            max_per_book=max_per_book,
-            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
-        )
+        # 各クエリで hybrid_search → (book_name, page_no) でデデュープし、
+        # 同じページが複数クエリから引かれた場合はスコア最大値を採用する
+        rows_by_key: dict[tuple[str, int], SearchHit] = {}
+        for q in queries:
+            sub_rows = hybrid_search(
+                conn,
+                q,
+                scope,
+                top=NOVEL_DB_QA_TOP_K,
+                min_chars=NOVEL_DB_MIN_BODY_CHARS,
+                max_per_book=max_per_book,
+                body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+            )
+            for h in sub_rows:
+                key = (h.book_name, h.page_no)
+                existing = rows_by_key.get(key)
+                if existing is None or h.rrf_score > existing.rrf_score:
+                    rows_by_key[key] = h
+        hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[
+            :NOVEL_DB_QA_TOP_K
+        ]
         # scope=all / series ではヒット書籍の俯瞰サマリをプロンプトに付与する
         # （生成済み書籍のみ。未生成は単に含めない＝後方互換）
         # B-8: ページヒット書籍に加えて、サマリ自体のベクトル検索 top-K も合流
