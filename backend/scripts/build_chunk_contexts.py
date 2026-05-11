@@ -29,6 +29,7 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
+from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS  # noqa: E402
 from services.meta_store import load_meta  # noqa: E402
 from services.novel_db import init_schema, with_db  # noqa: E402
 from services.novel_db.contextualizer import (  # noqa: E402
@@ -39,6 +40,23 @@ from services.novel_db.embedder import embed_batch, serialize_f32  # noqa: E402
 
 # bge-m3 のバッチサイズ
 _EMBED_BATCH_SIZE = 16
+
+
+def _should_skip_context(char_count: int, page_no: int, page_count: int) -> bool:
+    """ctx 生成を skip すべきチャンクか判定する。
+
+    skip 条件:
+    - char_count < NOVEL_DB_MIN_BODY_CHARS (300): 章扉・目次など薄いチャンク
+    - page_no が先頭・末尾 NOVEL_DB_BODY_PAGE_MARGIN (5) ページ以内: 表紙・あとがき等
+
+    skip 対象は ctx を NULL に保ち、検索 noise を避ける（B-9 改良 2026-05-12）。
+    """
+    if char_count < NOVEL_DB_MIN_BODY_CHARS:
+        return True
+    margin = NOVEL_DB_BODY_PAGE_MARGIN
+    if page_no <= margin or page_no > page_count - margin:
+        return True
+    return False
 
 
 def _list_target_books(
@@ -85,15 +103,24 @@ def _list_target_books(
     return candidates
 
 
-def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool) -> tuple[int, int]:
+def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool) -> tuple[int, int, int]:
     """1 冊のチャンクすべてに contextual_text を生成して chunks_vec を更新する。
 
-    Returns: (success_count, failure_count)
+    Returns: (success_count, skipped_count, failure_count)
+    skipped は _should_skip_context により ctx 生成を意図的に省いた件数（B-9 改良 2026-05-12）。
     """
     with with_db() as conn:
+        page_count_row = conn.execute(
+            "SELECT page_count FROM books WHERE id = ?", (book_id,),
+        ).fetchone()
+        if page_count_row is None:
+            print(f"  book not found: {book_name}", file=sys.stderr)
+            return (0, 0, 0)
+        page_count: int = page_count_row[0]
+
         if redo:
             chunks = conn.execute("""
-                SELECT c.id, c.text
+                SELECT c.id, c.text, c.char_count, p.page_no
                 FROM chunks c
                 JOIN pages p ON c.page_id = p.id
                 WHERE p.book_id = ?
@@ -101,7 +128,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
             """, (book_id,)).fetchall()
         else:
             chunks = conn.execute("""
-                SELECT c.id, c.text
+                SELECT c.id, c.text, c.char_count, p.page_no
                 FROM chunks c
                 JOIN pages p ON c.page_id = p.id
                 WHERE p.book_id = ? AND c.contextual_text IS NULL
@@ -110,21 +137,29 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
 
     if not chunks:
         print(f"  no pending chunks for {book_name}", flush=True)
-        return (0, 0)
+        return (0, 0, 0)
 
     print(f"  {len(chunks)} chunks to process", flush=True)
 
     success = 0
     failure = 0
+    skipped = 0
     t0 = time.time()
     # コンテキスト生成 → DB 更新（embedding は最後にバッチで）
-    pending_for_embed: list[tuple[int, str, str]] = []  # (chunk_id, ctx, text)
-    for i, (chunk_id, text) in enumerate(chunks, 1):
-        ctx = generate_chunk_context(book_name, book_summary, text)
-        if not ctx:
-            failure += 1
+    # ctx は str | None。skip 対象は None を保ち、make_embedding_input が text のみで embed する。
+    pending_for_embed: list[tuple[int, str | None, str]] = []
+    for i, (chunk_id, text, char_count, page_no) in enumerate(chunks, 1):
+        if _should_skip_context(char_count, page_no, page_count):
+            ctx: str | None = None
+            skipped += 1
         else:
-            success += 1
+            generated = generate_chunk_context(book_name, book_summary, text)
+            if generated:
+                ctx = generated
+                success += 1
+            else:
+                ctx = None
+                failure += 1
         with with_db() as conn:
             conn.execute(
                 "UPDATE chunks SET contextual_text = ?, "
@@ -138,7 +173,8 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
             avg = elapsed / i
             eta = avg * (len(chunks) - i)
             print(
-                f"  ctx [{i:>4}/{len(chunks)}] avg {avg:.1f}s/chunk eta {eta:.0f}s",
+                f"  ctx [{i:>4}/{len(chunks)}] avg {avg:.1f}s/chunk "
+                f"ok={success} skip={skipped} ng={failure} eta {eta:.0f}s",
                 flush=True,
             )
 
@@ -162,7 +198,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
                 )
             conn.commit()
     print(f"  embedding done ({time.time() - t1:.0f}s)", flush=True)
-    return (success, failure)
+    return (success, skipped, failure)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -185,23 +221,27 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"対象書籍: {len(targets)}")
     t0 = time.time()
-    total_ok, total_ng = 0, 0
+    total_ok, total_skip, total_ng = 0, 0, 0
     for i, (book_id, name, summary) in enumerate(targets, 1):
         print(f"\n[{i}/{len(targets)}] {name}", flush=True)
-        ok, ng = _process_book(book_id, name, summary, redo=args.redo)
+        ok, skip, ng = _process_book(book_id, name, summary, redo=args.redo)
         total_ok += ok
+        total_skip += skip
         total_ng += ng
         elapsed = time.time() - t0
         avg = elapsed / i
         eta = avg * (len(targets) - i)
         print(
-            f"  book done. cumulative ok={total_ok} ng={total_ng} "
+            f"  book done. cumulative ok={total_ok} skip={total_skip} ng={total_ng} "
             f"(elapsed {elapsed:.0f}s, eta {eta:.0f}s)",
             flush=True,
         )
 
     elapsed = time.time() - t0
-    print(f"\n完了: {len(targets)} 冊 / chunks ok={total_ok} ng={total_ng} ({elapsed:.0f}s)")
+    print(
+        f"\n完了: {len(targets)} 冊 / chunks ok={total_ok} skip={total_skip} "
+        f"ng={total_ng} ({elapsed:.0f}s)"
+    )
     return 0 if total_ng == 0 else 1
 
 
