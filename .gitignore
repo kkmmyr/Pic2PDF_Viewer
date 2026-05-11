@@ -31,6 +31,7 @@ frontend/coverage/
 
 # Claude local settings
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 
 # Editor / OS
 .vscode/

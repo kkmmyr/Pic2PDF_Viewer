@@ -80,6 +80,11 @@
             "type": "command",
             "command": "bash .claude/hooks/lint_check.sh",
             "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/mkdocs_build.sh",
+            "timeout": 60
           }
         ]
       }
