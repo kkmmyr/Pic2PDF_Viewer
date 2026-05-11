@@ -71,9 +71,12 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                             [Ollama localhost:11434]
                             ├─ bge-m3              (embedding)
                             ├─ gemma4:e4b          (主要登場人物 + チャンク位置説明: 短答型)
-                            └─ qwen3.6-iq4xs       (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル, IQ4_XS 量子化)
+                            └─ qwen3.6-iq4xs       (rollback only。既定では未使用、B-14/ADR-0009)
+
+                            [llama-server 127.0.0.1:11435]   ← B-14 / ADR-0009 で採用
+                            └─ qwen3.6-iq4xs       (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル, IQ4_XS GGUF)
                                   ▲
-                                  │ 共通モジュール経由
+                                  │ 共通モジュール経由（QWEN_BACKEND で 2 系統切替）
                               [D:\61.tool\common\Qwen\lib\qwen_client.py]
 
 [StaticFiles] /kindle_novel/images/{書籍名}/{連番}.png  (既存マウント流用)
@@ -670,18 +673,21 @@ def search_book_summaries(
 
 ## 7. 質問応答（`llm.py`）
 
-### 7.1. Qwen SSE ストリーミング（共通モジュール経由）
+### 7.1. Qwen SSE ストリーミング（共通モジュール経由、2 バックエンド切替）
 
 - LLM クライアントは `D:\61.tool\common\Qwen\lib\qwen_client.py` の `astream_ask()` を直接呼ぶ
 - `llm.py` 自体は薄いラッパで、Pic2PDF 固有の `LLM_OPTIONS` を渡しつつイベントを yield する
-- 共通モジュール側で **Qwen3.x の thinking モデル必須要件**（`stream=True` / `think=False` を毎回送る、`num_predict` を thinking で食い潰されない値にする）を担保している
-- レスポンスは NDJSON。各行を `event: token` / `data: {...}` 形式の SSE に変換してフロントへ流す
+- **B-14 / ADR-0009 で `QWEN_BACKEND` 切替を追加**（既定 `llama_server`、ロールバック用 `ollama`）。バックエンド分岐・OpenAI 互換 SSE → Ollama 形式イベントの正規化・thinking 抑制（`chat_template_kwargs.enable_thinking=false`）はすべて共通モジュール側に集約
+- 共通モジュール側で **Qwen3.x の thinking モデル必須要件**（thinking 抑制・`stream=True`・`num_predict` を thinking で食い潰されない値にする）を担保している
+- レスポンスは正規化された dict。`{response, done, done_reason, prompt_eval_count, eval_count}` の Ollama 互換形式で yield されるため、利用側は分岐を意識せず従来通り `event.get("response")` / `event.get("done")` のまま使える
 - 完了後（`done: true` 受信時）に履歴を保存
 
 ```python
 # services/novel_db/llm.py（抜粋）
 import os, sys
 os.environ.setdefault("QWEN_OLLAMA_BASE_URL", NOVEL_DB_OLLAMA_BASE_URL)
+os.environ.setdefault("QWEN_BACKEND", NOVEL_DB_LLM_BACKEND)            # B-14
+os.environ.setdefault("QWEN_LLAMA_SERVER_BASE_URL", NOVEL_DB_LLAMA_SERVER_URL)  # B-14
 sys.path.insert(0, r"D:\61.tool\common\Qwen\lib")
 from qwen_client import astream_ask as _astream_ask
 
@@ -690,7 +696,19 @@ async def stream_qa(prompt, *, model=NOVEL_DB_LLM_MODEL, options=None, timeout=6
         yield event
 ```
 
-なぜ共通モジュールに切り出したかは [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md) を参照。
+**バックエンド構成（採用後）**:
+
+| コンポーネント | バックエンド | ポート | 用途 |
+|---|---|---|---|
+| Qwen3.6-IQ4_XS | **llama.cpp llama-server** | 11435 | RAG 質問応答 + 書籍俯瞰サマリ生成 |
+| gemma4:e4b | Ollama | 11434 | 主要登場人物抽出 / Contextual Retrieval ctx 生成 / Query Expansion |
+| bge-m3 | Ollama | 11434 | 埋め込み |
+
+llama-server は Windows タスクスケジューラの `llama-server-qwen` タスク（ONLOGON トリガ、Limited 権限）で自動起動される。起動コマンドは `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat`。
+
+**ロールバック**: `NOVEL_DB_LLM_BACKEND=ollama` で 1 行で戻る（Ollama 側に `qwen3.6-iq4xs` モデルを残置している）。
+
+なぜ共通モジュールに切り出したかは [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)、なぜ llama-server に切り替えたかは [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) を参照。実機ベンチで応答 5× 短縮を確認している。
 
 ### 7.2. プロンプト構築
 

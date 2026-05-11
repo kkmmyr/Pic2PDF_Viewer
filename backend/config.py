@@ -44,11 +44,18 @@ KINDLE_NOVEL_IMAGES_DIR    = os.path.join(KINDLE_NOVEL_DIR, "images")
 NOVEL_DB_DIR  = os.path.join(DATA_DIR, "novel_db")
 NOVEL_DB_PATH = os.path.join(NOVEL_DB_DIR, "novel.db")
 
-# Novel DB の埋め込みモデル / LLM（Ollama）
+# Novel DB の埋め込みモデル / LLM
+# 埋め込み (bge-m3) と軽量 LLM (Gemma 4) は Ollama 経由。
+# 重量 LLM (Qwen) は B-14 / ADR-0009 で llama-server に切り替え済み（Ollama は rollback 用に残置）。
 NOVEL_DB_OLLAMA_BASE_URL = os.environ.get("NOVEL_DB_OLLAMA_BASE_URL", "http://localhost:11434")
 NOVEL_DB_EMBED_MODEL     = os.environ.get("NOVEL_DB_EMBED_MODEL", "bge-m3")
 NOVEL_DB_EMBED_DIM       = 1024  # bge-m3 の出力次元
 NOVEL_DB_LLM_MODEL       = os.environ.get("NOVEL_DB_LLM_MODEL", "qwen3.6-iq4xs")
+# B-14 / ADR-0009: Qwen の推論バックエンドを切替（'llama_server' / 'ollama'）。
+# 既定は llama_server（実機ベンチで tg 5× 高速化、scope=all 応答 24s→14s）。
+# rollback は NOVEL_DB_LLM_BACKEND=ollama で 1 行（環境変数）。
+NOVEL_DB_LLM_BACKEND      = os.environ.get("NOVEL_DB_LLM_BACKEND", "llama_server")
+NOVEL_DB_LLAMA_SERVER_URL = os.environ.get("NOVEL_DB_LLAMA_SERVER_URL", "http://127.0.0.1:11435")
 # 主要登場人物抽出用の軽量モデル（短答型タスク。thinking で num_predict を
 # 消費する 26b と異なり、e4b は応答が速く character 抽出に向く）
 NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gemma4:e4b")

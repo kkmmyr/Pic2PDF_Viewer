@@ -1,10 +1,15 @@
-"""Ollama 上の LLM (現状 qwen3.6:35b-a3b) への SSE ストリーミング呼び出し。
+"""Qwen LLM への SSE ストリーミング呼び出し。
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §7。
+詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §7 と
+ADR-0009（推論バックエンド切替）。
 
-Qwen3.x 系は thinking モデルのため、`stream=True` / `think=False` を併用する必要がある。
-この地雷を踏み抜く処理は `D:\\61.tool\\common\\Qwen` の共通モジュールに集約しているため、
-ここからは `astream_ask` を呼ぶだけにしている。
+Qwen3.x 系は thinking モデルのため、`stream=True` + thinking 抑制（Ollama では
+`think=False`、llama-server では `chat_template_kwargs.enable_thinking=false`）を
+両方そろえる必要がある。この地雷を踏み抜く処理は `D:\\61.tool\\common\\Qwen` の
+共通モジュールに集約しているため、ここからは `astream_ask` を呼ぶだけにしている。
+
+B-14 / ADR-0009 で Qwen のデフォルトバックエンドを llama-server に変更。
+ロールバックは `NOVEL_DB_LLM_BACKEND=ollama` の 1 行。
 """
 from __future__ import annotations
 
@@ -14,6 +19,8 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from config import (
+    NOVEL_DB_LLAMA_SERVER_URL,
+    NOVEL_DB_LLM_BACKEND,
     NOVEL_DB_LLM_MODEL,
     NOVEL_DB_OLLAMA_BASE_URL,
     NOVEL_DB_QA_NUM_CTX,
@@ -21,10 +28,12 @@ from config import (
 
 from .search import Scope, SearchHit
 
-# 共通 Qwen モジュールに Pic2PDF の Ollama URL を伝える。
-# qwen_client は import 時に config.OLLAMA_BASE_URL を読み込むため、
-# 必ず import 前に環境変数を設定する。
+# 共通 Qwen モジュールに Pic2PDF 側の設定をブリッジする。
+# qwen_client は呼び出し時に os.environ を都度読むため、import 前に確定させればよい。
+# setdefault を使うのは、外部から QWEN_* を直接渡された場合（ベンチ等）を尊重するため。
 os.environ.setdefault("QWEN_OLLAMA_BASE_URL", NOVEL_DB_OLLAMA_BASE_URL)
+os.environ.setdefault("QWEN_BACKEND", NOVEL_DB_LLM_BACKEND)
+os.environ.setdefault("QWEN_LLAMA_SERVER_BASE_URL", NOVEL_DB_LLAMA_SERVER_URL)
 
 # 共通 Qwen モジュールの lib/ を sys.path に直接追加する。
 # Qwen の config.py を import する流儀（Gemma 4 流）も用意されているが、
@@ -37,6 +46,9 @@ from qwen_client import astream_ask as _astream_ask  # noqa: E402
 
 # PoC で確定した LLM パラメータ。num_ctx は config 化されており、B-13 段階 A で
 # 既定 16384 に拡大（従来 8192 では top_k=32 + 全 11 冊サマリで切り詰めが発生していた）。
+# 注意: llama-server バックエンドでは num_ctx は起動時 `-c` で決まるため、ここで
+# 渡しても無視される（指定しても害はない）。env が llama_server の場合は
+# start-qwen-server.bat 側で `-c 18432` を変更すること。
 LLM_OPTIONS: dict[str, Any] = {
     "temperature": 0.2,
     "repeat_penalty": 1.2,
@@ -157,11 +169,11 @@ async def stream_qa(
     options: dict | None = None,
     timeout: float = 600.0,
 ) -> AsyncIterator[dict]:
-    """Ollama /api/generate に stream=True で投げ、各 NDJSON イベントを yield する。
+    """Qwen に stream=True で投げ、各イベントを yield する。
 
     実体は共通 Qwen モジュール（D:\\61.tool\\common\\Qwen）の `astream_ask` を呼ぶ
-    だけ。`think=False` / `stream=True` の制御や httpx の取り回しは共通側に集約
-    している。
+    だけ。バックエンド分岐（Ollama / llama-server）、thinking 抑制、SSE→Ollama 形式の
+    正規化はすべて共通側に集約している。
     """
     async for event in _astream_ask(
         prompt,
