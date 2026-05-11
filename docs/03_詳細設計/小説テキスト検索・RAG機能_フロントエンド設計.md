@@ -272,9 +272,14 @@ function NovelDbPage() {
 
 - 時系列降順
 - `QuestionHistoryItem` は折りたたみ展開（`<details>` + `<summary>` ベース）
-    - 折りたたみ時: 質問テキスト先頭 60 字 + タイムスタンプ + スコープ
+    - 折りたたみ時: 質問テキスト先頭 60 字 + **JST タイムスタンプ** + **応答時間** + スコープ
     - 展開時: 回答全文 + 引用ページ番号（クリックで PageImageModal 起動）+ 削除ボタン
 - 削除ボタン → `<ConfirmDialog>` で確認 → DELETE API → 一覧再フェッチ
+
+**タイムスタンプの取り扱い** (2026-05-11 追記):
+- バックエンドは SQLite `datetime('now')` で保存しており、出力形式は `"2026-05-11 13:30:45"`（タイムゾーン情報なし、実体は **UTC**）
+- JS の `new Date(s)` がこの形式をローカル時刻として誤解釈する事故を防ぐため、frontend では [`utils/date.ts`](../../frontend/src/utils/date.ts) に `parseSqliteUtc` / `formatSqliteUtcAsJst` / `formatElapsedSeconds` を集約
+- `QuestionHistoryItem` は `formatSqliteUtcAsJst(asked_at)` で JST 表示し、`formatElapsedSeconds(asked_at, finished_at)` で応答時間（例: 「2 分 50 秒」「1 時間 1 分」）を併記
 
 ### 5.7. `PageImageModal`
 

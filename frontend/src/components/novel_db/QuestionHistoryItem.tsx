@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
 import { fetchQaHistoryDetail } from '../../features/novel_db/api';
 import type { QaHistoryDetail, QaHistoryEntry } from '../../features/novel_db/types';
+import { formatElapsedSeconds, formatSqliteUtcAsJst } from '../../utils/date';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 
 interface Props {
@@ -52,7 +53,20 @@ export default function QuestionHistoryItem({ entry, onDelete, onOpenImage }: Pr
                         {entry.question}
                     </div>
                     <div className="flex gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        <span>{entry.asked_at?.replace('T', ' ').slice(0, 16)}</span>
+                        <span title="質問日時 (JST)">{formatSqliteUtcAsJst(entry.asked_at)}</span>
+                        {(() => {
+                            const elapsed = formatElapsedSeconds(
+                                entry.asked_at,
+                                entry.finished_at,
+                            );
+                            if (!elapsed) return null;
+                            return (
+                                <>
+                                    <span>·</span>
+                                    <span title="応答にかかった時間">応答 {elapsed}</span>
+                                </>
+                            );
+                        })()}
                         <span>·</span>
                         <span>{scopeLabel(entry)}</span>
                         {entry.done_reason && entry.done_reason !== 'stop' && (
