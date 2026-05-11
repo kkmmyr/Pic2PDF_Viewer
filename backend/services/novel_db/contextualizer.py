@@ -11,16 +11,19 @@ LLM 選定:
 - 既定: `gemma4:e4b`（NOVEL_DB_CONTEXT_MODEL）
 - 品質不足なら `qwen3.6:35b-a3b` にフォールバック（環境変数で切替）
 
+LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local_llm` の
+`OllamaBackend` 経由に集約。
+
 詳細は docs/01_要件定義/機能追加候補.md B-9 / 同設計書 §6.5（書籍サマリベクトル
 検索）と並ぶ「検索品質改善 2 段目」。
 """
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
+from local_llm import LLMError
 
-from config import NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_OLLAMA_BASE_URL
+from config import NOVEL_DB_CONTEXT_MODEL
+
+from ._llm_backend import build_ollama_backend
 
 # Anthropic 流のプロンプト。書名・俯瞰サマリ・チャンク本文を与えて
 # 「retrieval のための簡潔な位置説明」を返してもらう。
@@ -34,7 +37,7 @@ _CONTEXT_PROMPT = """以下は小説『{book_name}』の俯瞰サマリと、そ
 - 何が起きているかの一言
 
 避けるべきこと:
-- 前置き（「以下が〜」「このチャンクは〜」等）
+- 前置き（「以下が〜」「このチャンクは〜」等)
 - チャンク本文の引用そのまま
 - 余計な解説
 
@@ -48,6 +51,17 @@ _CONTEXT_PROMPT = """以下は小説『{book_name}』の俯瞰サマリと、そ
 
 _TIMEOUT_SEC = 120
 _MAX_CHUNK_CHARS = 1200  # チャンク先頭のみを送信（プロンプト長を抑える）
+
+# 80 字程度の位置説明 + 余裕。短答型のため num_predict / num_ctx を抑える
+_OPTIONS = {
+    "temperature": 0.2,
+    "repeat_penalty": 1.15,
+    "num_predict": 256,
+    "num_ctx": 8192,
+}
+
+# プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
+_BACKEND = build_ollama_backend(NOVEL_DB_CONTEXT_MODEL, timeout=_TIMEOUT_SEC)
 
 
 def generate_chunk_context(
@@ -82,42 +96,12 @@ def generate_chunk_context(
         book_summary=book_summary,
         chunk_text=chunk_text[:_MAX_CHUNK_CHARS],
     )
-    body = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": True,
-        "think": False,
-        "options": {
-            "temperature": 0.2,
-            "repeat_penalty": 1.15,
-            "num_predict": 256,   # 80 字程度の位置説明 + 余裕
-            "num_ctx": 8192,
-        },
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        f"{NOVEL_DB_OLLAMA_BASE_URL}/api/generate",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_SEC) as resp:
-            parts: list[str] = []
-            for raw in resp:
-                line = raw.decode("utf-8").strip()
-                if not line:
-                    continue
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if event.get("response"):
-                    parts.append(event["response"])
-                if event.get("done"):
-                    break
-            return _clean_response("".join(parts))
-    except urllib.error.URLError:
+        answer = _BACKEND.ask(prompt, model=model, options=_OPTIONS)
+    except LLMError:
         return ""
+
+    return _clean_response(answer)
 
 
 def _clean_response(text: str) -> str:

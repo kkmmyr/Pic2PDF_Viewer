@@ -9,19 +9,21 @@ LLM 選定:
 - Qwen3.6:35b-a3b だと +30〜60 秒のペナルティだが、gemma4:e4b なら +3〜5 秒
 - `NOVEL_DB_QA_EXPAND_MODEL` 環境変数で切替可
 
+LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local_llm` の
+`OllamaBackend` 経由に集約。
+
 詳細は docs/01_要件定義/機能追加候補.md B-11 / 同設計書 §7.4 を参照。
 """
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
+from local_llm import LLMError
 
 from config import (
-    NOVEL_DB_OLLAMA_BASE_URL,
     NOVEL_DB_QA_EXPAND_MODEL,
     NOVEL_DB_QA_EXPAND_N,
 )
+
+from ._llm_backend import build_ollama_backend
 
 _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意味検索するための短い検索クエリを {n} 個生成してください。
 
@@ -37,6 +39,17 @@ _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意
 検索クエリ（{n} 行）:"""
 
 _TIMEOUT_SEC = 60
+
+# 短答型（150 字程度）。temperature は多様性を少し上げる
+_OPTIONS = {
+    "temperature": 0.3,
+    "repeat_penalty": 1.2,
+    "num_predict": 256,
+    "num_ctx": 4096,
+}
+
+# プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
+_BACKEND = build_ollama_backend(NOVEL_DB_QA_EXPAND_MODEL, timeout=_TIMEOUT_SEC)
 
 
 def expand_query(
@@ -65,41 +78,9 @@ def expand_query(
         return [question]
 
     prompt = _EXPAND_PROMPT.format(question=question.strip(), n=n - 1)
-    body = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": True,
-        "think": False,
-        "options": {
-            "temperature": 0.3,   # 多様性を少し上げる（同じ展開ばかり出るのを防ぐ）
-            "repeat_penalty": 1.2,
-            "num_predict": 256,
-            "num_ctx": 4096,
-        },
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        f"{NOVEL_DB_OLLAMA_BASE_URL}/api/generate",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_SEC) as resp:
-            parts: list[str] = []
-            for raw in resp:
-                line = raw.decode("utf-8").strip()
-                if not line:
-                    continue
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if event.get("response"):
-                    parts.append(event["response"])
-                if event.get("done"):
-                    break
-            response = "".join(parts).strip()
-    except urllib.error.URLError:
+        response = _BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
+    except LLMError:
         return [question]
 
     expansions = _parse_expansions(response, target_n=n - 1)

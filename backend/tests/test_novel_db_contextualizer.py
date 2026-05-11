@@ -41,28 +41,44 @@ def test_clean_response_returns_empty_for_empty_input():
 
 def test_generate_returns_empty_for_empty_chunk():
     """空チャンクは LLM を呼ばずに空文字を返す。"""
-    with patch("urllib.request.urlopen") as mock_urlopen:
+    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
         out = generate_chunk_context("book", "summary", "")
     assert out == ""
-    mock_urlopen.assert_not_called()
+    mock_ask.assert_not_called()
 
 
 def test_generate_returns_empty_when_summary_missing():
     """書籍サマリ未生成のときは LLM を呼ばずに空文字を返す。"""
-    with patch("urllib.request.urlopen") as mock_urlopen:
+    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
         out = generate_chunk_context("book", "", "本文があるよ")
     assert out == ""
-    mock_urlopen.assert_not_called()
+    mock_ask.assert_not_called()
 
 
 def test_generate_handles_llm_error_gracefully():
-    """LLM 接続エラー時は空文字を返す（例外を伝播させない）。"""
-    import urllib.error
+    """LLM 接続エラー時 (LLMError) は空文字を返す（例外を伝播させない）。"""
+    from local_llm import LLMError
 
-    with patch("urllib.request.urlopen") as mock_urlopen:
-        mock_urlopen.side_effect = urllib.error.URLError("connection refused")
+    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
+        mock_ask.side_effect = LLMError("Ollama request failed: connection refused")
         out = generate_chunk_context("book", "summary", "本文")
     assert out == ""
+
+
+def test_generate_calls_backend_with_prompt_and_options():
+    """_BACKEND.ask に書籍名・サマリ・チャンクを含むプロンプトと適切な options が渡る。"""
+    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
+        mock_ask.return_value = "page 50 の対話シーン"
+        out = generate_chunk_context("テスト書籍", "サマリ本文", "チャンク本文")
+
+    assert out == "page 50 の対話シーン"
+    assert mock_ask.call_count == 1
+    prompt = mock_ask.call_args.args[0]
+    assert "テスト書籍" in prompt
+    assert "サマリ本文" in prompt
+    assert "チャンク本文" in prompt
+    # 短答型なので num_predict は控えめ
+    assert mock_ask.call_args.kwargs["options"]["num_predict"] == 256
 
 
 # ---------------------------------------------------------------------------

@@ -1,7 +1,23 @@
 # LLM 層リファクタリング計画
 
 最終更新: 2026-05-11
-ステータス: **Phase A 完了**（A-0〜A-7 全段階終了、2026-05-11）
+ステータス: **Phase A + Phase B 完了**（2026-05-11、Phase C は user 判断待ち）
+
+## Phase B 完了サマリ
+
+| 段階 | 内容 | 結果 |
+|---|---|---|
+| **B-1** | `_llm_backend.py` に `build_ollama_backend(model, *, timeout)` ヘルパー追加 | ✅ |
+| **B-2** | `character_extractor.py` を `OllamaBackend.ask()` に移行（urllib 削除） | ✅ |
+| **B-3** | `contextualizer.py` を同様に移行 | ✅ |
+| **B-4** | `query_expander.py` を同様に移行 | ✅ |
+| **B-5** | 各ファイルのテスト書き換え（`urllib.request.urlopen` mock → `_BACKEND.ask` mock） | ✅ |
+| **B-6** | 設計書 §5.6 / §5.8 / §7.4 更新 | ⏭️ 不要（実装詳細ではなく振る舞い記述で抽象化済み） |
+
+**最終検証**:
+- backend: 732 件 pass（Phase A 完了時 730 件 + 2、新テスト追加分）
+- ruff: 全変更ファイル clean
+- 重複コード（urllib ボディ組み立て + json parse + ストリーム読み × 3 ファイル）が消滅
 
 ## Phase A 完了サマリ
 
@@ -358,7 +374,7 @@ A-0 はグローバル設定 (`~/.claude.json`) を変更するため、Phase A 
 
 ---
 
-## 4. Phase B スコープ予告（Gemma 共通化）
+## 4. Phase B（Gemma 共通化、2026-05-11 着手）
 
 Phase A 完了後に着手。
 
@@ -367,12 +383,55 @@ Phase A 完了後に着手。
   [query_expander.py](../../backend/services/novel_db/query_expander.py)
   の **urllib 直叩き 3 箇所**
 - 現状: 各ファイルで Ollama API ボディ組み立て + ストリーム読み + json parse がほぼコピペ
-- 方針: Phase A の `OllamaBackend` を流用し、3 ファイルは `OllamaBackend.ask(prompt, options=...)` を呼ぶだけにする
-- 検討: 共通モジュールを `D:\61.tool\common\Gemma 4\` にも追加するか、
-  Pic2PDF 内部の `services/novel_db/_gemma_backend.py` に閉じるか
-  （`Gemma 4/lib/ollama_client.py` は既存だが think=True 固定で別物。統合判断を Phase B 設計時に行う）
 
-設計書は Phase A 完了後に「LLM 層リファクタリング計画 Phase B」として別ファイルで起こす。
+### 4.1. 実装方針
+
+**重要な発見**: Phase A で作った `OllamaBackend` がそのまま使える。Gemma は
+Ollama 経由なので、共通モジュール (`local_llm`) 側に追加実装は不要。当初検討して
+いた「`D:\61.tool\common\Gemma 4\` に共通モジュール追加」は **不要**（`local_llm`
+パッケージが Backend を model 非依存に提供しているため）。
+
+`Gemma 4/lib/ollama_client.py`（既存、Pic2PDF とは別プロジェクトで利用）は
+think=True 固定で別物。Pic2PDF 側 3 ファイルは `local_llm.OllamaBackend` を
+think=False で使う想定なので、Gemma 4 側は触らない。
+
+### 4.2. 段階分割
+
+| 段階 | 内容 | 後方互換 |
+|---|---|---|
+| **B-1** | `_llm_backend.py` に `build_ollama_backend(model, *, timeout)` ヘルパーを追加 | あり |
+| **B-2** | `character_extractor.py` を `OllamaBackend.ask()` に移行（urllib スカフォールディング削除） | あり（API 不変） |
+| **B-3** | `contextualizer.py` を同様に移行 | あり |
+| **B-4** | `query_expander.py` を同様に移行 | あり |
+| **B-5** | 各ファイルのテスト書き換え（`urllib.request.urlopen` mock → `_BACKEND.ask` mock） | — |
+| **B-6** | ドキュメント追記（設計書 §5.6 / §5.8 / §7.4）| — |
+
+### 4.3. 設計上の決定
+
+- 各ファイルで Backend インスタンスを module top で 1 つ持つ（`_BACKEND = build_ollama_backend(MODEL, timeout=...)`）。Backend は stateless なので 3 インスタンスでも害なし、Phase A の Pic2PDF 側パターンと統一
+- 応答テキストのパース部 (`_parse_names` / `_clean_response` / `_parse_expansions`) は各ファイル固有のドメインロジックなので **各ファイルに残す**。共通化のメリットなし
+- timeout は呼び出しごとに違う（character: 120s、contextualizer: 120s、query_expander: 60s）ので `BackendConfig.timeout` で個別指定
+- `options`（temperature, num_predict, num_ctx 等）は呼び出し時に `backend.ask(prompt, options={...})` で渡す（PoC で確定した値を維持）
+
+### 4.4. 影響ファイル
+
+**変更**:
+- `backend/services/novel_db/_llm_backend.py`（B-1: `build_ollama_backend` 追加）
+- `backend/services/novel_db/character_extractor.py`（B-2）
+- `backend/services/novel_db/contextualizer.py`（B-3）
+- `backend/services/novel_db/query_expander.py`（B-4）
+- `backend/tests/test_novel_db_character_extractor.py`（B-5）
+- `backend/tests/test_novel_db_contextualizer.py`（B-5）
+- `backend/tests/test_novel_db_query_expander.py`（B-5）
+- `docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md` §5.6 / §5.8 / §7.4（B-6）
+
+### 4.5. 完了条件
+
+- [ ] 3 ファイルから `import json`, `import urllib.error`, `import urllib.request` が消える
+- [ ] 各ファイルで `_BACKEND = build_ollama_backend(...)` が module level で 1 つ
+- [ ] 既存テストが pass（mock target を `_BACKEND.ask` に置換）
+- [ ] backend 全 730 件 pass を維持
+- [ ] ruff clean
 
 ---
 

@@ -4,15 +4,19 @@
 回答へのコンテキストヒントとして利用し、誤帰属（page 110 のデュークの行動を
 レティの行動と統合する等）を抑制する。
 
+LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local_llm` の
+`OllamaBackend` 経由に集約。urllib 直叩きを廃止して thinking 抑制と SSE 解析を
+共通モジュールに任せる。
+
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md。
 """
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
+from local_llm import LLMError
 
-from config import NOVEL_DB_CHAR_EXTRACT_MODEL, NOVEL_DB_OLLAMA_BASE_URL
+from config import NOVEL_DB_CHAR_EXTRACT_MODEL
+
+from ._llm_backend import build_ollama_backend
 
 EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大 3 名挙げてください。
 判断基準:
@@ -33,9 +37,20 @@ EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大
 _TEXT_HEAD_LIMIT = 1500
 _TIMEOUT_SEC = 120
 
+# 1 ページあたりの抽出は短答型なので num_predict / num_ctx を抑える
+_OPTIONS = {
+    "temperature": 0.2,
+    "repeat_penalty": 1.2,
+    "num_predict": 4096,
+    "num_ctx": 8192,
+}
+
+# プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
+_BACKEND = build_ollama_backend(NOVEL_DB_CHAR_EXTRACT_MODEL, timeout=_TIMEOUT_SEC)
+
 
 def extract_main_characters(
-    text: str, *, model: str = NOVEL_DB_CHAR_EXTRACT_MODEL
+    text: str, *, model: str = NOVEL_DB_CHAR_EXTRACT_MODEL,
 ) -> list[str]:
     """ページテキストから主要登場人物のリストを返す（同期）。
 
@@ -43,51 +58,20 @@ def extract_main_characters(
 
     `gemma4:26b` 等の thinking モデルを使うと、thinking ブロックで num_predict を
     消費して response が空になることがある。デフォルトでは軽量な `gemma4:e4b` を
-    使用し、加えて `think=false` を渡して thinking を抑止する。
+    使用し、加えて `think=false`（`OllamaBackend` の既定）を渡して thinking を抑止する。
+
+    `model` は呼び出し時に上書き可能（テストや実験で別モデルを試す用途）。
     """
     if not text or len(text.strip()) < 30:
         return []
 
     prompt = EXTRACT_PROMPT.format(text=text[:_TEXT_HEAD_LIMIT])
-    body = json.dumps({
-        "model": model,
-        "prompt": prompt,
-        "stream": True,
-        "think": False,  # thinking モデル対応（無視されても安全）
-        "options": {
-            "temperature": 0.2,
-            "repeat_penalty": 1.2,
-            "num_predict": 4096,
-            "num_ctx": 8192,
-        },
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        f"{NOVEL_DB_OLLAMA_BASE_URL}/api/generate",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    response_parts: list[str] = []
     try:
-        with urllib.request.urlopen(req, timeout=_TIMEOUT_SEC) as resp:
-            for raw in resp:
-                line = raw.decode("utf-8").strip()
-                if not line:
-                    continue
-                try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if event.get("response"):
-                    response_parts.append(event["response"])
-                if event.get("done"):
-                    break
-    except urllib.error.URLError:
+        answer = _BACKEND.ask(prompt, model=model, options=_OPTIONS)
+    except LLMError:
         return []
 
-    answer = "".join(response_parts).strip()
-    return _parse_names(answer)
+    return _parse_names(answer.strip())
 
 
 def _parse_names(text: str) -> list[str]:

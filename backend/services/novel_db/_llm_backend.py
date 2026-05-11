@@ -31,6 +31,24 @@ from local_llm import (  # noqa: E402
 import config  # noqa: E402
 
 
+def build_ollama_backend(model: str, *, timeout: int = 600) -> OllamaBackend:
+    """指定モデル用の `OllamaBackend` を 1 つ作る（Phase B、Gemma 系で利用）。
+
+    Gemma 系（character_extractor / contextualizer / query_expander）は
+    全部 Ollama 経由なので、`OllamaBackend` をそのまま流用できる。モデル名と
+    timeout だけ呼び出し側で指定する。
+
+    `BackendConfig.default_options` は Backend 既定（num_predict=8192 等）を
+    使用する。各サービスは `backend.ask(prompt, options=...)` で呼び出し時に
+    options を上書き（短答型タスクなら num_predict=256 等）する想定。
+    """
+    return OllamaBackend(BackendConfig(
+        base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
+        model=model,
+        timeout=timeout,
+    ))
+
+
 def build_qwen_backend() -> Backend:
     """`config.py` の `NOVEL_DB_*` 値から Qwen 用 `Backend` を 1 つ構築する。
 

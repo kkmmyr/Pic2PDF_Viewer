@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 from services.novel_db.character_extractor import _parse_names, extract_main_characters
 
-
 # ---------------------------------------------------------------------------
 # _parse_names
 # ---------------------------------------------------------------------------
@@ -69,39 +68,30 @@ def test_extract_returns_empty_for_too_short_text():
     assert extract_main_characters("短い") == []
 
 
-def test_extract_calls_ollama_and_parses_response():
-    """urlopen をモックして、ストリーミング応答を _parse_names に渡せることを確認。"""
-    # 各行が NDJSON。ストリーミング形式（stream=True 想定）。
-    stream_lines = [
-        '{"response": "レティ"}',
-        '{"response": ", "}',
-        '{"response": "デューク"}',
-        '{"done": true, "done_reason": "stop"}',
-    ]
+def test_extract_calls_backend_and_parses_response():
+    """_BACKEND.ask をモックして、Backend 集約済み応答を _parse_names に渡せることを確認。
 
-    class FakeStreamResp:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return False
-
-        def __iter__(self):
-            return iter(line.encode("utf-8") + b"\n" for line in stream_lines)
-
-    with patch("services.novel_db.character_extractor.urllib.request.urlopen") as urlopen:
-        urlopen.return_value = FakeStreamResp()
+    Phase B（2026-05-11）以降、urllib 直叩きから OllamaBackend 経由に切替。
+    Backend 内部のストリーミング解析は common/llm 側でテスト済み（test_local_llm.py）。
+    """
+    with patch("services.novel_db.character_extractor._BACKEND.ask") as mock_ask:
+        mock_ask.return_value = "レティ, デューク"
         result = extract_main_characters("これは十分に長い本文テキストです。" * 5)
 
     assert result == ["レティ", "デューク"]
+    # Backend にプロンプトと options が渡されている
+    assert mock_ask.call_count == 1
+    call_kwargs = mock_ask.call_args.kwargs
+    assert call_kwargs["options"]["num_predict"] == 4096
+    assert "ページテキスト:" in mock_ask.call_args.args[0]
 
 
-def test_extract_returns_empty_on_url_error():
-    """Ollama 接続失敗時は例外を伝播せず空リストを返す。"""
-    import urllib.error
+def test_extract_returns_empty_on_llm_error():
+    """Ollama 接続失敗時 (LLMError) は例外を伝播せず空リストを返す。"""
+    from local_llm import LLMError
 
-    with patch("services.novel_db.character_extractor.urllib.request.urlopen") as urlopen:
-        urlopen.side_effect = urllib.error.URLError("connection refused")
+    with patch("services.novel_db.character_extractor._BACKEND.ask") as mock_ask:
+        mock_ask.side_effect = LLMError("Ollama request failed: connection refused")
         result = extract_main_characters("これは十分に長い本文テキストです。" * 5)
 
     assert result == []
