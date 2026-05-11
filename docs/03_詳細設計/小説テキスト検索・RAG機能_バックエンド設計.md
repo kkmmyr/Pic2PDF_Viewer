@@ -2,7 +2,7 @@
 
 novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は [要件定義: 小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
 
-最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替 / B-13 段階 A→B で QA num_ctx を 32768 化・top_k を 64 / max_per_book を 5 に拡大 / B-14 で llama-server に切替）
+最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替 / B-13 段階 A→B→C で QA num_ctx を 段階拡大、scope=book は全 page 読み（`-c 131072 -ncmoe 28` canonical）/ B-14 で llama-server に切替 / 質問履歴を JST 表示 + 応答時間併記）
 
 ---
 
@@ -660,9 +660,9 @@ def search_book_summaries(
 |---|---|---|
 | `min_chars` | `NOVEL_DB_MIN_BODY_CHARS = 300` | `pages.char_count` がこの値未満のページを除外。章扉・目次・人物紹介の薄い 1 ページを弾く |
 | `body_page_margin` | `NOVEL_DB_BODY_PAGE_MARGIN = 5` | 各書籍の **先頭・末尾 N ページ** を除外。表紙・口絵・あとがき・解説・奥付を弾く |
-| `max_per_book` | `NOVEL_DB_QA_MAX_PER_BOOK = 2` | 1 書籍あたりの取得上限。`scope=all` / `scope=series` で特定書籍に偏らないよう均等化 |
+| `max_per_book` | `NOVEL_DB_QA_MAX_PER_BOOK = 5` | 1 書籍あたりの取得上限。`scope=all` / `scope=series` で特定書籍に偏らないよう均等化（B-13 段階 B で 2 → 5 に拡大、同書籍に集中する質問で深さ向上）|
 
-`top_k` のデフォルトも引き上げた（`NOVEL_DB_QA_TOP_K = 32`、B-13 段階 A で 2026-05-11 に 16 → 32 に拡大）。フィルタで弾かれた分を見越して多めに取り、`max_per_book` で書籍を分散させる方針。`max_per_book = 2` のままで `top_k = 32` を満たすには 16 冊以上の書籍が必要なので、現状 11 冊では `max_per_book` を超える前に書籍数で上限に達する（実際の取得件数は最大でも 22 件程度）。
+`top_k` のデフォルトも段階的に引き上げた（`NOVEL_DB_QA_TOP_K = 64`、B-13 段階 A で 16 → 32、段階 B で 32 → 64 に拡大）。フィルタで弾かれた分を見越して多めに取り、`max_per_book = 5` で書籍を分散させる方針。11 冊 × 5 = 最大 55 件取得可能（`top_k = 64` の枠内）。
 
 **フィルタの効き方の注意**:
 - `min_chars` を厳しくしすぎると挿絵が多い章でヒットを取り逃す。300 字は経験値（PoC で「短すぎる」と感じた境界）
@@ -799,7 +799,8 @@ LLM_OPTIONS = {
 
 段階 B では `top_k=64` のページ抜粋（~24k 字）+ 全 11 冊サマリ（~11k 字）+ システム
 プロンプト + 質問 ≒ **~40k 字 / ~25k tokens** に達するため、`num_ctx=32768` が必要。
-llama-server 側は `start-qwen-server.bat` で `-c 36864`（32768 + 余裕）として起動する。
+段階 B 用には `-c 36864` で運用していたが、段階 C 採用後の現在は **`-c 131072`**
+（scope=book 全 page 読み対応のため、scope=all/series でもヘッドルームが余るだけで実害なし）。
 
 `max_per_book=5` は段階 B で導入。scope=all/series でも同一書籍内のページを最大 5 件
 まで集め、同書籍に集中する質問（「この書籍の主人公の心情変化」等）に深く答えられる

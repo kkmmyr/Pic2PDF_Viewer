@@ -28,15 +28,19 @@
 - `ollama ps` で確認できる: `PROCESSOR    61%/39% CPU/GPU`
 - 「共有 GPU メモリ 15.6GB」は Windows の仕組み上の表示。Ollama を含む LLM 推論エンジンは速度的に使わない（PCIe 帯域 ~30GB/s vs 専用 VRAM ~700GB/s で 1/20）。CPU offload 部分は通常のシステム RAM + CPU 演算
 
-**性能への影響**:
+**性能への影響**（旧 Q4_K_M 27GB / Ollama 時代の値、参考）:
 - CPU 計算と CPU↔GPU 通信が速度律速
 - 実測生成速度: ~5.4 t/s（ctx=131k）/ ~13.8 t/s（ctx=8k）
 - num_ctx を上げても OOM しないのは、足りない分が CPU 側に流れるため（ただし遅くなる）
 
-**高速化したい場合の方針**:
-- より小さい量子化（IQ4_XS = ~22GB、Q3 = ~20GB）で CPU offload 比を減らす
-- MTP 変種で 1 forward あたりの生成トークン数を増やす
-- 詳細は機能追加候補 B-12
+**現状（2026-05-11、B-12 + B-14 + B-13 段階 C 採用後）**:
+
+採用した高速化策:
+- **B-12**: IQ4_XS 量子化（21GB）に切替で CPU offload を 61% → 49% に削減
+- **B-14**: 推論エンジンを Ollama → llama-server に切替。`-ncmoe / -ctk q8_0 / -ctv q8_0 / -fa 1` の組合せで応答時間 5× 短縮（[ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md)）
+- **B-13 段階 C**: `-c 131072` で書籍 1 冊（最大 87k tokens）丸読みに対応、`-ncmoe 28` で VRAM 70% 使用 + 30% ヘッドルームを確保
+
+結果として、scope=book の 1 冊丸読み（in_tok 78k）で **170 秒 / 9.8 t/s end-to-end**、短文 warm では **tg ~46 t/s** まで改善。詳細は §9.3 採用最適設定を参照。
 
 ---
 
@@ -127,18 +131,31 @@ PARAMETER top_p 0.95
 
 **ロールバック**: `NOVEL_DB_LLM_MODEL=qwen3.6:35b-a3b` を環境変数で指定。旧モデルは保険として削除しない。
 
-### 2.2 QA の num_ctx と切り詰め問題（B-13 段階 A、2026-05-11 採用）
+### 2.2 QA の num_ctx・top_k 段階拡大（B-13 段階 A → B → C、2026-05-11 採用）
 
 `llm.py:LLM_OPTIONS` の `num_ctx=8192` は PoC 当時の値だったが、B-5（書籍俯瞰サマリ）/ B-8（サマリ検索インデックス）追加で **scope=all の QA プロンプトが ~25k 字 / ~15k tokens** に膨らんでいた。実機ベンチマークで `prompt_eval_count` が **num_ctx 上限の 8,192 にぴったり張り付いている** ことが判明 = **入力時点で切り詰め発生**。
+
+これを契機に段階的に context を拡大した:
+
+| 段階 | num_ctx | top_k | max_per_book | scope=book 挙動 | llama-server `-c` / `-ncmoe` |
+|---|---:|---:|---:|---|---|
+| PoC | 8,192 | 16 | 2 | hybrid_search | (Ollama 時代) |
+| A | 16,384 | 32 | 2 | hybrid_search | -c 18432 / -ncmoe 16 |
+| B | 32,768 | 64 | 5 | hybrid_search | -c 36864 / -ncmoe 18 |
+| **C（既定）** | **32,768**（scope=all/series）<br/>**131,072**（scope=book） | **64** | **5** | **全 page 読み**（`NOVEL_DB_QA_FULL_BOOK_MODE`） | **-c 131072 / -ncmoe 28** |
+
+**段階 A の効果実測**:
 
 | 設定 | scope=all のプロンプト | 実 prompt_eval | 状況 |
 |---|---|---|---|
 | 旧（num_ctx=8192）| 16,676〜16,809 chars | **8,192 tok**（切詰）| 後半が捨てられ、Qwen が全文を見ていない |
-| 新（num_ctx=16384、B-13 段階 A）| 16,676〜16,809 chars | **10,833〜10,915 tok**（完全）| 全文を Qwen が受け取れる |
+| 新（num_ctx=16384、段階 A）| 16,676〜16,809 chars | **10,833〜10,915 tok**（完全）| 全文を Qwen が受け取れる |
 
-**応答時間の変動**: 想定 +20〜30% に対し、実測 -3% 〜 +12% でほぼ誤差範囲。切り詰め解消なのに遅くならない理由は、prompt processing が 680 t/s と高速 + そもそも切り詰め前の 8192 tok でも処理時間は近い（無駄に処理してた）から。
+応答時間の変動は想定 +20〜30% に対し、実測 -3% 〜 +12% でほぼ誤差範囲。切り詰め解消なのに遅くならない理由は、prompt processing が 680 t/s と高速 + そもそも切り詰め前の 8192 tok でも処理時間は近い（無駄に処理してた）から。
 
-**`NOVEL_DB_QA_TOP_K = 32`** も同時に採用（旧 16）。`max_per_book = 2` × 11 冊 = 上限 22 件まで実際は伸びる。
+**段階 B（B-14 後）**: B-14 の llama-server 切替で応答が 5× 速くなった分の余裕を使って `num_ctx=32768` / `top_k=64` / `max_per_book=5` に。同書籍に集中する質問への深さが向上。
+
+**段階 C（品質優先で本採用）**: scope=book で `load_all_pages_of_book()` が hybrid_search を bypass し、書籍の全 page を page_no 順で LLM に投げる。実測で 11 巻 = 87k tokens の本に対し 78k tokens 入力 / 170 秒 / 9.8 t/s end-to-end。本文 9 箇所以上から具体的セリフ引用付き分析が得られる（段階 B では 16 page = 2.8k tokens / 37 秒で浅め）。ロールバックは `NOVEL_DB_QA_FULL_BOOK_MODE=false` の env で段階 B 相当の hybrid_search に戻る。
 
 **注意**: `num_ctx=8192` 想定で動いていた頃の質問履歴（`qa_history.options_json`）と新設定後の履歴は同列に比較できない（前者は context が一部欠落している可能性）。
 

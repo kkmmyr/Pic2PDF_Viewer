@@ -1,6 +1,6 @@
 # ADR-0009: 小説 RAG の Qwen 推論バックエンドを Ollama から llama-server に切り替える
 
-- **Status**: Accepted
+- **Status**: Accepted（実装完了 2026-05-11、commit `a1eee28`）
 - **Date**: 2026-05-11
 - **決定者**: プロジェクトオーナー
 - **関連**: [ADR-0007](0007_llm-extraction-qwen-adoption.md) / [小説テキスト検索・RAG機能_バックエンド設計.md](../../03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md) / [小説RAG_技術知見.md](../../05_記録/小説RAG_技術知見.md) / [小説RAG_LLMバックエンド切替設計案.md](../../03_詳細設計/小説RAG_LLMバックエンド切替設計案.md) / [機能追加候補.md B-14](../../01_要件定義/機能追加候補.md)
@@ -96,6 +96,24 @@ ADR-0007 で小説 RAG の QA LLM を `qwen3.6:35b-a3b`（後に IQ4_XS 量子�
   - Phase 5（実装）: qwen_client 拡張 → 動作確認 → 既存テストの実行
   - Phase 6（運用）: Windows タスクスケジューラ登録 / Health endpoint 監視
   - Phase 7（記録）: 採用後 2 週間使ってみて応答品質の体感差を 技術知見.md に追記
+
+## 実装完了（2026-05-11）
+
+Phase 5（実装）完了:
+- `qwen_client.py` に `QWEN_BACKEND` 切替（`llama_server` / `ollama`）追加（commit `a1eee28`）
+- 共通モジュール側 + Pic2PDF 側で計 28 件のテスト追加、backend 全 725 件 pass
+- ロールバック動作確認済み
+
+Phase 6（運用）完了:
+- Windows タスクスケジューラに `llama-server-qwen` を ONLOGON / Limited / Interactive で登録（admin 不要）
+- 起動 bat: `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat`
+
+採用後の運用上の進化（同日 2026-05-11）:
+- **B-13 段階 B 採用** (commit `2bf05f3`): `num_ctx=32768 / top_k=64 / max_per_book=5`。llama-server を `-c 36864 -ncmoe 18` で再起動
+- **B-13 段階 C 本採用** (commit `7c06326`): scope=book で `load_all_pages_of_book()` 経由の全 page 読み込み（`NOVEL_DB_QA_FULL_BOOK_MODE=true` 既定）。llama-server を `-c 131072 -ncmoe 28` に再設定（ncmoe スイープで生成速度と VRAM 余裕の両立点として決定）
+- **質問履歴の JST 表示 + 応答時間表示** (commit `b17439f`): SQLite UTC 文字列を frontend で JST に変換 + elapsed 併記
+
+採用最適設定の更新は [小説RAG_技術知見.md §9.3](../../05_記録/小説RAG_技術知見.md) を参照（B-14 時点 / B-13 段階 C 本採用後 を併記）。
 
 ## 将来の再評価条件
 
