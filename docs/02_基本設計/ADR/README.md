@@ -20,6 +20,7 @@
 | [0006](0006_backend-log-file-persistence.md) | バックエンドログを RotatingFileHandler でファイル永続化 | Accepted | 2026-05-07 |
 | [0007](0007_llm-extraction-qwen-adoption.md) | 小説 RAG の LLM を Qwen3.6 に切替 + 共通モジュールに切り出し | Accepted | 2026-05-10 |
 | [0008](0008_design-docs-html-build.md) | 設計ドキュメントを Markdown 編集 + mkdocs-material で HTML 配信 | Accepted | 2026-05-11 |
+| [0009](0009_llm-backend-llama-server.md) | 小説 RAG の Qwen 推論バックエンドを Ollama から llama-server に切替 | Accepted | 2026-05-11 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順

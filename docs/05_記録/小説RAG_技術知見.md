@@ -2,7 +2,7 @@
 
 実機検証・モデル選定・回避策・ベンチマークの記録。設計書（How を書く場所）/ ADR（単発判断）とは別に、運用で蓄えた「経験則」を残す。
 
-最終更新: 2026-05-11
+最終更新: 2026-05-11（§9 LLM 推論バックエンド検証（llama.cpp vs Ollama, Phase 0〜4b）を追加）
 
 関連:
 - 設計: [バックエンド設計](../03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md)
@@ -218,8 +218,23 @@ SSE ストリーミング応答
 |---|---|---|
 | map-reduce 経路（旧、num_ctx=16384）| **0%**（10 主張を検証）| 個別シーン中心、因果連鎖は弱い |
 | 1-shot 経路（新、num_ctx=131072）| **0%**（17 主張を検証）| 因果連鎖・派閥構造を捕捉、構造把握深い |
+| scope=all QA（B-5/8/9/11/12/13A 全採用後）| **0%**（13 主張中 12 完全一致 + 1 言い換え）| 「シリーズ全体のテーマ」質問。逐語一致 92% |
 
 **観察:** 1-shot のほうが文章は短くなる傾向（984 vs 1233 chars）が、密度・構造把握は深い。両方とも完全に本文に依拠している。
+
+#### ベースライン比較（retrieval なしとの差分、2026-05-11）
+
+「シリーズ全体のテーマ」質問について、retrieval なし（Claude の事前知識のみ）と RAG QA を比較:
+
+| 観点 | retrieval なし | RAG QA |
+|---|---|---|
+| 粒度 | 「中世風 / 政治劇 / 王女主人公」程度の上位カテゴリ抽象論 | 3 軸（王権の脱構築 / 円卓の再生 / 思想の越境継承）× 巻横断引用 |
+| 具体性 | 主要キャラ 1 人（レティーツィア）のみ | 5〜6 人 + 各巻象徴事件を実引用 |
+| 検証可能性 | 「推察される」「であろう」 | 巻番号 + ページ番号 + 原文引用 |
+| ハルシネーション率 | 検証されていない断定をすれば 100% 近い | 0% |
+| 書ける文字数 | ~300 字（汎用テンプレ） | 2,000 字超の構造化テキスト |
+
+→ retrieval なしでは具体的なシリーズ分析は物理的に不可能。RAG の存在価値が定量的に確認できた。
 
 ### 4.3 retrieval 精度（B-9 パイロット後の実測）
 
@@ -234,6 +249,48 @@ top 5: p  9  score=0.0253
 ```
 
 contextual_text が「該当場面の位置説明」を embedding に含むため、抽象的なクエリでも該当ページが top に来る。
+
+### 4.4 B-9 ctx の弱点パターン（2026-05-11 発見）
+
+データ層品質チェックで、ctx 生成（gemma4:e4b）が **本文の重要な固有名詞・引用句を含まず、物語的解釈に流れる**事例を確認した。
+
+**実例: Vol 9 p113 chunk 1**
+
+本文に「王族は国の金で生きている。ならば王族は国のために尽くす義務がある」「幼い頃にベルナードが教えたことはソレスに深く染み」を含むが、生成された ctx は:
+
+> "ソルヴェール国、ソレスとレティの対話場面で、ソレスが自らの人生と夢について内省し、自由な未来を選ぶ決意を固める場面。"
+
+「ベルナード」「教え」「義務」「王族」が一切含まれない。
+
+結果として、クエリ「ベルナードの教え 国民への義務」のベクトル検索で本来 1〜2 位に来るべき chunk が **6 位** (dist=0.6041) まで沈降する。直接引用に近いクエリ「王族は国のために尽くす義務 ベルナード」でも 9 位 (dist=0.5549)。
+
+**同型: 表紙・タイトルページの ctx 捏造**
+
+`char_count<300` のページ（表紙・著作権・タイトル）に対し、本文がほぼ空でも ctx 生成が呼ばれた結果、物語の本筋を捏造する事例が頻発（例: Vol 1 p1 タイトルカバーの ctx が「レティがデュークに真の騎士としての覚悟を確信させる場面」）。これらは `min_chars` フィルタで検索対象からは除外されているため実害は出ていないが、embedding 空間にノイズとして残る。
+
+**救済される理由**
+
+それでも前回の RAG QA で p113 引用が正しく出たのは、top_k=32（B-13 段階 A）+ Query Expansion（B-11）+ summary 検索（B-8）の多層防御で 6 位まで含めて拾えるため。最終 QA 出力は 92% 逐語一致 + 0% ハルシネーション。
+
+**改善 TODO**（GPU 空き待ち、`pending_tasks.md` 高優先）
+
+1. プロンプトに「ctx には本文に登場する重要な固有名詞・特徴フレーズを必ず含めてください」追記
+2. `char_count<300` / body_page_margin 範囲のチャンクは ctx 生成 skip
+3. 全 2,230 chunk 再生成（gemma4:e4b で ~100 分の見込み）
+
+### 4.5 FTS5 vs Vector の単体精度（2026-05-11）
+
+ハイブリッド検索のうち FTS5 単独は **抽象的な助詞混じりクエリで 0 ヒット** を起こす（`tokenize='trigram'` 設定 + `build_fts5_or_query` で min_len=2 トークン抽出の組み合わせが原因）:
+
+| クエリ | FTS5 | Vector | Hybrid |
+|---|---|---|---|
+| ベルナードの教え 国民への義務 | **0 hits** | 5 hits | 5 hits ← Vector が救う |
+| 戦争を起こさない国 王の誓い | **0 hits** | 5 hits | 5 hits ← 同上 |
+| マティアス殺害事件の真相 | **0 hits** | 5 hits | 5 hits ← 同上 |
+| グイード 取り替えっ子 出生 | 5 hits | 5 hits | 5 hits |
+| おこぼれ姫 上等 国一番 | 5 hits | 5 hits | 5 hits |
+
+具体名詞があれば FTS5 もちゃんと働く、抽象 + 助詞混じりだとマッチしないことがある — ハイブリッド検索の RRF で Vector 側が常にカバーするので最終結果は問題なし。Vector 側の品質改善（§4.4 の B-9 ctx 改良）が ROI 最大。
 
 ---
 
@@ -346,9 +403,142 @@ LLM が生成したサマリ / 回答に対する事実確認の標準手順:
 - **症状**: 「page X で Y が～」と Z の心情なのに Y のものとして回答
 - **対処**: `pages.main_characters` が埋まっているか確認（`extract_characters.py --all`）。埋まっていれば「主要登場人物: ...」ヒントがプロンプトに乗り、誤統合が抑制される
 
+### 8.5 「重要キーフレーズを含むページが top-5 に来ない」
+
+- **症状**: 本文に明らかに「○○の教え」「△△の誓い」が書かれているのに、ベクトル検索の top-5 に出ない
+- **原因**: B-9 ctx が物語的解釈に流れ、本文の固有名詞や引用句を含まないため、ベクトル空間で query と離れる（§4.4 参照）
+- **応急処置**:
+  - `NOVEL_DB_QA_TOP_K` を 32 → 48 に上げる（GPU 余裕があれば）
+  - Query Expansion (`NOVEL_DB_QA_EXPAND_ENABLED=true`) を有効にして複数視点で検索
+  - クエリを「引用句っぽい言い回し」に近づけて手動で再検索
+- **根本対処**: B-9 ctx 改良（プロンプトに固有名詞含有を指示）+ 全 chunk 再生成。`pending_tasks.md` 高優先で管理
+
 ---
 
-## 9. 関連ファイル
+## 9. LLM 推論バックエンド検証 (Phase 0〜4b, llama.cpp vs Ollama)
+
+**Date**: 2026-05-11 / **関連**: [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) / [小説RAG_LLMバックエンド切替設計案.md](../03_詳細設計/小説RAG_LLMバックエンド切替設計案.md) / [機能追加候補 B-14](../01_要件定義/機能追加候補.md)
+
+### 9.1 検証の発端
+
+r/LocalLLaMA で「RTX 3060 12GB で Qwen3.6-35B-A3B IQ4_XS を `llama.cpp -ncmoe 18 -t 9 -ctk q8_0 -ctv q8_0` 設定で **46.8 t/s** で動かした」という投稿があり、本機 (RTX 5070 12GB) での再現性とさらなる最適化余地を検証。判定基準は **現状 (Ollama, ~13 t/s) の 1.5× = 20 t/s 以上**を採用ラインに設定。
+
+### 9.2 Phase 別検証結果
+
+#### Phase 0: Ollama ベースライン
+
+| ケース | 入力 tok | pp t/s (cold) | tg t/s |
+|---|---:|---:|---:|
+| A_short | 126 | 147 | 16.4 |
+| B_mid | 1,990 | 634 | 14.0 |
+| C_long | 8,377 | 671 | 13.0 |
+
+`prompt_eval` rate ~670 t/s は §4 の B-13 検証時の「680 t/s」と整合（再現性確認）。
+
+#### Phase 1: llama.cpp 入手
+
+- 公式 b9101 Windows CUDA 13.1 ビルド (`llama-b9101-bin-win-cuda-13.1-x64.zip` + `cudart-llama-bin-win-cuda-13.1-x64.zip`) を `D:\61.tool\common\llama.cpp\b9101\` に隔離配置（PATH 変更なし、Ollama と完全共存）
+- CUDA backend が RTX 5070 を正常認識: `Device 0: NVIDIA GeForce RTX 5070, compute capability 12.0, VMM: yes, VRAM: 12226 MiB`
+
+#### Phase 2: llama-bench 投稿設定再現
+
+```
+-ncmoe 18 -t 9 -ctk q8_0 -ctv q8_0 -fa 1 -p 512 -n 128
+```
+
+結果: **pp512 = 766.6 t/s / tg128 = 76.8 t/s**（投稿 46.8 を 64% 超過、本機 GPU 世代差で説明可能）
+
+#### Phase 2a: -ncmoe スイープ（最適点探索）
+
+| ncmoe | pp512 t/s | tg128 t/s |
+|---:|---:|---:|
+| 14 | 166 | 21.5 ← GPU 過密で大幅低下 |
+| **16** | **965** | **81.7** |
+| 18 | 919 | 77.3 |
+| 20 | 768 | 72.5 |
+| 22 | 724 | 69.0 |
+
+→ **本機の最適は `-ncmoe 16`**（投稿の 18 より 1 ステップ GPU 寄り）。
+
+#### Phase 2b: depth スイープ（実運用シナリオ近似）
+
+ncmoe=16 固定、`-d` で KV cache 既存 token 数を変動:
+
+| depth | pp512 t/s | tg128 t/s |
+|---:|---:|---:|
+| 0 | 987 | 81.5 |
+| 2,048 | 1,109 | 82.2 |
+| 4,096 | 1,082 | 81.3 |
+| 8,192 | 1,059 | 79.6 |
+| **16,384** | **749** | **76.3** |
+
+→ scope=all 想定の **depth=16k でも tg 76 t/s 維持**（KV cache q8_0 量子化の効果）。
+
+#### Phase 4: E2E 比較（Ollama vs llama-server）
+
+llama-server を `:11435` に起動（Ollama `:11434` と共存、`-np 1` 重要）。novel_db の PROMPT_TEMPLATE を模した 3 種類で実走。
+
+**最初の試行で問題判明**: llama-server デフォルトの `n_parallel=4` で KV cache が 4 分割されて性能 1/3 に低下（tg 23 t/s）。`-np 1` を指定して再起動で解決。
+
+#### Phase 4b: thinking 抑制（chat_template_kwargs）
+
+Phase 4 で「llama-server の `/completion` 直叩きだと Qwen3.x thinking モデルが `<think>` ブロックで `num_predict` を食い潰す」事象を確認（B_mid で 256 tok を全部 thinking 消費、実回答ゼロ）。
+
+解決策: `/v1/chat/completions` + `chat_template_kwargs: {enable_thinking: false}` + llama-server 側に `--jinja` フラグ。
+
+最終結果（同一プロンプト・同一モデル・thinking 抑制済み）:
+
+| ケース | Ollama tg | llama-server tg | tg 倍率 | Ollama 応答 | llama-server 応答 | 時間倍率 |
+|---|---:|---:|---:|---:|---:|---:|
+| A_short (~120 tok in) | 17.1 | **80.7** | **4.72×** | 3.75 s | **0.71 s** | **5.28×** |
+| B_mid (~2k tok in) | 14.6 | **80.5** | **5.51×** | 21.25 s | **3.55 s** | **5.99×** |
+| C_long (~8k tok in) | 13.4 | **78.0** | **5.82×** | 24.22 s | **14.03 s** | **1.73×★** |
+
+★ C_long の時間倍率が小さいのは Ollama 側 warm-up で KV cache hit していたため。cold start 比なら llama-server 圧勝。
+
+**応答品質**: 同等。Ollama 416 chars vs llama-server 147 chars の差は冗長性のみで論旨は一致（[backend/tmp_bench_phase4_*.json](../../backend/) 参照）。
+
+### 9.3 採用最適設定
+
+```
+llama-server.exe ^
+  -m D:\models\qwen3.6-35b-a3b-iq4_xs\Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf ^
+  -ncmoe 16 -t 9 ^
+  -ctk q8_0 -ctv q8_0 ^
+  -fa 1 ^
+  -ngl 99 ^
+  -c 18432 ^
+  -np 1 ^
+  --jinja ^
+  --port 11435 --host 127.0.0.1
+```
+
+- VRAM 11.8 / 12.2 GiB（97% 使用、ほぼ満載）
+- num_ctx は起動時の `-c` で決定（実行時オプションでは変更不可）
+
+### 9.4 検証で得られた重要な地雷リスト
+
+1. **`-np 1` 必須**: llama-server のデフォルト `n_parallel=4` で KV cache が 4 分割され性能 1/3 に低下
+2. **`-c <n>` は llama-bench にはない**: llama-server だけのオプション。llama-bench は GGUF のデフォルト ctx を使う
+3. **thinking 抑制は `chat_template_kwargs` + `--jinja` の組合せが必須**: 片方欠けると thinking が出続ける
+4. **`-ncmoe` の最適値は GPU と RAM 速度に依存**: 投稿 (3060) は 18、本機 (5070) は 16
+5. **CUDA バージョン**: 本機 CUDA 13.1 ドライバには公式 `llama-b9101-bin-win-cuda-13.1-x64` が完全フィット。CUDA 12.x ビルドを使うとフォワード互換で動くが微妙な性能差が出る可能性
+
+### 9.5 検証スクリプト
+
+| ファイル | 役割 |
+|---|---|
+| `tmp_bench_qwen_phase0.py` | Phase 0 ベースライン取得（Ollama 経由） |
+| `tmp_bench_phase4_compare.py` | Phase 4 / 4b E2E 比較（`--backend ollama` / `--backend llama` 切替） |
+| `tmp_bench_phase0_result.txt` | Phase 0 ログ |
+| `tmp_bench_phase2_*.txt` | Phase 2 / 2a / 2b の llama-bench ログ |
+| `backend/tmp_bench_phase4_*.json` | Phase 4 / 4b の比較結果 JSON |
+
+採用実装後、これらは `backend/scripts/bench_llm_backend.py` 等に整理して残す予定。
+
+---
+
+## 10. 関連ファイル
 
 | パス | 役割 |
 |---|---|
