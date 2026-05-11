@@ -437,7 +437,7 @@ LLM が生成したサマリ / 回答に対する事実確認の標準手順:
 
 ## 9. LLM 推論バックエンド検証 (Phase 0〜4b, llama.cpp vs Ollama)
 
-**Date**: 2026-05-11 / **関連**: [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) / [小説RAG_LLMバックエンド切替設計案.md](../03_詳細設計/小説RAG_LLMバックエンド切替設計案.md) / [機能追加候補 B-14](../01_要件定義/機能追加候補.md)
+**Date**: 2026-05-11 / **関連**: [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) / [機能追加候補 B-14](../01_要件定義/機能追加候補.md) / [LLM 層リファクタリング計画](../06_リファクタリング/LLM層リファクタリング計画.md)（A〜C 完了で Backend ABC 抽象化 + Ollama rollback 撤去）
 
 ### 9.1 検証の発端
 

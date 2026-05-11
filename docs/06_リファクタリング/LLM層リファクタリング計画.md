@@ -1,7 +1,7 @@
 # LLM 層リファクタリング計画
 
 最終更新: 2026-05-11
-ステータス: **Phase A + B + C 完了**（2026-05-11、`ollama rm qwen3.6-iq4xs` の C-7 実行のみ user 承認待ち）
+ステータス: **Phase A + B + C 全段階完了**（2026-05-11、C-7 `ollama rm` 実行済み、18GB 解放）
 
 ## Phase C 完了サマリ
 
@@ -20,6 +20,12 @@
 - ruff: 全変更ファイル clean
 - `build_qwen_backend()` が 18 行 → 9 行に簡素化
 - 設定マトリクスが「llama_server / ollama」の 2 択 → 「llama_server」1 択に縮小
+- `ollama list` から `qwen3.6-iq4xs` が消滅、`/health` で llama-server が ok 応答
+
+**全 commit**:
+- `08c79b0` — Phase A（Backend 抽象化 + 共通モジュール再構成）
+- `fbcdffb` — Phase B（Gemma 系 urllib スカフォールディング撤去）
+- `674f9ce` — Phase C（rollback 経路撤去）
 
 
 
@@ -83,7 +89,7 @@ ADR-0007 / ADR-0009 / B-13 / B-14 の連続検証で LLM 周りが拡張的に�
 |---|---|---|
 | **A** | Qwen 共通モジュールの interface を env-var 依存から **明示設定オブジェクト渡し** に変更 | bridge コード消滅、テスト容易性、Gemma 共通化の足場 |
 | **B** | Gemma も同じ `Backend` 抽象に乗せ、Pic2PDF の 3 ファイル分の urllib 直叩きを共通化 | character_extractor / contextualizer / query_expander の重複コード消滅 |
-| **C** | Ollama 上の qwen3.6-iq4xs（rollback 残置）を撤去 | 23GB 解放、設定マトリクス縮小 |
+| **C** | Ollama 上の qwen3.6-iq4xs（rollback 残置）を撤去 | 18GB 解放（Ollama 圧縮実体）、設定マトリクス縮小 |
 
 A → B → C の順で、各 Phase 完了ごとに動作確認を挟む。本ドキュメントは **Phase A の設計確定** が目的。
 B / C は §4 / §5 でスコープ予告のみ。
@@ -455,11 +461,12 @@ think=False で使う想定なので、Gemma 4 側は触らない。
 
 ---
 
-## 5. Phase C（Ollama 上の旧 Qwen 撤去、2026-05-11 着手）
+## 5. Phase C（Ollama 上の旧 Qwen 撤去、2026-05-11 完了）
 
-Phase A / B 完了後に着手。Phase A で `_llm_backend.py` に追加した
+Phase A で `_llm_backend.py` に追加した
 「`NOVEL_DB_LLM_BACKEND='ollama'` で `OllamaBackend` を返す rollback 分岐」と、
-Ollama 側に保険として残置している `qwen3.6-iq4xs` モデル（23GB）を削除する。
+Ollama 側に保険として残置していた `qwen3.6-iq4xs` モデル（18GB 実体）を撤去。
+C-1〜C-6 をコード 1 commit (`674f9ce`) で、C-7（`ollama rm`）を別作業で実行済み。
 
 ### 5.1. 実装方針
 
@@ -487,7 +494,7 @@ Ollama 側に保険として残置している `qwen3.6-iq4xs` モデル（23GB�
 | **C-4** | ADR-0009 / 設計書 §7.1 / 小説RAG_技術知見.md に Phase C 採用追記、「rollback あり」記述を削除 | 文書のみ |
 | **C-5** | memory `reference_qwen_common.md` から「ロールバック用 Ollama 残置」記述を削除 | 文書のみ |
 | **C-6** | 変更履歴に Phase C エントリ追加 | 文書のみ |
-| **C-7** | **`ollama rm qwen3.6-iq4xs` を実行**（user 承認後） | **不可逆**（23GB 解放、復旧には再 import 必要） |
+| **C-7** | **`ollama rm qwen3.6-iq4xs` 実行**（2026-05-11 完了、user 承認後） | **不可逆**（実体 18GB 解放、復旧には再 import 必要） |
 
 C-1〜C-6 を 1 commit にまとめる。C-7 は別操作（user の環境を変える不可逆作業）。
 
@@ -522,12 +529,12 @@ C-1〜C-6 をコミット後、もし問題が発覚した場合:
 
 ### 5.5. 完了条件
 
-- [ ] `_llm_backend.py` の `build_qwen_backend()` が `LlamaServerBackend` を返す経路のみ + LLMError
-- [ ] `config.py` から「rollback 用 Ollama」のコメント記述削除
-- [ ] backend テスト pass（rollback テスト削除で 731 件想定）
-- [ ] ADR-0009 / 設計書に Phase C 採用追記、rollback 記述削除
-- [ ] memory 更新
-- [ ] **C-7**: `ollama rm qwen3.6-iq4xs` 実行（user 承認後、不可逆）
+- [x] `_llm_backend.py` の `build_qwen_backend()` が `LlamaServerBackend` を返す経路のみ + LLMError
+- [x] `config.py` から「rollback 用 Ollama」のコメント記述削除
+- [x] backend テスト pass（実績: 732 件、削除 1 + 追加 1 で同数維持）
+- [x] ADR-0009 / 設計書に Phase C 採用追記、rollback 記述削除
+- [x] memory 更新
+- [x] **C-7**: `ollama rm qwen3.6-iq4xs` 実行済み（2026-05-11、18GB 解放）
 
 ---
 

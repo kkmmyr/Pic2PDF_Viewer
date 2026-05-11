@@ -91,7 +91,7 @@ ADR-0007 で小説 RAG の QA LLM を `qwen3.6:35b-a3b`（後に IQ4_XS 量子�
   - `backend/services/novel_db/llm.py` — qwen_client の使い方を変更（バックエンド切替を意識する）
   - `D:\61.tool\common\Qwen\lib\qwen_client.py` — llama-server バックエンドを追加（`_dispatch_backend` 関数で分岐）
   - `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat` — 新規。起動コマンドをラップ
-  - `docs/03_詳細設計/小説RAG_LLMバックエンド切替設計案.md` — 新規（本 ADR 採用時に本体設計書にマージ）
+  - `docs/03_詳細設計/小説RAG_LLMバックエンド切替設計案.md` — 新規ドラフト（本 ADR 採用時に本体設計書にマージ。Phase A の A-7 で削除済み、内容は §7.1 へ移行）
   - `docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md` — §7 LLM 呼び出し部分を更新
   - `docs/03_詳細設計/アーキテクチャ詳細_バックエンド編.md` — 推論バックエンド構成図を更新
   - `docs/04_環境構築/GPU環境セットアップ.md` — llama.cpp Windows CUDA ビルド入手手順を追加
