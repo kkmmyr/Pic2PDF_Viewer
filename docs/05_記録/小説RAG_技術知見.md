@@ -500,20 +500,30 @@ Phase 4 で「llama-server の `/completion` 直叩きだと Qwen3.x thinking �
 
 ### 9.3 採用最適設定
 
+**B-14 採用時（2026-05-11、num_ctx=16384 想定）**:
+
+```
+-ncmoe 16 -c 18432   # VRAM 11.8 / 12.2 GiB (97%)
+```
+
+**B-13 段階 B 採用後（2026-05-11、num_ctx=32768 想定）**:
+
 ```
 llama-server.exe ^
   -m D:\models\qwen3.6-35b-a3b-iq4_xs\Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf ^
-  -ncmoe 16 -t 9 ^
+  -ncmoe 18 -t 9 ^
   -ctk q8_0 -ctv q8_0 ^
   -fa 1 ^
   -ngl 99 ^
-  -c 18432 ^
+  -c 36864 ^
   -np 1 ^
   --jinja ^
   --port 11435 --host 127.0.0.1
 ```
 
-- VRAM 11.8 / 12.2 GiB（97% 使用、ほぼ満載）
+- VRAM 11.7 / 12.2 GiB（95.8% 使用、ヘッドルーム 0.5 GiB）
+- ctx を倍増（18432 → 36864）した分、`-ncmoe` を 16 → 18 にして MoE block を 2 個多めに
+  CPU offload。tg レートは Phase 2a 実測で -ncmoe 16 比 ~5% 低下する見込み（81.7 → 77.3 t/s）
 - num_ctx は起動時の `-c` で決定（実行時オプションでは変更不可）
 
 ### 9.4 検証で得られた重要な地雷リスト

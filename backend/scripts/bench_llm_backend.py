@@ -41,6 +41,7 @@ _QWEN_LIB_DIR = r"D:\61.tool\common\Qwen\lib"
 if _QWEN_LIB_DIR not in sys.path:
     sys.path.insert(0, _QWEN_LIB_DIR)
 
+from config import NOVEL_DB_QA_NUM_CTX  # noqa: E402
 from qwen_client import stream_ask  # noqa: E402
 
 DEFAULT_MODEL = "qwen3.6-iq4xs"
@@ -149,7 +150,10 @@ def _run_once(label: str, prompt: str, model: str) -> dict:
         "temperature": TEMPERATURE,
         "repeat_penalty": REPEAT_PENALTY,
         "num_predict": NUM_PREDICT,
-        "num_ctx": 16384,
+        # 本番 QA と同じ num_ctx を使う（config.NOVEL_DB_QA_NUM_CTX）。
+        # 段階 A=16384 / 段階 B=32768 などの切替に追従。llama_server backend では
+        # 起動時 -c で決まるためここの値は無視されるが、Ollama backend では効く
+        "num_ctx": NOVEL_DB_QA_NUM_CTX,
     }
     print(f"\n--- {label} (prompt_chars={len(prompt)}) ---", flush=True)
     start = time.time()

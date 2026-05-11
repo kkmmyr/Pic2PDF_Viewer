@@ -72,20 +72,25 @@ NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
 # - QA_MAX_PER_BOOK: scope=all / series での書籍ごと取得上限（ざっくり質問が特定冊に偏らないよう均等化）
 # - BODY_PAGE_MARGIN: 各書籍の先頭 / 末尾の除外ページ数（表紙・目次・あとがき・解説・奥付）
 NOVEL_DB_MIN_BODY_CHARS    = 300
-# B-13 段階 A（2026-05-11 採用）: top_k を 16 → 32 に拡大。
-# Qwen IQ4_XS（B-12）採用後の num_ctx 拡大に合わせ、ヒットページを多く取って RAG 品質を上げる。
-# 環境変数 NOVEL_DB_QA_TOP_K で上書き可（A/B/C 段階の切替やベンチ用途）
-NOVEL_DB_QA_TOP_K          = int(os.environ.get("NOVEL_DB_QA_TOP_K", "32"))
-NOVEL_DB_QA_MAX_PER_BOOK   = 2
+# B-13 段階 A→B（2026-05-11 採用）: top_k を 16 → 32 (A) → 64 (B) に段階拡大。
+# B-14 で llama-server 切替により応答が 5× 高速化したため、context 拡大の余地が生まれた。
+# 環境変数 NOVEL_DB_QA_TOP_K で上書き可（A=32 / B=64 / C=未定 の切替やベンチ用途）
+NOVEL_DB_QA_TOP_K          = int(os.environ.get("NOVEL_DB_QA_TOP_K", "64"))
+# B-13 段階 B（2026-05-11 採用）: max_per_book を 2 → 5 に拡大。
+# scope=all/series でも同一書籍内のページを最大 5 件まで集め、同書籍に集中する
+# 質問（「この書籍の主人公の心情変化」等）に深く答えられるようにする。
+# 11 冊 × 5 件 = 最大 55 件取得可能（top_k=64 にバランスする値）
+NOVEL_DB_QA_MAX_PER_BOOK   = 5
 NOVEL_DB_BODY_PAGE_MARGIN  = 5
 # B-8: scope=all / scope=series で QA プロンプトに含める書籍サマリの上限件数。
 # 現状 11 冊なので 11 でほぼ全冊カバー。書籍数が増えたら適宜下げる
 NOVEL_DB_QA_TOP_SUMMARIES  = 11
-# B-13 段階 A: QA 時の num_ctx。従来 8192 だったが、top_k=32 × 平均 600 字 = 約 12k 字 +
-# 全 11 冊サマリ ~11k 字 + テンプレート + 質問で約 24k 字 ≒ ~15k tokens となり 8192 を超えるため、
-# 16384 に拡大して切り詰めを防ぐ。応答時間は約 +20〜30% の見込み（量比例）
-# 環境変数 NOVEL_DB_QA_NUM_CTX で上書き可（段階 B=32768 / C=131072 への切替に使う）
-NOVEL_DB_QA_NUM_CTX        = int(os.environ.get("NOVEL_DB_QA_NUM_CTX", "16384"))
+# B-13 段階 A→B: QA 時の num_ctx。8192 (PoC) → 16384 (A) → 32768 (B) と段階拡大。
+# 段階 B では top_k=64 × 平均 600 字 = ~24k 字 + 全 11 冊サマリ ~11k 字 + テンプレ
+# = 約 40k 字 ≒ ~25k tokens となり 16384 を超えるため、32768 に拡大。
+# llama-server 側は -c 36864（32768 + 余裕）で起動する必要あり（start-qwen-server.bat）。
+# 環境変数 NOVEL_DB_QA_NUM_CTX で上書き可（A=16384 へのロールバックや C=131072 への切替に使う）
+NOVEL_DB_QA_NUM_CTX        = int(os.environ.get("NOVEL_DB_QA_NUM_CTX", "32768"))
 
 # B-11 Query Expansion（2026-05-11 採用）: ユーザーの質問を gemma4:e4b で複数の検索
 # クエリに展開して hybrid_search を多角的に実行する。抽象質問の recall 改善が狙い。

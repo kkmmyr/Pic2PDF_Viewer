@@ -2,7 +2,7 @@
 
 novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は [要件定義: 小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
 
-最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替 / B-13 段階 A で QA num_ctx を 16384 化・top_k を 32 に拡大）
+最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替 / B-13 段階 A→B で QA num_ctx を 32768 化・top_k を 64 / max_per_book を 5 に拡大 / B-14 で llama-server に切替）
 
 ---
 
@@ -778,17 +778,31 @@ LLM_OPTIONS = {
     "temperature": 0.2,
     "repeat_penalty": 1.2,
     "num_predict": 4096,
-    "num_ctx": NOVEL_DB_QA_NUM_CTX,  # config 化、既定 16384（B-13 段階 A、2026-05-11）
+    "num_ctx": NOVEL_DB_QA_NUM_CTX,  # config 化、既定 32768（B-13 段階 B、2026-05-11）
 }
 ```
 
 `num_predict=4096` は Qwen 系で `done_reason='stop'` で完走するのに十分な値（共通モジュールのデフォルト 8192 を `LLM_OPTIONS` で上書き）。
 
-**`num_ctx` は `NOVEL_DB_QA_NUM_CTX`（既定 16384）で config 化**（B-13 段階 A、2026-05-11）。従来 8192 では:
-- `top_k=32` のページ抜粋（~12k 字）+ 全 11 冊サマリ（~11k 字）+ システムプロンプト + 質問 ≒ **~25k 字 / ~15k tokens** に達し、`num_ctx=8192` では切り詰めが発生していた可能性
-- 16384 に拡大して切り詰めリスクを解消、応答時間は +20〜30% を許容
+**`num_ctx` は `NOVEL_DB_QA_NUM_CTX`（既定 32768）で config 化**。段階的に拡大した経緯:
 
-後続の段階 B / C（`num_ctx=32768` / `131072` 等）は機能追加候補 B-13 を参照。`NOVEL_DB_QA_NUM_CTX` 環境変数で切替可能。
+| 段階 | num_ctx | top_k | max_per_book | 採用日 | 主な狙い |
+|---|---:|---:|---:|---|---|
+| PoC | 8,192 | 16 | 2 | 2026-05 | 初期 |
+| **A** | **16,384** | **32** | 2 | 2026-05-11 | 切り詰めバグ解消（`prompt_eval_count` が 8,192 にぴったり張り付いていた問題） |
+| **B** | **32,768** | **64** | **5** | 2026-05-11 | 概括質問の深さ向上（B-14 で応答 5× 速くなった分の余裕を使う） |
+| C（保留）| 131,072 | 200 | 全 page | — | scope=book で本文丸読み |
+
+段階 B では `top_k=64` のページ抜粋（~24k 字）+ 全 11 冊サマリ（~11k 字）+ システム
+プロンプト + 質問 ≒ **~40k 字 / ~25k tokens** に達するため、`num_ctx=32768` が必要。
+llama-server 側は `start-qwen-server.bat` で `-c 36864`（32768 + 余裕）として起動する。
+
+`max_per_book=5` は段階 B で導入。scope=all/series でも同一書籍内のページを最大 5 件
+まで集め、同書籍に集中する質問（「この書籍の主人公の心情変化」等）に深く答えられる
+ようにする。11 冊 × 5 件 = 最大 55 件取得可能（`top_k=64` の枠内）。
+
+ロールバック: `NOVEL_DB_QA_NUM_CTX=16384 NOVEL_DB_QA_TOP_K=32` の環境変数で段階 A
+相当に戻る（`max_per_book` だけはコード定数のためコード戻しが必要）。
 
 ### 7.4. Query Expansion（`query_expander.py`、B-11、2026-05-11 採用）
 
