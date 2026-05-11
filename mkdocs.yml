@@ -1,10 +1,12 @@
 # Pic2PDF_Viewer 設計ドキュメントの HTML ビルド設定
 #
 # - ソース: docs/ 配下の Markdown
-# - 出力先: site/（.gitignore）
-# - ビルド: mkdocs build  →  site/index.html 以下が生成される
+# - 出力先: frontend/public/site/（.gitignore）
+#     Vite の publicDir 配下に出力することで、dev (:5176/site/) からも
+#     リリース統合ビルド (:8090/site/) からも閲覧可能になる。
+# - ビルド: mkdocs build  →  frontend/public/site/index.html 以下が生成される
 # - プレビュー: mkdocs serve  →  http://localhost:8000
-# - リリースビルド時: FastAPI が site/ を /docs-html にマウントする
+# - リリース統合: FastAPI が frontend/public/site/ を /docs-html にもマウントする
 #
 # 詳細は CLAUDE.md「設計ドキュメントの HTML 配信」セクション。
 
@@ -12,7 +14,7 @@ site_name: Pic2PDF_Viewer 設計ドキュメント
 site_description: WebP/ZIP → PDF ビューア（OCR + 小説 RAG 機能含む）の設計ドキュメント
 
 docs_dir: docs
-site_dir: site
+site_dir: frontend/public/site
 
 # ローカルファイルとして直接開く前提。ナビゲーション内のリンクが file:// でも動くよう、
 # use_directory_urls=false でフラットに *.html を吐く（site/01_要件定義/foo.html 形式）。

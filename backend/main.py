@@ -98,12 +98,13 @@ app.include_router(novel_db.router,   prefix="/api", tags=["novel_db"])
 # ---------------------------------------------------------------------------
 # 設計ドキュメント HTML 配信（mkdocs ビルド成果物）
 # ---------------------------------------------------------------------------
-# プロジェクトルートの site/ ディレクトリ（`mkdocs build` で生成）を /docs-html に
-# マウントする。site/ が存在しない場合はマウントしない（後方互換）。
+# `mkdocs build` の出力先は frontend/public/site/（Vite の publicDir 配下）。
+# Vite dev/build 経由でも /site/ で配信されるが、リリース統合 (:8090) では
+# 後方互換のため /docs-html にもマウントする。site/ が存在しない場合はスキップ。
 # html=True により /docs-html/ で index.html を自動配信する。
 # SPA catch-all より前に登録することで、/docs-html/* が優先的にこちらへ届く。
 
-_DOCS_HTML_DIR = os.path.join(PROJECT_ROOT, "site")
+_DOCS_HTML_DIR = os.path.join(PROJECT_ROOT, "frontend", "public", "site")
 if os.path.isdir(_DOCS_HTML_DIR):
     app.mount(
         "/docs-html",

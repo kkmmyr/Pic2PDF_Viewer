@@ -43,7 +43,13 @@ cd frontend && npx tsc --noEmit
 
 ### 設計ドキュメントの HTML 配信（mkdocs-material）
 
-ソースは `docs/*.md` のまま、ビルド時に `site/` へ HTML を生成し FastAPI が `/docs-html` で配信する（ローカル閲覧用）。Claude が読み書きするのは **Markdown 側**、ユーザーが閲覧用に見るのが **HTML 側**、という役割分担。
+ソースは `docs/*.md` のまま、ビルド時に `frontend/public/site/` へ HTML を生成する（Vite の publicDir 配下）。これにより:
+
+- **Vite dev** (`:5176`): `http://localhost:5176/site/index.html` で閲覧可
+- **リリース統合** (`:8090`): `http://localhost:8090/site/index.html`（Vite dist 経由）と `http://localhost:8090/docs-html/`（FastAPI マウント、後方互換）の両方で閲覧可
+- **mkdocs serve** (`:8000`): 開発時プレビュー
+
+Claude が読み書きするのは **Markdown 側**、ユーザーが閲覧用に見るのが **HTML 側**、という役割分担。
 
 ```powershell
 # 初回セットアップ（一度だけ）
@@ -52,7 +58,7 @@ uv tool install mkdocs --with mkdocs-material --with mkdocs-mermaid2-plugin
 # uv tool 配置先（~/.local/bin）を PATH に追加（一度だけ、PowerShell 再起動が必要）
 uv tool update-shell
 
-# ビルド（site/ に出力、.gitignore 配下）
+# ビルド（frontend/public/site/ に出力、.gitignore 配下）
 mkdocs build
 
 # 開発時プレビュー（http://localhost:8000、自動リロード）
@@ -61,9 +67,9 @@ mkdocs serve
 
 **注意**: `update-shell` 実行後に **PowerShell を一度閉じて開き直す** 必要があります。再起動せずに同じセッションで試したい場合は `$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"` で一時的にパスを通せます。
 
-リリース統合（`:8090`）後は `http://localhost:8090/docs-html/` で閲覧可能。Mermaid 図は ` ```mermaid` フェンスでそのまま記述する（mkdocs-material が描画）。
+Mermaid 図は ` ```mermaid` フェンスでそのまま記述する（mkdocs-material が描画）。
 
-**注意**: Markdown 編集後は `mkdocs build` で HTML 反映が必要（CI / 手動）。`site/` 配下は git 管理外なので、サーバ起動前に最低 1 回ビルドしておくこと。
+**注意**: Markdown 編集後は `mkdocs build` で HTML 反映が必要（CI / 手動）。`frontend/public/site/` 配下は git 管理外なので、サーバ起動前に最低 1 回ビルドしておくこと。`npm run build` 時は `frontend/dist/site/` にもコピーされる（dist サイズが site 分肥大化）。
 
 ## スラッシュコマンド
 

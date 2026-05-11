@@ -1,9 +1,9 @@
 # ADR-0008: 設計ドキュメントを Markdown 編集 + mkdocs-material で HTML 配信
 
-- **Status**: Accepted
+- **Status**: Accepted（2026-05-11 出力先を `frontend/public/site/` へ変更 / フロントヘッダー導線追加）
 - **Date**: 2026-05-11
 - **決定者**: プロジェクトオーナー
-- **関連**: [docs/index.md](../../index.md) / `mkdocs.yml`（プロジェクトルート） / `backend/main.py`（`/docs-html` マウント） / `.claude/CLAUDE.md`「設計ドキュメントの HTML 配信」セクション
+- **関連**: [docs/index.md](../../index.md) / `mkdocs.yml`（プロジェクトルート） / `backend/main.py`（`/docs-html` マウント） / `frontend/src/components/Layout.tsx`（ヘッダー「設計書」リンク） / `.claude/CLAUDE.md`「設計ドキュメントの HTML 配信」セクション
 
 ## コンテキスト
 
@@ -34,11 +34,12 @@
 ## 決定
 
 1. **ソース・オブ・トゥルース** は `docs/*.md`（Markdown）。Claude Code は今までどおり MD を読み書きする
-2. **HTML 配信** は `mkdocs-material` で `site/` ディレクトリにビルドし、FastAPI が `/docs-html` で配信する
-3. `site/` は `.gitignore`。`mkdocs build` で都度生成
+2. **HTML 配信** は `mkdocs-material` で `frontend/public/site/` ディレクトリにビルドする（2026-05-11 にプロジェクトルート `site/` から移動）。Vite の `publicDir` 配下に置くことで dev (`:5176/site/`) / dist (`:8090/site/`) いずれからも自動配信される。FastAPI 側でも後方互換として同ディレクトリを `/docs-html` にマウントする
+3. `frontend/public/site/` は `.gitignore`。`mkdocs build` で都度生成
 4. 開発時プレビューは `mkdocs serve`（`http://localhost:8000`、ファイル変更で自動リロード）
-5. 統合モード（FastAPI `:8090`）では `http://localhost:8090/docs-html/` から閲覧
-6. **Mermaid 図** を ` ```mermaid` フェンスで MD 内に記述可能（mkdocs-material が描画）
+5. 統合モード（FastAPI `:8090`）では `http://localhost:8090/site/index.html` または `/docs-html/` から閲覧
+6. フロントエンドヘッダー右上の「設計書」リンクから別タブで開ける（[`frontend/src/components/Layout.tsx`](../../../frontend/src/components/Layout.tsx)）
+7. **Mermaid 図** を ` ```mermaid` フェンスで MD 内に記述可能（mkdocs-material が描画）
 
 ## 根拠
 

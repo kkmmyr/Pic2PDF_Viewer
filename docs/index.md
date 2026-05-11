@@ -44,14 +44,23 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 ## ビルド方法
 
 ```powershell
-# 単発ビルド（→ site/ に出力）
+# 単発ビルド（→ frontend/public/site/ に出力）
 mkdocs build
 
 # 開発時プレビュー（→ http://localhost:8000）
 mkdocs serve
 ```
 
-リリース時は backend FastAPI が `site/` を `/docs-html` にマウントする（[`backend/main.py`](https://github.com/...)）。`http://localhost:8090/docs-html/` で参照可能。
+出力先は Vite の `publicDir`（`frontend/public/site/`）。これにより以下の経路すべてで閲覧可能:
+
+| 経路 | URL |
+|---|---|
+| Vite dev (`npm run dev`) | `http://localhost:5176/site/index.html` |
+| backend 直接（`/docs-html` マウント） | `http://localhost:8766/docs-html/` |
+| リリース統合 (Vite dist 経由) | `http://localhost:8090/site/index.html` |
+| リリース統合 (`/docs-html` 経由・後方互換) | `http://localhost:8090/docs-html/` |
+
+フロントエンドヘッダー右上の「設計書」リンクからも別タブで開ける（[`frontend/src/components/Layout.tsx`](../../frontend/src/components/Layout.tsx)）。
 
 ---
 
@@ -60,4 +69,4 @@ mkdocs serve
 - **ソース・オブ・トゥルース** は `docs/` 配下の Markdown
 - **ユーザー閲覧用** は本 HTML（mkdocs build 出力）
 - **編集**: Claude Code に依頼すると Markdown が更新される。次回 `mkdocs build` で HTML 反映
-- **git 管理**: `docs/*.md` のみ。`site/` は `.gitignore`
+- **git 管理**: `docs/*.md` のみ。`frontend/public/site/` は `.gitignore`
