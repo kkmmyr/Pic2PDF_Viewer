@@ -506,32 +506,18 @@ Phase 4 で「llama-server の `/completion` 直叩きだと Qwen3.x thinking �
 -ncmoe 16 -c 18432   # VRAM 11.8 / 12.2 GiB (97%)
 ```
 
-**B-13 段階 B 採用後（2026-05-11、num_ctx=32768 想定、既定構成）**:
+**B-13 段階 B（2026-05-11、num_ctx=32768、過去設定）**:
+
+```
+-ncmoe 18 -c 36864   # VRAM 11.7 / 12.2 GiB (95.8%)
+```
+
+**B-13 段階 C 本採用（2026-05-11、num_ctx=131072、現在の canonical 設定）**:
 
 ```
 llama-server.exe ^
   -m D:\models\qwen3.6-35b-a3b-iq4_xs\Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf ^
-  -ncmoe 18 -t 9 ^
-  -ctk q8_0 -ctv q8_0 ^
-  -fa 1 ^
-  -ngl 99 ^
-  -c 36864 ^
-  -np 1 ^
-  --jinja ^
-  --port 11435 --host 127.0.0.1
-```
-
-- VRAM 11.7 / 12.2 GiB（95.8% 使用、ヘッドルーム 0.5 GiB）
-- ctx を倍増（18432 → 36864）した分、`-ncmoe` を 16 → 18 にして MoE block を 2 個多めに
-  CPU offload。tg レートは Phase 2a 実測で -ncmoe 16 比 ~5% 低下する見込み（81.7 → 77.3 t/s）
-- num_ctx は起動時の `-c` で決定（実行時オプションでは変更不可）
-
-**B-13 段階 C 採用後（2026-05-11、num_ctx=131072 想定、opt-in 専用）**:
-
-```
-llama-server.exe ^
-  -m D:\models\qwen3.6-35b-a3b-iq4_xs\Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf ^
-  -ncmoe 32 -t 9 ^
+  -ncmoe 28 -t 9 ^
   -ctk q8_0 -ctv q8_0 ^
   -fa 1 ^
   -ngl 99 ^
@@ -541,13 +527,22 @@ llama-server.exe ^
   --port 11435 --host 127.0.0.1
 ```
 
-起動 bat: `D:\61.tool\common\llama.cpp\b9101\start-qwen-server-fullbook.bat`。段階 B 用 bat と排他（同 :11435）。
+起動 bat: `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat`（タスクスケジューラ `llama-server-qwen` で自動起動）。
 
-**実測結果（2026-05-11、87k tokens の書籍 1 冊に深い質問）**:
-- VRAM: **6.9 / 12.2 GiB（56% 使用、当初試算 11.7 GiB から大幅にヘッドルームあり）**
-- 生成速度: **9.8 t/s**（段階 B の 45 t/s から大幅低下、想定 5〜15 t/s 帯）
-- 応答時間: 170 秒（段階 B の 4.5×、in_tok 28× 増を考えれば妥当）
-- VRAM 余裕があるため `-ncmoe` を 28〜30 に下げれば速度向上の可能性あり（将来検証）
+**ncmoe スイープ結果（2026-05-11、bench warm KV measure）**:
+
+| -ncmoe | VRAM | A_short tg* | B_mid tg* | C_long tg* |
+|---:|---:|---:|---:|---:|
+| 32 | 56% (6.9 GB) | 21.4 | 55.0 | 59.4 |
+| 30 | 63% (7.7 GB) | 42.9 | 53.3 | 54.2 |
+| **28** | **70% (8.5 GB)** | **46.3** | **55.6** | **56.2** |
+
+採用根拠: A_short（純粋な生成速度に近い、out_tok ~20）で -ncmoe 28 が **32 比 +116%** で最速。B_mid / C_long でも僅差トップ。VRAM 30% 余裕あり。-ncmoe 26 以下は将来の更なる最適化余地として残置（gemma4:e4b と同時稼働しないシナリオなら検討可）。
+
+**書籍丸読み実測（2026-05-11、87k tokens の書籍 1 冊に深い質問、-ncmoe 28）**:
+- VRAM: 8.5 / 12.2 GiB（70% 使用、ヘッドルーム 3.7 GiB）
+- 生成速度: end-to-end 9.8 t/s（pp が depth=78k で支配的）
+- 応答時間: 170 秒
 
 ### 9.4 検証で得られた重要な地雷リスト
 

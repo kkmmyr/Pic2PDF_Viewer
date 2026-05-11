@@ -99,12 +99,13 @@ NOVEL_DB_QA_EXPAND_ENABLED = os.environ.get("NOVEL_DB_QA_EXPAND_ENABLED", "true"
 NOVEL_DB_QA_EXPAND_N       = int(os.environ.get("NOVEL_DB_QA_EXPAND_N", "3"))
 NOVEL_DB_QA_EXPAND_MODEL   = os.environ.get("NOVEL_DB_QA_EXPAND_MODEL", "gemma4:e4b")
 
-# B-13 段階 C（2026-05-11 実験用実装、opt-in）: scope=book で本文を丸ごと読み込むモード。
+# B-13 段階 C（2026-05-11 本採用）: scope=book で本文を丸ごと読み込むモード。
 # hybrid_search を bypass し、指定書籍の全 page を page_no 順で LLM に投げる。
-# 「最高品質はどこまで？」の上限測定用。llama-server も -c 131072 / -ncmoe 32 程度の
-# 別構成（start-qwen-server-fullbook.bat）で起動する必要あり。
-# 既定 false。本採用は検証品質 vs 応答時間（推定 5〜15 t/s）の判断後。
-NOVEL_DB_QA_FULL_BOOK_MODE    = os.environ.get("NOVEL_DB_QA_FULL_BOOK_MODE", "false").lower() in ("1", "true", "yes")
+# 実機測定で 78k tokens 入力 / 170 秒 / 9.8 t/s、本文 9 箇所以上から具体的セリフ
+# 引用付きの深い分析が得られたため、品質優先で既定有効化。
+# llama-server は start-qwen-server.bat で -c 131072 / -ncmoe 28 起動済み前提。
+# ロールバック: NOVEL_DB_QA_FULL_BOOK_MODE=false で段階 B 相当（hybrid_search）に戻る。
+NOVEL_DB_QA_FULL_BOOK_MODE    = os.environ.get("NOVEL_DB_QA_FULL_BOOK_MODE", "true").lower() in ("1", "true", "yes")
 NOVEL_DB_QA_FULL_BOOK_NUM_CTX = int(os.environ.get("NOVEL_DB_QA_FULL_BOOK_NUM_CTX", "131072"))
 
 # OCR 起動スクリプト

@@ -790,8 +790,12 @@ LLM_OPTIONS = {
 |---|---:|---:|---:|---|---|
 | PoC | 8,192 | 16 | 2 | 2026-05 | 初期 |
 | **A** | **16,384** | **32** | 2 | 2026-05-11 | 切り詰めバグ解消（`prompt_eval_count` が 8,192 にぴったり張り付いていた問題） |
-| **B**（既定）| **32,768** | **64** | **5** | 2026-05-11 | 概括質問の深さ向上（B-14 で応答 5× 速くなった分の余裕を使う） |
-| **C**（opt-in）| **131,072** | 全 page | — | 2026-05-11 | scope=book で本文丸読み。最高品質測定用、応答時間 4.5× 増 |
+| **B** | **32,768** | **64** | **5** | 2026-05-11 | 概括質問の深さ向上（B-14 で応答 5× 速くなった分の余裕を使う） |
+| **C**（既定）| **131,072** | 全 page | — | 2026-05-11 | scope=book で本文丸読み。応答時間 4.5× 増を許容して本文 9 箇所以上から具体的引用付きの深い分析を得る |
+
+**注**: 既定は段階 C（`NOVEL_DB_QA_FULL_BOOK_MODE=true`）。scope=book 時は全 page
+読み、scope=all/series 時は引き続き段階 B 相当（top_k=64 / max_per_book=5）。
+段階 B に戻す場合は `NOVEL_DB_QA_FULL_BOOK_MODE=false` の env で即時切替可。
 
 段階 B では `top_k=64` のページ抜粋（~24k 字）+ 全 11 冊サマリ（~11k 字）+ システム
 プロンプト + 質問 ≒ **~40k 字 / ~25k tokens** に達するため、`num_ctx=32768` が必要。
@@ -804,27 +808,39 @@ llama-server 側は `start-qwen-server.bat` で `-c 36864`（32768 + 余裕）�
 ロールバック: `NOVEL_DB_QA_NUM_CTX=16384 NOVEL_DB_QA_TOP_K=32` の環境変数で段階 A
 相当に戻る（`max_per_book` だけはコード定数のためコード戻しが必要）。
 
-#### 段階 C: scope=book 全 page 読み込みモード（opt-in、実験用）
+#### 段階 C: scope=book 全 page 読み込みモード（既定、本採用）
 
-`NOVEL_DB_QA_FULL_BOOK_MODE=true` の env で有効化。scope=book のとき hybrid_search
+`NOVEL_DB_QA_FULL_BOOK_MODE=true`（既定）で有効。scope=book のとき hybrid_search
 を bypass して書籍の全 page（`min_chars` / `body_page_margin` フィルタ後）を
 page_no 順で LLM に投げる。実装は [`search.py:load_all_pages_of_book`](../../backend/services/novel_db/search.py)。
 
-llama-server は `start-qwen-server-fullbook.bat` で `-c 131072 -ncmoe 32` 起動が必要。
-段階 B 用 bat とは排他（同 :11435 ポート）。
+llama-server は `start-qwen-server.bat` で `-c 131072 -ncmoe 28` 起動（B-13 段階 C
+本採用後の canonical 設定。Windows タスクスケジューラ `llama-server-qwen` に登録済み）。
 
 実測（2026-05-11、11 巻 = 87k tokens の最大本に対する深い質問）:
 
-| モード | hits | in_tok | out_tok | elapsed | 生成速度 |
+| モード | hits | in_tok | out_tok | elapsed | 生成速度（短文 warm）|
 |---|---:|---:|---:|---:|---:|
-| 段階 B（既定） | 16 page | 2,779 | 1,688 | 37.4 s | 45.1 t/s |
-| 段階 C（opt-in） | 100 page | **77,856** | 1,668 | **169.7 s** | 9.8 t/s |
+| 段階 B（hybrid_search） | 16 page | 2,779 | 1,688 | 37.4 s | 45 t/s |
+| 段階 C（全 page 読み）| 100 page | **77,856** | 1,668 | **169.7 s** | 9.8 t/s（end-to-end）|
 
 段階 C は **1 冊丸読み（78k tokens）を 170 秒で処理**し、本文 9 箇所以上から具体的な
 セリフ・場面を引用する深い分析が得られる。代わりに応答時間は段階 B の 4.5×。
-VRAM は -ncmoe 32 で 6.9 GiB / 12 GiB（56%）、ヘッドルーム余裕あり。
 
-本採用するか opt-in のままにするかは品質向上 vs 応答時間の体感判断（user）。
+**-ncmoe 28 採用根拠**（2026-05-11、ncmoe スイープ）:
+
+| -ncmoe | VRAM | A_short tg* | B_mid tg* | C_long tg* |
+|---:|---:|---:|---:|---:|
+| 32 | 56% (6.9 GB) | 21.4 | 55.0 | 59.4 |
+| 30 | 63% (7.7 GB) | 42.9 | 53.3 | 54.2 |
+| **28** | **70% (8.5 GB)** | **46.3** | **55.6** | **56.2** |
+
+A_short（純粋な生成速度に近い）で -ncmoe 28 が最速。B_mid/C_long も僅差で 28 がベスト。
+VRAM 30% 余裕あり。-ncmoe 26 以下は将来の最適化余地として残す。
+
+ロールバック: `NOVEL_DB_QA_FULL_BOOK_MODE=false` の env で段階 B 相当の hybrid_search
+経路に戻る（プロセス再起動不要）。llama-server 側は num_ctx=131072 で動いているが
+scope=book で過剰な ctx を使わないだけなので問題なし。
 
 ### 7.4. Query Expansion（`query_expander.py`、B-11、2026-05-11 採用）
 
