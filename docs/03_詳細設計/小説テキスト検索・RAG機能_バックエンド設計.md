@@ -21,7 +21,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
 - **既存パターン踏襲**: routers / services 分離・`_deps.py` の validated_source・`utils/path_utils.py` の validate_safe_path を流用（[CLAUDE.md backend conventions](../../.claude/CLAUDE.md)）
 - **SQLite 単一ファイル**: 書籍データ・チャンク・ベクトル・履歴・ジョブをすべて 1 ファイルにまとめ、DB 配置・バックアップを単純化
 - **既存 series / meta は流用**: 書籍 ↔ シリーズの紐付けは既存 `series.router` / `data/meta/novel/meta.json` をそのまま参照
-- **LLM クライアントは共通モジュール**: thinking モデルの呼び出しロジックは `D:\61.tool\common\Qwen` に切り出し、他プロジェクトと共有（詳細は [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)）
+- **LLM クライアントは共通モジュール**: thinking モデルの呼び出しロジックは `D:\61.tool\common\llm`（A-0 リネーム前は `Qwen/`）に切り出し、他プロジェクトと共有（詳細は [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)）
 - **リアルタイム配信は SSE**: Qwen3.6 の応答（80〜130 秒）を Server-Sent Events で逐次配信
 
 ### 1.3. 関連ドキュメント
@@ -77,7 +77,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                             └─ qwen3.6-iq4xs       (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル, IQ4_XS GGUF)
                                   ▲
                                   │ 共通モジュール経由（QWEN_BACKEND で 2 系統切替）
-                              [D:\61.tool\common\Qwen\lib\qwen_client.py]
+                              [D:\61.tool\common\llm\local_llm]
 
 [StaticFiles] /kindle_novel/images/{書籍名}/{連番}.png  (既存マウント流用)
 ```
@@ -675,26 +675,75 @@ def search_book_summaries(
 
 ### 7.1. Qwen SSE ストリーミング（共通モジュール経由、2 バックエンド切替）
 
-- LLM クライアントは `D:\61.tool\common\Qwen\lib\qwen_client.py` の `astream_ask()` を直接呼ぶ
-- `llm.py` 自体は薄いラッパで、Pic2PDF 固有の `LLM_OPTIONS` を渡しつつイベントを yield する
-- **B-14 / ADR-0009 で `QWEN_BACKEND` 切替を追加**（既定 `llama_server`、ロールバック用 `ollama`）。バックエンド分岐・OpenAI 互換 SSE → Ollama 形式イベントの正規化・thinking 抑制（`chat_template_kwargs.enable_thinking=false`）はすべて共通モジュール側に集約
-- 共通モジュール側で **Qwen3.x の thinking モデル必須要件**（thinking 抑制・`stream=True`・`num_predict` を thinking で食い潰されない値にする）を担保している
-- レスポンスは正規化された dict。`{response, done, done_reason, prompt_eval_count, eval_count}` の Ollama 互換形式で yield されるため、利用側は分岐を意識せず従来通り `event.get("response")` / `event.get("done")` のまま使える
+- LLM クライアントは `D:\61.tool\common\llm` の `local_llm` パッケージ
+  （`Backend(ABC)` + `LlamaServerBackend` / `OllamaBackend` の 2 具象）
+  を sys.path 経由で取り込む
+- Pic2PDF 側の `services/novel_db/_llm_backend.py` で **sys.path 注入 +
+  Backend 構築** をまとめており、各 service ファイル (`llm.py` / `summarizer.py`)
+  は `from ._llm_backend import build_qwen_backend` だけ書けばよい
+- **B-14 / ADR-0009 で `NOVEL_DB_LLM_BACKEND` 切替を追加**（既定 `llama_server`、
+  ロールバック用 `ollama`）。バックエンド分岐・OpenAI 互換 SSE → Ollama 形式
+  イベントの正規化・thinking 抑制（`chat_template_kwargs.enable_thinking=false`）
+  はすべて共通モジュール側に集約
+- 共通モジュール側で **Qwen3.x の thinking モデル必須要件**（thinking 抑制・
+  `stream=True`・`num_predict` を thinking で食い潰されない値にする）を担保している
+- レスポンスは正規化された dict。`{response, done, done_reason, prompt_eval_count,
+  eval_count}` の Ollama 互換形式で yield されるため、利用側は backend 種別を
+  意識せず従来通り `event.get("response")` / `event.get("done")` のまま使える
 - 完了後（`done: true` 受信時）に履歴を保存
 
 ```python
+# services/novel_db/_llm_backend.py（抜粋）
+import sys
+
+_LLM_PKG_DIR = r"D:\61.tool\common\llm"
+if _LLM_PKG_DIR not in sys.path:
+    sys.path.insert(0, _LLM_PKG_DIR)
+
+import config
+from local_llm import (
+    Backend, BackendConfig, LlamaServerBackend, LLMError, OllamaBackend,
+)
+
+def build_qwen_backend() -> Backend:
+    if config.NOVEL_DB_LLM_BACKEND == "llama_server":
+        return LlamaServerBackend(BackendConfig(
+            base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
+            model=config.NOVEL_DB_LLM_MODEL,
+        ))
+    if config.NOVEL_DB_LLM_BACKEND == "ollama":
+        return OllamaBackend(BackendConfig(
+            base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
+            model=config.NOVEL_DB_LLM_MODEL,
+        ))
+    raise LLMError(f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND}")
+
+
 # services/novel_db/llm.py（抜粋）
-import os, sys
-os.environ.setdefault("QWEN_OLLAMA_BASE_URL", NOVEL_DB_OLLAMA_BASE_URL)
-os.environ.setdefault("QWEN_BACKEND", NOVEL_DB_LLM_BACKEND)            # B-14
-os.environ.setdefault("QWEN_LLAMA_SERVER_BASE_URL", NOVEL_DB_LLAMA_SERVER_URL)  # B-14
-sys.path.insert(0, r"D:\61.tool\common\Qwen\lib")
-from qwen_client import astream_ask as _astream_ask
+from ._llm_backend import build_qwen_backend
+
+_BACKEND = build_qwen_backend()  # プロセス起動時に 1 度だけ
+
+async def _astream_ask(prompt, *, model=None, options=None, timeout=None):
+    """共通 Backend に委譲する thin wrapper（テストで monkeypatch 用）。"""
+    async for event in _BACKEND.astream_ask(
+        prompt, model=model, options=options, timeout=timeout,
+    ):
+        yield event
 
 async def stream_qa(prompt, *, model=NOVEL_DB_LLM_MODEL, options=None, timeout=600.0):
     async for event in _astream_ask(prompt, model=model, options=options or LLM_OPTIONS, timeout=timeout):
         yield event
 ```
+
+**設計上の決定（A-3、2026-05-11）**:
+- env var bridge (`os.environ.setdefault("QWEN_*", ...)`) を廃止し、
+  `BackendConfig` を引数渡しする方式に統一
+- `config` の値は call-time で参照（`from config import X` ではなく `config.X`）。
+  monkeypatch で reload 不要、後続テストへの状態漏れもない
+- `_astream_ask` は `_BACKEND.astream_ask` への薄い委譲。テストでは
+  `llm._astream_ask` を monkeypatch することで Backend 実体（HTTP）を介さず
+  動作確認できる
 
 **バックエンド構成（採用後）**:
 
@@ -708,7 +757,7 @@ llama-server は Windows タスクスケジューラの `llama-server-qwen` タ�
 
 **ロールバック**: `NOVEL_DB_LLM_BACKEND=ollama` で 1 行で戻る（Ollama 側に `qwen3.6-iq4xs` モデルを残置している）。
 
-なぜ共通モジュールに切り出したかは [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)、なぜ llama-server に切り替えたかは [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) を参照。実機ベンチで応答 5× 短縮を確認している。
+なぜ共通モジュールに切り出したかは [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)、なぜ llama-server に切り替えたかは [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) を参照。実機ベンチで応答 5× 短縮を確認している。なぜ Backend 抽象に再設計したかは [LLM 層リファクタリング計画](../06_リファクタリング/LLM層リファクタリング計画.md)（A-0〜A-7、2026-05-11）を参照。
 
 ### 7.2. プロンプト構築
 

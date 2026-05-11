@@ -19,7 +19,6 @@ ADR-0007 とは独立した品質改善（B-5）。
 from __future__ import annotations
 
 import sqlite3
-import sys
 from collections.abc import Callable
 
 from config import (
@@ -28,13 +27,11 @@ from config import (
     NOVEL_DB_MIN_BODY_CHARS,
 )
 
+from ._llm_backend import build_qwen_backend
 from .embedder import embed_batch, serialize_f32
 
-# 共通 Qwen モジュールを import（lib/ を sys.path 追加）
-_QWEN_LIB_DIR = r"D:\61.tool\common\Qwen\lib"
-if _QWEN_LIB_DIR not in sys.path:
-    sys.path.insert(0, _QWEN_LIB_DIR)
-from qwen_client import ask  # noqa: E402
+# プロセス起動時に Backend を作る。Backend は stateless なので使い回しで OK。
+_BACKEND = build_qwen_backend()
 
 # ---------------------------------------------------------------------------
 # 定数
@@ -185,7 +182,7 @@ def summarize_book(
             book_name=book_name, text=body_text,
             target=_FINAL_SUMMARY_TARGET_CHARS,
         )
-        return ask(prompt, model=model, options=_ONE_SHOT_OPTIONS).strip()
+        return _BACKEND.ask(prompt, model=model, options=_ONE_SHOT_OPTIONS).strip()
 
     # フォールバック経路: 異常に大きな本文（>200,000 字）は map-reduce で集約
     chunks = _chunk_for_map(body_text)
@@ -202,7 +199,7 @@ def summarize_book(
         prompt = _MAP_PROMPT.format(
             book_name=book_name, i=i, n=len(chunks), text=chunk,
         )
-        intermediates.append(ask(prompt, model=model, options=_MAP_OPTIONS).strip())
+        intermediates.append(_BACKEND.ask(prompt, model=model, options=_MAP_OPTIONS).strip())
 
     # reduce: 中間要約を統合
     _log(progress, f"  reduce ({sum(len(s) for s in intermediates):,} chars)...")
@@ -213,7 +210,7 @@ def summarize_book(
         book_name=book_name, summaries=summaries_block,
         target=_FINAL_SUMMARY_TARGET_CHARS,
     )
-    return ask(prompt, model=model, options=_REDUCE_OPTIONS).strip()
+    return _BACKEND.ask(prompt, model=model, options=_REDUCE_OPTIONS).strip()
 
 
 def update_book_summary(

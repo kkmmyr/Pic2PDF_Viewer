@@ -179,7 +179,7 @@ novel タブ（Kindle スクショ → Searchable PDF）を、**OCR テキスト
 | 質問応答 LLM | **`qwen3.6:35b-a3b`**（Ollama、thinking モデル / 35B 総・活性 3B MoE） | 概括的な質問への踏み込みが Gemma 4:26b より大幅に深い。`stream=True` / `think=False` を共通モジュール側で必須化（[ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)） |
 | 主要登場人物抽出 | **`gemma4:e4b`**（Ollama） | 短答型タスクは軽量モデルで十分。1300 ページの一括抽出を現実的な時間で回せる |
 | 検索 | FTS5 OR フレーズ + ベクトル + RRF + フィルタ（`min_chars` / `body_page_margin` / `max_per_book`）| 単純キーワードは FTS5、意味検索は bge-m3 が分担。フィルタで章扉・付録ページを除外し書籍偏りを抑制 |
-| LLM クライアント | **`D:\61.tool\common\Qwen`** 共通モジュール経由 | thinking モデル特有の地雷（`response` 空 / `num_predict` 食い潰し）を踏み抜く呼び出しを集約 |
+| LLM クライアント | **`D:\61.tool\common\llm`** 共通モジュール経由（A-0 リネーム前は `Qwen/`） | thinking モデル特有の地雷（`response` 空 / `num_predict` 食い潰し）を踏み抜く呼び出しを集約 |
 
 PoC 検証結果: [docs/05_記録/](../05_記録/) で別途記録予定（任意）
 
@@ -212,7 +212,7 @@ PoC 検証結果: [docs/05_記録/](../05_記録/) で別途記録予定（任�
 - ローカル完結。Ollama サーバー（`localhost:11434`）が起動している前提
 - 質問応答 LLM（qwen3.6:35b-a3b）は応答時間が長い（80〜130 秒）。UI で「生成中」スピナー / プログレス表示が必要
 - 環境: RTX 5070 **VRAM 12GB** + システム RAM 32GB。qwen3.6:35b-a3b（27GB / Q4_K_M）は VRAM に収まり切らず、Ollama が自動で約 61% を CPU 側にオフロードしている（システム RAM 使用）。それでも MoE 活性 3B のため動作するが、生成速度は ~5〜6 t/s 程度になる
-- LLM クライアントは共通 Qwen モジュール（`D:\61.tool\common\Qwen`）に依存。共通モジュールが破損 / 移動するとビルド不可
+- LLM クライアントは共通 LLM モジュール（`D:\61.tool\common\llm`）に依存。共通モジュールが破損 / 移動するとビルド不可
 
 ---
 

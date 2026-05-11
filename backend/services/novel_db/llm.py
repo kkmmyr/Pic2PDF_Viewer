@@ -1,54 +1,34 @@
-"""Qwen LLM への SSE ストリーミング呼び出し。
+"""Qwen LLM への SSE ストリーミング呼び出し（QA エンドポイント用）。
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §7 と
 ADR-0009（推論バックエンド切替）。
 
-Qwen3.x 系は thinking モデルのため、`stream=True` + thinking 抑制（Ollama では
-`think=False`、llama-server では `chat_template_kwargs.enable_thinking=false`）を
-両方そろえる必要がある。この地雷を踏み抜く処理は `D:\\61.tool\\common\\Qwen` の
-共通モジュールに集約しているため、ここからは `astream_ask` を呼ぶだけにしている。
+Qwen3.x 系は thinking モデルのため `stream=True` + thinking 抑制を両方そろえる
+必要がある。この地雷を踏み抜く処理は共通 LLM モジュール (`D:\\61.tool\\common\\llm`
+の `local_llm` パッケージ) に集約しているため、ここからは `Backend.astream_ask`
+を呼ぶだけにしている。
 
-B-14 / ADR-0009 で Qwen のデフォルトバックエンドを llama-server に変更。
-ロールバックは `NOVEL_DB_LLM_BACKEND=ollama` の 1 行。
+Backend インスタンスは `_llm_backend.QWEN_BACKEND` でプロセス全体で共有される
+（`config.py` の `NOVEL_DB_LLM_BACKEND` を見て llama_server / ollama を切替）。
 """
 from __future__ import annotations
 
-import os
-import sys
 from collections.abc import AsyncIterator
 from typing import Any
 
-from config import (
-    NOVEL_DB_LLAMA_SERVER_URL,
-    NOVEL_DB_LLM_BACKEND,
-    NOVEL_DB_LLM_MODEL,
-    NOVEL_DB_OLLAMA_BASE_URL,
-    NOVEL_DB_QA_NUM_CTX,
-)
+from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_NUM_CTX
 
+from ._llm_backend import build_qwen_backend
 from .search import Scope, SearchHit
 
-# 共通 Qwen モジュールに Pic2PDF 側の設定をブリッジする。
-# qwen_client は呼び出し時に os.environ を都度読むため、import 前に確定させればよい。
-# setdefault を使うのは、外部から QWEN_* を直接渡された場合（ベンチ等）を尊重するため。
-os.environ.setdefault("QWEN_OLLAMA_BASE_URL", NOVEL_DB_OLLAMA_BASE_URL)
-os.environ.setdefault("QWEN_BACKEND", NOVEL_DB_LLM_BACKEND)
-os.environ.setdefault("QWEN_LLAMA_SERVER_BASE_URL", NOVEL_DB_LLAMA_SERVER_URL)
+# プロセス起動時に Backend を作る。Backend は stateless なので使い回しで OK。
+_BACKEND = build_qwen_backend()
 
-# 共通 Qwen モジュールの lib/ を sys.path に直接追加する。
-# Qwen の config.py を import する流儀（Gemma 4 流）も用意されているが、
-# Pic2PDF backend は同じ名前 (`config`) のモジュールを既にキャッシュしているため、
-# こちらでは衝突を避けて lib/ ディレクトリのみ追加する。
-_QWEN_LIB_DIR = r"D:\61.tool\common\Qwen\lib"
-if _QWEN_LIB_DIR not in sys.path:
-    sys.path.insert(0, _QWEN_LIB_DIR)
-from qwen_client import astream_ask as _astream_ask  # noqa: E402
-
-# PoC で確定した LLM パラメータ。num_ctx は config 化されており、B-13 段階 A で
-# 既定 16384 に拡大（従来 8192 では top_k=32 + 全 11 冊サマリで切り詰めが発生していた）。
+# PoC で確定した QA 用 LLM パラメータ。num_ctx は config 化されており、B-13 段階 A〜C で
+# 段階拡大（既定 32768）。
 # 注意: llama-server バックエンドでは num_ctx は起動時 `-c` で決まるため、ここで
 # 渡しても無視される（指定しても害はない）。env が llama_server の場合は
-# start-qwen-server.bat 側で `-c 18432` を変更すること。
+# start-qwen-server.bat 側で `-c 131072` を変更すること。
 LLM_OPTIONS: dict[str, Any] = {
     "temperature": 0.2,
     "repeat_penalty": 1.2,
@@ -162,6 +142,24 @@ def _build_summaries_block(
     return "\n".join(lines)
 
 
+async def _astream_ask(
+    prompt: str,
+    *,
+    model: str | None = None,
+    options: dict | None = None,
+    timeout: float | None = None,
+) -> AsyncIterator[dict]:
+    """共通 Backend に委譲する thin wrapper。テストでは monkeypatch で差し替え可能。
+
+    `stream_qa` から呼ばれる単一の入口。利用側は `_astream_ask` を直接 mock
+    することで、Backend 実体（HTTP）を介さずにテストできる。
+    """
+    async for event in _BACKEND.astream_ask(
+        prompt, model=model, options=options, timeout=timeout,
+    ):
+        yield event
+
+
 async def stream_qa(
     prompt: str,
     *,
@@ -171,9 +169,9 @@ async def stream_qa(
 ) -> AsyncIterator[dict]:
     """Qwen に stream=True で投げ、各イベントを yield する。
 
-    実体は共通 Qwen モジュール（D:\\61.tool\\common\\Qwen）の `astream_ask` を呼ぶ
-    だけ。バックエンド分岐（Ollama / llama-server）、thinking 抑制、SSE→Ollama 形式の
-    正規化はすべて共通側に集約している。
+    実体は `_llm_backend.QWEN_BACKEND.astream_ask` を呼ぶだけ。
+    バックエンド分岐（Ollama / llama-server）、thinking 抑制、SSE→Ollama 形式の
+    正規化はすべて共通モジュール (`local_llm`) 側に集約している。
     """
     async for event in _astream_ask(
         prompt,

@@ -8,7 +8,7 @@
 - 設計: [バックエンド設計](../03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md)
 - 機能候補: [機能追加候補](../01_要件定義/機能追加候補.md)
 - LLM 切替の経緯: [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)
-- 共通 LLM モジュール: `D:\61.tool\common\Qwen`
+- 共通 LLM モジュール: `D:\61.tool\common\llm`（A-0 リネーム前は `Qwen/`）
 
 ---
 
@@ -56,7 +56,7 @@
 | `num_predict` 食い潰し | thinking ブロックで予算消化、本文 0 字 | `think=False` を必ず送る |
 | 途中切断 | `done_reason='length'`、回答が中途半端 | `num_predict` を 4096 以上に |
 
-これらは `D:\61.tool\common\Qwen\lib\qwen_client.py` で `_build_body()` がデフォルトで `stream=True` / `think=False` を強制している。利用側プロジェクトはこれを書かなくてよい設計。
+これらは `D:\61.tool\common\llm\local_llm\` の各 Backend 実装で `_build_body()` がデフォルトで `stream=True` / `think=False` を強制している。利用側プロジェクトはこれを書かなくてよい設計。
 
 ### 1.2 num_ctx と入力サイズの実機計測（2026-05-10）
 
@@ -339,12 +339,15 @@ DeepSeek V3.x 級のクラウド API を使う場合の試算（2026-05-10 時�
 
 ## 6. 実装パターン
 
-### 6.1 共通 Qwen モジュール（`D:\61.tool\common\Qwen`）
+### 6.1 共通 LLM モジュール（`D:\61.tool\common\llm`、A-0 リネーム前は `Qwen/`）
 
-- `lib/qwen_client.py` は **自己完結**（`config` モジュール非依存）
-- 設定は環境変数（`QWEN_OLLAMA_BASE_URL` / `QWEN_MODEL` / `QWEN_TIMEOUT_SEC`）から **呼び出しごとに** 読み直す（プロセス起動後の上書きにも追随）
-- 利用側プロジェクトが `config.py` を持っていても衝突しない（`lib/` を直接 `sys.path` 追加）
-- thinking モデル必須要件（`stream=True` / `think=False`）を `_build_body()` で強制
+- `local_llm/` パッケージは **自己完結**（利用側 `config.py` 等に依存しない）
+- 設定は `BackendConfig` 引数渡し（A-3 以降）。CLI / MCP は `backend_from_env()`
+  で環境変数（`QWEN_BACKEND` / `QWEN_OLLAMA_BASE_URL` / `QWEN_LLAMA_SERVER_BASE_URL`
+  / `QWEN_MODEL` / `QWEN_TIMEOUT_SEC`）から Backend を 1 つ作る
+- 利用側プロジェクトが `config.py` を持っていても衝突しない（`local_llm` 名前空間に閉じる）
+- thinking モデル必須要件（`stream=True` / `think=False`、llama-server では
+  `chat_template_kwargs.enable_thinking=False`）を各 Backend の `_build_body()` で強制
 
 経緯: [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)
 
@@ -400,7 +403,7 @@ LLM が生成したサマリ / 回答に対する事実確認の標準手順:
 
 - **症状**: `done_reason='stop'` だが応答 0 字
 - **原因**: `stream=False` を使った / `think=True` で thinking ブロックに num_predict 食い潰された
-- **対処**: `qwen_client.py` の `ask` / `stream_ask` を使う。直接 Ollama を叩かない
+- **対処**: `local_llm` の Backend (`OllamaBackend` / `LlamaServerBackend`) の `ask` / `stream_ask` を使う。直接 Ollama / llama-server を叩かない
 
 ### 8.2 「VRAM OOM」
 
@@ -595,7 +598,7 @@ llama-server.exe ^
 | `backend/scripts/build_novel_summaries.py` | サマリ一括生成 CLI |
 | `backend/scripts/extract_characters.py` | キャラ一括抽出 CLI |
 | `backend/scripts/build_chunk_contexts.py` | チャンク contextualize 一括 CLI |
-| `D:\61.tool\common\Qwen\lib\qwen_client.py` | 共通 Qwen クライアント |
+| `D:\61.tool\common\llm\local_llm\` | 共通 LLM クライアント（Backend ABC + 2 つの具象） |
 
 ---
 

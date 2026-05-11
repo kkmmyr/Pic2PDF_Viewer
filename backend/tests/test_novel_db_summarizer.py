@@ -99,8 +99,8 @@ def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
 # ---------------------------------------------------------------------------
 
 def test_summarize_book_one_shot_for_short_book(db_with_book):
-    """単一チャンクで収まる本では ask() が 1 回だけ呼ばれる。"""
-    with patch("services.novel_db.summarizer.ask") as mock_ask:
+    """単一チャンクで収まる本では _BACKEND.ask() が 1 回だけ呼ばれる。"""
+    with patch("services.novel_db.summarizer._BACKEND.ask") as mock_ask:
         mock_ask.return_value = "  これは要約です。  "
         with with_db() as conn:
             summary = summarize_book(
@@ -131,7 +131,7 @@ def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
             )
         conn.commit()
 
-    with patch("services.novel_db.summarizer.ask") as mock_ask:
+    with patch("services.novel_db.summarizer._BACKEND.ask") as mock_ask:
         mock_ask.side_effect = [f"map-{i}" for i in range(8)] + ["最終要約"]
         with with_db() as conn:
             summary = summarize_book(

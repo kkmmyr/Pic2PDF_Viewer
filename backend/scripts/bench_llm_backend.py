@@ -1,8 +1,9 @@
 """LLM 推論バックエンド (Ollama / llama-server) のベンチマーク。
 
 B-14 / ADR-0009 採用時に Phase 0〜4b として手動実行したベンチを統合し、再現
-可能な形で残したもの。共通 `qwen_client` の `QWEN_BACKEND` 切替で両 backend
-を同じプロンプトで叩き、`prompt_eval_count` / `eval_count` / 応答時間を比較する。
+可能な形で残したもの。共通 `local_llm` パッケージの `OllamaBackend` /
+`LlamaServerBackend` を直接 instantiate して同じプロンプトで叩き、
+`prompt_eval_count` / `eval_count` / 応答時間を比較する。
 
 3 種類のプロンプトサイズで warm-up + 計測 1 回ずつを流す:
     - A_short (~120 tok in)  - 単冊・短文 RAG
@@ -27,7 +28,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 import time
 from pathlib import Path
@@ -36,13 +36,19 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-# 共通 Qwen モジュール（B-14 で QWEN_BACKEND 切替対応）
-_QWEN_LIB_DIR = r"D:\61.tool\common\Qwen\lib"
-if _QWEN_LIB_DIR not in sys.path:
-    sys.path.insert(0, _QWEN_LIB_DIR)
+# 共通 LLM パッケージ（A-1 で qwen_client → local_llm に再構築）
+_LLM_PKG_DIR = r"D:\61.tool\common\llm"
+if _LLM_PKG_DIR not in sys.path:
+    sys.path.insert(0, _LLM_PKG_DIR)
+
+from local_llm import (  # noqa: E402
+    Backend,
+    BackendConfig,
+    LlamaServerBackend,
+    OllamaBackend,
+)
 
 from config import NOVEL_DB_QA_NUM_CTX  # noqa: E402
-from qwen_client import stream_ask  # noqa: E402
 
 DEFAULT_MODEL = "qwen3.6-iq4xs"
 NUM_PREDICT = 256       # tg 計測の安定化のため短めに固定
@@ -132,15 +138,16 @@ CASES = [
 # 1 回計測
 # ---------------------------------------------------------------------------
 
-def _run_once(label: str, prompt: str, model: str) -> dict:
+def _run_once(label: str, prompt: str, backend: Backend, model: str) -> dict:
     """1 リクエストを投げて Ollama 形式の最終イベントから統計を取り出す。
 
-    qwen_client が両 backend で同じ形式（`response` / `done` / `prompt_eval_count`
-    / `eval_count`）に正規化してくれるため、ここでは backend を意識しない。
+    `local_llm` の Backend が両系統で同じ形式（`response` / `done`
+    / `prompt_eval_count` / `eval_count`）に正規化してくれるため、ここでは
+    backend 種別を意識しない。
 
     `tg_t_per_s` の意味（重要）:
-        - **Ollama backend**: `eval_count / eval_duration` = 純粋な生成速度（プロンプト処理時間を除く）
-        - **llama_server backend**: `eval_count / elapsed` = end-to-end 速度（プロンプト処理込み）
+        - **OllamaBackend**: `eval_count / eval_duration` = 純粋な生成速度（プロンプト処理時間を除く）
+        - **LlamaServerBackend**: `eval_count / elapsed` = end-to-end 速度（プロンプト処理込み）
             * OpenAI 互換 SSE は `timings` フィールドを返さないため
             * 純粋な生成速度を知りたい場合は llama-server を `/v1/chat/completions`
               に **非ストリーミング**で叩いて `timings.predicted_per_second` を読む
@@ -151,15 +158,15 @@ def _run_once(label: str, prompt: str, model: str) -> dict:
         "repeat_penalty": REPEAT_PENALTY,
         "num_predict": NUM_PREDICT,
         # 本番 QA と同じ num_ctx を使う（config.NOVEL_DB_QA_NUM_CTX）。
-        # 段階 A=16384 / 段階 B=32768 などの切替に追従。llama_server backend では
-        # 起動時 -c で決まるためここの値は無視されるが、Ollama backend では効く
+        # 段階 A=16384 / 段階 B=32768 などの切替に追従。LlamaServerBackend では
+        # 起動時 -c で決まるためここの値は無視されるが、OllamaBackend では効く
         "num_ctx": NOVEL_DB_QA_NUM_CTX,
     }
     print(f"\n--- {label} (prompt_chars={len(prompt)}) ---", flush=True)
     start = time.time()
     final: dict = {}
     response_parts: list[str] = []
-    for event in stream_ask(prompt, model=model, options=options, think=False, timeout=600):
+    for event in backend.stream_ask(prompt, model=model, options=options, think=False, timeout=600):
         if event.get("response"):
             response_parts.append(event["response"])
         if event.get("done"):
@@ -205,21 +212,34 @@ def _run_once(label: str, prompt: str, model: str) -> dict:
 # 1 backend を回す
 # ---------------------------------------------------------------------------
 
-def run_backend(backend: str, *, model: str, llama_url: str | None) -> dict:
-    """backend を切り替えて 3 ケース実走。各ケース warm-up + 計測 1 回。"""
-    os.environ["QWEN_BACKEND"] = backend
-    if backend == "llama_server" and llama_url:
-        os.environ["QWEN_LLAMA_SERVER_BASE_URL"] = llama_url
+def _make_backend(kind: str, *, model: str, llama_url: str) -> Backend:
+    """ベンチ対象の Backend を 1 つ作る。
 
-    print(f"\n=== Bench: backend={backend}, model={model} ===", flush=True)
+    URL は CLI フラグ (`--llama-url`) で上書き可。Ollama 側は localhost:11434 固定
+    （bench で叩く対象を変えるユースケースが無いため）。
+    """
+    cfg_model = model
+    if kind == "llama_server":
+        return LlamaServerBackend(BackendConfig(base_url=llama_url, model=cfg_model))
+    if kind == "ollama":
+        return OllamaBackend(BackendConfig(
+            base_url="http://localhost:11434", model=cfg_model,
+        ))
+    raise ValueError(f"unknown backend kind: {kind}")
+
+
+def run_backend(kind: str, *, model: str, llama_url: str) -> dict:
+    """backend を切り替えて 3 ケース実走。各ケース warm-up + 計測 1 回。"""
+    backend = _make_backend(kind, model=model, llama_url=llama_url)
+    print(f"\n=== Bench: backend={kind}, model={model} ===", flush=True)
 
     results: list[dict] = []
     for label, prompt in CASES:
-        _run_once(f"{label} [warmup]", prompt, model)
-        r = _run_once(f"{label} [measure]", prompt, model)
+        _run_once(f"{label} [warmup]", prompt, backend, model)
+        r = _run_once(f"{label} [measure]", prompt, backend, model)
         results.append(r)
 
-    return {"backend": backend, "model": model, "results": results}
+    return {"backend": kind, "model": model, "results": results}
 
 
 def _summary_table(results: list[dict]) -> str:

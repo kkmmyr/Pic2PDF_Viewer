@@ -1,68 +1,58 @@
-"""services/novel_db/llm.py のバックエンド切替テスト（B-14 / ADR-0009）。
+"""services/novel_db/llm.py + _llm_backend.py のバックエンド構築 / 委譲テスト。
 
-llm.py 自体は `astream_ask` を呼ぶだけの薄いラッパなので、テストの主眼は
+A-3（local_llm 移行）以降は env var bridge ではなく `BackendConfig` を引数渡し
+する設計。テストの主眼は
 
-1. config の値が `QWEN_BACKEND` / `QWEN_LLAMA_SERVER_BASE_URL` に正しくブリッジ
-   されていることを確認（import 時の os.environ.setdefault が動いている）
+1. `_llm_backend.build_qwen_backend()` が `config.NOVEL_DB_LLM_BACKEND` に応じて
+   `LlamaServerBackend` / `OllamaBackend` を返すこと
 2. 既存呼び出し側（`build_prompt` / `stream_qa`）のシグネチャが両バックエンドで
    変わらないことの回帰
 
-の 2 点。バックエンド固有の挙動（OpenAI SSE 変換等）は `common/Qwen/tests/` 側
+の 2 点。バックエンド固有の挙動（OpenAI SSE 変換等）は `common/llm/tests/` 側
 で網羅済みなのでここではスタブで確認するに留める。
 """
 from __future__ import annotations
 
-import json
-from unittest.mock import patch
-
 import pytest
+from local_llm import LlamaServerBackend, LLMError, OllamaBackend
+
+import config
+from services.novel_db import _llm_backend
 
 
-class TestEnvBridge:
-    """import 時に config から os.environ へブリッジされていることを確認する。"""
+class TestBuildQwenBackend:
+    """`_llm_backend.build_qwen_backend()` が config に従って正しい Backend を返す。"""
 
-    def test_llama_server_backend_bridged_by_default(self, monkeypatch):
-        # llm.py が一度 import されると setdefault されるが、別プロセス相当に
-        # するため importlib.reload で再評価する。
-        import importlib
-        import os
-
-        import config
-
-        # 既存の値が残っている可能性を消す
-        for key in ["QWEN_BACKEND", "QWEN_LLAMA_SERVER_BASE_URL", "QWEN_OLLAMA_BASE_URL"]:
-            monkeypatch.delenv(key, raising=False)
-
-        # config 側のデフォルトを差し替え
+    def test_llama_server_backend_by_default(self, monkeypatch):
         monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "llama_server")
-        monkeypatch.setattr(config, "NOVEL_DB_LLAMA_SERVER_URL", "http://127.0.0.1:11435")
+        monkeypatch.setattr(config, "NOVEL_DB_LLAMA_SERVER_URL", "http://test:11435")
+        monkeypatch.setattr(config, "NOVEL_DB_LLM_MODEL", "qwen3.6-iq4xs")
 
-        from services.novel_db import llm
-        importlib.reload(llm)
-
-        assert os.environ["QWEN_BACKEND"] == "llama_server"
-        assert os.environ["QWEN_LLAMA_SERVER_BASE_URL"] == "http://127.0.0.1:11435"
+        backend = _llm_backend.build_qwen_backend()
+        assert isinstance(backend, LlamaServerBackend)
+        assert backend.config.base_url == "http://test:11435"
+        assert backend.config.model == "qwen3.6-iq4xs"
 
     def test_rollback_to_ollama_via_config(self, monkeypatch):
-        import importlib
-        import os
-
-        import config
-
-        for key in ["QWEN_BACKEND", "QWEN_LLAMA_SERVER_BASE_URL", "QWEN_OLLAMA_BASE_URL"]:
-            monkeypatch.delenv(key, raising=False)
         monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "ollama")
+        monkeypatch.setattr(config, "NOVEL_DB_OLLAMA_BASE_URL", "http://test:11434")
 
-        from services.novel_db import llm
-        importlib.reload(llm)
+        backend = _llm_backend.build_qwen_backend()
+        assert isinstance(backend, OllamaBackend)
+        assert backend.config.base_url == "http://test:11434"
 
-        assert os.environ["QWEN_BACKEND"] == "ollama"
+    def test_unknown_backend_raises(self, monkeypatch):
+        monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "vllm")
+
+        with pytest.raises(LLMError, match="unknown NOVEL_DB_LLM_BACKEND"):
+            _llm_backend.build_qwen_backend()
 
 
 class TestStreamQaPassthrough:
-    """stream_qa が astream_ask に正しく options/model を渡すことを確認する。
+    """`stream_qa` が `_astream_ask` 経由で options/model を正しく渡すことを確認。
 
-    実際の HTTP を叩かないよう、`_astream_ask` を mock する。
+    実際の HTTP を叩かないよう `llm._astream_ask` を mock する
+    （Backend 実体の動作は common/llm/tests/ で網羅）。
     """
 
     @pytest.mark.asyncio
@@ -108,7 +98,7 @@ class TestStreamQaPassthrough:
         async for _ in llm.stream_qa("q", options={"temperature": 0.9}):
             pass
 
-        # 呼び出し側 options がそのまま forward される（マージは qwen_client 側で行う）
+        # 呼び出し側 options がそのまま forward される（マージは Backend 側で行う）
         assert captured["options"] == {"temperature": 0.9}
 
 

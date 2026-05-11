@@ -35,6 +35,10 @@ package = false
 # ----------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# A-3: 共通 LLM パッケージ (local_llm) のパスを通す。runtime では
+# services/novel_db/_llm_backend.py が sys.path に注入するが、テスト時は
+# import 順が逆転しうるためこちらでも明示的に通しておく。
+pythonpath = ["D:/61.tool/common/llm"]
 
 [tool.coverage.run]
 branch = true
