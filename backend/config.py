@@ -65,12 +65,20 @@ NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
 # - QA_MAX_PER_BOOK: scope=all / series での書籍ごと取得上限（ざっくり質問が特定冊に偏らないよう均等化）
 # - BODY_PAGE_MARGIN: 各書籍の先頭 / 末尾の除外ページ数（表紙・目次・あとがき・解説・奥付）
 NOVEL_DB_MIN_BODY_CHARS    = 300
-NOVEL_DB_QA_TOP_K          = 16
+# B-13 段階 A（2026-05-11 採用）: top_k を 16 → 32 に拡大。
+# Qwen IQ4_XS（B-12）採用後の num_ctx 拡大に合わせ、ヒットページを多く取って RAG 品質を上げる。
+# 環境変数 NOVEL_DB_QA_TOP_K で上書き可（A/B/C 段階の切替やベンチ用途）
+NOVEL_DB_QA_TOP_K          = int(os.environ.get("NOVEL_DB_QA_TOP_K", "32"))
 NOVEL_DB_QA_MAX_PER_BOOK   = 2
 NOVEL_DB_BODY_PAGE_MARGIN  = 5
 # B-8: scope=all / scope=series で QA プロンプトに含める書籍サマリの上限件数。
 # 現状 11 冊なので 11 でほぼ全冊カバー。書籍数が増えたら適宜下げる
 NOVEL_DB_QA_TOP_SUMMARIES  = 11
+# B-13 段階 A: QA 時の num_ctx。従来 8192 だったが、top_k=32 × 平均 600 字 = 約 12k 字 +
+# 全 11 冊サマリ ~11k 字 + テンプレート + 質問で約 24k 字 ≒ ~15k tokens となり 8192 を超えるため、
+# 16384 に拡大して切り詰めを防ぐ。応答時間は約 +20〜30% の見込み（量比例）
+# 環境変数 NOVEL_DB_QA_NUM_CTX で上書き可（段階 B=32768 / C=131072 への切替に使う）
+NOVEL_DB_QA_NUM_CTX        = int(os.environ.get("NOVEL_DB_QA_NUM_CTX", "16384"))
 
 # OCR 起動スクリプト
 BATCH_OCR_LAUNCHER = os.path.join(PROJECT_ROOT, "kindle-pdf", "start_batch_ocr.bat")

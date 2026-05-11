@@ -2,7 +2,7 @@
 
 novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は [要件定義: 小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
 
-最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替）
+最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替 / B-13 段階 A で QA num_ctx を 16384 化・top_k を 32 に拡大）
 
 ---
 
@@ -658,7 +658,7 @@ def search_book_summaries(
 | `body_page_margin` | `NOVEL_DB_BODY_PAGE_MARGIN = 5` | 各書籍の **先頭・末尾 N ページ** を除外。表紙・口絵・あとがき・解説・奥付を弾く |
 | `max_per_book` | `NOVEL_DB_QA_MAX_PER_BOOK = 2` | 1 書籍あたりの取得上限。`scope=all` / `scope=series` で特定書籍に偏らないよう均等化 |
 
-`top_k` のデフォルトも引き上げた（`NOVEL_DB_QA_TOP_K = 16`）。フィルタで弾かれた分を見越して多めに取り、`max_per_book` で書籍を分散させる方針。
+`top_k` のデフォルトも引き上げた（`NOVEL_DB_QA_TOP_K = 32`、B-13 段階 A で 2026-05-11 に 16 → 32 に拡大）。フィルタで弾かれた分を見越して多めに取り、`max_per_book` で書籍を分散させる方針。`max_per_book = 2` のままで `top_k = 32` を満たすには 16 冊以上の書籍が必要なので、現状 11 冊では `max_per_book` を超える前に書籍数で上限に達する（実際の取得件数は最大でも 22 件程度）。
 
 **フィルタの効き方の注意**:
 - `min_chars` を厳しくしすぎると挿絵が多い章でヒットを取り逃す。300 字は経験値（PoC で「短すぎる」と感じた境界）
@@ -759,11 +759,17 @@ LLM_OPTIONS = {
     "temperature": 0.2,
     "repeat_penalty": 1.2,
     "num_predict": 4096,
-    "num_ctx": 8192,
+    "num_ctx": NOVEL_DB_QA_NUM_CTX,  # config 化、既定 16384（B-13 段階 A、2026-05-11）
 }
 ```
 
-PoC で確定した値を踏襲。`num_predict=4096` は `qwen3.6:35b-a3b` で `done_reason='stop'` で完走するのに十分な値（共通モジュールのデフォルト 8192 を `LLM_OPTIONS` で上書き）。これ以外の値は将来 `qa_history.options_json` を分析してチューニング。
+`num_predict=4096` は Qwen 系で `done_reason='stop'` で完走するのに十分な値（共通モジュールのデフォルト 8192 を `LLM_OPTIONS` で上書き）。
+
+**`num_ctx` は `NOVEL_DB_QA_NUM_CTX`（既定 16384）で config 化**（B-13 段階 A、2026-05-11）。従来 8192 では:
+- `top_k=32` のページ抜粋（~12k 字）+ 全 11 冊サマリ（~11k 字）+ システムプロンプト + 質問 ≒ **~25k 字 / ~15k tokens** に達し、`num_ctx=8192` では切り詰めが発生していた可能性
+- 16384 に拡大して切り詰めリスクを解消、応答時間は +20〜30% を許容
+
+後続の段階 B / C（`num_ctx=32768` / `131072` 等）は機能追加候補 B-13 を参照。`NOVEL_DB_QA_NUM_CTX` 環境変数で切替可能。
 
 ### 7.4. SSE エンドポイント
 

@@ -13,7 +13,11 @@ import sys
 from collections.abc import AsyncIterator
 from typing import Any
 
-from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_OLLAMA_BASE_URL
+from config import (
+    NOVEL_DB_LLM_MODEL,
+    NOVEL_DB_OLLAMA_BASE_URL,
+    NOVEL_DB_QA_NUM_CTX,
+)
 
 from .search import Scope, SearchHit
 
@@ -31,12 +35,13 @@ if _QWEN_LIB_DIR not in sys.path:
     sys.path.insert(0, _QWEN_LIB_DIR)
 from qwen_client import astream_ask as _astream_ask  # noqa: E402
 
-# PoC で確定した LLM パラメータ
+# PoC で確定した LLM パラメータ。num_ctx は config 化されており、B-13 段階 A で
+# 既定 16384 に拡大（従来 8192 では top_k=32 + 全 11 冊サマリで切り詰めが発生していた）。
 LLM_OPTIONS: dict[str, Any] = {
     "temperature": 0.2,
     "repeat_penalty": 1.2,
     "num_predict": 4096,
-    "num_ctx": 8192,
+    "num_ctx": NOVEL_DB_QA_NUM_CTX,
 }
 
 PROMPT_TEMPLATE = """以下は小説『{book_title}』からの抜粋です。
