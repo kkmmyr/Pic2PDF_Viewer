@@ -8,6 +8,9 @@
       "mcp__gemma-local__generate_code",
       "mcp__gemma-local__translate_text",
       "mcp__gemma-local__analyze_image",
+      "mcp__qwen-local__ask_qwen",
+      "mcp__qwen-local__analyze_code",
+      "mcp__qwen-local__analyze_long_text",
       "Bash(uv --version)",
       "Bash(npm --version)",
       "Bash(pip list)",
@@ -43,8 +46,7 @@
       "Bash(git show *)",
       "Bash(git branch)",
       "Bash(git branch *)",
-      "Bash(git stash list)",
-      "PowerShell(if \\(-not \\(Test-Path \"D:\\\\61.tool\\\\common\\\\Qwen\\\\docs\"\\)\\) { New-Item -ItemType Directory -Path \"D:\\\\61.tool\\\\common\\\\Qwen\\\\docs\" | Out-Null; \"created\" } else { \"exists\"; Get-ChildItem \"D:\\\\61.tool\\\\common\\\\Qwen\\\\docs\" | Select-Object Name })"
+      "Bash(git stash list)"
     ]
   },
   "hooks": {
