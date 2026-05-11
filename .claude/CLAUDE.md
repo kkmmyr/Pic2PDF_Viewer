@@ -67,4 +67,4 @@ mkdocs serve
 
 ## スラッシュコマンド
 
-`/big-files` `/audit` `/check-docs` `/refactor-status` `/changelog` `/sync-memory` を提供。詳細は [README.md](README.md) を参照。
+`/big-files` `/audit` `/check-docs` `/refactor-status` `/changelog` `/sync-memory` `/grill-me` を提供。詳細は [README.md](README.md) を参照。

@@ -86,6 +86,7 @@ Claude Code 用の設定は [.claude/](.claude/) を参照。スラッシュコ�
 /refactor-status リファクタリング計画書の状態サマリ
 /changelog       直近コミットから変更履歴追記の草稿生成
 /sync-memory     永続メモリと実態のズレ修正
+/grill-me        新機能・リファクタ着手前の要件詰めインタビュー
 ```
 
 ## 開発フロー
