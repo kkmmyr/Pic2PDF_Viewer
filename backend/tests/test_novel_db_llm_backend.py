@@ -14,7 +14,7 @@ A-3（local_llm 移行）以降は env var bridge ではなく `BackendConfig` �
 from __future__ import annotations
 
 import pytest
-from local_llm import LlamaServerBackend, LLMError, OllamaBackend
+from local_llm import LlamaServerBackend, LLMError
 
 import config
 from services.novel_db import _llm_backend
@@ -33,15 +33,15 @@ class TestBuildQwenBackend:
         assert backend.config.base_url == "http://test:11435"
         assert backend.config.model == "qwen3.6-iq4xs"
 
-    def test_rollback_to_ollama_via_config(self, monkeypatch):
-        monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "ollama")
-        monkeypatch.setattr(config, "NOVEL_DB_OLLAMA_BASE_URL", "http://test:11434")
-
-        backend = _llm_backend.build_qwen_backend()
-        assert isinstance(backend, OllamaBackend)
-        assert backend.config.base_url == "http://test:11434"
-
     def test_unknown_backend_raises(self, monkeypatch):
+        """Phase C で `ollama` 分岐撤去。`llama_server` 以外は LLMError。"""
+        monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "ollama")
+
+        with pytest.raises(LLMError, match="unknown NOVEL_DB_LLM_BACKEND"):
+            _llm_backend.build_qwen_backend()
+
+    def test_unknown_vllm_backend_raises(self, monkeypatch):
+        """将来 vLLM 等の新バックエンドを env で試そうとした場合のフェイルセーフ。"""
         monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "vllm")
 
         with pytest.raises(LLMError, match="unknown NOVEL_DB_LLM_BACKEND"):

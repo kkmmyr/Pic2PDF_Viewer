@@ -70,8 +70,8 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                                           ▼
                             [Ollama localhost:11434]
                             ├─ bge-m3              (embedding)
-                            ├─ gemma4:e4b          (主要登場人物 + チャンク位置説明: 短答型)
-                            └─ qwen3.6-iq4xs       (rollback only。既定では未使用、B-14/ADR-0009)
+                            └─ gemma4:e4b          (主要登場人物 + チャンク位置説明: 短答型)
+                            (※ Phase C / 2026-05-11 で rollback 用 qwen3.6-iq4xs を撤去)
 
                             [llama-server 127.0.0.1:11435]   ← B-14 / ADR-0009 で採用
                             └─ qwen3.6-iq4xs       (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル, IQ4_XS GGUF)
@@ -682,7 +682,8 @@ def search_book_summaries(
   Backend 構築** をまとめており、各 service ファイル (`llm.py` / `summarizer.py`)
   は `from ._llm_backend import build_qwen_backend` だけ書けばよい
 - **B-14 / ADR-0009 で `NOVEL_DB_LLM_BACKEND` 切替を追加**（既定 `llama_server`、
-  ロールバック用 `ollama`）。バックエンド分岐・OpenAI 互換 SSE → Ollama 形式
+  Phase C / 2026-05-11 で `ollama` 分岐を撤去 → 現状 `llama_server` 1 択 +
+  未知バックエンドは `LLMError`）。バックエンド分岐・OpenAI 互換 SSE → Ollama 形式
   イベントの正規化・thinking 抑制（`chat_template_kwargs.enable_thinking=false`）
   はすべて共通モジュール側に集約
 - 共通モジュール側で **Qwen3.x の thinking モデル必須要件**（thinking 抑制・
@@ -755,9 +756,7 @@ async def stream_qa(prompt, *, model=NOVEL_DB_LLM_MODEL, options=None, timeout=6
 
 llama-server は Windows タスクスケジューラの `llama-server-qwen` タスク（ONLOGON トリガ、Limited 権限）で自動起動される。起動コマンドは `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat`。
 
-**ロールバック**: `NOVEL_DB_LLM_BACKEND=ollama` で 1 行で戻る（Ollama 側に `qwen3.6-iq4xs` モデルを残置している）。
-
-なぜ共通モジュールに切り出したかは [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)、なぜ llama-server に切り替えたかは [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) を参照。実機ベンチで応答 5× 短縮を確認している。なぜ Backend 抽象に再設計したかは [LLM 層リファクタリング計画](../06_リファクタリング/LLM層リファクタリング計画.md)（A-0〜A-7、2026-05-11）を参照。
+なぜ共通モジュールに切り出したかは [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)、なぜ llama-server に切り替えたかは [ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md) を参照。実機ベンチで応答 5× 短縮を確認している。なぜ Backend 抽象に再設計したかは [LLM 層リファクタリング計画](../06_リファクタリング/LLM層リファクタリング計画.md)（A-0〜A-7、2026-05-11、Phase C で Ollama rollback 経路撤去）を参照。
 
 ### 7.2. プロンプト構築
 

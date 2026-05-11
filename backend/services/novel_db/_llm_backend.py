@@ -1,15 +1,21 @@
-"""共通 LLM パッケージ (`local_llm`) の sys.path 注入 + Qwen 用 Backend ファクトリ。
+"""共通 LLM パッケージ (`local_llm`) の sys.path 注入 + Qwen / Gemma 用 Backend ファクトリ。
 
 novel_db 配下の LLM 利用箇所は本ファイル経由で `local_llm` の Backend を取得する。
 sys.path 注入と Backend 構築の責務をここに集約することで、各 service ファイル
-（llm.py / summarizer.py 等）から「外部モジュールへの依存」が見えにくくなる
-弊害を避ける（明示的に `from ._llm_backend import build_qwen_backend` と書く）。
+（llm.py / summarizer.py / character_extractor.py 等）から「外部モジュールへの
+依存」が見えにくくなる弊害を避ける（明示的に
+`from ._llm_backend import build_qwen_backend` 等と書く）。
 
-config.py の `NOVEL_DB_LLM_BACKEND` を見て `LlamaServerBackend`（既定）or
-`OllamaBackend`（rollback 用）を作る。`build_qwen_backend()` は呼び出すたびに
-新しいインスタンスを返すので、利用側 (llm.py / summarizer.py) で各自モジュール
-レベル変数に保持して使い回す。Backend は完全に stateless （frozen dataclass の
-config を持つだけ）なので複数インスタンスを作っても害はない。
+ファクトリ:
+- `build_qwen_backend()`: QA + 書籍俯瞰サマリ用（`LlamaServerBackend` 一択、
+  Phase C で Ollama 分岐撤去）
+- `build_ollama_backend(model, *, timeout)`: Gemma 系（character_extractor /
+  contextualizer / query_expander）の汎用 OllamaBackend factory（Phase B 追加）
+
+`build_*_backend()` は呼び出すたびに新しいインスタンスを返すので、利用側
+（llm.py / summarizer.py 等）で各自モジュールレベル変数に保持して使い回す。
+Backend は完全に stateless（frozen dataclass の config を持つだけ）なので
+複数インスタンスを作っても害はない。
 """
 from __future__ import annotations
 
@@ -53,10 +59,11 @@ def build_qwen_backend() -> Backend:
     """`config.py` の `NOVEL_DB_*` 値から Qwen 用 `Backend` を 1 つ構築する。
 
     `NOVEL_DB_LLM_BACKEND='llama_server'`（既定）→ `LlamaServerBackend`
-    `NOVEL_DB_LLM_BACKEND='ollama'` → `OllamaBackend`（rollback 用）
 
-    base_url は backend 種別に応じて使い分ける。model はどちらでも同じ
-    `NOVEL_DB_LLM_MODEL`（既定 `qwen3.6-iq4xs`）。
+    Phase C（2026-05-11）で `'ollama'` 分岐を撤去。Ollama 上の `qwen3.6-iq4xs`
+    は llama-server 採用後 1 ヶ月以上未使用だったため、`ollama rm` で 23GB
+    解放。`NOVEL_DB_LLM_BACKEND` env 自体は将来の新バックエンド（vLLM 等）
+    追加時の拡張点として残す。
 
     config の値は呼び出し時に参照する（`from config import X` ではなく
     `config.X`）。これにより monkeypatch で上書きしたテストが reload なしで
@@ -67,11 +74,7 @@ def build_qwen_backend() -> Backend:
             base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
             model=config.NOVEL_DB_LLM_MODEL,
         ))
-    if config.NOVEL_DB_LLM_BACKEND == "ollama":
-        return OllamaBackend(BackendConfig(
-            base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
-            model=config.NOVEL_DB_LLM_MODEL,
-        ))
     raise LLMError(
-        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND}",
+        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
+        f"(supported: 'llama_server')",
     )

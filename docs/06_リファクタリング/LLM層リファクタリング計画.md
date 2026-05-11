@@ -1,7 +1,27 @@
 # LLM 層リファクタリング計画
 
 最終更新: 2026-05-11
-ステータス: **Phase A + Phase B 完了**（2026-05-11、Phase C は user 判断待ち）
+ステータス: **Phase A + B + C 完了**（2026-05-11、`ollama rm qwen3.6-iq4xs` の C-7 実行のみ user 承認待ち）
+
+## Phase C 完了サマリ
+
+| 段階 | 内容 | 結果 |
+|---|---|---|
+| **C-1** | `_llm_backend.py` の `build_qwen_backend()` から `OllamaBackend` 分岐削除 | ✅ |
+| **C-2** | `backend/config.py` の rollback コメント記述更新 | ✅ |
+| **C-3** | `test_rollback_to_ollama_via_config` 削除、`test_unknown_vllm_backend_raises` 追加 | ✅ |
+| **C-4** | ADR-0009 / 設計書 §2.1 / §7.1 から rollback 記述削除、Phase C 採用注記追加 | ✅ |
+| **C-5** | memory `reference_qwen_common.md` 更新 | ✅ |
+| **C-6** | 変更履歴に Phase C エントリ追加 | ✅ |
+| **C-7** | `ollama rm qwen3.6-iq4xs` 実行（21GB 解放） | ⏳ user 承認後 |
+
+**最終検証**:
+- backend: 732 件 pass（Phase B と同数維持、削除 1 + 追加 1 で差し引き 0）
+- ruff: 全変更ファイル clean
+- `build_qwen_backend()` が 18 行 → 9 行に簡素化
+- 設定マトリクスが「llama_server / ollama」の 2 択 → 「llama_server」1 択に縮小
+
+
 
 ## Phase B 完了サマリ
 
@@ -435,15 +455,79 @@ think=False で使う想定なので、Gemma 4 側は触らない。
 
 ---
 
-## 5. Phase C スコープ予告（Ollama 上の旧 Qwen 撤去）
+## 5. Phase C（Ollama 上の旧 Qwen 撤去、2026-05-11 着手）
 
-Phase A / B 完了後に着手。
+Phase A / B 完了後に着手。Phase A で `_llm_backend.py` に追加した
+「`NOVEL_DB_LLM_BACKEND='ollama'` で `OllamaBackend` を返す rollback 分岐」と、
+Ollama 側に保険として残置している `qwen3.6-iq4xs` モデル（23GB）を削除する。
 
-- `ollama rm qwen3.6-iq4xs`（23GB 解放）
-- `backend/config.py` から `NOVEL_DB_LLM_BACKEND` の `ollama` 分岐コードを削除
-  （`llama_server` 一択、env 切替廃止）
-- ADR-0009 に「Phase C で ollama backend を撤去した」追記
-- ロールバックは git revert（Ollama 上のモデルだけは `ollama pull` し直す必要があるが、IQ4_XS GGUF は `D:\models\` に残るので最悪 `ollama create` で再構築可能）
+### 5.1. 実装方針
+
+**設計判断: `NOVEL_DB_LLM_BACKEND` env 自体は残す**
+
+`_llm_backend.py` の `if NOVEL_DB_LLM_BACKEND == "llama_server"` 分岐構造は
+**残す**。理由:
+
+- 将来 vLLM / SGLang 等の新バックエンドを追加する際の拡張点として有用
+- env を完全削除すると `_llm_backend.py` から「Backend は切替可能」という設計
+  意図が失われる
+- 現状 `llama_server` 1 択にしても if 1 件 + LLMError で 5 行程度、複雑性は低い
+
+ただし `"ollama"` 分岐だけは完全削除し、未知の値は `LLMError` で弾く。
+**ollama_backend を Qwen に使う rollback 経路は消える**（Phase B 採用後 1 ヶ月
+以上の実機運用で問題なしを確認済み、user 判断 2026-05-11）。
+
+### 5.2. 段階分割
+
+| 段階 | 内容 | 不可逆性 |
+|---|---|---|
+| **C-1** | `_llm_backend.py` の `build_qwen_backend()` から `OllamaBackend` 分岐削除（`config` 経由の import から `NOVEL_DB_OLLAMA_BASE_URL` も削除） | コードのみ、git revert 可能 |
+| **C-2** | `backend/config.py` の `NOVEL_DB_LLM_BACKEND` のコメント更新（「rollback 用 ollama」記述を削除）。env 自体は残す | コードのみ |
+| **C-3** | テスト `test_novel_db_llm_backend.py` の `test_rollback_to_ollama_via_config` を削除 | git revert 可能 |
+| **C-4** | ADR-0009 / 設計書 §7.1 / 小説RAG_技術知見.md に Phase C 採用追記、「rollback あり」記述を削除 | 文書のみ |
+| **C-5** | memory `reference_qwen_common.md` から「ロールバック用 Ollama 残置」記述を削除 | 文書のみ |
+| **C-6** | 変更履歴に Phase C エントリ追加 | 文書のみ |
+| **C-7** | **`ollama rm qwen3.6-iq4xs` を実行**（user 承認後） | **不可逆**（23GB 解放、復旧には再 import 必要） |
+
+C-1〜C-6 を 1 commit にまとめる。C-7 は別操作（user の環境を変える不可逆作業）。
+
+### 5.3. ロールバック手順
+
+C-1〜C-6 をコミット後、もし問題が発覚した場合:
+
+1. **コード側**: `git revert` で Phase C コミットを取り消し
+2. **Ollama 側モデル**: C-7 を実行する前なら `ollama list` で `qwen3.6-iq4xs` が
+   生きているのでそのまま使える
+3. **C-7 実行後**: `D:\models\qwen3.6-35b-a3b-iq4_xs\Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf`
+   から `ollama create qwen3.6-iq4xs -f Modelfile` で再構築可能（GGUF 本体は
+   llama-server バックエンドでも使うので残置されている）
+
+### 5.4. 影響ファイル
+
+**変更**:
+- `backend/services/novel_db/_llm_backend.py`（C-1: ollama 分岐削除）
+- `backend/config.py`（C-2: コメント更新）
+- `backend/tests/test_novel_db_llm_backend.py`（C-3: rollback テスト削除）
+- `docs/02_基本設計/ADR/0009_llm-backend-llama-server.md`（C-4: Phase C 採用追記）
+- `docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md` §7.1（C-4: rollback 記述削除）
+- `docs/05_記録/小説RAG_技術知見.md`（C-4: rollback 記述削除）
+- `docs/05_記録/変更履歴.md`（C-6: Phase C エントリ）
+- `docs/06_リファクタリング/LLM層リファクタリング計画.md`（本ファイル、Phase C 完了マーク）
+
+**memory**:
+- `reference_qwen_common.md`（C-5: rollback 記述削除）
+
+**外部環境（C-7、user 承認後）**:
+- `ollama rm qwen3.6-iq4xs` で 23GB 解放
+
+### 5.5. 完了条件
+
+- [ ] `_llm_backend.py` の `build_qwen_backend()` が `LlamaServerBackend` を返す経路のみ + LLMError
+- [ ] `config.py` から「rollback 用 Ollama」のコメント記述削除
+- [ ] backend テスト pass（rollback テスト削除で 731 件想定）
+- [ ] ADR-0009 / 設計書に Phase C 採用追記、rollback 記述削除
+- [ ] memory 更新
+- [ ] **C-7**: `ollama rm qwen3.6-iq4xs` 実行（user 承認後、不可逆）
 
 ---
 

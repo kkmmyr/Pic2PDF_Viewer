@@ -58,6 +58,9 @@ ADR-0007 で小説 RAG の QA LLM を `qwen3.6:35b-a3b`（後に IQ4_XS 量子�
 - **Ollama を完全置換せず併存**。Gemma 4:e4b（主要登場人物抽出）/ bge-m3（embedding）は引き続き Ollama を使う。Qwen だけを llama-server に出す形で運用変更を最小化
 - llama-server は OpenAI 互換 API を出すため、将来別 UI / 別ツールから叩く際にもエコシステムが豊富
 - ロールバックは `NOVEL_DB_LLM_BACKEND=ollama` で 1 行（環境変数）で戻せる
+  （※ Phase C / 2026-05-11 で本 rollback 経路は撤去。llama-server 採用後 1 ヶ月
+  以上の実機運用で問題なしを確認したため、Ollama 上の `qwen3.6-iq4xs` を
+  `ollama rm` で 23GB 解放。詳細は [LLM 層リファクタリング計画.md §5](../../06_リファクタリング/LLM層リファクタリング計画.md)）
 
 ### thinking 抑制を `chat_template_kwargs` で行う理由
 
