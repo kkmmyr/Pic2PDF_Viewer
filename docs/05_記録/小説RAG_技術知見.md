@@ -12,6 +12,34 @@
 
 ---
 
+## 0. ハードウェア前提（重要、再発防止用）
+
+実機は次のスペック。**VRAM を 22GB と誤記していた箇所が複数あったため、2026-05-11 に全面訂正**:
+
+| 項目 | スペック |
+|---|---|
+| GPU | RTX 5070、**VRAM 12GB（dedicated）** |
+| 共有 GPU メモリ（Windows 表示）| 15.6GB | システム RAM の一部、PCIe 経由で低帯域。LLM 推論ではほぼ使えない |
+| システム RAM | 32GB |
+
+**重要な事実**:
+- `qwen3.6:35b-a3b`（Q4_K_M デフォルト）は **27GB** あり、12GB VRAM に乗り切らない
+- Ollama は自動で **61% を CPU 側にオフロード**（システム RAM 使用）
+- `ollama ps` で確認できる: `PROCESSOR    61%/39% CPU/GPU`
+- 「共有 GPU メモリ 15.6GB」は Windows の仕組み上の表示。Ollama を含む LLM 推論エンジンは速度的に使わない（PCIe 帯域 ~30GB/s vs 専用 VRAM ~700GB/s で 1/20）。CPU offload 部分は通常のシステム RAM + CPU 演算
+
+**性能への影響**:
+- CPU 計算と CPU↔GPU 通信が速度律速
+- 実測生成速度: ~5.4 t/s（ctx=131k）/ ~13.8 t/s（ctx=8k）
+- num_ctx を上げても OOM しないのは、足りない分が CPU 側に流れるため（ただし遅くなる）
+
+**高速化したい場合の方針**:
+- より小さい量子化（IQ4_XS = ~22GB、Q3 = ~20GB）で CPU offload 比を減らす
+- MTP 変種で 1 forward あたりの生成トークン数を増やす
+- 詳細は機能追加候補 B-12
+
+---
+
 ## 1. ローカル LLM の制約と回避策
 
 ### 1.1 Qwen3.x thinking モデルの地雷
@@ -39,7 +67,7 @@
 | **131,072** | **70,964（完全）** | 984 chars | 287s | ✅ 完走 |
 
 **示唆:**
-- VRAM ~22GB 環境で `num_ctx=131,072` まで OOM なく動作する
+- VRAM 12GB（RTX 5070）+ システム RAM 32GB の環境で `num_ctx=131,072` まで OOM なく動作する（モデルの大部分が CPU 側に offload されるため、KV cache 拡大も主にシステム RAM を使う）
 - Qwen のトークナイザは **~1.54〜1.6 chars/token**（日本語）。10,000 字 → 6,497 token、113,357 字 → 70,964 token
 - 大きな num_ctx でも、入力サイズが num_ctx 以下なら不利益なし（速度は ctx に比例して伸びるが、応答品質は維持）
 
@@ -63,11 +91,41 @@
 | タスク種別 | 推奨モデル | 理由 |
 |---|---|---|
 | 短答型（人物名抽出 / カンマ区切り出力 / 80 字位置説明） | **gemma4:e4b** | 1 件 2〜3 秒。重量モデルは過剰 |
-| 構造的要約（書籍俯瞰サマリ）| **qwen3.6:35b-a3b** | 1500 字に因果連鎖を組み込める文章生成力が必要 |
-| QA（RAG 質問応答）| **qwen3.6:35b-a3b** | コンテキスト統合 + 引用ページ番号管理 + 構造化回答 |
+| 構造的要約（書籍俯瞰サマリ）| **qwen3.6-iq4xs**（IQ4_XS、2026-05-11〜）| 1500 字に因果連鎖を組み込める文章生成力 + 12GB VRAM への適合 |
+| QA（RAG 質問応答）| **qwen3.6-iq4xs**（IQ4_XS、2026-05-11〜）| 同上 |
 | Embedding（多言語意味検索） | **bge-m3**（1024 次元）| 日本語意味距離が `nomic-embed-text` より明確に良い |
 
 **経験則**: 「単純な短答 = 軽量、構造分析 = 重量」。Anthropic の Contextual Retrieval blog も同様の指針（位置説明は Claude Haiku で十分と推奨）。
+
+### 2.1 Qwen 量子化グレードの選定（B-12、2026-05-11 採用）
+
+旧 `qwen3.6:35b-a3b`（Q4_K_M、27GB）は本機 VRAM 12GB に収まり切らず、61% を CPU 側にオフロードしていた。`bartowski/Qwen_Qwen3.6-35B-A3B-GGUF` から **IQ4_XS（21GB）** を取得・登録（`ollama create qwen3.6-iq4xs`）して切替。
+
+**実測効果**: 書籍サマリ 287s → 229s（-20%）、QA 93s → 80s（-14%）、CPU/GPU 比 61/39 → 49/51。詳細は変更履歴 2026-05-11 エントリ参照。
+
+**選定の経緯**:
+- 当初は MTP（Multi-Token Prediction）変種で 1.5〜2x 高速化を期待
+- 調査の結果、MTP は Aman Gupta の patched llama.cpp 必須 → Ollama では動作しない
+- IQ4_XS のみで採用、結果として 14〜20% 速度改善（モデルが GPU により多く乗ったため）
+
+**Modelfile**（`D:\models\qwen3.6-35b-a3b-iq4_xs\Modelfile`）:
+
+```
+FROM D:/models/qwen3.6-35b-a3b-iq4_xs/Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf
+TEMPLATE {{ .Prompt }}
+RENDERER qwen3.5
+PARSER qwen3.5
+PARAMETER min_p 0
+PARAMETER presence_penalty 1.5
+PARAMETER repeat_penalty 1
+PARAMETER temperature 1
+PARAMETER top_k 20
+PARAMETER top_p 0.95
+```
+
+`RENDERER qwen3.5` / `PARSER qwen3.5` は Ollama 内部の Qwen 3.5 系プロンプト整形に必須（既存 `qwen3.6:35b-a3b` から継承）。
+
+**ロールバック**: `NOVEL_DB_LLM_MODEL=qwen3.6:35b-a3b` を環境変数で指定。旧モデルは保険として削除しない。
 
 ### 2.1 軽量モデル採用で時間がどう変わるか
 
@@ -186,7 +244,7 @@ DeepSeek V3.x 級のクラウド API を使う場合の試算（2026-05-10 時�
 3. **要件定義 §1.3** で「ローカル完結」を前提として明文化済み（[小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md)）
 4. **ローカル代替の成立**: B-6（num_ctx 拡大）で 1 冊フル context が動くと判明したため、「部分読み問題」の本質的解決をローカルでできるようになった
 
-**結論:** B-7 として候補に残してはいるが、本機の VRAM 22GB が確保される限り、ローカル一本で要件を満たせる見込み。
+**結論:** B-7 として候補に残してはいるが、本機（VRAM 12GB + システム RAM 32GB）で CPU offload 込みでも要件は満たせている見込み。速度面での改善余地は B-12（量子化変更 / MTP 採用）で検討する。
 
 ---
 

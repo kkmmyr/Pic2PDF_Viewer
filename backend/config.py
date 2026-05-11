@@ -48,7 +48,7 @@ NOVEL_DB_PATH = os.path.join(NOVEL_DB_DIR, "novel.db")
 NOVEL_DB_OLLAMA_BASE_URL = os.environ.get("NOVEL_DB_OLLAMA_BASE_URL", "http://localhost:11434")
 NOVEL_DB_EMBED_MODEL     = os.environ.get("NOVEL_DB_EMBED_MODEL", "bge-m3")
 NOVEL_DB_EMBED_DIM       = 1024  # bge-m3 の出力次元
-NOVEL_DB_LLM_MODEL       = os.environ.get("NOVEL_DB_LLM_MODEL", "qwen3.6:35b-a3b")
+NOVEL_DB_LLM_MODEL       = os.environ.get("NOVEL_DB_LLM_MODEL", "qwen3.6-iq4xs")
 # 主要登場人物抽出用の軽量モデル（短答型タスク。thinking で num_predict を
 # 消費する 26b と異なり、e4b は応答が速く character 抽出に向く）
 NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gemma4:e4b")

@@ -2,7 +2,7 @@
 
 novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は [要件定義: 小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
 
-最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加）
+最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替）
 
 ---
 
@@ -11,7 +11,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
 ### 1.1. 目的
 
 - 既存 Searchable PDF（`backend/data/kindle_novel/pdfs/*.pdf`）から OCR テキストを抽出して SQLite に取り込む
-- ハイブリッド検索（FTS5 OR + ベクトル `bge-m3`）+ ローカル LLM `qwen3.6:35b-a3b` でページ番号付き引用回答を返す
+- ハイブリッド検索（FTS5 OR + ベクトル `bge-m3`）+ ローカル LLM `qwen3.6-iq4xs`（Qwen3.6:35b-a3b の IQ4_XS 量子化、2026-05-11 切替）でページ番号付き引用回答を返す
 - 主要登場人物のページ単位抽出（`gemma4:e4b`）でキャラ帰属の誤りを抑制したプロンプトを構築
 - ライブラリ表示・DB 再構築・履歴保存・画像配信を提供する
 
@@ -71,7 +71,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                             [Ollama localhost:11434]
                             ├─ bge-m3              (embedding)
                             ├─ gemma4:e4b          (主要登場人物 + チャンク位置説明: 短答型)
-                            └─ qwen3.6:35b-a3b     (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル)
+                            └─ qwen3.6-iq4xs       (RAG 質問応答 + 書籍俯瞰サマリ: thinking モデル, IQ4_XS 量子化)
                                   ▲
                                   │ 共通モジュール経由
                               [D:\61.tool\common\Qwen\lib\qwen_client.py]
@@ -428,7 +428,7 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = "gemma4:e4b"   # 短答型タスクは軽量モデ
 | **1-shot（既定）** | 全文をそのまま Qwen に渡し、1500 字サマリへ | `num_predict=2560`, `num_ctx=131072` |
 | フォールバック（>200,000 字） | map: 各 ~20000 字チャンクを 400 字に / reduce: 統合して 1500 字に | map: `num_ctx=16384`, reduce: `num_ctx=16384` |
 
-実機検証で `num_ctx=131072` が VRAM ~22GB 環境で OOM なく動作することを確認（[小説RAG_技術知見.md §1.2](../05_記録/小説RAG_技術知見.md)）。1 冊あたり 1.6 chars/token 換算で 113k 字 = ~71k tokens のため、131k ctx に余裕で収まる。
+実機検証で `num_ctx=131072` が **VRAM 12GB（RTX 5070）+ システム RAM 32GB の環境**で OOM なく動作することを確認（[小説RAG_技術知見.md §0 ハードウェア前提](../05_記録/小説RAG_技術知見.md)）。モデル本体（Q4_K_M、27GB）は VRAM に乗り切らず Ollama が約 61% を CPU 側にオフロードしているため、num_ctx 拡大による KV cache 増加も主にシステム RAM 側で吸収される。1 冊あたり 1.6 chars/token 換算で 113k 字 = ~71k tokens のため、131k ctx に余裕で収まる。
 
 **スキーマ**: `books.summary TEXT`（NULL = 未生成）/ `books.summary_generated_at TIMESTAMP`。`update_book_summary()` 内で `book_summaries_vec`（B-8）への upsert も同時に行う。
 
@@ -1070,7 +1070,7 @@ embedding / LLM の Ollama 呼び出しは `responses` ライブラリ等でモ�
 - **Qwen3.6:35b-a3b の応答時間 80〜130 秒** は変えられない。UI でストリーミング表示してユーザー体感を緩和。Gemma 4:26b 時代（30〜100 秒）より長くなったが、概括的な質問への踏み込みが大幅に改善されたため受容（[ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)）
 - **キャラ帰属誤統合（残存課題）**: `main_characters` ヒント付与で誤統合率を下げたが、ゼロにはできていない（PoC 計測で ~18%）。完全防止には RAG ではなく書籍ごとの fine-tuning が必要で、ローカル小説向け個人ツールとしてはコスト超過。許容範囲として運用
 - **シリーズ未所属書籍のグルーピング表示**: 全件スコープのライブラリ画面で「未所属」セクションを設けるかは [要件定義 §10 TBD-7](../01_要件定義/小説テキスト検索・RAG機能.md) の通り、シリーズスコープからは除外（全件・単冊では含む）
-- **複数モデル対応**: 質問応答は `qwen3.6:35b-a3b`、主要登場人物抽出は `gemma4:e4b` を採用。`backend/config.py` の `NOVEL_DB_LLM_MODEL` / `NOVEL_DB_CHAR_EXTRACT_MODEL` で切替可。将来 UI からのモデル切替は要件定義 §9 「将来検討事項」を参照
+- **複数モデル対応**: 質問応答は `qwen3.6-iq4xs`（Qwen3.6:35b-a3b の IQ4_XS 量子化、B-12 で 2026-05-11 採用）、主要登場人物抽出 / コンテキスト生成は `gemma4:e4b`。`backend/config.py` の `NOVEL_DB_LLM_MODEL` / `NOVEL_DB_CHAR_EXTRACT_MODEL` / `NOVEL_DB_CONTEXT_MODEL` で切替可。ロールバックは環境変数 `NOVEL_DB_LLM_MODEL=qwen3.6:35b-a3b` で即時可能（旧モデルは保険として残置）。将来 UI からのモデル切替は要件定義 §9 「将来検討事項」を参照
 - **俯瞰質問の天井（B-5 / B-8 / B-9 で 3 段の対応済み）**: `scope=all` / `scope=series` での「シリーズ全体のテーマ」のような概括質問は、ハイブリッド検索が拾える `top_k=16` 件のページ抜粋に依存するため、全 11 冊・1359 ページを俯瞰しきれない構造だった。3 段の改善を順次適用:
     - **B-5（2026-05-10）**: `books.summary` を Qwen 1-shot で事前生成し、QA プロンプトの先頭に「書籍俯瞰サマリ」ブロックとして埋め込む（§5.7 / §7.2）
     - **B-8（2026-05-10）**: `book_summaries_vec` にサマリの bge-m3 ベクトルを格納し、`scope=all` / `scope=series` で `search_book_summaries` でサマリ自体を retrieval 候補に。ページに引っかからなかった書籍も俯瞰サマリで Qwen に伝わる（§6.5）
