@@ -338,6 +338,70 @@ def hybrid_search(
     return hits
 
 
+def load_all_pages_of_book(
+    conn: sqlite3.Connection,
+    book_name: str,
+    *,
+    min_chars: int = 0,
+    body_page_margin: int = 0,
+) -> list[SearchHit]:
+    """指定書籍の全 page を page_no 順で SearchHit リストとして返す（B-13 段階 C）。
+
+    hybrid_search を bypass する経路。scope=book + 全 page 読み込みモード用。
+    フィルタは hybrid_search と同じ規約に揃える（min_chars / body_page_margin で
+    表紙・章扉・あとがき等を除外可能）。snippet には `pages.full_text` をそのまま
+    入れる（FTS5 の `<mark>` ハイライトは無し、HTML エスケープは LLM 入力では不要）。
+    """
+    # 書籍メタ取得（先頭・末尾除外用に page 数を見るため books.id も同時に）
+    book_row = conn.execute(
+        "SELECT id FROM books WHERE name = ?", (book_name,),
+    ).fetchone()
+    if book_row is None:
+        return []
+    book_id = book_row[0]
+
+    where_clauses = ["book_id = ?"]
+    params: list[object] = [book_id]
+    if min_chars > 0:
+        where_clauses.append("char_count >= ?")
+        params.append(min_chars)
+
+    sql = (
+        f"SELECT page_no, full_text "
+        f"FROM pages WHERE {' AND '.join(where_clauses)} "
+        f"ORDER BY page_no ASC"
+    )
+    rows = conn.execute(sql, params).fetchall()
+    if not rows:
+        return []
+
+    # body_page_margin で先頭・末尾 N page を除外する。
+    # hybrid_search 側と挙動を揃えるため、書籍内の page_no 最小・最大からの差分で判定
+    if body_page_margin > 0 and len(rows) > body_page_margin * 2:
+        page_nos = [r[0] for r in rows]
+        lo = page_nos[body_page_margin]
+        hi = page_nos[-(body_page_margin + 1)]
+        rows = [r for r in rows if lo <= r[0] <= hi]
+
+    keys = [(book_name, r[0]) for r in rows]
+    main_chars_map = _fetch_main_characters(conn, keys)
+
+    hits: list[SearchHit] = []
+    for page_no, full_text in rows:
+        hits.append(
+            SearchHit(
+                book_name=book_name,
+                page_no=page_no,
+                snippet=full_text or "",
+                has_highlight=False,
+                image_url=_image_url(book_name, page_no),
+                rrf_score=0.0,  # ランキングなし（page_no 順）
+                main_characters=main_chars_map.get((book_name, page_no), []),
+            ),
+        )
+    return hits
+
+
 def search_book_summaries(
     conn: sqlite3.Connection,
     query: str,

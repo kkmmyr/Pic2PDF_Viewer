@@ -12,6 +12,7 @@ from services.novel_db.search import (
     _resolve_book_names,
     build_fts5_or_query,
     hybrid_search,
+    load_all_pages_of_book,
     sanitize_snippet,
 )
 
@@ -222,3 +223,51 @@ def test_hybrid_search_returns_empty_for_no_match(search_db):
     # ベクトルは hits に入る
     # 何かしらの結果（or 空）が返ること
     assert isinstance(hits, list)
+
+
+# ---------------------------------------------------------------------------
+# load_all_pages_of_book（B-13 段階 C、scope=book 全 page 読み込み）
+# ---------------------------------------------------------------------------
+
+def test_load_all_pages_returns_pages_in_page_no_order(search_db):
+    """全 page を page_no 昇順で返す（narrative の時系列性を保つ）。"""
+    with with_db() as conn:
+        hits = load_all_pages_of_book(conn, "book-1")
+    assert len(hits) == 3
+    assert [h.page_no for h in hits] == [1, 2, 3]
+    # snippet は full_text そのもの（HTML タグなし）
+    assert hits[0].snippet == "デュークはレティの騎士である。"
+    # rrf_score は 0.0（ランキングなし）
+    assert all(h.rrf_score == 0.0 for h in hits)
+    # image_url は通常の hybrid_search と同形式
+    assert hits[0].image_url == "/kindle_novel/images/book-1/001.png"
+
+
+def test_load_all_pages_returns_empty_for_unknown_book(search_db):
+    with with_db() as conn:
+        hits = load_all_pages_of_book(conn, "no-such-book")
+    assert hits == []
+
+
+def test_load_all_pages_filters_by_min_chars(search_db):
+    """min_chars 未満の page は除外される。"""
+    # search_db は各 page が ~15 字程度の短文。min_chars=20 で全件除外される
+    with with_db() as conn:
+        hits = load_all_pages_of_book(conn, "book-1", min_chars=20)
+    assert hits == []
+    # min_chars=0 では全件返る
+    with with_db() as conn:
+        hits = load_all_pages_of_book(conn, "book-1", min_chars=0)
+    assert len(hits) == 3
+
+
+def test_load_all_pages_respects_body_page_margin(search_db):
+    """body_page_margin で先頭・末尾を除外する（ただし 2*margin より page 数が多いときのみ）。"""
+    # 3 page しかない書籍では margin=1 で len > 2*1 = 2 なので先頭/末尾 1 ずつ除外して 1 件残る
+    with with_db() as conn:
+        hits = load_all_pages_of_book(conn, "book-1", body_page_margin=1)
+    assert [h.page_no for h in hits] == [2]
+    # margin=2 では len(3) <= 2*2 で margin 無効、全件返る
+    with with_db() as conn:
+        hits = load_all_pages_of_book(conn, "book-1", body_page_margin=2)
+    assert len(hits) == 3

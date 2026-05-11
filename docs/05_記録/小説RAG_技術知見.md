@@ -506,7 +506,7 @@ Phase 4 で「llama-server の `/completion` 直叩きだと Qwen3.x thinking �
 -ncmoe 16 -c 18432   # VRAM 11.8 / 12.2 GiB (97%)
 ```
 
-**B-13 段階 B 採用後（2026-05-11、num_ctx=32768 想定）**:
+**B-13 段階 B 採用後（2026-05-11、num_ctx=32768 想定、既定構成）**:
 
 ```
 llama-server.exe ^
@@ -525,6 +525,29 @@ llama-server.exe ^
 - ctx を倍増（18432 → 36864）した分、`-ncmoe` を 16 → 18 にして MoE block を 2 個多めに
   CPU offload。tg レートは Phase 2a 実測で -ncmoe 16 比 ~5% 低下する見込み（81.7 → 77.3 t/s）
 - num_ctx は起動時の `-c` で決定（実行時オプションでは変更不可）
+
+**B-13 段階 C 採用後（2026-05-11、num_ctx=131072 想定、opt-in 専用）**:
+
+```
+llama-server.exe ^
+  -m D:\models\qwen3.6-35b-a3b-iq4_xs\Qwen_Qwen3.6-35B-A3B-IQ4_XS.gguf ^
+  -ncmoe 32 -t 9 ^
+  -ctk q8_0 -ctv q8_0 ^
+  -fa 1 ^
+  -ngl 99 ^
+  -c 131072 ^
+  -np 1 ^
+  --jinja ^
+  --port 11435 --host 127.0.0.1
+```
+
+起動 bat: `D:\61.tool\common\llama.cpp\b9101\start-qwen-server-fullbook.bat`。段階 B 用 bat と排他（同 :11435）。
+
+**実測結果（2026-05-11、87k tokens の書籍 1 冊に深い質問）**:
+- VRAM: **6.9 / 12.2 GiB（56% 使用、当初試算 11.7 GiB から大幅にヘッドルームあり）**
+- 生成速度: **9.8 t/s**（段階 B の 45 t/s から大幅低下、想定 5〜15 t/s 帯）
+- 応答時間: 170 秒（段階 B の 4.5×、in_tok 28× 増を考えれば妥当）
+- VRAM 余裕があるため `-ncmoe` を 28〜30 に下げれば速度向上の可能性あり（将来検証）
 
 ### 9.4 検証で得られた重要な地雷リスト
 

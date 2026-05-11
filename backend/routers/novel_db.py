@@ -19,6 +19,8 @@ from config import (
     NOVEL_DB_LLM_MODEL,
     NOVEL_DB_MIN_BODY_CHARS,
     NOVEL_DB_QA_EXPAND_ENABLED,
+    NOVEL_DB_QA_FULL_BOOK_MODE,
+    NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
     NOVEL_DB_QA_MAX_PER_BOOK,
     NOVEL_DB_QA_TOP_K,
     NOVEL_DB_QA_TOP_SUMMARIES,
@@ -28,6 +30,7 @@ from services.novel_db import Scope, hybrid_search, with_db
 from services.novel_db.job_queue import job_queue
 from services.novel_db.library import list_books, list_series
 from services.novel_db.llm import LLM_OPTIONS, build_prompt, stream_qa
+from services.novel_db.search import load_all_pages_of_book
 from services.novel_db.qa_history import (
     delete_history,
     get_history_detail,
@@ -189,57 +192,82 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
     _check_locked()
     scope = Scope(type=request.scope.type, id=request.scope.id)
 
-    # 検索 + 履歴の準備（同期処理、SSE 開始前に完了させる）
-    # scope=all / series では書籍偏り抑制のため max_per_book を有効化、
-    # 単冊（book）スコープでは不要なので None。
-    max_per_book = (
-        NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
+    # B-13 段階 C（opt-in、NOVEL_DB_QA_FULL_BOOK_MODE）: scope=book のとき hybrid_search
+    # を bypass して書籍全 page を読み込む。検索ノイズなしで最高品質を試すモード。
+    # llama-server 側は start-qwen-server-fullbook.bat（-c 131072 / -ncmoe 32）で
+    # 起動しておく必要がある。num_ctx を override する点が通常 RAG と異なる
+    full_book_mode = (
+        NOVEL_DB_QA_FULL_BOOK_MODE
+        and scope.type == "book"
+        and scope.id is not None
     )
 
-    # B-11 Query Expansion: 元の質問 + 展開クエリで multi-query 検索する。
-    # 展開無効時 / 失敗時は元の質問のみのリストが返るので、結果は従来と同じになる。
-    if NOVEL_DB_QA_EXPAND_ENABLED:
-        queries = expand_query(request.question)
-    else:
-        queries = [request.question]
+    qa_options = LLM_OPTIONS
+    if full_book_mode:
+        qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX}
 
     with with_db() as conn:
-        # 各クエリで hybrid_search → (book_name, page_no) でデデュープし、
-        # 同じページが複数クエリから引かれた場合はスコア最大値を採用する
-        rows_by_key: dict[tuple[str, int], SearchHit] = {}
-        for q in queries:
-            sub_rows = hybrid_search(
+        if full_book_mode:
+            # Query Expansion / hybrid_search / 書籍サマリは全 page 読みなので不要
+            hits = load_all_pages_of_book(
                 conn,
-                q,
-                scope,
-                top=NOVEL_DB_QA_TOP_K,
+                scope.id,
                 min_chars=NOVEL_DB_MIN_BODY_CHARS,
-                max_per_book=max_per_book,
                 body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
             )
-            for h in sub_rows:
-                key = (h.book_name, h.page_no)
-                existing = rows_by_key.get(key)
-                if existing is None or h.rrf_score > existing.rrf_score:
-                    rows_by_key[key] = h
-        hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[
-            :NOVEL_DB_QA_TOP_K
-        ]
-        # scope=all / series ではヒット書籍の俯瞰サマリをプロンプトに付与する
-        # （生成済み書籍のみ。未生成は単に含めない＝後方互換）
-        # B-8: ページヒット書籍に加えて、サマリ自体のベクトル検索 top-K も合流
-        # させ、ページに引っかからなかった書籍も俯瞰サマリとしてプロンプトに乗せる
-        if scope.type in ("all", "series"):
-            hit_book_names = {h.book_name for h in hits}
-            summary_hits = search_book_summaries(
-                conn, request.question, scope, top=NOVEL_DB_QA_TOP_SUMMARIES,
-            )
-            relevant_book_names = sorted(
-                hit_book_names | {name for name, _ in summary_hits},
-            )
-            book_summaries = load_summaries_for_books(conn, relevant_book_names)
-        else:
             book_summaries = None
+        else:
+            # 通常 RAG 経路（段階 A/B）
+            # scope=all / series では書籍偏り抑制のため max_per_book を有効化、
+            # 単冊（book）スコープでは不要なので None。
+            max_per_book = (
+                NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
+            )
+
+            # B-11 Query Expansion: 元の質問 + 展開クエリで multi-query 検索する。
+            # 展開無効時 / 失敗時は元の質問のみのリストが返るので、結果は従来と同じになる。
+            if NOVEL_DB_QA_EXPAND_ENABLED:
+                queries = expand_query(request.question)
+            else:
+                queries = [request.question]
+
+            # 各クエリで hybrid_search → (book_name, page_no) でデデュープし、
+            # 同じページが複数クエリから引かれた場合はスコア最大値を採用する
+            rows_by_key: dict[tuple[str, int], SearchHit] = {}
+            for q in queries:
+                sub_rows = hybrid_search(
+                    conn,
+                    q,
+                    scope,
+                    top=NOVEL_DB_QA_TOP_K,
+                    min_chars=NOVEL_DB_MIN_BODY_CHARS,
+                    max_per_book=max_per_book,
+                    body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+                )
+                for h in sub_rows:
+                    key = (h.book_name, h.page_no)
+                    existing = rows_by_key.get(key)
+                    if existing is None or h.rrf_score > existing.rrf_score:
+                        rows_by_key[key] = h
+            hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[
+                :NOVEL_DB_QA_TOP_K
+            ]
+            # scope=all / series ではヒット書籍の俯瞰サマリをプロンプトに付与する
+            # （生成済み書籍のみ。未生成は単に含めない＝後方互換）
+            # B-8: ページヒット書籍に加えて、サマリ自体のベクトル検索 top-K も合流
+            # させ、ページに引っかからなかった書籍も俯瞰サマリとしてプロンプトに乗せる
+            if scope.type in ("all", "series"):
+                hit_book_names = {h.book_name for h in hits}
+                summary_hits = search_book_summaries(
+                    conn, request.question, scope, top=NOVEL_DB_QA_TOP_SUMMARIES,
+                )
+                relevant_book_names = sorted(
+                    hit_book_names | {name for name, _ in summary_hits},
+                )
+                book_summaries = load_summaries_for_books(conn, relevant_book_names)
+            else:
+                book_summaries = None
+
         prompt = build_prompt(
             request.question, hits, scope, book_summaries=book_summaries,
         )
@@ -250,13 +278,13 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
             prompt=prompt,
             hits=hits,
             model=NOVEL_DB_LLM_MODEL,
-            options=LLM_OPTIONS,
+            options=qa_options,
         )
 
     async def event_stream():
         full_response: list[str] = []
         try:
-            async for event in stream_qa(prompt):
+            async for event in stream_qa(prompt, options=qa_options):
                 if await http_request.is_disconnected():
                     with with_db() as conn:
                         save_finish(
