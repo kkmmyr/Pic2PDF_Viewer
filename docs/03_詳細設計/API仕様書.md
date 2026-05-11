@@ -1152,3 +1152,169 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 **エラー**:
 - `404`: 該当 `job_id` なし
 - `409`: ジョブが実行中（実行中ジョブはキャンセル不可、[バックエンド設計 §8.4](小説テキスト検索・RAG機能_バックエンド設計.md)）
+
+---
+
+### §7.11 `GET /api/novel_db/books/{book_name}/characters`（B-15）
+
+書籍に登録済みのキャラ一覧を返す。`book_characters` テーブルが空（CLI 未実行）の書籍は `200 []` を返す。生成は `scripts/build_character_summaries.py` で行う（[バックエンド設計 §5.10](小説テキスト検索・RAG機能_バックエンド設計.md)）。
+
+**ソート順**: `page_count` 降順 → `first_page` 昇順 → `name` 昇順
+
+**レスポンス**:
+```json
+[
+  {
+    "name": "レティ",
+    "first_page": 11,
+    "page_count": 95,
+    "has_summary": true
+  },
+  {
+    "name": "デューク",
+    "first_page": 8,
+    "page_count": 69,
+    "has_summary": true
+  }
+]
+```
+
+**エラー**:
+- `404`: 該当書籍が `books` テーブルに無い
+
+---
+
+### §7.12 `GET /api/novel_db/books/{book_name}/characters/{char_name}`（B-15）
+
+書籍 × キャラの詳細（人物像サマリ + 主要シーン top 5）を返す。
+
+**`top_scenes`**: 当該キャラが `main_characters` に含まれる page を `char_count` 降順で上位 5 件。各要素は `{page_no, char_count}`。フロントは `page_no` を `PageImageModal` 表示にリンクする。
+
+**レスポンス**:
+```json
+{
+  "name": "レティ",
+  "first_page": 11,
+  "page_count": 95,
+  "summary": "物語の第三王女について第一王女、レティーツィア…",
+  "generated_at": "2026-05-11 22:21:37",
+  "top_scenes": [
+    { "page_no": 67, "char_count": 1820 },
+    { "page_no": 92, "char_count": 1640 }
+  ]
+}
+```
+
+**エラー**:
+- `404`: 該当書籍が無い、または該当キャラが `book_characters` に登録されていない
+
+---
+
+### §7.13 `GET /api/novel_db/qa/sessions`（B-16）
+
+マルチターン会話 QA のセッション一覧。`last_message_at` 降順 → `started_at` 降順。
+
+**クエリパラメータ**: `offset`（既定 0）/ `limit`（既定 20、最大 100）
+
+**レスポンス**:
+```json
+[
+  {
+    "id": 12,
+    "scope_type": "book",
+    "scope_id": "おこぼれ姫と円卓の騎士 1",
+    "title": "レティの内面はどう変化したか？",
+    "started_at": "2026-05-12 09:00:00",
+    "last_message_at": "2026-05-12 09:10:30",
+    "message_count": 6
+  }
+]
+```
+
+---
+
+### §7.14 `GET /api/novel_db/qa/sessions/{session_id}`（B-16）
+
+セッション詳細（メッセージ全件含む）。`system` ロールのメッセージは LLM 投入用なので **レスポンスから除外**（UI には表示しない）。
+
+**レスポンス**:
+```json
+{
+  "id": 12,
+  "scope_type": "book",
+  "scope_id": "おこぼれ姫と円卓の騎士 1",
+  "title": "レティの内面はどう変化したか？",
+  "started_at": "2026-05-12 09:00:00",
+  "last_message_at": "2026-05-12 09:10:30",
+  "messages": [
+    { "id": 21, "role": "user", "content": "レティの内面はどう変化したか？",
+      "eval_count": null, "done_reason": null, "created_at": "..." },
+    { "id": 22, "role": "assistant", "content": "page 67 ...",
+      "eval_count": 432, "done_reason": "stop", "created_at": "..." }
+  ]
+}
+```
+
+**エラー**: `404` セッション無し
+
+---
+
+### §7.15 `POST /api/novel_db/qa/sessions`（B-16、SSE）
+
+会話セッションを新規作成し、初手の質問を SSE で配信する。
+
+**リクエストボディ**:
+```json
+{
+  "scope": { "type": "book", "id": "おこぼれ姫と円卓の騎士 1" },
+  "question": "レティの内面はどう変化したか？"
+}
+```
+
+scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ + 回答ルール）を組み立て、`(system, user)` の 2 メッセージを `qa_messages` に append したうえで LLM ストリーミングを開始する。
+
+**SSE イベント形式（[バックエンド設計 §5.12](小説テキスト検索・RAG機能_バックエンド設計.md)）**:
+- `data: {"token": "..."}` — 部分トークン
+- `data: {"done": true, "session_id": 12, "message_id": 22, "eval_count": 432, "done_reason": "stop"}` — 終端
+- `data: {"error": "..."}` — 失敗（バックエンド非対応含む）
+
+**エラー**: `503` 再構築ジョブ実行中
+
+---
+
+### §7.16 `POST /api/novel_db/qa/sessions/{session_id}/messages`（B-16、SSE）
+
+既存セッションに新ターンを追加する。
+
+**リクエストボディ**:
+```json
+{ "question": "そのきっかけは何だった？" }
+```
+
+過去メッセージ（system + user/assistant 履歴）を全件読み込み、新 user メッセージを append したうえで LLM に投入する。SSE 形式は §7.15 と同じ。
+
+**エラー**:
+- `404` セッション無し
+- `503` 再構築ジョブ実行中
+
+---
+
+### §7.17 `DELETE /api/novel_db/qa/sessions/{session_id}`（B-16）
+
+セッションを削除（`qa_messages` も CASCADE で連動削除）。
+
+**レスポンス**: `204 No Content`
+**エラー**: `404` セッション無し
+
+---
+
+### §7.18 `PATCH /api/novel_db/qa/sessions/{session_id}/title`（B-16）
+
+セッションタイトルを手動更新する。
+
+**リクエストボディ**: `{ "title": "新しいタイトル" }`（1〜100 字）
+
+**レスポンス**: `204 No Content`
+**エラー**:
+- `404` セッション無し
+- `422` `title` 未指定 / 100 字超

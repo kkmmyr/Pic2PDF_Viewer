@@ -27,10 +27,21 @@ from config import (
 )
 from routers._deps import log_and_raise_500
 from services.novel_db import Scope, hybrid_search, with_db
+from services.novel_db.character_summarizer import (
+    get_character,
+    list_characters,
+    top_scenes_for_character,
+)
 from services.novel_db.job_queue import job_queue
 from services.novel_db.library import list_books, list_series
-from services.novel_db.llm import LLM_OPTIONS, build_prompt, stream_qa
-from services.novel_db.search import load_all_pages_of_book
+from services.novel_db.llm import (
+    LLM_OPTIONS,
+    build_chat_context_block,
+    build_chat_system_message,
+    build_prompt,
+    stream_chat,
+    stream_qa,
+)
 from services.novel_db.qa_history import (
     delete_history,
     get_history_detail,
@@ -39,8 +50,17 @@ from services.novel_db.qa_history import (
     save_finish,
     save_start,
 )
+from services.novel_db.qa_sessions import (
+    append_message,
+    create_session,
+    delete_session,
+    get_session_detail,
+    list_sessions,
+    load_chat_messages,
+    update_session_title,
+)
 from services.novel_db.query_expander import expand_query
-from services.novel_db.search import SearchHit, search_book_summaries
+from services.novel_db.search import SearchHit, load_all_pages_of_book, search_book_summaries
 from services.novel_db.summarizer import load_summaries_for_books
 
 router = APIRouter()
@@ -74,6 +94,87 @@ def get_series() -> list[dict]:
     """novel ソースのシリーズ一覧（書籍 1 件以上のみ）（[API §7.2]）。"""
     with with_db() as conn:
         return [asdict(s) for s in list_series(conn)]
+
+
+# ---------------------------------------------------------------------------
+# キャラクター辞典（B-15）
+# ---------------------------------------------------------------------------
+
+class CharacterSummary(BaseModel):
+    """書籍内 1 キャラの一覧用ペイロード（API §7.x [characters list]）。"""
+    name: str
+    first_page: int
+    page_count: int
+    has_summary: bool
+
+
+class CharacterScene(BaseModel):
+    page_no: int
+    char_count: int
+
+
+class CharacterDetail(BaseModel):
+    """書籍 × キャラの詳細（API §7.x [character detail]）。"""
+    name: str
+    first_page: int
+    page_count: int
+    summary: str | None
+    generated_at: str | None
+    top_scenes: list[CharacterScene]
+
+
+def _resolve_book_id(conn, book_name: str) -> int:
+    row = conn.execute("SELECT id FROM books WHERE name = ?", (book_name,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"book not found: {book_name}")
+    return row[0]
+
+
+@router.get("/novel_db/books/{book_name:path}/characters")
+@log_and_raise_500("novel_db/books/characters")
+def get_book_characters(book_name: str) -> list[CharacterSummary]:
+    """書籍に登録済みのキャラ一覧を返す（B-15）。
+
+    `book_characters` に未登録（CLI 未実行）の書籍は空配列。フロントは空配列なら
+    「キャラ辞典 未生成」表示にフォールバックする。
+    """
+    with with_db() as conn:
+        book_id = _resolve_book_id(conn, book_name)
+        rows = list_characters(conn, book_id)
+    return [
+        CharacterSummary(
+            name=r.name,
+            first_page=r.first_page,
+            page_count=r.page_count,
+            has_summary=bool(r.summary and r.summary.strip()),
+        )
+        for r in rows
+    ]
+
+
+@router.get("/novel_db/books/{book_name:path}/characters/{char_name}")
+@log_and_raise_500("novel_db/books/character_detail")
+def get_book_character_detail(book_name: str, char_name: str) -> CharacterDetail:
+    """書籍 × キャラの詳細（サマリ + 主要シーン top 5）を返す（B-15）。"""
+    with with_db() as conn:
+        book_id = _resolve_book_id(conn, book_name)
+        row = get_character(conn, book_id, char_name)
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"character not found in '{book_name}': {char_name}",
+            )
+        scenes = top_scenes_for_character(conn, book_id, char_name, limit=5)
+    return CharacterDetail(
+        name=row.name,
+        first_page=row.first_page,
+        page_count=row.page_count,
+        summary=row.summary,
+        generated_at=row.generated_at,
+        top_scenes=[
+            CharacterScene(page_no=pn, char_count=cc) for pn, cc in scenes
+        ],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -358,4 +459,318 @@ def delete_qa_history(history_id: int) -> Response:
         ok = delete_history(conn, history_id)
     if not ok:
         raise HTTPException(status_code=404, detail="history not found")
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# マルチターン会話 QA（B-16）
+# ---------------------------------------------------------------------------
+
+class ChatSessionStartRequest(BaseModel):
+    scope: ScopeModel
+    question: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatSessionContinueRequest(BaseModel):
+    question: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatMessagePayload(BaseModel):
+    id: int
+    role: str
+    content: str
+    eval_count: int | None
+    done_reason: str | None
+    created_at: str
+
+
+class ChatSessionSummary(BaseModel):
+    id: int
+    scope_type: str
+    scope_id: str | None
+    title: str | None
+    started_at: str
+    last_message_at: str | None
+    message_count: int
+
+
+class ChatSessionDetailPayload(BaseModel):
+    id: int
+    scope_type: str
+    scope_id: str | None
+    title: str | None
+    started_at: str
+    last_message_at: str | None
+    messages: list[ChatMessagePayload]
+
+
+def _auto_title(question: str) -> str:
+    """初手質問からセッションタイトルを生成する（先頭 30 字 + 省略記号）。"""
+    text = question.strip().replace("\n", " ")
+    if len(text) > 30:
+        return text[:30] + "…"
+    return text
+
+
+def _collect_initial_context(
+    conn,
+    scope: Scope,
+    question: str,
+) -> tuple[list[SearchHit], dict[str, str] | None, dict]:
+    """初手の context（hits + book_summaries + LLM options）を組み立てる。
+
+    既存 `/qa` の hits 構築ロジックと同等。`scope=book` のとき
+    `NOVEL_DB_QA_FULL_BOOK_MODE` なら全 page 読み、それ以外はハイブリッド検索。
+    `book_summaries` は scope=all / series のみ付与する。
+    """
+    full_book_mode = (
+        NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
+    )
+    qa_options = LLM_OPTIONS
+    if full_book_mode:
+        qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX}
+
+    if full_book_mode:
+        hits = load_all_pages_of_book(
+            conn, scope.id,
+            min_chars=NOVEL_DB_MIN_BODY_CHARS,
+            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+        )
+        return hits, None, qa_options
+
+    max_per_book = (
+        NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
+    )
+    queries = expand_query(question) if NOVEL_DB_QA_EXPAND_ENABLED else [question]
+
+    rows_by_key: dict[tuple[str, int], SearchHit] = {}
+    for q in queries:
+        sub_rows = hybrid_search(
+            conn, q, scope,
+            top=NOVEL_DB_QA_TOP_K,
+            min_chars=NOVEL_DB_MIN_BODY_CHARS,
+            max_per_book=max_per_book,
+            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+        )
+        for h in sub_rows:
+            key = (h.book_name, h.page_no)
+            existing = rows_by_key.get(key)
+            if existing is None or h.rrf_score > existing.rrf_score:
+                rows_by_key[key] = h
+    hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[
+        :NOVEL_DB_QA_TOP_K
+    ]
+
+    if scope.type in ("all", "series"):
+        hit_book_names = {h.book_name for h in hits}
+        summary_hits = search_book_summaries(
+            conn, question, scope, top=NOVEL_DB_QA_TOP_SUMMARIES,
+        )
+        relevant_book_names = sorted(
+            hit_book_names | {name for name, _ in summary_hits},
+        )
+        book_summaries = load_summaries_for_books(conn, relevant_book_names)
+    else:
+        book_summaries = None
+    return hits, book_summaries, qa_options
+
+
+@router.get("/novel_db/qa/sessions")
+@log_and_raise_500("novel_db/qa/sessions")
+def get_chat_sessions(offset: int = 0, limit: int = 20) -> list[ChatSessionSummary]:
+    """会話セッション一覧（B-16）。"""
+    if offset < 0 or limit < 1 or limit > 100:
+        raise HTTPException(status_code=422, detail="invalid offset/limit")
+    with with_db() as conn:
+        rows = list_sessions(conn, offset=offset, limit=limit)
+    return [
+        ChatSessionSummary(
+            id=r.id, scope_type=r.scope_type, scope_id=r.scope_id,
+            title=r.title, started_at=r.started_at,
+            last_message_at=r.last_message_at, message_count=r.message_count,
+        )
+        for r in rows
+    ]
+
+
+@router.get("/novel_db/qa/sessions/{session_id}")
+@log_and_raise_500("novel_db/qa/sessions/detail")
+def get_chat_session(session_id: int) -> ChatSessionDetailPayload:
+    """会話セッション詳細（メッセージ全件含む、system は除外）（B-16）。
+
+    UI は user/assistant のみを表示する。system は LLM 投入用の内部メッセージ
+    なのでレスポンスから除外する。
+    """
+    with with_db() as conn:
+        detail = get_session_detail(conn, session_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return ChatSessionDetailPayload(
+        id=detail.id, scope_type=detail.scope_type, scope_id=detail.scope_id,
+        title=detail.title, started_at=detail.started_at,
+        last_message_at=detail.last_message_at,
+        messages=[
+            ChatMessagePayload(
+                id=m.id, role=m.role, content=m.content,
+                eval_count=m.eval_count, done_reason=m.done_reason,
+                created_at=m.created_at,
+            )
+            for m in detail.messages if m.role != "system"
+        ],
+    )
+
+
+@router.delete("/novel_db/qa/sessions/{session_id}", status_code=204)
+@log_and_raise_500("novel_db/qa/sessions/delete")
+def delete_chat_session(session_id: int) -> Response:
+    """会話セッション削除（メッセージは CASCADE で連動削除）（B-16）。"""
+    with with_db() as conn:
+        ok = delete_session(conn, session_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="session not found")
+    return Response(status_code=204)
+
+
+@router.post("/novel_db/qa/sessions")
+async def post_chat_session_start(
+    request: ChatSessionStartRequest,
+    http_request: Request,
+) -> StreamingResponse:
+    """会話セッション開始 + 初手 SSE（B-16）。
+
+    1. session 作成 + system / user メッセージを DB に append
+    2. stream_chat に [system, user] を投入し、token を SSE で配信
+    3. 終端で assistant メッセージを DB に append
+    """
+    _check_locked()
+    scope = Scope(type=request.scope.type, id=request.scope.id)
+
+    with with_db() as conn:
+        hits, book_summaries, qa_options = _collect_initial_context(
+            conn, scope, request.question,
+        )
+        context_block = build_chat_context_block(
+            hits, scope, book_summaries=book_summaries,
+        )
+        system_message = build_chat_system_message(
+            scope, context_block=context_block,
+        )
+        session_id = create_session(conn, scope, title=_auto_title(request.question))
+        append_message(conn, session_id, role="system", content=system_message)
+        append_message(conn, session_id, role="user", content=request.question)
+
+    messages = [
+        {"role": "system", "content": system_message},
+        {"role": "user", "content": request.question},
+    ]
+    return StreamingResponse(
+        _chat_event_stream(http_request, session_id, messages, qa_options),
+        media_type="text/event-stream",
+    )
+
+
+@router.post("/novel_db/qa/sessions/{session_id}/messages")
+async def post_chat_session_message(
+    session_id: int,
+    request: ChatSessionContinueRequest,
+    http_request: Request,
+) -> StreamingResponse:
+    """会話セッションへの追加ターン SSE（B-16）。
+
+    1. 既存 messages（system + user/assistant 履歴）を取得
+    2. 新規 user メッセージを DB に append
+    3. messages + new user を投入し SSE で配信
+    4. 終端で assistant メッセージを DB に append
+    """
+    _check_locked()
+    with with_db() as conn:
+        detail = get_session_detail(conn, session_id)
+        if detail is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        prior = load_chat_messages(conn, session_id)
+        append_message(conn, session_id, role="user", content=request.question)
+
+    messages = prior + [{"role": "user", "content": request.question}]
+    # 続行ターンは初手と同じ qa_options を使う（scope 固定なので場合分け不要）
+    qa_options = LLM_OPTIONS
+    if detail.scope_type == "book" and NOVEL_DB_QA_FULL_BOOK_MODE:
+        qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX}
+    return StreamingResponse(
+        _chat_event_stream(http_request, session_id, messages, qa_options),
+        media_type="text/event-stream",
+    )
+
+
+async def _chat_event_stream(
+    http_request: Request,
+    session_id: int,
+    messages: list[dict],
+    qa_options: dict,
+):
+    """messages を Qwen に流して SSE で配信し、終端で assistant を DB 保存する。"""
+    full_response: list[str] = []
+    try:
+        async for event in stream_chat(messages, options=qa_options):
+            if await http_request.is_disconnected():
+                with with_db() as conn:
+                    append_message(
+                        conn, session_id, role="assistant",
+                        content="".join(full_response),
+                        done_reason="canceled",
+                    )
+                return
+            if event.get("response"):
+                full_response.append(event["response"])
+                yield _sse_event({"token": event["response"]})
+            if event.get("done"):
+                answer = "".join(full_response)
+                done_reason = event.get("done_reason", "stop")
+                eval_count = event.get("eval_count")
+                with with_db() as conn:
+                    msg_id = append_message(
+                        conn, session_id, role="assistant",
+                        content=answer,
+                        eval_count=eval_count, done_reason=done_reason,
+                    )
+                yield _sse_event({
+                    "done": True,
+                    "session_id": session_id,
+                    "message_id": msg_id,
+                    "eval_count": eval_count,
+                    "done_reason": done_reason,
+                })
+                return
+    except NotImplementedError as e:
+        # Ollama 経路など chat 非対応のバックエンドで起きる。500 相当のエラーを SSE で返す。
+        with with_db() as conn:
+            append_message(
+                conn, session_id, role="assistant",
+                content=f"backend does not support multi-turn chat: {e}",
+                done_reason="error",
+            )
+        yield _sse_event({"error": f"backend not supported: {e}"})
+    except Exception as e:  # noqa: BLE001
+        with with_db() as conn:
+            append_message(
+                conn, session_id, role="assistant",
+                content=str(e), done_reason="error",
+            )
+        yield _sse_event({"error": str(e)})
+
+
+# title 更新 (任意、UX 改善)
+@router.patch("/novel_db/qa/sessions/{session_id}/title")
+@log_and_raise_500("novel_db/qa/sessions/title")
+def patch_chat_session_title(session_id: int, payload: dict) -> Response:
+    """セッションタイトルを手動更新する（B-16）。"""
+    title = (payload.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="title is required")
+    if len(title) > 100:
+        raise HTTPException(status_code=422, detail="title too long (max 100)")
+    with with_db() as conn:
+        meta = get_session_detail(conn, session_id)
+        if meta is None:
+            raise HTTPException(status_code=404, detail="session not found")
+        update_session_title(conn, session_id, title)
     return Response(status_code=204)

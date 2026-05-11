@@ -10,6 +10,10 @@ import apiClient from '../../config/api_client';
 
 import type {
     BookSummary,
+    CharacterDetail,
+    CharacterSummary,
+    ChatSessionDetail,
+    ChatSessionSummary,
     QaHistoryDetail,
     QaHistoryListResponse,
     RebuildEnqueueResponse,
@@ -88,4 +92,42 @@ export function fetchRebuildStatus(): Promise<RebuildStatus> {
 
 export function cancelRebuild(jobId: number): Promise<void> {
     return apiClient.delete<unknown, void>(`${PREFIX}/rebuild/${jobId}`);
+}
+
+// ---------------------------------------------------------------------------
+// キャラクター辞典（B-15）
+// ---------------------------------------------------------------------------
+
+export function fetchBookCharacters(bookName: string): Promise<CharacterSummary[]> {
+    return apiClient.get<unknown, CharacterSummary[]>(
+        `${PREFIX}/books/${encodeURIComponent(bookName)}/characters`,
+    );
+}
+
+export function fetchCharacterDetail(bookName: string, charName: string): Promise<CharacterDetail> {
+    return apiClient.get<unknown, CharacterDetail>(
+        `${PREFIX}/books/${encodeURIComponent(bookName)}/characters/${encodeURIComponent(charName)}`,
+    );
+}
+
+// ---------------------------------------------------------------------------
+// マルチターン会話 QA（B-16）
+// ---------------------------------------------------------------------------
+
+export function fetchChatSessions(offset = 0, limit = 20): Promise<ChatSessionSummary[]> {
+    return apiClient.get<unknown, ChatSessionSummary[]>(`${PREFIX}/qa/sessions`, {
+        params: { offset, limit },
+    });
+}
+
+export function fetchChatSessionDetail(sessionId: number): Promise<ChatSessionDetail> {
+    return apiClient.get<unknown, ChatSessionDetail>(`${PREFIX}/qa/sessions/${sessionId}`);
+}
+
+export function deleteChatSession(sessionId: number): Promise<void> {
+    return apiClient.delete<unknown, void>(`${PREFIX}/qa/sessions/${sessionId}`);
+}
+
+export function patchChatSessionTitle(sessionId: number, title: string): Promise<void> {
+    return apiClient.patch<unknown, void>(`${PREFIX}/qa/sessions/${sessionId}/title`, { title });
 }

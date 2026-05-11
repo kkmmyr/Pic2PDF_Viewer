@@ -73,6 +73,44 @@ def _ddl() -> str:
         );
         CREATE INDEX IF NOT EXISTS idx_qa_history_asked_at ON qa_history(asked_at DESC);
 
+        -- B-15: キャラクター辞典。書籍ごとのキャラ単位サマリ + 登場ページ統計。
+        -- main_characters カラム集計から生成、Qwen でキャラ視点の 1 段落要約を作る。
+        CREATE TABLE IF NOT EXISTS book_characters (
+            id              INTEGER PRIMARY KEY,
+            book_id         INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            name            TEXT NOT NULL,
+            summary         TEXT,
+            first_page      INTEGER NOT NULL,
+            page_count      INTEGER NOT NULL,
+            generated_at    TIMESTAMP,
+            UNIQUE(book_id, name)
+        );
+        CREATE INDEX IF NOT EXISTS idx_book_characters_book ON book_characters(book_id);
+
+        -- B-16: マルチターン会話 QA。1 セッションは scope 固定、ターンごとに
+        -- qa_messages へ user / assistant メッセージを追記する。既存 qa_history
+        -- は単発 QA 用に温存（B-16 では非利用）。
+        CREATE TABLE IF NOT EXISTS qa_sessions (
+            id              INTEGER PRIMARY KEY,
+            scope_type      TEXT NOT NULL,
+            scope_id        TEXT,
+            title           TEXT,
+            started_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_message_at TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_qa_sessions_started ON qa_sessions(started_at DESC);
+
+        CREATE TABLE IF NOT EXISTS qa_messages (
+            id           INTEGER PRIMARY KEY,
+            session_id   INTEGER NOT NULL REFERENCES qa_sessions(id) ON DELETE CASCADE,
+            role         TEXT NOT NULL,           -- 'user' / 'assistant' / 'system'
+            content      TEXT NOT NULL,
+            eval_count   INTEGER,                 -- assistant のみ。NULL 可
+            done_reason  TEXT,                    -- assistant のみ。'stop' / 'length' / 'canceled' / 'error'
+            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_qa_messages_session ON qa_messages(session_id, id);
+
         CREATE TABLE IF NOT EXISTS rebuild_jobs (
             id              INTEGER PRIMARY KEY,
             job_type        TEXT NOT NULL,

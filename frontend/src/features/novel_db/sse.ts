@@ -122,3 +122,128 @@ export async function streamQa(
         handlers.onError(e instanceof Error ? e : new Error(String(e)));
     }
 }
+
+// ---------------------------------------------------------------------------
+// マルチターン会話 QA（B-16）
+// ---------------------------------------------------------------------------
+
+export interface ChatStreamInit {
+    /** 続行ターン: 既存セッションに新メッセージ。 */
+    sessionId?: number;
+    /** 初手: scope を指定して新規セッションを作る。 */
+    scope?: Scope;
+    question: string;
+}
+
+export interface ChatDoneEvent {
+    session_id: number;
+    message_id: number;
+    eval_count: number | null;
+    done_reason: string | null;
+}
+
+export interface ChatStreamHandlers {
+    onToken: (text: string) => void;
+    onDone: (event: ChatDoneEvent) => void;
+    onError: (error: Error) => void;
+}
+
+interface ChatSsePayload {
+    token?: string;
+    done?: boolean;
+    session_id?: number;
+    message_id?: number;
+    eval_count?: number | null;
+    done_reason?: string | null;
+    error?: string;
+}
+
+/**
+ * 会話セッションへの SSE。初手（scope 指定）/ 続行（sessionId 指定）の双方に対応。
+ *
+ * - 初手: POST /api/novel_db/qa/sessions （body: scope + question）
+ * - 続行: POST /api/novel_db/qa/sessions/{id}/messages （body: question）
+ */
+export async function streamChatSession(
+    init: ChatStreamInit,
+    handlers: ChatStreamHandlers,
+    signal?: AbortSignal,
+): Promise<void> {
+    const url =
+        init.sessionId !== undefined
+            ? `${API_URL_CONFIG.BASE_URL}/api/novel_db/qa/sessions/${init.sessionId}/messages`
+            : `${API_URL_CONFIG.BASE_URL}/api/novel_db/qa/sessions`;
+    const body =
+        init.sessionId !== undefined
+            ? { question: init.question }
+            : { scope: init.scope, question: init.question };
+
+    let response: Response;
+    try {
+        response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify(body),
+            signal,
+        });
+    } catch (e) {
+        if ((e as { name?: string }).name === 'AbortError') return;
+        handlers.onError(e instanceof Error ? e : new Error(String(e)));
+        return;
+    }
+
+    if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        handlers.onError(new Error(`HTTP ${response.status}: ${detail || response.statusText}`));
+        return;
+    }
+    if (!response.body) {
+        handlers.onError(new Error('Response body is empty'));
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const segments = buffer.split('\n\n');
+            buffer = segments.pop() ?? '';
+
+            for (const segment of segments) {
+                for (const line of segment.split('\n')) {
+                    if (!line.startsWith('data: ')) continue;
+                    let event: ChatSsePayload;
+                    try {
+                        event = JSON.parse(line.slice(6)) as ChatSsePayload;
+                    } catch {
+                        continue;
+                    }
+                    if (event.token !== undefined) {
+                        handlers.onToken(event.token);
+                    }
+                    if (event.error !== undefined) {
+                        handlers.onError(new Error(event.error));
+                        return;
+                    }
+                    if (event.done) {
+                        handlers.onDone({
+                            session_id: event.session_id ?? -1,
+                            message_id: event.message_id ?? -1,
+                            eval_count: event.eval_count ?? null,
+                            done_reason: event.done_reason ?? null,
+                        });
+                        return;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        if ((e as { name?: string }).name === 'AbortError') return;
+        handlers.onError(e instanceof Error ? e : new Error(String(e)));
+    }
+}

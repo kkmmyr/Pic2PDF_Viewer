@@ -4,7 +4,11 @@
  * 1 タブ内に「ライブラリ / 検索 / 質問」を縦並び配置し、
  * ヘッダーのスコープドロップダウンで対象を全件 / シリーズ / 単冊から選択する。
  */
+import { useState } from 'react';
+
 import {
+    CharacterDetailDialog,
+    ChatSection,
     LibrarySection,
     NovelDbHeader,
     PageImageModal,
@@ -35,6 +39,9 @@ export default function NovelDbPage() {
     });
     const imageModal = useNovelDbPageImageModal(books);
 
+    // B-15: キャラ詳細ダイアログの開閉状態
+    const [charDialog, setCharDialog] = useState<{ book: string; char: string } | null>(null);
+
     const isLocked = rebuildStatus?.is_running ?? false;
 
     const handleRebuildAll = () => {
@@ -43,6 +50,10 @@ export default function NovelDbPage() {
 
     const handleRebuildBook = (bookName: string) => {
         void enqueueRebuild({ type: 'book', target_id: bookName });
+    };
+
+    const handleSelectCharacter = (bookName: string, charName: string) => {
+        setCharDialog({ book: bookName, char: charName });
     };
 
     return (
@@ -60,6 +71,7 @@ export default function NovelDbPage() {
                 books={books}
                 isLoading={booksLoading}
                 onRebuildBook={handleRebuildBook}
+                onSelectCharacter={handleSelectCharacter}
                 rebuildStatus={rebuildStatus}
             />
             <SearchSection scope={scope} onOpenImage={imageModal.open} disabled={isLocked} />
@@ -72,6 +84,7 @@ export default function NovelDbPage() {
                 onOpenImage={imageModal.open}
                 disabled={isLocked}
             />
+            <ChatSection scope={scope} disabled={isLocked} />
             {imageModal.state && (
                 <PageImageModal
                     book={imageModal.state.book}
@@ -82,6 +95,12 @@ export default function NovelDbPage() {
                     onNext={imageModal.nextPage}
                 />
             )}
+            <CharacterDetailDialog
+                bookName={charDialog?.book ?? null}
+                charName={charDialog?.char ?? null}
+                onClose={() => setCharDialog(null)}
+                onOpenScene={(book, pageNo) => imageModal.open(book, pageNo)}
+            />
         </div>
     );
 }

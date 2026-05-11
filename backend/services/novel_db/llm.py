@@ -125,6 +125,35 @@ def build_prompt(
     )
 
 
+def build_chat_context_block(
+    hits: list[SearchHit],
+    scope: Scope,
+    *,
+    book_summaries: dict[str, str] | None = None,
+) -> str:
+    """B-16: chat 用の本文 + 俯瞰サマリブロックを 1 つの文字列に組み立てる。
+
+    `build_prompt` の context + summaries 部分と同じ整形ロジックを使うが、
+    質問文や回答ルールは含めない（system プロンプトのテンプレ側に書く）。
+    """
+    ctx_lines: list[str] = []
+    for h in hits:
+        chars_hint = ""
+        if h.main_characters:
+            chars_hint = f", 主要登場人物: {', '.join(h.main_characters)}"
+        if scope.type == "book":
+            header = f"[page {h.page_no}{chars_hint}]"
+        else:
+            header = f"[{h.book_name} page {h.page_no}{chars_hint}]"
+        ctx_lines.append(f"{header}\n{_strip_html(h.snippet)}")
+
+    context = "\n\n".join(ctx_lines)
+    summaries_block = _build_summaries_block(book_summaries, scope)
+    if summaries_block:
+        return f"{summaries_block}\n\n{context}"
+    return context
+
+
 def _build_summaries_block(
     book_summaries: dict[str, str] | None,
     scope: Scope,
@@ -175,6 +204,95 @@ async def stream_qa(
     """
     async for event in _astream_ask(
         prompt,
+        model=model,
+        options=options or LLM_OPTIONS,
+        timeout=timeout,
+    ):
+        yield event
+
+
+# ---------------------------------------------------------------------------
+# B-16: マルチターン会話 QA
+# ---------------------------------------------------------------------------
+
+# 会話用の system プロンプト。1 セッション 1 回（初手で必ず挿入）。
+# scope 固定 + 単発 QA と同じ「page 番号明記 / キャラ帰属」ルールを継承する。
+CHAT_SYSTEM_TEMPLATE = """あなたは小説作品の読書補助アシスタントです。
+以下の方針で会話的に質問に答えてください。
+
+- 根拠としたページ番号を必ず明記する（例: 「page 50 に記述あり」）。
+- 引用するときは誰の発言・行動・心情かを明示する。別キャラの内面を主人公に
+  誤って統合しない。
+- 直前のやりとり（過去の質問・回答）の文脈を踏まえ、同じ内容を繰り返さず、
+  深掘りや視点切替に応じる。
+- 抜粋に直接の記述がなくても、関連する記述から推論してよいが、推論である
+  ことを明示する。
+- 関連する記述がまったく無い場合のみ「該当箇所が見つかりません」と答える。
+
+【会話対象スコープ】
+{scope_block}
+
+【参照可能な本文・俯瞰サマリ】（初手で提示する。以降のターンでも参照可）
+{context_block}
+"""
+
+
+def build_chat_system_message(
+    scope: Any,
+    *,
+    context_block: str,
+) -> str:
+    """会話セッション開始時に投入する system メッセージ。
+
+    `scope` は `Scope`（`type` + `id`）。`context_block` は単発 QA と同じ手順で
+    組み立てた本文抜粋 + 書籍俯瞰サマリ（呼び出し側で `build_prompt`
+    互換のフォーマット）。
+    """
+    scope_line = _format_scope_line(scope)
+    return CHAT_SYSTEM_TEMPLATE.format(
+        scope_block=scope_line,
+        context_block=context_block,
+    )
+
+
+def _format_scope_line(scope: Any) -> str:
+    """scope を会話 system メッセージで表示するための 1 行説明に整形する。"""
+    if scope.type == "book" and scope.id:
+        return f"単冊「{scope.id}」"
+    if scope.type == "series" and scope.id:
+        return f"シリーズ「{scope.id}」"
+    return "全 novel ライブラリ"
+
+
+async def _astream_chat(
+    messages: list[dict],
+    *,
+    model: str | None = None,
+    options: dict | None = None,
+    timeout: float | None = None,
+) -> AsyncIterator[dict]:
+    """共通 Backend.astream_chat への thin wrapper。テストでは monkeypatch で差替可能。"""
+    async for event in _BACKEND.astream_chat(
+        messages, model=model, options=options, timeout=timeout,
+    ):
+        yield event
+
+
+async def stream_chat(
+    messages: list[dict],
+    *,
+    model: str = NOVEL_DB_LLM_MODEL,
+    options: dict | None = None,
+    timeout: float = 600.0,
+) -> AsyncIterator[dict]:
+    """OpenAI 互換 messages を直接 LLM に流す（multi-turn）。
+
+    実体は `_BACKEND.astream_chat`（`LlamaServerBackend` 専用、Ollama は
+    NotImplementedError）。バックエンド側の thinking 抑制 + SSE 正規化は
+    `local_llm` に委譲する。
+    """
+    async for event in _astream_chat(
+        messages,
         model=model,
         options=options or LLM_OPTIONS,
         timeout=timeout,

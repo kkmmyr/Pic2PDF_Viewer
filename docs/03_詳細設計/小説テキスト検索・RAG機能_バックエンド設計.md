@@ -453,14 +453,18 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 | 項目 | 値 |
 |---|---|
 | モデル | `gemma4:e4b`（軽量、`NOVEL_DB_CONTEXT_MODEL` で切替可）|
-| プロンプト | 書名 + 書籍俯瞰サマリ + チャンク先頭 1200 字 → 80 字程度の位置説明 |
+| プロンプト | 書名 + 書籍俯瞰サマリ + チャンク先頭 1200 字 → 80〜120 字の位置説明（**本文の固有名詞と特徴的フレーズを必ず含める** よう明示指示、2026-05-12 改良）|
 | 出力長 | `num_predict=256`, `num_ctx=8192` |
-| 1 チャンク所要 | ~2.8 秒（実機計測） |
-| 全件（2,230 チャンク） | 約 100〜110 分 |
+| 1 チャンク所要 | ~5 秒（実機計測、2026-05-12 のプロンプト拡張後） |
+| 全件（2,230 チャンク） | 約 110〜130 分 |
 
-**スキーマ**: `chunks.contextual_text TEXT`（NULL = 未生成）/ `chunks.contextual_generated_at TIMESTAMP`。
+**スキーマ**: `chunks.contextual_text TEXT`（NULL = 未生成または skip 対象）/ `chunks.contextual_generated_at TIMESTAMP`。
 
-**embedding 再構築**: 生成完了後、`(contextual_text + "\n\n" + chunk_text)` を bge-m3 でバッチ 16 で embedding し、`chunks_vec` を DELETE → INSERT で更新する（`make_embedding_input` ヘルパ）。
+**skip 条件**（2026-05-12 追加 / `_should_skip_context`）: 以下のチャンクは ctx 生成を省き `contextual_text = NULL` のまま保つ。検索 noise を防ぎ、`make_embedding_input` が text のみで embedding する経路に乗せる。
+- `chunks.char_count < NOVEL_DB_MIN_BODY_CHARS`（既定 300）— 章扉・目次・人物紹介などの薄いチャンク
+- `pages.page_no <= NOVEL_DB_BODY_PAGE_MARGIN` または `page_no > page_count - NOVEL_DB_BODY_PAGE_MARGIN`（既定 5）— 表紙・タイトルページ・あとがき・奥付などの余白ページ
+
+**embedding 再構築**: 生成完了後、`(contextual_text + "\n\n" + chunk_text)` を bge-m3 でバッチ 16 で embedding し、`chunks_vec` を DELETE → INSERT で更新する（`make_embedding_input` ヘルパ）。skip 対象は ctx が NULL のため text のみで再 embedding。
 
 **生成タイミング**: 別 CLI（[§5.9](#59-cli) の `build_chunk_contexts.py`）でユーザーが任意のタイミングで実行する。B-5 のサマリが前提（プロンプトのコンテキストに使う）。
 
@@ -469,12 +473,88 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 - LLM 接続エラーや空応答時は `contextual_text` を NULL のまま続行 → そのチャンクの embedding は text のみで計算（後方互換）
 - 重量モデルにフォールバックしたい場合は `NOVEL_DB_CONTEXT_MODEL=qwen3.6:35b-a3b` 等で切替
 
-**実機検証**: 書籍 1 巻（202 チャンク）のパイロットで以下を確認:
-- avg 63 字 / min 29 字 / max 88 字 の位置説明が生成される
-- サンプル 5 件すべて本文の内容と整合
-- 「父王が次期女王を発表する場面」→ p11 が distance 最良で top 1 に来る retrieval 結果
+**実機検証**:
+- **初版（2026-05-11）**: 書籍 1 巻（202 チャンク）のパイロットで avg 63 字 / min 29 字 / max 88 字 の位置説明、サンプル 5 件本文整合、「父王が次期女王を発表する場面」→ p11 top 1 retrieval を確認
+- **改良版（2026-05-12）**: id=23（おこぼれ姫 1 巻、202 chunks）の `--redo` で **ok=174 / skip=28 / ng=0**、長さ avg 106 字（指示の 80〜120 字に整合）。ctx 内に「レティーツィア」「ディーク・バンドゥエット」等の固有名詞 + 「騎士の誓いの言葉」「我が右手は剣、我が左手は楯」等の特徴的フレーズが含まれることを確認
 
-### 5.9. CLI
+### 5.10. キャラクター辞典生成（`character_summarizer.py`）（2026-05-12 追加: B-15）
+
+`pages.main_characters` カラムを集計してキャラ名を列挙し、各キャラについて「そのキャラが登場するページの本文のみ」を Qwen に投入してキャラ視点の 1 段落（~400 字）の人物像を生成し、`book_characters` テーブルにキャッシュする。フロントの「登場人物」セクション（[フロントエンド設計 §x.x]）から `GET /novel_db/books/{book}/characters/{name}` で取得して表示する。
+
+**なぜ必要か:** 続巻を読み始める前 / 間が空いた後に「このキャラは何者だったか」を即座に思い出したい。既に B-9 の chunk ctx で「キャラ名 → 主要シーン」は検索できるが、キャラ単位の俯瞰ページがあれば人物関係の思い出しコストが大幅に下がる。
+
+**生成方式:**
+
+| 項目 | 値 |
+|---|---|
+| モデル | `qwen3.6-iq4xs`（`NOVEL_DB_LLM_MODEL`、llama-server バックエンド） |
+| 入力範囲 | 該当キャラが `main_characters` に含まれる page の `full_text` を page_no 順に連結（先頭 80,000 字までで truncate） |
+| プロンプト | 書名 + キャラ名 + 本文 → 1 段落 400 字程度。役職 / 行動 / 心情の動き / 関係性の変化 / 印象的な台詞を指示 |
+| 出力長 | `num_predict=1024`, `num_ctx=65536` |
+| 1 キャラ所要 | 主要キャラ（80k 字 body）で ~470 秒、副キャラ（数 page）で ~30 秒 |
+
+**スキーマ**: `book_characters(id, book_id, name, summary, first_page, page_count, generated_at)`。UNIQUE(book_id, name)。
+
+**API 連動**: API 一覧はキャラ一覧 + has_summary フラグだけ返し、詳細 API でサマリ全文 + 主要シーン top 5（`char_count` 多い順）を返す。
+
+**生成タイミング**: 別 CLI（[§5.11](#511-cli) の `build_character_summaries.py`）でユーザーが任意のタイミングで実行する。`pages.main_characters` の前提（character_extractor で抽出済み）が必要。
+
+**フォールバック**:
+- `main_characters IS NULL` の page しかない書籍はキャラ抽出 = 0 で処理スキップ
+- LLM 失敗時は `book_characters.summary = NULL` のまま統計値（first_page / page_count）だけ保存
+- 既に summary 済みのキャラは `--redo` 未指定なら skip
+
+**実機検証 (2026-05-12)**: id=23 おこぼれ姫 1 巻 の top 3 キャラで動作確認:
+- レティ（95p, body 80k chars）: 419 chars サマリ / 471 秒
+- デューク（69p, body 80k chars）: 365 chars サマリ / 83 秒
+- アストリッド（35p, body 38k chars）: 365 chars サマリ / 41 秒
+- 合計 596 秒、`ng=0`、`book_characters` に 3 行 UPSERT 完了。生成内容は役職 / 行動 / 心情の変化 / 関係性 / 印象的フレーズを含む 1 段落 (400 字程度) に整合
+- 2 キャラ目以降が高速化したのは llama-server の KV cache 効果と見られる
+
+### 5.12. マルチターン会話 QA（`qa_sessions.py` + `llm.stream_chat`）（2026-05-12 追加: B-16）
+
+単発 QA（`/qa`）と並走する形で、会話履歴を保ったマルチターン QA を追加した。1 セッションは **scope 固定**（開始時に book / series / all を選び、途中変更不可）。LLM は `LlamaServerBackend.astream_chat` 経由で OpenAI 互換 `messages` をそのまま流す。
+
+**スキーマ**:
+- `qa_sessions(id, scope_type, scope_id, title, started_at, last_message_at)`
+- `qa_messages(id, session_id, role, content, eval_count, done_reason, created_at)` — CASCADE on session 削除
+
+**初手 (`POST /qa/sessions`)**:
+1. 既存 `/qa` と同じ手順で hits + book_summaries を構築（`scope=book` で `NOVEL_DB_QA_FULL_BOOK_MODE` なら全 page 読み）
+2. `build_chat_system_message(scope, context_block)` で `messages[0] = {role: 'system', content: ...}` を作成
+3. session 作成 → system + user メッセージを DB に append
+4. `stream_chat([system, user])` を SSE 配信
+5. 終端で assistant メッセージを DB に append（`eval_count` / `done_reason` 込み）
+
+**続行 (`POST /qa/sessions/{id}/messages`)**:
+1. `load_chat_messages(session_id)` で過去 messages（system + user/assistant 履歴）を全件取得
+2. 新 user メッセージを DB に append
+3. `stream_chat(prior + [new_user])` を SSE 配信
+4. 終端で assistant を append
+
+**LLM オプション**:
+- `LLM_OPTIONS` を流用（`num_ctx=32768` 既定）。`scope=book` で `NOVEL_DB_QA_FULL_BOOK_MODE` なら `num_ctx=131072` に上書き
+- 履歴は無圧縮で先頭から積む。長期セッションで肥大化したら要約圧縮を後付け（MVP では非対応）
+
+**llama-server の KV cache 効果**:
+- 初手の system + user は長い（page 抜粋 30 万字+質問）が、続行ターンでは同じ prefix が再送されるため KV cache がヒットし、2 ターン目以降は実質「新 user + assistant」分の推論に短縮される
+- B-15 の検証で 2 キャラ目以降が 5× 高速化したのと同じ効果
+
+**バックエンド前提**:
+- `NOVEL_DB_LLM_BACKEND=llama_server` 必須。Ollama 経路は `LlamaServerBackend` の `stream_chat` を持たないため、`local_llm.OllamaBackend.stream_chat` は `NotImplementedError` を投げ、SSE で `{"error": ...}` を 1 度返してストリーム終了する
+- thinking 抑制は `chat_template_kwargs.enable_thinking=False`（`local_llm` 側で既定）
+
+**実機検証 (2026-05-12)**: おこぼれ姫 1 巻 × scope=book で 3 ターン会話を実施:
+- Q1「レティの心情は物語の始めと終わりでどう変化した？」（初手、131k 全 page 読み）: 数分
+- Q2「その変化のきっかけは？」（KV cache ヒット）: 約 1 分
+- Q3「他キャラとの関係に影響は？」: 同程度
+- 観察:
+  - **KV cache 効果**: Q1 → Q2 で 3〜5× 高速化。system + Q1 + A1 の prefix を再利用できているため
+  - **文脈保持**: Q2 が「Q1 のレティの心情変化」を主語にしたきっかけ説明、Q3 が「レティの変化を起点とした他 4 キャラとの関係変化」を整理 → 履歴を踏まえた深掘りが機能
+  - **根拠 page 明記**: p19 / p30 / p40 / p66-67 / p68 / p75-76 / p99-100 / p105 / p107-108 など全域から page 番号付き引用 → 131k 全 page 読みが効いている
+  - **キャラ帰属**: デューク / フリートヘルム / グイード / レオンハルト / アストリッド の固有名詞 + 行動 + 内面が正しく対応、誤統合なし
+
+### 5.13. CLI
 
 | スクリプト | 用途 |
 |---|---|
@@ -482,6 +562,7 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 | `backend/scripts/extract_characters.py` | 主要登場人物の一括抽出（`pages.main_characters` を埋める）|
 | `backend/scripts/build_novel_summaries.py` | 書籍俯瞰サマリの一括生成（`books.summary` を埋める）|
 | `backend/scripts/build_chunk_contexts.py` | チャンク位置説明の一括生成 + 再 embedding（`chunks.contextual_text` を埋め、`chunks_vec` を更新）|
+| `backend/scripts/build_character_summaries.py` | キャラクター辞典の一括生成（`book_characters.summary` を埋める）（B-15）|
 
 ```bash
 uv run python scripts/build_novel_db.py --all                      # 全件
@@ -496,10 +577,14 @@ uv run python scripts/build_novel_summaries.py --book "..." --redo # 既存値�
 
 uv run python scripts/build_chunk_contexts.py --all                # 全チャンクに位置説明 + 再 embedding
 uv run python scripts/build_chunk_contexts.py --book "..." --redo  # 既存値を上書き
+
+uv run python scripts/build_character_summaries.py --book "..."           # キャラ辞典生成（B-15）
+uv run python scripts/build_character_summaries.py --book "..." --redo    # 既存サマリを上書き
+uv run python scripts/build_character_summaries.py --book "..." --character "レティ"  # 1 キャラのみ
 ```
 
 `build_novel_db.py` は内部的に `services/novel_db/job_queue.py` を経由（同時実行禁止）。
-`extract_characters.py` / `build_novel_summaries.py` / `build_chunk_contexts.py` はジョブキューを使わず逐次実行（再構築と並行しない前提）。
+`extract_characters.py` / `build_novel_summaries.py` / `build_chunk_contexts.py` / `build_character_summaries.py` はジョブキューを使わず逐次実行（再構築と並行しない前提）。
 
 **処理順序の推奨**: `build_novel_db` → `extract_characters` → `build_novel_summaries` → `build_chunk_contexts`。`build_chunk_contexts` は `book.summary` を要求するため、サマリ生成より後に実行する必要がある。
 

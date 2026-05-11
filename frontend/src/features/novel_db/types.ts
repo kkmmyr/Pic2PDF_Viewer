@@ -104,3 +104,55 @@ export interface RebuildEnqueueResponse {
     job_id: number;
     queued_position: number;
 }
+
+// ---------------------------------------------------------------------------
+// マルチターン会話 QA（B-16）
+// ---------------------------------------------------------------------------
+
+export interface ChatSessionSummary {
+    id: number;
+    scope_type: ScopeType;
+    scope_id: string | null;
+    title: string | null;
+    started_at: string;
+    last_message_at: string | null;
+    message_count: number;
+}
+
+export interface ChatMessage {
+    id: number;
+    role: 'user' | 'assistant' | 'system';
+    content: string;
+    eval_count: number | null;
+    done_reason: string | null;
+    created_at: string;
+}
+
+export interface ChatSessionDetail extends ChatSessionSummary {
+    messages: ChatMessage[];
+}
+
+// ---------------------------------------------------------------------------
+// キャラクター辞典（B-15）
+// ---------------------------------------------------------------------------
+
+export interface CharacterSummary {
+    name: string;
+    first_page: number;
+    page_count: number;
+    has_summary: boolean;
+}
+
+export interface CharacterScene {
+    page_no: number;
+    char_count: number;
+}
+
+export interface CharacterDetail {
+    name: string;
+    first_page: number;
+    page_count: number;
+    summary: string | null;
+    generated_at: string | null;
+    top_scenes: CharacterScene[];
+}

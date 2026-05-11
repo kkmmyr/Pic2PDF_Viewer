@@ -1,13 +1,18 @@
 /**
- * 書籍 1 冊のサムネイル + メタ情報 + 再構築ボタン。
+ * 書籍 1 冊のサムネイル + メタ情報 + 再構築ボタン + 登場人物トグル（B-15）。
  */
-import { CheckCircle2, Circle, RefreshCw } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, RefreshCw, Users } from 'lucide-react';
 
 import type { BookSummary } from '../../features/novel_db/types';
+
+import CharactersPanel from './CharactersPanel';
 
 interface Props {
     book: BookSummary;
     onRebuild: (bookName: string) => void;
+    /** B-15: キャラ選択時に親が CharacterDetailDialog を開く。 */
+    onSelectCharacter?: (bookName: string, charName: string) => void;
     disabled?: boolean;
 }
 
@@ -17,8 +22,9 @@ function formatIndexedAt(isoLike: string | null): string | null {
     return isoLike.replace('T', ' ').slice(0, 16);
 }
 
-export default function BookCard({ book, onRebuild, disabled }: Props) {
+export default function BookCard({ book, onRebuild, onSelectCharacter, disabled }: Props) {
     const indexedAt = formatIndexedAt(book.indexed_at);
+    const [charsExpanded, setCharsExpanded] = useState(false);
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col">
             {book.thumbnail_url ? (
@@ -73,7 +79,30 @@ export default function BookCard({ book, onRebuild, disabled }: Props) {
                     <RefreshCw className="w-3 h-3" />
                     再構築
                 </button>
+                {book.is_indexed && (
+                    <button
+                        type="button"
+                        onClick={() => setCharsExpanded((v) => !v)}
+                        className="px-2.5 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 flex items-center justify-center gap-1"
+                        aria-expanded={charsExpanded}
+                    >
+                        <Users className="w-3 h-3" />
+                        登場人物
+                        {charsExpanded ? (
+                            <ChevronUp className="w-3 h-3" />
+                        ) : (
+                            <ChevronDown className="w-3 h-3" />
+                        )}
+                    </button>
+                )}
             </div>
+            {book.is_indexed && onSelectCharacter && (
+                <CharactersPanel
+                    bookName={book.name}
+                    expanded={charsExpanded}
+                    onSelect={(charName) => onSelectCharacter(book.name, charName)}
+                />
+            )}
         </div>
     );
 }
