@@ -1,7 +1,8 @@
 """チャンク化戦略の比較実験スクリプト（§4.4）。
 
-現状のページ単位チャンク（chunk_page, 800字/ページ）と
-クロスページチャンク（chunk_book, 1200字/全文連結）の品質を比較する。
+現状のページ単位チャンク（chunk_page, 800字/ページ）、
+クロスページチャンク（chunk_book, 1200字/全文連結）、
+Qwen 意味セグメンテーション（chunk_qwen, 意味境界→サブ分割）の品質を比較する。
 本番コード（builder.py）は変更せず、読み取り専用で既存 DB のページデータを使う。
 
 使用例:
@@ -15,13 +16,21 @@
         --book "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)" \\
         --query "父王が次期女王を発表する場面"
 
+    # Qwen 意味セグメンテーションを含む 3 方式比較（Qwen サーバが起動していること）
+    uv run python scripts/eval_chunk_strategy.py \\
+        --book "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)" \\
+        --query "父王が次期女王を発表する場面" \\
+        --qwen
+
     # 書籍一覧表示
     uv run python scripts/eval_chunk_strategy.py --list
 """
 from __future__ import annotations
 
 import argparse
+import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -29,7 +38,14 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
+# Windows CP932 環境でも日本語・特殊文字を出力できるよう UTF-8 に切り替える
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from services.novel_db import init_schema, with_db  # noqa: E402
+from services.novel_db._llm_backend import build_qwen_backend  # noqa: E402
 from services.novel_db.chunker import chunk_book, chunk_page  # noqa: E402
 from services.novel_db.embedder import embed_batch  # noqa: E402
 
@@ -112,7 +128,7 @@ def _show_stats(label: str, chunks: list[dict]) -> None:
     for i, cnt in enumerate(buckets):
         lo = i * bucket_size
         hi = (i + 1) * bucket_size - 1 if i < n_buckets - 1 else "+"
-        bar = "█" * (cnt * 20 // max_count)
+        bar = "#" * (cnt * 20 // max_count)
         label_str = f"{lo}-{hi}" if isinstance(hi, int) else f"{lo}{hi}"
         print(f"      {label_str:8s}: {cnt:4d}  {bar}")
 
@@ -154,6 +170,108 @@ def _print_results(label: str, results: list[dict]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Qwen 意味セグメンテーション
+# ---------------------------------------------------------------------------
+
+_QWEN_PROMPT_TMPL = """\
+以下は小説1冊分のテキストです。各ページは「[PAGE N]」で区切られています。
+
+このテキストを意味的なまとまり（章・場面・場所・時間軸の区切りなど）で分割してください。
+分割点となるページ番号を JSON 配列のみで返してください（それ以外のテキスト不要）。
+例: [10, 25, 48, 72]
+
+各分割点は「このページから新しい場面/章が始まる」最初のページ番号です。
+先頭ページ（1ページ目）は含めないでください。
+あまり細かく分割しすぎず、大きな意味のまとまりで分割してください（目安: 10〜30 分割）。
+
+--- テキスト開始 ---
+{text}
+--- テキスト終了 ---
+
+JSON 配列のみを返答してください:"""
+
+_JSON_ARRAY_RE = re.compile(r"\[[\d,\s]+\]")
+
+
+def _segment_by_qwen(pages: list[dict]) -> list[int]:
+    """Qwen に 1 冊全文を送り、意味境界のページ番号リストを返す。
+
+    Returns: 境界ページ番号のソート済みリスト（先頭 1 は含まない）。
+             Qwen が失敗した場合は空リストを返す。
+    """
+    # [PAGE N]\ntext\n 形式で連結
+    lines: list[str] = []
+    for p in pages:
+        lines.append(f"[PAGE {p['page_no']}]")
+        lines.append(p.get("full_text") or "")
+    full_text = "\n".join(lines)
+
+    total_chars = sum(len(p.get("full_text") or "") for p in pages)
+    print(f"  Qwen へ送信: {len(pages)} ページ / {total_chars:,} 文字")
+    print("  （応答まで数十秒〜数分かかります）", flush=True)
+
+    try:
+        backend = build_qwen_backend()
+        response = backend.ask(
+            _QWEN_PROMPT_TMPL.format(text=full_text),
+            options={"num_predict": 1024, "temperature": 0.1},
+        )
+    except Exception as e:
+        print(f"  Qwen エラー: {e}", file=sys.stderr)
+        return []
+
+    # JSON 配列を抽出
+    m = _JSON_ARRAY_RE.search(response)
+    if not m:
+        print(f"  Qwen 応答から JSON 配列を抽出できませんでした:\n{response[:300]}", file=sys.stderr)
+        return []
+
+    try:
+        boundaries: list[int] = json.loads(m.group())
+    except json.JSONDecodeError as e:
+        print(f"  JSON パースエラー: {e}", file=sys.stderr)
+        return []
+
+    valid_page_nos = {p["page_no"] for p in pages}
+    boundaries = sorted(set(b for b in boundaries if b in valid_page_nos))
+    print(f"  Qwen セグメント境界: {boundaries}")
+    return boundaries
+
+
+def _build_qwen_chunks(pages: list[dict], boundaries: list[int]) -> list[dict]:
+    """Qwen の境界でページを分割し、各セグメントを chunk_book でサブ分割する。
+
+    boundaries が空の場合は全体を 1 セグメントとして chunk_book にかける。
+    """
+    if not pages:
+        return []
+
+    # ページを境界で分割
+    boundary_set = set(boundaries)
+    segments: list[list[dict]] = []
+    current: list[dict] = []
+    for p in pages:
+        if p["page_no"] in boundary_set and current:
+            segments.append(current)
+            current = []
+        current.append(p)
+    if current:
+        segments.append(current)
+
+    pid_to_pno = {p["page_id"]: p["page_no"] for p in pages}
+    all_chunks: list[dict] = []
+    for seg in segments:
+        for c in chunk_book(seg):
+            all_chunks.append({
+                "page_id": c["page_id"],
+                "page_no": pid_to_pno.get(c["page_id"], 0),
+                "chunk_idx": c["chunk_idx"],
+                "text": c["text"],
+            })
+    return all_chunks
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -166,6 +284,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--query", metavar="Q", help="比較検索クエリ（省略時は統計のみ）")
     parser.add_argument("--top", type=int, default=5, help="表示件数（デフォルト 5）")
     parser.add_argument("--list", action="store_true", help="DB 登録済み書籍一覧を表示")
+    parser.add_argument(
+        "--qwen", action="store_true",
+        help="Qwen 意味セグメンテーション方式も含めた 3 方式比較（Qwen サーバ起動必須）",
+    )
     args = parser.parse_args(argv)
 
     with with_db() as conn:
@@ -201,10 +323,23 @@ def main(argv: list[str] | None = None) -> int:
     print("【チャンク統計】")
     _show_stats("現状 (chunk_page / 800字・ページ単位)", page_chunks)
     print()
-    _show_stats("実験 (chunk_book / 1200字・クロスページ)", book_chunks)
+    _show_stats("実験B (chunk_book / 1200字・クロスページ)", book_chunks)
+
+    qwen_chunks: list[dict] = []
+    if args.qwen:
+        print("\n【Qwen 意味セグメンテーション】")
+        boundaries = _segment_by_qwen(pages)
+        qwen_chunks = _build_qwen_chunks(pages, boundaries)
+        print()
+        _show_stats(f"実験A (chunk_qwen / Qwen境界{len(boundaries)}点+chunk_book)", qwen_chunks)
 
     if not args.query:
-        print("\n--query QUERY を指定するとベクトル類似度で両方式のトップ N を比較できます。")
+        hint = "--query QUERY を指定するとベクトル類似度で"
+        hint += " 3 方式" if args.qwen else " 2 方式"
+        hint += "のトップ N を比較できます。"
+        if not args.qwen:
+            hint += "（--qwen で Qwen セグメンテーション方式も追加）"
+        print(f"\n{hint}")
         return 0
 
     print(f"\n【クエリ: {args.query!r}  top={args.top}】")
@@ -212,10 +347,14 @@ def main(argv: list[str] | None = None) -> int:
 
     query_emb = embed_batch([args.query])[0]
     page_chunks_emb = _embed_all(page_chunks, "現状")
-    book_chunks_emb = _embed_all(book_chunks, "実験")
+    book_chunks_emb = _embed_all(book_chunks, "実験B")
 
     _print_results(f"現状 (chunk_page) top {args.top}", _top_n(query_emb, page_chunks_emb, args.top))
-    _print_results(f"実験 (chunk_book) top {args.top}", _top_n(query_emb, book_chunks_emb, args.top))
+    _print_results(f"実験B (chunk_book) top {args.top}", _top_n(query_emb, book_chunks_emb, args.top))
+
+    if args.qwen and qwen_chunks:
+        qwen_chunks_emb = _embed_all(qwen_chunks, "実験A")
+        _print_results(f"実験A (chunk_qwen) top {args.top}", _top_n(query_emb, qwen_chunks_emb, args.top))
 
     print("\n（評価軸: 回答精度・根拠ページの妥当性・使い心地）")
     return 0
