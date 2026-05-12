@@ -591,6 +591,56 @@ llama-server.exe ^
 
 採用実装後、これらは `backend/scripts/bench_llm_backend.py` 等に整理して残す予定。
 
+### 9.6 B-14b: ngram Speculative Decoding 採用（2026-05-12）
+
+**目的**: decode フェーズの高速化。B-14（llama-server 切替）の延長上で「MTP や speculative decoding で追加の速度改善ができないか」の評価。
+
+#### 調査: 真の MTP（Multi-Token Prediction）の現状
+
+B-12 メモに「Aman Gupta の patched llama.cpp + MTP GGUF」と記録していた手法を再調査した。
+
+- GitHub で確認できた最も近い PR: **#22673 by am17an** (`llama + spec: MTP Support`)
+  - Qwen3.6-35B-A3B を明示的にテスト済み
+  - フラグ: `--spec-draft-model mtp.gguf --spec-type mtp`
+  - 必要なもの: MTP テンソル入り専用 GGUF（bartowski 標準 IQ4_XS には含まれない）
+  - **ステータス: Open（未マージ、2026-05-12 時点）**
+- 現行 b9101 にはこの MTP 実装は含まれない
+
+→ 本物の MTP はビルドから要するため、PR マージまで保留。
+
+#### 採用: ngram-cache Speculative Decoding（b9101 既存機能）
+
+b9101 の `llama-server.exe` に `--spec-type` フラグが既存実装として存在することを発見:
+
+```
+--spec-type [none|ngram-cache|ngram-simple|ngram-map-k|ngram-map-k4v|ngram-mod]
+```
+
+`ngram-cache` は KV cache 内の n-gram マッチを使って draft トークンを提案し、main モデルで並列 verify する仕組み。別モデル不要、GGUF 変更不要、API 透過的。
+
+**変更内容**: `start-qwen-server.bat` 他 2 ファイルに `--spec-type ngram-cache` を追記。
+
+```bat
+llama-server.exe ^
+  ... (既存フラグ) ... ^
+  --spec-type ngram-cache ^   ← B-14b 追加
+  --port 11435 --host 127.0.0.1
+```
+
+#### 速度改善の適用範囲と限界
+
+| フェーズ | 現況 | ngram-cache の効果 |
+|---|---|---|
+| Prefill（書籍丸読み 78k tok） | ~170 秒 | **効かない**（prefill は並列化済み、spec dec は decode のみ） |
+| Decode warm KV（2問目以降） | 46 t/s | **5〜20% 改善期待**（日本語小説のリピートパターン次第） |
+| Decode cold（サーバ再起動後初回） | 46 t/s（短文のみ） | 同上（prefill 部分は不変） |
+
+**170 秒短縮の本命は `--slot-save-path`（B-14c）**: サーバ再起動後も書籍 KV キャッシュをディスク永続化すれば初回 prefill をスキップできる。B-14b 完了後の次のタスクとして分類。
+
+#### 実測TODO
+
+サーバ再起動後、scope=book QA を ngram-cache ON/OFF で計測して `tg t/s` と `spec_acc_rate`（承認率）を記録する。実測値は本セクションに追記予定。
+
 ---
 
 ## 10. 関連ファイル

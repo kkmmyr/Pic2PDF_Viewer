@@ -108,7 +108,6 @@ backend/
 │   ├── novel_db/                    # 新規（DB ファイル格納）
 │   │   └── novel.db                 # SQLite + FTS5 + sqlite-vec
 │   └── kindle_novel/                # 既存（PDF / 画像 / サムネイル）
-│       ├── pdfs/                    # ★ 新ビューア動作確認後に削除予定
 │       ├── images/                  # 元画像（永続保持）
 │       └── thumbnails/              # 既存（流用または削除、後述）
 ├── routers/
@@ -1201,24 +1200,33 @@ def _check_locked(queue: NovelDbJobQueue) -> None:
 ### 9.1. 書籍一覧
 
 ```python
-def list_books() -> list[BookSummary]:
-    """既存の data/kindle_novel/pdfs/ + meta.json から書籍リストを構築し、
-    novel.db の DB 状態（is_indexed / page_count / indexed_at）を結合して返す。"""
-    pdf_files = list(NOVEL_PDF_DIR.glob("*.pdf"))
-    meta = load_meta_json("novel")  # 既存 meta_store の流用
-    indexed_books = {b.name: b for b in load_indexed_books_from_db()}
+def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
+    """data/kindle_novel/images/ のサブディレクトリを起点に書籍リストを構築し、
+    novel.db の DB 状態（is_indexed / page_count / indexed_at）と meta.json を結合して返す。
+
+    ※ PDFs ではなく images/ ディレクトリを起点とする（PDFs は廃止済み）。
+    """
+    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    if not images_dir.exists():
+        return []
+
+    meta = load_meta("novel")  # meta_store 経由
+    indexed = _fetch_indexed_status(conn)  # {name: {page_count, indexed_at}}
 
     summaries = []
-    for pdf in pdf_files:
-        name = pdf.stem
-        info = indexed_books.get(name)
+    for book_dir in sorted(d for d in images_dir.iterdir() if d.is_dir()):
+        name = book_dir.name
+        meta_entry = meta.get(f"{name}.pdf", {})
+        info = indexed.get(name)
         summaries.append(BookSummary(
             name=name,
-            authors=meta.get(name, {}).get("authors", []),
-            series_id=meta.get(name, {}).get("series_id"),
+            authors=list(meta_entry.get("authors", [])),
+            series_id=meta_entry.get("series_id"),
+            series_title=meta_entry.get("series_title"),
             is_indexed=info is not None,
-            page_count=info.page_count if info else None,
-            indexed_at=info.indexed_at if info else None,
+            page_count=info["page_count"] if info else None,
+            indexed_at=info["indexed_at"] if info else None,
+            thumbnail_url=_thumbnail_url(name),
         ))
     return summaries
 ```
