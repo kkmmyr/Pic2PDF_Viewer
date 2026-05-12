@@ -13,9 +13,9 @@ function App() {
             <ErrorBoundary>
                 <Routes>
                     <Route path="/" element={<Layout />}>
-                        <Route index element={<Navigate to="/viewer" replace />} />
+                        <Route index element={<Navigate to="/doujin" replace />} />
                         <Route
-                            path="viewer"
+                            path="doujin"
                             element={
                                 <ErrorBoundary>
                                     <ViewerPage />
@@ -23,7 +23,7 @@ function App() {
                             }
                         />
                         <Route
-                            path="generator"
+                            path="doujin/generator"
                             element={
                                 <ErrorBoundary>
                                     <GeneratorPage />
@@ -31,15 +31,7 @@ function App() {
                             }
                         />
                         <Route
-                            path="ocr"
-                            element={
-                                <ErrorBoundary>
-                                    <OCRPage />
-                                </ErrorBoundary>
-                            }
-                        />
-                        <Route
-                            path="hitomi"
+                            path="doujin/hitomi"
                             element={
                                 <ErrorBoundary>
                                     <HitomiPage />
@@ -47,10 +39,27 @@ function App() {
                             }
                         />
                         <Route
-                            path="novel-db"
+                            path="comic"
+                            element={
+                                <ErrorBoundary>
+                                    <ViewerPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route path="novel" element={<Navigate to="/novel/db" replace />} />
+                        <Route
+                            path="novel/db"
                             element={
                                 <ErrorBoundary>
                                     <NovelDbPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="novel/ocr"
+                            element={
+                                <ErrorBoundary>
+                                    <OCRPage />
                                 </ErrorBoundary>
                             }
                         />

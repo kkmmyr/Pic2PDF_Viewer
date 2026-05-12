@@ -11,7 +11,7 @@ describe('RelatedBooksPage', () => {
             <RelatedBooksPage
                 related={empty}
                 currentPath=""
-                currentSource="generated"
+                currentSource="doujin"
                 onSelect={vi.fn()}
             />,
         );
@@ -32,7 +32,7 @@ describe('RelatedBooksPage', () => {
             <RelatedBooksPage
                 related={related}
                 currentPath=""
-                currentSource="generated"
+                currentSource="doujin"
                 onSelect={vi.fn()}
             />,
         );
@@ -52,7 +52,7 @@ describe('RelatedBooksPage', () => {
             <RelatedBooksPage
                 related={related}
                 currentPath=""
-                currentSource="generated"
+                currentSource="doujin"
                 onSelect={vi.fn()}
             />,
         );
@@ -71,7 +71,7 @@ describe('RelatedBooksPage', () => {
             <RelatedBooksPage
                 related={related}
                 currentPath="sub"
-                currentSource="generated"
+                currentSource="doujin"
                 onSelect={onSelect}
             />,
         );

@@ -20,7 +20,6 @@ interface LibraryHeaderProps {
     breadcrumbs: LibraryBreadcrumb[];
     showHidden: boolean;
     onUpClick: () => void;
-    onSourceChange: (source: LibrarySource) => void;
     onToggleSelectionMode: () => void;
     onBulkSetAuthor: () => void;
     onBulkSetSeries: () => void;
@@ -53,7 +52,6 @@ export function LibraryHeader({
     breadcrumbs,
     showHidden,
     onUpClick,
-    onSourceChange,
     onToggleSelectionMode,
     onBulkSetAuthor,
     onBulkSetSeries,
@@ -76,10 +74,8 @@ export function LibraryHeader({
         <div className="sticky top-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-header">
             <LibraryNavBar
                 currentPath={currentPath}
-                currentSource={currentSource}
                 breadcrumbs={breadcrumbs}
                 onUpClick={onUpClick}
-                onSourceChange={onSourceChange}
             />
             <LibraryFilterBar
                 searchText={searchText}

@@ -3,6 +3,7 @@ import type { PdfFile, LibrarySource } from '../types';
 import { API_ENDPOINTS } from '../config/api';
 import apiClient from '../config/api_client';
 import { useUrlState } from '../hooks/useUrlState';
+import { useCurrentSource } from '../hooks/useCurrentSource';
 import { useLibraryManagement } from '../hooks';
 
 interface LibraryContextValue {
@@ -17,7 +18,6 @@ interface LibraryContextValue {
     // ナビゲーション
     onPdfClick: (name: string) => void;
     onUpClick: () => void;
-    onSourceChange: (source: LibrarySource) => void;
     onClosePdf: () => void;
     onPdfUpdated: () => void;
     // 選択モード
@@ -43,8 +43,8 @@ export function useLibraryContext(): LibraryContextValue {
 }
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
-    const { currentPath, selectedPdf, currentSource, navigateUp, selectPdf, clearPdf, setSource } =
-        useUrlState();
+    const { currentPath, selectedPdf, navigateUp, selectPdf, clearPdf } = useUrlState();
+    const currentSource = useCurrentSource();
 
     const [pdfs, setPdfs] = useState<PdfFile[]>([]);
     const [libraryVersion, setLibraryVersion] = useState(0);
@@ -89,10 +89,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         isSelectionMode,
         selectedItems,
         renameTarget,
-        onPdfClick: (name) => selectPdf(name, currentPath, currentSource),
-        onUpClick: () => navigateUp(currentPath, currentSource),
-        onSourceChange: setSource,
-        onClosePdf: () => clearPdf(currentPath, currentSource),
+        onPdfClick: (name) => selectPdf(name, currentPath),
+        onUpClick: () => navigateUp(currentPath),
+        onClosePdf: () => clearPdf(currentPath),
         onPdfUpdated: () => setLibraryVersion((v) => v + 1),
         onToggleSelectionMode: toggleSelectionMode,
         onClearSelection: clearSelection,

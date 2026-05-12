@@ -15,9 +15,9 @@ describe('useLibraryPins', () => {
         });
 
         it('localStorage に既存データがあれば復元する', () => {
-            localStorage.setItem('pins_series_generated', JSON.stringify({ 'sid-1': 'vol3.pdf' }));
+            localStorage.setItem('pins_series_doujin', JSON.stringify({ 'sid-1': 'vol3.pdf' }));
             localStorage.setItem(
-                'pins_author_generated',
+                'pins_author_doujin',
                 JSON.stringify({ 'Author A': 'bookA.pdf' }),
             );
             const { result } = renderHook(() => useLibraryPins('doujin'));
@@ -62,7 +62,7 @@ describe('useLibraryPins', () => {
             act(() => {
                 result.current.toggleSeriesPin('sid-1', 'vol2.pdf');
             });
-            const stored = JSON.parse(localStorage.getItem('pins_series_generated') ?? '{}');
+            const stored = JSON.parse(localStorage.getItem('pins_series_doujin') ?? '{}');
             expect(stored['sid-1']).toBe('vol2.pdf');
         });
 
@@ -111,7 +111,7 @@ describe('useLibraryPins', () => {
             act(() => {
                 result.current.toggleAuthorPin('Author A', 'bookA.pdf');
             });
-            const stored = JSON.parse(localStorage.getItem('pins_author_generated') ?? '{}');
+            const stored = JSON.parse(localStorage.getItem('pins_author_doujin') ?? '{}');
             expect(stored['Author A']).toBe('bookA.pdf');
         });
 
@@ -132,7 +132,7 @@ describe('useLibraryPins', () => {
                 gen.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });
             expect(kin.current.seriesPins).toEqual({});
-            expect(localStorage.getItem('pins_series_kindle')).toBeNull();
+            expect(localStorage.getItem('pins_series_comic')).toBeNull();
         });
     });
 });

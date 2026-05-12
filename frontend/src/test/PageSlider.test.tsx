@@ -131,7 +131,7 @@ describe('PageSlider', () => {
                 show={false}
                 selectedPdf="x.pdf"
                 currentPath=""
-                currentSource="generated"
+                currentSource="doujin"
                 onPageJump={vi.fn()}
             />,
         );
@@ -146,7 +146,7 @@ describe('PageSlider', () => {
                 show
                 selectedPdf="x.pdf"
                 currentPath=""
-                currentSource="generated"
+                currentSource="doujin"
                 onPageJump={vi.fn()}
             />,
         );

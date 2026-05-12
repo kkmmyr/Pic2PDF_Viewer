@@ -41,57 +41,84 @@ export default function Layout() {
                                 </Link>
                             </div>
 
-                            <nav className="flex items-center gap-1">
+                            <nav className="flex items-center gap-0.5">
+                                {/* 同人誌 */}
+                                <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
+                                    同人誌
+                                </span>
                                 <Link
-                                    to="/viewer"
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/viewer')}`}
+                                    to="/doujin"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/doujin')}`}
                                 >
                                     <Library className="w-4 h-4" />
                                     Library
                                 </Link>
                                 <Link
-                                    to="/generator"
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/generator')}`}
+                                    to="/doujin/generator"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/doujin/generator')}`}
                                 >
                                     <Settings className="w-4 h-4" />
                                     Generator
                                 </Link>
                                 <Link
-                                    to="/ocr"
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/ocr')}`}
-                                >
-                                    <Terminal className="w-4 h-4" />
-                                    Novel OCR
-                                </Link>
-                                <Link
-                                    to="/hitomi"
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/hitomi')}`}
+                                    to="/doujin/hitomi"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/doujin/hitomi')}`}
                                 >
                                     <Sparkles className="w-4 h-4" />
                                     新着
                                 </Link>
+
+                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+                                {/* 漫画 */}
+                                <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
+                                    漫画
+                                </span>
                                 <Link
-                                    to="/novel-db"
-                                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${isActive('/novel-db')}`}
+                                    to="/comic"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/comic')}`}
+                                >
+                                    <Library className="w-4 h-4" />
+                                    Library
+                                </Link>
+
+                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+
+                                {/* 小説 */}
+                                <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
+                                    小説
+                                </span>
+                                <Link
+                                    to="/novel/db"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/novel/db')}`}
                                 >
                                     <BookOpen className="w-4 h-4" />
-                                    小説検索
+                                    DB
                                 </Link>
+                                <Link
+                                    to="/novel/ocr"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/novel/ocr')}`}
+                                >
+                                    <Terminal className="w-4 h-4" />
+                                    OCR
+                                </Link>
+
+                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+
                                 <a
                                     href="/site/index.html"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"
+                                    className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"
                                     title="設計ドキュメント（別タブで開く）"
                                 >
                                     <BookText className="w-4 h-4" />
                                     設計書
                                 </a>
 
-                                {/* ダークモード切り替えボタン */}
                                 <button
                                     onClick={toggleDark}
-                                    className="ml-2 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    className="ml-1 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                                     title={
                                         isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'
                                     }

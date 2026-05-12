@@ -52,7 +52,6 @@ export function LibraryPanel() {
         renameTarget,
         onPdfClick,
         onUpClick,
-        onSourceChange,
         onToggleSelectionMode,
         onClearSelection,
         onToggleSelect,
@@ -283,7 +282,6 @@ export function LibraryPanel() {
                 breadcrumbs={breadcrumbs}
                 showHidden={showHidden}
                 onUpClick={onUpClick}
-                onSourceChange={onSourceChange}
                 onToggleSelectionMode={onToggleSelectionMode}
                 onBulkSetAuthor={() => dialogs.open('bulkAuthor')}
                 onBulkSetSeries={() => dialogs.open('bulkSeries')}

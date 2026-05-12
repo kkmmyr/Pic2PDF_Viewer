@@ -1,6 +1,4 @@
 import { ArrowLeft, Home, User, Library, ChevronRight } from 'lucide-react';
-import type { LibrarySource } from '../../types';
-import { SourceSelector } from './SourceSelector';
 
 export interface LibraryBreadcrumb {
     kind: 'home' | 'author' | 'series';
@@ -10,21 +8,13 @@ export interface LibraryBreadcrumb {
 
 interface LibraryNavBarProps {
     currentPath: string;
-    currentSource: LibrarySource;
     breadcrumbs: LibraryBreadcrumb[];
     onUpClick: () => void;
-    onSourceChange: (source: LibrarySource) => void;
 }
 
-export function LibraryNavBar({
-    currentPath,
-    currentSource,
-    breadcrumbs,
-    onUpClick,
-    onSourceChange,
-}: LibraryNavBarProps) {
+export function LibraryNavBar({ currentPath, breadcrumbs, onUpClick }: LibraryNavBarProps) {
     return (
-        <div className="h-12 flex items-center px-4 justify-between gap-4">
+        <div className="h-12 flex items-center px-4 gap-4">
             <div className="flex items-center gap-3 flex-1 min-w-0">
                 {currentPath && (
                     <button
@@ -81,7 +71,6 @@ export function LibraryNavBar({
                     </div>
                 )}
             </div>
-            <SourceSelector currentSource={currentSource} onSourceChange={onSourceChange} />
         </div>
     );
 }
