@@ -18,6 +18,7 @@ ADR-0007 とは独立した品質改善（B-5）。
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections.abc import Callable
 
@@ -71,6 +72,43 @@ _REDUCE_OPTIONS = {
     "num_predict": 2560,   # 最終 1500 字サマリ + 余裕
     "num_ctx": 16384,
 }
+
+# 一括生成（書籍サマリ + キャラクター辞典）の定数
+_CHAR_SUMMARY_TARGET_CHARS = 400
+_COMBINED_MAX_CHARACTERS = 20  # 一括出力で扱う最大キャラクター数
+
+_COMBINED_OPTIONS = {
+    "temperature": 0.2,
+    "repeat_penalty": 1.15,
+    # サマリ 1500 字 + 最大 20 キャラ × 400 字 ≈ 9500 字 ≈ ~6000 tokens + 余裕
+    "num_predict": 16384,
+    "num_ctx": 131072,
+}
+
+_COMBINED_PROMPT = """次は小説『{book_name}』の本文（連結ページ）です。
+以下の 3 セクションを指定のマーカー形式で出力してください。
+
+[SUMMARY]
+（{summary_target}字程度）
+含めること: 主人公と主要登場人物 / この巻の主要な出来事・対立・転機 /
+            キャラクター関係性の変化 / この巻のテーマや物語上の意味
+避けること: 単なる場面の羅列 / 巻末解説・あとがきの引用
+
+[CHARACTERS]
+（重要度順に最大 {max_chars} 名、キャラ名のみ 1 行 1 名）
+
+[CHARACTER_DETAIL:キャラ名]
+（{char_target}字程度の 1 段落）
+含めること: 役職・立場・他キャラとの関係 / この巻での主要な行動・選択・心情の動き /
+            関係性の変化 / 印象的な台詞（あれば 1 つ引用）
+避けること: 場面の単純な羅列 / 本文の長い引用
+
+（[CHARACTER_DETAIL:キャラ名] を登場人物ぶんだけ繰り返す）
+
+本文:
+{text}
+
+出力（マーカー [SUMMARY] / [CHARACTERS] / [CHARACTER_DETAIL:名前] から始めること）:"""
 
 # プロンプトテンプレート
 _MAP_PROMPT = """次は小説『{book_name}』の本文の一部（{n} 分割の {i} 番目）です。
@@ -184,33 +222,73 @@ def summarize_book(
         )
         return _BACKEND.ask(prompt, model=model, options=_ONE_SHOT_OPTIONS).strip()
 
-    # フォールバック経路: 異常に大きな本文（>200,000 字）は map-reduce で集約
-    chunks = _chunk_for_map(body_text)
+    return _run_map_reduce_summary(book_name, body_text, model=model, progress=progress)
+
+
+def summarize_book_with_characters(
+    conn: sqlite3.Connection,
+    book_name: str,
+    *,
+    model: str = NOVEL_DB_LLM_MODEL,
+    min_chars: int = NOVEL_DB_MIN_BODY_CHARS,
+    body_page_margin: int = NOVEL_DB_BODY_PAGE_MARGIN,
+    max_characters: int = _COMBINED_MAX_CHARACTERS,
+    progress: Callable[[str], None] | None = None,
+) -> tuple[str, dict[str, str]]:
+    """書籍サマリとキャラクター辞典を 1 回の Qwen 呼び出しで生成する。
+
+    Returns:
+        (book_summary, {char_name: char_summary})
+        本文が _ONE_SHOT_MAX_BODY_CHARS を超える場合はサマリのみ生成し、
+        キャラクター辞典は空 dict を返す（map-reduce フォールバック）。
+
+    Raises:
+        ValueError: 書籍が DB に存在しない、または本文が空
+        LLMError: Qwen 呼び出し失敗
+    """
+    book_row = conn.execute(
+        "SELECT id, page_count FROM books WHERE name = ?", (book_name,),
+    ).fetchone()
+    if book_row is None:
+        raise ValueError(f"book not found: {book_name}")
+    book_id, page_count = book_row
+
+    body_text = _load_body_text(
+        conn, book_id, page_count,
+        min_chars=min_chars, body_page_margin=body_page_margin,
+    )
+    if not body_text.strip():
+        raise ValueError(f"book has no body content: {book_name}")
+
+    if len(body_text) > _ONE_SHOT_MAX_BODY_CHARS:
+        _log(
+            progress,
+            f"  body chars={len(body_text):,} → too large for combined call; summary-only (map-reduce)",
+        )
+        summary = _run_map_reduce_summary(book_name, body_text, model=model, progress=progress)
+        return summary, {}
+
     _log(
         progress,
-        f"  body chars={len(body_text):,} → map-reduce ({len(chunks)} chunks, "
-        f"超過のため)",
+        f"  body chars={len(body_text):,} → combined one-shot "
+        f"(summary + up to {max_characters} characters, num_ctx={_COMBINED_OPTIONS['num_ctx']:,})",
     )
+    prompt = _COMBINED_PROMPT.format(
+        book_name=book_name,
+        text=body_text,
+        summary_target=_FINAL_SUMMARY_TARGET_CHARS,
+        char_target=_CHAR_SUMMARY_TARGET_CHARS,
+        max_chars=max_characters,
+    )
+    response = _BACKEND.ask(prompt, model=model, options=_COMBINED_OPTIONS).strip()
+    summary, char_summaries = _parse_combined_output(response)
 
-    # map: チャンクごとの中間要約
-    intermediates: list[str] = []
-    for i, chunk in enumerate(chunks, 1):
-        _log(progress, f"  map {i}/{len(chunks)} (chars={len(chunk):,})...")
-        prompt = _MAP_PROMPT.format(
-            book_name=book_name, i=i, n=len(chunks), text=chunk,
-        )
-        intermediates.append(_BACKEND.ask(prompt, model=model, options=_MAP_OPTIONS).strip())
+    if not summary:
+        _log(progress, "  warning: [SUMMARY] marker not found; using response head as summary")
+        summary = response[: _FINAL_SUMMARY_TARGET_CHARS * 2]
 
-    # reduce: 中間要約を統合
-    _log(progress, f"  reduce ({sum(len(s) for s in intermediates):,} chars)...")
-    summaries_block = "\n\n".join(
-        f"[{i}/{len(intermediates)}]\n{s}" for i, s in enumerate(intermediates, 1)
-    )
-    prompt = _REDUCE_PROMPT.format(
-        book_name=book_name, summaries=summaries_block,
-        target=_FINAL_SUMMARY_TARGET_CHARS,
-    )
-    return _BACKEND.ask(prompt, model=model, options=_REDUCE_OPTIONS).strip()
+    _log(progress, f"  done: summary={len(summary)} chars, {len(char_summaries)} characters")
+    return summary, char_summaries
 
 
 def update_book_summary(
@@ -340,6 +418,60 @@ def _chunk_for_map(text: str) -> list[str]:
         _ = i  # silence flake8 if any
     chunks.append(text[cursor:])
     return chunks
+
+
+def _run_map_reduce_summary(
+    book_name: str,
+    body_text: str,
+    *,
+    model: str,
+    progress: Callable[[str], None] | None = None,
+) -> str:
+    """map-reduce で書籍サマリを生成する（>200,000 字の本文用フォールバック）。"""
+    chunks = _chunk_for_map(body_text)
+    _log(
+        progress,
+        f"  body chars={len(body_text):,} → map-reduce ({len(chunks)} chunks, 超過のため)",
+    )
+    intermediates: list[str] = []
+    for i, chunk in enumerate(chunks, 1):
+        _log(progress, f"  map {i}/{len(chunks)} (chars={len(chunk):,})...")
+        prompt = _MAP_PROMPT.format(book_name=book_name, i=i, n=len(chunks), text=chunk)
+        intermediates.append(_BACKEND.ask(prompt, model=model, options=_MAP_OPTIONS).strip())
+
+    _log(progress, f"  reduce ({sum(len(s) for s in intermediates):,} chars)...")
+    summaries_block = "\n\n".join(
+        f"[{i}/{len(intermediates)}]\n{s}" for i, s in enumerate(intermediates, 1)
+    )
+    prompt = _REDUCE_PROMPT.format(
+        book_name=book_name, summaries=summaries_block,
+        target=_FINAL_SUMMARY_TARGET_CHARS,
+    )
+    return _BACKEND.ask(prompt, model=model, options=_REDUCE_OPTIONS).strip()
+
+
+def _parse_combined_output(text: str) -> tuple[str, dict[str, str]]:
+    """Qwen の一括出力から (書籍サマリ, {キャラ名: サマリ}) を抽出する。"""
+    summary = ""
+    char_summaries: dict[str, str] = {}
+
+    m = re.search(
+        r"\[SUMMARY\](.*?)(?=\[CHARACTERS\]|\[CHARACTER_DETAIL:|$)",
+        text, re.DOTALL,
+    )
+    if m:
+        summary = m.group(1).strip()
+
+    for m in re.finditer(
+        r"\[CHARACTER_DETAIL:([^\]]+)\](.*?)(?=\[CHARACTER_DETAIL:|$)",
+        text, re.DOTALL,
+    ):
+        name = m.group(1).strip()
+        detail = m.group(2).strip()
+        if name and detail:
+            char_summaries[name] = detail
+
+    return summary, char_summaries
 
 
 def _log(cb: Callable[[str], None] | None, msg: str) -> None:

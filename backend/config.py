@@ -66,6 +66,16 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gem
 # Anthropic の Contextual Retrieval blog では「位置説明は単純なタスクなので
 # 軽量モデルで十分」と推奨されており、gemma4:e4b で代用する。
 # 品質不足が確認されたら NOVEL_DB_LLM_MODEL（qwen3.6:35b-a3b）にフォールバック。
+#
+# TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) の評価
+#   Gemma4 公式が MTP による 1.5〜2× 高速化を発表（2026-05）。
+#   e4b は Dense モデルのため batch_size=1 でも MTP の恩恵を受けやすい。
+#   手順:
+#     1. Ollama に `bjoernb/gemma4-e4b-fast`（MTP 対応版）を追加
+#        `ollama pull bjoernb/gemma4-e4b-fast`
+#     2. この変数を "bjoernb/gemma4-e4b-fast" に変更して全書籍で速度計測
+#     3. 品質劣化がなければ既定値を MTP モデルに切替
+#   参考: https://ai.google.dev/gemma/docs/mtp/overview?hl=ja
 NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
 
 # §4.5 本構築統合: キャラ抽出 / チャンク文脈生成のバックエンド切替
