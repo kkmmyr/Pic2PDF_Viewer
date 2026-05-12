@@ -83,15 +83,26 @@ def _process_book(
     *,
     redo: bool,
     only_character: str | None,
+    min_pages: int = 1,
 ) -> tuple[int, int, int]:
     """1 冊のキャラを処理する。
 
     Returns: (success_count, skipped_count, failure_count)
     skipped は「既に summary 済みで --redo 未指定」または「pages が空」のケース。
+    `min_pages` 未満のキャラは集計から除外（カウントもしない）。副キャラのサマリ品質
+    は低い傾向があるため、本値で足切りすると全冊バッチの所要時間を大きく短縮できる。
     """
     with with_db() as conn:
         stats = list_book_characters_in_db(conn, book_id)
         existing = set() if redo else _existing_summaries(conn, book_id)
+
+    if min_pages > 1:
+        before = len(stats)
+        stats = [s for s in stats if s.page_count >= min_pages]
+        print(
+            f"  filtered by min_pages={min_pages}: {before} -> {len(stats)} characters",
+            flush=True,
+        )
 
     if only_character is not None:
         stats = [s for s in stats if s.name == only_character]
@@ -165,6 +176,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--redo", action="store_true", help="既存 summary を上書き")
     parser.add_argument("--character", metavar="NAME", default=None,
                         help="このキャラのみ生成（--book と併用、--all 時は全冊から該当キャラを探す）")
+    parser.add_argument("--min-pages", type=int, default=1, metavar="N",
+                        help="page_count >= N のキャラのみ対象（既定 1 = 足切りなし。"
+                             "副キャラを除外したいときに --min-pages 5 等を指定）")
     args = parser.parse_args(argv)
 
     targets = _list_target_books(book_name=args.book, series_id=args.series)
@@ -179,6 +193,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n[{i}/{len(targets)}] {name}", flush=True)
         ok, skip, ng = _process_book(
             book_id, name, redo=args.redo, only_character=args.character,
+            min_pages=args.min_pages,
         )
         total_ok += ok
         total_skip += skip

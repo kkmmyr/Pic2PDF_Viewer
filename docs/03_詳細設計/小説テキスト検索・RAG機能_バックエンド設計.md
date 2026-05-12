@@ -504,6 +504,8 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 - LLM 失敗時は `book_characters.summary = NULL` のまま統計値（first_page / page_count）だけ保存
 - 既に summary 済みのキャラは `--redo` 未指定なら skip
 
+**`--min-pages` による足切り** (2026-05-12 追加): `page_count` がこの値未満のキャラは集計から除外する（既定 1 = 足切りなし）。副キャラ（1〜4 page のみ登場）はサマリ生成の材料が薄く品質が低い傾向があり、また 11 冊フルバッチで 100〜200 キャラの副キャラが含まれるため、`--min-pages 5` で主要キャラに絞ると全冊バッチの所要時間を 6〜7 時間 → 2〜3 時間に短縮できる。副キャラのサマリは需要が出てから個別生成（`--character NAME`）または閾値を下げて再実行で対応する。
+
 **実機検証 (2026-05-12)**: id=23 おこぼれ姫 1 巻 の top 3 キャラで動作確認:
 - レティ（95p, body 80k chars）: 419 chars サマリ / 471 秒
 - デューク（69p, body 80k chars）: 365 chars サマリ / 83 秒
@@ -581,6 +583,7 @@ uv run python scripts/build_chunk_contexts.py --book "..." --redo  # 既存値�
 uv run python scripts/build_character_summaries.py --book "..."           # キャラ辞典生成（B-15）
 uv run python scripts/build_character_summaries.py --book "..." --redo    # 既存サマリを上書き
 uv run python scripts/build_character_summaries.py --book "..." --character "レティ"  # 1 キャラのみ
+uv run python scripts/build_character_summaries.py --all --min-pages 5    # page_count >= 5 の主要キャラのみ
 ```
 
 `build_novel_db.py` は内部的に `services/novel_db/job_queue.py` を経由（同時実行禁止）。
