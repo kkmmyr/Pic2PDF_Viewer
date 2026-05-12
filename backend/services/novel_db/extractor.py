@@ -1,22 +1,25 @@
 """ページ単位テキスト抽出。
 
 - PDF モード: PyMuPDF で縦書きブロックを連結（既存書籍との後方互換用）
-- 画像モード: OCR エンジン（yomitoku）で images/*.png から抽出（§4.2 新規）
+- 画像モード: ocr_worker.py を common/ocr/venv の Python でサブプロセス実行（§5.1.1）
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.1。
 """
 from __future__ import annotations
 
+import json
 import re
+import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TypedDict
 
 import fitz
 
-# D:\61.tool\common\ocr の ocr_engine.py を参照（sys.path 追加方式）
-_COMMON_OCR_PATH = r"D:\61.tool\common\ocr"
-
 _NEWLINE_RE = re.compile(r"\n+")
+
+_OCR_VENV_PYTHON = r"D:\61.tool\common\ocr\venv\Scripts\python.exe"
+_OCR_WORKER_SCRIPT = Path(__file__).parent / "ocr_worker.py"
 
 
 class PageText(TypedDict):
@@ -25,49 +28,29 @@ class PageText(TypedDict):
     char_count: int
 
 
-def extract_pages_from_images(images_dir: Path, engine: object) -> list[PageText]:
-    """画像ディレクトリから OCR エンジンでページテキストを抽出する（§4.2）。
+def run_ocr_subprocess(images_dirs: list[Path]) -> Iterator[tuple[str, list[PageText]]]:
+    """yomitoku OCR を common/ocr/venv で subprocess 実行し、書籍ごとに (book_name, pages) を yield する。
 
-    `engine` は `D:\\61.tool\\common\\ocr\\ocr_engine.py` の
-    `BaseOCREngine` サブクラス（初期化済み）。呼び出し側が 1 度だけ初期化して渡す。
+    yomitoku は 1 度だけ初期化して全書籍を連続処理する。
+    stderr は backend の stdout に流れる（GPU/モデルロードログが見える）。
     """
-    import cv2  # type: ignore[import-untyped]  # GPU 環境のみ利用可
+    cmd = [_OCR_VENV_PYTHON, str(_OCR_WORKER_SCRIPT)] + [str(d) for d in images_dirs]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+    assert proc.stdout is not None
 
-    pages: list[PageText] = []
-    for img_path in sorted(images_dir.glob("*.png")):
-        try:
-            page_no = int(img_path.stem)
-        except ValueError:
+    for line in proc.stdout:
+        line = line.strip()
+        if not line:
             continue
-        img = cv2.imread(str(img_path))
-        if img is None:
-            continue
-        results = engine.extract_text(img)  # type: ignore[union-attr]
-        full_text = "\n".join(r["text"] for r in results if r.get("text", "").strip())
-        pages.append({
-            "page_no": page_no,
-            "full_text": full_text,
-            "char_count": len(full_text),
-        })
-    return pages
+        data = json.loads(line)
+        book_name: str = data["book_name"]
+        if "error" in data:
+            raise RuntimeError(f"OCR worker error for '{book_name}': {data['error']}")
+        yield book_name, data["pages"]
 
-
-def load_ocr_engine() -> object:
-    """yomitoku OCR エンジンを初期化して返す。
-
-    `D:\\61.tool\\common\\ocr` を sys.path に追加して `ocr_engine.py` を import する。
-    GPU 環境（CUDA）前提。複数書籍を処理する場合は 1 度だけ呼ぶこと。
-    """
-    import sys
-
-    if _COMMON_OCR_PATH not in sys.path:
-        sys.path.insert(0, _COMMON_OCR_PATH)
-
-    from ocr_engine import get_ocr_engine  # type: ignore[import-not-found]
-
-    engine = get_ocr_engine("yomitoku")
-    engine.initialize()
-    return engine
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"OCR worker exited with code {proc.returncode}")
 
 
 def extract_pages(pdf_path: str | Path) -> list[PageText]:

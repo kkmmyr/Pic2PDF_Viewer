@@ -118,7 +118,8 @@ backend/
         ├── __init__.py
         ├── schema.py                # SQLite スキーマ DDL
         ├── connection.py            # sqlite3 接続 + sqlite_vec.load()
-        ├── extractor.py             # PyMuPDF blocks 抽出
+        ├── extractor.py             # PyMuPDF blocks 抽出 + OCR subprocess インターフェース
+        ├── ocr_worker.py            # yomitoku OCR ワーカー（common/ocr/venv で実行）
         ├── chunker.py               # 句点境界チャンク（800 字 / overlap 50）
         ├── embedder.py              # Ollama bge-m3 ラッパー
         ├── character_extractor.py   # Ollama gemma4:e4b で主要登場人物を抽出
@@ -297,6 +298,28 @@ def extract_pages(pdf_path: Path) -> list[dict]:
 ```
 
 PoC スクリプトで動作確認後、本実装に昇格（PoC ディレクトリ `tmp_poc/` は実装完了後に削除）。
+
+#### 5.1.1. 画像 OCR モード（`mode=ocr` / `mode=reocr`）（2026-05-13 追加）
+
+`rebuild_jobs.mode` が `ocr` または `reocr` のとき、PDF テキスト層の代わりに `images/*.png` を yomitoku で OCR してページテキストを生成する。
+
+**実行方式: subprocess 分離**
+
+yomitoku は `D:\61.tool\common\ocr\venv` 専用の GPU パッケージ群に依存するため、backend `.venv` には含めない。代わりに **`ocr_worker.py`** をスタンドアロンスクリプトとして `common/ocr/venv/Scripts/python.exe` で実行し、結果を JSON 行ストリームで受け取る。
+
+```
+job_queue._execute_job
+  └─ extractor.run_ocr_subprocess(images_dirs: list[Path])
+        └─ subprocess: common/ocr/venv/Scripts/python.exe ocr_worker.py <dir1> <dir2> ...
+              ├─ yomitoku を 1 度初期化（複数書籍で再利用）
+              └─ 各書籍: {"book_name": "...", "pages": [...]}  # stdout に 1 行ずつ flush
+  └─ builder._store_ocr_pages(book_name, pages)  # DB への書き込みは main process
+```
+
+**ポイント**:
+- yomitoku のモデルロード（~30 秒）は全書籍で 1 回だけ行う
+- stderr は backend の stdout/ログにそのまま流れる（GPU/モデル読み込みログが見える）
+- worker が 1 書籍でエラーした場合は `{"book_name": "...", "error": "..."}` を返し、job 全体を失敗にする
 
 ### 5.2. チャンク分割（`chunker.py`）
 
@@ -1411,12 +1434,9 @@ embedding / LLM の Ollama 呼び出しは `responses` ライブラリ等でモ�
     - **B-5（2026-05-10）**: `books.summary` を Qwen 1-shot で事前生成し、QA プロンプトの先頭に「書籍俯瞰サマリ」ブロックとして埋め込む（§5.7 / §7.2）
     - **B-8（2026-05-10）**: `book_summaries_vec` にサマリの bge-m3 ベクトルを格納し、`scope=all` / `scope=series` で `search_book_summaries` でサマリ自体を retrieval 候補に。ページに引っかからなかった書籍も俯瞰サマリで Qwen に伝わる（§6.5）
     - **B-9（2026-05-11）**: Anthropic 流の Contextual Retrieval。各チャンクに 80 字の位置説明を gemma4:e4b で生成し、`(contextual_text + chunk_text)` を再 embedding。検索 recall を 35〜49% 改善（§5.8）
-- **書籍単位の再 OCR 機能（将来）**: 検索結果や質問回答を見て「この書籍の OCR が壊れている」と気づいた際に、UI から「この本を再 OCR」ボタンで **元画像 (`data/kindle_novel/images/{書籍名}/*.png`) を yomitoku に流して新しい OCR テキストを得る → その書籍の DB レコード（pages / chunks / chunks_vec）を丸ごと作り直す** 機能。
-  - 実装方針: `services/novel_db/builder.py` に `mode` 引数を追加し、`mode='pdf_text'`（現行: PDF テキスト層から抽出、数分）と `mode='reocr'`（画像から yomitoku で再 OCR、GPU 必須・数十分）を切替できるようにする
-  - スキーマ変更: `rebuild_jobs.mode` カラムを追加（`'pdf_text' | 'reocr'`、デフォルト `'pdf_text'`）
-  - API 拡張: `POST /api/novel_db/rebuild` のリクエストに `mode` フィールドを追加
-  - UI: ライブラリ画面の各書籍に「再構築」ボタンと並んで「再 OCR」ボタンを置く（実行確認ダイアログで GPU 使用と所要時間を警告）
-  - 本フェーズでは未実装、要件定義 §9 に記載のとおり別途実装予定
+- **書籍単位の再 OCR 機能（実装済み, 2026-05-13）**: UI の「OCR」ボタンから `mode=ocr` / `mode=reocr` ジョブをキューに投入し、`images/*.png` を yomitoku で OCR して pages テーブルを更新する。実行方式の詳細は [§5.1.1](#511-画像-ocr-モードmodeocr--modereocr2026-05-13-追加) を参照。
+  - OCR 実行は `ocr_worker.py` を `D:\61.tool\common\ocr\venv\Scripts\python.exe` で subprocess 起動する方式（yomitoku の GPU 依存を backend venv から分離）
+  - `rebuild_jobs.mode` カラムで `pdf_text` / `ocr` / `reocr` / `full_build` を切替
 
 ---
 

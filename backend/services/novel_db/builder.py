@@ -21,7 +21,7 @@ from utils.logger import get_logger
 from .chunker import chunk_page
 from .connection import with_db
 from .embedder import embed_batch, serialize_f32
-from .extractor import extract_pages_from_images, load_ocr_engine
+from .extractor import PageText, run_ocr_subprocess
 from .schema import init_schema
 
 logger = get_logger(__name__)
@@ -43,31 +43,9 @@ def _resolve_images_dir(book_name: str) -> Path:
 # ステップ 1: OCR
 # ---------------------------------------------------------------------------
 
-def ocr_book(book_name: str, *, engine: object | None = None) -> None:
-    """OCR ステップ: images/*.png を OCR して pages.full_text を更新する。
-
-    - books レコードが存在しなければ INSERT、存在すれば page_count / ocr_done_at を更新。
-    - pages は (book_id, page_no) をキーに UPSERT（full_text / char_count / image_path を更新）。
-    - FTS5 を再同期する。
-    - chunks/chunks_vec は触らない（rebuild_from_pages が担当）。
-
-    Args:
-        book_name: 書籍 stem（= images サブディレクトリ名）
-        engine: 初期化済みの OCR エンジン。None のとき内部で yomitoku を初期化する。
-                複数書籍を連続処理する場合は呼び出し側で 1 度初期化して渡すこと。
-    """
+def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
+    """OCR 結果を DB に保存する（books/pages テーブル更新 + FTS5 再同期）。"""
     images_dir = _resolve_images_dir(book_name)
-    if not images_dir.exists():
-        raise FileNotFoundError(f"images dir not found: {images_dir}")
-
-    if engine is None:
-        engine = load_ocr_engine()
-
-    logger.info("ocr_book start: %s", book_name)
-    pages = extract_pages_from_images(images_dir, engine)
-    if not pages:
-        raise ValueError(f"no PNG images found in: {images_dir}")
-
     with with_db() as conn:
         init_schema(conn)
         with conn:
@@ -111,7 +89,6 @@ def ocr_book(book_name: str, *, engine: object | None = None) -> None:
                     ),
                 )
 
-            # FTS5 再同期
             conn.execute(
                 "DELETE FROM pages_fts WHERE rowid IN "
                 "(SELECT id FROM pages WHERE book_id = ?)",
@@ -123,7 +100,21 @@ def ocr_book(book_name: str, *, engine: object | None = None) -> None:
                 (book_id,),
             )
 
-    logger.info("ocr_book finished: %s (pages=%d)", book_name, len(pages))
+    logger.info("_store_ocr_pages finished: %s (pages=%d)", book_name, len(pages))
+
+
+def ocr_book(book_name: str) -> None:
+    """1 冊を OCR して DB に保存する（subprocess 経由）。複数冊連続処理は job_queue が担う。"""
+    images_dir = _resolve_images_dir(book_name)
+    if not images_dir.exists():
+        raise FileNotFoundError(f"images dir not found: {images_dir}")
+
+    logger.info("ocr_book start: %s", book_name)
+    for _, pages in run_ocr_subprocess([images_dir]):
+        if not pages:
+            raise ValueError(f"no PNG images found in: {images_dir}")
+        _store_ocr_pages(book_name, pages)
+    logger.info("ocr_book finished: %s", book_name)
 
 
 # ---------------------------------------------------------------------------

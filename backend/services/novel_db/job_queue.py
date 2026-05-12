@@ -14,8 +14,9 @@ from typing import Literal
 from config import KINDLE_NOVEL_IMAGES_DIR
 from utils.logger import get_logger
 
-from .builder import ocr_book, rebuild_from_pages
+from .builder import _resolve_images_dir, _store_ocr_pages, rebuild_from_pages
 from .connection import with_db
+from .extractor import run_ocr_subprocess
 from .full_builder import build_book_full
 from .schema import init_schema
 
@@ -229,12 +230,12 @@ class NovelDbJobQueue:
         self._update_progress(job_id, 0, total)
 
         if mode in ("ocr", "reocr"):
-            # OCR ステップ: images → pages.full_text
-            # 複数書籍を連続処理するためエンジンを 1 度だけ初期化する
-            from .extractor import load_ocr_engine
-            engine = load_ocr_engine()
-            for done, book_name in enumerate(targets, start=1):
-                ocr_book(book_name, engine=engine)
+            # OCR ステップ: subprocess で yomitoku を 1 度だけ初期化して全書籍を処理
+            images_dirs = [_resolve_images_dir(name) for name in targets]
+            for done, (book_name, pages) in enumerate(run_ocr_subprocess(images_dirs), start=1):
+                if not pages:
+                    raise ValueError(f"no PNG images found for: {book_name}")
+                _store_ocr_pages(book_name, pages)
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
         elif mode == "full_build":
