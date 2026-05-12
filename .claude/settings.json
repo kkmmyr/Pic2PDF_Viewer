@@ -14,8 +14,6 @@
       "mcp__qwen-local__analyze_long_text",
       "Bash(uv --version)",
       "Bash(npm --version)",
-      "Bash(pip list)",
-      "Bash(pip list *)",
       "Bash(npm audit)",
       "Bash(npm audit *)",
       "Bash(where *)",
@@ -27,6 +25,8 @@
       "Bash(uv run pytest *)",
       "Bash(uv run ruff check)",
       "Bash(uv run ruff check *)",
+      "Bash(uv run ruff format)",
+      "Bash(uv run ruff format *)",
       "Bash(npx vitest run)",
       "Bash(npx vitest run *)",
       "Bash(npx tsc --noEmit)",
@@ -35,6 +35,10 @@
       "Bash(npm run test *)",
       "Bash(npm run lint)",
       "Bash(npm run lint *)",
+      "Bash(npm run format)",
+      "Bash(npm run format *)",
+      "Bash(npm run build)",
+      "Bash(npm run build *)",
       "Bash(npx --yes knip)",
       "Bash(npx --yes knip *)",
       "Bash(git log)",
@@ -47,7 +51,8 @@
       "Bash(git show *)",
       "Bash(git branch)",
       "Bash(git branch *)",
-      "Bash(git stash list)"
+      "Bash(git stash)",
+      "Bash(git stash *)"
     ]
   },
   "hooks": {

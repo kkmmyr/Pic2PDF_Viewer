@@ -1,6 +1,6 @@
 # プロジェクト設定
 
-WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。Kindle キャプチャ連携と OCR（yomitoku）による Searchable PDF 生成機能あり。
+同人誌・漫画・小説を対象としたマルチソース閲覧 Web アプリ。WebP 画像・ZIP の PDF 化とブラウザ閲覧に加え、小説向けに OCR（yomitoku）+ Embedding（bge-m3）+ Qwen による RAG 全文検索・マルチターン QA・キャラクター辞典・書籍サマリ生成を備える。Kindle キャプチャ連携あり。サイドバーは同人誌 / 漫画 / 小説の 3 カテゴリ構成（source: doujin / comic / novel）。
 
 ## 環境の癖（推測しにくい部分）
 
