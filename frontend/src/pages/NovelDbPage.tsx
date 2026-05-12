@@ -8,6 +8,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
+    BookMetaEditModal,
     CharacterDetailDialog,
     ChatSection,
     LibrarySection,
@@ -16,6 +17,7 @@ import {
     RebuildJobBanner,
     SearchSection,
 } from '../components/novel_db';
+import type { BookSummary } from '../features/novel_db/types';
 import {
     useNovelDbBooks,
     useNovelDbHistory,
@@ -39,6 +41,8 @@ export default function NovelDbPage() {
 
     // B-15: キャラ詳細ダイアログの開閉状態
     const [charDialog, setCharDialog] = useState<{ book: string; char: string } | null>(null);
+    // 4.3: メタ編集モーダル
+    const [editBook, setEditBook] = useState<BookSummary | null>(null);
 
     const isLocked = rebuildStatus?.is_running ?? false;
 
@@ -96,8 +100,15 @@ export default function NovelDbPage() {
                 onOcrBook={handleOcrBook}
                 onReadBook={handleReadBook}
                 onFullBuildBook={handleFullBuildBook}
+                onEditBook={setEditBook}
+                onMetaRefetch={() => void refetchBooks()}
                 onSelectCharacter={handleSelectCharacter}
                 rebuildStatus={rebuildStatus}
+            />
+            <BookMetaEditModal
+                book={editBook}
+                onClose={() => setEditBook(null)}
+                onSaved={() => void refetchBooks()}
             />
             <SearchSection scope={scope} onOpenImage={handleOpenImage} disabled={isLocked} />
             <QuestionSection

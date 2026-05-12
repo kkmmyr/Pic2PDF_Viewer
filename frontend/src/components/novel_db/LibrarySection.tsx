@@ -3,6 +3,7 @@
  */
 import type { BookSummary, RebuildStatus } from '../../features/novel_db/types';
 
+import AmazonCsvImportSection from './AmazonCsvImportSection';
 import BookCard from './BookCard';
 
 interface Props {
@@ -12,6 +13,8 @@ interface Props {
     onOcrBook: (bookName: string) => void;
     onReadBook: (bookName: string) => void;
     onFullBuildBook: (bookName: string) => void;
+    onEditBook: (book: BookSummary) => void;
+    onMetaRefetch: () => void;
     /** B-15: 登場人物セクションでキャラ選択時に親が CharacterDetailDialog を開く。 */
     onSelectCharacter?: (bookName: string, charName: string) => void;
     rebuildStatus: RebuildStatus | null;
@@ -24,15 +27,20 @@ export default function LibrarySection({
     onOcrBook,
     onReadBook,
     onFullBuildBook,
+    onEditBook,
+    onMetaRefetch,
     onSelectCharacter,
     rebuildStatus,
 }: Props) {
     const isLocked = rebuildStatus?.is_running ?? false;
     return (
         <section className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                ライブラリ ({books.length} 冊)
-            </h2>
+            <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                    ライブラリ ({books.length} 冊)
+                </h2>
+                <AmazonCsvImportSection books={books} onApplied={onMetaRefetch} />
+            </div>
             {isLoading && books.length === 0 ? (
                 <p className="text-sm text-gray-500">読み込み中...</p>
             ) : books.length === 0 ? (
@@ -47,6 +55,7 @@ export default function LibrarySection({
                             onOcr={onOcrBook}
                             onRead={onReadBook}
                             onFullBuild={onFullBuildBook}
+                            onEdit={onEditBook}
                             onSelectCharacter={onSelectCharacter}
                             disabled={isLocked}
                         />

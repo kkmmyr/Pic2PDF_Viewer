@@ -2,7 +2,7 @@
  * 書籍 1 冊のサムネイル + メタ情報 + 再構築ボタン + 登場人物トグル（B-15）。
  */
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, RefreshCw, ScanText, Users, Wand2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, Pencil, RefreshCw, ScanText, Users, Wand2 } from 'lucide-react';
 
 import type { BookSummary } from '../../features/novel_db/types';
 
@@ -14,6 +14,7 @@ interface Props {
     onOcr: (bookName: string) => void;
     onRead: (bookName: string) => void;
     onFullBuild: (bookName: string) => void;
+    onEdit: (book: BookSummary) => void;
     /** B-15: キャラ選択時に親が CharacterDetailDialog を開く。 */
     onSelectCharacter?: (bookName: string, charName: string) => void;
     disabled?: boolean;
@@ -31,6 +32,7 @@ export default function BookCard({
     onOcr,
     onRead,
     onFullBuild,
+    onEdit,
     onSelectCharacter,
     disabled,
 }: Props) {
@@ -57,15 +59,35 @@ export default function BookCard({
                 )}
             </button>
             <div className="p-3 flex-1 flex flex-col gap-2">
-                <h3
-                    className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2"
-                    title={book.name}
-                >
-                    {book.name}
-                </h3>
+                <div className="flex items-start gap-1">
+                    <h3
+                        className="flex-1 text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2"
+                        title={book.name}
+                    >
+                        {book.name}
+                    </h3>
+                    <button
+                        onClick={() => onEdit(book)}
+                        title="メタデータを編集"
+                        className="shrink-0 p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                    >
+                        <Pencil className="w-3 h-3" />
+                    </button>
+                </div>
                 {book.authors.length > 0 && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
                         {book.authors.join(' / ')}
+                    </p>
+                )}
+                {(book.series_id || book.volume != null) && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
+                        {book.series_id}
+                        {book.volume != null ? ` ${book.volume}巻` : ''}
+                    </p>
+                )}
+                {book.publisher && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 line-clamp-1">
+                        {book.publisher}
                     </p>
                 )}
                 <div className="flex items-center gap-1.5 text-xs">
