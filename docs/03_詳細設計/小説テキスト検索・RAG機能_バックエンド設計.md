@@ -513,6 +513,11 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 - 合計 596 秒、`ng=0`、`book_characters` に 3 行 UPSERT 完了。生成内容は役職 / 行動 / 心情の変化 / 関係性 / 印象的フレーズを含む 1 段落 (400 字程度) に整合
 - 2 キャラ目以降が高速化したのは llama-server の KV cache 効果と見られる
 
+**全 11 冊バッチ実行 (2026-05-12)**: `--all --min-pages 5` で実行:
+- 完了: **96 キャラ生成 / skip=3 / ng=0 / 48 分**
+- 各冊 フィルタ後 9〜11 キャラ（フィルタ前 31〜46）→ KV cache が効きやすい程よい粒度
+- 1 冊あたり初手 ~75s + 続行 ~10〜15s/キャラ、書籍切替時に system prefix 変化で cache miss
+
 ### 5.12. マルチターン会話 QA（`qa_sessions.py` + `llm.stream_chat`）（2026-05-12 追加: B-16）
 
 単発 QA（`/qa`）と並走する形で、会話履歴を保ったマルチターン QA を追加した。1 セッションは **scope 固定**（開始時に book / series / all を選び、途中変更不可）。LLM は `LlamaServerBackend.astream_chat` 経由で OpenAI 互換 `messages` をそのまま流す。
