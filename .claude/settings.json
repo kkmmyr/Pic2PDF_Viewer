@@ -70,6 +70,17 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git commit*)",
+            "command": "bash .claude/hooks/remind_memory_sync.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
