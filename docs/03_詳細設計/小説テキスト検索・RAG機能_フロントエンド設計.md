@@ -556,6 +556,78 @@ SSE は `setupServer` (msw) でモック。fetch + ReadableStream のテスト�
 
 ---
 
+## 11. 読書会ディスカッション画面（B-20 / `/novel/discussion`）
+
+### 11.1 画面構成
+
+```
+NovelDiscussionPage (/novel/discussion)
+  ├─ BookSelector       — 書籍選択ドロップダウン（novel ソース限定）
+  ├─ PersonaPanel       — キャラクター A・B の設定
+  │    ├─ PresetSelector  — 3 軸（読書スタイル / 口調 / 視点）組み合わせ選択
+  │    └─ CustomInput     — 名前 + 一言説明の自由入力
+  ├─ TurnCountSlider    — 発話数スライダー（2〜40、偶数のみ）
+  ├─ GenerateButton     — 生成開始 / キャンセル切替
+  ├─ DiscussionView     — SSE 受信・交互表示エリア
+  │    └─ TurnBubble[]    — 各発言バブル（A/B で色分け）
+  └─ HistorySection     — 過去の討論履歴一覧
+       └─ HistoryCard[]   — タイムスタンプ・ペルソナ名・再表示ボタン
+```
+
+### 11.2 ファイル構成
+
+```
+frontend/src/
+  pages/
+    NovelDiscussionPage.tsx          — ページルート
+  components/novel_discussion/
+    BookSelector.tsx                 — 書籍選択
+    PersonaPanel.tsx                 — ペルソナ設定（プリセット + カスタム）
+    TurnCountSlider.tsx              — 発話数スライダー
+    DiscussionView.tsx               — 会話表示エリア
+    TurnBubble.tsx                   — 1 発言バブル
+    HistorySection.tsx               — 履歴一覧
+    HistoryCard.tsx                  — 履歴 1 件
+  hooks/novel_discussion/
+    useDiscussionStream.ts           — SSE 接続・状態管理
+    useDiscussionHistory.ts          — 履歴取得・削除
+  types/discussion.ts                — DiscussionTurn / DiscussionHistory 型定義
+```
+
+### 11.3 プリセット定義
+
+```ts
+const PRESET_STYLES = {
+  readingStyle: ['批評家', 'ファン', '懐疑派'],
+  tone:         ['敬語丁寧', 'フランク', '関西弁風'],
+  viewpoint:    ['文学評論', '感情重視', 'ロジック重視'],
+} as const;
+```
+
+各軸から 1 つ選んで組み合わせると `style` 文字列を自動生成。カスタムモードでは上書き入力可。
+
+### 11.4 SSE 接続パターン
+
+既存の `useNovelDbQa` の SSE ロジックを参考に `useDiscussionStream` を実装する。
+
+```ts
+// 擬似コード
+const { turns, isStreaming, start, cancel } = useDiscussionStream();
+
+// start() → POST /api/novel_db/books/{book}/discussion → SSE
+// turn_start → 新バブルを pending 状態で追加
+// token     → 末尾バブルのテキストを拡張（文字単位表示）
+// turn_end  → バブルを確定状態に
+// done      → isStreaming=false、履歴リフレッシュ
+// クライアントキャンセル → EventSource.close()
+```
+
+### 11.5 ルーティング
+
+`App.tsx` に `/novel/discussion` を追加。サイドバーの小説カテゴリに「読書会」リンクを追加する。
+
+---
+
 ## 12. 既知の制限・将来検討
 
 - **画像プリロード**: PageImageModal で前後ページを開いたときの読み込み待ち時間は許容。気になれば将来 `useImagePreloader` 流用

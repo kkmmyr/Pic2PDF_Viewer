@@ -59,6 +59,9 @@
   - §7.8 `POST /api/novel_db/rebuild` — 再構築ジョブ起動
   - §7.9 `GET /api/novel_db/rebuild/status` — ジョブキュー状態
   - §7.10 `DELETE /api/novel_db/rebuild/{job_id}` — 待機中ジョブのキャンセル
+  - §7.19 `POST /api/novel_db/books/{book_name}/discussion` — 読書会ディスカッション生成（SSE, B-20）
+  - §7.20 `GET /api/novel_db/books/{book_name}/discussion/history` — 討論履歴一覧（B-20）
+  - §7.21 `DELETE /api/novel_db/books/{book_name}/discussion/history/{timestamp}` — 討論履歴削除（B-20）
 
 ---
 
@@ -1318,3 +1321,84 @@ scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ
 **エラー**:
 - `404` セッション無し
 - `422` `title` 未指定 / 100 字超
+
+---
+
+### §7.19 `POST /api/novel_db/books/{book_name}/discussion`（B-20、SSE）
+
+書籍 1 冊の本文全体を Qwen に読み込ませ、2 人のキャラクター（ペルソナ）が交互に語り合う読書会ディスカッションを SSE ストリーミングで生成する。
+
+**パスパラメータ**: `book_name` — 書籍名（`kindle_novel/images/{book_name}/` が存在すること）
+
+**リクエストボディ**:
+```json
+{
+  "personas": [
+    { "name": "A さん", "style": "批評家的な視点で、丁寧な敬語で話す" },
+    { "name": "B さん", "style": "ファン目線で、フランクに感情豊かに話す" }
+  ],
+  "num_turns": 8
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `personas` | array[2] | キャラクター A・B の名前と口調説明（2 件固定） |
+| `personas[].name` | string | 表示名（1〜20 字） |
+| `personas[].style` | string | 口調・視点の説明（1〜200 字） |
+| `num_turns` | integer | 総発話数（2〜40 の偶数、A/B 交互なので往復数 = num_turns/2） |
+
+**レスポンス（SSE ストリーム）**:
+```
+data: {"type": "turn_start", "speaker": "A さん", "turn_index": 0}
+data: {"type": "token", "speaker": "A さん", "token": "この作品は"}
+data: {"type": "token", "speaker": "A さん", "token": "..."}
+data: {"type": "turn_end", "speaker": "A さん", "turn_index": 0, "text": "この作品は...（完全な発言）"}
+data: {"type": "turn_start", "speaker": "B さん", "turn_index": 1}
+...
+data: {"type": "done", "saved_path": "kindle_novel/discussions/書籍名/20260513_143022.json"}
+```
+
+**事前チェック**: 本文全体のトークン数を推計し、131,072 を超える場合は生成を開始せずに `422` を返す。
+
+**完了時の保存**: `kindle_novel/discussions/{book_name}/{YYYYMMDD_HHmmss}.json` に全発言を保存。キャンセル（クライアント切断）時は保存しない。
+
+**エラー**:
+- `404`: 書籍が存在しない
+- `422`: ペルソナ不正（2 件以外）/ `num_turns` 範囲外 / トークン超過（本文が 131k ctx を超える）
+- `503`: 再構築ジョブ実行中
+
+---
+
+### §7.20 `GET /api/novel_db/books/{book_name}/discussion/history`（B-20）
+
+指定書籍の討論履歴ファイル一覧を返す（新しい順）。
+
+**レスポンス**:
+```json
+[
+  {
+    "timestamp": "20260513_143022",
+    "created_at": "2026-05-13T14:30:22",
+    "num_turns": 8,
+    "personas": ["A さん", "B さん"]
+  }
+]
+```
+
+**エラー**: `404` 書籍が存在しない
+
+---
+
+### §7.21 `DELETE /api/novel_db/books/{book_name}/discussion/history/{timestamp}`（B-20）
+
+指定タイムスタンプの討論履歴 JSON ファイルを削除する。
+
+**パスパラメータ**:
+- `book_name` — 書籍名
+- `timestamp` — ファイル名形式 `YYYYMMDD_HHmmss`
+
+**レスポンス**: `204 No Content`
+
+**エラー**:
+- `404`: 書籍または該当タイムスタンプのファイルが存在しない
