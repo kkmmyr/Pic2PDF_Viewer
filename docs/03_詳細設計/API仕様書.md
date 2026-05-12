@@ -26,6 +26,7 @@
   - §2.5 `GET /api/meta/export` — メタデータエクスポート
   - §2.6 `PATCH /api/meta` — メタデータ更新
   - §2.7 `POST /api/meta/view` — 閲覧記録
+  - §2.8 `PATCH /api/meta/novel/{book_key}` — novel 1冊メタ部分更新（4.3）
 - [§3. シリーズ管理](#3-シリーズ管理)
   - §3.2 `POST /api/series/assign` — シリーズ割り当て
   - §3.3 `POST /api/series/unassign` — シリーズ解除
@@ -59,6 +60,8 @@
   - §7.8 `POST /api/novel_db/rebuild` — 再構築ジョブ起動
   - §7.9 `GET /api/novel_db/rebuild/status` — ジョブキュー状態
   - §7.10 `DELETE /api/novel_db/rebuild/{job_id}` — 待機中ジョブのキャンセル
+  - §7.22 `POST /api/novel_db/meta-import/preview` — Amazon CSV マッチングプレビュー（4.3）
+  - §7.23 `POST /api/novel_db/meta-import/apply` — CSV インポート適用（4.3）
   - §7.19 `POST /api/novel_db/books/{book_name}/discussion` — 読書会ディスカッション生成（SSE, B-20）
   - §7.20 `GET /api/novel_db/books/{book_name}/discussion/history` — 討論履歴一覧（B-20）
   - §7.21 `DELETE /api/novel_db/books/{book_name}/discussion/history/{timestamp}` — 討論履歴削除（B-20）
@@ -458,6 +461,37 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 - `read_state`: 自動遷移後の読書状態。`incremented=true` のときに既存値が `done` でなければ `'reading'` に自動遷移する（連打抑制でカウントが据え置かれた場合は変更しない）。
 
 **用途**: ライブラリ画面で書籍カードをクリックした瞬間にフロントエンドが呼び出す。「最近見た順」ソート (`recent_view`) と「よく見る順」ソート (`view_desc`) のためのデータを蓄積する。読書状態の自動遷移（unread → reading）もここで行う。最終ページ到達時の `done` 遷移は §2.6 `PATCH /api/meta` で行う。
+
+---
+
+### §2.8 `PATCH /api/meta/novel/{book_key}`（4.3）
+
+novel ソース 1 冊のメタデータを部分更新する。`{book_key}` は `stem.pdf` 形式（例: `おこぼれ姫と円卓の騎士 1.pdf`）。BookCard の編集ボタン → BookMetaEditModal から呼ばれる。
+
+**パスパラメータ**:
+- `book_key` — `{stem}.pdf` 形式。URL エンコード必須。
+
+**リクエストボディ** (すべて任意。省略されたフィールドは変更しない):
+```json
+{
+  "authors": ["石田 リンネ"],
+  "series_id": "おこぼれ姫と円卓の騎士",
+  "volume": 1,
+  "publisher": "ビーズログ文庫",
+  "asin": "B009IMAVXC",
+  "isbn": "9784047264298",
+  "release_date": "2012-09-01"
+}
+```
+- `authors` — 著者名リスト（空配列で削除）
+- `series_id` — シリーズ名（`series_title` も同値で設定される）
+- `volume` — 巻番号（整数。`null` で削除）
+- `publisher` — 出版社・レーベル（空文字で削除）
+- `asin` / `isbn` / `release_date` — 空文字で削除
+
+**レスポンス**: `{"message": "Updated"}`
+
+**エラー**: 400 — すべてのフィールドが省略された場合。
 
 ---
 
@@ -1402,3 +1436,53 @@ data: {"type": "done", "saved_path": "kindle_novel/discussions/書籍名/2026051
 
 **エラー**:
 - `404`: 書籍または該当タイムスタンプのファイルが存在しない
+
+---
+
+### §7.22 `POST /api/novel_db/meta-import/preview`（4.3）
+
+Amazon デジタル購入履歴 CSV をアップロードし、書籍メタ（著者/シリーズ/巻番号/出版社/ASIN）の抽出結果と書籍マッチング結果をプレビュー返却する（DB 書き込みなし）。
+
+**リクエスト**: `multipart/form-data`
+- `files` — CSV ファイル 1 件以上（`amazon-order_digital_*.csv`。UTF-8 with BOM / Shift-JIS 両対応）
+
+**レスポンス**:
+```json
+[
+  {
+    "csv_title": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+    "series_id": "おこぼれ姫と円卓の騎士",
+    "volume": 1,
+    "publisher": "ビーズログ文庫",
+    "authors": ["石田 リンネ"],
+    "asin": "B009IMAVXC",
+    "matched_book": "おこぼれ姫と円卓の騎士 1",
+    "match_score": 0.95
+  }
+]
+```
+- `matched_book`: マッチした書籍 stem 名（未マッチは `null`）
+- `match_score`: 部分一致スコア（0〜1）
+
+---
+
+### §7.23 `POST /api/novel_db/meta-import/apply`（4.3）
+
+プレビュー確認後に meta.json へ書き込む。
+
+**リクエストボディ**:
+```json
+[
+  {
+    "book_key": "おこぼれ姫と円卓の騎士 1.pdf",
+    "authors": ["石田 リンネ"],
+    "series_id": "おこぼれ姫と円卓の騎士",
+    "volume": 1,
+    "publisher": "ビーズログ文庫",
+    "asin": "B009IMAVXC"
+  }
+]
+```
+- 未マッチ行（フロントで手動選択した結果を含む）を配列で送信。`book_key` がない行はスキップ。
+
+**レスポンス**: `{"updated_count": 5}`

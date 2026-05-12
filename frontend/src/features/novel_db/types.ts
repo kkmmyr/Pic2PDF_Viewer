@@ -21,6 +21,44 @@ export interface BookSummary {
     indexed_at: string | null;
     thumbnail_url: string | null;
     ocr_done_at: string | null;
+    volume: number | null;
+    publisher: string | null;
+    asin: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// 書籍メタ編集（4.3）
+// ---------------------------------------------------------------------------
+
+export interface NovelMetaPatch {
+    authors?: string[];
+    series_id?: string;
+    volume?: number | null;
+    volume_clear?: boolean;
+    publisher?: string;
+    asin?: string;
+    isbn?: string;
+    release_date?: string;
+}
+
+export interface MetaImportPreviewRow {
+    csv_title: string;
+    series_id: string;
+    volume: number | null;
+    publisher: string;
+    authors: string[];
+    asin: string;
+    matched_book: string | null;
+    match_score: number;
+}
+
+export interface MetaApplyItem {
+    book_key: string;
+    authors?: string[];
+    series_id?: string;
+    volume?: number | null;
+    publisher?: string;
+    asin?: string;
 }
 
 export interface SeriesSummary {

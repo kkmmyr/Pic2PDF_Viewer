@@ -27,6 +27,16 @@ class MetaEntry(TypedDict):
     genre: NotRequired[str]
     # 読書状態。未設定の既存エントリは view_count から派生（0→unread / >0→reading）。
     read_state: NotRequired[ReadState]
+    # シリーズ管理（doujin/comic: series.py が書き込む。novel: meta PATCH API が書き込む）
+    series_id: NotRequired[str]
+    series_title: NotRequired[str]
+    series_index: NotRequired[float]  # doujin/comic の小数巻番号
+    # novel 向け追加フィールド（4.3）
+    volume: NotRequired[int | None]   # 整数巻番号
+    publisher: NotRequired[str]
+    asin: NotRequired[str]
+    isbn: NotRequired[str]
+    release_date: NotRequired[str]    # ISO 形式 (例: "2012-09-01")
 
 
 MetaDict = dict[str, MetaEntry]

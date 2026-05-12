@@ -10,7 +10,7 @@ import json
 from dataclasses import asdict
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -26,6 +26,8 @@ from config import (
     NOVEL_DB_QA_TOP_SUMMARIES,
 )
 from routers._deps import log_and_raise_500
+from services.amazon_csv_parser import match_books, parse_csv
+from services.meta_store import update_meta_locked
 from services.novel_db import Scope, hybrid_search, with_db
 from services.novel_db.character_summarizer import (
     get_character,
@@ -773,3 +775,68 @@ def patch_chat_session_title(session_id: int, payload: dict) -> Response:
             raise HTTPException(status_code=404, detail="session not found")
         update_session_title(conn, session_id, title)
     return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# Amazon CSV メタインポート（4.3）
+# ---------------------------------------------------------------------------
+
+
+class MetaApplyItem(BaseModel):
+    book_key: str
+    authors: list[str] = []
+    series_id: str = ""
+    volume: int | None = None
+    publisher: str = ""
+    asin: str = ""
+
+
+@router.post("/novel_db/meta-import/preview")
+def novel_meta_import_preview(files: list[UploadFile]) -> list[dict]:
+    """Amazon デジタル購入履歴 CSV をアップロードしてプレビュー結果を返す（DB 書き込みなし）。"""
+    all_parsed = []
+    for f in files:
+        content = f.file.read()
+        all_parsed.extend(parse_csv(content))
+
+    with with_db() as conn:
+        book_names = [b.name for b in list_books(conn)]
+    matched = match_books(all_parsed, book_names)
+    return [
+        {
+            "csv_title": r.csv_title,
+            "series_id": r.series_id,
+            "volume": r.volume,
+            "publisher": r.publisher,
+            "authors": r.authors,
+            "asin": r.asin,
+            "matched_book": r.matched_book,
+            "match_score": r.match_score,
+        }
+        for r in matched
+    ]
+
+
+@router.post("/novel_db/meta-import/apply")
+def novel_meta_import_apply(items: list[MetaApplyItem]) -> dict:
+    """プレビュー確認済みのメタを meta.json に一括書き込みする（4.3）。"""
+    valid = [it for it in items if it.book_key]
+
+    def _apply(data: dict) -> None:
+        for it in valid:
+            entry = dict(data.get(it.book_key, {}))
+            if it.authors:
+                entry["authors"] = it.authors
+            if it.series_id:
+                entry["series_id"] = it.series_id
+                entry["series_title"] = it.series_id
+            if it.volume is not None:
+                entry["volume"] = it.volume
+            if it.publisher:
+                entry["publisher"] = it.publisher
+            if it.asin:
+                entry["asin"] = it.asin
+            data[it.book_key] = entry
+
+    update_meta_locked("novel", _apply)
+    return {"updated_count": len(valid)}

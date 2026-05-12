@@ -14,6 +14,9 @@ import type {
     CharacterSummary,
     ChatSessionDetail,
     ChatSessionSummary,
+    MetaApplyItem,
+    MetaImportPreviewRow,
+    NovelMetaPatch,
     QaHistoryDetail,
     QaHistoryListResponse,
     RebuildEnqueueResponse,
@@ -130,4 +133,22 @@ export function deleteChatSession(sessionId: number): Promise<void> {
 
 export function patchChatSessionTitle(sessionId: number, title: string): Promise<void> {
     return apiClient.patch<unknown, void>(`${PREFIX}/qa/sessions/${sessionId}/title`, { title });
+}
+
+// ---------------------------------------------------------------------------
+// 書籍メタ編集（4.3）
+// ---------------------------------------------------------------------------
+
+export function patchNovelBookMeta(bookKey: string, patch: NovelMetaPatch): Promise<void> {
+    return apiClient.patch<unknown, void>(`/api/meta/novel/${encodeURIComponent(bookKey)}`, patch);
+}
+
+export function fetchNovelMetaImportPreview(files: File[]): Promise<MetaImportPreviewRow[]> {
+    const form = new FormData();
+    for (const f of files) form.append('files', f);
+    return apiClient.post<unknown, MetaImportPreviewRow[]>(`${PREFIX}/meta-import/preview`, form);
+}
+
+export function applyNovelMetaImport(items: MetaApplyItem[]): Promise<{ updated_count: number }> {
+    return apiClient.post<unknown, { updated_count: number }>(`${PREFIX}/meta-import/apply`, items);
 }

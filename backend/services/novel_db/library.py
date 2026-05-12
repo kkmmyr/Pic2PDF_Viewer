@@ -26,6 +26,9 @@ class BookSummary:
     indexed_at: str | None
     thumbnail_url: str | None
     ocr_done_at: str | None = None
+    volume: int | None = None
+    publisher: str | None = None
+    asin: str | None = None
 
 
 @dataclass
@@ -86,6 +89,9 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
                 indexed_at=info["indexed_at"] if info else None,
                 thumbnail_url=_thumbnail_url(name),
                 ocr_done_at=info["ocr_done_at"] if info else None,
+                volume=meta_entry.get("volume"),
+                publisher=meta_entry.get("publisher"),
+                asin=meta_entry.get("asin"),
             )
         )
     return summaries
