@@ -300,9 +300,24 @@ PoC スクリプトで動作確認後、本実装に昇格（PoC ディレクト
 
 ### 5.2. チャンク分割（`chunker.py`）
 
-- ページの全文長 ≤ 800 字 → 1 チャンク
-- 800 字超 → 句点境界（`。」!?`）優先で分割、50 字オーバーラップ
-- PoC スクリプト（旧 `tmp_poc/chunker.py`）を本実装に昇格
+#### 現行方式: クロスページチャンク `chunk_book()`（§4.4, 2026-05-12〜）
+
+OCR 後の全ページを 1 本に連結してから句点境界でチャンク分割する。ページ境界を無視することで、小説の 1 ページ（200〜600 字程度）で意味が途切れる問題を解消する。
+
+| パラメータ | 値 |
+|---|---|
+| `max_chars` | 1200 字 |
+| `overlap` | 120 字 |
+| `min_page_chars` | 30 字（章扉・ヘッダのみのページをスキップ） |
+| 句点境界 | `。」!?`（末尾 max_chars/10 以内を探索） |
+
+- 各チャンクの `page_id` = **チャンクが開始するページ**（リーダーへのジャンプに使う）
+- `bisect` による二分探索でオフセット → page_id を O(log N) で解決
+
+#### 旧方式: ページ単位 `chunk_page()`（後方互換 API として残置）
+
+- 1 ページの文字列 → 800 字 / overlap 50 字で分割
+- `rebuild_from_pages()` では使わない（単体テスト・外部スクリプト用に残置）
 
 ### 5.3. embedding（`embedder.py`）
 
@@ -1301,7 +1316,7 @@ app.include_router(novel_db.router, prefix="/api", tags=["novel_db"])
 | ファイル | 対象 |
 |---|---|
 | `test_novel_db_extractor.py` | PyMuPDF blocks 抽出、改行除去、空ページ |
-| `test_novel_db_chunker.py` | 句点境界分割、800 字超分割、オーバーラップ |
+| `test_novel_db_chunker.py` | chunk_page（句点境界・オーバーラップ）+ chunk_book（クロスページ・page_id 解決） |
 | `test_novel_db_search.py` | FTS5 OR クエリ整形、RRF マージ、scope フィルタ |
 | `test_novel_db_builder.py` | 1 冊構築（embedding はモック）、再構築での既存削除 |
 | `test_novel_db_job_queue.py` | キュー登録・順次実行・キャンセル |

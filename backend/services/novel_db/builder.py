@@ -18,7 +18,7 @@ from pathlib import Path
 from config import KINDLE_NOVEL_IMAGES_DIR
 from utils.logger import get_logger
 
-from .chunker import chunk_page
+from .chunker import chunk_book
 from .connection import with_db
 from .embedder import embed_batch, serialize_f32
 from .extractor import extract_pages_from_images, load_ocr_engine
@@ -152,7 +152,7 @@ def rebuild_from_pages(
     book_id = book_row[0]
 
     pages_rows = conn.execute(
-        "SELECT id, full_text, char_count FROM pages WHERE book_id = ? ORDER BY page_no",
+        "SELECT id, page_no, full_text, char_count FROM pages WHERE book_id = ? ORDER BY page_no",
         (book_id,),
     ).fetchall()
     if not pages_rows:
@@ -182,13 +182,13 @@ def rebuild_from_pages(
             (book_id,),
         )
 
-        # チャンク分割
-        all_chunks: list[dict] = []
-        for page_id, full_text, char_count in pages_rows:
-            if (char_count or 0) < MIN_CHARS_FOR_CHUNK:
-                continue
-            for idx, c in enumerate(chunk_page(full_text or "")):
-                all_chunks.append({"page_id": page_id, "chunk_idx": idx, "text": c})
+        # §4.4: クロスページチャンク化（全ページ連結 → chunk_book）
+        page_dicts = [
+            {"page_id": pid, "page_no": pno, "full_text": text or ""}
+            for pid, pno, text, char_count in pages_rows
+            if (char_count or 0) >= MIN_CHARS_FOR_CHUNK
+        ]
+        all_chunks = chunk_book(page_dicts)
 
         total_chunks = len(all_chunks)
         if progress_callback:
