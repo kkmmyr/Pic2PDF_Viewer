@@ -7,11 +7,11 @@ import { describe, it, expect, vi } from 'vitest';
 import QuestionInput from '../components/novel_db/QuestionInput';
 
 function setup(opts: {
-    onSubmit?: ReturnType<typeof vi.fn>;
+    onSubmit?: ReturnType<typeof vi.fn<(question: string) => void>>;
     isReplay?: (q: string) => boolean;
     disabled?: boolean;
 }) {
-    const onSubmit = opts.onSubmit ?? vi.fn();
+    const onSubmit = opts.onSubmit ?? vi.fn<(question: string) => void>();
     const isReplay = opts.isReplay ?? (() => false);
     const utils = render(
         <QuestionInput onSubmit={onSubmit} isReplay={isReplay} disabled={opts.disabled} />,

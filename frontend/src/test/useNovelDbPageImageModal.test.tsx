@@ -16,6 +16,7 @@ const BOOKS: BookSummary[] = [
         is_indexed: true,
         page_count: 100,
         indexed_at: null,
+        ocr_done_at: null,
         thumbnail_url: null,
     },
     {
@@ -26,6 +27,7 @@ const BOOKS: BookSummary[] = [
         is_indexed: true,
         page_count: 50,
         indexed_at: null,
+        ocr_done_at: null,
         thumbnail_url: null,
     },
 ];
