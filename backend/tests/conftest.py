@@ -89,7 +89,7 @@ def _patch_imported_paths(monkeypatch, paths: dict) -> None:
         ("services.novel_db.connection", "NOVEL_DB_PATH", paths["NOVEL_DB_PATH"]),
         ("services.novel_db.builder", "KINDLE_NOVEL_PDF_DIR", paths["KINDLE_NOVEL_PDF_DIR"]),
         ("services.novel_db.builder", "KINDLE_NOVEL_IMAGES_DIR", paths["KINDLE_NOVEL_IMAGES_DIR"]),
-        ("services.novel_db.library", "KINDLE_NOVEL_PDF_DIR", paths["KINDLE_NOVEL_PDF_DIR"]),
+        ("services.novel_db.library", "KINDLE_NOVEL_IMAGES_DIR", paths["KINDLE_NOVEL_IMAGES_DIR"]),
         ("services.novel_db.job_queue", "KINDLE_NOVEL_PDF_DIR", paths["KINDLE_NOVEL_PDF_DIR"]),
     ]
     for module, attr, value in targets:

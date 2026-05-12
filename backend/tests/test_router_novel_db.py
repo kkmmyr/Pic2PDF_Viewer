@@ -13,15 +13,14 @@ def db_initialized(tmp_data_dir):
     return tmp_data_dir
 
 
-def _put_pdf(tmp_data_dir, name: str) -> None:
-    pdf_dir = Path(tmp_data_dir["KINDLE_NOVEL_PDF_DIR"])
-    pdf_dir.mkdir(parents=True, exist_ok=True)
-    (pdf_dir / f"{name}.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
+def _put_image_dir(tmp_data_dir, name: str) -> None:
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"])
+    (images_dir / name).mkdir(parents=True, exist_ok=True)
 
 
-def test_get_books_returns_unindexed_pdf_list(client, db_initialized):
-    _put_pdf(db_initialized, "book-1")
-    _put_pdf(db_initialized, "book-2")
+def test_get_books_returns_unindexed_book_list(client, db_initialized):
+    _put_image_dir(db_initialized, "book-1")
+    _put_image_dir(db_initialized, "book-2")
 
     res = client.get("/api/novel_db/books")
     assert res.status_code == 200
@@ -32,7 +31,7 @@ def test_get_books_returns_unindexed_pdf_list(client, db_initialized):
 
 
 def test_get_series_empty_when_no_series_assigned(client, db_initialized):
-    _put_pdf(db_initialized, "book-1")
+    _put_image_dir(db_initialized, "book-1")
     res = client.get("/api/novel_db/series")
     assert res.status_code == 200
     assert res.json() == []

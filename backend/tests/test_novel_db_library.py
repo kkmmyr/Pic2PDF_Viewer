@@ -17,11 +17,10 @@ def setup_db(tmp_data_dir):
     return tmp_data_dir
 
 
-def _put_pdf(tmp_data_dir, name: str) -> None:
-    """tmp_data_dir に空 PDF（ヘッダだけ）を置く。"""
-    pdf_dir = Path(tmp_data_dir["KINDLE_NOVEL_PDF_DIR"])
-    pdf_dir.mkdir(parents=True, exist_ok=True)
-    (pdf_dir / f"{name}.pdf").write_bytes(b"%PDF-1.4\n%%EOF\n")
+def _put_image_dir(tmp_data_dir, name: str) -> None:
+    """tmp_data_dir に書籍画像ディレクトリを作る（images/{name}/）。"""
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"])
+    (images_dir / name).mkdir(parents=True, exist_ok=True)
 
 
 def _put_meta(meta_data: dict) -> None:
@@ -42,9 +41,9 @@ def _insert_indexed_book(conn, name: str, page_count: int = 100) -> int:
     return cur.lastrowid
 
 
-def test_list_books_returns_pdfs_with_unindexed_status(setup_db):
-    _put_pdf(setup_db, "book-1")
-    _put_pdf(setup_db, "book-2")
+def test_list_books_returns_images_dirs_with_unindexed_status(setup_db):
+    _put_image_dir(setup_db, "book-1")
+    _put_image_dir(setup_db, "book-2")
 
     with with_db() as conn:
         books = list_books(conn)
@@ -57,8 +56,8 @@ def test_list_books_returns_pdfs_with_unindexed_status(setup_db):
 
 
 def test_list_books_merges_indexed_status(setup_db):
-    _put_pdf(setup_db, "book-1")
-    _put_pdf(setup_db, "book-2")
+    _put_image_dir(setup_db, "book-1")
+    _put_image_dir(setup_db, "book-2")
 
     with with_db() as conn:
         _insert_indexed_book(conn, "book-1", page_count=120)
@@ -73,7 +72,7 @@ def test_list_books_merges_indexed_status(setup_db):
 
 
 def test_list_books_merges_meta_authors_and_series(setup_db):
-    _put_pdf(setup_db, "book-1")
+    _put_image_dir(setup_db, "book-1")
     _put_meta({
         "book-1.pdf": {
             "authors": ["田中啓子"],
@@ -92,7 +91,7 @@ def test_list_books_merges_meta_authors_and_series(setup_db):
 
 
 def test_list_books_thumbnail_url_uses_first_image(setup_db):
-    _put_pdf(setup_db, "book-1")
+    _put_image_dir(setup_db, "book-1")
 
     with with_db() as conn:
         books = list_books(conn)
@@ -101,20 +100,19 @@ def test_list_books_thumbnail_url_uses_first_image(setup_db):
 
 
 def test_list_books_url_encodes_japanese_book_name(setup_db):
-    _put_pdf(setup_db, "おこぼれ姫 1")
+    _put_image_dir(setup_db, "おこぼれ姫 1")
 
     with with_db() as conn:
         books = list_books(conn)
 
-    # 日本語・スペースが URL エンコードされる
     assert "%" in books[0].thumbnail_url
     assert books[0].thumbnail_url.endswith("/001.png")
 
 
 def test_list_series_excludes_unaffiliated_books(setup_db):
-    _put_pdf(setup_db, "book-1")
-    _put_pdf(setup_db, "book-2")
-    _put_pdf(setup_db, "book-orphan")
+    _put_image_dir(setup_db, "book-1")
+    _put_image_dir(setup_db, "book-2")
+    _put_image_dir(setup_db, "book-orphan")
     _put_meta({
         "book-1.pdf": {
             "series_id": "oko-kishi",
@@ -137,7 +135,7 @@ def test_list_series_excludes_unaffiliated_books(setup_db):
 
 
 def test_list_series_empty_when_no_series_assigned(setup_db):
-    _put_pdf(setup_db, "book-1")
+    _put_image_dir(setup_db, "book-1")
 
     with with_db() as conn:
         series = list_series(conn)
@@ -145,7 +143,7 @@ def test_list_series_empty_when_no_series_assigned(setup_db):
     assert series == []
 
 
-def test_list_books_empty_when_no_pdfs(setup_db):
+def test_list_books_empty_when_no_images_dir(setup_db):
     with with_db() as conn:
         books = list_books(conn)
     assert books == []

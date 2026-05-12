@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
-from config import KINDLE_NOVEL_PDF_DIR
+from config import KINDLE_NOVEL_IMAGES_DIR
 from services.meta_store import load_meta
 
 
@@ -57,17 +57,17 @@ def _fetch_indexed_status(conn: sqlite3.Connection) -> dict[str, dict]:
 
 
 def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
-    """novel ソースの全書籍を返す（`pdfs/` の PDF を起点）。"""
-    pdf_dir = Path(KINDLE_NOVEL_PDF_DIR)
-    if not pdf_dir.exists():
+    """novel ソースの全書籍を返す（`images/` のサブディレクトリを起点）。"""
+    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    if not images_dir.exists():
         return []
 
     meta = load_meta("novel")
     indexed = _fetch_indexed_status(conn)
 
     summaries: list[BookSummary] = []
-    for pdf in sorted(pdf_dir.glob("*.pdf")):
-        name = pdf.stem
+    for book_dir in sorted(d for d in images_dir.iterdir() if d.is_dir()):
+        name = book_dir.name
         meta_entry = meta.get(_meta_key(name), {})
         info = indexed.get(name)
         summaries.append(
