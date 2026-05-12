@@ -11,6 +11,7 @@ import CharactersPanel from './CharactersPanel';
 interface Props {
     book: BookSummary;
     onRebuild: (bookName: string) => void;
+    onRead: (bookName: string) => void;
     /** B-15: キャラ選択時に親が CharacterDetailDialog を開く。 */
     onSelectCharacter?: (bookName: string, charName: string) => void;
     disabled?: boolean;
@@ -22,23 +23,29 @@ function formatIndexedAt(isoLike: string | null): string | null {
     return isoLike.replace('T', ' ').slice(0, 16);
 }
 
-export default function BookCard({ book, onRebuild, onSelectCharacter, disabled }: Props) {
+export default function BookCard({ book, onRebuild, onRead, onSelectCharacter, disabled }: Props) {
     const indexedAt = formatIndexedAt(book.indexed_at);
     const [charsExpanded, setCharsExpanded] = useState(false);
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 flex flex-col">
-            {book.thumbnail_url ? (
-                <img
-                    src={book.thumbnail_url}
-                    alt={book.name}
-                    className="w-full aspect-[3/4] object-cover bg-gray-100 dark:bg-gray-900"
-                    loading="lazy"
-                />
-            ) : (
-                <div className="w-full aspect-[3/4] bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-400 text-sm">
-                    画像なし
-                </div>
-            )}
+            <button
+                className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                onClick={() => onRead(book.name)}
+                aria-label={`${book.name} を読む`}
+            >
+                {book.thumbnail_url ? (
+                    <img
+                        src={book.thumbnail_url}
+                        alt={book.name}
+                        className="w-full aspect-[3/4] object-cover bg-gray-100 dark:bg-gray-900 hover:opacity-90 transition-opacity"
+                        loading="lazy"
+                    />
+                ) : (
+                    <div className="w-full aspect-[3/4] bg-gray-100 dark:bg-gray-900 flex items-center justify-center text-gray-400 text-sm hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors">
+                        画像なし
+                    </div>
+                )}
+            </button>
             <div className="p-3 flex-1 flex flex-col gap-2">
                 <h3
                     className="text-sm font-medium text-gray-900 dark:text-gray-100 line-clamp-2"

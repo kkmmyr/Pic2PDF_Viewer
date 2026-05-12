@@ -9,6 +9,7 @@ interface Props {
     books: BookSummary[];
     isLoading: boolean;
     onRebuildBook: (bookName: string) => void;
+    onReadBook: (bookName: string) => void;
     /** B-15: 登場人物セクションでキャラ選択時に親が CharacterDetailDialog を開く。 */
     onSelectCharacter?: (bookName: string, charName: string) => void;
     rebuildStatus: RebuildStatus | null;
@@ -18,6 +19,7 @@ export default function LibrarySection({
     books,
     isLoading,
     onRebuildBook,
+    onReadBook,
     onSelectCharacter,
     rebuildStatus,
 }: Props) {
@@ -38,6 +40,7 @@ export default function LibrarySection({
                             key={b.name}
                             book={b}
                             onRebuild={onRebuildBook}
+                            onRead={onReadBook}
                             onSelectCharacter={onSelectCharacter}
                             disabled={isLocked}
                         />

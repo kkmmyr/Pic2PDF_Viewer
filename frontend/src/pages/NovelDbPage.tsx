@@ -4,14 +4,14 @@
  * 1 タブ内に「ライブラリ / 検索 / 質問」を縦並び配置し、
  * ヘッダーのスコープドロップダウンで対象を全件 / シリーズ / 単冊から選択する。
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import {
     CharacterDetailDialog,
     ChatSection,
     LibrarySection,
     NovelDbHeader,
-    PageImageModal,
     QuestionSection,
     RebuildJobBanner,
     SearchSection,
@@ -19,12 +19,12 @@ import {
 import {
     useNovelDbBooks,
     useNovelDbHistory,
-    useNovelDbPageImageModal,
     useNovelDbRebuildJob,
     useNovelDbScope,
 } from '../hooks/novel_db';
 
 export default function NovelDbPage() {
+    const navigate = useNavigate();
     const { scope, setScope } = useNovelDbScope();
     const { books, series, isLoading: booksLoading, refetch: refetchBooks } = useNovelDbBooks();
     const {
@@ -34,10 +34,8 @@ export default function NovelDbPage() {
         refetch: refetchHistory,
     } = useNovelDbHistory();
     const { status: rebuildStatus, enqueue: enqueueRebuild } = useNovelDbRebuildJob(() => {
-        // ジョブ完了通知 → 書籍一覧を再取得
         void refetchBooks();
     });
-    const imageModal = useNovelDbPageImageModal(books);
 
     // B-15: キャラ詳細ダイアログの開閉状態
     const [charDialog, setCharDialog] = useState<{ book: string; char: string } | null>(null);
@@ -56,6 +54,22 @@ export default function NovelDbPage() {
         setCharDialog({ book: bookName, char: charName });
     };
 
+    // 書籍を読む（表紙クリック）
+    const handleReadBook = useCallback(
+        (bookName: string) => {
+            void navigate(`/novel/reader/${encodeURIComponent(bookName)}`);
+        },
+        [navigate],
+    );
+
+    // 検索/AI 結果のページ番号からリーダーへジャンプ
+    const handleOpenImage = useCallback(
+        (book: string, pageNo: number) => {
+            void navigate(`/novel/reader/${encodeURIComponent(book)}?page=${pageNo}`);
+        },
+        [navigate],
+    );
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
             <NovelDbHeader
@@ -71,35 +85,26 @@ export default function NovelDbPage() {
                 books={books}
                 isLoading={booksLoading}
                 onRebuildBook={handleRebuildBook}
+                onReadBook={handleReadBook}
                 onSelectCharacter={handleSelectCharacter}
                 rebuildStatus={rebuildStatus}
             />
-            <SearchSection scope={scope} onOpenImage={imageModal.open} disabled={isLocked} />
+            <SearchSection scope={scope} onOpenImage={handleOpenImage} disabled={isLocked} />
             <QuestionSection
                 scope={scope}
                 history={history}
                 historyLoading={historyLoading}
                 onHistoryDelete={(id) => void deleteHistory(id)}
                 onHistoryRefetch={refetchHistory}
-                onOpenImage={imageModal.open}
+                onOpenImage={handleOpenImage}
                 disabled={isLocked}
             />
             <ChatSection scope={scope} disabled={isLocked} />
-            {imageModal.state && (
-                <PageImageModal
-                    book={imageModal.state.book}
-                    pageNo={imageModal.state.pageNo}
-                    maxPage={imageModal.maxPage}
-                    onClose={imageModal.close}
-                    onPrev={imageModal.prevPage}
-                    onNext={imageModal.nextPage}
-                />
-            )}
             <CharacterDetailDialog
                 bookName={charDialog?.book ?? null}
                 charName={charDialog?.char ?? null}
                 onClose={() => setCharDialog(null)}
-                onOpenScene={(book, pageNo) => imageModal.open(book, pageNo)}
+                onOpenScene={handleOpenImage}
             />
         </div>
     );
