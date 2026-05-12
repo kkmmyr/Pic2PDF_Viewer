@@ -107,7 +107,6 @@ export const STATIC_PATHS = {
         const versionParam = version !== undefined ? `?v=${version}` : '';
         let prefix = '/pdfs';
         if (source === 'kindle') prefix = '/kindle/pdfs';
-        else if (source === 'novel') prefix = '/kindle_novel/pdfs';
 
         return `${prefix}${basePath}/${encodedFilename}${versionParam}`;
     },

@@ -12,7 +12,6 @@ from config import (
     IMAGES_DIR,
     KINDLE_IMAGES_DIR,
     KINDLE_NOVEL_IMAGES_DIR,
-    KINDLE_NOVEL_PDF_DIR,
     KINDLE_NOVEL_THUMBNAIL_DIR,
     KINDLE_PDF_DIR,
     KINDLE_THUMBNAIL_DIR,
@@ -80,7 +79,6 @@ app.mount("/kindle/pdfs",        StaticFiles(directory=KINDLE_PDF_DIR),       na
 app.mount("/kindle/thumbnails",  StaticFiles(directory=KINDLE_THUMBNAIL_DIR), name="kindle_thumbnails")
 app.mount("/kindle/images",      StaticFiles(directory=KINDLE_IMAGES_DIR),    name="kindle_images")
 
-app.mount("/kindle_novel/pdfs",        StaticFiles(directory=KINDLE_NOVEL_PDF_DIR),       name="kindle_novel_pdfs")
 app.mount("/kindle_novel/thumbnails",  StaticFiles(directory=KINDLE_NOVEL_THUMBNAIL_DIR), name="kindle_novel_thumbnails")
 app.mount("/kindle_novel/images",      StaticFiles(directory=KINDLE_NOVEL_IMAGES_DIR),    name="kindle_novel_images")
 

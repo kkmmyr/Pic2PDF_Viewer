@@ -23,12 +23,6 @@ describe('useBookImages', () => {
         expect(result.current.isImageMode).toBe(false);
     });
 
-    it("source='novel' では fetch をスキップ（PDF モード）", () => {
-        const { result } = renderHook(() => useBookImages('book.pdf', '', 'novel'));
-        expect(mockedGet).not.toHaveBeenCalled();
-        expect(result.current.imageUrls).toBeNull();
-        expect(result.current.isImageMode).toBe(false);
-    });
 
     it('通常パスで images を取得し imageUrls / numPages が設定される', async () => {
         mockedGet.mockResolvedValue({
