@@ -9,7 +9,7 @@ beforeEach(() => {
 describe('useLibraryPins', () => {
     describe('初期状態', () => {
         it('localStorage が空のとき seriesPins/authorPins は空オブジェクト', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             expect(result.current.seriesPins).toEqual({});
             expect(result.current.authorPins).toEqual({});
         });
@@ -20,7 +20,7 @@ describe('useLibraryPins', () => {
                 'pins_author_generated',
                 JSON.stringify({ 'Author A': 'bookA.pdf' }),
             );
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             expect(result.current.seriesPins).toEqual({ 'sid-1': 'vol3.pdf' });
             expect(result.current.authorPins).toEqual({ 'Author A': 'bookA.pdf' });
         });
@@ -28,7 +28,7 @@ describe('useLibraryPins', () => {
 
     describe('toggleSeriesPin', () => {
         it('未ピン状態でトグルするとピンが追加される', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });
@@ -36,7 +36,7 @@ describe('useLibraryPins', () => {
         });
 
         it('同じ書籍を再トグルするとピンが解除される', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });
@@ -47,7 +47,7 @@ describe('useLibraryPins', () => {
         });
 
         it('別の書籍をトグルすると代表が切り替わる（1グループ1冊のみ）', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });
@@ -58,7 +58,7 @@ describe('useLibraryPins', () => {
         });
 
         it('localStorage に保存される', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleSeriesPin('sid-1', 'vol2.pdf');
             });
@@ -67,7 +67,7 @@ describe('useLibraryPins', () => {
         });
 
         it('シリーズピンは作者ピンに影響しない', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });
@@ -77,7 +77,7 @@ describe('useLibraryPins', () => {
 
     describe('toggleAuthorPin', () => {
         it('未ピン状態でトグルするとピンが追加される', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleAuthorPin('Author A\nAuthor B', 'bookA.pdf');
             });
@@ -85,7 +85,7 @@ describe('useLibraryPins', () => {
         });
 
         it('同じ書籍を再トグルするとピンが解除される', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleAuthorPin('Author A', 'bookA.pdf');
             });
@@ -96,7 +96,7 @@ describe('useLibraryPins', () => {
         });
 
         it('別の書籍をトグルすると代表が切り替わる', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleAuthorPin('Author A', 'bookA.pdf');
             });
@@ -107,7 +107,7 @@ describe('useLibraryPins', () => {
         });
 
         it('localStorage に保存される', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleAuthorPin('Author A', 'bookA.pdf');
             });
@@ -116,7 +116,7 @@ describe('useLibraryPins', () => {
         });
 
         it('作者ピンはシリーズピンに影響しない', () => {
-            const { result } = renderHook(() => useLibraryPins('generated'));
+            const { result } = renderHook(() => useLibraryPins('doujin'));
             act(() => {
                 result.current.toggleAuthorPin('Author A', 'bookA.pdf');
             });
@@ -126,8 +126,8 @@ describe('useLibraryPins', () => {
 
     describe('ソース別の独立管理', () => {
         it('source が異なれば別のキーで管理される', () => {
-            const { result: gen } = renderHook(() => useLibraryPins('generated'));
-            const { result: kin } = renderHook(() => useLibraryPins('kindle'));
+            const { result: gen } = renderHook(() => useLibraryPins('doujin'));
+            const { result: kin } = renderHook(() => useLibraryPins('comic'));
             act(() => {
                 gen.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });

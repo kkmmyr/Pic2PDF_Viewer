@@ -17,12 +17,12 @@ router = APIRouter()
 
 
 class AddGenreRequest(BaseModel):
-    source: str = "generated"
+    source: str = "doujin"
     name: str
 
 
 class ReorderGenresRequest(BaseModel):
-    source: str = "generated"
+    source: str = "doujin"
     genres: list[str]
 
 

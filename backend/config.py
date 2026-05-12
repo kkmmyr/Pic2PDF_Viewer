@@ -21,15 +21,15 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # backend/data/
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
-# Generated (default)
-MAIN_DATA_DIR      = os.path.join(DATA_DIR, "main")
+# Doujin (default)
+MAIN_DATA_DIR      = os.path.join(DATA_DIR, "doujin")
 PDF_COMPRESSED_DIR = os.path.join(MAIN_DATA_DIR, "pdfs_compressed")
 THUMBNAIL_DIR      = os.path.join(MAIN_DATA_DIR, "thumbnails")
 IMAGES_DIR         = os.path.join(MAIN_DATA_DIR, "images")
 COMPLETE_DIR       = os.path.join(MAIN_DATA_DIR, "complete")
 
-# Kindle
-KINDLE_DIR           = os.path.join(DATA_DIR, "kindle")
+# Comic
+KINDLE_DIR           = os.path.join(DATA_DIR, "comic")
 KINDLE_PDF_DIR       = os.path.join(KINDLE_DIR, "pdfs")
 KINDLE_THUMBNAIL_DIR = os.path.join(KINDLE_DIR, "thumbnails")
 KINDLE_IMAGES_DIR    = os.path.join(KINDLE_DIR, "images")
@@ -123,7 +123,7 @@ GEMMA_TOOL_DIR: str = os.environ.get("GEMMA_TOOL_DIR", r"D:\61.tool\Gemma 4")
 # ---------------------------------------------------------------------------
 # ソース識別子
 # ---------------------------------------------------------------------------
-VALID_SOURCES: tuple[str, ...] = ("generated", "kindle", "novel")
+VALID_SOURCES: tuple[str, ...] = ("doujin", "comic", "novel")
 
 # ---------------------------------------------------------------------------
 # サポートファイル形式
@@ -198,17 +198,17 @@ def get_dirs_by_source(source: str) -> SourceDirs:
     source 文字列に応じて PDF/サムネイル/画像のディレクトリを返す。
 
     Args:
-        source: 'generated' | 'kindle' | 'novel'
+        source: 'doujin' | 'comic' | 'novel'
 
     Returns:
         SourceDirs TypedDict
     """
-    if source == "kindle":
+    if source == "comic":
         return {
             "pdf": KINDLE_PDF_DIR,
             "thumb": KINDLE_THUMBNAIL_DIR,
             "img": KINDLE_IMAGES_DIR,
-            "thumb_url_prefix": "/kindle/thumbnails",
+            "thumb_url_prefix": "/comic/thumbnails",
         }
     if source == "novel":
         return {
@@ -217,7 +217,7 @@ def get_dirs_by_source(source: str) -> SourceDirs:
             "img": KINDLE_NOVEL_IMAGES_DIR,
             "thumb_url_prefix": "/kindle_novel/thumbnails",
         }
-    # generated (default)
+    # doujin (default)
     return {
         "pdf": PDF_COMPRESSED_DIR,
         "thumb": THUMBNAIL_DIR,

@@ -75,9 +75,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.mount("/thumbnails",  StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
 app.mount("/images",      StaticFiles(directory=IMAGES_DIR),    name="images")
 
-app.mount("/kindle/pdfs",        StaticFiles(directory=KINDLE_PDF_DIR),       name="kindle_pdfs")
-app.mount("/kindle/thumbnails",  StaticFiles(directory=KINDLE_THUMBNAIL_DIR), name="kindle_thumbnails")
-app.mount("/kindle/images",      StaticFiles(directory=KINDLE_IMAGES_DIR),    name="kindle_images")
+app.mount("/comic/pdfs",        StaticFiles(directory=KINDLE_PDF_DIR),       name="comic_pdfs")
+app.mount("/comic/thumbnails",  StaticFiles(directory=KINDLE_THUMBNAIL_DIR), name="comic_thumbnails")
+app.mount("/comic/images",      StaticFiles(directory=KINDLE_IMAGES_DIR),    name="comic_images")
 
 app.mount("/kindle_novel/thumbnails",  StaticFiles(directory=KINDLE_NOVEL_THUMBNAIL_DIR), name="kindle_novel_thumbnails")
 app.mount("/kindle_novel/images",      StaticFiles(directory=KINDLE_NOVEL_IMAGES_DIR),    name="kindle_novel_images")

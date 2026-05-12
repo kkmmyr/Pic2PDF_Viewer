@@ -1,4 +1,4 @@
-"""
+﻿"""
 services.series_suggester のユニットテスト（A-1）。
 
 ルールベースの紐付け候補スコアリングと、`POST /api/series/suggest`
@@ -201,7 +201,7 @@ def suggest_client(tmp_path, monkeypatch):
     return TestClient(app), tmp_path
 
 
-def _seed_meta(tmp_path, entries: dict, source: str = "generated") -> None:
+def _seed_meta(tmp_path, entries: dict, source: str = "doujin") -> None:
     meta_dir = tmp_path / "meta" / source
     meta_dir.mkdir(parents=True, exist_ok=True)
     (meta_dir / "meta.json").write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
@@ -219,7 +219,7 @@ class TestSuggestSeriesEndpoint:
             },
         })
         res = client.post("/api/series/suggest", json={
-            "path": "", "names": ["鬼滅の刃 2.pdf"], "source": "generated",
+            "path": "", "names": ["鬼滅の刃 2.pdf"], "source": "doujin",
         })
         assert res.status_code == 200
         body = res.json()
@@ -230,7 +230,7 @@ class TestSuggestSeriesEndpoint:
     def test_empty_names_returns_400(self, suggest_client):
         client, _ = suggest_client
         res = client.post("/api/series/suggest", json={
-            "path": "", "names": [], "source": "generated",
+            "path": "", "names": [], "source": "doujin",
         })
         assert res.status_code == 400
 
@@ -245,7 +245,7 @@ class TestSuggestSeriesEndpoint:
         client, tmp_path = suggest_client
         _seed_meta(tmp_path, {"book.pdf": {"authors": ["A"]}})
         res = client.post("/api/series/suggest", json={
-            "path": "", "names": ["other.pdf"], "source": "generated",
+            "path": "", "names": ["other.pdf"], "source": "doujin",
         })
         assert res.status_code == 200
         assert res.json()["candidates"] == []

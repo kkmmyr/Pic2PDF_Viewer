@@ -20,13 +20,13 @@ export const API_ENDPOINTS = {
     /** ステータス取得 */
     STATUS: '/api/status',
     /** 書籍画像取得 */
-    BOOK_IMAGES: (path: string, source: LibrarySource = 'generated') =>
+    BOOK_IMAGES: (path: string, source: LibrarySource = 'doujin') =>
         `/api/books/${encodeURIComponent(path)}/images?source=${source}`,
     /** ページ削除 */
-    DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
+    DELETE_PAGES: (filename: string, path: string, source: LibrarySource = 'doujin') =>
         `/api/pdfs/${encodeURIComponent(filename)}/delete_pages?path=${encodeURIComponent(path || '')}&source=${source}`,
     /** ページ並び替え（B-3） */
-    REORDER_PAGES: (filename: string, path: string, source: LibrarySource = 'generated') =>
+    REORDER_PAGES: (filename: string, path: string, source: LibrarySource = 'doujin') =>
         `/api/pdfs/${encodeURIComponent(filename)}/reorder_pages?path=${encodeURIComponent(path || '')}&source=${source}`,
     /** PDFリネーム */
     RENAME: '/api/rename',
@@ -99,14 +99,14 @@ export const STATIC_PATHS = {
     PDF: (
         path: string,
         filename: string,
-        source: LibrarySource = 'generated',
+        source: LibrarySource = 'doujin',
         version?: number,
     ) => {
         const basePath = path ? '/' + path.split('/').map(encodeURIComponent).join('/') : '';
         const encodedFilename = encodeURIComponent(filename);
         const versionParam = version !== undefined ? `?v=${version}` : '';
         let prefix = '/pdfs';
-        if (source === 'kindle') prefix = '/kindle/pdfs';
+        if (source === 'comic') prefix = '/comic/pdfs';
 
         return `${prefix}${basePath}/${encodedFilename}${versionParam}`;
     },

@@ -14,7 +14,7 @@ const renderEM = (overrides: Partial<Parameters<typeof useEditMode>[0]> = {}) =>
     const props = {
         selectedPdf: 'book.pdf',
         currentPath: '',
-        currentSource: 'generated' as const,
+        currentSource: 'doujin' as const,
         pageNumber: 1,
         setPageNumber: vi.fn(),
         onPdfUpdated: vi.fn(),

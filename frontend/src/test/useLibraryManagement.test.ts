@@ -14,7 +14,7 @@ const renderLM = (onRefresh = vi.fn()) =>
     renderHook(() =>
         useLibraryManagement({
             currentPath: '',
-            currentSource: 'generated',
+            currentSource: 'doujin',
             onRefresh,
         }),
     );
@@ -107,7 +107,7 @@ describe('useLibraryManagement', () => {
             const { result } = renderHook(() =>
                 useLibraryManagement({
                     currentPath: 'sub',
-                    currentSource: 'kindle',
+                    currentSource: 'comic',
                     onRefresh,
                 }),
             );
@@ -122,7 +122,7 @@ describe('useLibraryManagement', () => {
                 path: 'sub',
                 old_name: 'old.pdf',
                 new_name: 'new.pdf',
-                source: 'kindle',
+                source: 'comic',
                 is_folder: false,
             });
             expect(result.current.renameTarget).toBeNull();

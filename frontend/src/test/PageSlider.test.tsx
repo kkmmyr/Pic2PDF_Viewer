@@ -11,7 +11,7 @@ const renderSlider = (overrides: Partial<Parameters<typeof PageSlider>[0]> = {})
         show: true,
         selectedPdf: 'book.pdf',
         currentPath: '',
-        currentSource: 'generated' as const,
+        currentSource: 'doujin' as const,
         onPageJump: vi.fn(),
         ...overrides,
     };

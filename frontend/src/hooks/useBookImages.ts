@@ -25,7 +25,7 @@ interface UseBookImagesReturn {
 export function useBookImages(
     selectedPdf: string | null,
     currentPath: string,
-    source: LibrarySource = 'generated',
+    source: LibrarySource = 'doujin',
     version: number = 0,
 ): UseBookImagesReturn {
     const [imageUrls, setImageUrls] = useState<string[] | null>(null);

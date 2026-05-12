@@ -22,7 +22,7 @@ function useCombined(source: string) {
 
 const renderCombined = (initialMeta: BookMetaMap = {}) => {
     mockedGet.mockResolvedValue(initialMeta);
-    return renderHook(() => useCombined('generated'));
+    return renderHook(() => useCombined('doujin'));
 };
 
 describe('useBookMetaWrite', () => {
@@ -45,7 +45,7 @@ describe('useBookMetaWrite', () => {
                 path: '',
                 names: ['a.pdf'],
                 authors: ['新作者'],
-                source: 'generated',
+                source: 'doujin',
             });
             expect(result.current.meta['a.pdf']?.authors).toEqual(['新作者']);
         });

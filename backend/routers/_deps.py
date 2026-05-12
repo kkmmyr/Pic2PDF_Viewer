@@ -8,7 +8,7 @@ from utils.logger import get_logger
 from utils.path_utils import validate_safe_name, validate_safe_path
 
 
-def validated_source(source: str = "generated") -> str:
+def validated_source(source: str = "doujin") -> str:
     """クエリパラメーター `source` を検証して返す。無効値なら 400 を返す。"""
     if source not in VALID_SOURCES:
         raise HTTPException(status_code=400, detail="Invalid source")

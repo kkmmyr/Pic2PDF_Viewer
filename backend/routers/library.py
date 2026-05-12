@@ -80,7 +80,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = D
     dirs = get_dirs_by_source(source)
 
     # generated ソースは images/ サブディレクトリを走査（pdfs_compressed 不要）
-    if source == "generated":
+    if source == "doujin":
         return _list_from_images(background_tasks, path, dirs)
 
     # kindle / novel: 従来通り PDF ファイルを走査
@@ -160,7 +160,7 @@ class RenameItemRequest(BaseModel):
     path: str
     old_name: str
     new_name: str
-    source: str = "generated"
+    source: str = "doujin"
     is_folder: bool = False
 
 
@@ -207,7 +207,7 @@ def rename_item(request: RenameItemRequest):
 class DeletePdfsRequest(BaseModel):
     names: list[str]
     path: str = ""
-    source: str = "generated"
+    source: str = "doujin"
 
 
 @router.delete("/pdfs")

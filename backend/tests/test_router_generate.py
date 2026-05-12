@@ -1,4 +1,4 @@
-"""
+﻿"""
 routers.generate のユニットテスト。
 
 PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証する。
@@ -63,7 +63,7 @@ class TestGenerate:
             time.sleep(0.05)
         assert r.json()["status"] == "completed"
 
-        meta_path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "generated", "meta.json")
+        meta_path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
         with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
         assert meta["new1.pdf"]["genre"] == "オリジナル"
@@ -71,7 +71,7 @@ class TestGenerate:
 
     def test_existing_meta_genre_preserved(self, client, tmp_data_dir, monkeypatch):
         """既存メタデータがある書籍には genre を上書きしない。"""
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "generated")
+        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin")
         os.makedirs(meta_dir, exist_ok=True)
         with open(os.path.join(meta_dir, "meta.json"), "w", encoding="utf-8") as f:
             json.dump({"existing.pdf": {"genre": "プリンセスコネクト", "authors": ["A"]}}, f)

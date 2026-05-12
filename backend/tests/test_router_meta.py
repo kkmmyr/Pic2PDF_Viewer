@@ -1,4 +1,4 @@
-"""
+﻿"""
 routers.meta の追補ユニットテスト。
 
 `test_meta.py` でカバーされていない以下を検証する:
@@ -33,19 +33,19 @@ def _seed_meta(tmp_data_dir, source: str, data: dict) -> str:
 
 class TestGetMeta:
     def test_returns_full_meta(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "generated", {
+        _seed_meta(tmp_data_dir, "doujin", {
             "a.pdf": {"authors": ["A"]},
             "b.pdf": {"authors": ["B"], "genre": "G"},
         })
 
-        res = client.get("/api/meta?source=generated")
+        res = client.get("/api/meta?source=doujin")
         assert res.status_code == 200
         body = res.json()
         assert body["a.pdf"]["authors"] == ["A"]
         assert body["b.pdf"]["genre"] == "G"
 
     def test_returns_empty_dict_when_no_meta(self, client, tmp_data_dir):
-        res = client.get("/api/meta?source=kindle")
+        res = client.get("/api/meta?source=comic")
         assert res.status_code == 200
         assert res.json() == {}
 
@@ -60,16 +60,16 @@ class TestGetMeta:
 
 class TestExportMeta:
     def test_returns_json_with_attachment_header(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "generated", {"a.pdf": {"authors": ["X"]}})
+        _seed_meta(tmp_data_dir, "doujin", {"a.pdf": {"authors": ["X"]}})
 
-        res = client.get("/api/meta/export?source=generated")
+        res = client.get("/api/meta/export?source=doujin")
         assert res.status_code == 200
         # Content-Type は application/json
         assert "application/json" in res.headers["content-type"]
-        # Content-Disposition: attachment; filename="meta_generated_YYYYMMDD.json"
+        # Content-Disposition: attachment; filename="meta_doujin_YYYYMMDD.json"
         cd = res.headers["content-disposition"]
         assert "attachment" in cd
-        assert "meta_generated_" in cd
+        assert "meta_doujin_" in cd
         assert ".json" in cd
 
         data = res.json()
@@ -86,33 +86,33 @@ class TestExportMeta:
 
 class TestUpdateMetaGenre:
     def test_set_genre(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "generated", {"a.pdf": {"authors": ["X"]}})
+        _seed_meta(tmp_data_dir, "doujin", {"a.pdf": {"authors": ["X"]}})
 
         res = client.patch("/api/meta", json={
             "path": "",
             "names": ["a.pdf"],
             "genre": "プリンセスコネクト",
-            "source": "generated",
+            "source": "doujin",
         })
         assert res.status_code == 200
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "generated", "meta.json")
+        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
         with open(path, encoding="utf-8") as f:
             meta = json.load(f)
         assert meta["a.pdf"]["genre"] == "プリンセスコネクト"
         assert meta["a.pdf"]["authors"] == ["X"]
 
     def test_genre_empty_string_removes_field(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "generated", {"a.pdf": {"genre": "X", "authors": ["A"]}})
+        _seed_meta(tmp_data_dir, "doujin", {"a.pdf": {"genre": "X", "authors": ["A"]}})
 
         client.patch("/api/meta", json={
             "path": "",
             "names": ["a.pdf"],
             "genre": "",
-            "source": "generated",
+            "source": "doujin",
         })
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "generated", "meta.json")
+        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
         with open(path, encoding="utf-8") as f:
             meta = json.load(f)
         assert "genre" not in meta["a.pdf"]
@@ -122,7 +122,7 @@ class TestUpdateMetaGenre:
 class TestUpdateMetaEntryDeletion:
     def test_empty_lists_remove_entry(self, client, tmp_data_dir):
         """authors=[] で他に意味のあるフィールドが無ければエントリ自体が消える。"""
-        _seed_meta(tmp_data_dir, "generated", {
+        _seed_meta(tmp_data_dir, "doujin", {
             "victim.pdf": {"authors": ["A"]},
             "alive.pdf": {"authors": ["B"]},
         })
@@ -131,10 +131,10 @@ class TestUpdateMetaEntryDeletion:
             "path": "",
             "names": ["victim.pdf"],
             "authors": [],
-            "source": "generated",
+            "source": "doujin",
         })
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "generated", "meta.json")
+        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
         with open(path, encoding="utf-8") as f:
             meta = json.load(f)
         assert "victim.pdf" not in meta
@@ -142,7 +142,7 @@ class TestUpdateMetaEntryDeletion:
 
     def test_empty_lists_keep_entry_with_view_count(self, client, tmp_data_dir):
         """view_count 等 list 以外の意味のあるフィールドが残っていればエントリは保持される。"""
-        _seed_meta(tmp_data_dir, "generated", {
+        _seed_meta(tmp_data_dir, "doujin", {
             "book.pdf": {"authors": ["A"], "view_count": 5, "last_viewed_at": 1700000000.0},
         })
 
@@ -150,10 +150,10 @@ class TestUpdateMetaEntryDeletion:
             "path": "",
             "names": ["book.pdf"],
             "authors": [],
-            "source": "generated",
+            "source": "doujin",
         })
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "generated", "meta.json")
+        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
         with open(path, encoding="utf-8") as f:
             meta = json.load(f)
         assert meta["book.pdf"]["view_count"] == 5
@@ -164,7 +164,7 @@ class TestUpdateMetaEntryDeletion:
         res = client.patch("/api/meta", json={
             "path": "",
             "names": ["a.pdf"],
-            "source": "generated",
+            "source": "doujin",
         })
         assert res.status_code == 400
 

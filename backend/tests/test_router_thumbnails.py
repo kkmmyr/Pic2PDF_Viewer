@@ -1,4 +1,4 @@
-"""
+﻿"""
 routers.thumbnails のユニットテスト。
 
 ページサムネイルのオンデマンド生成（GET /api/thumbnails/page）と
@@ -24,43 +24,43 @@ class TestGetPageThumbnail:
         make_webp(os.path.join(img_dir, "book", "1.webp"), color=(255, 0, 0))
         make_webp(os.path.join(img_dir, "book", "2.webp"), color=(0, 255, 0))
 
-        res = client.get("/api/thumbnails/page?name=book.pdf&page=1&source=generated")
+        res = client.get("/api/thumbnails/page?name=book.pdf&page=1&source=doujin")
         assert res.status_code == 200
         assert res.headers["content-type"] == "image/webp"
         assert "max-age=3600" in res.headers["cache-control"]
 
     def test_generated_404_when_no_images(self, client, tmp_data_dir):
-        res = client.get("/api/thumbnails/page?name=nope.pdf&page=1&source=generated")
+        res = client.get("/api/thumbnails/page?name=nope.pdf&page=1&source=doujin")
         assert res.status_code == 404
 
     def test_generated_400_when_page_out_of_range(self, client, tmp_data_dir, make_webp):
         img_dir = tmp_data_dir["IMAGES_DIR"]
         make_webp(os.path.join(img_dir, "book", "1.webp"))
 
-        res = client.get("/api/thumbnails/page?name=book.pdf&page=99&source=generated")
+        res = client.get("/api/thumbnails/page?name=book.pdf&page=99&source=doujin")
         assert res.status_code == 400
 
     def test_400_when_page_less_than_1(self, client, tmp_data_dir):
-        res = client.get("/api/thumbnails/page?name=book.pdf&page=0&source=generated")
+        res = client.get("/api/thumbnails/page?name=book.pdf&page=0&source=doujin")
         assert res.status_code == 400
 
     def test_kindle_renders_pdf_to_jpeg(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=3)
 
-        res = client.get("/api/thumbnails/page?name=book.pdf&page=1&source=kindle")
+        res = client.get("/api/thumbnails/page?name=book.pdf&page=1&source=comic")
         assert res.status_code == 200
         assert res.headers["content-type"] == "image/jpeg"
 
     def test_kindle_404_when_pdf_missing(self, client, tmp_data_dir):
-        res = client.get("/api/thumbnails/page?name=nope.pdf&page=1&source=kindle")
+        res = client.get("/api/thumbnails/page?name=nope.pdf&page=1&source=comic")
         assert res.status_code == 404
 
     def test_kindle_400_when_page_out_of_range(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=2)
 
-        res = client.get("/api/thumbnails/page?name=book.pdf&page=99&source=kindle")
+        res = client.get("/api/thumbnails/page?name=book.pdf&page=99&source=comic")
         assert res.status_code == 400
 
     def test_invalid_source_returns_400(self, client, tmp_data_dir):
@@ -81,7 +81,7 @@ class TestRegenerateThumbnail:
         res = client.post("/api/thumbnails/regenerate", json={
             "path": "",
             "name": "book.pdf",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 200
         assert os.path.exists(os.path.join(thumb_dir, "book.jpg"))
@@ -97,7 +97,7 @@ class TestRegenerateThumbnail:
         res = client.post("/api/thumbnails/regenerate", json={
             "path": "",
             "name": "book.pdf",
-            "source": "generated",
+            "source": "doujin",
         })
         assert res.status_code == 200
         thumb_path = os.path.join(thumb_dir, "book.jpg")
@@ -110,7 +110,7 @@ class TestRegenerateThumbnail:
         res = client.post("/api/thumbnails/regenerate", json={
             "path": "",
             "name": "nope.pdf",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 404
 
@@ -118,7 +118,7 @@ class TestRegenerateThumbnail:
         res = client.post("/api/thumbnails/regenerate", json={
             "path": "../etc",
             "name": "book.pdf",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 
@@ -143,7 +143,7 @@ class TestRegenerateThumbnailBulk:
         res = client.post("/api/thumbnails/regenerate_bulk", json={
             "names": ["ok.pdf", "missing.pdf"],
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 200
         body = res.json()
@@ -158,7 +158,7 @@ class TestRegenerateThumbnailBulk:
         res = client.post("/api/thumbnails/regenerate_bulk", json={
             "names": ["a.pdf", "b.pdf"],
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         body = res.json()
         assert sorted(body["succeeded"]) == ["a.pdf", "b.pdf"]
@@ -173,7 +173,7 @@ class TestRegenerateThumbnailBulk:
         res = client.post("/api/thumbnails/regenerate_bulk", json={
             "names": ["first.pdf", "second.pdf", "third.pdf"],
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         body = res.json()
         # 第2項目で失敗しても third まで処理される
@@ -185,7 +185,7 @@ class TestRegenerateThumbnailBulk:
         res = client.post("/api/thumbnails/regenerate_bulk", json={
             "names": ["../etc.pdf"],
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 

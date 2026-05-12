@@ -67,7 +67,7 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
                 for name in result.generated:
                     if name not in data:
                         data[name] = {"genre": "オリジナル"}
-            update_meta_locked("generated", _init_genre)
+            update_meta_locked("doujin", _init_genre)
 
         failed_dicts = [{"name": n, "error": e} for n, e in result.failed_items]
         if failed_dicts:

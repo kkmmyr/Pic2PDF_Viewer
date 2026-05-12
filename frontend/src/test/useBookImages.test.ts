@@ -16,7 +16,7 @@ describe('useBookImages', () => {
     });
 
     it('selectedPdf=null では fetch せず imageUrls=null', () => {
-        const { result } = renderHook(() => useBookImages(null, '', 'generated'));
+        const { result } = renderHook(() => useBookImages(null, '', 'doujin'));
         expect(mockedGet).not.toHaveBeenCalled();
         expect(result.current.imageUrls).toBeNull();
         expect(result.current.numPages).toBe(0);
@@ -28,7 +28,7 @@ describe('useBookImages', () => {
         mockedGet.mockResolvedValue({
             images: ['/img/1.webp', '/img/2.webp', '/img/3.webp'],
         });
-        const { result } = renderHook(() => useBookImages('book.pdf', '', 'generated'));
+        const { result } = renderHook(() => useBookImages('book.pdf', '', 'doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         await waitFor(() => expect(result.current.numPages).toBe(3));
@@ -38,18 +38,18 @@ describe('useBookImages', () => {
 
     it('currentPath が指定されると bookPath が path/bookName になる', async () => {
         mockedGet.mockResolvedValue({ images: ['/img/1.webp'] });
-        renderHook(() => useBookImages('book.pdf', 'sub', 'generated'));
+        renderHook(() => useBookImages('book.pdf', 'sub', 'doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-        // BOOK_IMAGES('sub/book', 'generated') が呼ばれる
+        // BOOK_IMAGES('sub/book', 'doujin') が呼ばれる
         const calledUrl = mockedGet.mock.calls[0][0] as string;
         expect(calledUrl).toContain(encodeURIComponent('sub/book'));
-        expect(calledUrl).toContain('source=generated');
+        expect(calledUrl).toContain('source=doujin');
     });
 
     it('.pdf 拡張子は bookName から除去される', async () => {
         mockedGet.mockResolvedValue({ images: [] });
-        renderHook(() => useBookImages('book.PDF', '', 'generated'));
+        renderHook(() => useBookImages('book.PDF', '', 'doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         const calledUrl = mockedGet.mock.calls[0][0] as string;
@@ -59,7 +59,7 @@ describe('useBookImages', () => {
 
     it('images が空配列なら imageUrls は null のまま（PDF モードへフォールバック）', async () => {
         mockedGet.mockResolvedValue({ images: [] });
-        const { result } = renderHook(() => useBookImages('book.pdf', '', 'generated'));
+        const { result } = renderHook(() => useBookImages('book.pdf', '', 'doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -69,7 +69,7 @@ describe('useBookImages', () => {
 
     it('GET 失敗時は imageUrls=null のまま（PDF モードへフォールバック）', async () => {
         mockedGet.mockRejectedValue(new Error('not found'));
-        const { result } = renderHook(() => useBookImages('book.pdf', '', 'generated'));
+        const { result } = renderHook(() => useBookImages('book.pdf', '', 'doujin'));
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(result.current.imageUrls).toBeNull();
@@ -79,7 +79,7 @@ describe('useBookImages', () => {
     it('selectedPdf 切替で再フェッチされる', async () => {
         mockedGet.mockResolvedValueOnce({ images: ['/a.webp'] });
         const { rerender, result } = renderHook(
-            ({ pdf }: { pdf: string }) => useBookImages(pdf, '', 'generated'),
+            ({ pdf }: { pdf: string }) => useBookImages(pdf, '', 'doujin'),
             { initialProps: { pdf: 'a.pdf' } },
         );
         await waitFor(() => expect(result.current.numPages).toBe(1));
@@ -92,7 +92,7 @@ describe('useBookImages', () => {
     it('version 変化で再フェッチされ、新しい imageUrls / numPages に置き換わる', async () => {
         mockedGet.mockResolvedValueOnce({ images: ['/a.webp', '/b.webp', '/c.webp'] });
         const { rerender, result } = renderHook(
-            ({ v }: { v: number }) => useBookImages('book.pdf', '', 'generated', v),
+            ({ v }: { v: number }) => useBookImages('book.pdf', '', 'doujin', v),
             { initialProps: { v: 0 } },
         );
         await waitFor(() => expect(result.current.numPages).toBe(3));
@@ -108,7 +108,7 @@ describe('useBookImages', () => {
         // 1st fetch
         mockedGet.mockResolvedValueOnce({ images: ['/a.webp', '/b.webp', '/c.webp'] });
         const { rerender, result } = renderHook(
-            ({ v }: { v: number }) => useBookImages('book.pdf', '', 'generated', v),
+            ({ v }: { v: number }) => useBookImages('book.pdf', '', 'doujin', v),
             { initialProps: { v: 0 } },
         );
         await waitFor(() => expect(result.current.numPages).toBe(3));
@@ -136,7 +136,7 @@ describe('useBookImages', () => {
     it('selectedPdf 切替時は古い imageUrls をクリアしてから新しいリクエストを投げる', async () => {
         mockedGet.mockResolvedValueOnce({ images: ['/a.webp'] });
         const { rerender, result } = renderHook(
-            ({ pdf }: { pdf: string }) => useBookImages(pdf, '', 'generated'),
+            ({ pdf }: { pdf: string }) => useBookImages(pdf, '', 'doujin'),
             { initialProps: { pdf: 'a.pdf' } },
         );
         await waitFor(() => expect(result.current.numPages).toBe(1));

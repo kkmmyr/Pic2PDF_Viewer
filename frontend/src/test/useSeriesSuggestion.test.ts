@@ -16,14 +16,14 @@ describe('useSeriesSuggestion', () => {
     });
 
     it('初期状態は candidates=[] / loading=false / error=null', () => {
-        const { result } = renderHook(() => useSeriesSuggestion('generated', ''));
+        const { result } = renderHook(() => useSeriesSuggestion('doujin', ''));
         expect(result.current.candidates).toEqual([]);
         expect(result.current.loading).toBe(false);
         expect(result.current.error).toBeNull();
     });
 
     it('fetchSuggestions(空配列) は何もせず candidates をクリア', async () => {
-        const { result } = renderHook(() => useSeriesSuggestion('generated', ''));
+        const { result } = renderHook(() => useSeriesSuggestion('doujin', ''));
         await act(async () => {
             await result.current.fetchSuggestions([]);
         });
@@ -43,7 +43,7 @@ describe('useSeriesSuggestion', () => {
                 },
             ],
         });
-        const { result } = renderHook(() => useSeriesSuggestion('generated', 'sub'));
+        const { result } = renderHook(() => useSeriesSuggestion('doujin', 'sub'));
         await act(async () => {
             await result.current.fetchSuggestions(['鬼滅の刃 6.pdf']);
         });
@@ -52,13 +52,13 @@ describe('useSeriesSuggestion', () => {
         expect(mockedPost).toHaveBeenCalledWith('/api/series/suggest', {
             path: 'sub',
             names: ['鬼滅の刃 6.pdf'],
-            source: 'generated',
+            source: 'doujin',
         });
     });
 
     it('fetchSuggestions 失敗で error がセットされ candidates は空', async () => {
         mockedPost.mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => useSeriesSuggestion('generated', ''));
+        const { result } = renderHook(() => useSeriesSuggestion('doujin', ''));
         await act(async () => {
             await result.current.fetchSuggestions(['a.pdf']);
         });
@@ -78,7 +78,7 @@ describe('useSeriesSuggestion', () => {
                 },
             ],
         });
-        const { result } = renderHook(() => useSeriesSuggestion('generated', ''));
+        const { result } = renderHook(() => useSeriesSuggestion('doujin', ''));
         await act(async () => {
             await result.current.fetchSuggestions(['a.pdf']);
         });
@@ -93,7 +93,7 @@ describe('useSeriesSuggestion', () => {
 
     it('レスポンスに candidates が無くても [] にフォールバック', async () => {
         mockedPost.mockResolvedValue({});
-        const { result } = renderHook(() => useSeriesSuggestion('generated', ''));
+        const { result } = renderHook(() => useSeriesSuggestion('doujin', ''));
         await act(async () => {
             await result.current.fetchSuggestions(['a.pdf']);
         });

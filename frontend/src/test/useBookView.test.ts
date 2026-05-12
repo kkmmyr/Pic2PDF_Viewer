@@ -21,7 +21,7 @@ function useCombined(source: string) {
 
 const renderCombined = (initialMeta: BookMetaMap = {}) => {
     mockedGet.mockResolvedValue(initialMeta);
-    return renderHook(() => useCombined('generated'));
+    return renderHook(() => useCombined('doujin'));
 };
 
 describe('useBookView', () => {
@@ -42,7 +42,7 @@ describe('useBookView', () => {
         expect(mockedPost).toHaveBeenCalledWith('/api/meta/view', {
             path: '',
             name: 'a.pdf',
-            source: 'generated',
+            source: 'doujin',
         });
         expect(result.current.meta['a.pdf']?.view_count).toBe(3);
         expect(result.current.meta['a.pdf']?.last_viewed_at).toBe(1700000000);

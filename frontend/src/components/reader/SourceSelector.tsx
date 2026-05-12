@@ -6,8 +6,8 @@ interface SourceSelectorProps {
 }
 
 const SOURCES: { value: LibrarySource; label: string }[] = [
-    { value: 'generated', label: 'Main' },
-    { value: 'kindle', label: 'Kindle' },
+    { value: 'doujin', label: 'Main' },
+    { value: 'comic', label: 'Kindle' },
     { value: 'novel', label: 'Novel' },
 ];
 

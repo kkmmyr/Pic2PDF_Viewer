@@ -1,4 +1,4 @@
-"""
+﻿"""
 routers._deps のユニットテスト。
 
 全ルーターで使われるガード関数とデコレータをカバーする。
@@ -29,16 +29,16 @@ from routers._deps import (
 
 class TestValidatedSource:
     def test_generated_passes(self):
-        assert validated_source("generated") == "generated"
+        assert validated_source("doujin") == "doujin"
 
     def test_kindle_passes(self):
-        assert validated_source("kindle") == "kindle"
+        assert validated_source("comic") == "comic"
 
     def test_novel_passes(self):
         assert validated_source("novel") == "novel"
 
     def test_default_is_generated(self):
-        assert validated_source() == "generated"
+        assert validated_source() == "doujin"
 
     def test_invalid_source_raises_400(self):
         with pytest.raises(HTTPException) as exc:
@@ -48,7 +48,7 @@ class TestValidatedSource:
 
     def test_uppercase_rejected(self):
         with pytest.raises(HTTPException) as exc:
-            validated_source("GENERATED")
+            validated_source("Doujin")
         assert exc.value.status_code == 400
 
     def test_empty_string_rejected(self):
@@ -63,10 +63,10 @@ class TestValidatedSource:
 
 class TestAssertValidSource:
     def test_generated_passes(self):
-        assert_valid_source("generated")  # 例外が出ないことを確認
+        assert_valid_source("doujin")  # 例外が出ないことを確認
 
     def test_kindle_passes(self):
-        assert_valid_source("kindle")
+        assert_valid_source("comic")
 
     def test_novel_passes(self):
         assert_valid_source("novel")

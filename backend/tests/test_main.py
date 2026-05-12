@@ -120,8 +120,8 @@ class TestStaticMounts:
     def test_kindle_mounts_present(self):
         from main import app
         mount_paths = {r.path for r in app.routes if hasattr(r, "path")}
-        assert "/kindle/pdfs" in mount_paths
-        assert "/kindle/thumbnails" in mount_paths
+        assert "/comic/pdfs" in mount_paths
+        assert "/comic/thumbnails" in mount_paths
 
     def test_routers_registered(self):
         """各 router が /api プレフィクスで登録されている。"""

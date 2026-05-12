@@ -1,4 +1,4 @@
-"""
+﻿"""
 routers.library のユニットテスト。
 
 書籍一覧（/api/pdfs）・書籍画像一覧（/api/books/{path}/images）・
@@ -25,7 +25,7 @@ class TestListPdfsGenerated:
         make_webp(os.path.join(img_dir, "alpha", "1.webp"))
         make_webp(os.path.join(img_dir, "beta", "1.webp"))
 
-        res = client.get("/api/pdfs?source=generated")
+        res = client.get("/api/pdfs?source=doujin")
         assert res.status_code == 200
         data = res.json()
         names = {f["name"] for f in data["files"]}
@@ -36,7 +36,7 @@ class TestListPdfsGenerated:
         make_webp(os.path.join(img_dir, "has_image", "1.webp"))
         os.makedirs(os.path.join(img_dir, "empty_dir"))
 
-        res = client.get("/api/pdfs?source=generated")
+        res = client.get("/api/pdfs?source=doujin")
         names = {f["name"] for f in res.json()["files"]}
         assert names == {"has_image.pdf"}
 
@@ -49,7 +49,7 @@ class TestListPdfsGenerated:
         with open(thumb_path, "wb") as f:
             f.write(b"\xff\xd8\xff\xe0")  # JPEG magic
 
-        res = client.get("/api/pdfs?source=generated")
+        res = client.get("/api/pdfs?source=doujin")
         files = res.json()["files"]
         book = next(f for f in files if f["name"] == "book.pdf")
         assert book["thumbnail"] == "/thumbnails/book.jpg"
@@ -59,7 +59,7 @@ class TestListPdfsGenerated:
         img_dir = tmp_data_dir["IMAGES_DIR"]
         make_webp(os.path.join(img_dir, "newbook", "1.webp"))
 
-        res = client.get("/api/pdfs?source=generated")
+        res = client.get("/api/pdfs?source=doujin")
         files = res.json()["files"]
         book = next(f for f in files if f["name"] == "newbook.pdf")
         assert book["thumbnail"] is None
@@ -77,7 +77,7 @@ class TestListPdfsGenerated:
         make_webp(os.path.join(img_dir, "fresh", "1.webp"), size=(400, 600))
 
         # /api/pdfs を叩くと BackgroundTasks が起動する。TestClient は同期実行する。
-        res = client.get("/api/pdfs?source=generated")
+        res = client.get("/api/pdfs?source=doujin")
         assert res.status_code == 200
 
         # BackgroundTasks 完了後、サムネイル JPG が生成されている
@@ -87,12 +87,12 @@ class TestListPdfsGenerated:
             assert img.format == "JPEG"
 
     def test_returns_empty_when_path_not_exist(self, client, tmp_data_dir):
-        res = client.get("/api/pdfs?path=nope&source=generated")
+        res = client.get("/api/pdfs?path=nope&source=doujin")
         assert res.status_code == 200
         assert res.json() == {"files": [], "current_path": "nope"}
 
     def test_path_traversal_rejected(self, client, tmp_data_dir):
-        res = client.get("/api/pdfs?path=../etc&source=generated")
+        res = client.get("/api/pdfs?path=../etc&source=doujin")
         assert res.status_code == 400
 
 
@@ -106,7 +106,7 @@ class TestListPdfsKindle:
         make_pdf(os.path.join(pdf_dir, "book1.pdf"))
         make_pdf(os.path.join(pdf_dir, "book2.pdf"))
 
-        res = client.get("/api/pdfs?source=kindle")
+        res = client.get("/api/pdfs?source=comic")
         assert res.status_code == 200
         names = {f["name"] for f in res.json()["files"]}
         assert names == {"book1.pdf", "book2.pdf"}
@@ -117,7 +117,7 @@ class TestListPdfsKindle:
         with open(os.path.join(pdf_dir, "readme.txt"), "w") as f:
             f.write("hi")
 
-        res = client.get("/api/pdfs?source=kindle")
+        res = client.get("/api/pdfs?source=comic")
         names = {f["name"] for f in res.json()["files"]}
         assert names == {"book.pdf"}
 
@@ -125,7 +125,7 @@ class TestListPdfsKindle:
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "series_a", "vol1.pdf"))
 
-        res = client.get("/api/pdfs?path=series_a&source=kindle")
+        res = client.get("/api/pdfs?path=series_a&source=comic")
         names = {f["name"] for f in res.json()["files"]}
         assert names == {"vol1.pdf"}
 
@@ -145,7 +145,7 @@ class TestListBookImages:
         for n in ["1.webp", "2.webp", "10.webp"]:
             make_webp(os.path.join(img_dir, "book", n))
 
-        res = client.get("/api/books/book/images?source=generated")
+        res = client.get("/api/books/book/images?source=doujin")
         assert res.status_code == 200
         urls = res.json()["images"]
         # natsort: 1, 2, 10 の順
@@ -154,7 +154,7 @@ class TestListBookImages:
         assert urls[2].endswith("/10.webp")
 
     def test_404_when_path_missing(self, client, tmp_data_dir):
-        res = client.get("/api/books/nope/images?source=generated")
+        res = client.get("/api/books/nope/images?source=doujin")
         assert res.status_code == 404
 
     def test_400_when_path_is_file(self, client, tmp_data_dir):
@@ -162,7 +162,7 @@ class TestListBookImages:
         os.makedirs(img_dir, exist_ok=True)
         with open(os.path.join(img_dir, "afile"), "w") as f:
             f.write("x")
-        res = client.get("/api/books/afile/images?source=generated")
+        res = client.get("/api/books/afile/images?source=doujin")
         assert res.status_code == 400
 
     def test_invalid_source_returns_400(self, client, tmp_data_dir):
@@ -191,7 +191,7 @@ class TestRename:
             "old_name": "old.pdf",
             "new_name": "new.pdf",
             "is_folder": False,
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 200
 
@@ -204,7 +204,7 @@ class TestRename:
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "old.pdf"))
 
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "kindle")
+        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "comic")
         os.makedirs(meta_dir, exist_ok=True)
         meta_path = os.path.join(meta_dir, "meta.json")
         with open(meta_path, "w", encoding="utf-8") as f:
@@ -215,7 +215,7 @@ class TestRename:
             "old_name": "old.pdf",
             "new_name": "new.pdf",
             "is_folder": False,
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 200
 
@@ -230,7 +230,7 @@ class TestRename:
         os.makedirs(os.path.join(pdf_dir, "old_folder"))
         make_pdf(os.path.join(pdf_dir, "old_folder", "a.pdf"))
 
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "kindle")
+        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "comic")
         os.makedirs(meta_dir, exist_ok=True)
         meta_path = os.path.join(meta_dir, "meta.json")
         with open(meta_path, "w", encoding="utf-8") as f:
@@ -241,7 +241,7 @@ class TestRename:
             "old_name": "old_folder",
             "new_name": "new_folder",
             "is_folder": True,
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 200
 
@@ -256,7 +256,7 @@ class TestRename:
             "old_name": "nope.pdf",
             "new_name": "new.pdf",
             "is_folder": False,
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 404
 
@@ -270,7 +270,7 @@ class TestRename:
             "old_name": "old.pdf",
             "new_name": "exists.pdf",
             "is_folder": False,
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 
@@ -280,7 +280,7 @@ class TestRename:
             "old_name": "../etc",
             "new_name": "new.pdf",
             "is_folder": False,
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 
@@ -308,7 +308,7 @@ class TestDeletePdfs:
         res = client.request(
             "DELETE",
             "/api/pdfs",
-            json={"names": ["a.pdf", "b.pdf"], "path": "", "source": "kindle"},
+            json={"names": ["a.pdf", "b.pdf"], "path": "", "source": "comic"},
         )
         assert res.status_code == 200
         assert res.json()["deleted_count"] == 2
@@ -320,7 +320,7 @@ class TestDeletePdfs:
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "doomed.pdf"))
 
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "kindle")
+        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "comic")
         os.makedirs(meta_dir, exist_ok=True)
         meta_path = os.path.join(meta_dir, "meta.json")
         with open(meta_path, "w", encoding="utf-8") as f:
@@ -329,7 +329,7 @@ class TestDeletePdfs:
         client.request(
             "DELETE",
             "/api/pdfs",
-            json={"names": ["doomed.pdf"], "path": "", "source": "kindle"},
+            json={"names": ["doomed.pdf"], "path": "", "source": "comic"},
         )
 
         with open(meta_path, encoding="utf-8") as f:
@@ -344,7 +344,7 @@ class TestDeletePdfs:
         res = client.request(
             "DELETE",
             "/api/pdfs",
-            json={"names": ["exists.pdf", "missing.pdf"], "path": "", "source": "kindle"},
+            json={"names": ["exists.pdf", "missing.pdf"], "path": "", "source": "comic"},
         )
         assert res.status_code == 200
         body = res.json()
@@ -355,7 +355,7 @@ class TestDeletePdfs:
         res = client.request(
             "DELETE",
             "/api/pdfs",
-            json={"names": ["nope1.pdf", "nope2.pdf"], "path": "", "source": "kindle"},
+            json={"names": ["nope1.pdf", "nope2.pdf"], "path": "", "source": "comic"},
         )
         assert res.status_code == 500
 
@@ -363,7 +363,7 @@ class TestDeletePdfs:
         res = client.request(
             "DELETE",
             "/api/pdfs",
-            json={"names": ["../etc.pdf"], "path": "", "source": "kindle"},
+            json={"names": ["../etc.pdf"], "path": "", "source": "comic"},
         )
         assert res.status_code == 400
 

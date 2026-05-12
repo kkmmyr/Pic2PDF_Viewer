@@ -1,4 +1,4 @@
-"""
+﻿"""
 services.meta_store の純関数ユニットテスト。
 
 `test_meta.py` は routers 経由の挙動を検証しているのに対し、
@@ -129,9 +129,9 @@ class TestUpdateMetaLocked:
     def test_basic_update(self, tmp_path, monkeypatch):
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
 
-        update_meta_locked("generated", lambda d: d.update({"book.pdf": {"authors": ["A"]}}))
+        update_meta_locked("doujin", lambda d: d.update({"book.pdf": {"authors": ["A"]}}))
 
-        meta = load_meta("generated")
+        meta = load_meta("doujin")
         assert meta == {"book.pdf": {"authors": ["A"]}}
 
     def test_concurrent_updates_no_lost_update(self, tmp_path, monkeypatch):
@@ -139,13 +139,13 @@ class TestUpdateMetaLocked:
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
 
         # 初期値
-        update_meta_locked("generated", lambda d: d.update({"book.pdf": {"view_count": 0}}))
+        update_meta_locked("doujin", lambda d: d.update({"book.pdf": {"view_count": 0}}))
 
         def _increment():
             def _apply(data):
                 entry = data.setdefault("book.pdf", {})
                 entry["view_count"] = entry.get("view_count", 0) + 1
-            update_meta_locked("generated", _apply)
+            update_meta_locked("doujin", _apply)
 
         threads = [threading.Thread(target=_increment) for _ in range(10)]
         for t in threads:
@@ -153,18 +153,18 @@ class TestUpdateMetaLocked:
         for t in threads:
             t.join()
 
-        meta = load_meta("generated")
+        meta = load_meta("doujin")
         assert meta["book.pdf"]["view_count"] == 10
 
     def test_independent_locks_per_source(self, tmp_path, monkeypatch):
         """異なる source は独立して更新できる。"""
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
 
-        update_meta_locked("generated", lambda d: d.update({"a.pdf": {"authors": ["A"]}}))
-        update_meta_locked("kindle", lambda d: d.update({"b.pdf": {"authors": ["B"]}}))
+        update_meta_locked("doujin", lambda d: d.update({"a.pdf": {"authors": ["A"]}}))
+        update_meta_locked("comic", lambda d: d.update({"b.pdf": {"authors": ["B"]}}))
 
-        assert load_meta("generated") == {"a.pdf": {"authors": ["A"]}}
-        assert load_meta("kindle") == {"b.pdf": {"authors": ["B"]}}
+        assert load_meta("doujin") == {"a.pdf": {"authors": ["A"]}}
+        assert load_meta("comic") == {"b.pdf": {"authors": ["B"]}}
 
 
 # ---------------------------------------------------------------------------
@@ -174,31 +174,31 @@ class TestUpdateMetaLocked:
 class TestLoadSaveMeta:
     def test_load_missing_returns_empty_dict(self, tmp_path, monkeypatch):
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-        assert load_meta("generated") == {}
+        assert load_meta("doujin") == {}
 
     def test_load_invalid_json_returns_empty(self, tmp_path, monkeypatch):
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-        meta_dir = tmp_path / "meta" / "generated"
+        meta_dir = tmp_path / "meta" / "doujin"
         meta_dir.mkdir(parents=True)
         (meta_dir / "meta.json").write_text("{ broken json", encoding="utf-8")
 
         # 例外を投げず空 dict を返す
-        assert load_meta("generated") == {}
+        assert load_meta("doujin") == {}
 
     def test_save_load_roundtrip(self, tmp_path, monkeypatch):
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
         data = {"book.pdf": {"authors": ["A"], "view_count": 3}}
-        save_meta("generated", data)
+        save_meta("doujin", data)
 
-        loaded = load_meta("generated")
+        loaded = load_meta("doujin")
         assert loaded == data
 
     def test_save_preserves_non_ascii(self, tmp_path, monkeypatch):
         monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
         data = {"本.pdf": {"authors": ["著者"], "genre": "オリジナル"}}
-        save_meta("generated", data)
+        save_meta("doujin", data)
 
         # ファイル内容を直接確認（ensure_ascii=False で読める）
-        path = tmp_path / "meta" / "generated" / "meta.json"
+        path = tmp_path / "meta" / "doujin" / "meta.json"
         text = path.read_text(encoding="utf-8")
         assert "著者" in text

@@ -21,7 +21,7 @@ function useCombined(source: string) {
 
 const renderCombined = (initialMeta: BookMetaMap = {}) => {
     mockedGet.mockResolvedValue(initialMeta);
-    return renderHook(() => useCombined('generated'));
+    return renderHook(() => useCombined('doujin'));
 };
 
 describe('useBookSeries', () => {

@@ -12,7 +12,7 @@ import { useLibraryBulkActions } from '../hooks/useLibraryBulkActions';
 
 const makeOptions = (overrides: Record<string, unknown> = {}) => ({
     currentPath: '',
-    currentSource: 'generated' as const,
+    currentSource: 'doujin' as const,
     selectedItems: new Set<string>(['a.pdf', 'b.pdf']),
     showHidden: false,
     seriesFilter: '',

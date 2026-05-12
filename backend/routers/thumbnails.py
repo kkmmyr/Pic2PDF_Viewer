@@ -26,13 +26,13 @@ router = APIRouter()
 class RegenerateThumbnailRequest(BaseModel):
     path: str
     name: str  # .pdf 拡張子付きファイル名
-    source: str = "generated"
+    source: str = "doujin"
 
 
 class RegenerateThumbnailBulkRequest(BaseModel):
     names: list[str]  # .pdf 拡張子付きファイル名のリスト
     path: str = ""
-    source: str = "generated"
+    source: str = "doujin"
 
 
 def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir: str = "") -> bool:
@@ -79,7 +79,7 @@ def get_page_thumbnail(
     dirs = get_dirs_by_source(source)
 
     # generated: images/ ディレクトリから該当ページの WebP を直接返す
-    if source == "generated":
+    if source == "doujin":
         book_name = os.path.splitext(name)[0]
         webps = list_book_images(dirs["img"], book_name, path)
         if not webps:

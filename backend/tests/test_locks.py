@@ -1,4 +1,4 @@
-"""
+﻿"""
 utils.locks.SourceLockManager のユニットテスト。
 
 ストア層共通の遅延生成ロックマネージャの並行性を検証する。
@@ -19,20 +19,20 @@ from utils.locks import SourceLockManager
 class TestSourceLockManager:
     def test_same_source_returns_same_lock(self):
         mgr = SourceLockManager()
-        a = mgr.get("generated")
-        b = mgr.get("generated")
+        a = mgr.get("doujin")
+        b = mgr.get("doujin")
         assert a is b
 
     def test_different_sources_return_different_locks(self):
         mgr = SourceLockManager()
-        a = mgr.get("generated")
-        b = mgr.get("kindle")
+        a = mgr.get("doujin")
+        b = mgr.get("comic")
         assert a is not b
 
     def test_lock_is_threading_lock(self):
         """返り値は threading.Lock 互換（acquire / release を持つ）。"""
         mgr = SourceLockManager()
-        lock = mgr.get("generated")
+        lock = mgr.get("doujin")
         assert hasattr(lock, "acquire")
         assert hasattr(lock, "release")
         # 取得・解放が動く
@@ -46,7 +46,7 @@ class TestSourceLockManager:
         result_lock = threading.Lock()
 
         def _worker():
-            lock = mgr.get("generated")
+            lock = mgr.get("doujin")
             with result_lock:
                 results.append(lock)
 
@@ -64,8 +64,8 @@ class TestSourceLockManager:
         """異なる SourceLockManager インスタンスはロックを共有しない。"""
         a = SourceLockManager()
         b = SourceLockManager()
-        lock_a = a.get("generated")
-        lock_b = b.get("generated")
+        lock_a = a.get("doujin")
+        lock_b = b.get("doujin")
         assert lock_a is not lock_b
 
     def test_lock_provides_mutual_exclusion(self):
@@ -74,7 +74,7 @@ class TestSourceLockManager:
         counter = {"value": 0}
 
         def _increment():
-            with mgr.get("generated"):
+            with mgr.get("doujin"):
                 # lock 内で 1000 回足す
                 for _ in range(1000):
                     counter["value"] += 1

@@ -7,7 +7,7 @@ const renderOverlay = (overrides: Partial<React.ComponentProps<typeof PageGridOv
         open: true,
         selectedPdf: 'book.pdf',
         currentPath: '',
-        currentSource: 'generated' as const,
+        currentSource: 'doujin' as const,
         numPages: 10,
         pdfVersion: 0,
         selectedPages: new Set<number>(),

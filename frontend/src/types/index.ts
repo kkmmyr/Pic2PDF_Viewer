@@ -68,7 +68,7 @@ export type PageSide = 'left' | 'right' | 'single';
 /**
  * ライブラリソース
  */
-export type LibrarySource = 'generated' | 'kindle' | 'novel';
+export type LibrarySource = 'doujin' | 'comic' | 'novel';
 
 /**
  * Generator ジョブステータス

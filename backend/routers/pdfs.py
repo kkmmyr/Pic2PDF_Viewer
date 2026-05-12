@@ -58,7 +58,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     thumb_path = os.path.join(base_thumb_dir, path, thumb_name) if path else os.path.join(base_thumb_dir, thumb_name)
 
     # generated は image-only モード: images/{book_name}/ から WebP を削除する
-    if source == "generated":
+    if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
         book_img_dir = os.path.join(base_img_dir, path, book_name) if path else os.path.join(base_img_dir, book_name)
@@ -104,7 +104,7 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
     thumb_path = os.path.join(base_thumb_dir, path, thumb_name) if path else os.path.join(base_thumb_dir, thumb_name)
 
     # generated は image-only モード: images/{book_name}/ の WebP を再採番リネーム
-    if source == "generated":
+    if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
         book_img_dir = os.path.join(base_img_dir, path, book_name) if path else os.path.join(base_img_dir, book_name)
@@ -147,7 +147,7 @@ class MergePdfsRequest(BaseModel):
     names: list[str]   # 結合対象の .pdf ファイル名リスト（順序通りに結合）
     output_name: str   # 出力ファイル名（.pdf 拡張子付き）
     path: str = ""
-    source: str = "generated"
+    source: str = "doujin"
 
 
 @router.post("/pdfs/merge")

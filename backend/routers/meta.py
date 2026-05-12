@@ -46,14 +46,14 @@ class UpdateMetaRequest(BaseModel):
     hidden: bool | None = None
     genre: str | None = None
     read_state: str | None = None
-    source: str = "generated"
+    source: str = "doujin"
 
 
 class RecordViewRequest(BaseModel):
     """閲覧記録リクエスト。"""
     path: str = ""
     name: str
-    source: str = "generated"
+    source: str = "doujin"
 
 
 # ---------------------------------------------------------------------------

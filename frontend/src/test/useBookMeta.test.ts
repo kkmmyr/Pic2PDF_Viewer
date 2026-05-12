@@ -34,7 +34,7 @@ describe('useBookMeta', () => {
         mockedGet.mockResolvedValue({
             'book.pdf': { authors: ['サークルA'], view_count: 3, last_viewed_at: 1000 },
         });
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(1));
         expect(result.current.getAuthors('', 'book.pdf')).toEqual(['サークルA']);
@@ -44,7 +44,7 @@ describe('useBookMeta', () => {
 
     it('GET 失敗時は空 meta にフォールバック', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.meta).toEqual({});
@@ -54,7 +54,7 @@ describe('useBookMeta', () => {
 
     it('getViewCount: 未記録は 0', async () => {
         mockedGet.mockResolvedValue({});
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.getViewCount('', 'missing.pdf')).toBe(0);
     });
@@ -63,7 +63,7 @@ describe('useBookMeta', () => {
         mockedGet.mockResolvedValue({});
         mockedPost.mockResolvedValue({ view_count: 1, last_viewed_at: 12345, incremented: true });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -73,7 +73,7 @@ describe('useBookMeta', () => {
         expect(mockedPost).toHaveBeenCalledWith('/api/meta/view', {
             path: '',
             name: 'book.pdf',
-            source: 'generated',
+            source: 'doujin',
         });
         expect(result.current.getViewCount('', 'book.pdf')).toBe(1);
         expect(result.current.getLastViewedAt('', 'book.pdf')).toBe(12345);
@@ -83,7 +83,7 @@ describe('useBookMeta', () => {
         mockedGet.mockResolvedValue({});
         mockedPost.mockRejectedValue(new Error('network down'));
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -100,7 +100,7 @@ describe('useBookMeta', () => {
         });
         mockedPatch.mockResolvedValue({ message: 'Updated', updated_count: 1 });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -119,7 +119,7 @@ describe('useBookMeta', () => {
         });
         mockedPatch.mockResolvedValue({ message: 'Updated', updated_count: 1 });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -136,7 +136,7 @@ describe('useBookMeta', () => {
         });
         mockedPatch.mockResolvedValue({ message: 'Updated', updated_count: 1 });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -152,7 +152,7 @@ describe('useBookMeta', () => {
             'b.pdf': { authors: ['あさひA', 'かきくB'] },
         });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         // GET 呼び出し後の状態反映を待つ
         await waitFor(() => expect(result.current.allAuthors.length).toBe(3));
 
@@ -165,7 +165,7 @@ describe('useBookMeta', () => {
             'sub/book.pdf': { authors: ['サブ'] },
         });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         expect(result.current.getAuthors('', 'book.pdf')).toEqual(['ルート']);
@@ -178,7 +178,7 @@ describe('useBookMeta', () => {
         });
         mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -196,7 +196,7 @@ describe('useBookMeta', () => {
         });
         mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -214,7 +214,7 @@ describe('useBookMeta', () => {
         });
         mockedPatch.mockResolvedValue({ message: 'ok', updated_count: 1 });
 
-        const { result } = renderHook(() => useBookMeta('generated'));
+        const { result } = renderHook(() => useBookMeta('doujin'));
         await waitFor(() => expect(result.current.isHidden('', 'book.pdf')).toBe(true));
 
         await act(async () => {

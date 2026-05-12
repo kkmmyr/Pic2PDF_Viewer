@@ -1,4 +1,4 @@
-"""
+﻿"""
 routers.pdfs のユニットテスト。
 
 ページ削除（POST /api/pdfs/{filename}/delete_pages）と
@@ -26,7 +26,7 @@ class TestDeletePages:
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=5)
 
         res = client.post(
-            "/api/pdfs/book.pdf/delete_pages?source=kindle",
+            "/api/pdfs/book.pdf/delete_pages?source=comic",
             json={"page_indices": [0]},
         )
         assert res.status_code == 200
@@ -37,7 +37,7 @@ class TestDeletePages:
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=10)
 
         res = client.post(
-            "/api/pdfs/book.pdf/delete_pages?source=kindle",
+            "/api/pdfs/book.pdf/delete_pages?source=comic",
             json={"page_indices": [0, 2, 5]},
         )
         assert res.status_code == 200
@@ -45,7 +45,7 @@ class TestDeletePages:
 
     def test_delete_404_when_missing(self, client, tmp_data_dir):
         res = client.post(
-            "/api/pdfs/nope.pdf/delete_pages?source=kindle",
+            "/api/pdfs/nope.pdf/delete_pages?source=comic",
             json={"page_indices": [0]},
         )
         assert res.status_code == 404
@@ -56,7 +56,7 @@ class TestDeletePages:
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=3)
 
         res = client.post(
-            "/api/pdfs/book.pdf/delete_pages?source=kindle",
+            "/api/pdfs/book.pdf/delete_pages?source=comic",
             json={"page_indices": [99]},
         )
         assert res.status_code == 500
@@ -72,7 +72,7 @@ class TestDeletePages:
             f.write(b"old")
 
         res = client.post(
-            "/api/pdfs/book.pdf/delete_pages?source=kindle",
+            "/api/pdfs/book.pdf/delete_pages?source=comic",
             json={"page_indices": [0]},
         )
         assert res.status_code == 200
@@ -83,7 +83,7 @@ class TestDeletePages:
 
     def test_path_traversal_rejected(self, client, tmp_data_dir):
         res = client.post(
-            "/api/pdfs/x.pdf/delete_pages?path=../etc&source=kindle",
+            "/api/pdfs/x.pdf/delete_pages?path=../etc&source=comic",
             json={"page_indices": [0]},
         )
         assert res.status_code == 400
@@ -107,7 +107,7 @@ class TestDeletePages:
             make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
 
         res = client.post(
-            "/api/pdfs/book.pdf/delete_pages?source=generated",
+            "/api/pdfs/book.pdf/delete_pages?source=doujin",
             json={"page_indices": [0, 2]},
         )
         assert res.status_code == 200
@@ -116,7 +116,7 @@ class TestDeletePages:
 
     def test_delete_generated_404_when_book_missing(self, client, tmp_data_dir):
         res = client.post(
-            "/api/pdfs/nope.pdf/delete_pages?source=generated",
+            "/api/pdfs/nope.pdf/delete_pages?source=doujin",
             json={"page_indices": [0]},
         )
         assert res.status_code == 404
@@ -134,7 +134,7 @@ class TestDeletePages:
             f.write(b"old")
 
         res = client.post(
-            "/api/pdfs/book.pdf/delete_pages?source=generated",
+            "/api/pdfs/book.pdf/delete_pages?source=doujin",
             json={"page_indices": [0]},
         )
         assert res.status_code == 200
@@ -153,7 +153,7 @@ class TestReorderPages:
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=4)
 
         res = client.post(
-            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            "/api/pdfs/book.pdf/reorder_pages?source=comic",
             json={"page_indices": [3, 2, 1, 0]},
         )
         assert res.status_code == 200
@@ -161,7 +161,7 @@ class TestReorderPages:
 
     def test_reorder_kindle_404_when_missing(self, client, tmp_data_dir):
         res = client.post(
-            "/api/pdfs/nope.pdf/reorder_pages?source=kindle",
+            "/api/pdfs/nope.pdf/reorder_pages?source=comic",
             json={"page_indices": [0]},
         )
         assert res.status_code == 404
@@ -172,21 +172,21 @@ class TestReorderPages:
 
         # 重複
         res = client.post(
-            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            "/api/pdfs/book.pdf/reorder_pages?source=comic",
             json={"page_indices": [0, 0, 1]},
         )
         assert res.status_code == 400
 
         # 範囲外
         res = client.post(
-            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            "/api/pdfs/book.pdf/reorder_pages?source=comic",
             json={"page_indices": [0, 1, 5]},
         )
         assert res.status_code == 400
 
         # 欠落
         res = client.post(
-            "/api/pdfs/book.pdf/reorder_pages?source=kindle",
+            "/api/pdfs/book.pdf/reorder_pages?source=comic",
             json={"page_indices": [0, 1]},
         )
         assert res.status_code == 400
@@ -198,7 +198,7 @@ class TestReorderPages:
             make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
 
         res = client.post(
-            "/api/pdfs/book.pdf/reorder_pages?source=generated",
+            "/api/pdfs/book.pdf/reorder_pages?source=doujin",
             json={"page_indices": [2, 0, 1]},
         )
         assert res.status_code == 200
@@ -212,7 +212,7 @@ class TestReorderPages:
 
     def test_reorder_generated_404_when_book_missing(self, client, tmp_data_dir):
         res = client.post(
-            "/api/pdfs/nope.pdf/reorder_pages?source=generated",
+            "/api/pdfs/nope.pdf/reorder_pages?source=doujin",
             json={"page_indices": [0]},
         )
         assert res.status_code == 404
@@ -224,14 +224,14 @@ class TestReorderPages:
             make_webp(os.path.join(book_dir, f"{i + 1:02d}.webp"))
 
         res = client.post(
-            "/api/pdfs/book.pdf/reorder_pages?source=generated",
+            "/api/pdfs/book.pdf/reorder_pages?source=doujin",
             json={"page_indices": [0, 1]},
         )
         assert res.status_code == 400
 
     def test_reorder_path_traversal_rejected(self, client, tmp_data_dir):
         res = client.post(
-            "/api/pdfs/x.pdf/reorder_pages?path=../etc&source=kindle",
+            "/api/pdfs/x.pdf/reorder_pages?path=../etc&source=comic",
             json={"page_indices": [0]},
         )
         assert res.status_code == 400
@@ -258,7 +258,7 @@ class TestMergePdfs:
             "names": ["a.pdf", "b.pdf"],
             "output_name": "merged.pdf",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 200
         body = res.json()
@@ -280,7 +280,7 @@ class TestMergePdfs:
             "names": ["a.pdf", "b.pdf"],
             "output_name": "merged.pdf",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert os.path.exists(os.path.join(thumb_dir, "merged.jpg"))
 
@@ -294,7 +294,7 @@ class TestMergePdfs:
             "names": ["a.pdf", "b.pdf"],
             "output_name": "merged.pdf",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 
@@ -306,7 +306,7 @@ class TestMergePdfs:
             "names": ["a.pdf"],
             "output_name": "merged.pdf",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 
@@ -319,7 +319,7 @@ class TestMergePdfs:
             "names": ["a.pdf", "b.pdf"],
             "output_name": "merged.txt",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 
@@ -331,7 +331,7 @@ class TestMergePdfs:
             "names": ["a.pdf", "missing.pdf"],
             "output_name": "merged.pdf",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 404
 
@@ -340,7 +340,7 @@ class TestMergePdfs:
             "names": ["../etc.pdf", "b.pdf"],
             "output_name": "merged.pdf",
             "path": "",
-            "source": "kindle",
+            "source": "comic",
         })
         assert res.status_code == 400
 

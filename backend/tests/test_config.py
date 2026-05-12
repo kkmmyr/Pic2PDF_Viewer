@@ -1,4 +1,4 @@
-"""
+﻿"""
 config モジュールのユニットテスト。
 
 ソース別ディレクトリ解決ヘルパーの挙動を確認する。
@@ -17,18 +17,18 @@ from config import VALID_SOURCES, get_dirs_by_source
 
 class TestGetDirsBySource:
     def test_generated_default(self):
-        dirs = get_dirs_by_source("generated")
+        dirs = get_dirs_by_source("doujin")
         assert "pdf" in dirs
         assert "thumb" in dirs
         assert "img" in dirs
         assert "thumb_url_prefix" in dirs
         assert dirs["thumb_url_prefix"] == "/thumbnails"
 
-    def test_kindle(self):
-        dirs = get_dirs_by_source("kindle")
-        assert dirs["thumb_url_prefix"] == "/kindle/thumbnails"
-        # kindle ディレクトリを指している
-        assert "kindle" in dirs["pdf"].lower()
+    def test_comic(self):
+        dirs = get_dirs_by_source("comic")
+        assert dirs["thumb_url_prefix"] == "/comic/thumbnails"
+        # comic ディレクトリを指している
+        assert "comic" in dirs["pdf"].lower()
 
     def test_novel(self):
         dirs = get_dirs_by_source("novel")
@@ -49,4 +49,4 @@ class TestGetDirsBySource:
 
 class TestValidSources:
     def test_contains_three_sources(self):
-        assert set(VALID_SOURCES) == {"generated", "kindle", "novel"}
+        assert set(VALID_SOURCES) == {"doujin", "comic", "novel"}

@@ -69,7 +69,7 @@ PDFファイルとディレクトリの一覧を取得する。
 
 **クエリパラメータ**:
 - `path` (オプション) — 表示するサブディレクトリの相対パス
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
 
 **レスポンス**:
 ```json
@@ -92,7 +92,7 @@ PDFファイルとディレクトリの一覧を取得する。
 - `path` — 書籍（フォルダまたはZIP）の相対パス
 
 **クエリパラメータ**:
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
 
 **レスポンス**:
 ```json
@@ -109,12 +109,12 @@ PDFファイルとディレクトリの一覧を取得する。
 ### §1.3 `POST /api/pdfs/{filename}/delete_pages`
 書籍の指定ページを削除する。ソースによって動作が異なる:
 
-- **`generated`**: image-only モード。`images/{book_name}/` 配下の WebP を natsort 順に並べて、N 番目を削除する（ファイルが残った WebP の natsort 順に「ページ N」が再マッピングされる）。表紙サムネイルは削除後の先頭 WebP から PIL ベースで再生成。
-- **`kindle` / `novel`**: PDF モード。fitz で PDF を開いて該当ページを削除し、上書き保存。表紙サムネイルは削除後の PDF 先頭ページから fitz ベースで再生成。
+- **`doujin`**: image-only モード。`images/{book_name}/` 配下の WebP を natsort 順に並べて、N 番目を削除する（ファイルが残った WebP の natsort 順に「ページ N」が再マッピングされる）。表紙サムネイルは削除後の先頭 WebP から PIL ベースで再生成。
+- **`comic` / `novel`**: PDF モード。fitz で PDF を開いて該当ページを削除し、上書き保存。表紙サムネイルは削除後の PDF 先頭ページから fitz ベースで再生成。
 
 **クエリパラメータ**:
 - `path` (オプション) — 対象ファイルの親ディレクトリ相対パス
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
 
 **リクエストボディ**:
 ```json
@@ -127,7 +127,7 @@ PDFファイルとディレクトリの一覧を取得する。
 ```
 
 **エラー**:
-- `404`: 対象書籍が見つからない（generated は `images/{book_name}/` ディレクトリ不在、kindle/novel は PDF 不在）
+- `404`: 対象書籍が見つからない（doujin は `images/{book_name}/` ディレクトリ不在、comic/novel は PDF 不在）
 - `400`: ページインデックス範囲外
 - `400`: パストラバーサル拒否
 
@@ -138,12 +138,12 @@ PDFファイルとディレクトリの一覧を取得する。
 
 ソースによって動作が異なる:
 
-- **`generated`**: `images/{book_name}/` 配下の WebP を natsort 順に並べ、`page_indices` の指す順で `page_0001.webp` / `page_0002.webp` / ... という採番に物理リネーム。一時名（`__reorder_tmp_*`）経由で 2 段階リネームを行い、衝突を回避する。表紙サムネイルは並び替え後の先頭 WebP から PIL ベースで再生成。
-- **`kindle` / `novel`**: fitz の `Document.select(page_indices)` で PDF を再構築して上書き保存。表紙サムネイルは fitz ベースで再生成。
+- **`doujin`**: `images/{book_name}/` 配下の WebP を natsort 順に並べ、`page_indices` の指す順で `page_0001.webp` / `page_0002.webp` / ... という採番に物理リネーム。一時名（`__reorder_tmp_*`）経由で 2 段階リネームを行い、衝突を回避する。表紙サムネイルは並び替え後の先頭 WebP から PIL ベースで再生成。
+- **`comic` / `novel`**: fitz の `Document.select(page_indices)` で PDF を再構築して上書き保存。表紙サムネイルは fitz ベースで再生成。
 
 **クエリパラメータ**:
 - `path` (オプション) — 対象ファイルの親ディレクトリ相対パス
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
 
 **リクエストボディ**:
 ```json
@@ -172,7 +172,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "path": "current/relative/path",
   "old_name": "old_name.pdf",
   "new_name": "new_name.pdf",
-  "source": "generated",
+  "source": "doujin",
   "is_folder": false
 }
 ```
@@ -194,7 +194,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "names": ["book1.pdf", "book2.pdf"],
   "path": "current/relative/path",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 
@@ -208,7 +208,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ### §1.6 `GET /api/genres`
 ソース別のジャンルリスト（表示順）を返す。ファイルが未作成の場合は meta.json から既存 `genre` フィールドを収集して初期リストを返す。
 
-**クエリパラメータ**: `source=generated`（省略可）
+**クエリパラメータ**: `source=doujin`（省略可）
 
 **レスポンス**: `["オリジナル", "プリンセスコネクト", "Voiceloid"]`
 
@@ -217,7 +217,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ### §1.7 `POST /api/genres`
 ジャンルを追加する。
 
-**リクエストボディ**: `{"source": "generated", "name": "新ジャンル"}`
+**リクエストボディ**: `{"source": "doujin", "name": "新ジャンル"}`
 
 **レスポンス**: `{"genres": ["オリジナル", "プリンセスコネクト", "Voiceloid", "新ジャンル"]}`
 
@@ -239,7 +239,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ### §1.9 `PATCH /api/genres/reorder`
 ジャンルの表示順を更新する。
 
-**リクエストボディ**: `{"source": "generated", "genres": ["Voiceloid", "オリジナル", "プリンセスコネクト"]}`
+**リクエストボディ**: `{"source": "doujin", "genres": ["Voiceloid", "オリジナル", "プリンセスコネクト"]}`
 - `genres` は既存ジャンルリストと同一集合である必要がある（増減不可）。
 
 **レスポンス**: `{"genres": ["Voiceloid", "オリジナル", "プリンセスコネクト"]}`
@@ -254,7 +254,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "names": ["book1.pdf", "book2.pdf"],
   "path": "current/relative/path",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 
@@ -274,7 +274,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "names": ["book1.pdf", "book2.pdf"],
   "output_name": "merged.pdf",
   "path": "current/relative/path",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 - `names` — 結合対象のファイル名リスト（2件以上必須、順序通りに結合）
@@ -299,7 +299,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "path": "current/relative/path",
   "name": "book.pdf",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 
@@ -315,8 +315,8 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 指定ページのサムネイル画像をオンデマンドで返す。ページスライダーのドラッグ中プレビューに加え、**編集モードの全ページグリッドビュー**（`PageGridOverlay`）からも利用される。
 
 ソースによって取得方法が異なる:
-- `generated`: `images/{book}/` 配下の N 番目 WebP を直接返す（PDF 不要）
-- `kindle` / `novel`: PDF を fitz でレンダリングして JPEG で返す
+- `doujin`: `images/{book}/` 配下の N 番目 WebP を直接返す（PDF 不要）
+- `comic` / `novel`: PDF を fitz でレンダリングして JPEG で返す
 
 **クエリパラメータ**:
 
@@ -325,17 +325,17 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 | `name` | string | ✓ | PDF ファイル名（.pdf 付き） |
 | `page` | int | ✓ | ページ番号（1 始まり） |
 | `path` | string | - | 相対パス（デフォルト `""`） |
-| `source` | string | - | `generated` / `kindle` / `novel`（デフォルト `generated`） |
-| `width` | int | - | 出力画像幅 px（`kindle`/`novel` のみ使用、デフォルト `400`） |
+| `source` | string | - | `doujin` / `comic` / `novel`（デフォルト `doujin`） |
+| `width` | int | - | 出力画像幅 px（`comic`/`novel` のみ使用、デフォルト `400`） |
 
 **レスポンス**:
-- `generated`: `image/webp` バイナリ（`Cache-Control: max-age=3600`）
-- `kindle`/`novel`: `image/jpeg` バイナリ（`Cache-Control: max-age=3600`）
+- `doujin`: `image/webp` バイナリ（`Cache-Control: max-age=3600`）
+- `comic`/`novel`: `image/jpeg` バイナリ（`Cache-Control: max-age=3600`）
 
 **エラー**:
 - `400`: `page < 1` またはページが範囲外
 - `404`: 対象画像 / PDF が存在しない
-- `500`: レンダリング失敗（`kindle`/`novel` のみ）
+- `500`: レンダリング失敗（`comic`/`novel` のみ）
 
 ---
 
@@ -345,7 +345,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 指定ソースの書籍メタデータを全件取得する。各エントリは作者名・閲覧回数・最終閲覧時刻・シリーズ情報・非表示フラグ・ジャンル・読書状態などを含む。
 
 **クエリパラメータ**:
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
 
 **レスポンス例**:
 ```json
@@ -379,7 +379,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 指定ソースの書籍メタデータ全体を JSON ファイルとしてダウンロードする。バックアップ・環境移行用。
 
 **クエリパラメータ**:
-- `source` (オプション) — `generated`(default) / `kindle` / `novel`
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
 
 **レスポンス**: `application/json` ファイル（`Content-Disposition: attachment; filename="meta_{source}_{YYYYMMDD}.json"`）  
 ボディは `GET /api/meta` と同じ構造の JSON。
@@ -400,7 +400,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "hidden": true,
   "genre": "オリジナル",
   "read_state": "done",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 - `names` — 更新対象のファイル名リスト（複数指定で一括更新）
@@ -438,7 +438,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "path": "current/relative/path",
   "name": "book.pdf",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 
@@ -471,7 +471,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "title": "シリーズタイトル",
   "index": [4.0, 5.0],
   "id": "abc12345",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 - `names` — 対象ファイル名リスト（複数指定可）
@@ -497,7 +497,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "path": "current/relative/path",
   "names": ["book1.pdf", "book2.pdf"],
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 
@@ -514,7 +514,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
   "path": "current/relative/path",
   "names": ["vol3.pdf", "vol1.pdf", "vol2.pdf"],
   "series_id": "abc12345",
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 - `names` — シリーズに属する書籍を **新しい順序で** 並べたリスト
@@ -536,7 +536,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 {
   "path": "current/relative/path",
   "names": ["book1.pdf", "book2.pdf"],
-  "source": "generated"
+  "source": "doujin"
 }
 ```
 

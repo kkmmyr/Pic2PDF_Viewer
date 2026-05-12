@@ -26,8 +26,8 @@ def tmp_data_dir(tmp_path, monkeypatch):
     routers / services 側はモジュール変数として `from config import X` で
     取り込んでいるため、両方を monkeypatch する必要がある。
     """
-    main = tmp_path / "main"
-    kindle = tmp_path / "kindle"
+    main = tmp_path / "doujin"
+    kindle = tmp_path / "comic"
     novel = tmp_path / "kindle_novel"
     meta_dir = tmp_path / "meta"
 
@@ -67,7 +67,7 @@ def tmp_data_dir(tmp_path, monkeypatch):
     return {
         "root": str(tmp_path),
         "main": str(main),
-        "kindle": str(kindle),
+        "comic": str(kindle),
         "novel": str(novel),
         "meta": str(meta_dir),
         **paths,

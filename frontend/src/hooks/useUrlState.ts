@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { LibrarySource } from '../types';
 
-const VALID_SOURCES: LibrarySource[] = ['generated', 'kindle', 'novel'];
+const VALID_SOURCES: LibrarySource[] = ['doujin', 'comic', 'novel'];
 
 /**
  * ViewerPage の URL パラメータ同期ロジックを一元管理するフック。
@@ -16,10 +16,10 @@ export function useUrlState() {
 
     const currentPath = searchParams.get('path') || '';
     const selectedPdf = searchParams.get('file') || null;
-    const rawSource = searchParams.get('source') || 'generated';
+    const rawSource = searchParams.get('source') || 'doujin';
     const currentSource: LibrarySource = VALID_SOURCES.includes(rawSource as LibrarySource)
         ? (rawSource as LibrarySource)
-        : 'generated';
+        : 'doujin';
 
     /** フォルダに入る */
     const navigateIntoFolder = useCallback(

@@ -28,16 +28,16 @@ describe('useGenres', () => {
 
     it('マウント時に GET /api/genres?source= を実行して genres を初期化する', async () => {
         mockedGet.mockResolvedValue(['アクション', 'ロマンス']);
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-        expect(mockedGet).toHaveBeenCalledWith('/api/genres', { params: { source: 'generated' } });
+        expect(mockedGet).toHaveBeenCalledWith('/api/genres', { params: { source: 'doujin' } });
         await waitFor(() => expect(result.current.genres).toEqual(['アクション', 'ロマンス']));
     });
 
     it('GET 失敗時は空配列にフォールバック', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.genres).toEqual([]);
@@ -45,7 +45,7 @@ describe('useGenres', () => {
 
     it('GET の戻り値が undefined でも空配列に正規化', async () => {
         mockedGet.mockResolvedValue(undefined);
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.genres).toEqual([]);
@@ -55,14 +55,14 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A']);
         mockedPost.mockResolvedValue({ genres: ['A', 'B'] });
 
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
         await waitFor(() => expect(result.current.genres).toEqual(['A']));
 
         await act(async () => {
             await result.current.addGenre('B');
         });
 
-        expect(mockedPost).toHaveBeenCalledWith('/api/genres', { source: 'generated', name: 'B' });
+        expect(mockedPost).toHaveBeenCalledWith('/api/genres', { source: 'doujin', name: 'B' });
         expect(result.current.genres).toEqual(['A', 'B']);
     });
 
@@ -70,7 +70,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A', 'B']);
         mockedDelete.mockResolvedValue({ genres: ['A'] });
 
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
         await waitFor(() => expect(result.current.genres).toEqual(['A', 'B']));
 
         await act(async () => {
@@ -78,7 +78,7 @@ describe('useGenres', () => {
         });
 
         expect(mockedDelete).toHaveBeenCalledWith('/api/genres/B', {
-            params: { source: 'generated' },
+            params: { source: 'doujin' },
         });
         expect(result.current.genres).toEqual(['A']);
     });
@@ -87,7 +87,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue([]);
         mockedDelete.mockResolvedValue({ genres: [] });
 
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -102,7 +102,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A', 'B', 'C']);
         mockedPatch.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
         await waitFor(() => expect(result.current.genres).toEqual(['A', 'B', 'C']));
 
         await act(async () => {
@@ -110,7 +110,7 @@ describe('useGenres', () => {
         });
 
         expect(mockedPatch).toHaveBeenCalledWith('/api/genres/reorder', {
-            source: 'generated',
+            source: 'doujin',
             genres: ['C', 'A', 'B'],
         });
         expect(result.current.genres).toEqual(['C', 'A', 'B']);
@@ -120,7 +120,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A', 'B', 'C']);
         mockedPatch.mockRejectedValue(new Error('network'));
 
-        const { result } = renderHook(() => useGenres('generated'));
+        const { result } = renderHook(() => useGenres('doujin'));
         await waitFor(() => expect(result.current.genres).toEqual(['A', 'B', 'C']));
 
         await act(async () => {
@@ -134,13 +134,13 @@ describe('useGenres', () => {
     it('source 変化で再フェッチされる', async () => {
         mockedGet.mockResolvedValueOnce(['gen']).mockResolvedValueOnce(['kin']);
         const { result, rerender } = renderHook(
-            ({ src }: { src: 'generated' | 'kindle' }) => useGenres(src),
-            { initialProps: { src: 'generated' } },
+            ({ src }: { src: 'doujin' | 'comic' }) => useGenres(src),
+            { initialProps: { src: 'doujin' } },
         );
 
         await waitFor(() => expect(result.current.genres).toEqual(['gen']));
 
-        rerender({ src: 'kindle' });
+        rerender({ src: 'comic' });
         await waitFor(() => expect(result.current.genres).toEqual(['kin']));
         expect(mockedGet).toHaveBeenCalledTimes(2);
     });

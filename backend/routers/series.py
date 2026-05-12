@@ -30,14 +30,14 @@ class AssignSeriesRequest(BaseModel):
     title: str
     index: float | list[float]
     id: str | None = None  # 省略時はバックエンドで生成
-    source: str = "generated"
+    source: str = "doujin"
 
 
 class UnassignSeriesRequest(BaseModel):
     """書籍をシリーズから外すリクエスト。"""
     path: str = ""
     names: list[str]
-    source: str = "generated"
+    source: str = "doujin"
 
 
 class ReorderSeriesRequest(BaseModel):
@@ -45,7 +45,7 @@ class ReorderSeriesRequest(BaseModel):
     path: str = ""
     names: list[str]
     series_id: str
-    source: str = "generated"
+    source: str = "doujin"
 
 
 @router.post("/series/assign")
@@ -166,7 +166,7 @@ class SuggestSeriesRequest(BaseModel):
     """選択された書籍に対する既存シリーズの紐付け候補を取得するリクエスト。"""
     path: str = ""
     names: list[str]
-    source: str = "generated"
+    source: str = "doujin"
 
 
 @router.post("/series/suggest")
