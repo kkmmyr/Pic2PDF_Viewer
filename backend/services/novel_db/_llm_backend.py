@@ -11,6 +11,9 @@ sys.path 注入と Backend 構築の責務をここに集約することで、�
   Phase C で Ollama 分岐撤去）
 - `build_ollama_backend(model, *, timeout)`: Gemma 系（character_extractor /
   contextualizer / query_expander）の汎用 OllamaBackend factory（Phase B 追加）
+- `build_short_answer_backend(model)`: 短答型タスク（character_extractor /
+  contextualizer）用。`NOVEL_DB_GEMMA_BACKEND` に応じて OllamaBackend か
+  LlamaServerBackend を返す（§4.5 追加）
 
 `build_*_backend()` は呼び出すたびに新しいインスタンスを返すので、利用側
 （llm.py / summarizer.py 等）で各自モジュールレベル変数に保持して使い回す。
@@ -77,4 +80,22 @@ def build_qwen_backend() -> Backend:
     raise LLMError(
         f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
         f"(supported: 'llama_server')",
+    )
+
+
+def build_short_answer_backend(model: str | None = None) -> Backend:
+    """短答型タスク（character_extractor / contextualizer）用 backend。
+
+    NOVEL_DB_GEMMA_BACKEND:
+      "ollama" (既定): OllamaBackend with specified model
+      "qwen"         : LlamaServerBackend (thinking は _DEFAULT_THINK=False で自動抑制)
+
+    model は "ollama" 時のみ使用。None のとき NOVEL_DB_CHAR_EXTRACT_MODEL を既定値とする。
+    "qwen" 時は config.NOVEL_DB_LLM_MODEL / NOVEL_DB_LLAMA_SERVER_URL を参照する。
+    """
+    if config.NOVEL_DB_GEMMA_BACKEND == "qwen":
+        return build_qwen_backend()
+    return build_ollama_backend(
+        model or config.NOVEL_DB_CHAR_EXTRACT_MODEL,
+        timeout=120,
     )

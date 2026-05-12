@@ -24,7 +24,7 @@ from config import NOVEL_DB_CONTEXT_MODEL
 # `_llm_backend` を先に import することで local_llm の sys.path 注入を発火させる
 # （contextualizer をスクリプトから直接利用する経路で path が未注入なまま
 # `local_llm` を import すると失敗するため、Phase B の注入箇所に揃える）。
-from ._llm_backend import LLMError, build_ollama_backend
+from ._llm_backend import LLMError, build_short_answer_backend
 
 # Anthropic 流のプロンプト。書名・俯瞰サマリ・チャンク本文を与えて
 # 「retrieval のための簡潔な位置説明」を返してもらう。
@@ -69,7 +69,7 @@ _OPTIONS = {
 }
 
 # プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
-_BACKEND = build_ollama_backend(NOVEL_DB_CONTEXT_MODEL, timeout=_TIMEOUT_SEC)
+_BACKEND = build_short_answer_backend(NOVEL_DB_CONTEXT_MODEL)
 
 
 def generate_chunk_context(

@@ -11,6 +11,11 @@ interface Props {
 }
 
 function formatJobLabel(job: NonNullable<RebuildStatus['current_job']>): string {
+    if (job.mode === 'full_build') {
+        if (job.type === 'all') return '全書籍を全構築中';
+        if (job.type === 'series') return `シリーズを全構築中 (${job.target_id})`;
+        return `1 冊を全構築中 (${job.target_id})`;
+    }
     if (job.type === 'all') return '全書籍を再構築中';
     if (job.type === 'series') return `シリーズを再構築中 (${job.target_id})`;
     return `1 冊を再構築中 (${job.target_id})`;

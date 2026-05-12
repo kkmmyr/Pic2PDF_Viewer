@@ -16,6 +16,7 @@ from utils.logger import get_logger
 
 from .builder import ocr_book, rebuild_from_pages
 from .connection import with_db
+from .full_builder import build_book_full
 from .schema import init_schema
 
 logger = get_logger(__name__)
@@ -24,7 +25,7 @@ JobType = Literal["book", "series", "all"]
 # "rebuild": チャンク化・embedding 再構築（OCR 済みの pages.full_text を使う）
 # "ocr"    : OCR ステップ（images/*.png → pages.full_text）
 # "pdf_text"/"reocr": 旧モード名。DB に残った既存ジョブとの互換性のため "rebuild" と同じ動作にする
-JobMode = Literal["rebuild", "ocr", "pdf_text", "reocr"]
+JobMode = Literal["rebuild", "ocr", "pdf_text", "reocr", "full_build"]
 JobState = Literal["queued", "running", "completed", "failed", "canceled"]
 
 
@@ -236,6 +237,12 @@ class NovelDbJobQueue:
                 ocr_book(book_name, engine=engine)
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
+        elif mode == "full_build":
+            # 全構築統合: rebuild_from_pages → summarize → extract_chars → char_summary → contexts
+            for done, book_name in enumerate(targets, start=1):
+                build_book_full(book_name)
+                self._update_progress(job_id, done, total)
+                logger.info("Job %d full_build progress: %d/%d (%s)", job_id, done, total, book_name)
         else:
             # rebuild / pdf_text（後方互換）: pages.full_text → chunks/embeddings
             for done, book_name in enumerate(targets, start=1):

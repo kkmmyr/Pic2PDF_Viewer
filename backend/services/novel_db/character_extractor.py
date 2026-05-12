@@ -16,7 +16,7 @@ from local_llm import LLMError
 
 from config import NOVEL_DB_CHAR_EXTRACT_MODEL
 
-from ._llm_backend import build_ollama_backend
+from ._llm_backend import build_short_answer_backend
 
 EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大 3 名挙げてください。
 判断基準:
@@ -46,7 +46,7 @@ _OPTIONS = {
 }
 
 # プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
-_BACKEND = build_ollama_backend(NOVEL_DB_CHAR_EXTRACT_MODEL, timeout=_TIMEOUT_SEC)
+_BACKEND = build_short_answer_backend(NOVEL_DB_CHAR_EXTRACT_MODEL)
 
 
 def extract_main_characters(

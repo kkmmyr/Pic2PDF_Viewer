@@ -78,7 +78,7 @@ export interface QaHistoryDetail {
 }
 
 export type RebuildJobType = 'book' | 'series' | 'all';
-export type RebuildJobMode = 'rebuild' | 'ocr' | 'pdf_text' | 'reocr';
+export type RebuildJobMode = 'rebuild' | 'ocr' | 'pdf_text' | 'reocr' | 'full_build';
 
 export interface RebuildJob {
     id: number;

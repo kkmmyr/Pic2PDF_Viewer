@@ -635,6 +635,33 @@ uv run python scripts/build_character_summaries.py --all --min-pages 5    # page
 
 **処理順序の推奨**: `build_novel_db` → `extract_characters` → `build_novel_summaries` → `build_chunk_contexts`。`build_chunk_contexts` は `book.summary` を要求するため、サマリ生成より後に実行する必要がある。
 
+**UI からの統合実行（§4.5、2026-05-13 追加）**: 上記 5 スクリプトを順番に手動実行する代わりに、UI の「Full Build」ボタンから `mode=full_build` ジョブをキューに投入することで 1 操作で完結できる。内部処理は [§5.14](#514-full_builderpy本構築統合-パターン-a) で定義する `build_book_full()` が担う。
+
+### 5.14. `full_builder.py`（本構築統合、パターン A）（2026-05-13 追加: §4.5）
+
+5 つの CLI バッチ（`build_novel_db`, `extract_characters`, `build_novel_summaries`, `build_character_summaries`, `build_chunk_contexts`）を 1 関数 `build_book_full(book_name, *, redo=False)` に統合し、UI ジョブキュー（`mode=full_build`）から呼び出せるようにする。
+
+**処理ステップ（1 冊あたり）**:
+
+| ステップ | 関数 | スキップ条件 |
+|---|---|---|
+| 1. チャンク・embedding 再構築 | `builder.rebuild_from_pages()` | なし（常実行）|
+| 2. 書籍俯瞰サマリ生成 | `summarizer.summarize_book()` + `update_book_summary()` | `books.summary IS NOT NULL` かつ `redo=False` |
+| 3. 主要登場人物抽出 | `character_extractor.extract_main_characters()` per page | `pages.main_characters IS NOT NULL` かつ `redo=False` |
+| 4. キャラクター辞典生成 | `character_summarizer.summarize_character()` + `upsert_character()` per character | `book_characters.summary IS NOT NULL` かつ `redo=False` |
+| 5. チャンク位置説明生成 + 再 embedding | `contextualizer.generate_chunk_context()` + re-embed per chunk | `chunks.contextual_text IS NOT NULL` かつ `redo=False` |
+
+**Gemma 系バックエンド切替（§4.5）**: ステップ 3・5 は既定 `gemma4:e4b`（Ollama）を使うが、`NOVEL_DB_GEMMA_BACKEND=qwen` とすると `LlamaServerBackend`（Qwen、think=False 自動）に一本化できる。切替は `_llm_backend.build_short_answer_backend()` ファクトリで行う。
+
+```python
+# NOVEL_DB_GEMMA_BACKEND: "ollama" (既定) | "qwen"
+# "qwen" 時: gemma4:e4b の代わりに llama-server の Qwen を使用（think=False 自動）
+```
+
+**ジョブキュー統合**: `job_queue.py` の `JobMode` に `"full_build"` を追加。`_execute_job()` 内で `build_book_full(book_name)` を呼ぶ。`progress_total = 冊数`, `progress_done = 完了冊数`（ステップ単位の細粒度は追わない）。
+
+**UI**: `BookCard` に「Full Build」ボタンを追加（書籍が OCR 済みの場合に表示）。`mode=full_build` でジョブをキューに投入する。`RebuildJobBanner` でラベル表示。
+
 ---
 
 ## 6. 検索（`search.py`）
@@ -885,6 +912,8 @@ async def stream_qa(prompt, *, model=NOVEL_DB_LLM_MODEL, options=None, timeout=6
 | Qwen3.6-IQ4_XS | **llama.cpp llama-server** | 11435 | RAG 質問応答 + 書籍俯瞰サマリ生成 |
 | gemma4:e4b | Ollama | 11434 | 主要登場人物抽出 / Contextual Retrieval ctx 生成 / Query Expansion |
 | bge-m3 | Ollama | 11434 | 埋め込み |
+
+**`NOVEL_DB_GEMMA_BACKEND`（§4.5 追加）**: `"ollama"`（既定）か `"qwen"` で切替可。`"qwen"` 設定時は gemma4:e4b の代わりに llama-server の Qwen を使用（`_DEFAULT_THINK=False` により thinking トークンなし）。`build_short_answer_backend()` ファクトリが自動選択する。
 
 llama-server は Windows タスクスケジューラの `llama-server-qwen` タスク（ONLOGON トリガ、Limited 権限）で自動起動される。起動コマンドは `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat`。
 

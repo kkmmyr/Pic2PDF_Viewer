@@ -68,6 +68,11 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gem
 # 品質不足が確認されたら NOVEL_DB_LLM_MODEL（qwen3.6:35b-a3b）にフォールバック。
 NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
 
+# §4.5 本構築統合: キャラ抽出 / チャンク文脈生成のバックエンド切替
+# "ollama" (既定): Ollama 経由で gemma4:e4b を使用
+# "qwen"         : llama-server の Qwen に統一（thinking は _DEFAULT_THINK=False で自動抑制）
+NOVEL_DB_GEMMA_BACKEND = os.environ.get("NOVEL_DB_GEMMA_BACKEND", "ollama")
+
 # Novel DB 検索のデフォルト値
 # - MIN_BODY_CHARS: 章扉・目次・人物紹介・あとがき等の薄いページを検索対象から除外する閾値
 # - QA_TOP_K: RAG 質問応答で Gemma に渡すページ数（多いほど深い回答だが応答時間も伸びる）

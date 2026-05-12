@@ -2,7 +2,7 @@
  * 書籍 1 冊のサムネイル + メタ情報 + 再構築ボタン + 登場人物トグル（B-15）。
  */
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, RefreshCw, ScanText, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, RefreshCw, ScanText, Users, Wand2 } from 'lucide-react';
 
 import type { BookSummary } from '../../features/novel_db/types';
 
@@ -13,6 +13,7 @@ interface Props {
     onRebuild: (bookName: string) => void;
     onOcr: (bookName: string) => void;
     onRead: (bookName: string) => void;
+    onFullBuild: (bookName: string) => void;
     /** B-15: キャラ選択時に親が CharacterDetailDialog を開く。 */
     onSelectCharacter?: (bookName: string, charName: string) => void;
     disabled?: boolean;
@@ -24,7 +25,15 @@ function formatIndexedAt(isoLike: string | null): string | null {
     return isoLike.replace('T', ' ').slice(0, 16);
 }
 
-export default function BookCard({ book, onRebuild, onOcr, onRead, onSelectCharacter, disabled }: Props) {
+export default function BookCard({
+    book,
+    onRebuild,
+    onOcr,
+    onRead,
+    onFullBuild,
+    onSelectCharacter,
+    disabled,
+}: Props) {
     const indexedAt = formatIndexedAt(book.indexed_at);
     const [charsExpanded, setCharsExpanded] = useState(false);
     return (
@@ -100,6 +109,17 @@ export default function BookCard({ book, onRebuild, onOcr, onRead, onSelectChara
                     <RefreshCw className="w-3 h-3" />
                     再構築
                 </button>
+                {book.ocr_done_at && (
+                    <button
+                        onClick={() => onFullBuild(book.name)}
+                        disabled={disabled}
+                        title="チャンク再構築 → サマリ → 登場人物抽出 → キャラ辞典 → コンテキスト生成を一括実行"
+                        className="px-2.5 py-1 text-xs rounded bg-indigo-100 dark:bg-indigo-900/40 hover:bg-indigo-200 dark:hover:bg-indigo-800/60 text-indigo-800 dark:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                    >
+                        <Wand2 className="w-3 h-3" />
+                        Full Build
+                    </button>
+                )}
                 {book.is_indexed && (
                     <button
                         type="button"

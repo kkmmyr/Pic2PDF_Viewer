@@ -54,6 +54,10 @@ export default function NovelDbPage() {
         void enqueueRebuild({ type: 'book', mode: 'ocr', target_id: bookName });
     };
 
+    const handleFullBuildBook = (bookName: string) => {
+        void enqueueRebuild({ type: 'book', mode: 'full_build', target_id: bookName });
+    };
+
     const handleSelectCharacter = (bookName: string, charName: string) => {
         setCharDialog({ book: bookName, char: charName });
     };
@@ -91,6 +95,7 @@ export default function NovelDbPage() {
                 onRebuildBook={handleRebuildBook}
                 onOcrBook={handleOcrBook}
                 onReadBook={handleReadBook}
+                onFullBuildBook={handleFullBuildBook}
                 onSelectCharacter={handleSelectCharacter}
                 rebuildStatus={rebuildStatus}
             />

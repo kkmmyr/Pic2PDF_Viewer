@@ -184,7 +184,7 @@ def get_book_character_detail(book_name: str, char_name: str) -> CharacterDetail
 class RebuildRequest(BaseModel):
     type: Literal["book", "series", "all"]
     target_id: str | None = None
-    mode: Literal["rebuild", "ocr", "pdf_text", "reocr"] = Field(default="rebuild")
+    mode: Literal["rebuild", "ocr", "pdf_text", "reocr", "full_build"] = Field(default="rebuild")
 
 
 @router.post("/novel_db/rebuild")
