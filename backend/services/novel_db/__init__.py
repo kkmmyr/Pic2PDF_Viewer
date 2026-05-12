@@ -5,11 +5,11 @@ DB 構築フローを提供する。詳細は
 docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md を参照。
 """
 
-from .builder import rebuild_book
+from .builder import ocr_book, rebuild_book, rebuild_from_pages
 from .chunker import chunk_page
 from .connection import open_db, with_db
 from .embedder import embed_batch
-from .extractor import extract_pages
+from .extractor import extract_pages, extract_pages_from_images, load_ocr_engine
 from .schema import init_schema
 from .search import Scope, SearchHit, hybrid_search
 
@@ -19,9 +19,13 @@ __all__ = [
     "chunk_page",
     "embed_batch",
     "extract_pages",
+    "extract_pages_from_images",
     "hybrid_search",
     "init_schema",
+    "load_ocr_engine",
+    "ocr_book",
     "open_db",
     "rebuild_book",
+    "rebuild_from_pages",
     "with_db",
 ]

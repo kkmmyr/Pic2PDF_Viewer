@@ -25,6 +25,7 @@ class BookSummary:
     page_count: int | None
     indexed_at: str | None
     thumbnail_url: str | None
+    ocr_done_at: str | None = None
 
 
 @dataclass
@@ -46,13 +47,17 @@ def _thumbnail_url(book_name: str) -> str:
 
 
 def _fetch_indexed_status(conn: sqlite3.Connection) -> dict[str, dict]:
-    """novel.db から構築済み書籍の {name: {page_count, indexed_at}} を返す。"""
+    """novel.db から書籍の {name: {page_count, indexed_at, ocr_done_at}} を返す。"""
     rows = conn.execute(
-        "SELECT name, page_count, indexed_at FROM books"
+        "SELECT name, page_count, indexed_at, ocr_done_at FROM books"
     ).fetchall()
     return {
-        name: {"page_count": page_count, "indexed_at": indexed_at}
-        for name, page_count, indexed_at in rows
+        name: {
+            "page_count": page_count,
+            "indexed_at": indexed_at,
+            "ocr_done_at": ocr_done_at,
+        }
+        for name, page_count, indexed_at, ocr_done_at in rows
     }
 
 
@@ -80,6 +85,7 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
                 page_count=info["page_count"] if info else None,
                 indexed_at=info["indexed_at"] if info else None,
                 thumbnail_url=_thumbnail_url(name),
+                ocr_done_at=info["ocr_done_at"] if info else None,
             )
         )
     return summaries

@@ -20,6 +20,7 @@ export interface BookSummary {
     page_count: number | null;
     indexed_at: string | null;
     thumbnail_url: string | null;
+    ocr_done_at: string | null;
 }
 
 export interface SeriesSummary {
@@ -77,7 +78,7 @@ export interface QaHistoryDetail {
 }
 
 export type RebuildJobType = 'book' | 'series' | 'all';
-export type RebuildJobMode = 'pdf_text' | 'reocr';
+export type RebuildJobMode = 'rebuild' | 'ocr' | 'pdf_text' | 'reocr';
 
 export interface RebuildJob {
     id: number;

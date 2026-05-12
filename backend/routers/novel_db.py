@@ -184,22 +184,21 @@ def get_book_character_detail(book_name: str, char_name: str) -> CharacterDetail
 class RebuildRequest(BaseModel):
     type: Literal["book", "series", "all"]
     target_id: str | None = None
-    mode: Literal["pdf_text", "reocr"] = Field(default="pdf_text")
+    mode: Literal["rebuild", "ocr", "pdf_text", "reocr"] = Field(default="rebuild")
 
 
 @router.post("/novel_db/rebuild")
 @log_and_raise_500("novel_db/rebuild")
 def post_rebuild(request: RebuildRequest) -> dict:
-    """再構築ジョブをキューに登録する（[API §7.8]）。"""
+    """再構築 / OCR ジョブをキューに登録する（[API §7.8]）。
+
+    mode='rebuild': pages.full_text → chunk/embed を再構築（OCR 済み前提）
+    mode='ocr':     images/*.png → OCR → pages.full_text を更新
+    """
     if request.type in ("book", "series") and not request.target_id:
         raise HTTPException(
             status_code=422,
             detail=f"target_id is required for type='{request.type}'",
-        )
-    if request.mode == "reocr":
-        raise HTTPException(
-            status_code=422,
-            detail="mode='reocr' is not implemented yet (planned in a future phase)",
         )
 
     job_id, queued_position = job_queue.enqueue(

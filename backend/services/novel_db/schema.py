@@ -15,7 +15,7 @@ def _ddl() -> str:
             pdf_path    TEXT NOT NULL,
             images_dir  TEXT NOT NULL,
             page_count  INTEGER NOT NULL,
-            indexed_at  TIMESTAMP NOT NULL,
+            indexed_at  TIMESTAMP,
             created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_books_name ON books(name);
@@ -137,6 +137,33 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
 def _migrate(conn: sqlite3.Connection) -> None:
     """既存 DB に対する追加カラム等のマイグレーション（冪等）。"""
+    # §4.2: indexed_at NOT NULL → NULL 許容（OCR ステップは indexed_at をセットしない）。
+    # SQLite は ALTER COLUMN 非対応のためテーブル再作成。
+    _books_info = {row[1]: row for row in conn.execute("PRAGMA table_info(books)").fetchall()}
+    if _books_info.get("indexed_at") and _books_info["indexed_at"][3] == 1:  # notnull=1
+        _extra = [c for c in ("summary", "summary_generated_at", "ocr_done_at") if c in _books_info]
+        _type = {"summary": "TEXT", "summary_generated_at": "TIMESTAMP", "ocr_done_at": "TIMESTAMP"}
+        _extra_ddl = "".join(f",\n                {c}  {_type[c]}" for c in _extra)
+        _base = "id, name, pdf_path, images_dir, page_count, indexed_at, created_at"
+        _extra_sel = ("," + ",".join(_extra)) if _extra else ""
+        conn.executescript(f"""
+            PRAGMA foreign_keys = OFF;
+            CREATE TABLE books_new (
+                id          INTEGER PRIMARY KEY,
+                name        TEXT NOT NULL UNIQUE,
+                pdf_path    TEXT NOT NULL,
+                images_dir  TEXT NOT NULL,
+                page_count  INTEGER NOT NULL,
+                indexed_at  TIMESTAMP,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP{_extra_ddl}
+            );
+            INSERT INTO books_new ({_base}{_extra_sel}) SELECT {_base}{_extra_sel} FROM books;
+            DROP TABLE books;
+            ALTER TABLE books_new RENAME TO books;
+            CREATE INDEX IF NOT EXISTS idx_books_name ON books(name);
+            PRAGMA foreign_keys = ON;
+        """)
+
     pages_cols = {row[1] for row in conn.execute("PRAGMA table_info(pages)").fetchall()}
     if "main_characters" not in pages_cols:
         # カンマ区切りの主要登場人物（character_extractor で生成）。
@@ -151,6 +178,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE books ADD COLUMN summary TEXT")
     if "summary_generated_at" not in books_cols:
         conn.execute("ALTER TABLE books ADD COLUMN summary_generated_at TIMESTAMP")
+    if "ocr_done_at" not in books_cols:
+        # §4.2: OCR ステップ完了時刻。NULL = 未 OCR（PDF 由来の既存書籍は NULL のまま）。
+        conn.execute("ALTER TABLE books ADD COLUMN ocr_done_at TIMESTAMP")
 
     chunks_cols = {row[1] for row in conn.execute("PRAGMA table_info(chunks)").fetchall()}
     if "contextual_text" not in chunks_cols:

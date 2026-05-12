@@ -2,7 +2,7 @@
  * 書籍 1 冊のサムネイル + メタ情報 + 再構築ボタン + 登場人物トグル（B-15）。
  */
 import { useState } from 'react';
-import { CheckCircle2, ChevronDown, ChevronUp, Circle, RefreshCw, Users } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, Circle, RefreshCw, ScanText, Users } from 'lucide-react';
 
 import type { BookSummary } from '../../features/novel_db/types';
 
@@ -11,6 +11,7 @@ import CharactersPanel from './CharactersPanel';
 interface Props {
     book: BookSummary;
     onRebuild: (bookName: string) => void;
+    onOcr: (bookName: string) => void;
     onRead: (bookName: string) => void;
     /** B-15: キャラ選択時に親が CharacterDetailDialog を開く。 */
     onSelectCharacter?: (bookName: string, charName: string) => void;
@@ -23,7 +24,7 @@ function formatIndexedAt(isoLike: string | null): string | null {
     return isoLike.replace('T', ' ').slice(0, 16);
 }
 
-export default function BookCard({ book, onRebuild, onRead, onSelectCharacter, disabled }: Props) {
+export default function BookCard({ book, onRebuild, onOcr, onRead, onSelectCharacter, disabled }: Props) {
     const indexedAt = formatIndexedAt(book.indexed_at);
     const [charsExpanded, setCharsExpanded] = useState(false);
     return (
@@ -79,9 +80,22 @@ export default function BookCard({ book, onRebuild, onRead, onSelectCharacter, d
                     )}
                 </div>
                 <button
+                    onClick={() => onOcr(book.name)}
+                    disabled={disabled}
+                    title={book.ocr_done_at ? `OCR 済み: ${book.ocr_done_at.slice(0, 16)}` : 'OCR 未実施'}
+                    className={`mt-1 px-2.5 py-1 text-xs rounded flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed ${
+                        book.ocr_done_at
+                            ? 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200'
+                            : 'bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-800/60 text-amber-800 dark:text-amber-300'
+                    }`}
+                >
+                    <ScanText className="w-3 h-3" />
+                    OCR
+                </button>
+                <button
                     onClick={() => onRebuild(book.name)}
                     disabled={disabled}
-                    className="mt-1 px-2.5 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                    className="px-2.5 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                 >
                     <RefreshCw className="w-3 h-3" />
                     再構築

@@ -1,19 +1,28 @@
 """1 冊の novel.db レコードを構築するフロー。
 
-PDF テキスト抽出 → pages 登録 → FTS5 同期 → チャンク分割 → embedding 計算 → chunks/chunks_vec 登録。
-失敗時はトランザクションごとロールバックし、書籍は「未構築」状態に戻る（[設計書 §5.5]）。
+2 ステップに分割（§4.2）:
+  1. ocr_book()          : images/*.png → OCR → pages テーブルに full_text を保存
+  2. rebuild_from_pages(): pages.full_text → chunk → embed → chunks/chunks_vec を再構築
+
+各ステップは独立して実行可能。rebuild_from_pages は OCR 済みの full_text を前提とし、
+pages テーブルは一切変更しない（chunks/chunks_vec のみ再構築）。
+
+詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.5。
 """
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
 
-from config import KINDLE_NOVEL_IMAGES_DIR, KINDLE_NOVEL_PDF_DIR
+from config import KINDLE_NOVEL_IMAGES_DIR
 from utils.logger import get_logger
 
 from .chunker import chunk_page
+from .connection import with_db
 from .embedder import embed_batch, serialize_f32
-from .extractor import extract_pages
+from .extractor import extract_pages_from_images, load_ocr_engine
+from .schema import init_schema
 
 logger = get_logger(__name__)
 
@@ -23,53 +32,143 @@ MIN_CHARS_FOR_CHUNK = 30
 # embedding API 呼び出しのバッチサイズ
 EMBED_BATCH_SIZE = 16
 
+ProgressCallback = Callable[[int, int], None]
 
-def _resolve_paths(book_name: str) -> tuple[Path, Path]:
-    """書籍名から PDF と画像ディレクトリの絶対パスを返す。
 
-    book_name は PDF stem = 画像サブディレクトリ名と仮定（既存運用に従う）。
+def _resolve_images_dir(book_name: str) -> Path:
+    return Path(KINDLE_NOVEL_IMAGES_DIR) / book_name
+
+
+# ---------------------------------------------------------------------------
+# ステップ 1: OCR
+# ---------------------------------------------------------------------------
+
+def ocr_book(book_name: str, *, engine: object | None = None) -> None:
+    """OCR ステップ: images/*.png を OCR して pages.full_text を更新する。
+
+    - books レコードが存在しなければ INSERT、存在すれば page_count / ocr_done_at を更新。
+    - pages は (book_id, page_no) をキーに UPSERT（full_text / char_count / image_path を更新）。
+    - FTS5 を再同期する。
+    - chunks/chunks_vec は触らない（rebuild_from_pages が担当）。
+
+    Args:
+        book_name: 書籍 stem（= images サブディレクトリ名）
+        engine: 初期化済みの OCR エンジン。None のとき内部で yomitoku を初期化する。
+                複数書籍を連続処理する場合は呼び出し側で 1 度初期化して渡すこと。
     """
-    pdf_path = Path(KINDLE_NOVEL_PDF_DIR) / f"{book_name}.pdf"
-    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR) / book_name
-    return pdf_path, images_dir
+    images_dir = _resolve_images_dir(book_name)
+    if not images_dir.exists():
+        raise FileNotFoundError(f"images dir not found: {images_dir}")
+
+    if engine is None:
+        engine = load_ocr_engine()
+
+    logger.info("ocr_book start: %s", book_name)
+    pages = extract_pages_from_images(images_dir, engine)
+    if not pages:
+        raise ValueError(f"no PNG images found in: {images_dir}")
+
+    with with_db() as conn:
+        init_schema(conn)
+        with conn:
+            existing = conn.execute(
+                "SELECT id FROM books WHERE name = ?", (book_name,)
+            ).fetchone()
+
+            if existing is None:
+                cur = conn.execute(
+                    "INSERT INTO books "
+                    "(name, pdf_path, images_dir, page_count, indexed_at, ocr_done_at) "
+                    "VALUES (?, ?, ?, ?, NULL, datetime('now'))",
+                    (book_name, "", str(images_dir), len(pages)),
+                )
+                book_id = cur.lastrowid
+            else:
+                book_id = existing[0]
+                conn.execute(
+                    "UPDATE books SET page_count = ?, ocr_done_at = datetime('now') "
+                    "WHERE id = ?",
+                    (len(pages), book_id),
+                )
+
+            for p in pages:
+                img = images_dir / f"{p['page_no']:03d}.png"
+                conn.execute(
+                    """
+                    INSERT INTO pages (book_id, page_no, image_path, full_text, char_count)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(book_id, page_no) DO UPDATE SET
+                        full_text  = excluded.full_text,
+                        char_count = excluded.char_count,
+                        image_path = excluded.image_path
+                    """,
+                    (
+                        book_id,
+                        p["page_no"],
+                        str(img) if img.exists() else None,
+                        p["full_text"],
+                        p["char_count"],
+                    ),
+                )
+
+            # FTS5 再同期
+            conn.execute(
+                "DELETE FROM pages_fts WHERE rowid IN "
+                "(SELECT id FROM pages WHERE book_id = ?)",
+                (book_id,),
+            )
+            conn.execute(
+                "INSERT INTO pages_fts (rowid, full_text) "
+                "SELECT id, full_text FROM pages WHERE book_id = ?",
+                (book_id,),
+            )
+
+    logger.info("ocr_book finished: %s (pages=%d)", book_name, len(pages))
 
 
-def rebuild_book(
+# ---------------------------------------------------------------------------
+# ステップ 2: チャンク化 / embedding 再構築
+# ---------------------------------------------------------------------------
+
+def rebuild_from_pages(
     conn: sqlite3.Connection,
     book_name: str,
     *,
-    progress_callback=None,
+    progress_callback: ProgressCallback | None = None,
 ) -> None:
-    """1 冊を再構築する（既存レコードは削除して上書き）。
+    """チャンク化・embedding ステップ: pages.full_text → chunks/chunks_vec を再構築する。
 
-    Args:
-        conn: novel.db への sqlite3 接続（sqlite_vec ロード済み）
-        book_name: PDF stem = 画像サブディレクトリ名
-        progress_callback: 進捗通知用の関数 (done: int, total: int) -> None。任意
+    pages テーブルは変更しない（OCR 済みの full_text を前提とする）。
+    books.indexed_at を現在時刻に更新する。
 
     Raises:
-        FileNotFoundError: PDF が存在しないとき
-        EmbeddingError: Ollama 接続失敗 / 次元不一致など
+        ValueError: books レコードが存在しない、または pages が 0 件のとき。
     """
-    pdf_path, images_dir = _resolve_paths(book_name)
-    if not pdf_path.exists():
-        raise FileNotFoundError(pdf_path)
+    book_row = conn.execute(
+        "SELECT id FROM books WHERE name = ?", (book_name,)
+    ).fetchone()
+    if book_row is None:
+        raise ValueError(f"book not found (run OCR first): {book_name}")
+    book_id = book_row[0]
 
-    logger.info("rebuild_book start: %s", book_name)
+    pages_rows = conn.execute(
+        "SELECT id, full_text, char_count FROM pages WHERE book_id = ? ORDER BY page_no",
+        (book_id,),
+    ).fetchall()
+    if not pages_rows:
+        raise ValueError(f"no pages found (run OCR first): {book_name}")
 
-    # 既存レコードは削除（CASCADE で pages / chunks / chunks_vec も連動）
-    # トランザクション開始前に削除すると、構築失敗時に元の状態へ戻れないので、
-    # with conn: の中で DELETE → INSERT を一括実行する。
+    logger.info("rebuild_from_pages start: %s (pages=%d)", book_name, len(pages_rows))
+
     with conn:
-        # 先に同名書籍の既存 chunks_vec を消す（外部仮想テーブルなので CASCADE 不可）
+        # 既存 chunks_vec を削除（外部仮想テーブルは CASCADE 不可）
         old_chunk_ids = [
             row[0]
             for row in conn.execute(
                 "SELECT c.id FROM chunks c "
                 "JOIN pages p ON c.page_id = p.id "
-                "JOIN books b ON p.book_id = b.id "
-                "WHERE b.name = ?",
-                (book_name,),
+                "WHERE p.book_id = ?",
+                (book_id,),
             )
         ]
         if old_chunk_ids:
@@ -77,50 +176,18 @@ def rebuild_book(
                 "DELETE FROM chunks_vec WHERE rowid = ?",
                 [(cid,) for cid in old_chunk_ids],
             )
-
-        conn.execute("DELETE FROM books WHERE name = ?", (book_name,))
-
-        # PDF からページ抽出
-        pages = extract_pages(pdf_path)
-
-        # books に INSERT
-        cur = conn.execute(
-            "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
-            "VALUES (?, ?, ?, ?, datetime('now'))",
-            (book_name, str(pdf_path), str(images_dir), len(pages)),
-        )
-        book_id = cur.lastrowid
-
-        # pages に INSERT、id を保持
-        page_ids: list[int] = []
-        for p in pages:
-            img = images_dir / f"{p['page_no']:03d}.png"
-            cur = conn.execute(
-                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (
-                    book_id,
-                    p["page_no"],
-                    str(img) if img.exists() else None,
-                    p["full_text"],
-                    p["char_count"],
-                ),
-            )
-            page_ids.append(cur.lastrowid)
-
-        # FTS5 同期
         conn.execute(
-            "INSERT INTO pages_fts (rowid, full_text) "
-            "SELECT id, full_text FROM pages WHERE book_id = ?",
+            "DELETE FROM chunks WHERE page_id IN "
+            "(SELECT id FROM pages WHERE book_id = ?)",
             (book_id,),
         )
 
         # チャンク分割
         all_chunks: list[dict] = []
-        for p, page_id in zip(pages, page_ids, strict=True):
-            if p["char_count"] < MIN_CHARS_FOR_CHUNK:
+        for page_id, full_text, char_count in pages_rows:
+            if (char_count or 0) < MIN_CHARS_FOR_CHUNK:
                 continue
-            for idx, c in enumerate(chunk_page(p["full_text"])):
+            for idx, c in enumerate(chunk_page(full_text or "")):
                 all_chunks.append({"page_id": page_id, "chunk_idx": idx, "text": c})
 
         total_chunks = len(all_chunks)
@@ -129,7 +196,7 @@ def rebuild_book(
 
         # embedding 計算 + 保存
         for batch_start in range(0, total_chunks, EMBED_BATCH_SIZE):
-            batch = all_chunks[batch_start:batch_start + EMBED_BATCH_SIZE]
+            batch = all_chunks[batch_start : batch_start + EMBED_BATCH_SIZE]
             embeddings = embed_batch([c["text"] for c in batch])
             for c, emb in zip(batch, embeddings, strict=True):
                 cur = conn.execute(
@@ -146,7 +213,26 @@ def rebuild_book(
             if progress_callback:
                 progress_callback(done, total_chunks)
 
+        conn.execute(
+            "UPDATE books SET indexed_at = datetime('now') WHERE id = ?",
+            (book_id,),
+        )
+
     logger.info(
-        "rebuild_book finished: %s (pages=%d, chunks=%d)",
-        book_name, len(pages), total_chunks,
+        "rebuild_from_pages finished: %s (pages=%d, chunks=%d)",
+        book_name, len(pages_rows), total_chunks,
     )
+
+
+# ---------------------------------------------------------------------------
+# 後方互換エイリアス（既存テスト / CLI スクリプト用）
+# ---------------------------------------------------------------------------
+
+def rebuild_book(
+    conn: sqlite3.Connection,
+    book_name: str,
+    *,
+    progress_callback: ProgressCallback | None = None,
+) -> None:
+    """rebuild_from_pages() への後方互換エイリアス。"""
+    rebuild_from_pages(conn, book_name, progress_callback=progress_callback)

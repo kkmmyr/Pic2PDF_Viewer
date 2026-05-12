@@ -65,13 +65,14 @@ def test_post_rebuild_series_requires_target_id(client, db_initialized):
     assert res.status_code == 422
 
 
-def test_post_rebuild_rejects_reocr_mode(client, db_initialized):
+def test_post_rebuild_accepts_ocr_mode(client, db_initialized):
+    """mode='ocr' はキューに登録されること（§4.2）。"""
     res = client.post(
         "/api/novel_db/rebuild",
-        json={"type": "book", "target_id": "book-1", "mode": "reocr"},
+        json={"type": "book", "target_id": "book-1", "mode": "ocr"},
     )
-    assert res.status_code == 422
-    assert "reocr" in res.json()["detail"].lower()
+    assert res.status_code == 200
+    assert "job_id" in res.json()
 
 
 def test_post_rebuild_rejects_invalid_type(client, db_initialized):

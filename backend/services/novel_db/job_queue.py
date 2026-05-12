@@ -11,17 +11,20 @@ import traceback
 from pathlib import Path
 from typing import Literal
 
-from config import KINDLE_NOVEL_PDF_DIR
+from config import KINDLE_NOVEL_IMAGES_DIR
 from utils.logger import get_logger
 
-from .builder import rebuild_book
+from .builder import ocr_book, rebuild_from_pages
 from .connection import with_db
 from .schema import init_schema
 
 logger = get_logger(__name__)
 
 JobType = Literal["book", "series", "all"]
-JobMode = Literal["pdf_text", "reocr"]
+# "rebuild": チャンク化・embedding 再構築（OCR 済みの pages.full_text を使う）
+# "ocr"    : OCR ステップ（images/*.png → pages.full_text）
+# "pdf_text"/"reocr": 旧モード名。DB に残った既存ジョブとの互換性のため "rebuild" と同じ動作にする
+JobMode = Literal["rebuild", "ocr", "pdf_text", "reocr"]
 JobState = Literal["queued", "running", "completed", "failed", "canceled"]
 
 
@@ -220,20 +223,26 @@ class NovelDbJobQueue:
         target_id = job["target_id"]
         mode = job["mode"]
 
-        if mode == "reocr":
-            raise NotImplementedError(
-                "mode='reocr' is not yet implemented (planned in a future phase)"
-            )
-
         targets = self._resolve_targets(job_type, target_id)
         total = len(targets)
         self._update_progress(job_id, 0, total)
 
-        for done, book_name in enumerate(targets, start=1):
-            with with_db() as conn:
-                rebuild_book(conn, book_name)
-            self._update_progress(job_id, done, total)
-            logger.info("Job %d progress: %d/%d (%s)", job_id, done, total, book_name)
+        if mode in ("ocr", "reocr"):
+            # OCR ステップ: images → pages.full_text
+            # 複数書籍を連続処理するためエンジンを 1 度だけ初期化する
+            from .extractor import load_ocr_engine
+            engine = load_ocr_engine()
+            for done, book_name in enumerate(targets, start=1):
+                ocr_book(book_name, engine=engine)
+                self._update_progress(job_id, done, total)
+                logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
+        else:
+            # rebuild / pdf_text（後方互換）: pages.full_text → chunks/embeddings
+            for done, book_name in enumerate(targets, start=1):
+                with with_db() as conn:
+                    rebuild_from_pages(conn, book_name)
+                self._update_progress(job_id, done, total)
+                logger.info("Job %d rebuild progress: %d/%d (%s)", job_id, done, total, book_name)
 
     def _resolve_targets(self, job_type: JobType, target_id: str | None) -> list[str]:
         """job_type に応じて再構築対象書籍名のリストを返す。"""
@@ -251,15 +260,17 @@ class NovelDbJobQueue:
 
 
 def _list_all_book_names() -> list[str]:
-    pdf_dir = Path(KINDLE_NOVEL_PDF_DIR)
-    if not pdf_dir.exists():
+    """images/ 配下のサブディレクトリ名を書籍 stem として返す。"""
+    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    if not images_dir.exists():
         return []
-    return sorted(p.stem for p in pdf_dir.glob("*.pdf"))
+    return sorted(d.name for d in images_dir.iterdir() if d.is_dir())
 
 
 def _list_books_in_series(series_id: str) -> list[str]:
     """meta.json から指定 series_id に属する novel 書籍の stem 一覧を返す。"""
     from services.meta_store import load_meta
+    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
     meta = load_meta("novel")
     names: list[str] = []
     for key, entry in meta.items():
@@ -268,9 +279,8 @@ def _list_books_in_series(series_id: str) -> list[str]:
         if not key.endswith(".pdf"):
             continue
         stem = key[: -len(".pdf")]
-        # 実在チェック（meta だけ残っている孤立エントリを除外）
-        pdf = Path(KINDLE_NOVEL_PDF_DIR) / f"{stem}.pdf"
-        if pdf.exists():
+        # 実在チェック（images ディレクトリが存在する書籍のみ）
+        if (images_dir / stem).is_dir():
             names.append(stem)
     return sorted(names)
 
