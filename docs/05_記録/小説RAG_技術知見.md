@@ -637,9 +637,23 @@ llama-server.exe ^
 
 **170 秒短縮の本命は `--slot-save-path`（B-14c）**: サーバ再起動後も書籍 KV キャッシュをディスク永続化すれば初回 prefill をスキップできる。B-14b 完了後の次のタスクとして分類。
 
-#### 実測TODO
+#### 実測結果（2026-05-12）
 
-サーバ再起動後、scope=book QA を ngram-cache ON/OFF で計測して `tg t/s` と `spec_acc_rate`（承認率）を記録する。実測値は本セクションに追記予定。
+`--metrics` を追加して5リクエスト実行後に `/metrics` を確認。
+
+| 指標 | 値 |
+|---|---|
+| tokens_predicted_total | 572 |
+| n_decode_total | 571 |
+| **tokens / decode** | **1.002**（≈ 1.0） |
+| predicted_tokens_seconds | 47.5 t/s |
+| baseline（spec dec なし） | 46.3 t/s |
+
+**tokens/decode ≈ 1.0 = ngram ヒット率ほぼ 0%**。日本語小説の自由回答は n-gram 反復率が低く、ドラフトがほぼ全てリジェクトされていた。効果ゼロでオーバーヘッドだけ払う状態のため `--spec-type ngram-cache` は **削除**（2026-05-12 revert）。
+
+`--metrics` フラグは `/metrics` 監視用として維持。
+
+**結論**: ngram Speculative Decoding は日本語散文生成に対して無効。コード補完・定型文向けの手法。本来の MTP（PR #22673 マージ待ち）か、scope=book 初回 prefill の根本改善（B-14c は却下済み）が次の速度改善候補。
 
 ---
 
