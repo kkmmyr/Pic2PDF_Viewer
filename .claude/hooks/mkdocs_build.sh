@@ -52,9 +52,9 @@ EOF
     exit 0
 fi
 
-# ビルド実行
+# ビルド実行（--dirty で増分ビルド：Vite dev が site_dir のハッシュ付き asset を握っていても PermissionError を回避）
 build_failed=0
-output=$(cd "$PROJECT_ROOT" && "$MKDOCS_BIN" build --quiet 2>&1) || build_failed=1
+output=$(cd "$PROJECT_ROOT" && "$MKDOCS_BIN" build --dirty --quiet 2>&1) || build_failed=1
 
 if [ "$build_failed" -eq 1 ]; then
     msg=$(printf 'mkdocs build に失敗しました。docs/ 編集を確認してください:\n%s' "$output")

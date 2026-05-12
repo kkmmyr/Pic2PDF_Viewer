@@ -59,7 +59,11 @@ uv tool install mkdocs --with mkdocs-material --with mkdocs-mermaid2-plugin
 uv tool update-shell
 
 # ビルド（frontend/public/site/ に出力、.gitignore 配下）
-mkdocs build
+# Vite dev 起動中に site_dir 全 wipe で PermissionError になるため、通常は --dirty で増分ビルドする
+mkdocs build --dirty
+
+# テーマ更新時など、フルクリーンビルドしたい場合は Vite dev を停止してから:
+# mkdocs build
 
 # 開発時プレビュー（http://localhost:8000、自動リロード）
 mkdocs serve
@@ -69,7 +73,7 @@ mkdocs serve
 
 Mermaid 図は ` ```mermaid` フェンスでそのまま記述する（mkdocs-material が描画）。
 
-**注意**: Markdown 編集後は `mkdocs build` で HTML 反映が必要（CI / 手動）。`frontend/public/site/` 配下は git 管理外なので、サーバ起動前に最低 1 回ビルドしておくこと。`npm run build` 時は `frontend/dist/site/` にもコピーされる（dist サイズが site 分肥大化）。
+**注意**: Markdown 編集後は `mkdocs build --dirty` で HTML 反映が必要（CI / 手動）。`frontend/public/site/` 配下は git 管理外なので、サーバ起動前に最低 1 回ビルドしておくこと。`npm run build` 時は `frontend/dist/site/` にもコピーされる（dist サイズが site 分肥大化）。
 
 ## スラッシュコマンド
 
