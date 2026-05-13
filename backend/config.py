@@ -138,9 +138,6 @@ NOVEL_DB_QA_EXPAND_MODEL   = os.environ.get("NOVEL_DB_QA_EXPAND_MODEL", "gemma4:
 NOVEL_DB_QA_FULL_BOOK_MODE    = os.environ.get("NOVEL_DB_QA_FULL_BOOK_MODE", "true").lower() in ("1", "true", "yes")
 NOVEL_DB_QA_FULL_BOOK_NUM_CTX = int(os.environ.get("NOVEL_DB_QA_FULL_BOOK_NUM_CTX", "131072"))
 
-# OCR 起動スクリプト
-BATCH_OCR_LAUNCHER = os.path.join(PROJECT_ROOT, "kindle-pdf", "start_batch_ocr.bat")
-
 # フロントエンド配信ディレクトリ（リリースモード用）
 FRONTEND_DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
 

@@ -30,14 +30,10 @@ class Config:
     CROP_X2: int = 1314
     CROP_Y2: int = 1822
 
-    # 出力先パス
+    # 出力先パス（backend/data/comic/ = comic ソース。旧称 kindle）
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
-    # IMG_OUTPUT_DIR: str = os.path.join(BASE_DIR, 'output', 'img')
-    # PDF_OUTPUT_DIR: str = os.path.join(BASE_DIR, 'output', 'pdf')
-    
-    # Backend data integration
-    IMG_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'kindle', 'images'))
-    PDF_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'kindle', 'pdfs'))
+    IMG_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'comic', 'images'))
+    PDF_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'comic', 'pdfs'))
 
     # タイトルクリーニング用
     TITLE_PREFIX: str = "Kindle for PC - "
