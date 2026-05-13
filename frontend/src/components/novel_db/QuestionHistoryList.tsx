@@ -1,6 +1,3 @@
-/**
- * 質問履歴一覧（時系列降順、展開可能）。
- */
 import type { QaHistoryEntry } from '../../features/novel_db/types';
 
 import QuestionHistoryItem from './QuestionHistoryItem';
@@ -8,27 +5,40 @@ import QuestionHistoryItem from './QuestionHistoryItem';
 interface Props {
     items: QaHistoryEntry[];
     isLoading: boolean;
+    selectedId: number | null;
+    onSelect: (id: number) => void;
     onDelete: (id: number) => void;
-    onOpenImage: (book: string, pageNo: number) => void;
 }
 
-export default function QuestionHistoryList({ items, isLoading, onDelete, onOpenImage }: Props) {
-    if (isLoading && items.length === 0) {
-        return <p className="text-sm text-gray-500">履歴を読み込み中…</p>;
-    }
-    if (items.length === 0) {
-        return <p className="text-sm text-gray-500">まだ履歴がありません。</p>;
-    }
+export default function QuestionHistoryList({
+    items,
+    isLoading,
+    selectedId,
+    onSelect,
+    onDelete,
+}: Props) {
+    const inner =
+        isLoading && items.length === 0 ? (
+            <p className="p-3 text-xs text-gray-500">読み込み中…</p>
+        ) : items.length === 0 ? (
+            <p className="p-3 text-xs text-gray-500">まだ履歴がありません。</p>
+        ) : (
+            <ul>
+                {items.map((entry) => (
+                    <QuestionHistoryItem
+                        key={entry.id}
+                        entry={entry}
+                        isActive={entry.id === selectedId}
+                        onSelect={onSelect}
+                        onDelete={onDelete}
+                    />
+                ))}
+            </ul>
+        );
+
     return (
-        <ul className="space-y-2">
-            {items.map((entry) => (
-                <QuestionHistoryItem
-                    key={entry.id}
-                    entry={entry}
-                    onDelete={onDelete}
-                    onOpenImage={onOpenImage}
-                />
-            ))}
-        </ul>
+        <div className="border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30 max-h-[600px] overflow-y-auto">
+            {inner}
+        </div>
     );
 }
