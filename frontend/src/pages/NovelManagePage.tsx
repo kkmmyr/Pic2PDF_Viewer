@@ -41,9 +41,12 @@ export default function NovelManagePage() {
     useEffect(() => {
         fetchBooks()
             .then((data) => {
-                const ocred = data.filter((b) => b.ocr_done_at !== null);
-                setBooks(ocred);
-                const unbuilt = ocred.filter((b) => b.indexed_at === null);
+                // ocr_done_at または indexed_at があれば Build 対象（pdf_text モードは ocr_done_at を立てない）
+                const buildable = data.filter(
+                    (b) => b.ocr_done_at !== null || b.indexed_at !== null,
+                );
+                setBooks(buildable);
+                const unbuilt = buildable.filter((b) => b.indexed_at === null);
                 setSelectedBook(unbuilt.length > 0 ? unbuilt[0].name : '');
             })
             .catch(() => {});
@@ -54,8 +57,8 @@ export default function NovelManagePage() {
     );
 
     const handleShowBuiltChange = (value: boolean) => {
-        setShowBuilt(value);
         const next = books.filter((b) => (value ? b.indexed_at !== null : b.indexed_at === null));
+        setShowBuilt(value);
         setSelectedBook(next.length > 0 ? next[0].name : '');
     };
 

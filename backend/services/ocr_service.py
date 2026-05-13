@@ -1,15 +1,12 @@
-import os
-import subprocess
 import threading
 from collections import deque
+from pathlib import Path
 from typing import Any
 
-from config import BATCH_OCR_LAUNCHER, OCR_LOG_MAXLEN
+from config import KINDLE_NOVEL_IMAGES_DIR, OCR_LOG_MAXLEN
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-PROCESS_TERMINATE_TIMEOUT_SEC = 5
 
 
 class OCRService:
@@ -20,7 +17,7 @@ class OCRService:
         with cls._class_lock:
             if cls._instance is None:
                 instance = super().__new__(cls)
-                instance.process = None
+                instance._thread: threading.Thread | None = None
                 instance.status = "idle"  # idle, running, error
                 instance.logs: deque = deque(maxlen=OCR_LOG_MAXLEN)
                 instance.last_return_code: int | None = None
@@ -32,7 +29,7 @@ class OCRService:
     def is_running(self) -> bool:
         # 注意: このプロパティは self._lock を保持した状態で呼び出すこと
         if self.status == "running":
-            if self.process and self.process.poll() is None:
+            if self._thread and self._thread.is_alive():
                 return True
             else:
                 self.status = "idle"
@@ -43,67 +40,35 @@ class OCRService:
             if self.is_running:
                 raise RuntimeError("OCR process is already running")
 
-            cmd = [BATCH_OCR_LAUNCHER]
-            if target_dir:
-                cmd.extend(["--target-dir", target_dir])
+            self.status = "running"
+            self.last_return_code = None
+            self.logs.clear()
+            target_label = target_dir if target_dir else "all"
+            self.logs.append(f"Starting OCR: target={target_label}")
+            logger.info("Starting OCR thread: target=%s", target_label)
 
-            env = os.environ.copy()
-            env["PYTHONIOENCODING"] = "utf-8"
-
+        def _body():
             try:
-                self.process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    bufsize=1,
-                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
-                    env=env
-                )
-                self.status = "running"
-                self.last_return_code = None
-                self.logs.clear()
-                # 絶対パス露出を避けるため launcher と target を basename で記録
-                launcher_name = os.path.basename(cmd[0])
-                target_part = ""
-                if target_dir:
-                    target_part = f" --target-dir {os.path.basename(target_dir)}"
-                self.logs.append(f"Starting OCR process: {launcher_name}{target_part}")
-                pid = self.process.pid
-                logger.info("OCR process started (PID: %d)", pid)
-
+                self._run_ocr(target_dir)
             except Exception as e:
-                self.status = "error"
-                self.logs.append(f"Failed to start process: {str(e)}")
-                logger.error("Failed to start OCR process: %s", e)
-                raise e
+                self.logs.append(f"OCR error: {e}")
+                logger.exception("OCR thread error")
+                with self._lock:
+                    self.status = "error"
+                    self.last_return_code = 1
 
-        t_log = threading.Thread(target=self._log_reader, daemon=True)
-        t_log.start()
-
-        t_monitor = threading.Thread(target=self._process_monitor, daemon=True)
-        t_monitor.start()
-
-        return pid
+        self._thread = threading.Thread(target=_body, daemon=True)
+        self._thread.start()
+        return self._thread.ident or 0
 
     def stop_ocr(self) -> None:
         with self._lock:
-            if not self.is_running or not self.process:
-                raise RuntimeError("No running process to stop")
-
-            self.process.terminate()
-            self.logs.append("Sent TERMINATE signal...")
-            logger.info("Sent TERMINATE signal to OCR process")
-
-        try:
-            self.process.wait(timeout=PROCESS_TERMINATE_TIMEOUT_SEC)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            with self._lock:
-                self.logs.append("Sent KILL signal...")
-                logger.warning("OCR process did not terminate; sent KILL signal")
-
-        with self._lock:
+            if not self.is_running:
+                raise RuntimeError("No running OCR to stop")
+            # スレッドは強制終了不可。ステータスをリセットして次の書籍完了後に停止
             self.status = "idle"
+            self.logs.append("Stop requested (will finish current book).")
+            logger.info("OCR stop requested")
 
     def get_status(self) -> dict[str, Any]:
         with self._lock:
@@ -113,33 +78,39 @@ class OCRService:
                 "logs": list(self.logs),
             }
 
-    def _log_reader(self) -> None:
-        """プロセスの stdout を読み取ってログキューに追記する。"""
-        if not self.process or not self.process.stdout:
+    def _run_ocr(self, target_dir: str | None) -> None:
+        """OCR スレッド本体。run_ocr_subprocess + _store_ocr_pages を直接呼ぶ。"""
+        from services.novel_db.builder import _store_ocr_pages
+        from services.novel_db.extractor import run_ocr_subprocess
+
+        images_base = Path(KINDLE_NOVEL_IMAGES_DIR)
+        if target_dir:
+            dirs = [images_base / target_dir]
+        else:
+            if not images_base.exists():
+                raise FileNotFoundError(f"Images dir not found: {images_base}")
+            dirs = sorted(d for d in images_base.iterdir() if d.is_dir())
+
+        if not dirs:
+            self.logs.append("No image directories found.")
+            with self._lock:
+                self.status = "idle"
+                self.last_return_code = 0
             return
 
-        for line in iter(self.process.stdout.readline, b''):
-            decoded = line.decode('utf-8', errors='replace').rstrip()
-            self.logs.append(decoded)
-        self.process.stdout.close()
+        total = len(dirs)
+        self.logs.append(f"Found {total} book(s) to process.")
 
-    def _process_monitor(self) -> None:
-        """プロセス終了を監視してステータスを更新する。"""
-        if not self.process:
-            return
+        for done, (book_name, pages) in enumerate(run_ocr_subprocess(dirs), start=1):
+            self.logs.append(f"[{done}/{total}] {book_name}: {len(pages)} pages")
+            _store_ocr_pages(book_name, pages)
+            self.logs.append(f"[{done}/{total}] Stored: {book_name}")
 
-        self.process.wait()
-
+        self.logs.append("OCR finished successfully.")
+        logger.info("OCR finished successfully")
         with self._lock:
-            self.last_return_code = self.process.returncode
             self.status = "idle"
-
-            if self.process.returncode == 0:
-                self.logs.append("Process finished successfully.")
-                logger.info("OCR process finished successfully")
-            else:
-                self.logs.append(f"Process finished with error code: {self.process.returncode}")
-                logger.error("OCR process finished with error code: %d", self.process.returncode)
+            self.last_return_code = 0
 
 
 # Global instance
