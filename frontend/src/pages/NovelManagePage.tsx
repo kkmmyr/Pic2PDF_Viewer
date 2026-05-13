@@ -36,16 +36,28 @@ export default function NovelManagePage() {
     const [books, setBooks] = useState<BookSummary[]>([]);
     const [allBooks, setAllBooks] = useState(false);
     const [selectedBook, setSelectedBook] = useState('');
+    const [showBuilt, setShowBuilt] = useState(false);
 
     useEffect(() => {
         fetchBooks()
             .then((data) => {
                 const ocred = data.filter((b) => b.ocr_done_at !== null);
                 setBooks(ocred);
-                if (ocred.length > 0) setSelectedBook(ocred[0].name);
+                const unbuilt = ocred.filter((b) => b.indexed_at === null);
+                setSelectedBook(unbuilt.length > 0 ? unbuilt[0].name : '');
             })
             .catch(() => {});
     }, []);
+
+    const filteredBooks = books.filter((b) =>
+        showBuilt ? b.indexed_at !== null : b.indexed_at === null,
+    );
+
+    const handleShowBuiltChange = (value: boolean) => {
+        setShowBuilt(value);
+        const next = books.filter((b) => (value ? b.indexed_at !== null : b.indexed_at === null));
+        setSelectedBook(next.length > 0 ? next[0].name : '');
+    };
 
     const handleEnqueue = (mode: 'full_build' | 'generate_contexts' = 'full_build') => {
         if (allBooks) {
@@ -202,20 +214,46 @@ export default function NovelManagePage() {
                             </div>
 
                             {!allBooks && (
-                                <select
-                                    value={selectedBook}
-                                    onChange={(e) => setSelectedBook(e.target.value)}
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                >
-                                    {books.map((b) => (
-                                        <option key={b.name} value={b.name}>
-                                            {b.name}
-                                        </option>
-                                    ))}
-                                    {books.length === 0 && (
-                                        <option value="">（書籍が見つかりません）</option>
-                                    )}
-                                </select>
+                                <>
+                                    <div className="flex gap-4 text-sm ml-1">
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                checked={!showBuilt}
+                                                onChange={() => handleShowBuiltChange(false)}
+                                                className="text-primary-500"
+                                            />
+                                            <span className="text-gray-600 dark:text-gray-400">
+                                                未完了
+                                            </span>
+                                        </label>
+                                        <label className="flex items-center gap-1.5 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                checked={showBuilt}
+                                                onChange={() => handleShowBuiltChange(true)}
+                                                className="text-primary-500"
+                                            />
+                                            <span className="text-gray-600 dark:text-gray-400">
+                                                完了済み
+                                            </span>
+                                        </label>
+                                    </div>
+                                    <select
+                                        value={selectedBook}
+                                        onChange={(e) => setSelectedBook(e.target.value)}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        {filteredBooks.map((b) => (
+                                            <option key={b.name} value={b.name}>
+                                                {b.name}
+                                            </option>
+                                        ))}
+                                        {filteredBooks.length === 0 && (
+                                            <option value="">（書籍が見つかりません）</option>
+                                        )}
+                                    </select>
+                                </>
                             )}
 
                             {enqueueError && (
