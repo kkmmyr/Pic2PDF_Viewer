@@ -5,7 +5,7 @@
  * 実行中セクション / 待機中セクション / 完了済みセクションの 3 分割リスト。
  */
 import { useEffect, useState } from 'react';
-import { HammerIcon, Loader2 } from 'lucide-react';
+import { HammerIcon, Layers, Loader2 } from 'lucide-react';
 
 import {
     FinishedJobCard,
@@ -34,12 +34,12 @@ export default function NovelBuildPage() {
             .catch(() => {});
     }, []);
 
-    const handleEnqueue = () => {
+    const handleEnqueue = (mode: 'full_build' | 'generate_contexts' = 'full_build') => {
         if (allBooks) {
-            void enqueue(null, true);
+            void enqueue(null, true, mode);
         } else {
             if (!selectedBook) return;
-            void enqueue(selectedBook, false);
+            void enqueue(selectedBook, false, mode);
         }
     };
 
@@ -55,7 +55,7 @@ export default function NovelBuildPage() {
                         本構築管理
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                        OCR 済み書籍の Full Build（Embedding → サマリ → 登場人物 → コンテキスト）
+                        OCR 済み書籍の Full Build（Embedding → サマリ → 登場人物）とコンテキスト生成
                     </p>
                 </div>
             </div>
@@ -108,18 +108,32 @@ export default function NovelBuildPage() {
                         <p className="text-sm text-red-500 dark:text-red-400">{enqueueError}</p>
                     )}
 
-                    <button
-                        onClick={handleEnqueue}
-                        disabled={isEnqueuing || (!allBooks && !selectedBook)}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
-                    >
-                        {isEnqueuing ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                            <HammerIcon className="w-4 h-4" />
-                        )}
-                        Full Build をエンキュー
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => handleEnqueue('full_build')}
+                            disabled={isEnqueuing || (!allBooks && !selectedBook)}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                            {isEnqueuing ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <HammerIcon className="w-4 h-4" />
+                            )}
+                            Full Build
+                        </button>
+                        <button
+                            onClick={() => handleEnqueue('generate_contexts')}
+                            disabled={isEnqueuing || (!allBooks && !selectedBook)}
+                            className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                        >
+                            {isEnqueuing ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Layers className="w-4 h-4" />
+                            )}
+                            コンテキスト生成
+                        </button>
+                    </div>
                 </div>
             </div>
 

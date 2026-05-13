@@ -3,9 +3,12 @@
  * バックエンド API §8 スキーマと一致させる。
  */
 
+export type BuildMode = 'full_build' | 'generate_contexts';
+
 export interface BuildJob {
     id: number;
     target_id: string | null;
+    mode?: BuildMode;
     started_at?: string;
     enqueued_at?: string;
     progress_total?: number;

@@ -19,7 +19,11 @@ export interface UseNovelBuildQueue {
     status: BuildQueueStatus;
     isEnqueuing: boolean;
     enqueueError: string | null;
-    enqueue: (bookName: string | null, allBooks: boolean) => Promise<void>;
+    enqueue: (
+        bookName: string | null,
+        allBooks: boolean,
+        mode?: 'full_build' | 'generate_contexts',
+    ) => Promise<void>;
     cancel: (jobId: number) => Promise<void>;
 }
 
@@ -51,20 +55,27 @@ export function useNovelBuildQueue(): UseNovelBuildQueue {
         };
     }, []);
 
-    const enqueue = useCallback(async (bookName: string | null, allBooks: boolean) => {
-        setEnqueueError(null);
-        setIsEnqueuing(true);
-        try {
-            await enqueueBuild(bookName, allBooks);
-        } catch (e: unknown) {
-            const msg =
-                (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-                (e instanceof Error ? e.message : '不明なエラー');
-            setEnqueueError(msg);
-        } finally {
-            setIsEnqueuing(false);
-        }
-    }, []);
+    const enqueue = useCallback(
+        async (
+            bookName: string | null,
+            allBooks: boolean,
+            mode: 'full_build' | 'generate_contexts' = 'full_build',
+        ) => {
+            setEnqueueError(null);
+            setIsEnqueuing(true);
+            try {
+                await enqueueBuild(bookName, allBooks, mode);
+            } catch (e: unknown) {
+                const msg =
+                    (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+                    (e instanceof Error ? e.message : '不明なエラー');
+                setEnqueueError(msg);
+            } finally {
+                setIsEnqueuing(false);
+            }
+        },
+        [],
+    );
 
     const cancel = useCallback(async (jobId: number) => {
         try {

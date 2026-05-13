@@ -55,7 +55,7 @@ def build_book_full(
     _log("start")
 
     # ステップ 1: チャンク分割 + embedding 再構築（常実行）
-    _log("step 1/3: rebuild_from_pages")
+    _log("step 1/2: rebuild_from_pages")
 
     def _rebuild_progress(done: int, total: int) -> None:
         _detail(f"embedding {done}/{total} チャンク")
@@ -65,15 +65,38 @@ def build_book_full(
         rebuild_from_pages(conn, book_name, progress_callback=_rebuild_progress)
 
     # ステップ 2: 書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成
-    _log("step 2/3: summarize_book + characters")
+    _log("step 2/2: summarize_book + characters")
     with with_db() as conn:
         _run_combined_step(conn, book_name, redo=redo, log=_log, detail=_detail)
 
-    # ステップ 3: チャンク位置説明生成 + 再 embedding
-    _log("step 3/3: generate_contexts")
+    _log("finished")
+
+
+def build_book_contexts(
+    book_name: str,
+    *,
+    redo: bool = False,
+    step_callback: StepCallback | None = None,
+    detail_callback: StepCallback | None = None,
+) -> None:
+    """Step 3（コンテキスト生成 + 再 embedding）のみを実行する（B-23 分離ジョブ）。
+
+    build_book_full() で Step 1+2 完了後に手動投入する想定。
+    `contextual_text IS NULL` のチャンクのみ対象（途中失敗からのリカバリ対応）。
+    """
+
+    def _log(msg: str) -> None:
+        logger.info("[generate_contexts:%s] %s", book_name, msg)
+        if step_callback:
+            step_callback(msg)
+
+    def _detail(msg: str) -> None:
+        if detail_callback:
+            detail_callback(msg)
+
+    _log("step 1/1: generate_contexts")
     with with_db() as conn:
         _run_generate_contexts(conn, book_name, redo=redo, log=_log, detail=_detail)
-
     _log("finished")
 
 

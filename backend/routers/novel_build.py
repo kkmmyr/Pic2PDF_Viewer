@@ -14,9 +14,9 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from routers._deps import cancel_job_response, log_and_raise_500, sse_event
-from utils.logger import get_logger
 from services.novel_db.connection import with_db
 from services.novel_db.job_queue import job_queue
+from utils.logger import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -29,27 +29,32 @@ logger = get_logger(__name__)
 class EnqueueRequest(BaseModel):
     book_name: str | None = Field(default=None)
     all_books: bool = Field(default=False)
+    mode: str = Field(default="full_build")
 
 
 # ---------------------------------------------------------------------------
 # ヘルパー: full_build ジョブに絞ったステータス取得
 # ---------------------------------------------------------------------------
 
+_BUILD_MODES = ("full_build", "generate_contexts")
+
+
 def _get_full_build_status() -> dict:
-    """job_queue の get_status() を full_build mode に絞って返す。"""
+    """job_queue の get_status() を full_build / generate_contexts mode に絞って返す。"""
     raw = job_queue.get_status()
 
     current = raw["current_job"]
-    if current and current.get("mode") != "full_build":
+    if current and current.get("mode") not in _BUILD_MODES:
         current = None
 
-    queued = [j for j in raw["queued_jobs"] if j.get("mode") == "full_build"]
+    queued = [j for j in raw["queued_jobs"] if j.get("mode") in _BUILD_MODES]
 
     with with_db() as conn:
         recent_rows = conn.execute(
-            "SELECT id, target_id, state, finished_at, error_message "
+            "SELECT id, target_id, mode, state, finished_at, error_message "
             "FROM rebuild_jobs "
-            "WHERE mode='full_build' AND state IN ('completed','failed','canceled') "
+            "WHERE mode IN ('full_build','generate_contexts') "
+            "AND state IN ('completed','failed','canceled') "
             "ORDER BY finished_at DESC LIMIT 20"
         ).fetchall()
 
@@ -57,9 +62,10 @@ def _get_full_build_status() -> dict:
         {
             "id": r[0],
             "target_id": r[1],
-            "state": r[2],
-            "finished_at": r[3],
-            "error_message": r[4],
+            "mode": r[2],
+            "state": r[3],
+            "finished_at": r[4],
+            "error_message": r[5],
         }
         for r in recent_rows
     ]
@@ -72,22 +78,22 @@ def _get_full_build_status() -> dict:
     }
 
 
-def _is_already_queued_or_running(book_name: str | None) -> bool:
-    """同一書籍（または全冊）の full_build ジョブがキュー / 実行中かチェックする。"""
+def _is_already_queued_or_running(book_name: str | None, mode: str) -> bool:
+    """同一書籍（または全冊）の同一 mode ジョブがキュー / 実行中かチェックする。"""
     with with_db() as conn:
         if book_name is None:
-            # 全冊ジョブ: type='all' の full_build が active ならブロック
             row = conn.execute(
                 "SELECT 1 FROM rebuild_jobs "
-                "WHERE mode='full_build' AND job_type='all' "
-                "AND state IN ('queued','running') LIMIT 1"
+                "WHERE mode=? AND job_type='all' "
+                "AND state IN ('queued','running') LIMIT 1",
+                (mode,),
             ).fetchone()
         else:
             row = conn.execute(
                 "SELECT 1 FROM rebuild_jobs "
-                "WHERE mode='full_build' AND target_id=? "
+                "WHERE mode=? AND target_id=? "
                 "AND state IN ('queued','running') LIMIT 1",
-                (book_name,),
+                (mode, book_name),
             ).fetchone()
     return row is not None
 
@@ -99,7 +105,10 @@ def _is_already_queued_or_running(book_name: str | None) -> bool:
 @router.post("/novel/build/enqueue")
 @log_and_raise_500("novel/build/enqueue")
 def post_enqueue(request: EnqueueRequest) -> dict:
-    """Full Build ジョブをキューに登録する（API §8.1）。"""
+    """Full Build / コンテキスト生成ジョブをキューに登録する（API §8.1）。"""
+    if request.mode not in _BUILD_MODES:
+        raise HTTPException(status_code=422, detail=f"invalid mode: {request.mode}")
+
     if not request.all_books and not request.book_name:
         raise HTTPException(
             status_code=422, detail="book_name is required when all_books=false"
@@ -107,13 +116,13 @@ def post_enqueue(request: EnqueueRequest) -> dict:
 
     target_book = None if request.all_books else request.book_name
 
-    if _is_already_queued_or_running(target_book):
+    if _is_already_queued_or_running(target_book, request.mode):
         raise HTTPException(
             status_code=422, detail="already queued or running"
         )
 
     job_type = "all" if request.all_books else "book"
-    job_id, queued_position = job_queue.enqueue(job_type, target_book, "full_build")
+    job_id, queued_position = job_queue.enqueue(job_type, target_book, request.mode)
     return {"job_id": job_id, "queued_position": queued_position}
 
 

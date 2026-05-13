@@ -17,7 +17,7 @@ from utils.logger import get_logger
 from .builder import _resolve_images_dir, _store_ocr_pages, rebuild_from_pages
 from .connection import with_db
 from .extractor import run_ocr_subprocess
-from .full_builder import build_book_full
+from .full_builder import build_book_contexts, build_book_full
 from .schema import init_schema
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ JobType = Literal["book", "series", "all"]
 # "rebuild": チャンク化・embedding 再構築（OCR 済みの pages.full_text を使う）
 # "ocr"    : OCR ステップ（images/*.png → pages.full_text）
 # "pdf_text"/"reocr": 旧モード名。DB に残った既存ジョブとの互換性のため "rebuild" と同じ動作にする
-JobMode = Literal["rebuild", "ocr", "pdf_text", "reocr", "full_build"]
+JobMode = Literal["rebuild", "ocr", "pdf_text", "reocr", "full_build", "generate_contexts"]
 JobState = Literal["queued", "running", "completed", "failed", "canceled"]
 
 
@@ -255,7 +255,7 @@ class NovelDbJobQueue:
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
         elif mode == "full_build":
-            # 全構築統合: rebuild_from_pages → summarize → extract_chars → char_summary → contexts
+            # 全構築統合: rebuild_from_pages → summarize → extract_chars → char_summary
             def _step_cb(msg: str, _jid: int = job_id) -> None:
                 self._update_step(_jid, msg)
 
@@ -268,6 +268,20 @@ class NovelDbJobQueue:
                 build_book_full(book_name, step_callback=_step_cb, detail_callback=_detail_cb)
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d full_build progress: %d/%d (%s)", job_id, done, total, book_name)
+        elif mode == "generate_contexts":
+            # Step 3 単独: チャンクごとの文脈付与 + 再 embedding
+            def _ctx_step_cb(msg: str, _jid: int = job_id) -> None:
+                self._update_step(_jid, msg)
+
+            for done, book_name in enumerate(targets, start=1):
+                _prefix = f"冊 {done}/{total} 処理中 | " if total > 1 else ""
+
+                def _ctx_detail_cb(detail: str, _jid: int = job_id, _p: str = _prefix) -> None:
+                    self._update_detail(_jid, _p + detail)
+
+                build_book_contexts(book_name, step_callback=_ctx_step_cb, detail_callback=_ctx_detail_cb)
+                self._update_progress(job_id, done, total)
+                logger.info("Job %d generate_contexts progress: %d/%d (%s)", job_id, done, total, book_name)
         else:
             # rebuild / pdf_text（後方互換）: pages.full_text → chunks/embeddings
             for done, book_name in enumerate(targets, start=1):
