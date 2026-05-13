@@ -20,7 +20,7 @@ export interface UseNovelDbHistory {
     refetch: () => Promise<void>;
 }
 
-export function useNovelDbHistory(): UseNovelDbHistory {
+export function useNovelDbHistory(book?: string): UseNovelDbHistory {
     const [items, setItems] = useState<QaHistoryEntry[]>([]);
     const [total, setTotal] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +30,7 @@ export function useNovelDbHistory(): UseNovelDbHistory {
         setIsLoading(true);
         setError(null);
         try {
-            const res = await fetchQaHistory(0, FETCH_LIMIT);
+            const res = await fetchQaHistory(0, FETCH_LIMIT, book);
             setItems(Array.isArray(res?.items) ? res.items : []);
             setTotal(typeof res?.total === 'number' ? res.total : 0);
         } catch (e) {
@@ -38,7 +38,7 @@ export function useNovelDbHistory(): UseNovelDbHistory {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [book]);
 
     useEffect(() => {
         void refetch();

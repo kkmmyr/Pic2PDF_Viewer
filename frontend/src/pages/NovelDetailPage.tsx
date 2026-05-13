@@ -3,6 +3,7 @@
  *
  * 書籍ごとの情報集約ハブ：メタ / 要約 / 登場人物 / 読書会履歴を 1 画面に集約し、
  * リーダー・読書会ページへの導線を提供する。
+ * 既存セクションの下に検索・会話 QA・質問＋履歴をこの本固定スコープで追加（2026-05-14）。
  */
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -22,14 +23,21 @@ import {
     BookMetaEditModal,
     CharacterDetailDialog,
     CharactersPanel,
+    ChatSection,
+    QuestionSection,
     RebuildJobBanner,
+    SearchSection,
 } from '../components/novel_db';
 import BookMetaList from '../components/novel_db/BookMetaList';
 import DiscussionHistoryItemCard from '../components/novel_db/DiscussionHistoryItem';
 import type { DiscussionHistoryItem } from '../features/novel_db/api';
 import { fetchDiscussionHistory } from '../features/novel_db/api';
 import type { BookDetail } from '../features/novel_db/types';
-import { useBookDetail, useNovelDbRebuildJob } from '../hooks/novel_db';
+import {
+    useBookDetail,
+    useNovelDbHistory,
+    useNovelDbRebuildJob,
+} from '../hooks/novel_db';
 import { formatSqliteUtcAsJst } from '../utils/date';
 
 export default function NovelDetailPage() {
@@ -37,8 +45,18 @@ export default function NovelDetailPage() {
     const navigate = useNavigate();
     const decodedName = bookName ? decodeURIComponent(bookName) : '';
 
+    const bookScope = { type: 'book' as const, id: decodedName };
+
     const { detail, isLoading, error, refetch } = useBookDetail(decodedName);
     const { status: rebuildStatus, enqueue: enqueueRebuild } = useNovelDbRebuildJob(refetch);
+    const {
+        items: history,
+        isLoading: historyLoading,
+        deleteItem: deleteHistory,
+        refetch: refetchHistory,
+    } = useNovelDbHistory(decodedName);
+
+    const isLocked = rebuildStatus?.is_running ?? false;
 
     const [charDialog, setCharDialog] = useState<{ book: string; char: string } | null>(null);
     const [editBook, setEditBook] = useState<BookDetail | null>(null);
@@ -260,6 +278,19 @@ export default function NovelDetailPage() {
                     </div>
                 )}
             </section>
+
+            {/* 検索・会話 QA・質問＋履歴（この本固定スコープ） */}
+            <SearchSection scope={bookScope} onOpenImage={handleOpenScene} disabled={isLocked} />
+            <ChatSection scope={bookScope} disabled={isLocked} />
+            <QuestionSection
+                scope={bookScope}
+                history={history}
+                historyLoading={historyLoading}
+                onHistoryDelete={(id) => void deleteHistory(id)}
+                onHistoryRefetch={refetchHistory}
+                onOpenImage={handleOpenScene}
+                disabled={isLocked}
+            />
 
             {/* ダイアログ類 */}
             <CharacterDetailDialog

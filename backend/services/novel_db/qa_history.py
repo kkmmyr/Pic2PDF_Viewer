@@ -67,16 +67,29 @@ def save_error(conn: sqlite3.Connection, history_id: int, error: str) -> None:
 
 
 def list_history(
-    conn: sqlite3.Connection, offset: int = 0, limit: int = 20
+    conn: sqlite3.Connection, offset: int = 0, limit: int = 20, book: str | None = None
 ) -> dict:
-    """[API §7.5] 一覧（要約）。"""
-    rows = conn.execute(
-        "SELECT id, asked_at, finished_at, scope_type, scope_id, question, answer, "
-        "done_reason FROM qa_history "
-        "ORDER BY asked_at DESC, id DESC LIMIT ? OFFSET ?",
-        (limit, offset),
-    ).fetchall()
-    total = conn.execute("SELECT COUNT(*) FROM qa_history").fetchone()[0]
+    """[API §7.5] 一覧（要約）。book 指定時はその書籍への質問のみ返す。"""
+    if book is not None:
+        rows = conn.execute(
+            "SELECT id, asked_at, finished_at, scope_type, scope_id, question, answer, "
+            "done_reason FROM qa_history "
+            "WHERE scope_type='book' AND scope_id=? "
+            "ORDER BY asked_at DESC, id DESC LIMIT ? OFFSET ?",
+            (book, limit, offset),
+        ).fetchall()
+        total = conn.execute(
+            "SELECT COUNT(*) FROM qa_history WHERE scope_type='book' AND scope_id=?",
+            (book,),
+        ).fetchone()[0]
+    else:
+        rows = conn.execute(
+            "SELECT id, asked_at, finished_at, scope_type, scope_id, question, answer, "
+            "done_reason FROM qa_history "
+            "ORDER BY asked_at DESC, id DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+        total = conn.execute("SELECT COUNT(*) FROM qa_history").fetchone()[0]
 
     items = []
     for row in rows:

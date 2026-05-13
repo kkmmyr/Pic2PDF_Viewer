@@ -3,7 +3,6 @@
 LLM (stream_qa) と embedder (embed_batch) はモックする。
 """
 import json
-from collections.abc import AsyncIterator
 
 import pytest
 
@@ -262,3 +261,54 @@ def test_delete_qa_history_returns_204(client, search_setup, monkeypatch):
 def test_delete_qa_history_returns_404_for_missing(client, search_setup):
     res = client.delete("/api/novel_db/qa/history/99999")
     assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# 履歴 book フィルタ (§7.5 book パラメータ)
+# ---------------------------------------------------------------------------
+
+def _make_qa(client, monkeypatch, question: str, scope: dict) -> int:
+    """QA を 1 件作成して history_id を返すヘルパー。"""
+    from routers import novel_db as router_mod
+    monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
+    history_id = None
+    with client.stream("POST", "/api/novel_db/qa", json={"question": question, "scope": scope}) as resp:
+        for line in resp.iter_lines():
+            if line.startswith("data: "):
+                ev = json.loads(line[6:])
+                if ev.get("done"):
+                    history_id = ev["history_id"]
+    return history_id
+
+
+def test_get_qa_history_book_filter_returns_only_matching(client, search_setup, monkeypatch):
+    """book パラメータを指定すると、その書籍への質問のみ返る。"""
+    _make_qa(client, monkeypatch, "Q-book1", {"type": "book", "id": "book-1"})
+    _make_qa(client, monkeypatch, "Q-all", {"type": "all"})
+
+    res = client.get("/api/novel_db/qa/history", params={"book": "book-1"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] == 1
+    assert body["items"][0]["question"] == "Q-book1"
+
+
+def test_get_qa_history_book_filter_empty_when_no_match(client, search_setup, monkeypatch):
+    """一致する書籍への質問がない場合は空リストを返す。"""
+    _make_qa(client, monkeypatch, "Q-all", {"type": "all"})
+
+    res = client.get("/api/novel_db/qa/history", params={"book": "nonexistent-book"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["total"] == 0
+    assert body["items"] == []
+
+
+def test_get_qa_history_without_book_filter_returns_all(client, search_setup, monkeypatch):
+    """book パラメータなしの場合は全件返す（既存動作に変更なし）。"""
+    _make_qa(client, monkeypatch, "Q-book1", {"type": "book", "id": "book-1"})
+    _make_qa(client, monkeypatch, "Q-all", {"type": "all"})
+
+    res = client.get("/api/novel_db/qa/history")
+    assert res.status_code == 200
+    assert res.json()["total"] == 2
