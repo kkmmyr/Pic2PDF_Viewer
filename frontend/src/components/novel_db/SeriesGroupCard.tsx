@@ -1,4 +1,4 @@
-import { BookOpen, Users } from 'lucide-react';
+import { Check, Minus, BookOpen, Users } from 'lucide-react';
 
 import type { NovelBookGroup } from '../../hooks/useNovelLibraryGroup';
 import type { GroupMode } from '../../hooks/useNovelLibraryGroup';
@@ -7,18 +7,42 @@ interface Props {
     group: NovelBookGroup;
     groupMode: GroupMode;
     onClick: () => void;
+    isSelecting?: boolean;
+    selectionState?: 'all' | 'partial' | 'none';
+    onSelect?: () => void;
 }
 
-export default function SeriesGroupCard({ group, groupMode, onClick }: Props) {
+export default function SeriesGroupCard({
+    group,
+    groupMode,
+    onClick,
+    isSelecting,
+    selectionState,
+    onSelect,
+}: Props) {
     const { representative, books, label } = group;
+
+    const handleClick = () => {
+        if (isSelecting && onSelect) {
+            onSelect();
+        } else {
+            onClick();
+        }
+    };
 
     return (
         <button
             className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded-lg"
-            onClick={onClick}
-            aria-label={`${label} を開く`}
+            onClick={handleClick}
+            aria-label={isSelecting ? `${label} を選択` : `${label} を開く`}
         >
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 hover:border-accent-400 dark:hover:border-accent-500 transition-colors">
+            <div
+                className={`border rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-colors ${
+                    isSelecting && selectionState !== 'none'
+                        ? 'border-primary-400 dark:border-primary-500'
+                        : 'border-gray-200 dark:border-gray-700 hover:border-accent-400 dark:hover:border-accent-500'
+                }`}
+            >
                 <div className="relative">
                     {representative.thumbnail_url ? (
                         <img
@@ -41,6 +65,21 @@ export default function SeriesGroupCard({ group, groupMode, onClick }: Props) {
                         )}
                         {books.length}
                     </span>
+                    {/* 選択モード: チェックボックス */}
+                    {isSelecting && (
+                        <span
+                            className={`absolute top-1.5 left-1.5 flex items-center justify-center w-5 h-5 rounded-full border-2 ${
+                                selectionState !== 'none'
+                                    ? 'bg-primary-600 border-primary-600'
+                                    : 'bg-white/90 dark:bg-gray-900/90 border-gray-300 dark:border-gray-600'
+                            }`}
+                        >
+                            {selectionState === 'all' && <Check className="w-3 h-3 text-white" />}
+                            {selectionState === 'partial' && (
+                                <Minus className="w-3 h-3 text-white" />
+                            )}
+                        </span>
+                    )}
                 </div>
                 <div className="p-2">
                     <p
