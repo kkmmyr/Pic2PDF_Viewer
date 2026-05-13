@@ -3,10 +3,9 @@ import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import GeneratorPage from './pages/GeneratorPage';
 import ViewerPage from './pages/ViewerPage';
-import OCRPage from './pages/OCRPage';
 import HitomiPage from './pages/HitomiPage';
 import NovelDbPage from './pages/NovelDbPage';
-import NovelBuildPage from './pages/NovelBuildPage';
+import NovelManagePage from './pages/NovelManagePage';
 import NovelDetailPage from './pages/NovelDetailPage';
 import NovelDiscussionPage from './pages/NovelDiscussionPage';
 import NovelReaderPage from './pages/NovelReaderPage';
@@ -60,10 +59,10 @@ function App() {
                             }
                         />
                         <Route
-                            path="novel/ocr"
+                            path="novel/manage"
                             element={
                                 <ErrorBoundary>
-                                    <OCRPage />
+                                    <NovelManagePage />
                                 </ErrorBoundary>
                             }
                         />
@@ -88,14 +87,6 @@ function App() {
                             element={
                                 <ErrorBoundary>
                                     <NovelReaderPage />
-                                </ErrorBoundary>
-                            }
-                        />
-                        <Route
-                            path="novel/build"
-                            element={
-                                <ErrorBoundary>
-                                    <NovelBuildPage />
                                 </ErrorBoundary>
                             }
                         />

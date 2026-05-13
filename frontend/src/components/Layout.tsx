@@ -4,14 +4,13 @@ import {
     BookOpen,
     BookText,
     FileText,
-    Hammer,
     Library,
     MessageSquare,
     Moon,
     Settings,
     Sparkles,
     Sun,
-    Terminal,
+    Wrench,
 } from 'lucide-react';
 import { useDarkMode } from '../hooks';
 
@@ -46,8 +45,7 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
             { to: '/novel/db', icon: BookOpen, label: 'DB' },
             { to: '/novel/discussion', icon: MessageSquare, label: '読書会' },
-            { to: '/novel/ocr', icon: Terminal, label: 'OCR' },
-            { to: '/novel/build', icon: Hammer, label: 'Build' },
+            { to: '/novel/manage', icon: Wrench, label: '管理' },
         ],
     },
 ];

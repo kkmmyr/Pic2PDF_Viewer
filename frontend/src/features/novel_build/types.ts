@@ -20,6 +20,7 @@ export interface BuildJob {
 export interface FinishedJob {
     id: number;
     target_id: string | null;
+    mode?: BuildMode;
     state: 'completed' | 'failed' | 'canceled';
     finished_at: string;
     error_message: string | null;

@@ -85,6 +85,7 @@ describe('useNovelBuildQueue', () => {
         expect(mockedPost).toHaveBeenCalledWith('/api/novel/build/enqueue', {
             book_name: '花太郎',
             all_books: false,
+            mode: 'full_build',
         });
         expect(result.current.isEnqueuing).toBe(false);
         expect(result.current.enqueueError).toBeNull();
@@ -142,6 +143,7 @@ describe('useNovelBuildQueue', () => {
         expect(mockedPost).toHaveBeenCalledWith('/api/novel/build/enqueue', {
             book_name: null,
             all_books: true,
+            mode: 'full_build',
         });
     });
 
