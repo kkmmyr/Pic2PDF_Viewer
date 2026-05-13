@@ -67,14 +67,12 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gem
 # 軽量モデルで十分」と推奨されており、gemma4:e4b で代用する。
 # 品質不足が確認されたら NOVEL_DB_LLM_MODEL（qwen3.6:35b-a3b）にフォールバック。
 #
-# TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) の評価
+# TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) の再評価
 #   Gemma4 公式が MTP による 1.5〜2× 高速化を発表（2026-05）。
-#   e4b は Dense モデルのため batch_size=1 でも MTP の恩恵を受けやすい。
-#   手順:
-#     1. Ollama に `bjoernb/gemma4-e4b-fast`（MTP 対応版）を追加
-#        `ollama pull bjoernb/gemma4-e4b-fast`
-#     2. この変数を "bjoernb/gemma4-e4b-fast" に変更して全書籍で速度計測
-#     3. 品質劣化がなければ既定値を MTP モデルに切替
+#   2026-05-13 実機検証: `bjoernb/gemma4-e4b-fast` は同一 GGUF ウェイトで
+#   速度差ゼロ（31.3 t/s = gemma4:e4b と同値）。Ollama 0.23.2 時点では
+#   MTP ヘッドが未サポート、または e4b GGUF に MTP ヘッドが含まれていない。
+#   今後 Ollama / llama.cpp が公式 MTP をサポートしたら再計測すること。
 #   参考: https://ai.google.dev/gemma/docs/mtp/overview?hl=ja
 NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
 
