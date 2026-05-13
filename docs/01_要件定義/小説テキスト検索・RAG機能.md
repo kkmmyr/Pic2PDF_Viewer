@@ -197,7 +197,7 @@ PoC 検証結果: [docs/05_記録/](../05_記録/) で別途記録予定（任�
     - `backend/data/kindle_novel/pdfs/` 配下の PDF
     - `app.mount("/kindle_novel/pdfs", ...)` の StaticFiles マウント（[main.py:69](../../backend/main.py#L69)）
     - `STATIC_PATHS.PDF` の `source === 'novel'` 分岐（[api.ts:110](../../frontend/src/config/api.ts#L110)）
-    - `kindle-pdf/batch_ocr.py` / `searchable_pdf.py` を novel 用途から外す（kindle 用は残す）
+    - `kindle-pdf/batch_ocr.py` / `searchable_pdf.py` / `start_batch_ocr.bat` を削除（Phase 5 で実施済み）
 
 ### 7.2 保持する資産
 

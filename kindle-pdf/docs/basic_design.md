@@ -1,62 +1,79 @@
-# Kindle PDF化ツール 基本設計書
+# Kindle キャプチャツール 基本設計書
 
 ## 1. システム概要
-本システムは、Windows版「Kindle for PC」で開いている書籍を自動的にページめくりしながらスクリーンショットを撮影し、最終的に一冊のPDFファイルとして保存する自動化ツールである。
-ユーザーの手動操作を最小限に抑え、固定レイアウトやフルスクリーン表示など、複数のキャプチャモードに対応する。
 
-## 2. 目的
-*   Kindle書籍のバックアップおよびPDF化の作業効率化。
-*   手動でのスクリーンショット撮影やリネーム、PDF結合の手間を削減する。
+Windows 版「Kindle for PC」で開いている書籍を自動的にページめくりしながらスクリーンショットを撮影し、画像として保存する自動化ツール群。漫画用（`run_comic.bat`）と小説用（`run_novel.bat`）の 2 系統がある。
 
-## 3. 機能要件
+- **漫画（comic ソース）**: キャプチャ後に PDF を生成し `backend/data/comic/` へ保存。
+- **小説（novel ソース）**: キャプチャした画像を `backend/data/kindle_novel/images/` へ保存のみ。OCR・PDF 生成・RAG インデックス構築は backend の job queue（`/novel/manage`）で実施する。
 
-### 3.1. 基本機能
-*   **Kindleウィンドウ検出**: 起動中のKindle for PCウィンドウを自動的に特定し、操作対象とする。
-*   **タイトル自動取得**: ウィンドウタイトルから書籍名を取得し、保存ファイル名（フォルダ名）の候補とする。
-*   **ページめくり自動化**: キーボード入力（左矢印キー）のエミュレーションにより、ページを自動でめくる。
-*   **変化検知・終了判定**: ページめくり後の画像変化を検知して次へ進む。一定時間変化がない場合は終了とみなす。
-*   **PDF作成**: 保存された連番画像を結合し、PDFファイルを作成する。
+## 2. 動作環境
 
-### 3.2. キャプチャモード
-本システムは以下の2つのモードを提供する。
+- **OS**: Windows 10/11
+- **対象アプリ**: Kindle for PC
+- **言語**: Python 3.x（`uv` で管理。`pyproject.toml` / `uv.lock`）
+- **主な外部ライブラリ**:
+    - `pyautogui`: キーボード・マウス操作
+    - `pillow` (PIL): スクリーンショット取得
+    - `opencv-python` (cv2): 画像保存・解析
+    - `numpy`: 画像データ処理
 
-#### (1) 固定クロップモード (`main.py`)
-*   Kindleウィンドウを指定サイズ（または現在のサイズ）で利用し、ウィンドウ内の**固定された相対座標**を切り抜く。
-*   主にウィンドウサイズやレイアウトが一定の書籍向け。
+## 3. 起動方法
 
-#### (2) フルスクリーン・自動検出モード (`main_auto.py`)
-*   Kindleを**フルスクリーン表示 (F11)** に切り替えて撮影を行う。
-*   **コンテンツ境界の自動検出**: 1ページ目の画像を解析し、左右の余白（黒帯）を除去したコンテンツ領域を自動的に算出する。
-*   **UI回避**: 画面端のページ送りボタンなどのUI要素を避けてキャプチャ範囲を決定する。
+```
+kindle-pdf\run_comic.bat   # 漫画キャプチャ（main_auto.py を起動）
+kindle-pdf\run_novel.bat   # 小説キャプチャ（main_novel.py を起動）
+```
 
-## 4. 動作環境
-*   **OS**: Windows 10/11
-*   **対象アプリ**: Kindle for PC
-*   **言語**: Python 3.x
-*   **外部ライブラリ**:
-    *   `pyautogui`: キーボード・マウス操作
-    *   `pillow` (PIL): スクリーンショット取得
-    *   `opencv-python` (cv2): 画像保存、画像解析
-    *   `numpy`: 画像データ処理
+## 4. 機能概要
 
-## 5. 入出力
-*   **入力**: 
-    *   Kindle for PCで開かれた書籍
-    *   ユーザーによるタイトル確認・修正（ダイアログ）
-*   **出力**:
-    *   **画像**: `./output/img/[書籍名]/[連番].png`
-    *   **PDF**: `./output/pdf/[書籍名].pdf`
+### 4.1. 漫画キャプチャ（フルスクリーン・自動検出モード）
 
-## 6. ディレクトリ構成
+- Kindle を F11 フルスクリーンに切り替えて撮影。
+- 1 ページ目の画像を解析し、左右の黒帯（余白）を自動除去してコンテンツ領域を決定。
+- 撮影後に画像をまとめて PDF 化し `backend/data/comic/pdfs/` に保存。
+
+### 4.2. 小説キャプチャ（白背景検出モード）
+
+- Kindle を F11 フルスクリーンに切り替えて撮影。
+- 白背景（`WHITE_THRESHOLD = 240`）をもとにテキスト領域の左右端を自動検出。
+- 画像のみ `backend/data/kindle_novel/images/<書籍名>/` に保存する（PDF 化・OCR はしない）。
+
+## 5. ディレクトリ構成
+
 ```text
 kindle-pdf/
-├── main.py           # メインスクリプト（固定モード基本クラス）
-├── main_auto.py      # フルスクリーン・自動検出モードスクリプト
-├── requirements.txt  # 依存ライブラリ一覧
-├── output/           # 出力ディレクトリ
-│   ├── img/          # 画像保存先
-│   └── pdf/          # PDF保存先
-└── docs/             # ドキュメント
-    ├── basic_design.md    # 基本設計書
-    └── detailed_design.md # 詳細設計書
+├── capturer.py           # 基底クラス (Config, KindleCapturer, AutoConfig, AutoKindleCapturer)
+├── main_manual.py        # 固定クロップモード（旧 main.py）
+├── main_auto.py          # 漫画用フルスクリーン・自動検出モード
+├── novel_capturer.py     # 小説用クラス (NovelConfig, NovelKindleCapturer)
+├── main_novel.py         # 小説キャプチャ起動スクリプト
+├── run_comic.bat         # 漫画キャプチャ起動（main_auto.py を呼び出す）
+├── run_novel.bat         # 小説キャプチャ起動（main_novel.py を呼び出す）
+├── pyproject.toml        # uv 依存管理
+├── uv.lock               # uv ロックファイル
+└── docs/
+    ├── basic_design.md
+    └── detailed_design.md
+```
+
+## 6. 入出力
+
+| 系統 | 入力 | 出力 |
+|---|---|---|
+| 漫画 | Kindle for PC（開いた書籍） | 画像: `backend/data/comic/images/<書籍名>/` → PDF: `backend/data/comic/pdfs/<書籍名>.pdf` |
+| 小説 | Kindle for PC（開いた書籍） | 画像のみ: `backend/data/kindle_novel/images/<書籍名>/` |
+
+## 7. OCR・後処理フロー
+
+漫画は capturer が直接 PDF を生成する。小説は画像保存のみで、後続処理は backend が担う。
+
+```
+[小説キャプチャ完了]
+        ↓
+backend/data/kindle_novel/images/<書籍名>/001.png ...
+        ↓
+/novel/manage（管理画面）から OCR ジョブをキュー投入
+        ↓
+yomitoku OCR → Searchable PDF → RAG インデックス構築
 ```

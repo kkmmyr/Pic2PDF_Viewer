@@ -62,14 +62,9 @@ uv run python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available
 
 ## 実行方法
 
-GPU 環境で OCR を実行する場合は `uv run` でコマンドを実行する（仮想環境のアクティベートは不要）:
-
-```powershell
-cd kindle-pdf
-uv run python batch_ocr.py
-```
-
-または同梱の `start_batch_ocr.bat` を利用。
+GPU 環境での OCR は管理画面（`/novel/manage`）の「OCR」タブから実行する。
+`batch_ocr.py` / `start_batch_ocr.bat` は Phase 5 で削除済み。
+OCR は `services/novel_db/extractor.py` → `D:\61.tool\common\ocr\` の独立 venv 経由で動作する。
 
 ## トラブルシューティング
 

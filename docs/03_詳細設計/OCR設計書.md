@@ -5,17 +5,20 @@
 - 最終更新: 2026-05-09（novel ソースの新機能（テキスト DB 化）への移行方針を追記）
 - 関連: [ADR-0003: image-only モード](../02_基本設計/ADR/0003_generated-image-only-mode.md)（`generated` ソースは OCR 対象外）、[GPU環境セットアップ.md](../04_環境構築/GPU環境セットアップ.md)（`uv` ベースに更新済み）
 
-> **2026-05-09 注記**: novel ソース（`backend/data/kindle_novel/`）については、Searchable PDF を中間成果物として持つ運用から、**OCR テキストを SQLite に取り込み検索・質問応答する新機能** に移行する方針が確定。本設計書（yomitoku ベースの Searchable PDF 生成）は **kindle ソースで引き続き利用** + **novel の書籍単位の再 OCR モード（将来）** で使用される。novel タブの新ビューア仕様は [小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) / [バックエンド設計](小説テキスト検索・RAG機能_バックエンド設計.md) / [フロントエンド設計](小説テキスト検索・RAG機能_フロントエンド設計.md) を参照。
+> **2026-05-09 注記**: novel ソース（`backend/data/kindle_novel/`）については、Searchable PDF を中間成果物として持つ運用から、**OCR テキストを SQLite に取り込み検索・質問応答する新機能** に移行する方針が確定。novel タブの新ビューア仕様は [小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) / [バックエンド設計](小説テキスト検索・RAG機能_バックエンド設計.md) / [フロントエンド設計](小説テキスト検索・RAG機能_フロントエンド設計.md) を参照。
+
+> **2026-05-13 更新**: `ocr_service.py` を `start_batch_ocr.bat` 経由のサブプロセス起動からスレッドベース実装に刷新。`POST /api/ocr/run` は管理画面「OCR」タブから直接 `run_ocr_subprocess` + `_store_ocr_pages` を呼ぶ方式で再び動作する。
 
 ---
 
 ## アーキテクチャ概要
 
-**現在の OCR フロー**（novel_db rebuild 経由）:
+**現在の OCR フロー**（管理画面「OCR」タブ経由）:
 ```
 kindle-pdf/main_novel.py  →  kindle_novel/images/{書籍名}/*.png  (キャプチャのみ)
                                           ↓
-services/novel_db/extractor.py (run_ocr_subprocess)
+POST /api/ocr/run  →  services/ocr_service.py (スレッド起動)
+  → services/novel_db/extractor.py (run_ocr_subprocess)
   → D:\61.tool\common\ocr\venv\Scripts\python.exe ocr_worker.py
   → YomitokuEngine.extract_text()
                                           ↓
@@ -28,7 +31,7 @@ services/novel_db/extractor.py (run_ocr_subprocess)
 kindle-pdf/batch_ocr.py (削除済み) → YomitokuEngine → kindle-pdf/searchable_pdf.py (削除済み)
 → kindle_novel/pdfs/{書籍名}.pdf
 ```
-`batch_ocr.py` / `searchable_pdf.py` / `start_batch_ocr.bat` は Phase 5（旧 PDF 経路撤去）で削除。`POST /api/ocr/run` は現在動作しない。
+`batch_ocr.py` / `searchable_pdf.py` / `start_batch_ocr.bat` は Phase 5（旧 PDF 経路撤去）で削除。
 
 ### 関連ファイル
 

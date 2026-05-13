@@ -1,77 +1,112 @@
-# Kindle PDF化ツール 詳細設計書
+# Kindle キャプチャツール 詳細設計書
 
 ## 1. モジュール構成・クラス設計
 
-本システムは、基本機能を実装する `main.py` と、それを継承・拡張した `main_auto.py` で構成される。
+### 1.1. `capturer.py`（基底クラス群）
 
-### 1.1. `main.py` (基本機能)
+#### `Config`（データクラス）
 
-#### `Config` (データクラス)
 アプリケーションの全体設定を管理する。
-*   `KINDLE_WINDOW_TITLE`: 対象ウィンドウタイトル
-*   `PAGE_CHANGE_KEY`: ページめくりキー ('left')
-*   `CROP_X1` ～ `CROP_Y2`: キャプチャ時のクロップ範囲（ウィンドウ相対座標）
-*   `IMG_OUTPUT_DIR`, `PDF_OUTPUT_DIR`: 出力先パス
 
-#### `KindleCapturer` (クラス)
-キャプチャの中核ロジックを担う。
+| フィールド | 説明 |
+|---|---|
+| `KINDLE_WINDOW_TITLE` | 対象ウィンドウタイトル |
+| `PAGE_CHANGE_KEY` | ページめくりキー (`'left'`) |
+| `WAIT_SEC` / `TIMEOUT_SEC` | 待機・タイムアウト秒数 |
+| `CROP_X1` 〜 `CROP_Y2` | キャプチャ時のクロップ範囲（ウィンドウ相対座標） |
+| `IMG_OUTPUT_DIR` | 漫画画像の出力先: `backend/data/comic/images/` |
+| `PDF_OUTPUT_DIR` | 漫画 PDF の出力先: `backend/data/comic/pdfs/` |
 
-*   **`find_window()`**: `EnumWindows` APIを使用してKindleウィンドウを検索し、ハンドル(`hwnd`)を取得する。
-*   **`setup_window()`**: ウィンドウを最前面に表示(`SetForegroundWindow`)し、中央をクリックしてフォーカスを確保する。
-*   **`get_book_title()`**: ウィンドウタイトルから書籍名を抽出する。
-    *   サニタイズ処理: "Kindle for PC - " プレフィックスの削除、特定文字列（"工藤智康さんの"など）の削除、禁止文字の置換、空白の正規化。
-    *   ダイアログ表示: `simpledialog` を使用してユーザーに確認・編集を求める。
-*   **`capture_loop(title)`**: メイン処理ループ。
-    1.  保存先ディレクトリを作成。
-    2.  `_capture_screen()` で現在の画面を取得。
-    3.  `_save_image()` で保存（`cv2.imencode`使用で日本語パス対応）。
-    4.  `_next_page()` でページめくり（キーボード操作）。
-    5.  画像の変化がなくなるかタイムアウトするまで待機。
-    6.  変化がなくなれば次ページとして保存。一定時間変化なしで終了。
-*   **`create_pdf(title, image_dir)`**: 保存された連番画像(PNG)を読み込み、PDFファイルを作成する。
+#### `KindleCapturer`（クラス）
 
-### 1.2. `main_auto.py` (自動検出拡張)
+- **`find_window()`**: `EnumWindows` API で Kindle ウィンドウを検索しハンドル取得。
+- **`setup_window()`**: ウィンドウ最前面化・フォーカス確保。
+- **`get_book_title()`**: ウィンドウタイトルから書籍名を抽出し、ダイアログで確認。
+- **`capture_loop(title)`**: メインキャプチャループ（画面取得→保存→ページめくり→変化待ち）。
+- **`create_pdf(title, image_dir)`**: 連番 PNG から PDF を生成。
 
-#### `AutoConfig` (継承クラス)
-`Config` を継承し、自動検出用の設定を追加。
-*   `FULLSCREEN_CROP_TOP`, `FULLSCREEN_CROP_BOTTOM_MARGIN`: 上下の固定マージン。
-*   `BLACK_THRESHOLD`: 黒帯判定の閾値。
-*   `SIDE_IGNORE_PX`: 画面左右のUI（矢印等）を無視するための開始オフセット。
+#### `AutoConfig`（継承クラス）
 
-#### `AutoKindleCapturer` (継承クラス)
-`KindleCapturer` を継承し、以下のメソッドをオーバーライドまたは追加。
+フルスクリーン検出用の設定を追加。
 
-*   **`setup_window()` (オーバーライド)**:
-    1.  ウィンドウアクティブ化。
-    2.  `F11` キー送信でフルスクリーン化。
-    3.  **動的検出 (`_detect_boundaries`)** を実行。
-    4.  計算された範囲で `config.CROP_*` を更新。
-    5.  マウスカーソルを画面右側の安全地帯（黒帯）へ退避。
-*   **`_detect_boundaries(img, w, h)`**:
-    *   画面の上部(1/4)、中央(1/2)、下部(3/4)の3ラインをスキャン。
-    *   左右それぞれ `SIDE_IGNORE_PX` 分だけ内側からスキャン開始。
-    *   `BLACK_THRESHOLD` 以下のピクセルを「黒」とみなす。
-    *   3ラインの結果から、**最も広いコンテンツ幅**（左端の最小値、右端の最大値）を採用してクロップ範囲とする。
-*   **`cleanup()`**: 終了時にフルスクリーンを解除(`F11`)する。
+| フィールド | 説明 |
+|---|---|
+| `FULLSCREEN_CROP_TOP` / `FULLSCREEN_CROP_BOTTOM_MARGIN` | 上下の固定マージン |
+| `BLACK_THRESHOLD` | 黒帯判定閾値 |
+| `SIDE_IGNORE_PX` | 左右 UI（矢印等）を無視する開始オフセット |
 
-## 2. 処理フロー詳細 (自動検出モード)
+#### `AutoKindleCapturer`（継承クラス）
 
-1.  **起動**: `main_auto.py` を実行。
-2.  **ウィンドウ特定**: `Kindle for PC` を検索。
-3.  **フルスクリーン化**: `setup_window` で `F11` 送信。
-4.  **タイトル取得**: ダイアログで入力（※フルスクリーン後だと隠れることがあるため、実装上は前後調整あり）。
-5.  **境界検出**: 
-    - フルスクリーンでの全画面キャプチャを取得。
-    - 3ラインスキャンで黒帯を除去したコンテンツ領域を特定。
-6.  **撮影・保存ループ**:
-    - 指定領域のみクロップして保存。
-    - 左キーでページ送り。
-    - タイムアウトまで継続。
-7.  **終了・PDF化**:
-    - フルスクリーン解除。
-    - 取得した画像をPDFに変換。
+- **`setup_window()` (オーバーライド)**: F11 でフルスクリーム化 → `_detect_boundaries` 実行 → CROP 座標を更新。
+- **`_detect_boundaries(img, w, h)`**: 上部・中央・下部の 3 ラインをスキャンし、黒帯を除いたコンテンツ領域を算出。
+- **`cleanup()`**: 終了時に F11 でフルスクリーンを解除。
 
-## 3. 今後の拡張性・保守
-*   **閾値調整**: 書籍によって背景が完全な黒でない場合、`BLACK_THRESHOLD` を調整可能。
-*   **UI回避**: ページ送り矢印の位置が変わった場合、`SIDE_IGNORE_PX` を調整。
-*   **リトライ**: ページめくり失敗時のリトライロジックなどを `capture_loop` に追加可能。
+---
+
+### 1.2. `main_manual.py`（固定クロップモード）
+
+`KindleCapturer` を固定クロップ設定で起動するエントリーポイント。ウィンドウサイズ・レイアウトが一定の書籍向け。
+
+### 1.3. `main_auto.py`（漫画用フルスクリーン起動）
+
+`AutoKindleCapturer` を使い、フルスクリーン・自動検出モードで漫画をキャプチャして PDF を生成する。`run_comic.bat` から起動される。
+
+---
+
+### 1.4. `novel_capturer.py`（小説用クラス群）
+
+#### `NovelConfig`（継承クラス）
+
+`AutoConfig` を継承し、小説（白背景）向けの設定を変更。
+
+| フィールド | 説明 |
+|---|---|
+| `WHITE_THRESHOLD` | 白画素判定閾値（デフォルト `240`） |
+| `IMG_OUTPUT_DIR` | 小説画像の出力先: `backend/data/kindle_novel/images/` |
+
+#### `NovelKindleCapturer`（継承クラス）
+
+`AutoKindleCapturer` を継承し以下をオーバーライド。
+
+- **`_detect_boundaries(img, w, h)`**: 黒帯検出の代わりに白背景（全チャンネル ≥ WHITE_THRESHOLD）を基準にテキスト左右端を 10 点スキャンで検出。
+- **`capture_loop(title)`**: OCR・PDF 生成を省略し、画像のみを `IMG_OUTPUT_DIR/<書籍名>/` に保存する。
+
+### 1.5. `main_novel.py`（小説キャプチャ起動）
+
+`NovelKindleCapturer` を使い小説をキャプチャするエントリーポイント。`run_novel.bat` から起動される。撮影完了後は管理画面（`/novel/manage`）から OCR ジョブを投入すること。
+
+---
+
+## 2. 処理フロー
+
+### 漫画（`run_comic.bat`）
+
+```
+起動 → Kindle ウィンドウ検索 → F11 フルスクリーン
+    → ダイアログでタイトル確認
+    → 黒帯スキャン → CROP 座標確定
+    → キャプチャループ（左キーでページ送り、タイムアウトまで）
+    → F11 でフルスクリーン解除
+    → PNG → PDF 結合（backend/data/comic/pdfs/<書籍名>.pdf）
+```
+
+### 小説（`run_novel.bat`）
+
+```
+起動 → Kindle ウィンドウ検索 → F11 フルスクリーン
+    → ダイアログでタイトル確認
+    → 白背景スキャン → CROP 座標確定
+    → キャプチャループ（左キーでページ送り、タイムアウトまで）
+    → F11 でフルスクリーン解除
+    → backend/data/kindle_novel/images/<書籍名>/ に PNG 保存のみ
+        ↓
+    管理画面（/novel/manage）で OCR・DB 構築ジョブを投入
+```
+
+## 3. 調整パラメータ
+
+| パラメータ | 対象 | 用途 |
+|---|---|---|
+| `BLACK_THRESHOLD` | 漫画 | 書籍背景が純黒でない場合に調整 |
+| `SIDE_IGNORE_PX` | 漫画 | ページ送り矢印位置が変わった場合に調整 |
+| `WHITE_THRESHOLD` | 小説 | 背景がオフホワイトの場合に調整 |
