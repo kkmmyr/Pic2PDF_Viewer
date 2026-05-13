@@ -52,6 +52,7 @@
 - [§7. 小説テキスト検索・RAG（novel_db）](#7-小説テキスト検索ragnovel_db)
   - §7.1 `GET /api/novel_db/books` — 書籍一覧 + DB 状態
   - §7.2 `GET /api/novel_db/series` — novel シリーズ一覧
+  - §7.2b `GET /api/novel_db/authors` — novel 作者一覧（B-21）
   - §7.3 `POST /api/novel_db/search` — ハイブリッド検索（FTS5 + ベクトル + RRF）
   - §7.4 `POST /api/novel_db/qa` — RAG 質問応答（SSE）
   - §7.5 `GET /api/novel_db/qa/history` — 履歴一覧
@@ -926,6 +927,19 @@ novel ソースのシリーズ一覧。書籍が 1 件以上紐付いている�
   { "id": "oko-kishi", "name": "おこぼれ姫と円卓の騎士", "book_count": 11 }
 ]
 ```
+
+---
+
+### §7.2b `GET /api/novel_db/authors`（B-21）
+
+novel ソースの全書籍から重複なし作者一覧を返す。作者未設定の書籍は除外。`localStorage` に書籍作者を一括設定する際の候補リスト用途。
+
+**レスポンス**:
+```json
+["石田リンネ", "田中啓子", "山本花子"]
+```
+
+文字列配列（アルファベット / 読み昇順）。空配列の可能性あり。
 
 ---
 
