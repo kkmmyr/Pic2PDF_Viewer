@@ -62,10 +62,10 @@
   - §7.8 `POST /api/novel_db/rebuild` — 再構築ジョブ起動
   - §7.9 `GET /api/novel_db/rebuild/status` — ジョブキュー状態
   - §7.10 `DELETE /api/novel_db/rebuild/{job_id}` — 待機中ジョブのキャンセル
-  - §7.22 `POST /api/novel_db/meta-import/preview` — Amazon CSV マッチングプレビュー（4.3）
-  - §7.23 `POST /api/novel_db/meta-import/apply` — CSV インポート適用（4.3）
   - §7.19 `POST /api/novel/discussion/generate` — 読書会ディスカッション生成（SSE, B-20）
   - §7.20 `GET /api/novel/discussion/history` — ディスカッション履歴一覧（B-20）
+- [§9. Amazon CSV インポート（amazon_import）](#9-amazon-csvインポートamazon_import)
+  - §9.1 `POST /api/amazon/import` — 固定パス CSV から authors/ASIN を補完
 - [§8. 本構築管理（novel_build）](#8-本構築管理novel_build)（4.6）
   - §8.1 `POST /api/novel/build/enqueue` — Full Build ジョブ登録
   - §8.2 `GET /api/novel/build/status` — Full Build キュー状態スナップショット
@@ -1095,6 +1095,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 **クエリパラメータ**:
 - `offset` (default `0`)
 - `limit` (default `20`、最大 100)
+- `book` (optional): 書籍名文字列。指定時は `scope_type='book' AND scope_id=book` の行のみ返す。未指定時は全件対象（既存の動作と変わらない）
 
 **レスポンス**:
 ```json
@@ -1495,53 +1496,44 @@ data: {"type": "error", "message": "本文が長すぎます（推定 120,000 �
 
 ---
 
-### §7.22 `POST /api/novel_db/meta-import/preview`（4.3）
+## §9. Amazon CSV インポート（amazon_import）
 
-Amazon デジタル購入履歴 CSV をアップロードし、書籍メタ（著者/シリーズ/巻番号/出版社/ASIN）の抽出結果と書籍マッチング結果をプレビュー返却する（DB 書き込みなし）。
-
-**リクエスト**: `multipart/form-data`
-- `files` — CSV ファイル 1 件以上（`amazon-order_digital_*.csv`。UTF-8 with BOM / Shift-JIS 両対応）
-
-**レスポンス**:
-```json
-[
-  {
-    "csv_title": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
-    "series_id": "おこぼれ姫と円卓の騎士",
-    "volume": 1,
-    "publisher": "ビーズログ文庫",
-    "authors": ["石田 リンネ"],
-    "asin": "B009IMAVXC",
-    "matched_book": "おこぼれ姫と円卓の騎士 1",
-    "match_score": 0.95
-  }
-]
-```
-- `matched_book`: マッチした書籍 stem 名（未マッチは `null`）
-- `match_score`: 部分一致スコア（0〜1）
+Amazon 購入履歴 CSV から novel / comic ライブラリの `meta.json` を著者・ASIN で補完するエンドポイント。CSV はサーバー側の固定パス（`AMAZON_DATA_DIR`）から自動読み込みするため、ファイルアップロード不要。
 
 ---
 
-### §7.23 `POST /api/novel_db/meta-import/apply`（4.3）
+### §9.1 `POST /api/amazon/import`
 
-プレビュー確認後に meta.json へ書き込む。
+固定パスの Amazon CSV を読み込み、指定ソース（`novel` または `comic`）の `meta.json` を著者・ASIN で補完する。既存値は上書きしない（空欄のみ補完）。
 
-**リクエストボディ**:
+**クエリパラメータ**:
+
+| パラメータ | 必須 | 説明 |
+|---|---|---|
+| `source` | △ | `novel` または `comic`（デフォルト: `novel`） |
+
+**CSV ソース（サーバー固定パス）**:
+- `{AMAZON_DATA_DIR}/amazon-order/Your Amazon Orders/Digital Content Orders.csv` — 全期間エクスポート（ASIN + タイトル）
+- `{AMAZON_DATA_DIR}/amazon-order_digital/*.csv` — 月別デジタル注文（著者情報あり、2021 年〜）
+
+**マッチング方式**:
+1. 既存エントリに `asin` があれば直接引く
+2. ファイル名ステムが正規化タイトル（巻番号/レーベル除去）を含む場合にマッチ
+
+**レスポンス**:
 ```json
-[
-  {
-    "book_key": "おこぼれ姫と円卓の騎士 1.pdf",
-    "authors": ["石田 リンネ"],
-    "series_id": "おこぼれ姫と円卓の騎士",
-    "volume": 1,
-    "publisher": "ビーズログ文庫",
-    "asin": "B009IMAVXC"
-  }
-]
+{ "updated": 3, "skipped": 42, "unmatched": 5 }
 ```
-- 未マッチ行（フロントで手動選択した結果を含む）を配列で送信。`book_key` がない行はスキップ。
 
-**レスポンス**: `{"updated_count": 5}`
+| フィールド | 説明 |
+|---|---|
+| `updated` | authors/ASIN を補完した件数 |
+| `skipped` | 既に両フィールドが埋まっていてスキップした件数 |
+| `unmatched` | CSV にマッチする書籍が見つからなかった件数 |
+
+**エラー**:
+- `400`: `source` が `novel` / `comic` 以外
+- `422`: CSV ファイルが 1 件も見つからない（`AMAZON_DATA_DIR` 確認）
 
 ---
 
