@@ -11,22 +11,30 @@
 
 ## アーキテクチャ概要
 
+**現在の OCR フロー**（novel_db rebuild 経由）:
 ```
 kindle-pdf/main_novel.py  →  kindle_novel/images/{書籍名}/*.png  (キャプチャのみ)
                                           ↓
-kindle-pdf/batch_ocr.py   →  YomitokuEngine.extract_text()
+services/novel_db/extractor.py (run_ocr_subprocess)
+  → D:\61.tool\common\ocr\venv\Scripts\python.exe ocr_worker.py
+  → YomitokuEngine.extract_text()
                                           ↓
-kindle-pdf/searchable_pdf.py  →  ReportLab で透明テキスト付きPDF
-                                          ↓
-                              kindle_novel/pdfs/{書籍名}.pdf
+                              novel.db (books / pages テーブル)
+                              ← FTS5 + sqlite-vec でテキスト検索・RAG に利用
 ```
+
+**旧フロー（Phase 5 で削除済み）**:
+```
+kindle-pdf/batch_ocr.py (削除済み) → YomitokuEngine → kindle-pdf/searchable_pdf.py (削除済み)
+→ kindle_novel/pdfs/{書籍名}.pdf
+```
+`batch_ocr.py` / `searchable_pdf.py` / `start_batch_ocr.bat` は Phase 5（旧 PDF 経路撤去）で削除。`POST /api/ocr/run` は現在動作しない。
 
 ### 関連ファイル
 
 | ファイル | 役割 |
 |---|---|
-| `kindle-pdf/batch_ocr.py` | `kindle_novel/images` 配下を走査しSearchable PDFを一括生成 |
-| `kindle-pdf/searchable_pdf.py` | 画像とOCR結果から透明テキスト付きPDFを生成（ReportLab） |
+| `backend/services/novel_db/extractor.py` | `run_ocr_subprocess` — common/ocr venv を呼び出して画像からテキストを取得 |
 | `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー。テキスト抽出・フリガナ除去・正規化 |
 | `D:\61.tool\common\ocr\debug_yomitoku.py` | yomitoku出力構造の診断ツール |
 

@@ -53,6 +53,7 @@
   - §7.1 `GET /api/novel_db/books` — 書籍一覧 + DB 状態
   - §7.2 `GET /api/novel_db/series` — novel シリーズ一覧
   - §7.2b `GET /api/novel_db/authors` — novel 作者一覧（B-21）
+  - §7.21 `GET /api/novel_db/books/{book_name}/detail` — 単一書籍の詳細情報
   - §7.3 `POST /api/novel_db/search` — ハイブリッド検索（FTS5 + ベクトル + RRF）
   - §7.4 `POST /api/novel_db/qa` — RAG 質問応答（SSE）
   - §7.5 `GET /api/novel_db/qa/history` — 履歴一覧
@@ -621,7 +622,7 @@ novel ソース 1 冊のメタデータを部分更新する。`{book_key}` は 
 ## §4. PDF生成
 
 ### §4.1 `POST /api/generate`
-指定ディレクトリ内の画像からPDFを生成する。生成された PDF は `backend/data/main/pdfs_compressed/` 配下に保存される（`/pdfs` 静的マウントから配信）。
+指定ディレクトリ内の画像から PDF を生成する（doujin ソースは image-only モードのため PDF 生成をスキップし `data/doujin/images/` に WebP を配置する）。comic / novel ソースは PDF を `data/{source}/pdfs/` に保存する。`/pdfs` 静的マウントは廃止済み（[ADR-0003](../02_基本設計/ADR/0003_generated-image-only-mode.md)）。
 
 **リクエストボディ**:
 ```json
@@ -689,7 +690,7 @@ PDF生成処理の進捗状況を取得する。
 ---
 
 ### §4.4 `POST /api/batch_compress`
-`data/main/images/` 配下の全WebP画像を一括で圧縮PDFに変換する。既存ファイルはスキップ。
+`data/doujin/images/` 配下の全WebP画像を一括で圧縮PDFに変換する。既存ファイルはスキップ。
 
 **リクエストボディ**:
 ```json
@@ -940,6 +941,45 @@ novel ソースの全書籍から重複なし作者一覧を返す。作者未�
 ```
 
 文字列配列（アルファベット / 読み昇順）。空配列の可能性あり。
+
+---
+
+### §7.21 `GET /api/novel_db/books/{book_name}/detail`
+
+単一書籍の詳細情報（要約・キャラクター数・ディスカッション数含む）を返す。`NovelDetailPage`（`/novel/detail/:bookName`）から利用。
+
+**パスパラメータ**:
+- `book_name` — 書籍名（`{book_name:path}` 形式でスラッシュを含む名称に対応）
+
+**レスポンス例**:
+```json
+{
+  "name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+  "authors": ["田中啓子"],
+  "series_id": "oko-kishi",
+  "series_title": "おこぼれ姫と円卓の騎士",
+  "is_indexed": true,
+  "page_count": 118,
+  "indexed_at": "2026-05-09T11:30:00Z",
+  "thumbnail_url": "/kindle_novel/images/.../001.png",
+  "ocr_done_at": "2026-05-09T11:25:00Z",
+  "volume": 1,
+  "publisher": "エンターブレイン",
+  "asin": "B00XXXXXX",
+  "isbn": null,
+  "summary": "レティは……（要約テキスト）",
+  "summary_generated_at": "2026-05-10T08:00:00Z",
+  "character_count": 12,
+  "discussion_count": 3
+}
+```
+
+- `summary` / `summary_generated_at` は未生成時 `null`
+- `character_count` は `characters` テーブルの登録数（0 の可能性あり）
+- `discussion_count` は `novel/discussion` で生成済みのディスカッション件数
+
+**エラー**:
+- `404`: `book_name` に一致する書籍ディレクトリが存在しない
 
 ---
 
