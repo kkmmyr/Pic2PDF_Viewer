@@ -1446,63 +1446,65 @@ embedding / LLM の Ollama 呼び出しは `responses` ライブラリ等でモ�
 
 書籍 1 冊の本文テキスト全体を Qwen 131k コンテキストに投入し、2 人のキャラクター（ペルソナ）が交互に語り合う対話を SSE ストリーミングで生成する。会話を内容把握補助・エンタメ両用に提供。
 
-### 16.2 新規ファイル
+### 16.2 新規ファイル（実装済み、2026-05-13）
 
 | ファイル | 役割 |
 |---|---|
-| `routers/novel_discussion.py` | SSE エンドポイント / 履歴 CRUD |
-| `services/novel_db/discussion.py` | Qwen 呼び出し・プロンプト構築・保存ロジック |
+| `routers/novel_discussion.py` | SSE エンドポイント（generate / history） |
+| `services/novel_db/discussion_service.py` | トークン推計・プロンプト構築・ターン解析・保存/一覧 |
 
 ### 16.3 ディレクトリ・保存形式
 
 ```
 backend/data/kindle_novel/discussions/
   └─ {book_name}/
-       └─ {YYYYMMDD_HHmmss}.json
+       └─ {YYYYMMDDTHHMMSSz}.json   ← UTC タイムスタンプ（ISO 形式）
 ```
 
 JSON 構造:
 ```json
 {
-  "book_name": "...",
-  "personas": [{"name": "A", "style": "..."}, {"name": "B", "style": "..."}],
+  "book": "書籍名",
+  "personas": [
+    {"name": "批評家", "style_description": "批評家・敬語丁寧・文学評論"},
+    {"name": "ファン",  "style_description": "ファン・フランク・感情重視"}
+  ],
   "turns": [{"speaker": "A", "text": "..."}, ...],
-  "created_at": "2026-05-13T14:30:22"
+  "partial": false,
+  "created_at": "2026-05-13T14:30:22+00:00"
 }
 ```
 
 ### 16.4 プロンプト設計
 
+LLM には `astream_chat` で messages 形式（system + user）を投入する。ターン境界は `[A]:` / `[B]:` マーカーで識別する。
+
 ```
 [system]
-あなたは読書会の司会者です。以下の 2 人のキャラクターになりきって交互に発言してください。
-
-キャラクター A: {name_a} — {style_a}
-キャラクター B: {name_b} — {style_b}
+小説タイトル / キャラクター A・B の名前と口調説明 /
+書籍全ページ（load_all_pages_of_book 経由）を埋め込む。
 
 ルール:
-- 必ず JSON 配列で返す: [{"speaker": "A名前", "text": "..."}, ...]
-- {num_turns} 発言分、A→B→A→... の順番で生成する
-- 相手の発言を受けて自然につながる対話にする
+- キャラ A の発言は `[A]:` で始め、キャラ B の発言は `[B]:` で始める
+- 各発言 100〜300 字程度
+- num_turns 往復の対話を生成する
 
 [user]
-以下は「{book_name}」の本文全文です。この内容をテーマに読書会を開いてください。
-
-{full_text}
+{num_turns} 往復の読書会対話をお願いします。
 ```
 
 ### 16.5 トークン超過チェック
 
-生成前に本文のトークン数を推計する（1 文字 ≒ 0.6 token の近似）。推計値が 110,000（システムプロンプト + 応答バッファを差し引いた実効上限）を超える場合は `422` を返す。
+生成前に本文のトークン数を推計する（1 token ≒ 1.5 日本語文字）。推計値が 112,000（131,072 ctx から出力 8,192 + プロンプト構造オーバーヘッドを除いた入力上限）を超える場合はエラー SSE を即座に返す（HTTP 200 で SSE error イベント）。
 
 ### 16.6 SSE 配信フロー
 
-1. リクエスト受信 → バリデーション → トークン超過チェック
-2. 本文テキスト読み込み（`data/kindle_novel/images/{book_name}/` 配下の pages テキスト、または PDF テキスト層）
-3. Qwen へ投入（`services/novel_db/llm.py` の共通 SSE 経路を流用）
-4. レスポンスを JSON 配列としてパース → 1 発言ごとに SSE `turn_start` / `token` / `turn_end` を配信
-5. 全発言完了 → JSON 保存 → SSE `done` 送信
-6. クライアント切断検知 → 保存をスキップ
+1. リクエスト受信 → バリデーション → `load_all_pages_of_book` で全ページ取得
+2. トークン超過チェック → 超過時はエラー SSE を返して終了
+3. `build_messages` でプロンプト構築 → `stream_discussion_turns` で SSE ストリーミング開始
+4. トークン受信ごとにバッファ累積。`[A]:` / `[B]:` マーカー検出で 1 ターン完結 → SSE `{"type": "turn", "speaker": "A"|"B", "text": "..."}` 配信
+5. クライアント切断時 → ループ終了・保存スキップ
+6. 全ターン完了 → `save_discussion` で JSON 保存 → SSE `{"type": "done", "saved_path": "..."}` 送信
 
 ### 16.7 スコープ外
 

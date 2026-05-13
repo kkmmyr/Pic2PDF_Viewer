@@ -556,75 +556,68 @@ SSE は `setupServer` (msw) でモック。fetch + ReadableStream のテスト�
 
 ---
 
-## 11. 読書会ディスカッション画面（B-20 / `/novel/discussion`）
+## 11. 読書会ディスカッション画面（B-20 / `/novel/discussion`）実装済み（2026-05-13）
 
 ### 11.1 画面構成
 
+書籍選択 → ペルソナ A/B 設定 → 往復数スライダー → 生成 → SSE リアルタイム表示 → 履歴閲覧 のワンページ構成。
+
 ```
 NovelDiscussionPage (/novel/discussion)
-  ├─ BookSelector       — 書籍選択ドロップダウン（novel ソース限定）
-  ├─ PersonaPanel       — キャラクター A・B の設定
-  │    ├─ PresetSelector  — 3 軸（読書スタイル / 口調 / 視点）組み合わせ選択
-  │    └─ CustomInput     — 名前 + 一言説明の自由入力
-  ├─ TurnCountSlider    — 発話数スライダー（2〜40、偶数のみ）
-  ├─ GenerateButton     — 生成開始 / キャンセル切替
-  ├─ DiscussionView     — SSE 受信・交互表示エリア
-  │    └─ TurnBubble[]    — 各発言バブル（A/B で色分け）
-  └─ HistorySection     — 過去の討論履歴一覧
-       └─ HistoryCard[]   — タイムスタンプ・ペルソナ名・再表示ボタン
+  ├─ 書籍選択ドロップダウン（useNovelDbBooks の books から）
+  ├─ PersonaPanel × 2（A/B）
+  │    ├─ 名前テキスト入力
+  │    ├─ プリセット 3 軸チップ（読書スタイル / 口調 / 視点）
+  │    └─ カスタム切替（自由テキストに切り替え可）
+  ├─ 往復数スライダー（2〜20、デフォルト 6）
+  ├─ 生成ボタン / 中止ボタン
+  ├─ エラーバナー
+  ├─ 生成結果エリア（TurnCard の積み上げ、新ターン追加時に自動スクロール）
+  └─ 履歴セクション（書籍変更時に自動ロード、HistoryItemCard で折りたたみ表示）
 ```
 
-### 11.2 ファイル構成
+### 11.2 ファイル構成（実装済み）
 
 ```
 frontend/src/
   pages/
-    NovelDiscussionPage.tsx          — ページルート
-  components/novel_discussion/
-    BookSelector.tsx                 — 書籍選択
-    PersonaPanel.tsx                 — ペルソナ設定（プリセット + カスタム）
-    TurnCountSlider.tsx              — 発話数スライダー
-    DiscussionView.tsx               — 会話表示エリア
-    TurnBubble.tsx                   — 1 発言バブル
-    HistorySection.tsx               — 履歴一覧
-    HistoryCard.tsx                  — 履歴 1 件
-  hooks/novel_discussion/
-    useDiscussionStream.ts           — SSE 接続・状態管理
-    useDiscussionHistory.ts          — 履歴取得・削除
-  types/discussion.ts                — DiscussionTurn / DiscussionHistory 型定義
+    NovelDiscussionPage.tsx   — ページ + ローカルサブコンポーネント（一体型）
+  features/novel_db/
+    sse.ts                    — streamDiscussion() 追加（B-20 SSE クライアント）
+    api.ts                    — fetchDiscussionHistory() / DiscussionHistoryItem 型追加
 ```
 
-### 11.3 プリセット定義
+サブコンポーネント（`PersonaPanel`, `PresetRow`, `TurnCard`, `HistoryItemCard`）は
+`NovelDiscussionPage.tsx` 内にローカル定義（別ファイル分割なし）。
+
+### 11.3 プリセット定義（実装済み）
 
 ```ts
-const PRESET_STYLES = {
-  readingStyle: ['批評家', 'ファン', '懐疑派'],
-  tone:         ['敬語丁寧', 'フランク', '関西弁風'],
-  viewpoint:    ['文学評論', '感情重視', 'ロジック重視'],
-} as const;
+const READING_STYLES = ['批評家', 'ファン', '懐疑派'] as const;
+const TONES         = ['敬語丁寧', 'フランク', '関西弁風'] as const;
+const PERSPECTIVES  = ['文学評論', '感情重視', 'ロジック重視'] as const;
 ```
 
-各軸から 1 つ選んで組み合わせると `style` 文字列を自動生成。カスタムモードでは上書き入力可。
+各軸から 1 つ選ぶと `style_description`（例: `批評家・敬語丁寧・文学評論`）を自動生成。カスタムモード切替で自由記述に上書き可。
 
 ### 11.4 SSE 接続パターン
 
-既存の `useNovelDbQa` の SSE ロジックを参考に `useDiscussionStream` を実装する。
+`features/novel_db/sse.ts` の `streamDiscussion()` を直接呼び出す（hook 化なし）。
 
 ```ts
-// 擬似コード
-const { turns, isStreaming, start, cancel } = useDiscussionStream();
-
-// start() → POST /api/novel_db/books/{book}/discussion → SSE
-// turn_start → 新バブルを pending 状態で追加
-// token     → 末尾バブルのテキストを拡張（文字単位表示）
-// turn_end  → バブルを確定状態に
-// done      → isStreaming=false、履歴リフレッシュ
-// クライアントキャンセル → EventSource.close()
+// POST /api/novel/discussion/generate → SSE
+streamDiscussion(body, {
+  onTurn: (ev) => setTurns(prev => [...prev, ev]),   // turn ごとに追記
+  onDone: () => { setIsGenerating(false); void loadHistory(book); },
+  onError: (e) => { setError(e.message); setIsGenerating(false); },
+}, abortController.signal);
 ```
+
+受信イベント: `{"type": "turn", "speaker": "A"|"B", "text": "..."}` が 1 ターンごとに到着。
 
 ### 11.5 ルーティング
 
-`App.tsx` に `/novel/discussion` を追加。サイドバーの小説カテゴリに「読書会」リンクを追加する。
+`App.tsx` の `/novel/discussion` ルート追加済み。`Layout.tsx` の小説カテゴリに「読書会」（`MessageSquare` アイコン）リンク追加済み。
 
 ---
 
