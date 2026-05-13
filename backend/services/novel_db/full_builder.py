@@ -101,7 +101,7 @@ def _run_combined_step(
     except Exception as exc:
         log(f"  error: {exc}")
         logger.exception("[full_build:%s] combined_step failed", book_name)
-        return
+        raise
 
     update_book_summary(conn, book_name, summary)
 

@@ -21,7 +21,7 @@ def open_db(db_path: str | None = None) -> sqlite3.Connection:
     呼び出し元が close() の責務を持つ。短命用途では with_db() を推奨。
     """
     _ensure_dir()
-    conn = sqlite3.connect(db_path or NOVEL_DB_PATH)
+    conn = sqlite3.connect(db_path or NOVEL_DB_PATH, timeout=30)
     conn.enable_load_extension(True)
     sqlite_vec.load(conn)
     conn.enable_load_extension(False)

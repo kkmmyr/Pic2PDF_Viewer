@@ -26,8 +26,10 @@ export default function NovelBuildPage() {
     useEffect(() => {
         fetchBooks()
             .then((data) => {
-                setBooks(data);
-                if (data.length > 0) setSelectedBook(data[0].name);
+                // OCR 未実施（ocr_done_at === null）の書籍は Full Build 不可なので除外
+                const ocred = data.filter((b) => b.ocr_done_at !== null);
+                setBooks(ocred);
+                if (ocred.length > 0) setSelectedBook(ocred[0].name);
             })
             .catch(() => {});
     }, []);
