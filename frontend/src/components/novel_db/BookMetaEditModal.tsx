@@ -3,10 +3,16 @@
  * BookCard の「編集」ボタンから開く。
  */
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
 
 import { patchNovelBookMeta } from '../../features/novel_db/api';
 import type { BookSummary } from '../../features/novel_db/types';
+import {
+    Dialog,
+    DialogBody,
+    DialogCancelButton,
+    DialogFooter,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 
 interface Props {
     book: BookSummary | null;
@@ -44,14 +50,12 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
         setError(null);
     }, [book]);
 
-    if (!book) return null;
-
     const handleSave = async () => {
         setSaving(true);
         setError(null);
         try {
             const volNum = volume.trim() ? parseInt(volume.trim(), 10) : null;
-            await patchNovelBookMeta(`${book.name}.pdf`, {
+            await patchNovelBookMeta(`${book!.name}.pdf`, {
                 authors: splitAuthors(authors),
                 series_id: seriesId.trim(),
                 ...(volNum != null ? { volume: volNum } : { volume_clear: true }),
@@ -70,23 +74,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
     };
 
     return (
-        <div
-            className="fixed inset-0 z-modal bg-black/50 flex items-center justify-center p-4"
-            onClick={onClose}
-        >
-            <div
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md"
-                onClick={(e) => e.stopPropagation()}
-            >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
-                        {book.name}
-                    </h2>
-                    <button onClick={onClose} aria-label="閉じる">
-                        <X className="w-4 h-4 text-gray-500" />
-                    </button>
-                </div>
-                <div className="px-4 py-4 space-y-3">
+        <Dialog open={Boolean(book)} title={book?.name ?? ''} maxWidth="md" onClose={onClose}>
+            <DialogBody>
+                <div className="space-y-3">
                     <Field label="著者（カンマ区切り）">
                         <input
                             type="text"
@@ -152,23 +142,14 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
                     </Field>
                     {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
                 </div>
-                <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                    <button
-                        onClick={onClose}
-                        className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                        キャンセル
-                    </button>
-                    <button
-                        onClick={() => void handleSave()}
-                        disabled={saving}
-                        className="px-3 py-1.5 text-xs rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50"
-                    >
-                        {saving ? '保存中...' : '保存'}
-                    </button>
-                </div>
-            </div>
-        </div>
+            </DialogBody>
+            <DialogFooter>
+                <DialogCancelButton onClick={onClose} disabled={saving} />
+                <DialogPrimaryButton onClick={() => void handleSave()} disabled={saving}>
+                    {saving ? '保存中...' : '保存'}
+                </DialogPrimaryButton>
+            </DialogFooter>
+        </Dialog>
     );
 }
 

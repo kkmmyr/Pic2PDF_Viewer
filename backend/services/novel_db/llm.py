@@ -264,7 +264,7 @@ def _format_scope_line(scope: Any) -> str:
     return "全 novel ライブラリ"
 
 
-async def _astream_chat(
+async def astream_chat(
     messages: list[dict],
     *,
     model: str | None = None,
@@ -291,7 +291,7 @@ async def stream_chat(
     NotImplementedError）。バックエンド側の thinking 抑制 + SSE 正規化は
     `local_llm` に委譲する。
     """
-    async for event in _astream_chat(
+    async for event in astream_chat(
         messages,
         model=model,
         options=options or LLM_OPTIONS,

@@ -5,7 +5,6 @@ GET  /api/novel/discussion/history   → 過去生成一覧（?book_name=<name>�
 """
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Request
@@ -13,6 +12,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS
+from routers._deps import sse_event
+from utils.logger import get_logger
 from services.novel_db.connection import with_db
 from services.novel_db.discussion_service import (
     MAX_INPUT_TOKENS,
@@ -26,6 +27,7 @@ from services.novel_db.discussion_service import (
 from services.novel_db.search import load_all_pages_of_book
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 class PersonaRequest(BaseModel):
@@ -37,10 +39,6 @@ class GenerateRequest(BaseModel):
     book_name: str = Field(..., min_length=1)
     personas: list[PersonaRequest] = Field(..., min_length=2, max_length=2)
     num_turns: int = Field(default=6, ge=2, le=20)
-
-
-def _sse(payload: dict) -> str:
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 @router.post("/novel/discussion/generate")
@@ -68,7 +66,7 @@ async def generate_discussion(
 
     if not hits:
         async def _no_pages() -> AsyncGenerator[str, None]:
-            yield _sse({
+            yield sse_event({
                 "type": "error",
                 "message": f"書籍「{request.book_name}」のページデータが見つかりません。インデックスを再構築してください。",
             })
@@ -77,7 +75,7 @@ async def generate_discussion(
     token_count = estimate_book_tokens(hits)
     if token_count > MAX_INPUT_TOKENS:
         async def _too_long() -> AsyncGenerator[str, None]:
-            yield _sse({
+            yield sse_event({
                 "type": "error",
                 "message": (
                     f"本文が長すぎます（推定 {token_count:,} トークン、"
@@ -100,18 +98,19 @@ async def generate_discussion(
                     "speaker": turn_event["speaker"],
                     "text": turn_event["text"],
                 })
-                yield _sse(turn_event)
+                yield sse_event(turn_event)
         except Exception as e:
-            yield _sse({"type": "error", "message": str(e)})
+            logger.exception("generate_discussion SSE failed")
+            yield sse_event({"type": "error", "message": str(e)})
             return
 
         if accumulated_turns:
             saved_path = save_discussion(
                 request.book_name, persona_a, persona_b, accumulated_turns,
             )
-            yield _sse({"type": "done", "saved_path": saved_path})
+            yield sse_event({"type": "done", "saved_path": saved_path})
         else:
-            yield _sse({"type": "done"})
+            yield sse_event({"type": "done"})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

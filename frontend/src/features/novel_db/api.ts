@@ -9,6 +9,7 @@
 import apiClient from '../../config/api_client';
 
 import type {
+    BookDetail,
     BookSummary,
     CharacterDetail,
     CharacterSummary,
@@ -19,6 +20,7 @@ import type {
     NovelMetaPatch,
     QaHistoryDetail,
     QaHistoryListResponse,
+    DiscussionHistoryItem,
     RebuildEnqueueResponse,
     RebuildJobMode,
     RebuildJobType,
@@ -27,6 +29,8 @@ import type {
     SearchResponse,
     SeriesSummary,
 } from './types';
+
+export type { DiscussionHistoryItem };
 
 const PREFIX = '/api/novel_db';
 
@@ -157,12 +161,10 @@ export function applyNovelMetaImport(items: MetaApplyItem[]): Promise<{ updated_
 // 読書会ディスカッション（B-20）
 // ---------------------------------------------------------------------------
 
-export interface DiscussionHistoryItem {
-    filename: string;
-    created_at: string | null;
-    personas: { name: string; style_description: string }[];
-    turn_count: number;
-    turns: { speaker: string; text: string }[];
+export function fetchBookDetail(bookName: string): Promise<BookDetail> {
+    return apiClient.get<unknown, BookDetail>(
+        `${PREFIX}/books/${encodeURIComponent(bookName)}/detail`,
+    );
 }
 
 export function fetchDiscussionHistory(bookName: string): Promise<DiscussionHistoryItem[]> {

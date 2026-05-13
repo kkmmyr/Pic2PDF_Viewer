@@ -26,6 +26,14 @@ export interface BookSummary {
     asin: string | null;
 }
 
+export interface BookDetail extends BookSummary {
+    isbn: string | null;
+    summary: string | null;
+    summary_generated_at: string | null;
+    character_count: number;
+    discussion_count: number;
+}
+
 // ---------------------------------------------------------------------------
 // 書籍メタ編集（4.3）
 // ---------------------------------------------------------------------------
@@ -194,4 +202,16 @@ export interface CharacterDetail {
     summary: string | null;
     generated_at: string | null;
     top_scenes: CharacterScene[];
+}
+
+// ---------------------------------------------------------------------------
+// 読書会ディスカッション（B-20）
+// ---------------------------------------------------------------------------
+
+export interface DiscussionHistoryItem {
+    filename: string;
+    created_at: string | null;
+    personas: { name: string; style_description: string }[];
+    turn_count: number;
+    turns: { speaker: string; text: string }[];
 }

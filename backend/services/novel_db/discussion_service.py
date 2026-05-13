@@ -22,7 +22,7 @@ from config import (
     NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
 )
 
-from ._llm_backend import build_qwen_backend
+from .llm import astream_chat as _astream_chat
 from .search import SearchHit
 
 # ディスカッション JSON 保存先
@@ -32,8 +32,6 @@ DISCUSSIONS_DIR = Path(KINDLE_NOVEL_DIR) / "discussions"
 _CHARS_PER_TOKEN = 1.5
 # 131072 ctx から出力 8192 + プロンプト構造オーバーヘッドを引いた入力上限
 MAX_INPUT_TOKENS = 112_000
-
-_BACKEND = build_qwen_backend()
 
 LLM_OPTIONS: dict[str, Any] = {
     "temperature": 0.7,
@@ -128,19 +126,6 @@ def build_messages(
     ]
 
 
-async def _astream_chat(
-    messages: list[dict],
-    *,
-    model: str | None = None,
-    options: dict | None = None,
-) -> AsyncIterator[dict]:
-    """thin wrapper — monkeypatch でテスト可能にするため _BACKEND を隠蔽。"""
-    async for event in _BACKEND.astream_chat(
-        messages, model=model, options=options,
-    ):
-        yield event
-
-
 async def stream_discussion_turns(
     messages: list[dict],
     *,
@@ -211,6 +196,14 @@ def save_discussion(
     }
     out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return str(out_path)
+
+
+def count_discussions(book_name: str) -> int:
+    """指定書籍のディスカッション数を返す（ファイル数カウントのみ、JSON ロードなし）。"""
+    book_dir = DISCUSSIONS_DIR / book_name
+    if not book_dir.exists():
+        return 0
+    return sum(1 for _ in book_dir.glob("*.json"))
 
 
 def list_discussions(book_name: str) -> list[dict]:

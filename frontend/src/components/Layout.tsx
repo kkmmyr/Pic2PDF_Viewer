@@ -1,8 +1,10 @@
+import { Fragment, type ComponentType } from 'react';
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import {
     BookOpen,
     BookText,
     FileText,
+    Hammer,
     Library,
     MessageSquare,
     Moon,
@@ -13,17 +15,57 @@ import {
 } from 'lucide-react';
 import { useDarkMode } from '../hooks';
 
+interface NavItem {
+    to: string;
+    label: string;
+    icon: ComponentType<{ className?: string }>;
+}
+
+interface NavGroup {
+    label: string;
+    items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
+    {
+        label: '同人誌',
+        items: [
+            { to: '/doujin', icon: Library, label: 'Library' },
+            { to: '/doujin/generator', icon: Settings, label: 'Generator' },
+            { to: '/doujin/hitomi', icon: Sparkles, label: '新着' },
+        ],
+    },
+    {
+        label: '漫画',
+        items: [
+            { to: '/comic', icon: Library, label: 'Library' },
+        ],
+    },
+    {
+        label: '小説',
+        items: [
+            { to: '/novel/db', icon: BookOpen, label: 'DB' },
+            { to: '/novel/discussion', icon: MessageSquare, label: '読書会' },
+            { to: '/novel/ocr', icon: Terminal, label: 'OCR' },
+            { to: '/novel/build', icon: Hammer, label: 'Build' },
+        ],
+    },
+];
+
+const LINK_CLASS =
+    'px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5';
+const DIVIDER = <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />;
+
 export default function Layout() {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const isReaderMode = searchParams.has('file');
     const { isDark, toggle: toggleDark } = useDarkMode();
 
-    const isActive = (path: string) => {
-        return location.pathname === path
+    const isActive = (path: string) =>
+        location.pathname === path
             ? 'text-primary-600 bg-primary-50 dark:text-primary-400 dark:bg-primary-900/30'
             : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800';
-    };
 
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col font-sans text-gray-900 dark:text-gray-100">
@@ -43,81 +85,32 @@ export default function Layout() {
                             </div>
 
                             <nav className="flex items-center gap-0.5">
-                                {/* 同人誌 */}
-                                <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
-                                    同人誌
-                                </span>
-                                <Link
-                                    to="/doujin"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/doujin')}`}
-                                >
-                                    <Library className="w-4 h-4" />
-                                    Library
-                                </Link>
-                                <Link
-                                    to="/doujin/generator"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/doujin/generator')}`}
-                                >
-                                    <Settings className="w-4 h-4" />
-                                    Generator
-                                </Link>
-                                <Link
-                                    to="/doujin/hitomi"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/doujin/hitomi')}`}
-                                >
-                                    <Sparkles className="w-4 h-4" />
-                                    新着
-                                </Link>
+                                {NAV_GROUPS.map((group, gi) => (
+                                    <Fragment key={group.label}>
+                                        {gi > 0 && DIVIDER}
+                                        <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
+                                            {group.label}
+                                        </span>
+                                        {group.items.map((item) => (
+                                            <Link
+                                                key={item.to}
+                                                to={item.to}
+                                                className={`${LINK_CLASS} ${isActive(item.to)}`}
+                                            >
+                                                <item.icon className="w-4 h-4" />
+                                                {item.label}
+                                            </Link>
+                                        ))}
+                                    </Fragment>
+                                ))}
 
-                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
-
-                                {/* 漫画 */}
-                                <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
-                                    漫画
-                                </span>
-                                <Link
-                                    to="/comic"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/comic')}`}
-                                >
-                                    <Library className="w-4 h-4" />
-                                    Library
-                                </Link>
-
-                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
-
-                                {/* 小説 */}
-                                <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
-                                    小説
-                                </span>
-                                <Link
-                                    to="/novel/db"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/novel/db')}`}
-                                >
-                                    <BookOpen className="w-4 h-4" />
-                                    DB
-                                </Link>
-                                <Link
-                                    to="/novel/discussion"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/novel/discussion')}`}
-                                >
-                                    <MessageSquare className="w-4 h-4" />
-                                    読書会
-                                </Link>
-                                <Link
-                                    to="/novel/ocr"
-                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/novel/ocr')}`}
-                                >
-                                    <Terminal className="w-4 h-4" />
-                                    OCR
-                                </Link>
-
-                                <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />
+                                {DIVIDER}
 
                                 <a
                                     href="/site/index.html"
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800"
+                                    className={`${LINK_CLASS} text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800`}
                                     title="設計ドキュメント（別タブで開く）"
                                 >
                                     <BookText className="w-4 h-4" />

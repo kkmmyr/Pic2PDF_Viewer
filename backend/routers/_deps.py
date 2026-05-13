@@ -1,7 +1,9 @@
 """ルーター共通 FastAPI 依存関数・ヘルパー。"""
 import functools
+import json
 
 from fastapi import HTTPException
+from fastapi.responses import Response
 
 from config import VALID_SOURCES
 from utils.logger import get_logger
@@ -74,3 +76,21 @@ def log_and_raise_500(operation: str):
         return wrapper
 
     return decorator
+
+
+def sse_event(payload: dict) -> str:
+    """SSE イベントを `data: {JSON}\\n\\n` フォーマットで返す。"""
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+def cancel_job_response(result: str) -> Response:
+    """job_queue.cancel() の戻り値を HTTP レスポンスに変換する。
+
+    not_found → 404 / running → 409 / その他（"canceled"）→ 204 を返す。
+    呼び出し元で @log_and_raise_500 を付与すること。
+    """
+    if result == "not_found":
+        raise HTTPException(status_code=404, detail="job not found")
+    if result == "running":
+        raise HTTPException(status_code=409, detail="cannot cancel a running job")
+    return Response(status_code=204)

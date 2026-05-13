@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
-type DialogMaxWidth = 'sm' | 'md';
+type DialogMaxWidth = 'sm' | 'md' | 'xl';
 
 interface DialogProps {
     open: boolean;
@@ -10,8 +10,10 @@ interface DialogProps {
     subtitle?: string;
     /** ネストダイアログとして上層に表示する場合 true */
     nested?: boolean;
-    /** dialog 横幅: sm = max-w-sm（デフォルト）/ md = max-w-md */
+    /** dialog 横幅: sm = max-w-sm（デフォルト）/ md = max-w-md / xl = max-w-4xl */
     maxWidth?: DialogMaxWidth;
+    /** 内部パネルへの追加 Tailwind クラス（flex / max-h などの調整用） */
+    className?: string;
     onClose: () => void;
     children: ReactNode;
 }
@@ -19,6 +21,7 @@ interface DialogProps {
 const MAX_WIDTH_CLASS: Record<DialogMaxWidth, string> = {
     sm: 'max-w-sm',
     md: 'max-w-md',
+    xl: 'max-w-4xl',
 };
 
 /**
@@ -44,6 +47,7 @@ export function Dialog({
     subtitle,
     nested = false,
     maxWidth = 'sm',
+    className = '',
     onClose,
     children,
 }: DialogProps) {
@@ -69,7 +73,7 @@ export function Dialog({
             }}
         >
             <div
-                className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full ${MAX_WIDTH_CLASS[maxWidth]} mx-4 border border-gray-200 dark:border-gray-700`}
+                className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full ${MAX_WIDTH_CLASS[maxWidth]} mx-4 border border-gray-200 dark:border-gray-700 ${className}`}
             >
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <div>
@@ -97,8 +101,14 @@ export function Dialog({
 }
 
 /** ダイアログ本体（パディング付き）。タイトル/フッターと挟む形で使う。 */
-export function DialogBody({ children }: { children: ReactNode }) {
-    return <div className="px-6 py-4">{children}</div>;
+export function DialogBody({
+    children,
+    className = '',
+}: {
+    children: ReactNode;
+    className?: string;
+}) {
+    return <div className={`px-6 py-4 ${className}`}>{children}</div>;
 }
 
 /** ダイアログ下部のボタン領域（ボーダー + 右寄せ flex）。 */

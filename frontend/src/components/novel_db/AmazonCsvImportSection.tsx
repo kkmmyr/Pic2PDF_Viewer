@@ -7,6 +7,15 @@ import { Upload } from 'lucide-react';
 
 import { applyNovelMetaImport, fetchNovelMetaImportPreview } from '../../features/novel_db/api';
 import type { BookSummary, MetaImportPreviewRow } from '../../features/novel_db/types';
+import { useToast } from '../../hooks/useToast';
+import { ToastContainer } from '../reader/ToastContainer';
+import {
+    Dialog,
+    DialogBody,
+    DialogCancelButton,
+    DialogFooter,
+    DialogPrimaryButton,
+} from '../ui/Dialog';
 
 interface Props {
     books: BookSummary[];
@@ -21,6 +30,7 @@ export default function AmazonCsvImportSection({ books, onApplied }: Props) {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const { toasts, showToast, dismissToast } = useToast();
 
     const handleFiles = async (files: FileList | null) => {
         if (!files || files.length === 0) return;
@@ -57,10 +67,10 @@ export default function AmazonCsvImportSection({ books, onApplied }: Props) {
                 })
                 .filter((it): it is NonNullable<typeof it> => it !== null);
             const res = await applyNovelMetaImport(items);
-            alert(`${res.updated_count} 冊のメタデータを更新しました。`);
             setOpen(false);
             setRows([]);
             onApplied();
+            showToast(`${res.updated_count} 冊のメタデータを更新しました。`, 'success');
         } catch {
             setError('保存に失敗しました。');
         } finally {
@@ -87,101 +97,76 @@ export default function AmazonCsvImportSection({ books, onApplied }: Props) {
                 onChange={(e) => void handleFiles(e.target.files)}
             />
 
-            {open && (
-                <div
-                    className="fixed inset-0 z-modal bg-black/50 flex items-center justify-center p-4"
-                    onClick={() => setOpen(false)}
-                >
-                    <div
-                        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl max-h-[85vh] flex flex-col"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                Amazon CSV インポート — プレビュー ({rows.length} 件)
-                            </h2>
-                            <button
-                                onClick={() => setOpen(false)}
-                                className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-200"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="overflow-auto flex-1">
-                            <table className="w-full text-xs">
-                                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                                    <tr>
-                                        <th className={th}>CSV タイトル</th>
-                                        <th className={th}>著者</th>
-                                        <th className={th}>シリーズ</th>
-                                        <th className={th}>巻</th>
-                                        <th className={th}>出版社</th>
-                                        <th className={th}>対応書籍</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {rows.map((r, i) => (
-                                        <tr
-                                            key={i}
-                                            className="border-t border-gray-100 dark:border-gray-700"
+            <Dialog
+                open={open}
+                title={`Amazon CSV インポート — プレビュー (${rows.length} 件)`}
+                maxWidth="xl"
+                className="max-h-[85vh] flex flex-col"
+                onClose={() => setOpen(false)}
+            >
+                <DialogBody className="overflow-auto flex-1 !py-0 !px-0">
+                    <table className="w-full text-xs">
+                        <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                            <tr>
+                                <th className={th}>CSV タイトル</th>
+                                <th className={th}>著者</th>
+                                <th className={th}>シリーズ</th>
+                                <th className={th}>巻</th>
+                                <th className={th}>出版社</th>
+                                <th className={th}>対応書籍</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((r, i) => (
+                                <tr
+                                    key={i}
+                                    className="border-t border-gray-100 dark:border-gray-700"
+                                >
+                                    <td className={td} title={r.csv_title}>
+                                        <span className="line-clamp-2">{r.csv_title}</span>
+                                    </td>
+                                    <td className={td}>{r.authors.join(', ')}</td>
+                                    <td className={td}>{r.series_id}</td>
+                                    <td className={td}>{r.volume ?? '—'}</td>
+                                    <td className={td}>{r.publisher}</td>
+                                    <td className={td}>
+                                        <select
+                                            value={overrides[i] ?? r.matched_book ?? ''}
+                                            onChange={(e) =>
+                                                setOverrides((prev) => ({
+                                                    ...prev,
+                                                    [i]: e.target.value,
+                                                }))
+                                            }
+                                            className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-1 py-0.5"
                                         >
-                                            <td className={td} title={r.csv_title}>
-                                                <span className="line-clamp-2">{r.csv_title}</span>
-                                            </td>
-                                            <td className={td}>{r.authors.join(', ')}</td>
-                                            <td className={td}>{r.series_id}</td>
-                                            <td className={td}>{r.volume ?? '—'}</td>
-                                            <td className={td}>{r.publisher}</td>
-                                            <td className={td}>
-                                                <select
-                                                    value={overrides[i] ?? r.matched_book ?? ''}
-                                                    onChange={(e) =>
-                                                        setOverrides((prev) => ({
-                                                            ...prev,
-                                                            [i]: e.target.value,
-                                                        }))
-                                                    }
-                                                    className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-1 py-0.5"
-                                                >
-                                                    <option value="">（スキップ）</option>
-                                                    {books.map((b) => (
-                                                        <option key={b.name} value={b.name}>
-                                                            {b.name}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                                            <option value="">（スキップ）</option>
+                                            {books.map((b) => (
+                                                <option key={b.name} value={b.name}>
+                                                    {b.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </DialogBody>
 
-                        {error && (
-                            <p className="px-4 py-2 text-xs text-red-600 dark:text-red-400">
-                                {error}
-                            </p>
-                        )}
+                {error && (
+                    <p className="px-4 py-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+                )}
 
-                        <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
-                            <button
-                                onClick={() => setOpen(false)}
-                                className="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
-                            >
-                                キャンセル
-                            </button>
-                            <button
-                                onClick={() => void handleApply()}
-                                disabled={saving}
-                                className="px-3 py-1.5 text-xs rounded bg-primary-600 hover:bg-primary-700 text-white disabled:opacity-50"
-                            >
-                                {saving ? '保存中...' : '保存'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+                <DialogFooter>
+                    <DialogCancelButton onClick={() => setOpen(false)} disabled={saving} />
+                    <DialogPrimaryButton onClick={() => void handleApply()} disabled={saving}>
+                        {saving ? '保存中...' : '保存'}
+                    </DialogPrimaryButton>
+                </DialogFooter>
+            </Dialog>
+
+            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );
 }

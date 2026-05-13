@@ -4,6 +4,7 @@
  * シーンの page_no クリックで親が `PageImageModal` を開くよう onOpenScene を呼ぶ。
  */
 import { useCharacterDetail } from '../../hooks/novel_db';
+import { formatSqliteUtcAsJst } from '../../utils/date';
 
 import { Dialog, DialogBody } from '../ui/Dialog';
 
@@ -41,7 +42,7 @@ export default function CharacterDetailDialog({ bookName, charName, onClose, onO
                             初登場 p{detail.first_page} / 登場 {detail.page_count} ページ
                             {detail.generated_at && (
                                 <span className="ml-2 opacity-70">
-                                    生成 {detail.generated_at.replace('T', ' ').slice(0, 16)}
+                                    生成 {formatSqliteUtcAsJst(detail.generated_at)}
                                 </span>
                             )}
                         </div>

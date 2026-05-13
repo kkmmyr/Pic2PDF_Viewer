@@ -6,7 +6,6 @@ docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設�
 """
 from __future__ import annotations
 
-import json
 from dataclasses import asdict
 from typing import Literal
 
@@ -25,7 +24,8 @@ from config import (
     NOVEL_DB_QA_TOP_K,
     NOVEL_DB_QA_TOP_SUMMARIES,
 )
-from routers._deps import log_and_raise_500
+from routers._deps import cancel_job_response, log_and_raise_500, sse_event
+from utils.logger import get_logger
 from services.amazon_csv_parser import match_books, parse_csv
 from services.meta_store import update_meta_locked
 from services.novel_db import Scope, hybrid_search, with_db
@@ -35,7 +35,7 @@ from services.novel_db.character_summarizer import (
     top_scenes_for_character,
 )
 from services.novel_db.job_queue import job_queue
-from services.novel_db.library import list_books, list_series
+from services.novel_db.library import get_book_detail, list_books, list_series
 from services.novel_db.llm import (
     LLM_OPTIONS,
     build_chat_context_block,
@@ -66,6 +66,7 @@ from services.novel_db.search import SearchHit, load_all_pages_of_book, search_b
 from services.novel_db.summarizer import load_summaries_for_books
 
 router = APIRouter()
+logger = get_logger(__name__)
 
 
 def _check_locked() -> None:
@@ -96,6 +97,17 @@ def get_series() -> list[dict]:
     """novel ソースのシリーズ一覧（書籍 1 件以上のみ）（[API §7.2]）。"""
     with with_db() as conn:
         return [asdict(s) for s in list_series(conn)]
+
+
+@router.get("/novel_db/books/{book_name:path}/detail")
+@log_and_raise_500("novel_db/books/detail")
+def get_book_detail_route(book_name: str) -> dict:
+    """単一書籍の詳細情報（summary / character_count / discussion_count 含む）を返す。"""
+    with with_db() as conn:
+        detail = get_book_detail(conn, book_name)
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"book not found: {book_name}")
+    return asdict(detail)
 
 
 # ---------------------------------------------------------------------------
@@ -220,14 +232,7 @@ def get_rebuild_status() -> dict:
 @log_and_raise_500("novel_db/rebuild/cancel")
 def delete_rebuild(job_id: int) -> Response:
     """待機中ジョブをキャンセルする（[API §7.10]）。実行中は 409。"""
-    result = job_queue.cancel(job_id)
-    if result == "not_found":
-        raise HTTPException(status_code=404, detail="job not found")
-    if result == "running":
-        raise HTTPException(
-            status_code=409, detail="cannot cancel a running job"
-        )
-    return Response(status_code=204)
+    return cancel_job_response(job_queue.cancel(job_id))
 
 
 # ---------------------------------------------------------------------------
@@ -282,10 +287,6 @@ def post_search(request: SearchRequest) -> dict:
 class QaRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
     scope: ScopeModel
-
-
-def _sse_event(payload: dict) -> str:
-    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 @router.post("/novel_db/qa")
@@ -399,7 +400,7 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
                     return
                 if event.get("response"):
                     full_response.append(event["response"])
-                    yield _sse_event({"token": event["response"]})
+                    yield sse_event({"token": event["response"]})
                 if event.get("done"):
                     answer = "".join(full_response)
                     done_reason = event.get("done_reason", "stop")
@@ -412,7 +413,7 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
                             done_reason=done_reason,
                             eval_count=eval_count,
                         )
-                    yield _sse_event({
+                    yield sse_event({
                         "done": True,
                         "history_id": history_id,
                         "eval_count": eval_count,
@@ -420,9 +421,10 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
                     })
                     return
         except Exception as e:
+            logger.exception("post_qa SSE failed")
             with with_db() as conn:
                 save_error(conn, history_id, str(e))
-            yield _sse_event({"error": str(e)})
+            yield sse_event({"error": str(e)})
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -722,7 +724,7 @@ async def _chat_event_stream(
                 return
             if event.get("response"):
                 full_response.append(event["response"])
-                yield _sse_event({"token": event["response"]})
+                yield sse_event({"token": event["response"]})
             if event.get("done"):
                 answer = "".join(full_response)
                 done_reason = event.get("done_reason", "stop")
@@ -733,7 +735,7 @@ async def _chat_event_stream(
                         content=answer,
                         eval_count=eval_count, done_reason=done_reason,
                     )
-                yield _sse_event({
+                yield sse_event({
                     "done": True,
                     "session_id": session_id,
                     "message_id": msg_id,
@@ -749,14 +751,15 @@ async def _chat_event_stream(
                 content=f"backend does not support multi-turn chat: {e}",
                 done_reason="error",
             )
-        yield _sse_event({"error": f"backend not supported: {e}"})
+        yield sse_event({"error": f"backend not supported: {e}"})
     except Exception as e:  # noqa: BLE001
+        logger.exception("chat SSE failed")
         with with_db() as conn:
             append_message(
                 conn, session_id, role="assistant",
                 content=str(e), done_reason="error",
             )
-        yield _sse_event({"error": str(e)})
+        yield sse_event({"error": str(e)})
 
 
 # title 更新 (任意、UX 改善)
