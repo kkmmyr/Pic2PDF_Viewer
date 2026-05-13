@@ -1,14 +1,15 @@
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import {
-    FileText,
-    Library,
-    Settings,
-    Terminal,
-    Moon,
-    Sun,
-    Sparkles,
     BookOpen,
     BookText,
+    FileText,
+    Library,
+    MessageSquare,
+    Moon,
+    Settings,
+    Sparkles,
+    Sun,
+    Terminal,
 } from 'lucide-react';
 import { useDarkMode } from '../hooks';
 
@@ -94,6 +95,13 @@ export default function Layout() {
                                 >
                                     <BookOpen className="w-4 h-4" />
                                     DB
+                                </Link>
+                                <Link
+                                    to="/novel/discussion"
+                                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${isActive('/novel/discussion')}`}
+                                >
+                                    <MessageSquare className="w-4 h-4" />
+                                    読書会
                                 </Link>
                                 <Link
                                     to="/novel/ocr"

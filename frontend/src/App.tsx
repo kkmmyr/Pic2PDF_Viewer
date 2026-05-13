@@ -6,6 +6,7 @@ import ViewerPage from './pages/ViewerPage';
 import OCRPage from './pages/OCRPage';
 import HitomiPage from './pages/HitomiPage';
 import NovelDbPage from './pages/NovelDbPage';
+import NovelDiscussionPage from './pages/NovelDiscussionPage';
 import NovelReaderPage from './pages/NovelReaderPage';
 
 function App() {
@@ -61,6 +62,14 @@ function App() {
                             element={
                                 <ErrorBoundary>
                                     <OCRPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="novel/discussion"
+                            element={
+                                <ErrorBoundary>
+                                    <NovelDiscussionPage />
                                 </ErrorBoundary>
                             }
                         />

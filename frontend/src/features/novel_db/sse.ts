@@ -247,3 +247,113 @@ export async function streamChatSession(
         handlers.onError(e instanceof Error ? e : new Error(String(e)));
     }
 }
+
+// ---------------------------------------------------------------------------
+// 読書会ディスカッション生成（B-20）
+// ---------------------------------------------------------------------------
+
+export interface DiscussionPersona {
+    name: string;
+    style_description: string;
+}
+
+export interface DiscussionGenerateRequest {
+    book_name: string;
+    personas: [DiscussionPersona, DiscussionPersona];
+    num_turns: number;
+}
+
+export interface DiscussionTurnEvent {
+    speaker: 'A' | 'B';
+    text: string;
+}
+
+export interface DiscussionDoneEvent {
+    saved_path?: string;
+}
+
+export interface DiscussionStreamHandlers {
+    onTurn: (event: DiscussionTurnEvent) => void;
+    onDone: (event: DiscussionDoneEvent) => void;
+    onError: (error: Error) => void;
+}
+
+interface DiscussionSsePayload {
+    type?: string;
+    speaker?: string;
+    text?: string;
+    saved_path?: string;
+    message?: string;
+}
+
+/** /api/novel/discussion/generate を SSE で受信する。 */
+export async function streamDiscussion(
+    body: DiscussionGenerateRequest,
+    handlers: DiscussionStreamHandlers,
+    signal?: AbortSignal,
+): Promise<void> {
+    let response: Response;
+    try {
+        response = await fetch(`${API_URL_CONFIG.BASE_URL}/api/novel/discussion/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+            body: JSON.stringify(body),
+            signal,
+        });
+    } catch (e) {
+        if ((e as { name?: string }).name === 'AbortError') return;
+        handlers.onError(e instanceof Error ? e : new Error(String(e)));
+        return;
+    }
+
+    if (!response.ok) {
+        const detail = await response.text().catch(() => '');
+        handlers.onError(new Error(`HTTP ${response.status}: ${detail || response.statusText}`));
+        return;
+    }
+    if (!response.body) {
+        handlers.onError(new Error('Response body is empty'));
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const segments = buf.split('\n\n');
+            buf = segments.pop() ?? '';
+
+            for (const segment of segments) {
+                for (const line of segment.split('\n')) {
+                    if (!line.startsWith('data: ')) continue;
+                    let event: DiscussionSsePayload;
+                    try {
+                        event = JSON.parse(line.slice(6)) as DiscussionSsePayload;
+                    } catch {
+                        continue;
+                    }
+                    if (event.type === 'turn' && event.speaker && event.text !== undefined) {
+                        handlers.onTurn({
+                            speaker: event.speaker as 'A' | 'B',
+                            text: event.text,
+                        });
+                    } else if (event.type === 'done') {
+                        handlers.onDone({ saved_path: event.saved_path });
+                        return;
+                    } else if (event.type === 'error' || event.message !== undefined) {
+                        handlers.onError(new Error(event.message ?? 'Unknown error'));
+                        return;
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        if ((e as { name?: string }).name === 'AbortError') return;
+        handlers.onError(e instanceof Error ? e : new Error(String(e)));
+    }
+}

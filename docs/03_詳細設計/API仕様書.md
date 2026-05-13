@@ -62,9 +62,8 @@
   - §7.10 `DELETE /api/novel_db/rebuild/{job_id}` — 待機中ジョブのキャンセル
   - §7.22 `POST /api/novel_db/meta-import/preview` — Amazon CSV マッチングプレビュー（4.3）
   - §7.23 `POST /api/novel_db/meta-import/apply` — CSV インポート適用（4.3）
-  - §7.19 `POST /api/novel_db/books/{book_name}/discussion` — 読書会ディスカッション生成（SSE, B-20）
-  - §7.20 `GET /api/novel_db/books/{book_name}/discussion/history` — 討論履歴一覧（B-20）
-  - §7.21 `DELETE /api/novel_db/books/{book_name}/discussion/history/{timestamp}` — 討論履歴削除（B-20）
+  - §7.19 `POST /api/novel/discussion/generate` — 読書会ディスカッション生成（SSE, B-20）
+  - §7.20 `GET /api/novel/discussion/history` — ディスカッション履歴一覧（B-20）
 
 ---
 
@@ -1358,84 +1357,71 @@ scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ
 
 ---
 
-### §7.19 `POST /api/novel_db/books/{book_name}/discussion`（B-20、SSE）
+### §7.19 `POST /api/novel/discussion/generate`（B-20、SSE）
 
 書籍 1 冊の本文全体を Qwen に読み込ませ、2 人のキャラクター（ペルソナ）が交互に語り合う読書会ディスカッションを SSE ストリーミングで生成する。
-
-**パスパラメータ**: `book_name` — 書籍名（`kindle_novel/images/{book_name}/` が存在すること）
 
 **リクエストボディ**:
 ```json
 {
+  "book_name": "書籍名",
   "personas": [
-    { "name": "A さん", "style": "批評家的な視点で、丁寧な敬語で話す" },
-    { "name": "B さん", "style": "ファン目線で、フランクに感情豊かに話す" }
+    { "name": "批評家", "style_description": "批評家・敬語丁寧・文学評論" },
+    { "name": "ファン",  "style_description": "ファン・フランク・感情重視" }
   ],
-  "num_turns": 8
+  "num_turns": 6
 }
 ```
 
 | フィールド | 型 | 説明 |
 |---|---|---|
-| `personas` | array[2] | キャラクター A・B の名前と口調説明（2 件固定） |
-| `personas[].name` | string | 表示名（1〜20 字） |
-| `personas[].style` | string | 口調・視点の説明（1〜200 字） |
-| `num_turns` | integer | 総発話数（2〜40 の偶数、A/B 交互なので往復数 = num_turns/2） |
+| `book_name` | string | 書籍名（novel DB のインデックス済み書籍名） |
+| `personas` | array[2] | キャラクター A・B（2 件固定） |
+| `personas[].name` | string | 表示名（1〜50 字） |
+| `personas[].style_description` | string | 口調・視点の説明（1〜200 字） |
+| `num_turns` | integer | 往復数（2〜20、デフォルト 6） |
 
 **レスポンス（SSE ストリーム）**:
 ```
-data: {"type": "turn_start", "speaker": "A さん", "turn_index": 0}
-data: {"type": "token", "speaker": "A さん", "token": "この作品は"}
-data: {"type": "token", "speaker": "A さん", "token": "..."}
-data: {"type": "turn_end", "speaker": "A さん", "turn_index": 0, "text": "この作品は...（完全な発言）"}
-data: {"type": "turn_start", "speaker": "B さん", "turn_index": 1}
+data: {"type": "turn", "speaker": "A", "text": "この作品の...（完全な発言）"}
+data: {"type": "turn", "speaker": "B", "text": "確かに、でも..."}
 ...
-data: {"type": "done", "saved_path": "kindle_novel/discussions/書籍名/20260513_143022.json"}
+data: {"type": "done", "saved_path": "/path/to/kindle_novel/discussions/書籍名/20260513T143022Z.json"}
+data: {"type": "error", "message": "本文が長すぎます（推定 120,000 トークン、上限 112,000 トークン）。"}
 ```
 
-**事前チェック**: 本文全体のトークン数を推計し、131,072 を超える場合は生成を開始せずに `422` を返す。
+**事前チェック**: 本文全体のトークン数を推計し、112,000 を超える場合はエラー SSE を即座に返して終了する（生成開始しない）。
 
-**完了時の保存**: `kindle_novel/discussions/{book_name}/{YYYYMMDD_HHmmss}.json` に全発言を保存。キャンセル（クライアント切断）時は保存しない。
-
-**エラー**:
-- `404`: 書籍が存在しない
-- `422`: ペルソナ不正（2 件以外）/ `num_turns` 範囲外 / トークン超過（本文が 131k ctx を超える）
-- `503`: 再構築ジョブ実行中
+**完了時の保存**: `kindle_novel/discussions/{book_name}/{timestamp}Z.json` に全発言を保存。キャンセル（クライアント切断）時は保存しない。
 
 ---
 
-### §7.20 `GET /api/novel_db/books/{book_name}/discussion/history`（B-20）
+### §7.20 `GET /api/novel/discussion/history`（B-20）
 
-指定書籍の討論履歴ファイル一覧を返す（新しい順）。
+指定書籍のディスカッション履歴一覧を返す（新しい順）。turns 全件含む。
+
+**クエリパラメータ**: `book_name` — 書籍名（必須）
 
 **レスポンス**:
 ```json
 [
   {
-    "timestamp": "20260513_143022",
-    "created_at": "2026-05-13T14:30:22",
-    "num_turns": 8,
-    "personas": ["A さん", "B さん"]
+    "filename": "20260513T143022Z.json",
+    "created_at": "2026-05-13T14:30:22+00:00",
+    "personas": [
+      { "name": "批評家", "style_description": "批評家・敬語丁寧・文学評論" },
+      { "name": "ファン",  "style_description": "ファン・フランク・感情重視" }
+    ],
+    "turn_count": 12,
+    "turns": [
+      { "speaker": "A", "text": "..." },
+      { "speaker": "B", "text": "..." }
+    ]
   }
 ]
 ```
 
-**エラー**: `404` 書籍が存在しない
-
----
-
-### §7.21 `DELETE /api/novel_db/books/{book_name}/discussion/history/{timestamp}`（B-20）
-
-指定タイムスタンプの討論履歴 JSON ファイルを削除する。
-
-**パスパラメータ**:
-- `book_name` — 書籍名
-- `timestamp` — ファイル名形式 `YYYYMMDD_HHmmss`
-
-**レスポンス**: `204 No Content`
-
-**エラー**:
-- `404`: 書籍または該当タイムスタンプのファイルが存在しない
+書籍ディレクトリが存在しない / 履歴ゼロの場合は空配列 `[]` を返す。
 
 ---
 

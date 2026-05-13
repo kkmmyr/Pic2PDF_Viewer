@@ -152,3 +152,21 @@ export function fetchNovelMetaImportPreview(files: File[]): Promise<MetaImportPr
 export function applyNovelMetaImport(items: MetaApplyItem[]): Promise<{ updated_count: number }> {
     return apiClient.post<unknown, { updated_count: number }>(`${PREFIX}/meta-import/apply`, items);
 }
+
+// ---------------------------------------------------------------------------
+// 読書会ディスカッション（B-20）
+// ---------------------------------------------------------------------------
+
+export interface DiscussionHistoryItem {
+    filename: string;
+    created_at: string | null;
+    personas: { name: string; style_description: string }[];
+    turn_count: number;
+    turns: { speaker: string; text: string }[];
+}
+
+export function fetchDiscussionHistory(bookName: string): Promise<DiscussionHistoryItem[]> {
+    return apiClient.get<unknown, DiscussionHistoryItem[]>(
+        `/api/novel/discussion/history?book_name=${encodeURIComponent(bookName)}`,
+    );
+}
