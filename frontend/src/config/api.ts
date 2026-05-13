@@ -77,6 +77,8 @@ export const API_ENDPOINTS = {
     GENRES: '/api/genres',
     /** ジャンル並べ替え */
     GENRES_REORDER: '/api/genres/reorder',
+    /** Amazon CSV 固定パスインポート（authors/asin 空欄補完） */
+    AMAZON_IMPORT: (source: string) => `/api/amazon/import?source=${encodeURIComponent(source)}`,
     /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダー / 編集モードグリッド用） */
     PAGE_THUMBNAIL: (
         name: string,
@@ -96,12 +98,7 @@ export const API_ENDPOINTS = {
  */
 export const STATIC_PATHS = {
     /** PDFファイルパス */
-    PDF: (
-        path: string,
-        filename: string,
-        source: LibrarySource = 'doujin',
-        version?: number,
-    ) => {
+    PDF: (path: string, filename: string, source: LibrarySource = 'doujin', version?: number) => {
         const basePath = path ? '/' + path.split('/').map(encodeURIComponent).join('/') : '';
         const encodedFilename = encodeURIComponent(filename);
         const versionParam = version !== undefined ? `?v=${version}` : '';

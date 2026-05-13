@@ -141,6 +141,12 @@ NOVEL_DB_QA_FULL_BOOK_NUM_CTX = int(os.environ.get("NOVEL_DB_QA_FULL_BOOK_NUM_CT
 # フロントエンド配信ディレクトリ（リリースモード用）
 FRONTEND_DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
 
+# Amazon 購入履歴 CSV ルートディレクトリ（環境変数で上書き可能）
+AMAZON_DATA_DIR: str = os.environ.get(
+    "AMAZON_DATA_DIR",
+    r"C:\Users\amashio\OneDrive\61.tool\amazon_data",
+)
+
 # Gemma 4 ツールディレクトリ（web_extract モジュールの場所）
 # .env の GEMMA_TOOL_DIR で上書き可能
 GEMMA_TOOL_DIR: str = os.environ.get("GEMMA_TOOL_DIR", r"D:\61.tool\Gemma 4")
