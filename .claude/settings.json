@@ -72,7 +72,14 @@
       "PowerShell(cd *; git show*)",
       "PowerShell(cd *; git branch*)",
       "PowerShell(cd *; git add*)",
-      "PowerShell(cd *; git commit*)"
+      "PowerShell(cd *; git commit*)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Get-ChildItem)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(jq *)",
+      "Bash(ls)",
+      "Bash(ls *)"
     ]
   },
   "hooks": {
