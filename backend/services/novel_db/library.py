@@ -172,6 +172,19 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
     return summaries
 
 
+def list_authors(conn: sqlite3.Connection) -> list[str]:  # noqa: ARG001
+    """novel ソースの全書籍から重複なし作者一覧を返す（作者未設定は除く）。"""
+    books = list_books(conn)
+    seen: set[str] = set()
+    authors: list[str] = []
+    for b in books:
+        for a in b.authors:
+            if a and a not in seen:
+                seen.add(a)
+                authors.append(a)
+    return sorted(authors, key=lambda x: x.lower())
+
+
 def list_series(conn: sqlite3.Connection) -> list[SeriesSummary]:
     """novel ソースのシリーズ一覧を返す（書籍 1 件以上のもののみ）。
 

@@ -46,6 +46,10 @@ export function fetchSeries(): Promise<SeriesSummary[]> {
     return apiClient.get<unknown, SeriesSummary[]>(`${PREFIX}/series`);
 }
 
+export function fetchNovelAuthors(): Promise<string[]> {
+    return apiClient.get<unknown, string[]>(`${PREFIX}/authors`);
+}
+
 // ---------------------------------------------------------------------------
 // 検索
 // ---------------------------------------------------------------------------

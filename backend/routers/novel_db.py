@@ -25,7 +25,6 @@ from config import (
     NOVEL_DB_QA_TOP_SUMMARIES,
 )
 from routers._deps import cancel_job_response, log_and_raise_500, sse_event
-from utils.logger import get_logger
 from services.amazon_csv_parser import match_books, parse_csv
 from services.meta_store import update_meta_locked
 from services.novel_db import Scope, hybrid_search, with_db
@@ -35,7 +34,7 @@ from services.novel_db.character_summarizer import (
     top_scenes_for_character,
 )
 from services.novel_db.job_queue import job_queue
-from services.novel_db.library import get_book_detail, list_books, list_series
+from services.novel_db.library import get_book_detail, list_authors, list_books, list_series
 from services.novel_db.llm import (
     LLM_OPTIONS,
     build_chat_context_block,
@@ -64,6 +63,7 @@ from services.novel_db.qa_sessions import (
 from services.novel_db.query_expander import expand_query
 from services.novel_db.search import SearchHit, load_all_pages_of_book, search_book_summaries
 from services.novel_db.summarizer import load_summaries_for_books
+from utils.logger import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -97,6 +97,14 @@ def get_series() -> list[dict]:
     """novel ソースのシリーズ一覧（書籍 1 件以上のみ）（[API §7.2]）。"""
     with with_db() as conn:
         return [asdict(s) for s in list_series(conn)]
+
+
+@router.get("/novel_db/authors")
+@log_and_raise_500("novel_db/authors")
+def get_authors() -> list[str]:
+    """novel ソースの全書籍から作者一覧（重複なし・アルファベット順）を返す（B-21）。"""
+    with with_db() as conn:
+        return list_authors(conn)
 
 
 @router.get("/novel_db/books/{book_name:path}/detail")
