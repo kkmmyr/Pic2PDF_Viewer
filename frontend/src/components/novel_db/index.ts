@@ -7,6 +7,8 @@ export { default as CharacterDetailDialog } from './CharacterDetailDialog';
 export { default as CharactersPanel } from './CharactersPanel';
 export { default as ChatSection } from './ChatSection';
 export { default as LibrarySection } from './LibrarySection';
+export { NovelBulkAuthorDialog } from './NovelBulkAuthorDialog';
+export { NovelBulkSeriesAssignDialog } from './NovelBulkSeriesAssignDialog';
 export { default as NovelDbHeader } from './NovelDbHeader';
 export { default as PageImageModal } from './PageImageModal';
 export { default as PersonaPanel } from './PersonaPanel';
