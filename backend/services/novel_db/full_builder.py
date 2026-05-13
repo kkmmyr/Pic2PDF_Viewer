@@ -32,13 +32,15 @@ def build_book_full(
     *,
     redo: bool = False,
     step_callback: StepCallback | None = None,
+    detail_callback: StepCallback | None = None,
 ) -> None:
     """1 冊の全構築パイプラインを実行する。
 
     Args:
         book_name: 書籍 stem（= images サブディレクトリ名）
         redo: True のとき既存の summary / book_characters / contextual_text を上書きする
-        step_callback: 進捗ログ用コールバック（"step: ..." 形式のメッセージを受け取る）
+        step_callback: ステップ名更新用コールバック（current_step に書き込む）
+        detail_callback: 細粒度進捗更新用コールバック（current_detail に書き込む）
     """
 
     def _log(msg: str) -> None:
@@ -46,23 +48,31 @@ def build_book_full(
         if step_callback:
             step_callback(msg)
 
+    def _detail(msg: str) -> None:
+        if detail_callback:
+            detail_callback(msg)
+
     _log("start")
 
     # ステップ 1: チャンク分割 + embedding 再構築（常実行）
     _log("step 1/3: rebuild_from_pages")
+
+    def _rebuild_progress(done: int, total: int) -> None:
+        _detail(f"embedding {done}/{total} チャンク")
+
     with with_db() as conn:
         init_schema(conn)
-        rebuild_from_pages(conn, book_name)
+        rebuild_from_pages(conn, book_name, progress_callback=_rebuild_progress)
 
     # ステップ 2: 書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成
     _log("step 2/3: summarize_book + characters")
     with with_db() as conn:
-        _run_combined_step(conn, book_name, redo=redo, log=_log)
+        _run_combined_step(conn, book_name, redo=redo, log=_log, detail=_detail)
 
     # ステップ 3: チャンク位置説明生成 + 再 embedding
     _log("step 3/3: generate_contexts")
     with with_db() as conn:
-        _run_generate_contexts(conn, book_name, redo=redo, log=_log)
+        _run_generate_contexts(conn, book_name, redo=redo, log=_log, detail=_detail)
 
     _log("finished")
 
@@ -77,6 +87,7 @@ def _run_combined_step(
     *,
     redo: bool,
     log: StepCallback,
+    detail: StepCallback | None = None,
 ) -> None:
     """書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成して DB に保存する。"""
     row = conn.execute(
@@ -96,6 +107,8 @@ def _run_combined_step(
         log("  skip: summary and characters already exist")
         return
 
+    if detail:
+        detail("サマリ生成中")
     try:
         summary, char_summaries = summarize_book_with_characters(conn, book_name, progress=log)
     except Exception as exc:
@@ -106,6 +119,8 @@ def _run_combined_step(
     update_book_summary(conn, book_name, summary)
 
     if char_summaries:
+        if detail:
+            detail("キャラクタ抽出中")
         conn.execute("DELETE FROM book_characters WHERE book_id = ?", (book_id,))
         for name, char_summary in char_summaries.items():
             # first_page / page_count をテキスト検索で近似
@@ -133,6 +148,7 @@ def _run_generate_contexts(
     *,
     redo: bool,
     log: StepCallback,
+    detail: StepCallback | None = None,
 ) -> None:
     book_row = conn.execute(
         "SELECT id, summary FROM books WHERE name = ?", (book_name,)
@@ -159,9 +175,12 @@ def _run_generate_contexts(
         log("  skip: no chunks to contextualize (all done)")
         return
 
-    log(f"  processing {len(chunks)} chunks")
+    total_chunks = len(chunks)
+    log(f"  processing {total_chunks} chunks")
     done = 0
     for chunk_id, chunk_text in chunks:
+        if detail:
+            detail(f"コンテキスト {done}/{total_chunks} チャンク")
         try:
             ctx = generate_chunk_context(book_name, book_summary, chunk_text)
             if not ctx:
@@ -188,4 +207,4 @@ def _run_generate_contexts(
                 "[full_build:%s] generate_context chunk %s failed: %s",
                 book_name, chunk_id, exc,
             )
-    log(f"  done: {done}/{len(chunks)} chunks")
+    log(f"  done: {done}/{total_chunks} chunks")

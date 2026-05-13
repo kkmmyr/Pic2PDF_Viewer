@@ -133,7 +133,7 @@ class NovelDbJobQueue:
         with with_db() as conn:
             current = conn.execute(
                 "SELECT id, job_type, target_id, mode, started_at, "
-                "progress_total, progress_done, current_step "
+                "progress_total, progress_done, current_step, current_detail "
                 "FROM rebuild_jobs WHERE state='running' "
                 "ORDER BY started_at LIMIT 1"
             ).fetchone()
@@ -227,6 +227,14 @@ class NovelDbJobQueue:
             )
             conn.commit()
 
+    def _update_detail(self, job_id: int, detail: str) -> None:
+        with with_db() as conn:
+            conn.execute(
+                "UPDATE rebuild_jobs SET current_detail = ? WHERE id = ?",
+                (detail, job_id),
+            )
+            conn.commit()
+
     def _execute_job(self, job: dict) -> None:
         job_id = job["id"]
         job_type = job["job_type"]
@@ -248,10 +256,16 @@ class NovelDbJobQueue:
                 logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
         elif mode == "full_build":
             # 全構築統合: rebuild_from_pages → summarize → extract_chars → char_summary → contexts
+            def _step_cb(msg: str, _jid: int = job_id) -> None:
+                self._update_step(_jid, msg)
+
             for done, book_name in enumerate(targets, start=1):
-                def _step_cb(msg: str, _jid: int = job_id) -> None:
-                    self._update_step(_jid, msg)
-                build_book_full(book_name, step_callback=_step_cb)
+                _prefix = f"冊 {done}/{total} 処理中 | " if total > 1 else ""
+
+                def _detail_cb(detail: str, _jid: int = job_id, _p: str = _prefix) -> None:
+                    self._update_detail(_jid, _p + detail)
+
+                build_book_full(book_name, step_callback=_step_cb, detail_callback=_detail_cb)
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d full_build progress: %d/%d (%s)", job_id, done, total, book_name)
         else:
@@ -304,7 +318,7 @@ def _list_books_in_series(series_id: str) -> list[str]:
 
 
 def _row_to_running(row: tuple) -> dict:
-    job_id, job_type, target_id, mode, started_at, total, done, current_step = row
+    job_id, job_type, target_id, mode, started_at, total, done, current_step, current_detail = row
     return {
         "id": job_id,
         "type": job_type,
@@ -314,6 +328,7 @@ def _row_to_running(row: tuple) -> dict:
         "progress_total": total,
         "progress_done": done,
         "current_step": current_step,
+        "current_detail": current_detail,
     }
 
 

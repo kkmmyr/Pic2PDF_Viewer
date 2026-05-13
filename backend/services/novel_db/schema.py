@@ -194,3 +194,5 @@ def _migrate(conn: sqlite3.Connection) -> None:
     rebuild_jobs_cols = {row[1] for row in conn.execute("PRAGMA table_info(rebuild_jobs)").fetchall()}
     if "current_step" not in rebuild_jobs_cols:
         conn.execute("ALTER TABLE rebuild_jobs ADD COLUMN current_step TEXT")
+    if "current_detail" not in rebuild_jobs_cols:
+        conn.execute("ALTER TABLE rebuild_jobs ADD COLUMN current_detail TEXT")

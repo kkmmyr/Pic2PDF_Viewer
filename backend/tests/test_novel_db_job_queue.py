@@ -92,3 +92,53 @@ def test_enqueue_with_explicit_mode(queue):
     job_id, _ = queue.enqueue("book", "a", mode="reocr")
     status = queue.get_status()
     assert status["queued_jobs"][0]["mode"] == "reocr"
+
+
+def test_update_detail_writes_to_db(queue):
+    """_update_detail が current_detail カラムを更新する。"""
+    job_id, _ = queue.enqueue("book", "a")
+    with with_db() as conn:
+        conn.execute(
+            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') "
+            "WHERE id = ?",
+            (job_id,),
+        )
+        conn.commit()
+
+    queue._update_detail(job_id, "embedding 10/100 チャンク")
+
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+    assert row is not None
+    assert row[0] == "embedding 10/100 チャンク"
+
+
+def test_get_status_current_job_includes_current_detail(queue):
+    """get_status の current_job に current_detail が含まれる。"""
+    job_id, _ = queue.enqueue("book", "b")
+    with with_db() as conn:
+        conn.execute(
+            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now'), "
+            "current_detail='コンテキスト 5/50 チャンク' WHERE id = ?",
+            (job_id,),
+        )
+        conn.commit()
+
+    status = queue.get_status()
+    assert status["is_running"] is True
+    assert status["current_job"]["current_detail"] == "コンテキスト 5/50 チャンク"
+
+
+def test_update_detail_overwrites_previous_value(queue):
+    """_update_detail を複数回呼ぶと最新値に上書きされる。"""
+    job_id, _ = queue.enqueue("book", "c")
+    queue._update_detail(job_id, "first")
+    queue._update_detail(job_id, "second")
+
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)
+        ).fetchone()
+    assert row[0] == "second"

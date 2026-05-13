@@ -26,11 +26,23 @@ function StepLabel({ step }: { step: string | null | undefined }) {
     if (!step) return null;
     const display = step.replace(/^step\s+(\d+\/\d+):\s*/i, 'Step $1: ');
     return (
-        <p
-            className="text-xs font-mono text-primary-600 dark:text-primary-400 mt-1 truncate"
-            title={step}
-        >
-            {display}
+        <div className="flex items-center gap-1 mt-1">
+            <Loader2 className="w-3 h-3 text-primary-500 animate-spin shrink-0" />
+            <p
+                className="text-xs font-mono text-primary-600 dark:text-primary-400 truncate"
+                title={step}
+            >
+                {display}
+            </p>
+        </div>
+    );
+}
+
+function DetailLabel({ detail }: { detail: string | null | undefined }) {
+    if (!detail) return null;
+    return (
+        <p className="text-xs text-gray-500 dark:text-gray-400 ml-4 truncate" title={detail}>
+            {detail}
         </p>
     );
 }
@@ -45,6 +57,7 @@ export default function RunningJobCard({ job }: { job: BuildJob }) {
                 </span>
             </div>
             <StepLabel step={job.current_step} />
+            <DetailLabel detail={job.current_detail} />
             <ProgressBar done={job.progress_done ?? 0} total={job.progress_total ?? 1} />
             {job.started_at && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">

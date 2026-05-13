@@ -11,6 +11,7 @@ export interface BuildJob {
     progress_total?: number;
     progress_done?: number;
     current_step?: string | null;
+    current_detail?: string | null;
 }
 
 export interface FinishedJob {
