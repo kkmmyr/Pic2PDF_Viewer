@@ -50,26 +50,6 @@ export interface NovelMetaPatch {
     release_date?: string;
 }
 
-export interface MetaImportPreviewRow {
-    csv_title: string;
-    series_id: string;
-    volume: number | null;
-    publisher: string;
-    authors: string[];
-    asin: string;
-    matched_book: string | null;
-    match_score: number;
-}
-
-export interface MetaApplyItem {
-    book_key: string;
-    authors?: string[];
-    series_id?: string;
-    volume?: number | null;
-    publisher?: string;
-    asin?: string;
-}
-
 export interface SeriesSummary {
     id: string;
     name: string;

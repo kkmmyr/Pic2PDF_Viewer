@@ -24,7 +24,6 @@ import {
     type NovelBookGroup,
     useNovelLibraryGroup,
 } from '../../hooks/useNovelLibraryGroup';
-import AmazonCsvImportSection from './AmazonCsvImportSection';
 import BookCard from './BookCard';
 import { NovelBulkAuthorDialog } from './NovelBulkAuthorDialog';
 import { NovelBulkSeriesAssignDialog } from './NovelBulkSeriesAssignDialog';
@@ -351,10 +350,6 @@ export default function LibrarySection({
                         </div>
 
                         {renderSelectButton()}
-
-                        <div className="ml-auto">
-                            <AmazonCsvImportSection books={books} onApplied={onMetaRefetch} />
-                        </div>
                     </div>
 
                     {/* 選択アクションバー */}

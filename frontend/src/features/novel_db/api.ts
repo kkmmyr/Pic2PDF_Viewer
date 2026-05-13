@@ -15,8 +15,6 @@ import type {
     CharacterSummary,
     ChatSessionDetail,
     ChatSessionSummary,
-    MetaApplyItem,
-    MetaImportPreviewRow,
     NovelMetaPatch,
     QaHistoryDetail,
     QaHistoryListResponse,
@@ -69,9 +67,13 @@ export function searchHits(req: SearchRequest): Promise<SearchResponse> {
 // 質問履歴
 // ---------------------------------------------------------------------------
 
-export function fetchQaHistory(offset = 0, limit = 20): Promise<QaHistoryListResponse> {
+export function fetchQaHistory(
+    offset = 0,
+    limit = 20,
+    book?: string,
+): Promise<QaHistoryListResponse> {
     return apiClient.get<unknown, QaHistoryListResponse>(`${PREFIX}/qa/history`, {
-        params: { offset, limit },
+        params: { offset, limit, ...(book !== undefined && { book }) },
     });
 }
 
@@ -157,16 +159,6 @@ export function reorderNovelSeries(seriesId: string, names: string[]): Promise<v
         names,
         source: 'novel',
     });
-}
-
-export function fetchNovelMetaImportPreview(files: File[]): Promise<MetaImportPreviewRow[]> {
-    const form = new FormData();
-    for (const f of files) form.append('files', f);
-    return apiClient.post<unknown, MetaImportPreviewRow[]>(`${PREFIX}/meta-import/preview`, form);
-}
-
-export function applyNovelMetaImport(items: MetaApplyItem[]): Promise<{ updated_count: number }> {
-    return apiClient.post<unknown, { updated_count: number }>(`${PREFIX}/meta-import/apply`, items);
 }
 
 // ---------------------------------------------------------------------------

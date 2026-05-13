@@ -1,4 +1,3 @@
-export { default as AmazonCsvImportSection } from './AmazonCsvImportSection';
 export { default as BookMetaList } from './BookMetaList';
 export { default as DiscussionHistoryItemCard, TurnCard } from './DiscussionHistoryItem';
 export { default as BookCard } from './BookCard';
@@ -13,6 +12,7 @@ export { default as NovelDbHeader } from './NovelDbHeader';
 export { default as PageImageModal } from './PageImageModal';
 export { default as PersonaPanel } from './PersonaPanel';
 export type { PersonaState } from './PersonaPanel';
+export { default as QuestionHistoryDetail } from './QuestionHistoryDetail';
 export { default as QuestionHistoryItem } from './QuestionHistoryItem';
 export { default as QuestionHistoryList } from './QuestionHistoryList';
 export { default as QuestionInput } from './QuestionInput';
