@@ -1,11 +1,12 @@
 /**
- * ライブラリ（書籍一覧）セクション（B-21 拡張）。
+ * ライブラリ（書籍一覧）セクション。
  *
- * - グループ表示: フラット / 作者別 / シリーズ別の切り替えトグル
- * - 選択モード: チェックボックス選択 → 一括作者設定 / 一括シリーズ登録
+ * - トップ階層: シリーズ/作者グループカードグリッド + 未設定書籍フラット表示
+ * - ドリルダウン: シリーズ内 DnD 並び替え（ドロップ時即時保存）
+ * - 選択モード: トップ階層のみ（一括作者設定 / 一括シリーズ登録）
  */
 import { useState, useCallback } from 'react';
-import { Check, Users, BookOpen, LayoutGrid, CheckSquare, Square } from 'lucide-react';
+import { Check, Users, BookOpen, LayoutGrid, CheckSquare, Square, ChevronRight } from 'lucide-react';
 
 import type { BookSummary, SeriesSummary } from '../../features/novel_db/types';
 import { fetchNovelAuthors, fetchSeries, patchNovelBookMeta } from '../../features/novel_db/api';
@@ -14,6 +15,8 @@ import AmazonCsvImportSection from './AmazonCsvImportSection';
 import BookCard from './BookCard';
 import { NovelBulkAuthorDialog } from './NovelBulkAuthorDialog';
 import { NovelBulkSeriesAssignDialog } from './NovelBulkSeriesAssignDialog';
+import SeriesGroupCard from './SeriesGroupCard';
+import SeriesDrilldownView from './SeriesDrilldownView';
 
 interface Props {
     books: BookSummary[];
@@ -36,9 +39,16 @@ export default function LibrarySection({
     onEditBook,
     onMetaRefetch,
 }: Props) {
-    const [groupMode, setGroupMode] = useState<GroupMode>('flat');
+    const [groupMode, setGroupMode] = useState<GroupMode>('series');
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+
+    // ドリルダウン: { seriesId, label, books }
+    const [drilldown, setDrilldown] = useState<{
+        seriesId: string;
+        label: string;
+        books: BookSummary[];
+    } | null>(null);
 
     // ダイアログ状態
     const [showAuthorDialog, setShowAuthorDialog] = useState(false);
@@ -122,13 +132,7 @@ export default function LibrarySection({
         const selected = selectedNames.has(book.name);
         return (
             <div key={book.name} className="relative">
-                <div
-                    className={
-                        selected
-                            ? 'ring-2 ring-primary-500 rounded-lg'
-                            : undefined
-                    }
-                >
+                <div className={selected ? 'ring-2 ring-primary-500 rounded-lg' : undefined}>
                     <BookCard
                         book={book}
                         onOpenDetail={isSelecting ? () => {} : onOpenDetailBook}
@@ -152,6 +156,49 @@ export default function LibrarySection({
 
     const selectedList = books.filter((b) => selectedNames.has(b.name));
 
+    // ---- グループカードクリック → ドリルダウン ----
+    const handleGroupClick = useCallback(
+        (seriesId: string, label: string, groupBooks: BookSummary[]) => {
+            setDrilldown({ seriesId, label, books: groupBooks });
+            setIsSelecting(false);
+            setSelectedNames(new Set());
+        },
+        [],
+    );
+
+    // ---- ドリルダウンビュー ----
+    if (drilldown) {
+        return (
+            <section className="space-y-3">
+                {/* パンくず */}
+                <nav className="flex items-center gap-1 text-sm">
+                    <button
+                        onClick={() => setDrilldown(null)}
+                        className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                    >
+                        ライブラリ
+                    </button>
+                    <ChevronRight className="w-4 h-4 text-gray-400 shrink-0" />
+                    <span className="text-gray-900 dark:text-gray-100 font-medium truncate">
+                        {drilldown.label}
+                    </span>
+                    <span className="text-gray-400 dark:text-gray-500 text-xs ml-1 shrink-0">
+                        ({drilldown.books.length} 冊)
+                    </span>
+                </nav>
+
+                <SeriesDrilldownView
+                    seriesId={drilldown.seriesId}
+                    books={drilldown.books}
+                    onOpenDetailBook={onOpenDetailBook}
+                    onEditBook={onEditBook}
+                    onReordered={onMetaRefetch}
+                />
+            </section>
+        );
+    }
+
+    // ---- トップ階層ビュー ----
     return (
         <section className="space-y-3">
             {/* ヘッダー */}
@@ -178,22 +225,24 @@ export default function LibrarySection({
                     ))}
                 </div>
 
-                {/* 選択モードトグル */}
-                <button
-                    onClick={() => (isSelecting ? exitSelecting() : setIsSelecting(true))}
-                    className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
-                        isSelecting
-                            ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-400 text-primary-700 dark:text-primary-300'
-                            : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                >
-                    {isSelecting ? (
-                        <CheckSquare className="w-3.5 h-3.5" />
-                    ) : (
-                        <Square className="w-3.5 h-3.5" />
-                    )}
-                    選択
-                </button>
+                {/* 選択モードトグル（グループ表示時のみ） */}
+                {groupMode !== 'flat' && (
+                    <button
+                        onClick={() => (isSelecting ? exitSelecting() : setIsSelecting(true))}
+                        className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors ${
+                            isSelecting
+                                ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-400 text-primary-700 dark:text-primary-300'
+                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        {isSelecting ? (
+                            <CheckSquare className="w-3.5 h-3.5" />
+                        ) : (
+                            <Square className="w-3.5 h-3.5" />
+                        )}
+                        選択
+                    </button>
+                )}
 
                 <div className="ml-auto">
                     <AmazonCsvImportSection books={books} onApplied={onMetaRefetch} />
@@ -242,14 +291,34 @@ export default function LibrarySection({
                 </div>
             ) : (
                 <div className="space-y-6">
-                    {/* グループ */}
-                    {groups.map((group) => (
-                        <GroupBlock key={group.label} label={group.label} count={group.books.length}>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                                {group.books.map(renderCard)}
-                            </div>
-                        </GroupBlock>
-                    ))}
+                    {/* グループカード */}
+                    {groups.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {groups.map((group) =>
+                                isSelecting ? (
+                                    // 選択モード中はグループ内の全書籍を展開してチェック可能に
+                                    <div key={group.label} className="contents">
+                                        {group.books.map(renderCard)}
+                                    </div>
+                                ) : (
+                                    <SeriesGroupCard
+                                        key={group.label}
+                                        group={group}
+                                        groupMode={groupMode}
+                                        onClick={() =>
+                                            group.series_id
+                                                ? handleGroupClick(
+                                                      group.series_id,
+                                                      group.label,
+                                                      group.books,
+                                                  )
+                                                : undefined
+                                        }
+                                    />
+                                ),
+                            )}
+                        </div>
+                    )}
 
                     {/* グループ外（未設定）書籍 */}
                     {ungrouped.length > 0 && (
@@ -283,32 +352,5 @@ export default function LibrarySection({
                 onAssign={handleAssignSeries}
             />
         </section>
-    );
-}
-
-// ---- グループブロック（折りたたみ） ----
-
-interface GroupBlockProps {
-    label: string;
-    count: number;
-    children: React.ReactNode;
-}
-
-function GroupBlock({ label, count, children }: GroupBlockProps) {
-    const [open, setOpen] = useState(true);
-    return (
-        <div>
-            <button
-                onClick={() => setOpen((v) => !v)}
-                className="flex items-center gap-2 mb-2 group w-full text-left"
-            >
-                <span className="text-base font-semibold text-gray-800 dark:text-gray-200 group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors">
-                    {label}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500">({count} 冊)</span>
-                <span className="text-xs text-gray-400 ml-1">{open ? '▾' : '▸'}</span>
-            </button>
-            {open && children}
-        </div>
     );
 }

@@ -1324,6 +1324,10 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
             page_count=info["page_count"] if info else None,
             indexed_at=info["indexed_at"] if info else None,
             thumbnail_url=_thumbnail_url(name),
+            volume=meta_entry.get("volume"),
+            publisher=meta_entry.get("publisher"),
+            asin=meta_entry.get("asin"),
+            series_index=meta_entry.get("series_index"),  # DnD 並び替え後の順序（float）
         ))
     return summaries
 ```

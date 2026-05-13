@@ -151,6 +151,14 @@ export function patchNovelBookMeta(bookKey: string, patch: NovelMetaPatch): Prom
     return apiClient.patch<unknown, void>(`/api/meta/novel/${encodeURIComponent(bookKey)}`, patch);
 }
 
+export function reorderNovelSeries(seriesId: string, names: string[]): Promise<void> {
+    return apiClient.post<unknown, void>('/api/series/reorder', {
+        series_id: seriesId,
+        names,
+        source: 'novel',
+    });
+}
+
 export function fetchNovelMetaImportPreview(files: File[]): Promise<MetaImportPreviewRow[]> {
     const form = new FormData();
     for (const f of files) form.append('files', f);

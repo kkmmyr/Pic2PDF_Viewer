@@ -4,22 +4,34 @@ import type { BookSummary } from '../features/novel_db/types';
 
 export type GroupMode = 'flat' | 'author' | 'series';
 
-export interface BookGroup {
+export interface NovelBookGroup {
     label: string;
+    series_id: string | null;
+    representative: BookSummary;
     books: BookSummary[];
 }
 
 export interface NovelLibraryGroupResult {
-    groups: BookGroup[];
-    /** グループに属さない書籍（作者未設定 / シリーズ未設定） */
+    groups: NovelBookGroup[];
     ungrouped: BookSummary[];
+}
+
+function sortBySeriesIndex(books: BookSummary[]): BookSummary[] {
+    return [...books].sort((a, b) => {
+        const ai = a.series_index ?? a.volume ?? null;
+        const bi = b.series_index ?? b.volume ?? null;
+        if (ai === null && bi === null) return a.name.localeCompare(b.name, 'ja');
+        if (ai === null) return 1;
+        if (bi === null) return -1;
+        return ai - bi;
+    });
 }
 
 /**
  * 書籍一覧を groupMode に従って作者別 / シリーズ別にグループ化する。
  * - flat: 全書籍を ungrouped に返す（グループなし）
  * - author: 第 1 作者でグループ化。作者未設定は ungrouped
- * - series: series_id でグループ化。series 内は volume 昇順（null は末尾）。シリーズ未設定は ungrouped
+ * - series: series_id でグループ化。シリーズ内は series_index → volume 昇順（null は末尾）。シリーズ未設定は ungrouped
  */
 export function useNovelLibraryGroup(
     books: BookSummary[],
@@ -44,10 +56,15 @@ export function useNovelLibraryGroup(
             }
             const groups = [...grouped.entries()]
                 .sort(([a], [b]) => a.localeCompare(b, 'ja'))
-                .map(([label, grpBooks]) => ({
-                    label,
-                    books: [...grpBooks].sort((a, b) => a.name.localeCompare(b.name, 'ja')),
-                }));
+                .map(([label, grpBooks]) => {
+                    const sorted = [...grpBooks].sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+                    return {
+                        label,
+                        series_id: null,
+                        representative: sorted[0],
+                        books: sorted,
+                    };
+                });
             return { groups, ungrouped };
         }
 
@@ -64,18 +81,17 @@ export function useNovelLibraryGroup(
                 grouped.get(book.series_id)!.books.push(book);
             }
         }
-        const groups = [...grouped.values()]
-            .sort((a, b) => a.label.localeCompare(b.label, 'ja'))
-            .map((g) => ({
-                label: g.label,
-                books: [...g.books].sort((a, b) => {
-                    if (a.volume === null && b.volume === null)
-                        return a.name.localeCompare(b.name, 'ja');
-                    if (a.volume === null) return 1;
-                    if (b.volume === null) return -1;
-                    return a.volume - b.volume;
-                }),
-            }));
+        const groups = [...grouped.entries()]
+            .sort(([, a], [, b]) => a.label.localeCompare(b.label, 'ja'))
+            .map(([series_id, g]) => {
+                const sorted = sortBySeriesIndex(g.books);
+                return {
+                    label: g.label,
+                    series_id,
+                    representative: sorted[0],
+                    books: sorted,
+                };
+            });
         return { groups, ungrouped };
     }, [books, mode]);
 }

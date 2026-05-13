@@ -29,6 +29,7 @@ class BookSummary:
     volume: int | None = None
     publisher: str | None = None
     asin: str | None = None
+    series_index: float | None = None
 
 
 @dataclass
@@ -167,6 +168,7 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
                 volume=meta_entry.get("volume"),
                 publisher=meta_entry.get("publisher"),
                 asin=meta_entry.get("asin"),
+                series_index=meta_entry.get("series_index"),
             )
         )
     return summaries

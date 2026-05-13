@@ -206,11 +206,26 @@ function NovelDbPage() {
 
 ### 5.3. `LibrarySection` + `BookCard`
 
+- **トップ階層（シリーズ/作者グループカードグリッド）**
+    - グループモード切替トグル: `series` / `author`
+    - `SeriesGroupCard`: 代表カード（series の場合は volume 最小 or series_index 最小の表紙）+ シリーズ名 + 冊数バッジ
+    - 未グループ書籍（シリーズ/作者未設定）はグリッド下部にフラット表示
+    - 選択モード（一括シリーズ登録 / 作者設定）はトップ階層でのみ使用可
+
+- **ドリルダウン（シリーズ内ビュー）**
+    - シリーズカードクリック → `SeriesDrilldownView` を表示
+    - パンくず: `ライブラリ > {series_title}`（ライブラリ部分クリックでトップへ戻る）
+    - 書籍カードは `@dnd-kit/sortable` によりドラッグ可能
+    - DnD ドロップ時に即座に `POST /api/series/reorder { source: "novel", series_id, names: ["{book_name}.pdf", ...] }` を呼び出し、`series_index` を `1.0, 2.0, ...` に更新
+    - ドロップ後はローカル state の順序を保ったまま表示（次回読み込み時は series_index 順）
+
+- **`useNovelLibraryGroup` フック**
+    - `series_id` / `representative`（代表 BookSummary）/ `books`（series_index 昇順ソート済み、null は末尾）を各グループに付与
+    - `volume` は表示用整数、並び替え後の順序は `series_index`（float）を使用
+
 - BookCard グリッド（既存 PdfCard を流用せず、シンプル化した独自カード）
     - サムネイル（`/kindle_novel/images/{書籍名}/001.png` を縮小）
     - 書籍名 / 作者 / ページ数 / DB 状態バッジ
-    - 「再構築」ボタン → `useNovelDbRebuildJob.enqueueBook(name)` 呼び出し
-- シリーズグループ表示: scope=all のとき、シリーズ単位でグルーピング（既存 `LibraryPanel` のシリーズ表示パターンを参考）
 - 「全件再構築」「このシリーズ再構築」ボタンはセクションヘッダーに配置
 
 ### 5.4. `RebuildJobBanner`

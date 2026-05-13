@@ -24,6 +24,7 @@ export interface BookSummary {
     volume: number | null;
     publisher: string | null;
     asin: string | null;
+    series_index: number | null;
 }
 
 export interface BookDetail extends BookSummary {

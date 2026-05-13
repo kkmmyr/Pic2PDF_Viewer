@@ -703,16 +703,20 @@ PDF生成処理の進捗状況を取得する。
 
 ## §5. OCR
 
+> **2026-05-13 更新**: `ocr_service.py` を `start_batch_ocr.bat`（Phase 5 で削除済み）経由のサブプロセス起動からスレッドベース実装に刷新。`run_ocr_subprocess` + `_store_ocr_pages` を直接呼ぶ。`POST /api/ocr/run` は再び動作する。
+
 ### §5.1 `POST /api/ocr/run`
-Novel用OCR処理 (`batch_ocr.py`) を開始する。
+
+novel OCR を開始する。`services.ocr_service.OCRService` がスレッドを起動し、`run_ocr_subprocess`（yomitoku）でテキスト抽出 → `_store_ocr_pages` で DB 保存。
 
 **クエリパラメータ**:
-- `target_dir` (オプション) — 対象ディレクトリを指定（省略時は全未処理フォルダ）
+- `target_dir` (オプション) — 対象書籍ディレクトリ名を指定（省略時は `kindle_novel/images/` 配下の全書籍）
 
 ---
 
 ### §5.2 `POST /api/ocr/stop`
-実行中のOCRプロセスを停止する。
+
+実行中の OCR を停止要求する（現在処理中の書籍が完了した時点で停止。強制終了ではない）。
 
 ---
 
@@ -892,7 +896,7 @@ novel タブのテキスト DB ビューア機能。設計の詳細は [小説�
 
 ### §7.1 `GET /api/novel_db/books`
 
-novel ソースに登録された書籍一覧と DB 状態を返す。`data/kindle_novel/pdfs/` 配下の PDF を起点とし、`data/meta/novel/meta.json` の作者・シリーズ情報と `novel.db` の DB 状態を結合。
+novel ソースに登録された書籍一覧と DB 状態を返す。`data/kindle_novel/images/` 配下のサブディレクトリを起点とし、`data/meta/novel/meta.json` の作者・シリーズ情報と `novel.db` の DB 状態を結合。
 
 **クエリパラメータ**: なし
 
@@ -902,18 +906,25 @@ novel ソースに登録された書籍一覧と DB 状態を返す。`data/kind
   {
     "name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
     "authors": ["田中啓子"],
-    "series_id": "oko-kishi",
-    "series_name": "おこぼれ姫と円卓の騎士",
+    "series_id": "54986012bdc6",
+    "series_title": "おこぼれ姫と円卓の騎士",
+    "series_index": 1.0,
     "is_indexed": true,
     "page_count": 118,
     "indexed_at": "2026-05-09T11:30:00Z",
-    "thumbnail_url": "/kindle_novel/images/おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)/001.png"
+    "thumbnail_url": "/kindle_novel/images/おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)/001.png",
+    "ocr_done_at": "2026-05-09T10:00:00Z",
+    "volume": 1,
+    "publisher": "ビーズログ文庫",
+    "asin": "B00XXXXXX"
   }
 ]
 ```
 
 - `is_indexed=false` のとき、`page_count` / `indexed_at` は `null`
-- `series_id` / `series_name` はシリーズ未所属の場合 `null`
+- `series_id` / `series_title` はシリーズ未所属の場合 `null`
+- `series_index` — DnD 並び替え後の順序（float、`null` は未設定）
+- `volume` — 巻番号（整数、表示用。`null` は未設定）
 - `thumbnail_url` は連番 `001.png` をそのまま縮小表示用に返す（事前生成しない）
 
 ---
