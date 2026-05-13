@@ -52,7 +52,27 @@
       "Bash(git branch)",
       "Bash(git branch *)",
       "Bash(git stash)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(git add)",
+      "Bash(git add *)",
+      "Bash(git commit)",
+      "Bash(git commit *)",
+      "PowerShell(cd *; uv run pytest*)",
+      "PowerShell(cd *; uv run ruff*)",
+      "PowerShell(cd *; npx tsc*)",
+      "PowerShell(cd *; npm run test*)",
+      "PowerShell(cd *; npm run lint*)",
+      "PowerShell(cd *; npm run format*)",
+      "PowerShell(cd *; npm run build*)",
+      "PowerShell(cd *; npx vitest*)",
+      "PowerShell(cd *; npx prettier*)",
+      "PowerShell(cd *; git log*)",
+      "PowerShell(cd *; git status*)",
+      "PowerShell(cd *; git diff*)",
+      "PowerShell(cd *; git show*)",
+      "PowerShell(cd *; git branch*)",
+      "PowerShell(cd *; git add*)",
+      "PowerShell(cd *; git commit*)"
     ]
   },
   "hooks": {
