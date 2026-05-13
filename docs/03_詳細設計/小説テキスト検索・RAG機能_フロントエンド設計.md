@@ -20,7 +20,7 @@ novel タブを **OCR テキスト DB を主軸とした検索・質問応答ビ
 ### 1.2. 設計原則
 
 - **既存規約踏襲**: components/reader (presentation) + components/viewer (state container) 分離 / apiClient 必須 / Dialog 共通シェル / z-index Tailwind 階層 / `any` 禁止（[frontend-conventions skill](../../.claude/skills/frontend-conventions/SKILL.md)）
-- **別ルート並行運用**: 新画面は `/novel-db` で稼働、既存 `/viewer?source=novel` は動作確認期間中も残す（[要件定義 §7](../01_要件定義/小説テキスト検索・RAG機能.md)）
+- **別ルート並行運用**: 新画面は `/novel/db` で稼働（初期設計では `/novel-db`、移行後に `/novel/db` に変更）。既存 `/viewer?source=novel` は撤去済み
 - **専用ディレクトリ**: `components/novel_db/` `hooks/novel_db/` `features/novel_db/` のように本機能専用の名前空間を切る（hitomi 機能と同等のスタイル）
 
 ### 1.3. 関連ドキュメント
@@ -42,48 +42,47 @@ novel タブを **OCR テキスト DB を主軸とした検索・質問応答ビ
    ├─ /viewer              → ViewerPage（既存、main / kindle / generated / novel）
    │   └─ source=novel     → 旧 PDF ビューア（移行期間中のみ）
    │
-   ├─ /novel-db (new)      → NovelDbPage
-   │   ├─ サブヘッダー (スコープドロップダウン + 設定ボタン)
+   ├─ /novel/db             → NovelDbPage
    │   ├─ ライブラリセクション
-   │   ├─ 検索セクション
-   │   ├─ 質問セクション
-   │   └─ 画像モーダル (オーバーレイ)
+   │   └─ 検索セクション（全冊固定スコープ）
+   │
+   ├─ /novel/detail/:bookName → NovelDetailPage
+   │   ├─ 書籍メタ・要約・登場人物・読書会履歴（既存）
+   │   ├─ 検索セクション（この本固定スコープ）
+   │   ├─ 会話 QA セクション（この本固定スコープ）
+   │   └─ 質問セクション + 履歴（この本固定スコープ）
    │
    ├─ /generator           → GeneratorPage（既存）
    ├─ /ocr                 → OCRPage（既存）
    └─ /hitomi              → HitomiPage（既存）
 ```
 
-移行完了後に `/viewer?source=novel` から `/novel-db` への 301 相当のリダイレクトを実装し、既存 novel タブを撤去。
+移行完了後に `/viewer?source=novel` から `/novel/db` への 301 相当のリダイレクトを実装し、既存 novel タブを撤去。
 
 ### 2.2. データフロー
 
 ```
-[NovelDbPage]
-   ↓ useNovelDbScope (URL 同期)
-   ↓
-[ScopeContext.Provider] (scope = all | series | book)
-   ↓
+[NovelDbPage]（全冊固定スコープ、スコープ選択 UI なし）
    ├─→ [LibrarySection] ── useNovelDbBooks → GET /api/novel_db/books
    │                       useNovelDbRebuildJob → POST /api/novel_db/rebuild + GET /rebuild/status (poll)
    │
-   ├─→ [SearchSection] ── useNovelDbSearch → POST /api/novel_db/search (debounce 300ms, 無限スクロール)
-   │                       └→ 結果クリック → openImageModal(book, page_no)
+   └─→ [SearchSection scope={type:'all'}] ── useNovelDbSearch → POST /api/novel_db/search
+
+[NovelDetailPage]（scope = {type:'book', id:bookName} 固定）
+   ├─→ [SearchSection] ── useNovelDbSearch → POST /api/novel_db/search
    │
-   ├─→ [QuestionSection] ── useNovelDbQuestion → POST /api/novel_db/qa (SSE)
-   │                        useNovelDbHistory → GET /qa/history + DELETE /qa/history/:id
-   │                        ├→ 履歴クリック → 展開
-   │                        └→ 引用ページクリック → openImageModal
+   ├─→ [ChatSection] ── streamChatSession → POST /api/novel_db/chat/session (SSE)
+   │                    useChatSessions → GET /api/novel_db/chat/sessions
    │
-   └─→ [PageImageModal] ── 単独 state（ZustandStore or useReducer）
-                            ├→ ESC / × / 背景クリックで閉じる
-                            └→ 左右キー / ボタンで前後ページ
+   └─→ [QuestionSection] ── useNovelDbQuestion → POST /api/novel_db/qa (SSE)
+                            useNovelDbHistory(bookName) → GET /qa/history?book=xxx
+                            └→ 引用ページクリック → navigate to reader
 ```
 
 ### 2.3. 設計判断（Why）
 
 - **専用ディレクトリで隔離する理由**: `components/reader` 系は既存 PDF ビューア向けで肥大化中。新機能を混ぜると既存テストや refactor 計画に影響を出すため、`components/novel_db/` で独立させる
-- **別ルート (/novel-db) にする理由**: 動作確認中は既存 novel タブと並行運用したい（[要件定義 §7 Phase 1](../01_要件定義/小説テキスト検索・RAG機能.md)）。同一ルートで分岐するとロールバック不可
+- **別ルート (/novel/db) にする理由**: 動作確認中は既存 novel タブと並行運用したい（[要件定義 §7 Phase 1](../01_要件定義/小説テキスト検索・RAG機能.md)）。同一ルートで分岐するとロールバック不可（初期設計では `/novel-db`、移行後に `/novel/db` に統一）
 - **SSE を fetch + ReadableStream で実装する理由**: 標準 EventSource は `POST` リクエスト不可、リクエストボディに質問文を渡したいので fetch streaming を採用
 
 ---
@@ -93,22 +92,33 @@ novel タブを **OCR テキスト DB を主軸とした検索・質問応答ビ
 ```
 frontend/src/
 ├── pages/
-│   └── NovelDbPage.tsx                  # 新規（ルート: /novel-db）
+│   └── NovelDbPage.tsx                  # ルート: /novel/db
 ├── components/
 │   └── novel_db/                        # 新規（本機能専用、presentation 中心）
 │       ├── index.ts
 │       ├── NovelDbHeader.tsx            # スコープドロップダウン + 設定ボタン
 │       ├── ScopeSelector.tsx            # 全件 / シリーズ / 単冊 切替
-│       ├── LibrarySection.tsx           # 書籍一覧 + 再構築ボタン
+│       ├── LibrarySection.tsx           # 書籍一覧（グループカードグリッド + ドリルダウン）
 │       ├── BookCard.tsx                 # 1 冊分カード（サムネイル + メタ + DB 状態 + 再構築ボタン）
+│       ├── BookMetaEditModal.tsx        # novel 書籍メタ手動編集モーダル（4.3 /「編集」ボタンから開く）
+│       ├── BookMetaList.tsx             # メタ情報表示（card: コンパクト / detail: dl 形式）
+│       ├── CharactersPanel.tsx          # BookCard 内折りたたみ登場人物一覧（B-15、expanded 時のみ API 呼び出し）
+│       ├── CharacterDetailDialog.tsx    # キャラクター詳細ダイアログ（B-15 / サマリ + 主要シーン top5）
+│       ├── ChatSection.tsx              # マルチターン会話 QA セクション（B-16 / ChatGPT 風左右 2 ペイン）
+│       ├── DiscussionHistoryItem.tsx    # 読書会ディスカッション履歴アイテム（折りたたみカード / NovelDiscussionPage / NovelDetailPage 共用）
+│       ├── NovelBulkAuthorDialog.tsx    # 複数書籍への作者名一括設定ダイアログ（`<Dialog>` ベース）
+│       ├── NovelBulkSeriesAssignDialog.tsx # 複数書籍を一度にシリーズへ登録するダイアログ
+│       ├── SeriesGroupCard.tsx          # シリーズ/作者グループカード（代表表紙 + 名前 + 冊数バッジ）。選択モード時グループ全選択対応
+│       ├── SeriesDrilldownView.tsx      # シリーズ内書籍一覧（@dnd-kit/sortable で並び替え可、パンくず付き）
 │       ├── RebuildJobBanner.tsx         # 上部に出る「再構築中」表示
 │       ├── SearchSection.tsx            # 検索ボックス + 結果リスト + 無限スクロール
 │       ├── SearchHitItem.tsx            # 1 件分検索結果（snippet + サムネイル + ページ番号）
-│       ├── QuestionSection.tsx          # 質問入力 + 履歴
+│       ├── QuestionSection.tsx          # 質問入力 + 履歴（上部入力帯 + 下部左右 2 ペイン）
 │       ├── QuestionInput.tsx            # textarea + 送信ボタン + 文字数カウンタ + 連投警告
 │       ├── QuestionStreaming.tsx        # 送信中のストリーミング表示（停止ボタン含む）
-│       ├── QuestionHistoryList.tsx      # 履歴リスト（時系列降順）
-│       ├── QuestionHistoryItem.tsx      # 1 履歴行（折りたたみ展開、引用ページリンク）
+│       ├── QuestionHistoryList.tsx      # 履歴リスト（左パネル、時系列降順）
+│       ├── QuestionHistoryItem.tsx      # 1 履歴行（左パネル行、ホバー削除）
+│       ├── QuestionHistoryDetail.tsx    # 選択履歴の詳細（右パネル、オンデマンド fetch）
 │       └── PageImageModal.tsx           # ヒットページ画像モーダル（前後送り対応）
 ├── features/
 │   └── novel_db/                        # 新規（API / 型）
@@ -116,15 +126,19 @@ frontend/src/
 │       ├── types.ts                     # 共通型（BookSummary, SearchHit, QaHistoryEntry, RebuildJob 等）
 │       └── sse.ts                       # SSE クライアント（fetch + ReadableStream）
 ├── hooks/
-│   └── novel_db/                        # 新規
+│   └── novel_db/                        # novel_db 専用フック
 │       ├── index.ts
 │       ├── useNovelDbScope.ts           # URL 同期スコープ (?scope=all|series&id=... | book&id=...)
 │       ├── useNovelDbBooks.ts           # 書籍一覧取得 + ポーリング更新
 │       ├── useNovelDbSearch.ts          # 検索（debounce 300ms + 無限スクロール）
 │       ├── useNovelDbQuestion.ts        # 質問送信 + SSE 受信 + 停止
-│       ├── useNovelDbHistory.ts         # 履歴一覧 + 削除
+│       ├── useNovelDbHistory.ts         # 履歴一覧 + 削除（book フィルタ対応）
 │       ├── useNovelDbRebuildJob.ts      # ジョブ起動 + ステータスポーリング (5s)
-│       └── useNovelDbPageImageModal.ts  # 画像モーダルの開閉 + 前後送り
+│       ├── useNovelDbPageImageModal.ts  # 画像モーダルの開閉 + 前後送り
+│       ├── useBookDetail.ts             # 書籍詳細取得（`GET /api/novel_db/books/{book_name}/detail`）。NovelDetailPage で使用
+│       ├── useBookCharacters.ts         # 書籍のキャラクター一覧 on-demand 取得（B-15 / enabled=false 中は未取得）
+│       ├── useCharacterDetail.ts        # キャラクター詳細（サマリ + 主要シーン top 5）取得（B-15）
+│       └── useChatSessions.ts           # 会話セッション一覧・詳細・SSE ストリーム管理（B-16）
 └── constants.ts                         # NOVEL_DB_CONFIG セクション追加
                                           # - SEARCH_DEBOUNCE_MS = 300
                                           # - SEARCH_PAGE_SIZE = 20
@@ -141,7 +155,7 @@ frontend/src/
 `App.tsx` または `Layout.tsx` のルート定義に追加（既存実装が React Router 等を使っているか要確認 → 詳細は実装時）。
 
 ```tsx
-<Route path="/novel-db" element={<NovelDbPage />} />
+<Route path="/novel/db" element={<NovelDbPage />} />
 ```
 
 ### 4.2. URL パラメータ
@@ -154,9 +168,9 @@ frontend/src/
 | `q` | 検索クエリ（オプション、検索したまま再訪用） | `デューク` |
 
 URL 例:
-- `/novel-db?scope=all` (デフォルト)
-- `/novel-db?scope=series&series_id=oko-kishi`
-- `/novel-db?scope=book&book=...&q=アストリッド`
+- `/novel/db?scope=all` (デフォルト)
+- `/novel/db?scope=series&series_id=oko-kishi`
+- `/novel/db?scope=book&book=...&q=アストリッド`
 
 `useNovelDbScope` で URL とローカル state の双方向同期。`history.replaceState` で履歴汚染を抑える（既存 `useUrlState` 流用パターン）。
 
@@ -164,45 +178,28 @@ URL 例:
 
 ## 5. コンポーネント設計
 
-### 5.1. `NovelDbPage`（ルート画面）
+### 5.1. `NovelDbPage`（ルート画面）— 2026-05-14 改修
+
+ライブラリ一覧と全冊検索に専念するシンプルな構成。QuestionSection / ChatSection / ScopeSelector は **NovelDetailPage に移動**して削除済み。
 
 ```tsx
 function NovelDbPage() {
-    const scope = useNovelDbScope();  // URL 同期
     return (
-        <div className="flex flex-col gap-6 p-4">
-            <NovelDbHeader scope={scope} />
-            <RebuildJobBanner />
-            <LibrarySection scope={scope} />
-            <SearchSection scope={scope} />
-            <QuestionSection scope={scope} />
-            <PageImageModal />  // 内部で useNovelDbPageImageModal を読む
+        <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+            <LibrarySection ... />
+            <BookMetaEditModal ... />
+            <SearchSection scope={{ type: 'all' }} ... />
         </div>
     );
 }
 ```
 
-- 各セクションは props で `scope` を受け取り、自身で API 呼び出し
-- `PageImageModal` は portal でなく単純な fixed overlay（既存 Dialog 系の z-dialog クラスを使う）
+- `scope` は `{type:'all'}` 固定で `SearchSection` に直接渡す（`useNovelDbScope` / `NovelDbHeader` は不使用）
+- `useNovelDbRebuildJob` / `RebuildJobBanner` も削除（再構築は各 NovelDetailPage から操作）
 
-### 5.2. `NovelDbHeader` + `ScopeSelector`
+### 5.2. `NovelDbHeader` + `ScopeSelector`（削除済み）
 
-- 上段: 戻るボタン（任意） / タイトル「小説テキスト検索」 / 設定アイコン
-- 下段: `ScopeSelector` ドロップダウン（全件 / シリーズ / 単冊 を切替）
-
-```tsx
-<select value={scope.type} onChange={...}>
-    <option value="all">全件</option>
-    <optgroup label="シリーズ">
-        {seriesList.map(s => <option value={`series:${s.id}`}>{s.name}</option>)}
-    </optgroup>
-    <optgroup label="単冊">
-        {books.map(b => <option value={`book:${b.name}`}>{b.name}</option>)}
-    </optgroup>
-</select>
-```
-
-シリーズ未所属の書籍は `<optgroup label="シリーズ">` には出さず、`<optgroup label="単冊">` のみに表示（[要件定義 TBD-7](../01_要件定義/小説テキスト検索・RAG機能.md)）。
+NovelDbPage から削除。`NovelDbHeader.tsx` / `ScopeSelector.tsx` ファイルは components/novel_db/ に残るが NovelDbPage では使用しない。
 
 ### 5.3. `LibrarySection` + `BookCard`
 
@@ -249,53 +246,54 @@ function NovelDbPage() {
     - 右: 書名 / page 番号 / `<mark>` ハイライト付きスニペット（`dangerouslySetInnerHTML` で FTS5 の snippet を反映、サニタイズは backend 側で `<mark>` 以外をエスケープ済み）
 - 「該当なし」時は単にメッセージ表示（[要件定義 TBD-10](../01_要件定義/小説テキスト検索・RAG機能.md)）
 
-### 5.6. `QuestionSection` の構成
+### 5.6. `QuestionSection` の構成（2026-05-14 改修）
 
-```tsx
-<section>
-    <QuestionInput
-        scope={scope}
-        onSubmit={...}
-        disabled={isStreaming || isRebuildRunning}
-        maxLength={500}
-    />
-    {isStreaming && <QuestionStreaming text={streamingText} onStop={...} />}
-    <QuestionHistoryList items={history} onDelete={...} onClickPage={openImageModal} />
-</section>
+入力帯を上部に固定し、その下を ChatSection と同様の左右 2 ペインに変更。履歴が縦長になる問題を解消する。
+
 ```
+[QuestionInput]                      ← 上部帯（現状維持）
+[QuestionStreaming]                   ← 入力帯直下（現状維持）
+┌────────────────┬──────────────────────────────────┐
+│ 左パネル(260px)│ 右パネル(flex-1)                  │
+│ QuestionHistory│ QuestionHistoryDetail             │
+│ List           │  - 質問全文                        │
+│ - 質問行1      │  - 日時・応答時間                  │
+│ - 質問行2      │  - 回答テキスト                    │
+│ ...            │  - 参照ページボタン群              │
+└────────────────┴──────────────────────────────────┘
+```
+
+- 送信完了後は `pendingAutoSelect` フラグ経由で最新エントリを自動選択して右パネルに表示
+- `selectedId: number | null` を `QuestionSection` 内で管理（`QuestionHistoryDetail` へ prop で渡す）
 
 #### 5.6.1. `QuestionInput`
 
-- textarea（5 行ぐらい高さ）
+- textarea（4 行）
 - 文字数カウンタ表示。500 文字超で disabled
 - 送信ボタン
 - **連投警告**: 直前の質問テキストと完全一致した場合、`<ConfirmDialog>` で「同じ質問を再送しますか?」と確認
-    - 「直前」の判定は **セッション内（メモリ上）のみ**。`QuestionSection` の `useState` で保持し、ページリロードで自動リセット
-    - 履歴 API（`qa_history` テーブル）とは独立。永続的な「過去すべての質問との重複」までは見ない
+    - 「直前」の判定は **セッション内（メモリ上）のみ**。`useNovelDbQuestion` の `lastQuestion` で保持し、ページリロードで自動リセット
 
 #### 5.6.2. `QuestionStreaming`
 
-送信中の表示。応答が逐次描画される。停止ボタンあり：
-
-```tsx
-<div className="border rounded p-3 bg-card">
-    <div className="text-sm text-muted">回答生成中...</div>
-    <div className="whitespace-pre-wrap">{streamingText}</div>
-    <div className="flex justify-end mt-2">
-        <Button variant="ghost" onClick={onStop}>停止</Button>
-    </div>
-</div>
-```
+送信中の表示。応答が逐次描画される。停止ボタンあり。
 
 停止: `useNovelDbQuestion.stop()` を呼び、`AbortController.abort()` で fetch を中断 → バックエンドが `done_reason='canceled'` で履歴保存 → `useNovelDbHistory` が再フェッチ。
 
-#### 5.6.3. `QuestionHistoryList` + `QuestionHistoryItem`
+#### 5.6.3. `QuestionHistoryList`（左パネル）
 
-- 時系列降順
-- `QuestionHistoryItem` は折りたたみ展開（`<details>` + `<summary>` ベース）
-    - 折りたたみ時: 質問テキスト先頭 60 字 + **JST タイムスタンプ** + **応答時間** + スコープ
-    - 展開時: 回答全文 + 引用ページ番号（クリックで PageImageModal 起動）+ 削除ボタン
-- 削除ボタン → `<ConfirmDialog>` で確認 → DELETE API → 一覧再フェッチ
+- 時系列降順の質問一覧
+- 各行: 質問テキスト（1 行 truncate）+ スコープ（2 行目、小さく）
+- 選択行をハイライト（`bg-primary-50`）
+- ホバー時に右端へ Trash アイコン表示 → `<ConfirmDialog>` → DELETE API → 再フェッチ
+- `max-h-[600px]` スクロール可（ChatSection と統一）
+
+#### 5.6.4. `QuestionHistoryDetail`（右パネル）
+
+- `selectedId` が `null` の場合はプレースホルダー表示
+- 選択時: `fetchQaHistoryDetail(selectedId)` をオンデマンドで呼び出し
+- 表示内容: 質問全文 / 日時（JST）/ 応答時間 / 回答テキスト（whitespace-pre-wrap）/ 参照ページボタン群
+- `max-h-[600px]` スクロール可
 
 **タイムスタンプの取り扱い** (2026-05-11 追記):
 - バックエンドは SQLite `datetime('now')` で保存しており、出力形式は `"2026-05-11 13:30:45"`（タイムゾーン情報なし、実体は **UTC**）
@@ -323,6 +321,46 @@ function NovelDbPage() {
 - ESC キー / × ボタン / 背景クリック: 閉じる
 
 `Dialog` 共通シェルを利用するが、画像表示用に `variant="image"` モードを追加（中央配置 + max-w-screen-lg + transparent backdrop）。`Dialog.tsx` 自体に微改修が必要なら別タスクで切り出す。
+
+### 5.8. `NovelDetailPage` — RAG 機能セクション（2026-05-14 追加）
+
+書籍詳細画面（`/novel/detail/:bookName`）の既存セクション（要約 / 登場人物 / 読書会履歴）の下に、この本固定スコープの RAG 機能セクションを追加する。
+
+**配置順（下から）:**
+
+```
+既存: 要約セクション
+既存: 登場人物セクション
+既存: 読書会履歴セクション
+--- 追加 ---
+<SearchSection scope={bookScope} onOpenImage={handleOpenScene} />
+<ChatSection scope={bookScope} disabled={isLocked} />
+<QuestionSection scope={bookScope} history={bookHistory} ... disabled={isLocked} />
+```
+
+**スコープ:**
+
+```tsx
+const bookScope: Scope = { type: 'book', id: decodedName };
+```
+
+UI には ScopeSelector を表示しない。書籍名は URL パラメータ（`useParams`）から取得。
+
+**履歴フィルタ:**
+
+```tsx
+const { items: history, ... } = useNovelDbHistory(decodedName);
+```
+
+`useNovelDbHistory(decodedName)` は `GET /api/novel_db/qa/history?book={decodedName}` を呼び出し、この書籍への質問のみ返す。
+
+**disabled 制御:**
+
+既存の `useNovelDbRebuildJob` の `isLocked`（`rebuildStatus?.is_running ?? false`）を SearchSection / ChatSection / QuestionSection に流す。
+
+**セクション間の順序の意図:**
+
+「会話 QA（ChatSection）が先、質問＋履歴（QuestionSection）が後」は、一問一答の記録よりマルチターン対話を優先する UX 上の判断（[要件定義](../01_要件定義/NovelPage_QA_UI_リデザイン_要件.md)）。
 
 ---
 
@@ -396,15 +434,19 @@ function useNovelDbQuestion(scope: Scope): {
 ### 6.5. `useNovelDbHistory`
 
 ```tsx
-function useNovelDbHistory(): {
+function useNovelDbHistory(book?: string): {
     items: QaHistoryEntry[];
+    total: number;
     isLoading: boolean;
+    error: string | null;
     deleteItem: (id: number) => Promise<void>;
     refetch: () => Promise<void>;
 };
 ```
 
-質問送信完了時 / 削除時に refetch。
+- `book` が指定された場合: `GET /api/novel_db/qa/history?book=xxx` でその書籍の質問のみ取得
+- `book` が未指定の場合: 全件取得（NovelDbPage では現在 QuestionSection ごと削除されたため使用なし）
+- 質問送信完了時 / 削除時に refetch
 
 ### 6.6. `useNovelDbRebuildJob`
 
@@ -567,7 +609,7 @@ SSE は `setupServer` (msw) でモック。fetch + ReadableStream のテスト�
 
 - [frontend/src/config/api.ts:110](../../frontend/src/config/api.ts#L110) の `source === 'novel'` 分岐を削除
 - 既存 SourceSelector の `novel` タブ表示を「小説検索 (新)」へのリンクに置換 or タブ自体を撤去
-- ViewerPage で `source=novel` のリクエストが来たら `/novel-db` にリダイレクト
+- ViewerPage で `source=novel` のリクエストが来たら `/novel/db` にリダイレクト
 - バックエンド側の `/kindle_novel/pdfs` マウント削除（バックエンド設計 §13 と連動）
 
 ### 残す資産
