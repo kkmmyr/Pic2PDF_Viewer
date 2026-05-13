@@ -190,3 +190,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE chunks ADD COLUMN contextual_text TEXT")
     if "contextual_generated_at" not in chunks_cols:
         conn.execute("ALTER TABLE chunks ADD COLUMN contextual_generated_at TIMESTAMP")
+
+    rebuild_jobs_cols = {row[1] for row in conn.execute("PRAGMA table_info(rebuild_jobs)").fetchall()}
+    if "current_step" not in rebuild_jobs_cols:
+        conn.execute("ALTER TABLE rebuild_jobs ADD COLUMN current_step TEXT")

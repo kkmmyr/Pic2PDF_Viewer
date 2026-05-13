@@ -50,9 +50,12 @@ NOVEL_DB_PATH = os.path.join(NOVEL_DB_DIR, "novel.db")
 # Phase C（2026-05-11）で Ollama 上の qwen3.6-iq4xs は撤去（23GB 解放）、
 # `NOVEL_DB_LLM_BACKEND` env は将来の新バックエンド（vLLM 等）追加時の拡張点
 # として残存（現状は `llama_server` 1 択）。
-NOVEL_DB_OLLAMA_BASE_URL = os.environ.get("NOVEL_DB_OLLAMA_BASE_URL", "http://localhost:11434")
-NOVEL_DB_EMBED_MODEL     = os.environ.get("NOVEL_DB_EMBED_MODEL", "bge-m3")
-NOVEL_DB_EMBED_DIM       = 1024  # bge-m3 の出力次元
+NOVEL_DB_OLLAMA_BASE_URL  = os.environ.get("NOVEL_DB_OLLAMA_BASE_URL", "http://localhost:11434")
+NOVEL_DB_EMBED_MODEL      = os.environ.get("NOVEL_DB_EMBED_MODEL", "bge-m3")
+NOVEL_DB_EMBED_DIM        = 1024  # bge-m3 の出力次元
+# 既定 0 = CPU 推論。llama-server（Qwen 35B）に VRAM を譲るため。
+# GPU に戻すなら NOVEL_DB_EMBED_NUM_GPU=99 を設定して uvicorn を再起動。
+NOVEL_DB_EMBED_NUM_GPU    = int(os.environ.get("NOVEL_DB_EMBED_NUM_GPU", "0"))
 NOVEL_DB_LLM_MODEL       = os.environ.get("NOVEL_DB_LLM_MODEL", "qwen3.6-iq4xs")
 # 既定 `llama_server`（実機ベンチで tg 5× 高速化、scope=all 応答 24s→14s）。
 # Phase C で `ollama` 分岐撤去。未知の値は LLMError。
@@ -67,13 +70,25 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gem
 # 軽量モデルで十分」と推奨されており、gemma4:e4b で代用する。
 # 品質不足が確認されたら NOVEL_DB_LLM_MODEL（qwen3.6:35b-a3b）にフォールバック。
 #
-# TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) の再評価
-#   Gemma4 公式が MTP による 1.5〜2× 高速化を発表（2026-05）。
-#   2026-05-13 実機検証: `bjoernb/gemma4-e4b-fast` は同一 GGUF ウェイトで
-#   速度差ゼロ（31.3 t/s = gemma4:e4b と同値）。Ollama 0.23.2 時点では
-#   MTP ヘッドが未サポート、または e4b GGUF に MTP ヘッドが含まれていない。
-#   今後 Ollama / llama.cpp が公式 MTP をサポートしたら再計測すること。
+# TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) — llama.cpp 公式対応待ち
+#   MTP は投機デコード（4 層の軽量ドラフターが先回り予測）。E4B 長文(256 tok)で 2.10× 実測。
+#   現状: ~31 t/s × ~70 tok/chunk → MTP 適用後: ~65 t/s 期待（実測は 1.7×〜2.2×、3× はベスト値）。
+#
+#   【対応方針】llama.cpp の Gemma4 アシスタント GGUF 変換対応を待つ（緊急性なし）。
+#   対応後は既存の llama-server をそのまま流用できるため移行コストが最小。
+#   進捗: llama.cpp PR#22673 (MTP ベータ) + issue#22747 (Gemma4 GGUF 変換) — 2026-05-13 時点で進行中。
+#
+#   【各ランタイムの状況】（2026-05-13 技術検証済）
+#   - llama.cpp: PR#22673 で MTP ベータ実装済みだが Gemma4 アシスタントの GGUF 変換が公式未対応 ← 待機中
+#   - vLLM: Day-0 サポート済み（唯一の即時実用パス）。WSL2 + Linux 環境が必要で当環境では未セットアップ。
+#           起動例: vllm serve google/gemma-4-E4B-it --tensor-parallel-size 1 --max-model-len 8192 \
+#                     --speculative-config '{"method":"mtp","model":"google/gemma-4-E4B-it-assistant","num_speculative_tokens":1}'
+#           ※ num_speculative_tokens=1 が推奨デフォルト（4 にすると最大速だが品質トレードオフあり）
+#   - Ollama: PR#15980 (2026-05-05 マージ) は MLX (Apple Silicon) 専用。Windows/CUDA 非対応。
+#   - `bjoernb/gemma4-e4b-fast` は同一 GGUF の別ラッパーで速度差なし（実機検証済み）。
+#
 #   参考: https://ai.google.dev/gemma/docs/mtp/overview?hl=ja
+#         https://dev.classmethod.jp/articles/dgx-spark-gemma4-mtp-multi-token-prediction-bench/
 NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
 
 # §4.5 本構築統合: キャラ抽出 / チャンク文脈生成のバックエンド切替

@@ -133,7 +133,7 @@ class NovelDbJobQueue:
         with with_db() as conn:
             current = conn.execute(
                 "SELECT id, job_type, target_id, mode, started_at, "
-                "progress_total, progress_done "
+                "progress_total, progress_done, current_step "
                 "FROM rebuild_jobs WHERE state='running' "
                 "ORDER BY started_at LIMIT 1"
             ).fetchone()
@@ -219,6 +219,14 @@ class NovelDbJobQueue:
             )
             conn.commit()
 
+    def _update_step(self, job_id: int, step: str) -> None:
+        with with_db() as conn:
+            conn.execute(
+                "UPDATE rebuild_jobs SET current_step = ? WHERE id = ?",
+                (step, job_id),
+            )
+            conn.commit()
+
     def _execute_job(self, job: dict) -> None:
         job_id = job["id"]
         job_type = job["job_type"]
@@ -241,7 +249,9 @@ class NovelDbJobQueue:
         elif mode == "full_build":
             # 全構築統合: rebuild_from_pages → summarize → extract_chars → char_summary → contexts
             for done, book_name in enumerate(targets, start=1):
-                build_book_full(book_name)
+                def _step_cb(msg: str, _jid: int = job_id) -> None:
+                    self._update_step(_jid, msg)
+                build_book_full(book_name, step_callback=_step_cb)
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d full_build progress: %d/%d (%s)", job_id, done, total, book_name)
         else:
@@ -294,7 +304,7 @@ def _list_books_in_series(series_id: str) -> list[str]:
 
 
 def _row_to_running(row: tuple) -> dict:
-    job_id, job_type, target_id, mode, started_at, total, done = row
+    job_id, job_type, target_id, mode, started_at, total, done, current_step = row
     return {
         "id": job_id,
         "type": job_type,
@@ -303,6 +313,7 @@ def _row_to_running(row: tuple) -> dict:
         "started_at": started_at,
         "progress_total": total,
         "progress_done": done,
+        "current_step": current_step,
     }
 
 

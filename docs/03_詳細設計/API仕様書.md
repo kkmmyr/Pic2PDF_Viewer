@@ -64,6 +64,11 @@
   - §7.23 `POST /api/novel_db/meta-import/apply` — CSV インポート適用（4.3）
   - §7.19 `POST /api/novel/discussion/generate` — 読書会ディスカッション生成（SSE, B-20）
   - §7.20 `GET /api/novel/discussion/history` — ディスカッション履歴一覧（B-20）
+- [§8. 本構築管理（novel_build）](#8-本構築管理novel_build)（4.6）
+  - §8.1 `POST /api/novel/build/enqueue` — Full Build ジョブ登録
+  - §8.2 `GET /api/novel/build/status` — Full Build キュー状態スナップショット
+  - §8.3 `DELETE /api/novel/build/jobs/{job_id}` — 待機中 Full Build ジョブキャンセル
+  - §8.4 `GET /api/novel/build/stream` — Full Build キュー状態 SSE ストリーム
 
 ---
 
@@ -1472,3 +1477,92 @@ Amazon デジタル購入履歴 CSV をアップロードし、書籍メタ（�
 - 未マッチ行（フロントで手動選択した結果を含む）を配列で送信。`book_key` がない行はスキップ。
 
 **レスポンス**: `{"updated_count": 5}`
+
+---
+
+## §8. 本構築管理（novel_build）
+
+小説本の Full Build（OCR 済み → Embedding → サマリ → 登場人物 → コンテキスト）を管理する専用管理画面 `/novel/build` が使うエンドポイント群（4.6）。内部的には `novel_db` の `job_queue` と同一ワーカーを使い、`mode=full_build` ジョブのみを扱う。
+
+---
+
+### §8.1 `POST /api/novel/build/enqueue`（4.6）
+
+Full Build ジョブをキューに登録する。即座に `job_id` を返す。
+
+**リクエストボディ**:
+```json
+{ "book_name": "花太郎", "all_books": false }
+```
+
+| フィールド | 必須 | 説明 |
+|---|---|---|
+| `book_name` | △ | 書籍名（`all_books=false` のとき必須） |
+| `all_books` | × | `true` のとき全冊一括。省略時 `false` |
+
+**レスポンス**:
+```json
+{ "job_id": 12, "queued_position": 2 }
+```
+
+**エラー**:
+- `422`: `all_books=false` なのに `book_name` が空
+- `422`: 同一書籍の Full Build ジョブが既にキュー / 実行中（`detail: "already queued or running"`）
+
+---
+
+### §8.2 `GET /api/novel/build/status`（4.6）
+
+全キューのスナップショットを返す（`mode=full_build` ジョブのみ表示）。
+
+**レスポンス**:
+```json
+{
+  "is_running": true,
+  "current_job": {
+    "id": 12,
+    "target_id": "花太郎",
+    "started_at": "2026-05-13T10:00:00",
+    "progress_total": 1,
+    "progress_done": 0,
+    "current_step": "step 2/3: summarize_book + characters"
+  },
+  "queued_jobs": [
+    { "id": 13, "target_id": "千の刀", "enqueued_at": "2026-05-13T10:01:00" }
+  ],
+  "recent_finished": [
+    { "id": 11, "target_id": "鯱", "state": "completed", "finished_at": "2026-05-13T09:55:00", "error_message": null }
+  ]
+}
+```
+
+- `is_running=true` は Full Build ジョブが実行中のとき（他モードのジョブが走っている場合は `false`）
+- `recent_finished` は直近 20 件（`completed` / `failed` / `canceled`）
+- `current_job.current_step`: `mode=full_build` 時のみ。現在実行中のステップ名（`"step 1/3: rebuild_from_pages"` / `"step 2/3: summarize_book + characters"` / `"step 3/3: generate_contexts"`）。ステップ開始前は `null`
+
+---
+
+### §8.3 `DELETE /api/novel/build/jobs/{job_id}`（4.6）
+
+待機中の Full Build ジョブをキャンセル。
+
+**レスポンス**: `204 No Content`
+
+**エラー**:
+- `404`: 該当 `job_id` なし
+- `409`: ジョブが実行中（実行中ジョブはキャンセル不可）
+
+---
+
+### §8.4 `GET /api/novel/build/stream`（4.6、SSE）
+
+Full Build キューの状態を SSE でストリーミングする。クライアントは `EventSource` で接続し、状態変化のたびにイベントを受信する。
+
+**イベント形式**（1.5 秒ごとにポーリング）:
+```
+data: {"is_running": true, "current_job": {...}, "queued_jobs": [...], "recent_finished": [...]}
+
+```
+
+- クライアント切断で自動終了
+- `Content-Type: text/event-stream`

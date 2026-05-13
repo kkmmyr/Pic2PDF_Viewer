@@ -2,7 +2,7 @@
 
 実機検証・モデル選定・回避策・ベンチマークの記録。設計書（How を書く場所）/ ADR（単発判断）とは別に、運用で蓄えた「経験則」を残す。
 
-最終更新: 2026-05-12（§9.3 ncmoe スイープに 26 / 24 実測値を追加）
+最終更新: 2026-05-13（§9.7 Gemma4 MTP Ollama 検証結果を追加）
 
 関連:
 - 設計: [バックエンド設計](../03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md)
@@ -33,12 +33,22 @@
 - 実測生成速度: ~5.4 t/s（ctx=131k）/ ~13.8 t/s（ctx=8k）
 - num_ctx を上げても OOM しないのは、足りない分が CPU 側に流れるため（ただし遅くなる）
 
-**現状（2026-05-11、B-12 + B-14 + B-13 段階 C 採用後）**:
+**現状（2026-05-13、B-12 + B-14 + B-13 段階 C + bge-m3 CPU 化後）**:
 
 採用した高速化策:
 - **B-12**: IQ4_XS 量子化（21GB）に切替で CPU offload を 61% → 49% に削減
 - **B-14**: 推論エンジンを Ollama → llama-server に切替。`-ncmoe / -ctk q8_0 / -ctv q8_0 / -fa 1` の組合せで応答時間 5× 短縮（[ADR-0009](../02_基本設計/ADR/0009_llm-backend-llama-server.md)）
 - **B-13 段階 C**: `-c 131072` で書籍 1 冊（最大 87k tokens）丸読みに対応、`-ncmoe 28` で VRAM 70% 使用 + 30% ヘッドルームを確保
+- **bge-m3 CPU 化（2026-05-13）**: `NOVEL_DB_EMBED_NUM_GPU=0`（既定）で bge-m3 を Ollama の CPU 推論に固定。Full Build 中の VRAM 配分（概算）:
+
+  | プロセス | VRAM |
+  |---|---|
+  | llama-server（Qwen 35B IQ4_XS, ngl=28） | ~10.0〜10.5 GB |
+  | Ollama（bge-m3 CPU 化後）| ~0 GB（CPU で処理） |
+  | CUDA バッファ等 | ~0.3 GB |
+  | **合計** | **~10.5 GB 以下**（旧 ~11.5 GB → 約 1 GB 解放） |
+
+  ロールバック: `NOVEL_DB_EMBED_NUM_GPU=99` → uvicorn 再起動
 
 結果として、scope=book の 1 冊丸読み（in_tok 78k）で **170 秒 / 9.8 t/s end-to-end**、短文 warm では **tg ~46 t/s** まで改善。詳細は §9.3 採用最適設定を参照。
 
@@ -663,6 +673,47 @@ llama-server.exe ^
 `--metrics` フラグは `/metrics` 監視用として維持。
 
 **結論**: ngram Speculative Decoding は日本語散文生成に対して無効。コード補完・定型文向けの手法。本来の MTP（PR #22673 マージ待ち）か、scope=book 初回 prefill の根本改善（B-14c は却下済み）が次の速度改善候補。
+
+---
+
+### 9.7 Gemma4 MTP（contextualizer Step5）実機検証（2026-05-13）
+
+**目的**: Step5（contextualizer、B-9）の速度改善。`google/gemma-4-E4B` の MTP が E4B 長文で 2.10× を達成したとの報告（DGX Spark、vLLM 使用）を受けて Ollama での適用可否を検証。
+
+#### 検証対象
+
+| 項目 | 内容 |
+|---|---|
+| 現行モデル | `gemma4:e4b`（Ollama 0.23.2、GGUF: `4c27e0f5b5ad`、Q4_K_M、9.6 GB）|
+| MTP 候補 | `bjoernb/gemma4-e4b-fast`（Ollama Hub より pull）|
+| プロンプト | contextualizer の `_CONTEXT_PROMPT`（514 tok）|
+| 設定 | `temperature=0.2`, `repeat_penalty=1.15`, `num_predict=256`, `num_ctx=8192`, `think=False`|
+
+#### 実測結果（各 3 回中央値）
+
+| モデル | 生成速度 | 生成トークン数 | 備考 |
+|---|---|---|---|
+| `gemma4:e4b` | **31.3 t/s** | ~71 tok | |
+| `bjoernb/gemma4-e4b-fast` | **31.3 t/s** | ~71 tok | 速度差ゼロ |
+
+出力品質は両モデルとも同等（固有名詞・場面種別を正しく含む位置説明を生成）。
+
+#### 原因分析
+
+`ollama show` で確認したところ、`bjoernb/gemma4-e4b-fast` は **同一 GGUF ウェイト**（`sha256-4c27e0f5b5ad`）を使っており、System プロンプト違いのラッパーに過ぎなかった。`RENDERER gemma4` / `PARSER gemma4` フラグは Thinking トークンのフィルタリング用で MTP 投機デコードとは無関係。
+
+**Ollama 0.23.2 時点では Gemma4 MTP は非対応**。
+
+#### 正規 MTP の条件（今後の参考）
+
+DGX Spark 記事（classmethod, 2026-05）によると:
+
+- フレームワーク: **vLLM 必須**
+- モデル: `google/gemma-4-E4B-it-assistant`（MTP ドラフトヘッド込み HF モデル）
+- 仕組み: 本体の埋め込み層を共有する 4 層の軽量ドラフターで投機デコード
+- E4B 256 tok: **2.10× 実測**（短文 8 tok では効果ほぼなし）
+
+→ 本番適用には `local_llm` に vLLM 対応 Backend を追加し、Ollama → vLLM に切替が必要（中規模の作業）。
 
 ---
 

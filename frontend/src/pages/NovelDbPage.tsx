@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router-dom';
 
 import {
     BookMetaEditModal,
-    CharacterDetailDialog,
     ChatSection,
     LibrarySection,
     NovelDbHeader,
@@ -39,9 +38,6 @@ export default function NovelDbPage() {
         void refetchBooks();
     });
 
-    // B-15: キャラ詳細ダイアログの開閉状態
-    const [charDialog, setCharDialog] = useState<{ book: string; char: string } | null>(null);
-    // 4.3: メタ編集モーダル
     const [editBook, setEditBook] = useState<BookSummary | null>(null);
 
     const isLocked = rebuildStatus?.is_running ?? false;
@@ -50,26 +46,10 @@ export default function NovelDbPage() {
         void enqueueRebuild({ type: 'all' });
     };
 
-    const handleRebuildBook = (bookName: string) => {
-        void enqueueRebuild({ type: 'book', target_id: bookName });
-    };
-
-    const handleOcrBook = (bookName: string) => {
-        void enqueueRebuild({ type: 'book', mode: 'ocr', target_id: bookName });
-    };
-
-    const handleFullBuildBook = (bookName: string) => {
-        void enqueueRebuild({ type: 'book', mode: 'full_build', target_id: bookName });
-    };
-
-    const handleSelectCharacter = (bookName: string, charName: string) => {
-        setCharDialog({ book: bookName, char: charName });
-    };
-
-    // 書籍を読む（表紙クリック）
-    const handleReadBook = useCallback(
+    // 書籍カードクリック → 詳細画面へ
+    const handleOpenDetail = useCallback(
         (bookName: string) => {
-            void navigate(`/novel/reader/${encodeURIComponent(bookName)}`);
+            void navigate(`/novel/detail/${encodeURIComponent(bookName)}`);
         },
         [navigate],
     );
@@ -96,14 +76,9 @@ export default function NovelDbPage() {
             <LibrarySection
                 books={books}
                 isLoading={booksLoading}
-                onRebuildBook={handleRebuildBook}
-                onOcrBook={handleOcrBook}
-                onReadBook={handleReadBook}
-                onFullBuildBook={handleFullBuildBook}
+                onOpenDetailBook={handleOpenDetail}
                 onEditBook={setEditBook}
                 onMetaRefetch={() => void refetchBooks()}
-                onSelectCharacter={handleSelectCharacter}
-                rebuildStatus={rebuildStatus}
             />
             <BookMetaEditModal
                 book={editBook}
@@ -121,12 +96,6 @@ export default function NovelDbPage() {
                 disabled={isLocked}
             />
             <ChatSection scope={scope} disabled={isLocked} />
-            <CharacterDetailDialog
-                bookName={charDialog?.book ?? null}
-                charName={charDialog?.char ?? null}
-                onClose={() => setCharDialog(null)}
-                onOpenScene={handleOpenImage}
-            />
         </div>
     );
 }

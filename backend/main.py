@@ -19,7 +19,20 @@ from config import (
     THUMBNAIL_DIR,
 )
 from exceptions import FileOperationError, OcrProcessError
-from routers import generate, genres, hitomi, library, meta, novel_db, novel_discussion, ocr, pdfs, series, thumbnails
+from routers import (
+    generate,
+    genres,
+    hitomi,
+    library,
+    meta,
+    novel_build,
+    novel_db,
+    novel_discussion,
+    ocr,
+    pdfs,
+    series,
+    thumbnails,
+)
 from services.novel_db.job_queue import job_queue
 from utils.logger import get_logger
 
@@ -93,6 +106,7 @@ app.include_router(hitomi.router,     prefix="/api", tags=["hitomi"])
 app.include_router(genres.router,     prefix="/api", tags=["genres"])
 app.include_router(novel_db.router,         prefix="/api", tags=["novel_db"])
 app.include_router(novel_discussion.router, prefix="/api", tags=["novel_discussion"])
+app.include_router(novel_build.router,      prefix="/api", tags=["novel_build"])
 
 # ---------------------------------------------------------------------------
 # 設計ドキュメント HTML 配信（mkdocs ビルド成果物）

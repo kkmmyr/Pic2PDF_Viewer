@@ -6,6 +6,8 @@ import ViewerPage from './pages/ViewerPage';
 import OCRPage from './pages/OCRPage';
 import HitomiPage from './pages/HitomiPage';
 import NovelDbPage from './pages/NovelDbPage';
+import NovelBuildPage from './pages/NovelBuildPage';
+import NovelDetailPage from './pages/NovelDetailPage';
 import NovelDiscussionPage from './pages/NovelDiscussionPage';
 import NovelReaderPage from './pages/NovelReaderPage';
 
@@ -74,10 +76,26 @@ function App() {
                             }
                         />
                         <Route
+                            path="novel/detail/:bookName"
+                            element={
+                                <ErrorBoundary>
+                                    <NovelDetailPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
                             path="novel/reader/:bookName"
                             element={
                                 <ErrorBoundary>
                                     <NovelReaderPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="novel/build"
+                            element={
+                                <ErrorBoundary>
+                                    <NovelBuildPage />
                                 </ErrorBoundary>
                             }
                         />

@@ -1,7 +1,7 @@
 /**
  * ライブラリ（書籍一覧）セクション。
  */
-import type { BookSummary, RebuildStatus } from '../../features/novel_db/types';
+import type { BookSummary } from '../../features/novel_db/types';
 
 import AmazonCsvImportSection from './AmazonCsvImportSection';
 import BookCard from './BookCard';
@@ -9,30 +9,18 @@ import BookCard from './BookCard';
 interface Props {
     books: BookSummary[];
     isLoading: boolean;
-    onRebuildBook: (bookName: string) => void;
-    onOcrBook: (bookName: string) => void;
-    onReadBook: (bookName: string) => void;
-    onFullBuildBook: (bookName: string) => void;
+    onOpenDetailBook: (bookName: string) => void;
     onEditBook: (book: BookSummary) => void;
     onMetaRefetch: () => void;
-    /** B-15: 登場人物セクションでキャラ選択時に親が CharacterDetailDialog を開く。 */
-    onSelectCharacter?: (bookName: string, charName: string) => void;
-    rebuildStatus: RebuildStatus | null;
 }
 
 export default function LibrarySection({
     books,
     isLoading,
-    onRebuildBook,
-    onOcrBook,
-    onReadBook,
-    onFullBuildBook,
+    onOpenDetailBook,
     onEditBook,
     onMetaRefetch,
-    onSelectCharacter,
-    rebuildStatus,
 }: Props) {
-    const isLocked = rebuildStatus?.is_running ?? false;
     return (
         <section className="space-y-3">
             <div className="flex items-center justify-between">
@@ -51,13 +39,8 @@ export default function LibrarySection({
                         <BookCard
                             key={b.name}
                             book={b}
-                            onRebuild={onRebuildBook}
-                            onOcr={onOcrBook}
-                            onRead={onReadBook}
-                            onFullBuild={onFullBuildBook}
+                            onOpenDetail={onOpenDetailBook}
                             onEdit={onEditBook}
-                            onSelectCharacter={onSelectCharacter}
-                            disabled={isLocked}
                         />
                     ))}
                 </div>

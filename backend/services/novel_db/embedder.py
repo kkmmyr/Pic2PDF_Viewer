@@ -13,6 +13,7 @@ import urllib.request
 from config import (
     NOVEL_DB_EMBED_DIM,
     NOVEL_DB_EMBED_MODEL,
+    NOVEL_DB_EMBED_NUM_GPU,
     NOVEL_DB_OLLAMA_BASE_URL,
 )
 
@@ -35,7 +36,11 @@ def embed_batch(
     """
     if not texts:
         return []
-    body = json.dumps({"model": model, "input": texts}).encode("utf-8")
+    body = json.dumps({
+        "model": model,
+        "input": texts,
+        "options": {"num_gpu": NOVEL_DB_EMBED_NUM_GPU},
+    }).encode("utf-8")
     req = urllib.request.Request(
         f"{NOVEL_DB_OLLAMA_BASE_URL}/api/embed",
         data=body,

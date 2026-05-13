@@ -234,6 +234,7 @@ CREATE TABLE rebuild_jobs (
     finished_at     TIMESTAMP,
     progress_total  INTEGER,             -- 対象書籍数
     progress_done   INTEGER,             -- 処理完了書籍数
+    current_step    TEXT,                -- 実行中ステップ名（full_build 時: 'step 1/3: rebuild_from_pages' 等）
     error_message   TEXT
 );
 CREATE INDEX idx_rebuild_jobs_state ON rebuild_jobs(state, enqueued_at);
@@ -374,6 +375,8 @@ Qwen が識別した境界: `[13, 41, 74, 107]`（p74 = 「第三章 騎士と�
 - バッチサイズ: 16
 - タイムアウト: 180 秒
 - リトライ: 1 回（接続失敗時）
+
+**GPU 配置ポリシー**: リクエストボディに `options.num_gpu = NOVEL_DB_EMBED_NUM_GPU`（既定 `0` = CPU 専用）を渡す。Full Build 実行中は llama-server（Qwen 35B, `-ngl 28`）が VRAM を約 10〜10.5 GB 占有するため、bge-m3 を CPU で動かすことで余裕を確保する。GPU で動かしたい場合は `NOVEL_DB_EMBED_NUM_GPU=99` を設定して uvicorn を再起動する。
 
 PoC スクリプトベースで、エラーハンドリング・ログ出力を追加して本実装。
 
@@ -1278,6 +1281,8 @@ def _check_locked(queue: NovelDbJobQueue) -> None:
 ### 8.3. ジョブ進捗表示
 
 `rebuild_jobs.progress_total` / `progress_done` を builder 側から逐次更新。フロントは `GET /api/novel_db/rebuild/status` でポーリング（5 秒間隔）。
+
+`mode=full_build` ジョブは追加で `current_step` にステップ名（`"step 1/3: rebuild_from_pages"` / `"step 2/3: summarize_book + characters"` / `"step 3/3: generate_contexts"`）を書き込む。SSE 経由でフロントに届き、実行中カードに `Step 1/3: ...` として表示される。
 
 ### 8.4. ジョブのキャンセル仕様
 

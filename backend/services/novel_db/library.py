@@ -32,6 +32,28 @@ class BookSummary:
 
 
 @dataclass
+class BookDetail:
+    """単一書籍の詳細情報（BookSummary + summary / counts）。"""
+    name: str
+    authors: list[str]
+    series_id: str | None
+    series_title: str | None
+    is_indexed: bool
+    page_count: int | None
+    indexed_at: str | None
+    thumbnail_url: str | None
+    ocr_done_at: str | None
+    volume: int | None
+    publisher: str | None
+    asin: str | None
+    isbn: str | None
+    summary: str | None
+    summary_generated_at: str | None
+    character_count: int
+    discussion_count: int
+
+
+@dataclass
 class SeriesSummary:
     id: str
     name: str
@@ -62,6 +84,59 @@ def _fetch_indexed_status(conn: sqlite3.Connection) -> dict[str, dict]:
         }
         for name, page_count, indexed_at, ocr_done_at in rows
     }
+
+
+def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | None:
+    """指定書籍の詳細情報（summary / character_count / discussion_count 含む）を返す。
+
+    書籍ディレクトリが存在しない場合は None。
+    """
+    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    if not (images_dir / book_name).is_dir():
+        return None
+
+    meta = load_meta("novel")
+    meta_entry = meta.get(_meta_key(book_name), {})
+
+    db_row = conn.execute(
+        "SELECT page_count, indexed_at, ocr_done_at, summary, summary_generated_at "
+        "FROM books WHERE name = ?",
+        (book_name,),
+    ).fetchone()
+
+    if db_row:
+        page_count, indexed_at, ocr_done_at, summary, summary_generated_at = db_row
+        char_count = conn.execute(
+            "SELECT COUNT(*) FROM book_characters bc "
+            "JOIN books b ON bc.book_id = b.id WHERE b.name = ?",
+            (book_name,),
+        ).fetchone()[0]
+    else:
+        page_count = indexed_at = ocr_done_at = summary = summary_generated_at = None
+        char_count = 0
+
+    from services.novel_db.discussion_service import count_discussions  # noqa: PLC0415
+    discussion_count = count_discussions(book_name)
+
+    return BookDetail(
+        name=book_name,
+        authors=list(meta_entry.get("authors", [])),
+        series_id=meta_entry.get("series_id"),
+        series_title=meta_entry.get("series_title"),
+        is_indexed=db_row is not None,
+        page_count=page_count,
+        indexed_at=indexed_at,
+        thumbnail_url=_thumbnail_url(book_name),
+        ocr_done_at=ocr_done_at,
+        volume=meta_entry.get("volume"),
+        publisher=meta_entry.get("publisher"),
+        asin=meta_entry.get("asin"),
+        isbn=meta_entry.get("isbn"),
+        summary=summary,
+        summary_generated_at=summary_generated_at,
+        character_count=char_count,
+        discussion_count=discussion_count,
+    )
 
 
 def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
