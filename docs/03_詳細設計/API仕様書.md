@@ -1536,23 +1536,24 @@ Amazon デジタル購入履歴 CSV をアップロードし、書籍メタ（�
 
 ## §8. 本構築管理（novel_build）
 
-小説本の Full Build（OCR 済み → Embedding → サマリ → 登場人物 → コンテキスト）を管理する専用管理画面 `/novel/build` が使うエンドポイント群（4.6）。内部的には `novel_db` の `job_queue` と同一ワーカーを使い、`mode=full_build` ジョブのみを扱う。
+小説本の Build 処理を管理する専用管理画面 `/novel/build` が使うエンドポイント群（4.6）。内部的には `novel_db` の `job_queue` と同一ワーカーを使い、`mode=full_build`（Step 1+2: Embedding → サマリ + 登場人物）と `mode=generate_contexts`（Step 3: Contextual Retrieval 単独実行、B-23）の 2 モードを扱う。
 
 ---
 
 ### §8.1 `POST /api/novel/build/enqueue`（4.6）
 
-Full Build ジョブをキューに登録する。即座に `job_id` を返す。
+Build ジョブをキューに登録する。即座に `job_id` を返す。
 
 **リクエストボディ**:
 ```json
-{ "book_name": "花太郎", "all_books": false }
+{ "book_name": "花太郎", "all_books": false, "mode": "full_build" }
 ```
 
 | フィールド | 必須 | 説明 |
 |---|---|---|
 | `book_name` | △ | 書籍名（`all_books=false` のとき必須） |
 | `all_books` | × | `true` のとき全冊一括。省略時 `false` |
+| `mode` | × | `"full_build"`（省略時デフォルト）/ `"generate_contexts"`（Step 3 単独、B-23） |
 
 **レスポンス**:
 ```json
@@ -1561,13 +1562,14 @@ Full Build ジョブをキューに登録する。即座に `job_id` を返す�
 
 **エラー**:
 - `422`: `all_books=false` なのに `book_name` が空
-- `422`: 同一書籍の Full Build ジョブが既にキュー / 実行中（`detail: "already queued or running"`）
+- `422`: 不正な `mode` 値
+- `422`: 同一書籍・同一 mode のジョブが既にキュー / 実行中（`detail: "already queued or running"`）
 
 ---
 
 ### §8.2 `GET /api/novel/build/status`（4.6）
 
-全キューのスナップショットを返す（`mode=full_build` ジョブのみ表示）。
+全キューのスナップショットを返す（`mode=full_build` / `mode=generate_contexts` ジョブを対象）。
 
 **レスポンス**:
 ```json
@@ -1576,23 +1578,26 @@ Full Build ジョブをキューに登録する。即座に `job_id` を返す�
   "current_job": {
     "id": 12,
     "target_id": "花太郎",
+    "mode": "full_build",
     "started_at": "2026-05-13T10:00:00",
     "progress_total": 1,
     "progress_done": 0,
-    "current_step": "step 2/3: summarize_book + characters"
+    "current_step": "step 2/2: summarize_book + characters",
+    "current_detail": "サマリ生成中"
   },
   "queued_jobs": [
-    { "id": 13, "target_id": "千の刀", "enqueued_at": "2026-05-13T10:01:00" }
+    { "id": 13, "target_id": "千の刀", "mode": "generate_contexts", "enqueued_at": "2026-05-13T10:01:00" }
   ],
   "recent_finished": [
-    { "id": 11, "target_id": "鯱", "state": "completed", "finished_at": "2026-05-13T09:55:00", "error_message": null }
+    { "id": 11, "target_id": "鯱", "mode": "full_build", "state": "completed", "finished_at": "2026-05-13T09:55:00", "error_message": null }
   ]
 }
 ```
 
-- `is_running=true` は Full Build ジョブが実行中のとき（他モードのジョブが走っている場合は `false`）
+- `is_running=true` は `full_build` / `generate_contexts` ジョブが実行中のとき
 - `recent_finished` は直近 20 件（`completed` / `failed` / `canceled`）
-- `current_job.current_step`: `mode=full_build` 時のみ。現在実行中のステップ名（`"step 1/3: rebuild_from_pages"` / `"step 2/3: summarize_book + characters"` / `"step 3/3: generate_contexts"`）。ステップ開始前は `null`
+- `current_job.current_step`: 現在実行中のステップ名。`full_build` は `"step 1/2: rebuild_from_pages"` / `"step 2/2: summarize_book + characters"`、`generate_contexts` は `"step 1/1: generate_contexts"`。ステップ開始前は `null`
+- `current_job.current_detail`（B-22）: ステップ内の詳細進捗メッセージ（例: `"コンテキスト 50/303 チャンク"`）。未発火時は `null`
 
 ---
 
