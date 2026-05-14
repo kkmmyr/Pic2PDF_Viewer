@@ -42,7 +42,8 @@ from ._prompts import (
     SINGLE_PROMPT,
     parse_combined_output,
 )
-from .embedder import embed_batch, serialize_f32
+from .embedder import embed_batch
+from .lance_store import get_summaries_table
 
 # プロセス起動時に Backend を作る。Backend は stateless なので使い回しで OK。
 _BACKEND = build_qwen_backend()
@@ -302,7 +303,7 @@ def _index_summary_vector(
     book_id: int,
     summary: str,
 ) -> None:
-    """書籍サマリを bge-m3 で embedding し、`book_summaries_vec` に upsert する。"""
+    """書籍サマリを bge-m3 で embedding し、LanceDB summaries テーブルに upsert する。"""
     try:
         emb = embed_batch([summary])[0]
     except Exception as e:  # noqa: BLE001
@@ -311,11 +312,11 @@ def _index_summary_vector(
             "Failed to index summary vector for book_id=%s: %s", book_id, e,
         )
         return
-    conn.execute("DELETE FROM book_summaries_vec WHERE rowid = ?", (book_id,))
-    conn.execute(
-        "INSERT INTO book_summaries_vec (rowid, embedding) VALUES (?, ?)",
-        (book_id, serialize_f32(emb)),
-    )
+    book_name_row = conn.execute("SELECT name FROM books WHERE id = ?", (book_id,)).fetchone()
+    book_name = book_name_row[0] if book_name_row else ""
+    table = get_summaries_table()
+    table.delete(f"book_id = {book_id}")
+    table.add([{"book_id": book_id, "book_name": book_name, "embedding": emb}])
 
 
 def _log(cb: Callable[[str], None] | None, msg: str) -> None:

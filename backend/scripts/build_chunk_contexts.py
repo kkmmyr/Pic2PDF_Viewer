@@ -36,7 +36,8 @@ from services.novel_db.contextualizer import (  # noqa: E402
     make_embedding_input,
     should_skip_context,
 )
-from services.novel_db.embedder import embed_batch, serialize_f32  # noqa: E402
+from services.novel_db.embedder import embed_batch  # noqa: E402
+from services.novel_db.lance_store import get_chunks_table  # noqa: E402
 
 # bge-m3 のバッチサイズ
 _EMBED_BATCH_SIZE = 16
@@ -166,6 +167,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
     # embedding バッチ
     print(f"  re-embedding {len(pending_for_embed)} chunks ...", flush=True)
     t1 = time.time()
+    lance_table = get_chunks_table()
     for batch_start in range(0, len(pending_for_embed), _EMBED_BATCH_SIZE):
         batch = pending_for_embed[batch_start : batch_start + _EMBED_BATCH_SIZE]
         inputs = [make_embedding_input(ctx, text) for _, ctx, text in batch]
@@ -175,13 +177,31 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
             print(f"  embedding failed at batch {batch_start}: {e}", file=sys.stderr)
             continue
         with with_db() as conn:
+            lance_rows = []
             for (chunk_id, _ctx, _text), emb in zip(batch, embeds, strict=True):
-                conn.execute("DELETE FROM chunks_vec WHERE rowid = ?", (chunk_id,))
-                conn.execute(
-                    "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
-                    (chunk_id, serialize_f32(emb)),
-                )
-            conn.commit()
+                meta = conn.execute(
+                    "SELECT b.name, p.page_no, p.char_count, b.page_count "
+                    "FROM chunks c "
+                    "JOIN pages p ON c.page_id = p.id "
+                    "JOIN books b ON p.book_id = b.id "
+                    "WHERE c.id = ?",
+                    (chunk_id,),
+                ).fetchone()
+                if meta:
+                    lance_rows.append({
+                        "chunk_id": chunk_id,
+                        "book_name": meta[0],
+                        "page_no": meta[1],
+                        "text": _text,
+                        "char_count": meta[2] or 0,
+                        "page_count": meta[3] or 0,
+                        "embedding": emb,
+                    })
+            if lance_rows:
+                chunk_ids = [r["chunk_id"] for r in lance_rows]
+                ids_str = ", ".join(str(cid) for cid in chunk_ids)
+                lance_table.delete(f"chunk_id IN ({ids_str})")
+                lance_table.add(lance_rows)
     print(f"  embedding done ({time.time() - t1:.0f}s)", flush=True)
     return (success, skipped, failure)
 

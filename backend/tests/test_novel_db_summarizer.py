@@ -12,6 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from services.novel_db import init_schema, with_db
+from services.novel_db.lance_store import get_summaries_table
 from services.novel_db.summarizer import (
     _chunk_for_map,
     _load_body_text,
@@ -211,7 +212,7 @@ def test_load_summaries_for_empty_input_returns_empty():
 # ---------------------------------------------------------------------------
 
 def test_update_book_summary_indexes_vector(db_with_book):
-    """update_book_summary が summary を保存し、book_summaries_vec にも upsert する。"""
+    """update_book_summary が summary を保存し、LanceDB summaries にも upsert する。"""
     with patch("services.novel_db.summarizer.embed_batch") as mock_embed:
         # bge-m3 は 1024 次元
         mock_embed.return_value = [[0.1] * 1024]
@@ -222,12 +223,10 @@ def test_update_book_summary_indexes_vector(db_with_book):
                 "SELECT summary FROM books WHERE name = ?", ("test-book",),
             ).fetchone()
             assert row[0] == "テストサマリ"
-            # book_summaries_vec に 1 件
-            n = conn.execute(
-                "SELECT COUNT(*) FROM book_summaries_vec WHERE rowid = ?",
-                (db_with_book,),
-            ).fetchone()[0]
-            assert n == 1
+        # LanceDB summaries に 1 件
+        table = get_summaries_table()
+        n = table.count_rows()
+        assert n == 1
     mock_embed.assert_called_once_with(["テストサマリ"])
 
 
@@ -242,12 +241,9 @@ def test_update_book_summary_handles_embed_failure(db_with_book):
                 "SELECT summary FROM books WHERE name = ?", ("test-book",),
             ).fetchone()
             assert row[0] == "テスト"
-            # vec は空のまま
-            n = conn.execute(
-                "SELECT COUNT(*) FROM book_summaries_vec WHERE rowid = ?",
-                (db_with_book,),
-            ).fetchone()[0]
-            assert n == 0
+        # LanceDB summaries は空のまま
+        table = get_summaries_table()
+        assert table.count_rows() == 0
 
 
 def test_update_book_summary_replaces_existing_vector(db_with_book):
@@ -257,11 +253,9 @@ def test_update_book_summary_replaces_existing_vector(db_with_book):
         with with_db() as conn:
             update_book_summary(conn, "test-book", "v1")
             update_book_summary(conn, "test-book", "v2")
-            n = conn.execute(
-                "SELECT COUNT(*) FROM book_summaries_vec WHERE rowid = ?",
-                (db_with_book,),
-            ).fetchone()[0]
-            assert n == 1
+        # LanceDB summaries に 1 件のみ（重複なし）
+        table = get_summaries_table()
+        assert table.count_rows() == 1
 
 
 def test_update_book_summary_raises_for_missing_book(tmp_data_dir):

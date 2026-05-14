@@ -6,13 +6,14 @@ embedder 呼び出しはモック。スキーマ初期化 + book_summaries_vec �
 from unittest.mock import patch
 
 from services.novel_db import init_schema, with_db
-from services.novel_db.embedder import serialize_f32
+from services.novel_db.lance_store import get_summaries_table
 from services.novel_db.search import Scope, search_book_summaries
 
 
 def _setup_books(conn, books: list[tuple[str, list[float]]]) -> list[int]:
-    """books と book_summaries_vec に書籍を投入し、ID リストを返す。"""
+    """books と LanceDB summaries テーブルに書籍を投入し、ID リストを返す。"""
     ids = []
+    table = get_summaries_table()
     for name, vec in books:
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
@@ -20,10 +21,7 @@ def _setup_books(conn, books: list[tuple[str, list[float]]]) -> list[int]:
             (name, f"/{name}.pdf", "/imgs", 100),
         )
         bid = cur.lastrowid
-        conn.execute(
-            "INSERT INTO book_summaries_vec (rowid, embedding) VALUES (?, ?)",
-            (bid, serialize_f32(vec)),
-        )
+        table.add([{"book_id": bid, "book_name": name, "embedding": vec}])
         ids.append(bid)
     conn.commit()
     return ids
@@ -82,14 +80,11 @@ def test_search_book_summaries_returns_empty_for_unknown_scope(tmp_data_dir):
     assert results == []
 
 
-def test_search_book_summaries_handles_missing_table(tmp_data_dir):
-    """`book_summaries_vec` が無い古い DB では空リストを返す（後方互換）。"""
+def test_search_book_summaries_handles_empty_table(tmp_data_dir):
+    """LanceDB summaries テーブルが空のときは空リストを返す。"""
     with with_db() as conn:
         init_schema(conn)
-        # 仮想テーブルを削除して古い DB を模す
-        conn.execute("DROP TABLE book_summaries_vec")
-        conn.commit()
-
+        # テーブルは作成されるがデータなし
         results = search_book_summaries(conn, "Q", Scope("all"), top=5)
 
     assert results == []

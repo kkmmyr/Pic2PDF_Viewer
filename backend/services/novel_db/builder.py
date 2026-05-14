@@ -20,8 +20,9 @@ from utils.logger import get_logger
 
 from .chunker import chunk_page
 from .connection import with_db
-from .embedder import embed_batch, serialize_f32
+from .embedder import embed_batch
 from .extractor import PageText, run_ocr_subprocess
+from .lance_store import get_chunks_table
 from .schema import init_schema
 
 logger = get_logger(__name__)
@@ -151,8 +152,10 @@ def rebuild_from_pages(
 
     logger.info("rebuild_from_pages start: %s (pages=%d)", book_name, len(pages_rows))
 
+    lance_table = get_chunks_table()
+
     with conn:
-        # 既存 chunks_vec を削除（外部仮想テーブルは CASCADE 不可）
+        # 既存 chunks を LanceDB から削除
         old_chunk_ids = [
             row[0]
             for row in conn.execute(
@@ -163,10 +166,8 @@ def rebuild_from_pages(
             )
         ]
         if old_chunk_ids:
-            conn.executemany(
-                "DELETE FROM chunks_vec WHERE rowid = ?",
-                [(cid,) for cid in old_chunk_ids],
-            )
+            ids_str = ", ".join(str(cid) for cid in old_chunk_ids)
+            lance_table.delete(f"chunk_id IN ({ids_str})")
         conn.execute(
             "DELETE FROM chunks WHERE page_id IN "
             "(SELECT id FROM pages WHERE book_id = ?)",
@@ -175,11 +176,29 @@ def rebuild_from_pages(
 
         # チャンク分割（ページ単位）
         all_chunks: list[dict] = []
+        # book_name と page_count をページIDから引くためのマップ
+        book_row2 = conn.execute(
+            "SELECT name, page_count FROM books WHERE id = ?", (book_id,)
+        ).fetchone()
+        book_name_val = book_row2[0] if book_row2 else ""
+        book_page_count = book_row2[1] if book_row2 else 0
+
+        page_meta: dict[int, tuple[int, int]] = {}  # page_id → (page_no, char_count_per_page)
         for page_id, full_text, char_count in pages_rows:
             if (char_count or 0) < MIN_CHARS_FOR_CHUNK:
                 continue
+            page_no_row = conn.execute(
+                "SELECT page_no FROM pages WHERE id = ?", (page_id,)
+            ).fetchone()
+            page_no = page_no_row[0] if page_no_row else 0
+            page_meta[page_id] = (page_no, char_count or 0)
             for idx, c in enumerate(chunk_page(full_text or "")):
-                all_chunks.append({"page_id": page_id, "chunk_idx": idx, "text": c})
+                all_chunks.append({
+                    "page_id": page_id,
+                    "page_no": page_no,
+                    "chunk_idx": idx,
+                    "text": c,
+                })
 
         total_chunks = len(all_chunks)
         if progress_callback:
@@ -189,6 +208,7 @@ def rebuild_from_pages(
         for batch_start in range(0, total_chunks, EMBED_BATCH_SIZE):
             batch = all_chunks[batch_start : batch_start + EMBED_BATCH_SIZE]
             embeddings = embed_batch([c["text"] for c in batch])
+            lance_rows: list[dict] = []
             for c, emb in zip(batch, embeddings, strict=True):
                 cur = conn.execute(
                     "INSERT INTO chunks (page_id, chunk_idx, text, char_count) "
@@ -196,10 +216,19 @@ def rebuild_from_pages(
                     (c["page_id"], c["chunk_idx"], c["text"], len(c["text"])),
                 )
                 chunk_id = cur.lastrowid
-                conn.execute(
-                    "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
-                    (chunk_id, serialize_f32(emb)),
-                )
+                page_no = c["page_no"]
+                page_char_count = page_meta.get(c["page_id"], (0, 0))[1]
+                lance_rows.append({
+                    "chunk_id": chunk_id,
+                    "book_name": book_name_val,
+                    "page_no": page_no,
+                    "text": c["text"],
+                    "char_count": page_char_count,
+                    "page_count": book_page_count,
+                    "embedding": emb,
+                })
+            if lance_rows:
+                lance_table.add(lance_rows)
             done = min(batch_start + EMBED_BATCH_SIZE, total_chunks)
             if progress_callback:
                 progress_callback(done, total_chunks)

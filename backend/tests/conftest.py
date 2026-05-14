@@ -31,6 +31,7 @@ def tmp_data_dir(tmp_path, monkeypatch):
     novel = tmp_path / "kindle_novel"
     meta_dir = tmp_path / "meta"
 
+    lance_path = str(tmp_path / "novel.lancedb")
     paths = {
         "DATA_DIR": str(tmp_path),
         "MAIN_DATA_DIR": str(main),
@@ -48,6 +49,7 @@ def tmp_data_dir(tmp_path, monkeypatch):
         "KINDLE_NOVEL_IMAGES_DIR": str(novel / "images"),
         "NOVEL_DB_DIR": str(tmp_path / "novel_db"),
         "NOVEL_DB_PATH": str(tmp_path / "novel_db" / "novel.db"),
+        "NOVEL_DB_LANCE_PATH": lance_path,
     }
 
     # 必要ディレクトリを作成
@@ -63,6 +65,14 @@ def tmp_data_dir(tmp_path, monkeypatch):
 
     # モジュール側で `from config import X` で取り込んでいる場合の差し替え
     _patch_imported_paths(monkeypatch, paths)
+
+    # LanceDB グローバル接続をリセット（テスト用 tmp_path に再接続させる）
+    try:
+        import services.novel_db.lance_store as _lance
+        monkeypatch.setattr(_lance, "NOVEL_DB_LANCE_PATH", lance_path)
+        _lance.reset_db()
+    except ImportError:
+        pass
 
     return {
         "root": str(tmp_path),

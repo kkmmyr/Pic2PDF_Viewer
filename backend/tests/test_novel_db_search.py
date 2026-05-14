@@ -6,7 +6,7 @@ import pytest
 
 from services.meta_store import meta_path
 from services.novel_db import init_schema, with_db
-from services.novel_db.embedder import serialize_f32
+from services.novel_db.lance_store import get_chunks_table
 from services.novel_db.search import (
     Scope,
     _resolve_book_names,
@@ -136,10 +136,22 @@ def _insert_chunk(conn, page_id: int, idx: int, text: str, vec: list[float]) -> 
         (page_id, idx, text, len(text)),
     )
     chunk_id = cur.lastrowid
-    conn.execute(
-        "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
-        (chunk_id, serialize_f32(vec)),
-    )
+    # book_name / page_no / page_count を SQLite から取得
+    meta = conn.execute(
+        "SELECT b.name, p.page_no, p.char_count, b.page_count "
+        "FROM pages p JOIN books b ON p.book_id = b.id WHERE p.id = ?",
+        (page_id,),
+    ).fetchone()
+    book_name, page_no, char_count, page_count = meta if meta else ("", 0, 0, 0)
+    get_chunks_table().add([{
+        "chunk_id": chunk_id,
+        "book_name": book_name,
+        "page_no": page_no,
+        "text": text,
+        "char_count": char_count or 0,
+        "page_count": page_count or 0,
+        "embedding": vec,
+    }])
     return chunk_id
 
 

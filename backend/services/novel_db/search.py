@@ -14,7 +14,8 @@ from urllib.parse import quote
 
 from services.meta_store import load_meta
 
-from .embedder import embed_batch, serialize_f32
+from .embedder import embed_batch
+from .lance_store import get_chunks_table, get_summaries_table
 
 # FTS5 特殊文字（クエリ整形時に空白へ置換）
 _FTS5_SPECIAL = re.compile(r'[?*"^():+\-]')
@@ -182,57 +183,44 @@ def vec_search(
         return []
 
     emb = embed_batch([query])[0]
-    emb_blob = serialize_f32(emb)
 
-    # sqlite-vec の MATCH/k は必須なので、まず k 件取ってから p.char_count / page_no
-    # フィルタを適用する（フィルタされる分を見越して k を多めに取得）
+    # フィルタ後に top 件確保できるよう多めに取得
     has_extra_filter = (
         min_chars > 0 or body_page_margin > 0 or book_names is not None
     )
     k = max(top * 5, 50) if has_extra_filter else top
 
-    if book_names is not None:
-        placeholders = ",".join(["?"] * len(book_names))
-        sql = f"""
-            SELECT b.name, p.page_no, c.text, distance
-            FROM chunks_vec
-            JOIN chunks c ON c.id = chunks_vec.rowid
-            JOIN pages p ON c.page_id = p.id
-            JOIN books b ON p.book_id = b.id
-            WHERE chunks_vec.embedding MATCH ?
-              AND chunks_vec.k = ?
-              AND b.name IN ({placeholders})
-              AND p.char_count >= ?
-              AND p.page_no > ?
-              AND p.page_no <= b.page_count - ?
-            ORDER BY distance LIMIT ?
-        """
-        params: list = [
-            emb_blob,
-            k,
-            *book_names,
-            min_chars,
-            body_page_margin,
-            body_page_margin,
-            top,
-        ]
-    else:
-        sql = """
-            SELECT b.name, p.page_no, c.text, distance
-            FROM chunks_vec
-            JOIN chunks c ON c.id = chunks_vec.rowid
-            JOIN pages p ON c.page_id = p.id
-            JOIN books b ON p.book_id = b.id
-            WHERE chunks_vec.embedding MATCH ?
-              AND chunks_vec.k = ?
-              AND p.char_count >= ?
-              AND p.page_no > ?
-              AND p.page_no <= b.page_count - ?
-            ORDER BY distance LIMIT ?
-        """
-        params = [emb_blob, k, min_chars, body_page_margin, body_page_margin, top]
+    table = get_chunks_table()
+    query_builder = table.search(emb).limit(k).select(
+        ["chunk_id", "book_name", "page_no", "text", "char_count", "page_count"]
+    )
 
-    return conn.execute(sql, params).fetchall()
+    # WHERE 句フィルタ（LanceDB SQL 構文）
+    filters: list[str] = []
+    if min_chars > 0:
+        filters.append(f"char_count >= {min_chars}")
+    if book_names is not None:
+        quoted = ", ".join(f"'{n}'" for n in book_names)
+        filters.append(f"book_name IN ({quoted})")
+    if filters:
+        query_builder = query_builder.where(" AND ".join(filters), prefilter=True)
+
+    results = query_builder.to_list()
+
+    # body_page_margin フィルタ（書籍ごとに先頭・末尾 N ページを除外）
+    if body_page_margin > 0:
+        results = [
+            r for r in results
+            if r["page_no"] > body_page_margin
+            and r["page_no"] <= (r["page_count"] - body_page_margin)
+        ]
+
+    results.sort(key=lambda r: r["_distance"])
+    rows: list[tuple] = [
+        (r["book_name"], r["page_no"], r["text"], r["_distance"])
+        for r in results[:top]
+    ]
+    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -424,43 +412,21 @@ def search_book_summaries(
     if book_names is not None and not book_names:
         return []
 
-    # book_summaries_vec が無い古い DB との互換性
-    has_vec = conn.execute(
-        "SELECT name FROM sqlite_master "
-        "WHERE type='table' AND name='book_summaries_vec'",
-    ).fetchone()
-    if has_vec is None:
+    emb = embed_batch([query])[0]
+
+    table = get_summaries_table()
+    if table.count_rows() == 0:
         return []
 
-    emb = embed_batch([query])[0]
-    emb_blob = serialize_f32(emb)
-
-    # vec0 は MATCH/k 必須。scope フィルタ用に多めに取得。
     k = max(top * 2, 22) if book_names is not None else top
+    query_builder = table.search(emb).limit(k).select(["book_name"])
     if book_names is not None:
-        placeholders = ",".join(["?"] * len(book_names))
-        sql = f"""
-            SELECT b.name, distance
-            FROM book_summaries_vec
-            JOIN books b ON b.id = book_summaries_vec.rowid
-            WHERE book_summaries_vec.embedding MATCH ?
-              AND book_summaries_vec.k = ?
-              AND b.name IN ({placeholders})
-            ORDER BY distance LIMIT ?
-        """  # noqa: S608
-        params: list = [emb_blob, k, *book_names, top]
-    else:
-        sql = """
-            SELECT b.name, distance
-            FROM book_summaries_vec
-            JOIN books b ON b.id = book_summaries_vec.rowid
-            WHERE book_summaries_vec.embedding MATCH ?
-              AND book_summaries_vec.k = ?
-            ORDER BY distance LIMIT ?
-        """
-        params = [emb_blob, top, top]
+        quoted = ", ".join(f"'{n}'" for n in book_names)
+        query_builder = query_builder.where(f"book_name IN ({quoted})", prefilter=True)
 
-    return [(name, dist) for name, dist in conn.execute(sql, params)]
+    results = query_builder.to_list()
+    results.sort(key=lambda r: r["_distance"])
+    return [(r["book_name"], r["_distance"]) for r in results[:top]]
 
 
 def _fetch_main_characters(

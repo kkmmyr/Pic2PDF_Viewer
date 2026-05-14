@@ -4,11 +4,8 @@
 """
 import sqlite3
 
-from config import NOVEL_DB_EMBED_DIM
-
-
 def _ddl() -> str:
-    return f"""
+    return """
         CREATE TABLE IF NOT EXISTS books (
             id          INTEGER PRIMARY KEY,
             name        TEXT NOT NULL UNIQUE,
@@ -46,14 +43,6 @@ def _ddl() -> str:
             char_count INTEGER NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_chunks_page ON chunks(page_id);
-
-        CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(embedding FLOAT[{NOVEL_DB_EMBED_DIM}]);
-
-        -- 書籍サマリ（books.summary）の embedding。
-        -- rowid = books.id。scope=all / scope=series の RAG で「サマリ自体が
-        -- ヒット候補」になるよう、bge-m3 で書籍 1 冊あたり 1 ベクトルを格納する。
-        -- B-5 の summary 生成完了時に upsert する。
-        CREATE VIRTUAL TABLE IF NOT EXISTS book_summaries_vec USING vec0(embedding FLOAT[{NOVEL_DB_EMBED_DIM}]);
 
         CREATE TABLE IF NOT EXISTS qa_history (
             id            INTEGER PRIMARY KEY,

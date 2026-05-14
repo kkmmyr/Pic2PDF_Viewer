@@ -10,6 +10,7 @@ import pytest
 
 from services.novel_db import builder, init_schema, with_db
 from services.novel_db.embedder import EmbeddingError
+from services.novel_db.lance_store import get_chunks_table
 
 
 def _populate_pages(conn: sqlite3.Connection, book_name: str, texts: list[str]) -> int:
@@ -46,6 +47,12 @@ def novel_db_env(tmp_path, monkeypatch):
     db_path = db_dir / "novel.db"
     monkeypatch.setattr(builder, "KINDLE_NOVEL_IMAGES_DIR", str(images_dir))
 
+    # LanceDB をテスト用 tmp_path にリダイレクト
+    import services.novel_db.lance_store as _lance
+    lance_path = str(tmp_path / "novel.lancedb")
+    monkeypatch.setattr(_lance, "NOVEL_DB_LANCE_PATH", lance_path)
+    _lance.reset_db()
+
     return {"images_dir": images_dir, "db_path": db_path}
 
 
@@ -80,11 +87,12 @@ def test_rebuild_from_pages_creates_chunks(novel_db_env, monkeypatch):
 
         chunks_count = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
         assert chunks_count > 0
-
-        vec_count = conn.execute("SELECT COUNT(*) FROM chunks_vec").fetchone()[0]
-        assert vec_count == chunks_count
     finally:
         conn.close()
+
+    # LanceDB にも同数のチャンクが登録されている
+    vec_count = get_chunks_table().count_rows()
+    assert vec_count == chunks_count
 
 
 def test_rebuild_from_pages_replaces_existing_chunks(novel_db_env, monkeypatch):

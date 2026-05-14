@@ -7,6 +7,16 @@ Novel DB（小説 RAG 機能）の設定値。
 import os
 
 # ---------------------------------------------------------------------------
+# Novel DB の LanceDB ベクトルストアパス（sqlite-vec から移行）
+# data/novel.lancedb/ に保存。環境変数で上書き可。
+import os as _os
+NOVEL_DB_LANCE_PATH: str = _os.environ.get(
+    "NOVEL_DB_LANCE_PATH",
+    _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "novel.lancedb"),
+)
+del _os
+
+# ---------------------------------------------------------------------------
 # Novel DB の埋め込みモデル / LLM
 # 埋め込み (bge-m3) と軽量 LLM (Gemma 4) は Ollama 経由。
 # 重量 LLM (Qwen) は B-14 / ADR-0009 で llama-server に切り替え済み。

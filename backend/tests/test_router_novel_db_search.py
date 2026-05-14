@@ -7,7 +7,7 @@ import json
 import pytest
 
 from services.novel_db import init_schema, with_db
-from services.novel_db.embedder import serialize_f32
+from services.novel_db.lance_store import get_chunks_table
 
 
 def _stub_embed(texts):
@@ -33,6 +33,7 @@ def search_setup(tmp_data_dir, monkeypatch):
         body_text_b = "アストリッドは元暗殺者だった。デュークの後輩。" * 18  # 約 360 字
         filler = "あ" * 320  # クエリと無関係な本文相当（min_chars 通過、検索ヒットしない）
 
+        lance_table = get_chunks_table()
         for i in range(1, 16):
             if i == 7:
                 text = body_text_a
@@ -52,10 +53,15 @@ def search_setup(tmp_data_dir, monkeypatch):
                 (page_id, 0, text, len(text)),
             )
             chunk_id = cur.lastrowid
-            conn.execute(
-                "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
-                (chunk_id, serialize_f32([0.1] + [0.0] * 1023)),
-            )
+            lance_table.add([{
+                "chunk_id": chunk_id,
+                "book_name": "book-1",
+                "page_no": i,
+                "text": text,
+                "char_count": len(text),
+                "page_count": 15,
+                "embedding": [0.1] + [0.0] * 1023,
+            }])
         conn.execute(
             "INSERT INTO pages_fts (rowid, full_text) "
             "SELECT id, full_text FROM pages WHERE book_id = ?",

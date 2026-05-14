@@ -6,7 +6,6 @@ Ollama の `/api/embed` を urllib で叩くシンプルな実装。バッチサ
 from __future__ import annotations
 
 import json
-import struct
 import urllib.error
 import urllib.request
 
@@ -65,8 +64,3 @@ def embed_batch(
                 f"Check NOVEL_DB_EMBED_MODEL ({model}) and NOVEL_DB_EMBED_DIM."
             )
     return embeddings
-
-
-def serialize_f32(vec: list[float]) -> bytes:
-    """sqlite-vec の vec0 列に格納するバイナリ表現に変換する。"""
-    return struct.pack(f"{len(vec)}f", *vec)

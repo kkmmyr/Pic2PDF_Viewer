@@ -18,7 +18,8 @@ from utils.logger import get_logger
 from .builder import rebuild_from_pages
 from .connection import with_db
 from .contextualizer import generate_chunk_context, make_embedding_input
-from .embedder import embed_batch, serialize_f32
+from .embedder import embed_batch
+from .lance_store import get_chunks_table, get_summaries_table
 from .schema import init_schema
 from .summarizer import summarize_book_with_characters, update_book_summary
 
@@ -200,6 +201,7 @@ def _run_generate_contexts(
 
     total_chunks = len(chunks)
     log(f"  processing {total_chunks} chunks")
+    lance_table = get_chunks_table()
     done = 0
     for chunk_id, chunk_text in chunks:
         if detail:
@@ -214,14 +216,29 @@ def _run_generate_contexts(
             )
             emb_input = make_embedding_input(ctx, chunk_text)
             emb = embed_batch([emb_input])[0]
-            conn.execute(
-                "DELETE FROM chunks_vec WHERE rowid = ?",
+            # LanceDB の embedding を更新（削除して再挿入）
+            lance_table.delete(f"chunk_id = {chunk_id}")
+            # book_name / page_no / char_count / page_count を SQLite から取得
+            meta = conn.execute(
+                """
+                SELECT b.name, p.page_no, p.char_count, b.page_count
+                FROM chunks c
+                JOIN pages p ON c.page_id = p.id
+                JOIN books b ON p.book_id = b.id
+                WHERE c.id = ?
+                """,
                 (chunk_id,),
-            )
-            conn.execute(
-                "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
-                (chunk_id, serialize_f32(emb)),
-            )
+            ).fetchone()
+            if meta:
+                lance_table.add([{
+                    "chunk_id": chunk_id,
+                    "book_name": meta[0],
+                    "page_no": meta[1],
+                    "text": chunk_text,
+                    "char_count": meta[2] or 0,
+                    "page_count": meta[3] or 0,
+                    "embedding": emb,
+                }])
             conn.commit()
             done += 1
         except Exception as exc:
