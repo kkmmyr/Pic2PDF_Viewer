@@ -21,12 +21,18 @@ import { usePinnedBookSets } from '../../hooks/usePinnedBookSets';
 import { useSeriesAuthorFilter } from '../../hooks/useSeriesAuthorFilter';
 import { useDialogToggles } from '../../hooks/useDialogToggles';
 import { useAsyncToast } from '../../hooks/useAsyncToast';
-import { useLibraryContext } from '../../contexts/LibraryContext';
+import { useUrlState } from '../../hooks/useUrlState';
+import { useLibraryStore } from '../../stores/libraryStore';
 import { API_ENDPOINTS } from '../../config/api';
 import { authorsKey } from '../../utils/authors';
 import apiClient from '../../config/api_client';
 
 type BulkDialogKey = 'bulkAuthor' | 'merge' | 'bulkSeries' | 'bulkGenre';
+
+interface LibraryPanelProps {
+    onPdfClick: (name: string) => void;
+    onUpClick: () => void;
+}
 
 /**
  * ライブラリ一覧ビュー。
@@ -41,26 +47,26 @@ type BulkDialogKey = 'bulkAuthor' | 'merge' | 'bulkSeries' | 'bulkGenre';
  * - `useLibrarySelectionShortcut`: s キーで選択モードトグル
  * - `useSeriesEditDialog`: SeriesEditDialog の state + assign/unassign ハンドラ
  */
-export function LibraryPanel() {
+export function LibraryPanel({ onPdfClick, onUpClick }: LibraryPanelProps) {
     const {
         pdfs,
-        selectedPdf,
         currentPath,
         currentSource,
         isSelectionMode,
         selectedItems,
         renameTarget,
-        onPdfClick,
-        onUpClick,
-        onToggleSelectionMode,
-        onClearSelection,
-        onToggleSelect,
-        onOpenRename,
-        onCloseRename,
-        onRenameItem,
-        onRefresh,
-        onBulkSelect,
-    } = useLibraryContext();
+        toggleSelectionMode,
+        clearSelection,
+        toggleSelectItem,
+        bulkSelectItems,
+        openRenameDialog,
+        closeRenameDialog,
+        handleRename,
+        bumpVersion,
+    } = useLibraryStore();
+
+    // selectedPdf は URL 由来（リーダーが開いているかの判定に使用）
+    const { selectedPdf } = useUrlState();
 
     const [searchText, setSearchText] = useState('');
     const dialogs = useDialogToggles<BulkDialogKey>();
@@ -88,7 +94,7 @@ export function LibraryPanel() {
         setSearchText('');
     }, [currentPath, currentSource]);
 
-    useLibrarySelectionShortcut(selectedPdf, onToggleSelectionMode);
+    useLibrarySelectionShortcut(selectedPdf, toggleSelectionMode);
 
     const handleGroupModeChange = useCallback(
         (mode: typeof groupMode) => {
@@ -164,9 +170,9 @@ export function LibraryPanel() {
                 name,
                 source: currentSource,
             });
-            onRefresh();
+            bumpVersion();
         },
-        [currentPath, currentSource, onRefresh],
+        [currentPath, currentSource, bumpVersion],
     );
 
     const { filteredPdfs } = useLibraryFilter({
@@ -202,8 +208,8 @@ export function LibraryPanel() {
         selectedItems,
         showHidden,
         seriesFilter,
-        onClearSelection,
-        onRefresh,
+        onClearSelection: clearSelection,
+        onRefresh: bumpVersion,
         showToast,
         bookMeta: {
             updateAuthors,
@@ -239,15 +245,15 @@ export function LibraryPanel() {
             const members = grouped.membersByRepresentativeName.get(name);
             if (members && members.length > 0) {
                 const allSelected = members.every((m) => selectedItems.has(m.name));
-                onBulkSelect(
+                bulkSelectItems(
                     members.map((m) => m.name),
                     !allSelected,
                 );
             } else {
-                onToggleSelect(name);
+                toggleSelectItem(name);
             }
         },
-        [grouped.membersByRepresentativeName, selectedItems, onBulkSelect, onToggleSelect],
+        [grouped.membersByRepresentativeName, selectedItems, bulkSelectItems, toggleSelectItem],
     );
 
     const seriesEdit = useSeriesEditDialog({
@@ -282,7 +288,7 @@ export function LibraryPanel() {
                 breadcrumbs={breadcrumbs}
                 showHidden={showHidden}
                 onUpClick={onUpClick}
-                onToggleSelectionMode={onToggleSelectionMode}
+                onToggleSelectionMode={toggleSelectionMode}
                 onBulkSetAuthor={() => dialogs.open('bulkAuthor')}
                 onBulkSetSeries={() => dialogs.open('bulkSeries')}
                 bulkSeriesDisabled={isMixedAuthors}
@@ -306,8 +312,8 @@ export function LibraryPanel() {
                 currentSource={currentSource}
                 selectedItems={selectedItems}
                 renameTarget={renameTarget}
-                onCloseRename={onCloseRename}
-                onRenameItem={onRenameItem}
+                onCloseRename={closeRenameDialog}
+                onRenameItem={handleRename}
                 isBulkAuthorOpen={dialogs.isOpen('bulkAuthor')}
                 bulkAuthorAllAuthors={allAuthors}
                 onCloseBulkAuthor={dialogs.close}
@@ -347,7 +353,7 @@ export function LibraryPanel() {
                         onToggleFavorite={
                             authorFilter || seriesFilter ? handleTogglePin : undefined
                         }
-                        onRename={onOpenRename}
+                        onRename={openRenameDialog}
                         onRegenThumb={handleRegenThumb}
                         getAuthors={(name) => getAuthors(currentPath, name)}
                         onAuthorClick={setAuthorFilter}

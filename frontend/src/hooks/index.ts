@@ -2,7 +2,6 @@ export { useWindowSize } from './useWindowSize';
 export { useReaderNavigation } from './useReaderNavigation';
 export { useBookImages } from './useBookImages';
 export { useImagePreloader } from './useImagePreloader';
-export { useLibraryManagement } from './useLibraryManagement';
 export { useLibraryPins } from './useLibraryPins';
 export { useSortedPdfs } from './useSortedPdfs';
 export { useDarkMode } from './useDarkMode';

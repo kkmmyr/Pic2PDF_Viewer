@@ -1,9 +1,5 @@
-/**
- * 書籍一覧 + シリーズ一覧を取得・キャッシュするフック。
- */
-import { useCallback, useEffect, useState } from 'react';
-
-import { fetchBooks, fetchSeries } from '../../features/novel_db/api';
+import { useEffect } from 'react';
+import { useNovelBooksStore } from '../../stores/novelBooksStore';
 import type { BookSummary, SeriesSummary } from '../../features/novel_db/types';
 
 export interface UseNovelDbBooks {
@@ -15,28 +11,16 @@ export interface UseNovelDbBooks {
 }
 
 export function useNovelDbBooks(): UseNovelDbBooks {
-    const [books, setBooks] = useState<BookSummary[]>([]);
-    const [series, setSeries] = useState<SeriesSummary[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const refetch = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const [b, s] = await Promise.all([fetchBooks(), fetchSeries()]);
-            setBooks(Array.isArray(b) ? b : []);
-            setSeries(Array.isArray(s) ? s : []);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+    const { books, series, isLoading, error, fetch } = useNovelBooksStore();
 
     useEffect(() => {
-        void refetch();
-    }, [refetch]);
+        // データ未取得かつ取得中でなければ初回フェッチ。
+        // 他コンポーネントが先にフェッチ中の場合は store の isLoading が true になっているためスキップ。
+        if (books.length === 0 && !isLoading) {
+            void fetch();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-    return { books, series, isLoading, error, refetch };
+    return { books, series, isLoading, error, refetch: fetch };
 }
