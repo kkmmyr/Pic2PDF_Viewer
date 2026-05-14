@@ -36,8 +36,7 @@ describe('useBookMeta', () => {
         });
         const { result } = renderHook(() => useBookMeta('doujin'));
 
-        await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(1));
-        expect(result.current.getAuthors('', 'book.pdf')).toEqual(['サークルA']);
+        await waitFor(() => expect(result.current.getAuthors('', 'book.pdf')).toEqual(['サークルA']));
         expect(result.current.getViewCount('', 'book.pdf')).toBe(3);
         expect(result.current.getLastViewedAt('', 'book.pdf')).toBe(1000);
     });

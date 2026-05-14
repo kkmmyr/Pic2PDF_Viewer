@@ -1,9 +1,11 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+    /** React 19: ref を通常 prop として受け取る（forwardRef 不要）。 */
+    ref?: Ref<HTMLButtonElement>;
     variant?: ButtonVariant;
     size?: ButtonSize;
     /** トグル ON 状態（secondary variant 専用）。gray-700 ベースで強調表示。 */
@@ -39,18 +41,16 @@ const BASE_CLASS =
     'inline-flex items-center justify-center rounded-md font-medium ' +
     'transition-colors disabled:cursor-not-allowed';
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-    {
-        variant = 'primary',
-        size = 'md',
-        active = false,
-        className = '',
-        children,
-        type = 'button',
-        ...rest
-    },
+export function Button({
     ref,
-) {
+    variant = 'primary',
+    size = 'md',
+    active = false,
+    className = '',
+    children,
+    type = 'button',
+    ...rest
+}: ButtonProps) {
     const variantClass =
         active && variant === 'secondary' ? SECONDARY_ACTIVE_CLASS : VARIANT_CLASS[variant];
     const classes = `${BASE_CLASS} ${SIZE_CLASS[size]} ${variantClass} ${className}`.trim();
@@ -59,4 +59,4 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
             {children}
         </button>
     );
-});
+}
