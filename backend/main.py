@@ -36,6 +36,7 @@ from routers import (
 )
 from services.meta_db import init_db
 from services.novel_db.job_queue import job_queue
+from services.novel_db.migrations import upgrade_head
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -43,8 +44,9 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """起動時に meta_db の初期化・マイグレーションと job_queue worker を起動する。"""
+    """起動時に meta_db / novel_db の初期化・マイグレーションと job_queue worker を起動する。"""
     init_db()
+    upgrade_head()
     job_queue.start()
     try:
         yield

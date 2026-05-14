@@ -118,7 +118,8 @@ backend/
 └── services/
     └── novel_db/                    # 新規パッケージ
         ├── __init__.py
-        ├── schema.py                # SQLite スキーマ DDL
+        ├── schema.py                # SQLite スキーマ DDL（全カラム含む最新定義）
+        ├── migrations.py            # Alembic upgrade_head() ヘルパー（起動時呼び出し）
         ├── connection.py            # sqlite3 接続 + sqlite_vec.load()
         ├── extractor.py             # PyMuPDF blocks 抽出 + OCR subprocess インターフェース
         ├── ocr_worker.py            # yomitoku OCR ワーカー（common/ocr/venv で実行）
@@ -148,7 +149,7 @@ backend/scripts/                     # CLI 用ツール
 
 ## 4. データモデル（SQLite スキーマ）
 
-`services/novel_db/schema.py` に DDL を集約。マイグレーションは PoC では「破棄して再構築」で十分（履歴を保持したい場合は将来 alembic 等を導入）。
+`services/novel_db/schema.py` に DDL を集約。**Phase 66** で Alembic を導入済み（`backend/alembic/`）。`_ddl()` は常に全カラムを含む最新スキーマを返し、`init_schema(conn)` は `CREATE TABLE IF NOT EXISTS` で冪等に実行する。既存 DB へのカラム追加は Alembic revision が担い、起動時 `upgrade_head()` で自動適用される（失敗で起動中断）。
 
 ```sql
 -- 書籍メタ（DB 構築時に upsert）
