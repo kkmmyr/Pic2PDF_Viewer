@@ -48,6 +48,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
               ▼
 [FastAPI] routers/novel_db.py
               │
+              ├─→ services/novel_db/retrieval.py (検索・コンテキスト構築統合: hybrid_search デデュープ + full_book_mode + 書籍サマリ付与, Phase 55-3)
               ├─→ services/novel_db/search.py    (検索: FTS5 + ベクトル + RRF + 主要キャラ JOIN)
               ├─→ services/novel_db/llm.py       (Qwen SSE 呼び出し: 共通モジュール経由)
               ├─→ services/novel_db/library.py   (書籍一覧 + DB 状態)
@@ -123,9 +124,10 @@ backend/
         ├── chunker.py               # 句点境界チャンク（800 字 / overlap 50）
         ├── embedder.py              # Ollama bge-m3 ラッパー
         ├── character_extractor.py   # Ollama gemma4:e4b で主要登場人物を抽出
-        ├── contextualizer.py        # gemma4:e4b でチャンクごとの位置説明を生成（B-9）
+        ├── contextualizer.py        # gemma4:e4b でチャンクごとの位置説明を生成（B-9）。should_skip_context() を公開（Phase 55-2）
         ├── query_expander.py        # gemma4:e4b で QA 質問を 3 個の検索クエリに展開（B-11）
-        ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN + サマリ vec 検索
+        ├── retrieval.py             # post_qa / post_chat_session_start 共通の検索・コンテキスト構築（Phase 55-3: RetrievalResult + retrieve()）
+        ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN + サマリ vec 検索（Scope frozen=True / _resolve_book_names lru_cache, Phase 55-4）
         ├── llm.py                   # 共通 Qwen モジュール経由のストリーミング（薄いラッパ）
         ├── builder.py               # 1 冊の DB 構築フロー（再構築含む）
         ├── summarizer.py            # 1 冊の俯瞰サマリ生成（Qwen 1-shot、num_ctx=131072）
@@ -525,7 +527,7 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 
 **スキーマ**: `chunks.contextual_text TEXT`（NULL = 未生成または skip 対象）/ `chunks.contextual_generated_at TIMESTAMP`。
 
-**skip 条件**（2026-05-12 追加 / `_should_skip_context`）: 以下のチャンクは ctx 生成を省き `contextual_text = NULL` のまま保つ。検索 noise を防ぎ、`make_embedding_input` が text のみで embedding する経路に乗せる。
+**skip 条件**（2026-05-12 追加 / `should_skip_context`、Phase 55-2 でサービス層に移動・パブリック化）: 以下のチャンクは ctx 生成を省き `contextual_text = NULL` のまま保つ。検索 noise を防ぎ、`make_embedding_input` が text のみで embedding する経路に乗せる。
 - `chunks.char_count < NOVEL_DB_MIN_BODY_CHARS`（既定 300）— 章扉・目次・人物紹介などの薄いチャンク
 - `pages.page_no <= NOVEL_DB_BODY_PAGE_MARGIN` または `page_no > page_count - NOVEL_DB_BODY_PAGE_MARGIN`（既定 5）— 表紙・タイトルページ・あとがき・奥付などの余白ページ
 
