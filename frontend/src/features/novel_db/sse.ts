@@ -192,8 +192,8 @@ export async function streamChatSession(
 ): Promise<void> {
     const url =
         init.sessionId !== undefined
-            ? `${API_URL_CONFIG.BASE_URL}/api/novel_db/qa/sessions/${init.sessionId}/messages`
-            : `${API_URL_CONFIG.BASE_URL}/api/novel_db/qa/sessions`;
+            ? `${API_URL_CONFIG.BASE_URL}/api/novel_db/sessions/${init.sessionId}/messages`
+            : `${API_URL_CONFIG.BASE_URL}/api/novel_db/sessions`;
     const body =
         init.sessionId !== undefined
             ? { question: init.question }

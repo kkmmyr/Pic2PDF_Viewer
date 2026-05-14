@@ -67,7 +67,7 @@ def test_status_shows_only_full_build_jobs(client, db_initialized):
     # full_build ジョブ
     client.post("/api/novel/build/enqueue", json={"book_name": "花太郎", "all_books": False})
     # rebuild ジョブ（別エンドポイント）
-    client.post("/api/novel_db/rebuild", json={"type": "book", "target_id": "千の刀", "mode": "rebuild"})
+    client.post("/api/novel_db/builds", json={"type": "book", "target_id": "千の刀", "mode": "rebuild"})
 
     res = client.get("/api/novel/build/status")
     body = res.json()

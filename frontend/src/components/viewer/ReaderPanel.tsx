@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 
@@ -21,6 +21,9 @@ import { usePdfSearch } from '../../hooks/usePdfSearch';
 import { useReaderShortcuts } from '../../hooks/useReaderShortcuts';
 import { useReaderUIState } from '../../hooks/useReaderUIState';
 import { usePdfDocumentState } from '../../hooks/usePdfDocumentState';
+import { useRelatedBooksNavigation } from '../../hooks/useRelatedBooksNavigation';
+import { useReadProgressTracker } from '../../hooks/useReadProgressTracker';
+import { useVolumeNavigation } from '../../hooks/useVolumeNavigation';
 import { ReaderHeader, PageRenderer, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
 import { PageGridOverlay } from '../reader/PageGridOverlay';
@@ -100,33 +103,20 @@ export function ReaderPanel({
     const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } =
         useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
-
     const { toasts, showToast, dismissToast } = useToast();
 
-    // 「次の巻へ」用に書籍メタデータを参照する。
-    // 同 series_id で series_index が現在より大きい中で最小のものを次巻とする。
-    // 判定範囲は同フォルダ内のみ（meta のキー prefix で path 一致をチェック）。
     const { meta, getSeries, recordView, getReadState, setReadState } = useBookMeta(currentSource);
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const relatedBooks = useRelatedBooks(meta, currentPath, selectedPdf);
 
-    // 関連書籍ページ（最終ページの次の仮想ページ）に居るかどうか。
-    // 最終ページから next で true、関連書籍ページで prev で false、本切替で false。
-    const [isOnRelatedPage, setIsOnRelatedPage] = useState(false);
-
-    const handleNextAtEnd = useCallback(() => {
-        // 末尾で次へ送られたら関連書籍ページに切替（候補が 1 件以上ある場合のみ）
-        if (relatedBooks.series.length === 0 && relatedBooks.authors.length === 0) return;
-        if (!onSelectPdf) return;
-        setIsOnRelatedPage(true);
-    }, [relatedBooks, onSelectPdf]);
-
-    const handlePrevIntercept = useCallback(() => {
-        if (!isOnRelatedPage) return false;
-        setIsOnRelatedPage(false);
-        return true;
-    }, [isOnRelatedPage]);
+    const {
+        isOnRelatedPage,
+        setIsOnRelatedPage,
+        handleNextAtEnd,
+        handlePrevIntercept,
+        handleSelectRelated,
+    } = useRelatedBooksNavigation({ relatedBooks, onSelectPdf, recordView, currentPath });
 
     const { pageNumber, setPageNumber, handleNext, handlePrev, resetPage } = useReaderNavigation({
         numPages,
@@ -137,52 +127,25 @@ export function ReaderPanel({
         onPrevIntercept: handlePrevIntercept,
     });
 
-    const handleSelectRelated = useCallback(
-        (name: string) => {
-            if (!onSelectPdf) return;
-            recordView(currentPath, name);
-            onSelectPdf(name);
-        },
-        [onSelectPdf, recordView, currentPath],
-    );
+    const { handleNavigateNextVolume, handleNavigatePrevVolume } = useVolumeNavigation({
+        nextVolume,
+        prevVolume,
+        onSelectPdf,
+        recordView,
+        currentPath,
+    });
 
     // 最終ページ/最終スプレッド到達判定。numPages が未確定（0）なら表示しない。
     const isAtLastSpread =
         numPages > 0 && (isSpread ? pageNumber + 1 >= numPages : pageNumber >= numPages);
 
-    // 最終ページ到達時に read_state='done' を 1 度だけ立てる。
-    // 多重発火（再描画・状態切替）を useRef で抑止し、selectedPdf 切替時にリセット。
-    const doneSentForRef = useRef<string | null>(null);
-    useEffect(() => {
-        if (!isAtLastSpread) return;
-        if (doneSentForRef.current === selectedPdf) return;
-        if (getReadState(currentPath, selectedPdf) === 'done') {
-            doneSentForRef.current = selectedPdf;
-            return;
-        }
-        doneSentForRef.current = selectedPdf;
-        setReadState(currentPath, [selectedPdf], 'done').catch(() => {
-            // PATCH 失敗時はガードを外し次回再試行可能にする
-            doneSentForRef.current = null;
-        });
-    }, [isAtLastSpread, selectedPdf, currentPath, getReadState, setReadState]);
-
-    useEffect(() => {
-        // 別書籍を開いたらガードをリセット
-        doneSentForRef.current = null;
-    }, [selectedPdf]);
-
-    const handleNavigateNextVolume = useCallback(() => {
-        if (!nextVolume || !onSelectPdf) return;
-        recordView(currentPath, nextVolume.name);
-        onSelectPdf(nextVolume.name);
-    }, [nextVolume, onSelectPdf, recordView, currentPath]);
-
-    const handleNavigatePrevVolume = useCallback(() => {
-        if (!prevVolume || !onSelectPdf) return;
-        recordView(currentPath, prevVolume.name);
-        onSelectPdf(prevVolume.name);
-    }, [prevVolume, onSelectPdf, recordView, currentPath]);
+    useReadProgressTracker({
+        selectedPdf,
+        currentPath,
+        isAtLastSpread,
+        getReadState,
+        setReadState,
+    });
 
     const {
         isEditMode,
@@ -207,7 +170,6 @@ export function ReaderPanel({
         showError: (msg) => showToast(msg, 'error'),
     });
 
-    // PDF 内テキスト検索
     const {
         searchText,
         setSearchText,
@@ -220,7 +182,6 @@ export function ReaderPanel({
         onDocumentLoaded,
     } = usePdfSearch({ isSearchOpen, setPageNumber });
 
-    // キーボードショートカット（Ctrl+F / f / e / ?）を集約
     useReaderShortcuts({
         isActive: true,
         onToggleFullscreen: toggleFullscreen,
@@ -236,7 +197,6 @@ export function ReaderPanel({
         closeSearchState();
     }, [closeSearch, closeSearchState]);
 
-    // プリロード (3ページ先読み)
     useImagePreloader(imageUrls, pageNumber - 1, 3);
 
     useEffect(() => {
@@ -250,7 +210,7 @@ export function ReaderPanel({
         handleCloseSearch();
         resetPage();
         setIsOnRelatedPage(false);
-    }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread, resetNumPages]);
+    }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread, resetNumPages, setIsOnRelatedPage]);
 
     // ページペア切替時に Auto 見開き判定をリセット。直後に PageRenderer の onRenderSuccess
     // で左右両ページの寸法が通知され、片方でも横長なら 1 ページ表示に確定する。
@@ -300,7 +260,6 @@ export function ReaderPanel({
         const p1 = pageNumber;
         const p2 = pageNumber + 1;
         if (direction === 'rtl') {
-            // RTL: 1ページ目（表紙）は単独表示。2ページ目を両スプレッドに出さないため
             if (pageNumber === 1) return <>{renderPageItem(p1, 'single')}</>;
             return (
                 <>
@@ -321,7 +280,6 @@ export function ReaderPanel({
         STATIC_PATHS.PDF(currentPath, selectedPdf, currentSource, pdfVersion),
     );
 
-    // 検索バーが開いている分だけコンテンツを下げるオフセット
     const contentTopOffset = isSearchOpen ? 'pt-10' : '';
 
     return (

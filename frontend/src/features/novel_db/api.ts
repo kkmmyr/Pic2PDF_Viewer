@@ -96,15 +96,15 @@ export interface RebuildEnqueueRequest {
 }
 
 export function postRebuild(req: RebuildEnqueueRequest): Promise<RebuildEnqueueResponse> {
-    return apiClient.post<unknown, RebuildEnqueueResponse>(`${PREFIX}/rebuild`, req);
+    return apiClient.post<unknown, RebuildEnqueueResponse>(`${PREFIX}/builds`, req);
 }
 
 export function fetchRebuildStatus(): Promise<RebuildStatus> {
-    return apiClient.get<unknown, RebuildStatus>(`${PREFIX}/rebuild/status`);
+    return apiClient.get<unknown, RebuildStatus>(`${PREFIX}/builds/status`);
 }
 
 export function cancelRebuild(jobId: number): Promise<void> {
-    return apiClient.delete<unknown, void>(`${PREFIX}/rebuild/${jobId}`);
+    return apiClient.delete<unknown, void>(`${PREFIX}/builds/${jobId}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,21 +128,21 @@ export function fetchCharacterDetail(bookName: string, charName: string): Promis
 // ---------------------------------------------------------------------------
 
 export function fetchChatSessions(offset = 0, limit = 20): Promise<ChatSessionSummary[]> {
-    return apiClient.get<unknown, ChatSessionSummary[]>(`${PREFIX}/qa/sessions`, {
+    return apiClient.get<unknown, ChatSessionSummary[]>(`${PREFIX}/sessions`, {
         params: { offset, limit },
     });
 }
 
 export function fetchChatSessionDetail(sessionId: number): Promise<ChatSessionDetail> {
-    return apiClient.get<unknown, ChatSessionDetail>(`${PREFIX}/qa/sessions/${sessionId}`);
+    return apiClient.get<unknown, ChatSessionDetail>(`${PREFIX}/sessions/${sessionId}`);
 }
 
 export function deleteChatSession(sessionId: number): Promise<void> {
-    return apiClient.delete<unknown, void>(`${PREFIX}/qa/sessions/${sessionId}`);
+    return apiClient.delete<unknown, void>(`${PREFIX}/sessions/${sessionId}`);
 }
 
 export function patchChatSessionTitle(sessionId: number, title: string): Promise<void> {
-    return apiClient.patch<unknown, void>(`${PREFIX}/qa/sessions/${sessionId}/title`, { title });
+    return apiClient.patch<unknown, void>(`${PREFIX}/sessions/${sessionId}/title`, { title });
 }
 
 // ---------------------------------------------------------------------------
@@ -166,9 +166,7 @@ export function reorderNovelSeries(seriesId: string, names: string[]): Promise<v
 // ---------------------------------------------------------------------------
 
 export function fetchBookDetail(bookName: string): Promise<BookDetail> {
-    return apiClient.get<unknown, BookDetail>(
-        `${PREFIX}/books/${encodeURIComponent(bookName)}/detail`,
-    );
+    return apiClient.get<unknown, BookDetail>(`${PREFIX}/books/${encodeURIComponent(bookName)}`);
 }
 
 export function fetchDiscussionHistory(bookName: string): Promise<DiscussionHistoryItem[]> {

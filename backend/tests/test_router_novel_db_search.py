@@ -142,7 +142,7 @@ async def _stub_stream_qa_raises(prompt, **kwargs):
 
 
 def test_post_qa_streams_tokens_and_saves_history(client, search_setup, monkeypatch):
-    from routers import novel_db as router_mod
+    from routers.novel_db import qa as router_mod
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
 
     with client.stream(
@@ -211,7 +211,7 @@ def test_get_qa_history_empty_initially(client, search_setup):
 
 
 def test_get_qa_history_after_qa_call(client, search_setup, monkeypatch):
-    from routers import novel_db as router_mod
+    from routers.novel_db import qa as router_mod
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
 
     with client.stream(
@@ -237,7 +237,7 @@ def test_get_qa_history_detail_returns_404(client, search_setup):
 
 
 def test_delete_qa_history_returns_204(client, search_setup, monkeypatch):
-    from routers import novel_db as router_mod
+    from routers.novel_db import qa as router_mod
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
 
     # 1 件作る
@@ -269,7 +269,7 @@ def test_delete_qa_history_returns_404_for_missing(client, search_setup):
 
 def _make_qa(client, monkeypatch, question: str, scope: dict) -> int:
     """QA を 1 件作成して history_id を返すヘルパー。"""
-    from routers import novel_db as router_mod
+    from routers.novel_db import qa as router_mod
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
     history_id = None
     with client.stream("POST", "/api/novel_db/qa", json={"question": question, "scope": scope}) as resp:

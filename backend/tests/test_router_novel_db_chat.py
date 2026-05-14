@@ -24,7 +24,7 @@ def db_initialized(tmp_data_dir):
 # ---------------------------------------------------------------------------
 
 def test_get_sessions_returns_empty_when_none(client, db_initialized):
-    res = client.get("/api/novel_db/qa/sessions")
+    res = client.get("/api/novel_db/sessions")
     assert res.status_code == 200
     assert res.json() == []
 
@@ -35,7 +35,7 @@ def test_get_sessions_returns_meta_with_message_count(client, db_initialized):
         append_message(conn, sid, role="user", content="Q")
         append_message(conn, sid, role="assistant", content="A")
 
-    res = client.get("/api/novel_db/qa/sessions")
+    res = client.get("/api/novel_db/sessions")
     assert res.status_code == 200
     body = res.json()
     assert len(body) == 1
@@ -54,7 +54,7 @@ def test_get_session_detail_excludes_system_messages(client, db_initialized):
         append_message(conn, sid, role="user", content="Q1")
         append_message(conn, sid, role="assistant", content="A1")
 
-    res = client.get(f"/api/novel_db/qa/sessions/{sid}")
+    res = client.get(f"/api/novel_db/sessions/{sid}")
     assert res.status_code == 200
     body = res.json()
     roles = [m["role"] for m in body["messages"]]
@@ -62,21 +62,21 @@ def test_get_session_detail_excludes_system_messages(client, db_initialized):
 
 
 def test_get_session_detail_404_for_missing(client, db_initialized):
-    res = client.get("/api/novel_db/qa/sessions/9999")
+    res = client.get("/api/novel_db/sessions/9999")
     assert res.status_code == 404
 
 
 def test_delete_session_returns_204(client, db_initialized):
     with with_db() as conn:
         sid = create_session(conn, Scope(type="all", id=None))
-    res = client.delete(f"/api/novel_db/qa/sessions/{sid}")
+    res = client.delete(f"/api/novel_db/sessions/{sid}")
     assert res.status_code == 204
     # 削除後の取得は 404
-    assert client.get(f"/api/novel_db/qa/sessions/{sid}").status_code == 404
+    assert client.get(f"/api/novel_db/sessions/{sid}").status_code == 404
 
 
 def test_delete_session_404_for_missing(client, db_initialized):
-    res = client.delete("/api/novel_db/qa/sessions/9999")
+    res = client.delete("/api/novel_db/sessions/9999")
     assert res.status_code == 404
 
 
@@ -88,10 +88,10 @@ def test_patch_title_updates(client, db_initialized):
     with with_db() as conn:
         sid = create_session(conn, Scope(type="all", id=None), title="old")
     res = client.patch(
-        f"/api/novel_db/qa/sessions/{sid}/title", json={"title": "new"},
+        f"/api/novel_db/sessions/{sid}/title", json={"title": "new"},
     )
     assert res.status_code == 204
-    detail = client.get(f"/api/novel_db/qa/sessions/{sid}").json()
+    detail = client.get(f"/api/novel_db/sessions/{sid}").json()
     assert detail["title"] == "new"
 
 
@@ -99,7 +99,7 @@ def test_patch_title_rejects_empty(client, db_initialized):
     with with_db() as conn:
         sid = create_session(conn, Scope(type="all", id=None))
     res = client.patch(
-        f"/api/novel_db/qa/sessions/{sid}/title", json={"title": "   "},
+        f"/api/novel_db/sessions/{sid}/title", json={"title": "   "},
     )
     assert res.status_code == 422
 
@@ -133,10 +133,10 @@ def test_post_chat_session_start_creates_session_and_appends_assistant(
     monkeypatch.setattr(
         "services.novel_db.retrieval.load_summaries_for_books", lambda *a, **kw: {},
     )
-    monkeypatch.setattr("routers.novel_db.stream_chat", _fake_stream_chat)
+    monkeypatch.setattr("routers.novel_db.chat.stream_chat", _fake_stream_chat)
 
     res = client.post(
-        "/api/novel_db/qa/sessions",
+        "/api/novel_db/sessions",
         json={"scope": {"type": "all", "id": None}, "question": "テスト質問"},
     )
     assert res.status_code == 200
@@ -166,10 +166,10 @@ def test_post_chat_session_message_appends_user_and_assistant(
         append_message(conn, sid, role="user", content="Q1")
         append_message(conn, sid, role="assistant", content="A1")
 
-    monkeypatch.setattr("routers.novel_db.stream_chat", _fake_stream_chat)
+    monkeypatch.setattr("routers.novel_db.chat.stream_chat", _fake_stream_chat)
 
     res = client.post(
-        f"/api/novel_db/qa/sessions/{sid}/messages",
+        f"/api/novel_db/sessions/{sid}/messages",
         json={"question": "深掘り Q2"},
     )
     assert res.status_code == 200
@@ -186,9 +186,9 @@ def test_post_chat_session_message_appends_user_and_assistant(
 
 
 def test_post_chat_session_message_404_for_missing(client, db_initialized, monkeypatch):
-    monkeypatch.setattr("routers.novel_db.stream_chat", _fake_stream_chat)
+    monkeypatch.setattr("routers.novel_db.chat.stream_chat", _fake_stream_chat)
     res = client.post(
-        "/api/novel_db/qa/sessions/9999/messages",
+        "/api/novel_db/sessions/9999/messages",
         json={"question": "x"},
     )
     assert res.status_code == 404

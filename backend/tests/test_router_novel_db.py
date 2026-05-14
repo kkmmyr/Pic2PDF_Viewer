@@ -39,7 +39,7 @@ def test_get_series_empty_when_no_series_assigned(client, db_initialized):
 
 def test_post_rebuild_book_enqueues_and_returns_job_id(client, db_initialized):
     res = client.post(
-        "/api/novel_db/rebuild",
+        "/api/novel_db/builds",
         json={"type": "book", "target_id": "book-1"},
     )
     assert res.status_code == 200
@@ -49,26 +49,26 @@ def test_post_rebuild_book_enqueues_and_returns_job_id(client, db_initialized):
 
 
 def test_post_rebuild_all_does_not_require_target_id(client, db_initialized):
-    res = client.post("/api/novel_db/rebuild", json={"type": "all"})
+    res = client.post("/api/novel_db/builds", json={"type": "all"})
     assert res.status_code == 200
     assert res.json()["job_id"] > 0
 
 
 def test_post_rebuild_book_requires_target_id(client, db_initialized):
-    res = client.post("/api/novel_db/rebuild", json={"type": "book"})
+    res = client.post("/api/novel_db/builds", json={"type": "book"})
     assert res.status_code == 422
     assert "target_id" in res.json()["detail"].lower()
 
 
 def test_post_rebuild_series_requires_target_id(client, db_initialized):
-    res = client.post("/api/novel_db/rebuild", json={"type": "series"})
+    res = client.post("/api/novel_db/builds", json={"type": "series"})
     assert res.status_code == 422
 
 
 def test_post_rebuild_accepts_ocr_mode(client, db_initialized):
     """mode='ocr' はキューに登録されること（§4.2）。"""
     res = client.post(
-        "/api/novel_db/rebuild",
+        "/api/novel_db/builds",
         json={"type": "book", "target_id": "book-1", "mode": "ocr"},
     )
     assert res.status_code == 200
@@ -77,14 +77,14 @@ def test_post_rebuild_accepts_ocr_mode(client, db_initialized):
 
 def test_post_rebuild_rejects_invalid_type(client, db_initialized):
     res = client.post(
-        "/api/novel_db/rebuild",
+        "/api/novel_db/builds",
         json={"type": "invalid", "target_id": "x"},
     )
     assert res.status_code == 422
 
 
 def test_get_rebuild_status_returns_empty_initially(client, db_initialized):
-    res = client.get("/api/novel_db/rebuild/status")
+    res = client.get("/api/novel_db/builds/status")
     assert res.status_code == 200
     body = res.json()
     assert body["is_running"] is False
@@ -95,12 +95,12 @@ def test_get_rebuild_status_returns_empty_initially(client, db_initialized):
 
 def test_get_rebuild_status_after_enqueue(client, db_initialized):
     enq = client.post(
-        "/api/novel_db/rebuild",
+        "/api/novel_db/builds",
         json={"type": "book", "target_id": "book-1"},
     )
     job_id = enq.json()["job_id"]
 
-    res = client.get("/api/novel_db/rebuild/status")
+    res = client.get("/api/novel_db/builds/status")
     assert res.status_code == 200
     body = res.json()
     assert body["is_running"] is False
@@ -110,26 +110,26 @@ def test_get_rebuild_status_after_enqueue(client, db_initialized):
 
 def test_delete_rebuild_cancels_queued_job(client, db_initialized):
     enq = client.post(
-        "/api/novel_db/rebuild",
+        "/api/novel_db/builds",
         json={"type": "book", "target_id": "book-1"},
     )
     job_id = enq.json()["job_id"]
 
-    res = client.delete(f"/api/novel_db/rebuild/{job_id}")
+    res = client.delete(f"/api/novel_db/builds/{job_id}")
     assert res.status_code == 204
 
-    status = client.get("/api/novel_db/rebuild/status").json()
+    status = client.get("/api/novel_db/builds/status").json()
     assert status["queued_jobs"] == []
 
 
 def test_delete_rebuild_returns_404_for_unknown_id(client, db_initialized):
-    res = client.delete("/api/novel_db/rebuild/99999")
+    res = client.delete("/api/novel_db/builds/99999")
     assert res.status_code == 404
 
 
 def test_delete_rebuild_returns_409_for_running_job(client, db_initialized):
     enq = client.post(
-        "/api/novel_db/rebuild",
+        "/api/novel_db/builds",
         json={"type": "book", "target_id": "book-1"},
     )
     job_id = enq.json()["job_id"]
@@ -143,5 +143,5 @@ def test_delete_rebuild_returns_409_for_running_job(client, db_initialized):
         )
         conn.commit()
 
-    res = client.delete(f"/api/novel_db/rebuild/{job_id}")
+    res = client.delete(f"/api/novel_db/builds/{job_id}")
     assert res.status_code == 409
