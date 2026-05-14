@@ -376,11 +376,11 @@ Qwen が識別した境界: `[13, 41, 74, 107]`（p74 = 「第三章 騎士と�
 
 ### 5.3. embedding（`embedder.py`）
 
-- Ollama API (`POST /api/embed`) を urllib で叩く
+- Ollama API (`POST /api/embed`) を httpx で叩く（Phase 63 にて urllib → httpx 移行）
 - モデル: `bge-m3`（1024 次元）
 - バッチサイズ: 16
 - タイムアウト: 180 秒
-- リトライ: 1 回（接続失敗時）
+- エラー: `httpx.HTTPError`（接続失敗・タイムアウト・4xx/5xx）を `EmbeddingError` に変換
 
 **GPU 配置ポリシー**: リクエストボディに `options.num_gpu = NOVEL_DB_EMBED_NUM_GPU`（既定 `0` = CPU 専用）を渡す。Full Build 実行中は llama-server（Qwen 35B, `-ngl 28`）が VRAM を約 10〜10.5 GB 占有するため、bge-m3 を CPU で動かすことで余裕を確保する。GPU で動かしたい場合は `NOVEL_DB_EMBED_NUM_GPU=99` を設定して uvicorn を再起動する。
 

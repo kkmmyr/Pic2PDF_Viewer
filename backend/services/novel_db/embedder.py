@@ -1,13 +1,11 @@
 """Ollama 経由で embedding を取得する（bge-m3, 1024 次元）。
 
-Ollama の `/api/embed` を urllib で叩くシンプルな実装。バッチサイズは呼び出し側で制御。
+Ollama の `/api/embed` を httpx で叩くシンプルな実装。バッチサイズは呼び出し側で制御。
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.3。
 """
 from __future__ import annotations
 
-import json
-import urllib.error
-import urllib.request
+import httpx
 
 from config import (
     NOVEL_DB_EMBED_DIM,
@@ -35,22 +33,20 @@ def embed_batch(
     """
     if not texts:
         return []
-    body = json.dumps({
-        "model": model,
-        "input": texts,
-        "options": {"num_gpu": NOVEL_DB_EMBED_NUM_GPU},
-    }).encode("utf-8")
-    req = urllib.request.Request(
-        f"{NOVEL_DB_OLLAMA_BASE_URL}/api/embed",
-        data=body,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except urllib.error.URLError as e:
+        response = httpx.post(
+            f"{NOVEL_DB_OLLAMA_BASE_URL}/api/embed",
+            json={
+                "model": model,
+                "input": texts,
+                "options": {"num_gpu": NOVEL_DB_EMBED_NUM_GPU},
+            },
+            timeout=timeout,
+        )
+        response.raise_for_status()
+    except httpx.HTTPError as e:
         raise EmbeddingError(f"Ollama embed API request failed: {e}") from e
+    data = response.json()
     embeddings = data.get("embeddings")
     if not isinstance(embeddings, list) or len(embeddings) != len(texts):
         raise EmbeddingError(
