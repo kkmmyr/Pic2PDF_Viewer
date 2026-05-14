@@ -49,3 +49,5 @@ frontend/public/site/
 
 # bench スクリプトの実行結果（環境依存・再現用なので管理しない）
 backend/scripts/results/
+
+experiments/.venv
