@@ -61,7 +61,9 @@ def get_chunks_table() -> lancedb.table.Table:
     try:
         return db.open_table("chunks")
     except Exception:
-        return db.create_table("chunks", schema=_CHUNKS_SCHEMA)
+        # schema-only 作成は Windows で manifest 書き込みエラーになるため
+        # 0 行の Arrow テーブルを data として渡してテーブルを初期化する
+        return db.create_table("chunks", data=_CHUNKS_SCHEMA.empty_table())
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +82,7 @@ def get_summaries_table() -> lancedb.table.Table:
     try:
         return db.open_table("summaries")
     except Exception:
-        return db.create_table("summaries", schema=_SUMMARIES_SCHEMA)
+        return db.create_table("summaries", data=_SUMMARIES_SCHEMA.empty_table())
 
 
 # ---------------------------------------------------------------------------
