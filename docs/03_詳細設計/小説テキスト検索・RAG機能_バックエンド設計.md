@@ -130,7 +130,8 @@ backend/
         ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN + サマリ vec 検索（Scope frozen=True / _resolve_book_names lru_cache, Phase 55-4）
         ├── llm.py                   # 共通 Qwen モジュール経由のストリーミング（薄いラッパ）
         ├── builder.py               # 1 冊の DB 構築フロー（再構築含む）
-        ├── summarizer.py            # 1 冊の俯瞰サマリ生成（Qwen 1-shot、num_ctx=131072）
+        ├── _prompts.py              # プロンプトテンプレート・LLM オプション・parse_combined_output — Phase 60 抽出
+        ├── summarizer.py            # 1 冊の俯瞰サマリ生成（Qwen 1-shot + map-reduce fallback）
         ├── job_queue.py             # 再構築ジョブの全体ロック + キュー API（NovelDbJobQueue）
         ├── job_worker.py            # ジョブ実行 worker スレッド（NovelDbJobWorker）— Phase 59 抽出
         └── library.py               # 書籍一覧取得・DB 状態問い合わせ
@@ -501,6 +502,8 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = "gemma4:e4b"   # 短答型タスクは軽量モデ
 | フォールバック（>200,000 字） | map: 各 ~20000 字チャンクを 400 字に / reduce: 統合して 1500 字に | map: `num_ctx=16384`, reduce: `num_ctx=16384` |
 
 実機検証で `num_ctx=131072` が **VRAM 12GB（RTX 5070）+ システム RAM 32GB の環境**で OOM なく動作することを確認（[小説RAG_技術知見.md §0 ハードウェア前提](../05_記録/小説RAG_技術知見.md)）。モデル本体（Q4_K_M、27GB）は VRAM に乗り切らず Ollama が約 61% を CPU 側にオフロードしているため、num_ctx 拡大による KV cache 増加も主にシステム RAM 側で吸収される。1 冊あたり 1.6 chars/token 換算で 113k 字 = ~71k tokens のため、131k ctx に余裕で収まる。
+
+**プロンプト管理（Phase 60）**: プロンプトテンプレート・LLM オプション・`parse_combined_output` は `_prompts.py` に一元化。`summarizer.py` はビジネスロジックのみ保持する。
 
 **スキーマ**: `books.summary TEXT`（NULL = 未生成）/ `books.summary_generated_at TIMESTAMP`。`update_book_summary()` 内で `book_summaries_vec`（B-8）への upsert も同時に行う。
 
