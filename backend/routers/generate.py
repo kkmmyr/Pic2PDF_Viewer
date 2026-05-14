@@ -5,8 +5,8 @@ GET  /generate/job/:id — ジョブ進捗を取得
 GET  /status           — ソースディレクトリの変換状態を一覧
 POST /batch_compress   — 既存 PDF を一括圧縮
 """
+import asyncio
 import os
-import threading
 from enum import StrEnum
 
 from fastapi import APIRouter, HTTPException
@@ -44,7 +44,7 @@ class GenerateRequest(BaseModel):
 
 
 def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
-    """Background thread: PDF generation job."""
+    """同期ワーカー: executor スレッドで PDF 生成ジョブを実行する。"""
     def progress_callback(item_name: str):
         job.update(current_item=item_name)
         logger.info("Processing: %s", item_name)
@@ -89,14 +89,18 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
         job.update(status=JobStatus.FAILED, current_item=None, error=str(e))
 
 
+async def _run_generate_job_async(job: GenerateJob, request: GenerateRequest) -> None:
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _run_generate_job, job, request)
+
+
 @router.post("/generate")
-def generate_pdfs(request: GenerateRequest):
+async def generate_pdfs(request: GenerateRequest):
     if not os.path.isdir(request.source_dir):
         raise HTTPException(status_code=400, detail="Invalid directory path")
 
     job = job_store.create()
-    t = threading.Thread(target=_run_generate_job, args=(job, request), daemon=True)
-    t.start()
+    asyncio.create_task(_run_generate_job_async(job, request))
 
     return {"job_id": job.job_id, "status": "pending"}
 
