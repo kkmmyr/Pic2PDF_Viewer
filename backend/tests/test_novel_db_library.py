@@ -1,10 +1,9 @@
 """services/novel_db/library.py の単体テスト。"""
-import json
 from pathlib import Path
 
 import pytest
 
-from services.meta_store import meta_path
+from services.meta_store import save_meta
 from services.novel_db import init_schema, with_db
 from services.novel_db.library import list_books, list_series
 
@@ -24,11 +23,8 @@ def _put_image_dir(tmp_data_dir, name: str) -> None:
 
 
 def _put_meta(meta_data: dict) -> None:
-    """data/meta/novel/meta.json に書き込む。"""
-    path = meta_path("novel")
-    Path(path).parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(meta_data, f, ensure_ascii=False)
+    """novel ソースのメタデータを DB に書き込む。"""
+    save_meta("novel", meta_data)
 
 
 def _insert_indexed_book(conn, name: str, page_count: int = 100) -> int:

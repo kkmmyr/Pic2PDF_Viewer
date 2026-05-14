@@ -34,6 +34,7 @@ from routers import (
     series,
     thumbnails,
 )
+from services.meta_db import init_db
 from services.novel_db.job_queue import job_queue
 from utils.logger import get_logger
 
@@ -42,7 +43,8 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """起動時に novel_db の job_queue worker を起動、停止時に join する。"""
+    """起動時に meta_db の初期化・マイグレーションと job_queue worker を起動する。"""
+    init_db()
     job_queue.start()
     try:
         yield

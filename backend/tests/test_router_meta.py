@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.meta の追補ユニットテスト。
 
 `test_meta.py` でカバーされていない以下を検証する:
@@ -10,21 +10,11 @@ routers.meta の追補ユニットテスト。
     cd backend
     uv run pytest tests/test_router_meta.py -v
 """
-import json
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from services.meta_store import load_meta, save_meta
 
 
-def _seed_meta(tmp_data_dir, source: str, data: dict) -> str:
-    """meta.json を書き込み、そのパスを返す。"""
-    meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", source)
-    os.makedirs(meta_dir, exist_ok=True)
-    path = os.path.join(meta_dir, "meta.json")
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-    return path
+def _seed_meta(source: str, data: dict) -> None:
+    save_meta(source, data)
 
 
 # ---------------------------------------------------------------------------
@@ -33,7 +23,7 @@ def _seed_meta(tmp_data_dir, source: str, data: dict) -> str:
 
 class TestGetMeta:
     def test_returns_full_meta(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "doujin", {
+        _seed_meta("doujin", {
             "a.pdf": {"authors": ["A"]},
             "b.pdf": {"authors": ["B"], "genre": "G"},
         })
@@ -60,7 +50,7 @@ class TestGetMeta:
 
 class TestExportMeta:
     def test_returns_json_with_attachment_header(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "doujin", {"a.pdf": {"authors": ["X"]}})
+        _seed_meta("doujin", {"a.pdf": {"authors": ["X"]}})
 
         res = client.get("/api/meta/export?source=doujin")
         assert res.status_code == 200
@@ -86,7 +76,7 @@ class TestExportMeta:
 
 class TestUpdateMetaGenre:
     def test_set_genre(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "doujin", {"a.pdf": {"authors": ["X"]}})
+        _seed_meta("doujin", {"a.pdf": {"authors": ["X"]}})
 
         res = client.patch("/api/meta", json={
             "path": "",
@@ -96,14 +86,12 @@ class TestUpdateMetaGenre:
         })
         assert res.status_code == 200
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
-        with open(path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("doujin")
         assert meta["a.pdf"]["genre"] == "プリンセスコネクト"
         assert meta["a.pdf"]["authors"] == ["X"]
 
     def test_genre_empty_string_removes_field(self, client, tmp_data_dir):
-        _seed_meta(tmp_data_dir, "doujin", {"a.pdf": {"genre": "X", "authors": ["A"]}})
+        _seed_meta("doujin", {"a.pdf": {"genre": "X", "authors": ["A"]}})
 
         client.patch("/api/meta", json={
             "path": "",
@@ -112,9 +100,7 @@ class TestUpdateMetaGenre:
             "source": "doujin",
         })
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
-        with open(path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("doujin")
         assert "genre" not in meta["a.pdf"]
         assert meta["a.pdf"]["authors"] == ["A"]
 
@@ -122,7 +108,7 @@ class TestUpdateMetaGenre:
 class TestUpdateMetaEntryDeletion:
     def test_empty_lists_remove_entry(self, client, tmp_data_dir):
         """authors=[] で他に意味のあるフィールドが無ければエントリ自体が消える。"""
-        _seed_meta(tmp_data_dir, "doujin", {
+        _seed_meta("doujin", {
             "victim.pdf": {"authors": ["A"]},
             "alive.pdf": {"authors": ["B"]},
         })
@@ -134,15 +120,13 @@ class TestUpdateMetaEntryDeletion:
             "source": "doujin",
         })
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
-        with open(path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("doujin")
         assert "victim.pdf" not in meta
         assert "alive.pdf" in meta
 
     def test_empty_lists_keep_entry_with_view_count(self, client, tmp_data_dir):
         """view_count 等 list 以外の意味のあるフィールドが残っていればエントリは保持される。"""
-        _seed_meta(tmp_data_dir, "doujin", {
+        _seed_meta("doujin", {
             "book.pdf": {"authors": ["A"], "view_count": 5, "last_viewed_at": 1700000000.0},
         })
 
@@ -153,9 +137,7 @@ class TestUpdateMetaEntryDeletion:
             "source": "doujin",
         })
 
-        path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
-        with open(path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("doujin")
         assert meta["book.pdf"]["view_count"] == 5
         assert meta["book.pdf"]["last_viewed_at"] == 1700000000.0
         assert meta["book.pdf"]["authors"] == []
@@ -167,5 +149,3 @@ class TestUpdateMetaEntryDeletion:
             "source": "doujin",
         })
         assert res.status_code == 400
-
-

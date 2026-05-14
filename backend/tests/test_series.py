@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.series（手動編集 API）のユニットテスト。
 
 `POST /api/series/assign` / `POST /api/series/unassign` / `POST /api/series/reorder`
@@ -8,13 +8,9 @@ routers.series（手動編集 API）のユニットテスト。
     cd backend
     uv run pytest tests/test_series.py -v
 """
-import json
-import os
-import sys
-
 import pytest
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from services.meta_store import load_meta
 
 
 # ---------------------------------------------------------------------------
@@ -23,21 +19,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 @pytest.fixture
 def series_client(tmp_path, monkeypatch):
-    """assign / unassign を検証する TestClient。`meta_store.DATA_DIR` を tmp_path に。"""
+    """assign / unassign を検証する TestClient。`meta_db.DATA_DIR` を tmp_path に。"""
     from fastapi.testclient import TestClient
-    monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
     from main import app
-    return TestClient(app), tmp_path
+    return TestClient(app)
 
 
-def _read_meta_at(tmp_path, source: str = "doujin") -> dict:
-    p = tmp_path / "meta" / source / "meta.json"
-    return json.loads(p.read_text(encoding="utf-8"))
+def _read_meta(source: str = "doujin") -> dict:
+    return load_meta(source)
 
 
 class TestAssignSeries:
     def test_new_series_generates_id(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         # 先に authors を登録（series_id 自動生成のため）
         client.patch("/api/meta", json={
             "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "doujin",
@@ -51,13 +46,13 @@ class TestAssignSeries:
         assert body["updated_count"] == 1
         assert body["id"]  # 自動生成された
 
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["book.pdf"]["series_id"] == body["id"]
         assert meta["book.pdf"]["series_title"] == "テストシリーズ"
         assert meta["book.pdf"]["series_index"] == 1.0
 
     def test_existing_id_reused_for_multiple_books(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         client.patch("/api/meta", json={
             "path": "", "names": ["a.pdf", "b.pdf"], "authors": ["A"], "source": "doujin",
         })
@@ -75,14 +70,14 @@ class TestAssignSeries:
         assert res2.status_code == 200
         assert res2.json()["id"] == sid
 
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["a.pdf"]["series_id"] == sid
         assert meta["b.pdf"]["series_id"] == sid
         assert meta["a.pdf"]["series_index"] == 1.0
         assert meta["b.pdf"]["series_index"] == 2.0
 
     def test_assign_preserves_other_fields(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         client.patch("/api/meta", json={
             "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "doujin",
         })
@@ -94,13 +89,13 @@ class TestAssignSeries:
             "title": "S", "index": 2.5, "source": "doujin",
         })
 
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["book.pdf"]["authors"] == ["A"]
         assert meta["book.pdf"]["view_count"] == 1
         assert meta["book.pdf"]["series_index"] == 2.5
 
     def test_assign_supports_fractional_index(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         client.patch("/api/meta", json={
             "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "doujin",
         })
@@ -108,11 +103,11 @@ class TestAssignSeries:
             "path": "", "names": ["book.pdf"],
             "title": "Z", "index": 4.5, "source": "doujin",
         })
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["book.pdf"]["series_index"] == 4.5
 
     def test_assign_invalid_source_returns_400(self, series_client):
-        client, _ = series_client
+        client = series_client
         res = client.post("/api/series/assign", json={
             "path": "", "names": ["book.pdf"],
             "title": "X", "index": 1.0, "source": "invalid",
@@ -120,7 +115,7 @@ class TestAssignSeries:
         assert res.status_code == 400
 
     def test_assign_empty_title_returns_400(self, series_client):
-        client, _ = series_client
+        client = series_client
         res = client.post("/api/series/assign", json={
             "path": "", "names": ["book.pdf"],
             "title": "  ", "index": 1.0, "source": "doujin",
@@ -129,7 +124,7 @@ class TestAssignSeries:
 
     def test_assign_index_array_per_book(self, series_client):
         """index を配列で渡すと names[i] に index[i] が割り当てられる。"""
-        client, tmp_path = series_client
+        client = series_client
         client.patch("/api/meta", json={
             "path": "", "names": ["a.pdf", "b.pdf", "c.pdf"],
             "authors": ["A"], "source": "doujin",
@@ -140,7 +135,7 @@ class TestAssignSeries:
         })
         assert res.status_code == 200
         assert res.json()["updated_count"] == 3
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["a.pdf"]["series_index"] == 1.0
         assert meta["b.pdf"]["series_index"] == 2.0
         assert meta["c.pdf"]["series_index"] == 3.0
@@ -148,7 +143,7 @@ class TestAssignSeries:
         assert meta["a.pdf"]["series_id"] == meta["b.pdf"]["series_id"] == meta["c.pdf"]["series_id"]
 
     def test_assign_index_array_length_mismatch_returns_400(self, series_client):
-        client, _ = series_client
+        client = series_client
         res = client.post("/api/series/assign", json={
             "path": "", "names": ["a.pdf", "b.pdf"],
             "title": "Z", "index": [1.0, 2.0, 3.0], "source": "doujin",
@@ -157,7 +152,7 @@ class TestAssignSeries:
 
     def test_assign_index_scalar_still_applies_to_all(self, series_client):
         """後方互換: index が単一 number なら全 names に同じ巻数を割り当て。"""
-        client, tmp_path = series_client
+        client = series_client
         client.patch("/api/meta", json={
             "path": "", "names": ["a.pdf", "b.pdf"],
             "authors": ["A"], "source": "doujin",
@@ -167,14 +162,14 @@ class TestAssignSeries:
             "title": "Z", "index": 5.0, "source": "doujin",
         })
         assert res.status_code == 200
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["a.pdf"]["series_index"] == 5.0
         assert meta["b.pdf"]["series_index"] == 5.0
 
 
 class TestUnassignSeries:
     def test_unassign_removes_series_fields(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         client.patch("/api/meta", json={
             "path": "", "names": ["book.pdf"], "authors": ["A"], "source": "doujin",
         })
@@ -185,7 +180,7 @@ class TestUnassignSeries:
         client.post("/api/series/unassign", json={
             "path": "", "names": ["book.pdf"], "source": "doujin",
         })
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         # series_* は消えるが authors は残る
         assert "series_id" not in meta["book.pdf"]
         assert "series_title" not in meta["book.pdf"]
@@ -193,7 +188,7 @@ class TestUnassignSeries:
         assert meta["book.pdf"]["authors"] == ["A"]
 
     def test_unassign_no_existing_entry_is_noop(self, series_client):
-        client, _ = series_client
+        client = series_client
         # メタなし状態で unassign してもエラーにならない
         res = client.post("/api/series/unassign", json={
             "path": "", "names": ["nothere.pdf"], "source": "doujin",
@@ -216,7 +211,7 @@ class TestReorderSeries:
         return res.json()["id"]
 
     def test_reorder_renumbers_in_given_order(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         sid = self._setup_series(client, ["a.pdf", "b.pdf", "c.pdf"])
         res = client.post("/api/series/reorder", json={
             "path": "", "names": ["c.pdf", "a.pdf", "b.pdf"],
@@ -225,13 +220,13 @@ class TestReorderSeries:
         assert res.status_code == 200
         assert res.json()["updated_count"] == 3
 
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["c.pdf"]["series_index"] == 1.0
         assert meta["a.pdf"]["series_index"] == 2.0
         assert meta["b.pdf"]["series_index"] == 3.0
 
     def test_reorder_preserves_other_fields(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         sid = self._setup_series(client, ["a.pdf", "b.pdf"])
         client.post("/api/meta/view", json={
             "path": "", "name": "a.pdf", "source": "doujin",
@@ -240,14 +235,14 @@ class TestReorderSeries:
             "path": "", "names": ["b.pdf", "a.pdf"],
             "series_id": sid, "source": "doujin",
         })
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["a.pdf"]["authors"] == ["A"]
         assert meta["a.pdf"]["view_count"] == 1
         assert meta["a.pdf"]["series_id"] == sid
         assert meta["a.pdf"]["series_title"] == "S"
 
     def test_reorder_rejects_book_from_different_series(self, series_client):
-        client, tmp_path = series_client
+        client = series_client
         sid = self._setup_series(client, ["a.pdf", "b.pdf"])
         # 別シリーズの c.pdf を作成
         client.patch("/api/meta", json={
@@ -264,22 +259,20 @@ class TestReorderSeries:
         })
         assert res.status_code == 400
         # 失敗時は元の順序が保たれる（中途半端な書き込みなし）
-        meta = _read_meta_at(tmp_path)
+        meta = _read_meta()
         assert meta["a.pdf"]["series_index"] == 1.0
         assert meta["b.pdf"]["series_index"] == 2.0
 
     def test_reorder_empty_names_returns_400(self, series_client):
-        client, _ = series_client
+        client = series_client
         res = client.post("/api/series/reorder", json={
             "path": "", "names": [], "series_id": "x", "source": "doujin",
         })
         assert res.status_code == 400
 
     def test_reorder_invalid_source_returns_400(self, series_client):
-        client, _ = series_client
+        client = series_client
         res = client.post("/api/series/reorder", json={
             "path": "", "names": ["a.pdf"], "series_id": "x", "source": "invalid",
         })
         assert res.status_code == 400
-
-

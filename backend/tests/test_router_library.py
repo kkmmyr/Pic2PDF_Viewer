@@ -8,11 +8,9 @@ routers.library のユニットテスト。
     cd backend
     uv run pytest tests/test_router_library.py -v
 """
-import json
 import os
-import sys
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from services.meta_store import load_meta, save_meta
 
 
 # ---------------------------------------------------------------------------
@@ -204,11 +202,7 @@ class TestRename:
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "old.pdf"))
 
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "comic")
-        os.makedirs(meta_dir, exist_ok=True)
-        meta_path = os.path.join(meta_dir, "meta.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"old.pdf": {"authors": ["A"], "tags": ["t1"]}}, f)
+        save_meta("comic", {"old.pdf": {"authors": ["A"], "genre": "テスト"}})
 
         res = client.patch("/api/rename", json={
             "path": "",
@@ -219,22 +213,17 @@ class TestRename:
         })
         assert res.status_code == 200
 
-        with open(meta_path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("comic")
         assert "old.pdf" not in meta
         assert meta["new.pdf"]["authors"] == ["A"]
-        assert meta["new.pdf"]["tags"] == ["t1"]
+        assert meta["new.pdf"]["genre"] == "テスト"
 
     def test_rename_folder_updates_meta_prefix(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         os.makedirs(os.path.join(pdf_dir, "old_folder"))
         make_pdf(os.path.join(pdf_dir, "old_folder", "a.pdf"))
 
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "comic")
-        os.makedirs(meta_dir, exist_ok=True)
-        meta_path = os.path.join(meta_dir, "meta.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"old_folder/a.pdf": {"authors": ["X"]}}, f)
+        save_meta("comic", {"old_folder/a.pdf": {"authors": ["X"]}})
 
         res = client.patch("/api/rename", json={
             "path": "",
@@ -245,8 +234,7 @@ class TestRename:
         })
         assert res.status_code == 200
 
-        with open(meta_path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("comic")
         assert "old_folder/a.pdf" not in meta
         assert meta["new_folder/a.pdf"]["authors"] == ["X"]
 
@@ -320,11 +308,10 @@ class TestDeletePdfs:
         pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "doomed.pdf"))
 
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "comic")
-        os.makedirs(meta_dir, exist_ok=True)
-        meta_path = os.path.join(meta_dir, "meta.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump({"doomed.pdf": {"authors": ["X"]}, "alive.pdf": {"authors": ["Y"]}}, f)
+        save_meta("comic", {
+            "doomed.pdf": {"authors": ["X"]},
+            "alive.pdf": {"authors": ["Y"]},
+        })
 
         client.request(
             "DELETE",
@@ -332,8 +319,7 @@ class TestDeletePdfs:
             json={"names": ["doomed.pdf"], "path": "", "source": "comic"},
         )
 
-        with open(meta_path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("comic")
         assert "doomed.pdf" not in meta
         assert "alive.pdf" in meta
 

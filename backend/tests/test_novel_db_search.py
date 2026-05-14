@@ -1,10 +1,7 @@
 """services/novel_db/search.py の単体・統合テスト。"""
-import json
-from pathlib import Path
-
 import pytest
 
-from services.meta_store import meta_path
+from services.meta_store import save_meta
 from services.novel_db import init_schema, with_db
 from services.novel_db.lance_store import get_chunks_table
 from services.novel_db.search import (
@@ -88,16 +85,12 @@ class TestResolveBookNames:
         assert _resolve_book_names(Scope(type="series")) == []
 
     def test_series_resolves_via_meta(self, tmp_data_dir):
-        # meta.json をセット
         meta = {
             "book-a.pdf": {"series_id": "s1", "series_title": "S"},
             "book-b.pdf": {"series_id": "s1", "series_title": "S"},
             "book-c.pdf": {"series_id": "s2", "series_title": "T"},
         }
-        path = meta_path("novel")
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, ensure_ascii=False)
+        save_meta("novel", meta)
 
         result = _resolve_book_names(Scope(type="series", id="s1"))
         assert sorted(result) == ["book-a", "book-b"]

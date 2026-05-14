@@ -4,7 +4,8 @@
  * - 5 秒間隔で `/rebuild/status` をポーリング
  * - `running → !running` の遷移検知時に `onJobCompleted` を呼ぶ（書籍一覧 refetch 用）
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { cancelRebuild, fetchRebuildStatus, postRebuild } from '../../features/novel_db/api';
 import type { RebuildEnqueueRequest } from '../../features/novel_db/api';
@@ -20,59 +21,54 @@ export interface UseNovelDbRebuildJob {
     refresh: () => Promise<void>;
 }
 
+const QUERY_KEY = ['novelDbRebuildStatus'];
+
 export function useNovelDbRebuildJob(onJobCompleted?: () => void): UseNovelDbRebuildJob {
-    const [status, setStatus] = useState<RebuildStatus | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
     const lastIsRunningRef = useRef(false);
     const onCompletedRef = useRef(onJobCompleted);
+    useEffect(() => { onCompletedRef.current = onJobCompleted; }, [onJobCompleted]);
 
+    const { data: status, isLoading, error: queryError } = useQuery<RebuildStatus>({
+        queryKey: QUERY_KEY,
+        queryFn: fetchRebuildStatus,
+        refetchInterval: NOVEL_DB_CONFIG.REBUILD_POLL_INTERVAL_MS,
+        staleTime: 0,
+        gcTime: 30_000,
+        retry: false,
+    });
+
+    // Detect running → !running transition
     useEffect(() => {
-        onCompletedRef.current = onJobCompleted;
-    }, [onJobCompleted]);
+        if (!status) return;
+        if (lastIsRunningRef.current && !status.is_running) {
+            onCompletedRef.current?.();
+        }
+        lastIsRunningRef.current = status.is_running;
+    }, [status]);
+
+    const error = queryError instanceof Error ? queryError.message : null;
 
     const refresh = useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const s = await fetchRebuildStatus();
-            setStatus(s);
-            // running → !running の遷移を検知して通知
-            if (lastIsRunningRef.current && !s.is_running) {
-                onCompletedRef.current?.();
-            }
-            lastIsRunningRef.current = s.is_running;
-            setError(null);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        void refresh();
-        const id = setInterval(() => {
-            void refresh();
-        }, NOVEL_DB_CONFIG.REBUILD_POLL_INTERVAL_MS);
-        return () => clearInterval(id);
-    }, [refresh]);
+        await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    }, [queryClient]);
 
     const enqueue = useCallback(
         async (req: RebuildEnqueueRequest) => {
             const res = await postRebuild(req);
-            await refresh();
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
             return res;
         },
-        [refresh],
+        [queryClient],
     );
 
     const cancel = useCallback(
         async (jobId: number) => {
             await cancelRebuild(jobId);
-            await refresh();
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
         },
-        [refresh],
+        [queryClient],
     );
 
-    return { status, isLoading, error, enqueue, cancel, refresh };
+    return { status: status ?? null, isLoading, error, enqueue, cancel, refresh };
 }

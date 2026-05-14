@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.genres のユニットテスト。
 
 ジャンルリスト CRUD のフローを検証する。
@@ -7,18 +7,11 @@ routers.genres のユニットテスト。
     cd backend
     uv run pytest tests/test_router_genres.py -v
 """
-import json
-import os
-import sys
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+from services.genre_store import save_genres
 
 
-def _seed_genres(tmp_data_dir, source: str, genres: list[str]) -> None:
-    genres_dir = os.path.join(tmp_data_dir["DATA_DIR"], "genres")
-    os.makedirs(genres_dir, exist_ok=True)
-    with open(os.path.join(genres_dir, f"{source}.json"), "w", encoding="utf-8") as f:
-        json.dump(genres, f, ensure_ascii=False)
+def _seed_genres(source: str, genres: list[str]) -> None:
+    save_genres(source, genres)
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +20,7 @@ def _seed_genres(tmp_data_dir, source: str, genres: list[str]) -> None:
 
 class TestGetGenres:
     def test_returns_list(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A", "B"])
+        _seed_genres("doujin", ["A", "B"])
         res = client.get("/api/genres?source=doujin")
         assert res.status_code == 200
         assert res.json() == ["A", "B"]
@@ -48,13 +41,13 @@ class TestGetGenres:
 
 class TestAddGenre:
     def test_add_new_genre(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A"])
+        _seed_genres("doujin", ["A"])
         res = client.post("/api/genres", json={"source": "doujin", "name": "B"})
         assert res.status_code == 200
         assert res.json()["genres"] == ["A", "B"]
 
     def test_409_when_duplicate(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A"])
+        _seed_genres("doujin", ["A"])
         res = client.post("/api/genres", json={"source": "doujin", "name": "A"})
         assert res.status_code == 409
 
@@ -82,13 +75,13 @@ class TestAddGenre:
 
 class TestDeleteGenre:
     def test_delete_existing(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A", "B", "C"])
+        _seed_genres("doujin", ["A", "B", "C"])
         res = client.delete("/api/genres/B?source=doujin")
         assert res.status_code == 200
         assert res.json()["genres"] == ["A", "C"]
 
     def test_404_when_not_found(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A"])
+        _seed_genres("doujin", ["A"])
         res = client.delete("/api/genres/Z?source=doujin")
         assert res.status_code == 404
 
@@ -98,7 +91,7 @@ class TestDeleteGenre:
 
     def test_400_when_name_contains_path_traversal(self, client, tmp_data_dir):
         """ジャンル名に '..' が URL エンコードで埋め込まれた場合は 400 で拒否する。"""
-        _seed_genres(tmp_data_dir, "doujin", ["A"])
+        _seed_genres("doujin", ["A"])
         # %2E%2E = '..'
         res = client.delete("/api/genres/%2E%2E?source=doujin")
         assert res.status_code == 400
@@ -110,7 +103,7 @@ class TestDeleteGenre:
 
 class TestReorderGenres:
     def test_reorder_same_set(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A", "B", "C"])
+        _seed_genres("doujin", ["A", "B", "C"])
         res = client.patch("/api/genres/reorder", json={
             "source": "doujin",
             "genres": ["C", "A", "B"],
@@ -120,7 +113,7 @@ class TestReorderGenres:
 
     def test_400_when_set_mismatch(self, client, tmp_data_dir):
         """既存集合と一致しない（追加・削除がある）場合は 400。"""
-        _seed_genres(tmp_data_dir, "doujin", ["A", "B", "C"])
+        _seed_genres("doujin", ["A", "B", "C"])
         res = client.patch("/api/genres/reorder", json={
             "source": "doujin",
             "genres": ["A", "B"],  # C が欠けている
@@ -128,7 +121,7 @@ class TestReorderGenres:
         assert res.status_code == 400
 
     def test_400_when_extra_item(self, client, tmp_data_dir):
-        _seed_genres(tmp_data_dir, "doujin", ["A", "B"])
+        _seed_genres("doujin", ["A", "B"])
         res = client.patch("/api/genres/reorder", json={
             "source": "doujin",
             "genres": ["A", "B", "C"],  # 余分

@@ -194,23 +194,22 @@ class TestSuggestSeries:
 
 @pytest.fixture
 def suggest_client(tmp_path, monkeypatch):
-    """suggest_series_endpoint を検証する TestClient。`meta_store.DATA_DIR` を tmp_path に。"""
+    """suggest_series_endpoint を検証する TestClient。`meta_db.DATA_DIR` を tmp_path に。"""
     from fastapi.testclient import TestClient
-    monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
+    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
     from main import app
-    return TestClient(app), tmp_path
+    return TestClient(app)
 
 
-def _seed_meta(tmp_path, entries: dict, source: str = "doujin") -> None:
-    meta_dir = tmp_path / "meta" / source
-    meta_dir.mkdir(parents=True, exist_ok=True)
-    (meta_dir / "meta.json").write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
+def _seed_meta_db(entries: dict, source: str = "doujin") -> None:
+    from services.meta_store import save_meta
+    save_meta(source, entries)
 
 
 class TestSuggestSeriesEndpoint:
     def test_returns_candidates(self, suggest_client):
-        client, tmp_path = suggest_client
-        _seed_meta(tmp_path, {
+        client = suggest_client
+        _seed_meta_db({
             "鬼滅の刃 1.pdf": {
                 "authors": ["A"],
                 "series_id": "s1",
@@ -228,22 +227,22 @@ class TestSuggestSeriesEndpoint:
         assert body["candidates"][0]["series_id"] == "s1"
 
     def test_empty_names_returns_400(self, suggest_client):
-        client, _ = suggest_client
+        client = suggest_client
         res = client.post("/api/series/suggest", json={
             "path": "", "names": [], "source": "doujin",
         })
         assert res.status_code == 400
 
     def test_invalid_source_returns_400(self, suggest_client):
-        client, _ = suggest_client
+        client = suggest_client
         res = client.post("/api/series/suggest", json={
             "path": "", "names": ["a.pdf"], "source": "invalid",
         })
         assert res.status_code == 400
 
     def test_no_existing_series_returns_empty_list(self, suggest_client):
-        client, tmp_path = suggest_client
-        _seed_meta(tmp_path, {"book.pdf": {"authors": ["A"]}})
+        client = suggest_client
+        _seed_meta_db({"book.pdf": {"authors": ["A"]}})
         res = client.post("/api/series/suggest", json={
             "path": "", "names": ["other.pdf"], "source": "doujin",
         })

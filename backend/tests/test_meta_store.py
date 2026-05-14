@@ -1,19 +1,20 @@
-﻿"""
-services.meta_store の純関数ユニットテスト。
+"""
+services.meta_store の純関数ユニットテスト（Phase 64: SQLite バックエンド対応版）。
 
 `test_meta.py` は routers 経由の挙動を検証しているのに対し、
 このファイルは `merge_entry_fields` / `has_meaningful_value` /
 `update_meta_locked` を直接テストする。
 
+テスト時は DATA_DIR を tmp_path に向けることで meta.db を分離する。
+services.meta_db.DATA_DIR を monkeypatch することで DB パスが切り替わる。
+
 実行方法:
     cd backend
     uv run pytest tests/test_meta_store.py -v
 """
-import os
-import sys
 import threading
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+import pytest
 
 from services.meta_store import (
     has_meaningful_value,
@@ -22,6 +23,16 @@ from services.meta_store import (
     save_meta,
     update_meta_locked,
 )
+
+# ---------------------------------------------------------------------------
+# フィクスチャ: DATA_DIR を tmp_path に向け、DB を毎テストで分離する
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def isolate_db(tmp_path, monkeypatch):
+    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    yield
+
 
 # ---------------------------------------------------------------------------
 # merge_entry_fields
@@ -126,19 +137,14 @@ class TestHasMeaningfulValue:
 # ---------------------------------------------------------------------------
 
 class TestUpdateMetaLocked:
-    def test_basic_update(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-
+    def test_basic_update(self):
         update_meta_locked("doujin", lambda d: d.update({"book.pdf": {"authors": ["A"]}}))
 
         meta = load_meta("doujin")
         assert meta == {"book.pdf": {"authors": ["A"]}}
 
-    def test_concurrent_updates_no_lost_update(self, tmp_path, monkeypatch):
+    def test_concurrent_updates_no_lost_update(self):
         """10 スレッドで view_count を +1 ずつ → 最終値 10 になる（lost update が起きない）。"""
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-
-        # 初期値
         update_meta_locked("doujin", lambda d: d.update({"book.pdf": {"view_count": 0}}))
 
         def _increment():
@@ -156,10 +162,8 @@ class TestUpdateMetaLocked:
         meta = load_meta("doujin")
         assert meta["book.pdf"]["view_count"] == 10
 
-    def test_independent_locks_per_source(self, tmp_path, monkeypatch):
+    def test_independent_locks_per_source(self):
         """異なる source は独立して更新できる。"""
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-
         update_meta_locked("doujin", lambda d: d.update({"a.pdf": {"authors": ["A"]}}))
         update_meta_locked("comic", lambda d: d.update({"b.pdf": {"authors": ["B"]}}))
 
@@ -172,33 +176,44 @@ class TestUpdateMetaLocked:
 # ---------------------------------------------------------------------------
 
 class TestLoadSaveMeta:
-    def test_load_missing_returns_empty_dict(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
+    def test_load_missing_returns_empty_dict(self):
         assert load_meta("doujin") == {}
 
-    def test_load_invalid_json_returns_empty(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
-        meta_dir = tmp_path / "meta" / "doujin"
-        meta_dir.mkdir(parents=True)
-        (meta_dir / "meta.json").write_text("{ broken json", encoding="utf-8")
-
-        # 例外を投げず空 dict を返す
-        assert load_meta("doujin") == {}
-
-    def test_save_load_roundtrip(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
+    def test_save_load_roundtrip(self):
         data = {"book.pdf": {"authors": ["A"], "view_count": 3}}
         save_meta("doujin", data)
 
         loaded = load_meta("doujin")
         assert loaded == data
 
-    def test_save_preserves_non_ascii(self, tmp_path, monkeypatch):
-        monkeypatch.setattr("services.meta_store.DATA_DIR", str(tmp_path))
+    def test_save_preserves_non_ascii(self):
         data = {"本.pdf": {"authors": ["著者"], "genre": "オリジナル"}}
         save_meta("doujin", data)
 
-        # ファイル内容を直接確認（ensure_ascii=False で読める）
-        path = tmp_path / "meta" / "doujin" / "meta.json"
-        text = path.read_text(encoding="utf-8")
-        assert "著者" in text
+        loaded = load_meta("doujin")
+        assert loaded == data
+
+    def test_save_optional_fields_roundtrip(self):
+        """NotRequired フィールドが有り/無しどちらも正確に往復する。"""
+        data = {
+            "full.pdf": {
+                "authors": ["作者"],
+                "view_count": 5,
+                "last_viewed_at": 1700000000.0,
+                "hidden": True,
+                "genre": "ジャンル",
+                "read_state": "reading",
+                "series_id": "sid",
+                "series_title": "シリーズ",
+                "series_index": 1.5,
+                "volume": 2,
+                "publisher": "出版社",
+                "asin": "B000001",
+                "isbn": "978-4000000000",
+                "release_date": "2024-01-01",
+            },
+            "minimal.pdf": {"authors": []},
+        }
+        save_meta("novel", data)
+        loaded = load_meta("novel")
+        assert loaded == data

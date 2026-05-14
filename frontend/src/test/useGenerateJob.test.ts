@@ -1,4 +1,6 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../config/api_client', async () => {
@@ -29,19 +31,24 @@ const buildJob = (overrides: Partial<GenerateJob> = {}): GenerateJob => ({
     ...overrides,
 });
 
+const createWrapper = () => {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: 0, gcTime: 30_000 } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+};
+
 describe('useGenerateJob', () => {
     beforeEach(() => {
         mockedGet.mockReset();
         localStorage.clear();
-        vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
-    });
-
-    afterEach(() => {
-        vi.useRealTimers();
     });
 
     it('初期状態: localStorage が空なら currentJob=null', () => {
-        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()));
+        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
+            wrapper: createWrapper(),
+        });
         expect(result.current.currentJob).toBeNull();
         expect(result.current.isGenerating).toBe(false);
         expect(result.current.isRestoredJob).toBe(false);
@@ -49,7 +56,9 @@ describe('useGenerateJob', () => {
     });
 
     it('startJob で localStorage に保存され、currentJob が pending 状態になる', () => {
-        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()));
+        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
+            wrapper: createWrapper(),
+        });
         act(() => {
             result.current.startJob('jid-1', '/some/dir');
         });
@@ -66,7 +75,9 @@ describe('useGenerateJob', () => {
             STORAGE_KEY,
             JSON.stringify({ job_id: 'restored', sourceDir: '/restored/dir' }),
         );
-        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()));
+        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
+            wrapper: createWrapper(),
+        });
         expect(result.current.currentJob?.job_id).toBe('restored');
         expect(result.current.isGenerating).toBe(true);
         expect(result.current.isRestoredJob).toBe(true);
@@ -75,7 +86,9 @@ describe('useGenerateJob', () => {
 
     it('clearCurrentJob で localStorage と state が消える', () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ job_id: 'jid-1', sourceDir: '/x' }));
-        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()));
+        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
+            wrapper: createWrapper(),
+        });
         expect(result.current.currentJob).not.toBeNull();
 
         act(() => {
@@ -90,14 +103,11 @@ describe('useGenerateJob', () => {
         const onFailed = vi.fn();
         mockedGet.mockResolvedValue(buildJob({ status: 'completed', files: ['a.pdf'] }));
 
-        const { result } = renderHook(() => useGenerateJob(onCompleted, onFailed));
+        const { result } = renderHook(() => useGenerateJob(onCompleted, onFailed), {
+            wrapper: createWrapper(),
+        });
         act(() => {
             result.current.startJob('jid-1', '/x');
-        });
-
-        // ポーリング interval を進める
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(1500);
         });
 
         await waitFor(() => expect(onCompleted).toHaveBeenCalledTimes(1));
@@ -111,13 +121,11 @@ describe('useGenerateJob', () => {
         const onFailed = vi.fn();
         mockedGet.mockResolvedValue(buildJob({ status: 'failed', error: 'oops' }));
 
-        const { result } = renderHook(() => useGenerateJob(onCompleted, onFailed));
+        const { result } = renderHook(() => useGenerateJob(onCompleted, onFailed), {
+            wrapper: createWrapper(),
+        });
         act(() => {
             result.current.startJob('jid-1', '/x');
-        });
-
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(1500);
         });
 
         await waitFor(() => expect(onFailed).toHaveBeenCalledTimes(1));
@@ -130,13 +138,11 @@ describe('useGenerateJob', () => {
         const onFailed = vi.fn();
         mockedGet.mockRejectedValue(new ApiError('not found', 404, 'client'));
 
-        const { result } = renderHook(() => useGenerateJob(onCompleted, onFailed));
+        const { result } = renderHook(() => useGenerateJob(onCompleted, onFailed), {
+            wrapper: createWrapper(),
+        });
         act(() => {
             result.current.startJob('jid-1', '/x');
-        });
-
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(1500);
         });
 
         await waitFor(() => expect(result.current.currentJob).toBeNull());
@@ -148,16 +154,16 @@ describe('useGenerateJob', () => {
     it('500 エラーではジョブをクリアしない（リトライ可能）', async () => {
         mockedGet.mockRejectedValue(new ApiError('server error', 500, 'server'));
 
-        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()));
+        const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
+            wrapper: createWrapper(),
+        });
         act(() => {
             result.current.startJob('jid-1', '/x');
         });
 
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(1500);
-        });
+        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
-        // currentJob はそのまま残る
+        // currentJob はそのまま残る（pending stub）
         expect(result.current.currentJob?.job_id).toBe('jid-1');
     });
 });

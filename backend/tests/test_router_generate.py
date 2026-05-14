@@ -8,13 +8,10 @@ PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証�
     cd backend
     uv run pytest tests/test_router_generate.py -v
 """
-import json
 import os
-import sys
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
+from services.meta_store import load_meta, save_meta
 from services.pdf_generator import GenerateResult
 
 # ---------------------------------------------------------------------------
@@ -63,18 +60,13 @@ class TestGenerate:
             time.sleep(0.05)
         assert r.json()["status"] == "completed"
 
-        meta_path = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin", "meta.json")
-        with open(meta_path, encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("doujin")
         assert meta["new1.pdf"]["genre"] == "オリジナル"
         assert meta["new2.pdf"]["genre"] == "オリジナル"
 
     def test_existing_meta_genre_preserved(self, client, tmp_data_dir, monkeypatch):
         """既存メタデータがある書籍には genre を上書きしない。"""
-        meta_dir = os.path.join(tmp_data_dir["DATA_DIR"], "meta", "doujin")
-        os.makedirs(meta_dir, exist_ok=True)
-        with open(os.path.join(meta_dir, "meta.json"), "w", encoding="utf-8") as f:
-            json.dump({"existing.pdf": {"genre": "プリンセスコネクト", "authors": ["A"]}}, f)
+        save_meta("doujin", {"existing.pdf": {"genre": "プリンセスコネクト", "authors": ["A"]}})
 
         monkeypatch.setattr(
             "routers.generate.scan_and_generate",
@@ -91,8 +83,7 @@ class TestGenerate:
                 break
             time.sleep(0.05)
 
-        with open(os.path.join(meta_dir, "meta.json"), encoding="utf-8") as f:
-            meta = json.load(f)
+        meta = load_meta("doujin")
         assert meta["existing.pdf"]["genre"] == "プリンセスコネクト"
         assert meta["existing.pdf"]["authors"] == ["A"]
 

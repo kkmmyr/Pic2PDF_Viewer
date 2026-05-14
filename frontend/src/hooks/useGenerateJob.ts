@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import apiClient, { ApiError } from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
-import { usePolling } from './usePolling';
 import { STORAGE_KEYS, API_CONFIG } from '../constants';
 import { getStorageJson, setStorageJson, removeStorage } from '../utils/storage';
 import type { GenerateJob } from '../types';
@@ -12,6 +12,16 @@ interface StoredJob {
 }
 
 const STORAGE_KEY = STORAGE_KEYS.GENERATOR_JOB;
+
+const pendingJob = (job_id: string): GenerateJob => ({
+    job_id,
+    status: 'pending',
+    current_item: null,
+    files: [],
+    failed_items: [],
+    message: '',
+    error: null,
+});
 
 interface UseGenerateJobReturn {
     currentJob: GenerateJob | null;
@@ -29,72 +39,66 @@ export function useGenerateJob(
     onFailed: (job: GenerateJob) => void,
 ): UseGenerateJobReturn {
     const stored = loadStoredJob();
-
-    const [currentJob, setCurrentJob] = useState<GenerateJob | null>(
-        stored
-            ? {
-                  job_id: stored.job_id,
-                  status: 'pending',
-                  current_item: null,
-                  files: [],
-                  failed_items: [],
-                  message: '',
-                  error: null,
-              }
-            : null,
-    );
+    const [currentJobId, setCurrentJobId] = useState<string | null>(stored?.job_id ?? null);
     const [restoredSourceDir] = useState<string | null>(stored?.sourceDir ?? null);
 
+    const onCompletedRef = useRef(onCompleted);
+    const onFailedRef = useRef(onFailed);
+    useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
+    useEffect(() => { onFailedRef.current = onFailed; }, [onFailed]);
+
+    const { data: fetchedJob, error } = useQuery<GenerateJob>({
+        queryKey: ['generateJob', currentJobId],
+        queryFn: () =>
+            apiClient.get<unknown, GenerateJob>(API_ENDPOINTS.GENERATE_JOB(currentJobId!)),
+        enabled: currentJobId !== null,
+        refetchInterval: (query) => {
+            const status = query.state.data?.status;
+            if (status === 'completed' || status === 'failed') return false;
+            return API_CONFIG.JOB_POLL_INTERVAL_MS;
+        },
+        staleTime: 0,
+        gcTime: 30_000,
+        retry: false,
+    });
+
+    const currentJob: GenerateJob | null =
+        currentJobId === null ? null : (fetchedJob ?? pendingJob(currentJobId));
+
     const isGenerating =
-        currentJob !== null && (currentJob.status === 'pending' || currentJob.status === 'running');
+        currentJob !== null &&
+        (currentJob.status === 'pending' || currentJob.status === 'running');
     const isRestoredJob = isGenerating && !!stored;
 
-    const fetchJob = useCallback(async () => {
-        if (!currentJob) return;
-        try {
-            const job = await apiClient.get<unknown, GenerateJob>(
-                API_ENDPOINTS.GENERATE_JOB(currentJob.job_id),
-            );
-            setCurrentJob(job);
-            if (job.status === 'completed') {
-                removeStorage(STORAGE_KEY);
-                onCompleted(job);
-            } else if (job.status === 'failed') {
-                removeStorage(STORAGE_KEY);
-                onFailed(job);
-            }
-        } catch (e) {
-            console.error('Failed to poll job status', e);
-            // 404 はサーバー再起動等でジョブが消えた状態。ポーリングを停止してストレージをクリアする
-            if (e instanceof ApiError && e.status === 404) {
-                removeStorage(STORAGE_KEY);
-                setCurrentJob(null);
-            }
+    // Detect terminal status transitions
+    useEffect(() => {
+        if (!fetchedJob) return;
+        if (fetchedJob.status === 'completed') {
+            removeStorage(STORAGE_KEY);
+            onCompletedRef.current(fetchedJob);
+        } else if (fetchedJob.status === 'failed') {
+            removeStorage(STORAGE_KEY);
+            onFailedRef.current(fetchedJob);
         }
-    }, [currentJob, onCompleted, onFailed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fetchedJob?.status]);
 
-    usePolling(fetchJob, {
-        enabled: isGenerating,
-        interval: API_CONFIG.JOB_POLL_INTERVAL_MS,
-        immediate: false,
-    });
+    // Handle 404 (job disappeared, e.g. server restart)
+    useEffect(() => {
+        if (error instanceof ApiError && error.status === 404) {
+            removeStorage(STORAGE_KEY);
+            setCurrentJobId(null);
+        }
+    }, [error]);
 
     const startJob = useCallback((jobId: string, sourceDir: string) => {
         setStorageJson<StoredJob>(STORAGE_KEY, { job_id: jobId, sourceDir });
-        setCurrentJob({
-            job_id: jobId,
-            status: 'pending',
-            current_item: null,
-            files: [],
-            failed_items: [],
-            message: '',
-            error: null,
-        });
+        setCurrentJobId(jobId);
     }, []);
 
     const clearCurrentJob = useCallback(() => {
         removeStorage(STORAGE_KEY);
-        setCurrentJob(null);
+        setCurrentJobId(null);
     }, []);
 
     return {

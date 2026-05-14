@@ -87,9 +87,7 @@ def tmp_data_dir(tmp_path, monkeypatch):
 def _patch_imported_paths(monkeypatch, paths: dict) -> None:
     """`from config import X` で取り込まれたモジュール変数を差し替える。"""
     targets = [
-        ("services.meta_store", "DATA_DIR", paths["DATA_DIR"]),
-        ("services.genre_store", "DATA_DIR", paths["DATA_DIR"]),
-        ("services.genre_store", "GENRE_STORE_DIR", os.path.join(paths["DATA_DIR"], "genres")),
+        ("services.meta_db", "DATA_DIR", paths["DATA_DIR"]),
         ("routers.generate", "PDF_COMPRESSED_DIR", paths["PDF_COMPRESSED_DIR"]),
         ("routers.generate", "THUMBNAIL_DIR", paths["THUMBNAIL_DIR"]),
         ("routers.generate", "IMAGES_DIR", paths["IMAGES_DIR"]),

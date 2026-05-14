@@ -1,14 +1,12 @@
-"""meta.json の読み書き・ロック管理。
+"""meta.db（SQLite）の読み書き・ロック管理。
 
 詳細仕様: docs/03_詳細設計/詳細設計書_バックエンド編.md「閲覧回数 / 最近見た順ソート（バックエンド側）」節
 """
-import json
-import os
 import threading
 from collections.abc import Callable
 from typing import Literal, NotRequired, TypedDict
 
-from config import DATA_DIR
+from services.meta_db import connect, create_tables, row_to_entry, upsert_entry
 from utils.locks import SourceLockManager
 
 ReadState = Literal["unread", "reading", "done"]
@@ -17,26 +15,19 @@ VALID_READ_STATES: tuple[ReadState, ...] = ("unread", "reading", "done")
 
 class MetaEntry(TypedDict):
     authors: list[str]
-    # 閲覧回数。既存エントリには含まれない場合があるため任意。
     view_count: NotRequired[int]
-    # 最終閲覧時刻 (UNIX time, float)。
     last_viewed_at: NotRequired[float]
-    # 非表示フラグ。True なら通常モードでは一覧・検索・フィルタに表示されない。
     hidden: NotRequired[bool]
-    # ジャンル（例: "プリンセスコネクト" / "Voiceloid" / "オリジナル"）。
     genre: NotRequired[str]
-    # 読書状態。未設定の既存エントリは view_count から派生（0→unread / >0→reading）。
     read_state: NotRequired[ReadState]
-    # シリーズ管理（doujin/comic: series.py が書き込む。novel: meta PATCH API が書き込む）
     series_id: NotRequired[str]
     series_title: NotRequired[str]
-    series_index: NotRequired[float]  # doujin/comic の小数巻番号
-    # novel 向け追加フィールド（4.3）
-    volume: NotRequired[int | None]   # 整数巻番号
+    series_index: NotRequired[float]
+    volume: NotRequired[int | None]
     publisher: NotRequired[str]
     asin: NotRequired[str]
     isbn: NotRequired[str]
-    release_date: NotRequired[str]    # ISO 形式 (例: "2012-09-01")
+    release_date: NotRequired[str]
 
 
 MetaDict = dict[str, MetaEntry]
@@ -48,35 +39,34 @@ def get_lock(source: str) -> threading.Lock:
     return _lock_manager.get(source)
 
 
-def meta_path(source: str) -> str:
-    meta_dir = os.path.join(DATA_DIR, "meta", source)
-    os.makedirs(meta_dir, exist_ok=True)
-    return os.path.join(meta_dir, "meta.json")
-
-
-def load_meta(source: str) -> MetaDict:
-    path = meta_path(source)
-    if not os.path.exists(path):
-        return {}
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
-def save_meta(source: str, data: MetaDict) -> None:
-    path = meta_path(source)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
 def make_key(path: str, name: str) -> str:
     return f"{path}/{name}" if path else name
 
 
+def _ensure(conn) -> None:
+    """テーブルが存在しない場合（テスト等）に自動作成する。"""
+    create_tables(conn)
+
+
+def load_meta(source: str) -> MetaDict:
+    with connect() as conn:
+        _ensure(conn)
+        rows = conn.execute(
+            "SELECT * FROM books_meta WHERE source=?", (source,)
+        ).fetchall()
+    return {row["book_id"]: row_to_entry(row) for row in rows}  # type: ignore[return-value]
+
+
+def save_meta(source: str, data: MetaDict) -> None:
+    with connect() as conn:
+        _ensure(conn)
+        conn.execute("DELETE FROM books_meta WHERE source=?", (source,))
+        for book_id, entry in data.items():
+            upsert_entry(conn, source, book_id, entry)
+
+
 def update_meta_locked(source: str, updater: Callable[[MetaDict], None]) -> None:
-    """ロックを取得してから meta.json を読み込み、updater を適用して保存する。"""
+    """ロックを取得してから DB を読み込み、updater を適用して保存する。"""
     with get_lock(source):
         meta = load_meta(source)
         updater(meta)
@@ -122,8 +112,5 @@ def merge_entry_fields(
 
 
 def has_meaningful_value(entry: dict) -> bool:
-    """エントリに「空 list 以外」の意味のある値があるかを返す。
-
-    `update_meta` で全フィールドに空 list が指定された場合にエントリ自体を消すかの判定に使う。
-    """
+    """エントリに「空 list 以外」の意味のある値があるかを返す。"""
     return any(not (isinstance(v, list) and not v) for v in entry.values())
