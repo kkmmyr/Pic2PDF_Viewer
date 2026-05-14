@@ -44,7 +44,7 @@ def test_search_book_summaries_returns_nearest_first(tmp_data_dir):
             ("c", _vec(2)),
         ])
 
-        with patch("services.novel_db.search.embed_batch") as mock_embed:
+        with patch("services.novel_db.vector_search.embed_batch") as mock_embed:
             mock_embed.return_value = [_vec(1)]  # b に近い
             results = search_book_summaries(conn, "質問", Scope("all"), top=3)
 
@@ -60,7 +60,7 @@ def test_search_book_summaries_respects_scope_book(tmp_data_dir):
         init_schema(conn)
         _setup_books(conn, [("a", _vec(0)), ("b", _vec(1))])
 
-        with patch("services.novel_db.search.embed_batch") as mock_embed:
+        with patch("services.novel_db.vector_search.embed_batch") as mock_embed:
             mock_embed.return_value = [_vec(0)]
             results = search_book_summaries(conn, "Q", Scope("book", "b"), top=5)
 
@@ -72,7 +72,7 @@ def test_search_book_summaries_returns_empty_for_unknown_scope(tmp_data_dir):
         init_schema(conn)
         _setup_books(conn, [("a", _vec(0))])
 
-        with patch("services.novel_db.search.embed_batch") as mock_embed:
+        with patch("services.novel_db.vector_search.embed_batch") as mock_embed:
             mock_embed.return_value = [_vec(0)]
             results = search_book_summaries(
                 conn, "Q", Scope("book", "no-such"), top=5,
@@ -95,7 +95,7 @@ def test_search_book_summaries_top_limits_count(tmp_data_dir):
         init_schema(conn)
         _setup_books(conn, [(f"b{i}", _vec(i)) for i in range(5)])
 
-        with patch("services.novel_db.search.embed_batch") as mock_embed:
+        with patch("services.novel_db.vector_search.embed_batch") as mock_embed:
             mock_embed.return_value = [_vec(0)]
             results = search_book_summaries(conn, "Q", Scope("all"), top=2)
 

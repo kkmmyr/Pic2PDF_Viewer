@@ -69,8 +69,8 @@ def search_setup(tmp_data_dir, monkeypatch):
         )
         conn.commit()
 
-    from services.novel_db import search as search_mod
-    monkeypatch.setattr(search_mod, "embed_batch", _stub_embed)
+    from services.novel_db import vector_search as vs_mod
+    monkeypatch.setattr(vs_mod, "embed_batch", _stub_embed)
 
 
 # ---------------------------------------------------------------------------
