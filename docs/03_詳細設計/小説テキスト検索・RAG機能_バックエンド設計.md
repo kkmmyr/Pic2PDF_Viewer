@@ -66,7 +66,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
                                           │
                                           ▼
                             [SQLite] backend/data/novel_db/novel.db
-                            (FTS5 + sqlite-vec)
+                            (FTS5 + メタデータ) + [LanceDB] novel.lancedb（ベクトル）
                                           │
                                           ▼
                             [Ollama localhost:11434]
@@ -86,10 +86,10 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
 ### 2.2. 設計判断（Why）
 
 - **既存 FastAPI に組み込む理由**: hitomi 監視は単発タスクなので別プロセスにしたが、本機能は対話型 API（検索・質問）が主であり、リクエスト都度の応答が必須。組み込み方が自然
-- **SQLite + FTS5 + sqlite-vec を選んだ理由**:
-    - PoC で検証済み、十分な性能（11 冊で約 10MB、検索 < 1 秒）
-    - ChromaDB 等の別 DB を増やすより、メタ・FTS5・ベクトルを 1 ファイルで JOIN できる方が運用が楽
-    - sqlite-vec は backend の uv に追加済み (`sqlite-vec==0.1.9`)
+- **SQLite + FTS5 + LanceDB を選んだ理由**:
+    - PoC で SQLite + FTS5 + sqlite-vec を検証済み、十分な性能（11 冊で約 10MB、検索 < 1 秒）
+    - Phase 62（2026-05-14）でベクトル部分を sqlite-vec → LanceDB に移行。FTS5・メタデータは SQLite に残し、ベクトル（chunks/summaries）を LanceDB へ分離
+    - LanceDB 移行理由: sqlite-vec の vec0 は線形スキャン O(n) で ANN インデックス追加不可。LanceDB は 50,000 チャンク超で IVF_PQ 自動ビルドにより ANN 検索が有効化される
 - **bge-m3 を採用した理由**: PoC で `nomic-embed-text` と比較し、日本語意味検索精度が明確に高い（OCR ミスを意味距離で吸収可能）
 - **質問応答 LLM に Qwen3.6:35b-a3b を採用した理由**: 当初 PoC で gemma4:26b を採用したが、シリーズ全体の概括的な質問（「テーマ」「主人公の成長」など）に対する回答が浅く、踏み込みが足りなかった。Qwen3.6:35b-a3b（35B 総 / 活性 3B MoE）に切り替えたところ、同条件の質問で `done_reason='stop'` で完走し、章ごとの対比や具体例の引用を含む構造的回答が得られた。応答時間は 30〜100 秒 → 80〜130 秒に伸びたが、品質向上の方が大きい（詳細・経緯は [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)）
 - **主要登場人物抽出に gemma4:e4b を採用した理由**: 短答型タスク（人物名のリスト出力）であり、Qwen のような重量モデルは過剰。1300 ページの一括抽出を現実的な時間で回すために軽量モデルが必須。`stream=True` / `think=False` / `num_predict=4096` で安定動作する
@@ -107,7 +107,8 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
 backend/
 ├── data/
 │   ├── novel_db/                    # 新規（DB ファイル格納）
-│   │   └── novel.db                 # SQLite + FTS5 + sqlite-vec
+│   │   ├── novel.db                 # SQLite + FTS5 + メタデータ（chunks/pages/books 等）
+│   │   └── novel.lancedb/           # LanceDB ベクトルストア（Phase 62、NTFS 必須）
 │   └── kindle_novel/                # 既存（PDF / 画像 / サムネイル）
 │       ├── images/                  # 元画像（永続保持）
 │       └── thumbnails/              # 既存（流用または削除、後述）
@@ -164,11 +165,10 @@ CREATE TABLE books (
 );
 CREATE INDEX idx_books_name ON books(name);
 
--- 書籍サマリの embedding（B-8、bge-m3 1024 次元）
--- rowid = books.id。scope=all / scope=series の retrieval で「サマリ自体が
--- ヒット候補」になるよう、書籍 1 冊あたり 1 ベクトルを格納する。summarizer の
--- update_book_summary() が summary 保存時に upsert する。
-CREATE VIRTUAL TABLE book_summaries_vec USING vec0(embedding FLOAT[1024]);
+-- ※ book_summaries_vec（vec0 仮想テーブル）は Phase 62 で廃止。
+--    書籍サマリ embedding は LanceDB summaries テーブルに格納される。
+--    スキーマ: (book_id: int, book_name: str, embedding: vector[1024])
+--    詳細: backend/services/novel_db/lance_store.py get_summaries_table()
 
 -- ページ単位（FTS5 検索の対象）
 CREATE TABLE pages (
@@ -203,10 +203,12 @@ CREATE TABLE chunks (
 );
 CREATE INDEX idx_chunks_page ON chunks(page_id);
 
--- ベクトル（chunks.id とリンク）
--- B-9 適用後の embedding は (contextual_text + text) で再計算済。contextual_text
--- が NULL のチャンクは text のみで embedding（後方互換）
-CREATE VIRTUAL TABLE chunks_vec USING vec0(embedding FLOAT[1024]);
+-- ※ chunks_vec（vec0 仮想テーブル）は Phase 62 で廃止。
+--    チャンク embedding は LanceDB chunks テーブルに格納される。
+--    スキーマ: (chunk_id, book_name, page_no, text, char_count, page_count, embedding[1024])
+--    B-9 適用後の embedding は (contextual_text + "\n\n" + text) で計算。
+--    contextual_text が NULL のチャンクは text のみ（後方互換）。
+--    詳細: backend/services/novel_db/lance_store.py get_chunks_table()
 
 -- 質問履歴
 CREATE TABLE qa_history (
@@ -267,7 +269,7 @@ Path(pdf) ──┐
             │
             ├─→ embedder.embed_batch(texts) で 16 件単位に bge-m3 埋め込み
             │
-            └─→ chunks / chunks_vec テーブルに INSERT
+            └─→ chunks テーブルに INSERT + LanceDB chunks テーブルに add()
 ```
 
 ### 5.1. テキスト抽出（`extractor.py`）
@@ -394,9 +396,9 @@ def rebuild_book(conn, book_name: str) -> None:
     if not pdf_path.exists():
         raise FileNotFoundError(pdf_path)
 
-    # 既存レコード削除（CASCADE で pages / chunks / chunks_vec も連動）
+    # 既存レコード削除（CASCADE で pages / chunks も連動）
     # ⚠️ pages.main_characters / chunks.contextual_text / books.summary / books.summary_generated_at /
-    #    book_summaries_vec の該当行も道連れに消える。再構築後に extract_characters /
+    #    LanceDB summaries の該当行も道連れに消える。再構築後に extract_characters /
     #    build_novel_summaries / build_chunk_contexts を CLI で再実行する必要がある
     conn.execute("DELETE FROM books WHERE name = ?", (book_name,))
 
@@ -438,10 +440,8 @@ def rebuild_book(conn, book_name: str) -> None:
                 "VALUES (?, ?, ?, ?)",
                 (c["page_id"], c["chunk_idx"], c["text"], len(c["text"])),
             )
-            conn.execute(
-                "INSERT INTO chunks_vec (rowid, embedding) VALUES (?, ?)",
-                (cur.lastrowid, serialize_f32(emb)),
-            )
+            # Phase 62: LanceDB chunks テーブルに add()（serialize_f32 不要）
+            # get_chunks_table().add([{"chunk_id": chunk_id, "book_name": ..., "embedding": emb, ...}])
     conn.commit()
 ```
 
@@ -505,7 +505,7 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = "gemma4:e4b"   # 短答型タスクは軽量モデ
 
 **プロンプト管理（Phase 60）**: プロンプトテンプレート・LLM オプション・`parse_combined_output` は `_prompts.py` に一元化。`summarizer.py` はビジネスロジックのみ保持する。
 
-**スキーマ**: `books.summary TEXT`（NULL = 未生成）/ `books.summary_generated_at TIMESTAMP`。`update_book_summary()` 内で `book_summaries_vec`（B-8）への upsert も同時に行う。
+**スキーマ**: `books.summary TEXT`（NULL = 未生成）/ `books.summary_generated_at TIMESTAMP`。`update_book_summary()` 内で LanceDB `summaries` テーブル（B-8）への upsert も同時に行う（Phase 62 で `book_summaries_vec` から移行）。
 
 **生成タイミング**: 別 CLI（[§5.9](#59-cli) の `build_novel_summaries.py`）でユーザーが任意のタイミングで実行する。`builder.rebuild_book` には組み込まない（再構築のたびに数十分かかるのを避けるため）。
 
@@ -535,7 +535,7 @@ Anthropic 2024-09 ブログの **Contextual Retrieval** 手法を踏襲。各チ
 - `chunks.char_count < NOVEL_DB_MIN_BODY_CHARS`（既定 300）— 章扉・目次・人物紹介などの薄いチャンク
 - `pages.page_no <= NOVEL_DB_BODY_PAGE_MARGIN` または `page_no > page_count - NOVEL_DB_BODY_PAGE_MARGIN`（既定 5）— 表紙・タイトルページ・あとがき・奥付などの余白ページ
 
-**embedding 再構築**: 生成完了後、`(contextual_text + "\n\n" + chunk_text)` を bge-m3 でバッチ 16 で embedding し、`chunks_vec` を DELETE → INSERT で更新する（`make_embedding_input` ヘルパ）。skip 対象は ctx が NULL のため text のみで再 embedding。
+**embedding 再構築**: 生成完了後、`(contextual_text + "\n\n" + chunk_text)` を bge-m3 でバッチ 16 で embedding し、LanceDB `chunks` テーブルを `delete(chunk_id=...)` → `add([...])` で更新する（`make_embedding_input` ヘルパ、Phase 62 で `chunks_vec` から移行）。skip 対象は ctx が NULL のため text のみで再 embedding。
 
 **生成タイミング**: 別 CLI（[§5.9](#59-cli) の `build_chunk_contexts.py`）でユーザーが任意のタイミングで実行する。B-5 のサマリが前提（プロンプトのコンテキストに使う）。
 
@@ -702,7 +702,7 @@ uv run python scripts/build_character_summaries.py --all --min-pages 5    # page
 
 PoC スクリプト（旧 `tmp_poc/search.py`）の `hybrid_search()` を本実装に昇格。
 
-**ベクトル embedding の構成（B-9 適用後）**: `chunks_vec.embedding` は `(contextual_text + "\n\n" + chunk_text)` を bge-m3 で計算した値。`contextual_text` が NULL の chunk は `chunk_text` のみで計算する（後方互換）。これにより「該当ページに直接の語彙的一致がない抽象的なクエリ」でも、位置説明込みの semantic 距離で top に来るようになる。
+**ベクトル embedding の構成（B-9 適用後）**: LanceDB `chunks` テーブルの `embedding` は `(contextual_text + "\n\n" + chunk_text)` を bge-m3 で計算した値（Phase 62 で `chunks_vec.embedding` から移行）。`contextual_text` が NULL の chunk は `chunk_text` のみで計算する（後方互換）。これにより「該当ページに直接の語彙的一致がない抽象的なクエリ」でも、位置説明込みの semantic 距離で top に来るようになる。
 
 ```python
 def hybrid_search(
@@ -834,14 +834,14 @@ def search_book_summaries(
     *,
     top: int = 11,
 ) -> list[tuple[str, float]]:
-    """`book_summaries_vec` に対する vec0 ベクトル検索。
+    """LanceDB `summaries` テーブルに対するベクトル検索（Phase 62 で `book_summaries_vec` から移行）。
     Returns: [(book_name, distance), ...]（distance 昇順）
     """
 ```
 
 **動作確認**: 「メルディの軍師としての活躍」→ 「10 二人の軍師」が distance 0.97 で 1 位（タイトル通り軍師がテーマの巻が圧勝）、「1 巻」が 1.18 で 2 位、と意味的に妥当な順位を返すことを実機確認。
 
-**フォールバック**: `book_summaries_vec` が無い古い DB（B-8 マイグレーション前）では空リストを返し、page 単位の hit-book-summaries だけが prompt に乗る（後方互換）。
+**フォールバック**: LanceDB `summaries` テーブルが空の場合（embedding 未生成）は空リストを返し、page 単位の hit-book-summaries だけが prompt に乗る（後方互換）。
 
 ### 6.6. 検索フィルタ（2026-05-10 追加）
 

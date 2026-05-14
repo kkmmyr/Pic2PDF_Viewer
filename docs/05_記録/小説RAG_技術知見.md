@@ -192,8 +192,8 @@ PARAMETER top_p 0.95
   ↓
 [ハイブリッド検索]
   ├ FTS5 OR 検索（pages_fts）
-  ├ ベクトル検索（chunks_vec）  ← B-9 で contextual_text を含めて再 embedding
-  └ 書籍サマリベクトル検索        ← B-8（book_summaries_vec）
+  ├ ベクトル検索（LanceDB chunks）  ← B-9 で contextual_text を含めて再 embedding（Phase 62 で chunks_vec から移行）
+  └ 書籍サマリベクトル検索（LanceDB summaries） ← B-8（Phase 62 で book_summaries_vec から移行）
   ↓
 [RRF 融合 + フィルタ]
   ├ min_chars（薄いページ除外）
@@ -369,7 +369,7 @@ DeepSeek V3.x 級のクラウド API を使う場合の試算（2026-05-10 時�
 |---|---|---|
 | `pages.main_characters` | キャラ帰属誤統合の抑制（character_extractor 生成）| 2026-05-10 |
 | `books.summary` / `books.summary_generated_at` | 書籍俯瞰サマリ（B-5 / B-6）| 2026-05-10 |
-| `book_summaries_vec` (vec0) | サマリの検索インデックス（B-8）| 2026-05-10 |
+| `book_summaries_vec` (vec0) | サマリの検索インデックス（B-8、Phase 62 で LanceDB `summaries` に移行）| 2026-05-10 |
 | `chunks.contextual_text` / `chunks.contextual_generated_at` | Contextual Retrieval（B-9）| 2026-05-11 |
 
 すべて NULL 許容 + テーブル欠落時の後方互換（古い DB でも検索は劣化のみで失敗しない）。
@@ -379,12 +379,8 @@ DeepSeek V3.x 級のクラウド API を使う場合の試算（2026-05-10 時�
 新しい列・テーブルが無い古い DB でも、検索 / QA は動作する。
 
 ```python
-# 例: search.py:search_book_summaries
-has_vec = conn.execute(
-    "SELECT name FROM sqlite_master WHERE type='table' AND name='book_summaries_vec'"
-).fetchone()
-if has_vec is None:
-    return []  # 後方互換: vec テーブル欠落時は空リストを返す
+# Phase 62 以降: LanceDB summaries テーブルが空なら空リストを返す
+# get_summaries_table().count_rows() == 0 の場合は後方互換で空リスト返却
 ```
 
 新機能の取り込みは「再実行できる CLI を別途用意し、ユーザーが都合のいいタイミングで走らせる」スタイル。`builder.rebuild_book` には組み込まず、`build_novel_db.py` / `extract_characters.py` / `build_novel_summaries.py` / `build_chunk_contexts.py` の独立 CLI として提供。
@@ -425,7 +421,7 @@ LLM が生成したサマリ / 回答に対する事実確認の標準手順:
 - **症状**: 「シリーズ全体のテーマは？」に対し汎用語の羅列
 - **対処**: 以下を順に確認
   1. `books.summary` が生成されているか（`build_novel_summaries.py --all`）
-  2. `book_summaries_vec` が更新されているか（B-8）
+  2. LanceDB `summaries` テーブルに embedding が入っているか（B-8、`build_novel_summaries.py --all` で再生成）
   3. `chunks.contextual_text` が埋まっているか（B-9）
 
 ### 8.4 「特定キャラの行動が別キャラに誤帰属」
