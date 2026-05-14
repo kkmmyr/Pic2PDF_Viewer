@@ -29,12 +29,12 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS  # noqa: E402
 from services.meta_store import load_meta  # noqa: E402
 from services.novel_db import init_schema, with_db  # noqa: E402
 from services.novel_db.contextualizer import (  # noqa: E402
     generate_chunk_context,
     make_embedding_input,
+    should_skip_context,
 )
 from services.novel_db.embedder import embed_batch, serialize_f32  # noqa: E402
 
@@ -42,21 +42,6 @@ from services.novel_db.embedder import embed_batch, serialize_f32  # noqa: E402
 _EMBED_BATCH_SIZE = 16
 
 
-def _should_skip_context(char_count: int, page_no: int, page_count: int) -> bool:
-    """ctx 生成を skip すべきチャンクか判定する。
-
-    skip 条件:
-    - char_count < NOVEL_DB_MIN_BODY_CHARS (300): 章扉・目次など薄いチャンク
-    - page_no が先頭・末尾 NOVEL_DB_BODY_PAGE_MARGIN (5) ページ以内: 表紙・あとがき等
-
-    skip 対象は ctx を NULL に保ち、検索 noise を避ける（B-9 改良 2026-05-12）。
-    """
-    if char_count < NOVEL_DB_MIN_BODY_CHARS:
-        return True
-    margin = NOVEL_DB_BODY_PAGE_MARGIN
-    if page_no <= margin or page_no > page_count - margin:
-        return True
-    return False
 
 
 def _list_target_books(
@@ -149,7 +134,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
     # ctx は str | None。skip 対象は None を保ち、make_embedding_input が text のみで embed する。
     pending_for_embed: list[tuple[int, str | None, str]] = []
     for i, (chunk_id, text, char_count, page_no) in enumerate(chunks, 1):
-        if _should_skip_context(char_count, page_no, page_count):
+        if should_skip_context(char_count, page_no, page_count):
             ctx: str | None = None
             skipped += 1
         else:

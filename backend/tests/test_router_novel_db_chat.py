@@ -122,16 +122,16 @@ def test_post_chat_session_start_creates_session_and_appends_assistant(
     """初手 POST: session + system + user + assistant が DB に積まれる。"""
     # ハイブリッド検索を空ヒットにモック（テストで実検索を走らせない）
     monkeypatch.setattr(
-        "routers.novel_db.hybrid_search", lambda *a, **kw: [],
+        "services.novel_db.retrieval.hybrid_search", lambda *a, **kw: [],
     )
     monkeypatch.setattr(
-        "routers.novel_db.expand_query", lambda q: [q],
+        "services.novel_db.retrieval.expand_query", lambda q: [q],
     )
     monkeypatch.setattr(
-        "routers.novel_db.search_book_summaries", lambda *a, **kw: [],
+        "services.novel_db.retrieval.search_book_summaries", lambda *a, **kw: [],
     )
     monkeypatch.setattr(
-        "routers.novel_db.load_summaries_for_books", lambda *a, **kw: {},
+        "services.novel_db.retrieval.load_summaries_for_books", lambda *a, **kw: {},
     )
     monkeypatch.setattr("routers.novel_db.stream_chat", _fake_stream_chat)
 

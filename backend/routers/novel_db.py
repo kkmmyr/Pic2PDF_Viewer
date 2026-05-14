@@ -17,12 +17,8 @@ from config import (
     NOVEL_DB_BODY_PAGE_MARGIN,
     NOVEL_DB_LLM_MODEL,
     NOVEL_DB_MIN_BODY_CHARS,
-    NOVEL_DB_QA_EXPAND_ENABLED,
     NOVEL_DB_QA_FULL_BOOK_MODE,
     NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
-    NOVEL_DB_QA_MAX_PER_BOOK,
-    NOVEL_DB_QA_TOP_K,
-    NOVEL_DB_QA_TOP_SUMMARIES,
 )
 from routers._deps import cancel_job_response, log_and_raise_500, sse_event
 from services.novel_db import Scope, hybrid_search, with_db
@@ -58,9 +54,7 @@ from services.novel_db.qa_sessions import (
     load_chat_messages,
     update_session_title,
 )
-from services.novel_db.query_expander import expand_query
-from services.novel_db.search import SearchHit, load_all_pages_of_book, search_book_summaries
-from services.novel_db.summarizer import load_summaries_for_books
+from services.novel_db.retrieval import retrieve
 from utils.logger import get_logger
 
 router = APIRouter()
@@ -301,94 +295,21 @@ async def post_qa(request: QaRequest, http_request: Request) -> StreamingRespons
     _check_locked()
     scope = Scope(type=request.scope.type, id=request.scope.id)
 
-    # B-13 段階 C（opt-in、NOVEL_DB_QA_FULL_BOOK_MODE）: scope=book のとき hybrid_search
-    # を bypass して書籍全 page を読み込む。検索ノイズなしで最高品質を試すモード。
-    # llama-server 側は start-qwen-server-fullbook.bat（-c 131072 / -ncmoe 32）で
-    # 起動しておく必要がある。num_ctx を override する点が通常 RAG と異なる
-    full_book_mode = (
-        NOVEL_DB_QA_FULL_BOOK_MODE
-        and scope.type == "book"
-        and scope.id is not None
-    )
-
-    qa_options = LLM_OPTIONS
-    if full_book_mode:
-        qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX}
-
     with with_db() as conn:
-        if full_book_mode:
-            # Query Expansion / hybrid_search / 書籍サマリは全 page 読みなので不要
-            hits = load_all_pages_of_book(
-                conn,
-                scope.id,
-                min_chars=NOVEL_DB_MIN_BODY_CHARS,
-                body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
-            )
-            book_summaries = None
-        else:
-            # 通常 RAG 経路（段階 A/B）
-            # scope=all / series では書籍偏り抑制のため max_per_book を有効化、
-            # 単冊（book）スコープでは不要なので None。
-            max_per_book = (
-                NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
-            )
-
-            # B-11 Query Expansion: 元の質問 + 展開クエリで multi-query 検索する。
-            # 展開無効時 / 失敗時は元の質問のみのリストが返るので、結果は従来と同じになる。
-            if NOVEL_DB_QA_EXPAND_ENABLED:
-                queries = expand_query(request.question)
-            else:
-                queries = [request.question]
-
-            # 各クエリで hybrid_search → (book_name, page_no) でデデュープし、
-            # 同じページが複数クエリから引かれた場合はスコア最大値を採用する
-            rows_by_key: dict[tuple[str, int], SearchHit] = {}
-            for q in queries:
-                sub_rows = hybrid_search(
-                    conn,
-                    q,
-                    scope,
-                    top=NOVEL_DB_QA_TOP_K,
-                    min_chars=NOVEL_DB_MIN_BODY_CHARS,
-                    max_per_book=max_per_book,
-                    body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
-                )
-                for h in sub_rows:
-                    key = (h.book_name, h.page_no)
-                    existing = rows_by_key.get(key)
-                    if existing is None or h.rrf_score > existing.rrf_score:
-                        rows_by_key[key] = h
-            hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[
-                :NOVEL_DB_QA_TOP_K
-            ]
-            # scope=all / series ではヒット書籍の俯瞰サマリをプロンプトに付与する
-            # （生成済み書籍のみ。未生成は単に含めない＝後方互換）
-            # B-8: ページヒット書籍に加えて、サマリ自体のベクトル検索 top-K も合流
-            # させ、ページに引っかからなかった書籍も俯瞰サマリとしてプロンプトに乗せる
-            if scope.type in ("all", "series"):
-                hit_book_names = {h.book_name for h in hits}
-                summary_hits = search_book_summaries(
-                    conn, request.question, scope, top=NOVEL_DB_QA_TOP_SUMMARIES,
-                )
-                relevant_book_names = sorted(
-                    hit_book_names | {name for name, _ in summary_hits},
-                )
-                book_summaries = load_summaries_for_books(conn, relevant_book_names)
-            else:
-                book_summaries = None
-
+        result = retrieve(conn, request.question, scope)
         prompt = build_prompt(
-            request.question, hits, scope, book_summaries=book_summaries,
+            request.question, result.hits, scope, book_summaries=result.book_summaries,
         )
         history_id = save_start(
             conn,
             scope=scope,
             question=request.question,
             prompt=prompt,
-            hits=hits,
+            hits=result.hits,
             model=NOVEL_DB_LLM_MODEL,
-            options=qa_options,
+            options=result.qa_options,
         )
+    qa_options = result.qa_options
 
     async def event_stream():
         full_response: list[str] = []
@@ -521,69 +442,6 @@ def _auto_title(question: str) -> str:
     return text
 
 
-def _collect_initial_context(
-    conn,
-    scope: Scope,
-    question: str,
-) -> tuple[list[SearchHit], dict[str, str] | None, dict]:
-    """初手の context（hits + book_summaries + LLM options）を組み立てる。
-
-    既存 `/qa` の hits 構築ロジックと同等。`scope=book` のとき
-    `NOVEL_DB_QA_FULL_BOOK_MODE` なら全 page 読み、それ以外はハイブリッド検索。
-    `book_summaries` は scope=all / series のみ付与する。
-    """
-    full_book_mode = (
-        NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
-    )
-    qa_options = LLM_OPTIONS
-    if full_book_mode:
-        qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX}
-
-    if full_book_mode:
-        hits = load_all_pages_of_book(
-            conn, scope.id,
-            min_chars=NOVEL_DB_MIN_BODY_CHARS,
-            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
-        )
-        return hits, None, qa_options
-
-    max_per_book = (
-        NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
-    )
-    queries = expand_query(question) if NOVEL_DB_QA_EXPAND_ENABLED else [question]
-
-    rows_by_key: dict[tuple[str, int], SearchHit] = {}
-    for q in queries:
-        sub_rows = hybrid_search(
-            conn, q, scope,
-            top=NOVEL_DB_QA_TOP_K,
-            min_chars=NOVEL_DB_MIN_BODY_CHARS,
-            max_per_book=max_per_book,
-            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
-        )
-        for h in sub_rows:
-            key = (h.book_name, h.page_no)
-            existing = rows_by_key.get(key)
-            if existing is None or h.rrf_score > existing.rrf_score:
-                rows_by_key[key] = h
-    hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[
-        :NOVEL_DB_QA_TOP_K
-    ]
-
-    if scope.type in ("all", "series"):
-        hit_book_names = {h.book_name for h in hits}
-        summary_hits = search_book_summaries(
-            conn, question, scope, top=NOVEL_DB_QA_TOP_SUMMARIES,
-        )
-        relevant_book_names = sorted(
-            hit_book_names | {name for name, _ in summary_hits},
-        )
-        book_summaries = load_summaries_for_books(conn, relevant_book_names)
-    else:
-        book_summaries = None
-    return hits, book_summaries, qa_options
-
-
 @router.get("/novel_db/qa/sessions")
 @log_and_raise_500("novel_db/qa/sessions")
 def get_chat_sessions(offset: int = 0, limit: int = 20) -> list[ChatSessionSummary]:
@@ -655,11 +513,9 @@ async def post_chat_session_start(
     scope = Scope(type=request.scope.type, id=request.scope.id)
 
     with with_db() as conn:
-        hits, book_summaries, qa_options = _collect_initial_context(
-            conn, scope, request.question,
-        )
+        result = retrieve(conn, request.question, scope)
         context_block = build_chat_context_block(
-            hits, scope, book_summaries=book_summaries,
+            result.hits, scope, book_summaries=result.book_summaries,
         )
         system_message = build_chat_system_message(
             scope, context_block=context_block,
@@ -667,6 +523,7 @@ async def post_chat_session_start(
         session_id = create_session(conn, scope, title=_auto_title(request.question))
         append_message(conn, session_id, role="system", content=system_message)
         append_message(conn, session_id, role="user", content=request.question)
+    qa_options = result.qa_options
 
     messages = [
         {"role": "system", "content": system_message},

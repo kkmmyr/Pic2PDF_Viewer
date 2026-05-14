@@ -8,6 +8,7 @@ import html
 import re
 import sqlite3
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Literal
 from urllib.parse import quote
 
@@ -26,7 +27,7 @@ _MARK_ESCAPED = re.compile(r"&lt;(/?mark)&gt;")
 ScopeType = Literal["all", "series", "book"]
 
 
-@dataclass
+@dataclass(frozen=True)
 class Scope:
     type: ScopeType
     id: str | None = None  # series_id or book_name (`type='all'` のとき None)
@@ -82,6 +83,7 @@ def _image_url(book_name: str, page_no: int) -> str:
 # scope → 書籍名フィルタ
 # ---------------------------------------------------------------------------
 
+@lru_cache(maxsize=16)
 def _resolve_book_names(scope: Scope) -> list[str] | None:
     """scope=all のとき None（全件）、それ以外は対象書籍名のリスト（空なら 0 件）。"""
     if scope.type == "all":

@@ -19,7 +19,7 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 """
 from __future__ import annotations
 
-from config import NOVEL_DB_CONTEXT_MODEL
+from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_MIN_BODY_CHARS
 
 # `_llm_backend` を先に import することで local_llm の sys.path 注入を発火させる
 # （contextualizer をスクリプトから直接利用する経路で path が未注入なまま
@@ -134,3 +134,18 @@ def make_embedding_input(contextual_text: str | None, chunk_text: str) -> str:
     if contextual_text and contextual_text.strip():
         return f"{contextual_text.strip()}\n\n{chunk_text}"
     return chunk_text
+
+
+def should_skip_context(char_count: int, page_no: int, page_count: int) -> bool:
+    """ctx 生成を skip すべきチャンクか判定する（B-9 改良 2026-05-12）。
+
+    skip 条件:
+    - char_count < NOVEL_DB_MIN_BODY_CHARS (300): 章扉・目次など薄いチャンク
+    - page_no が先頭・末尾 NOVEL_DB_BODY_PAGE_MARGIN (5) ページ以内: 表紙・あとがき等
+
+    skip 対象は ctx を NULL に保ち、検索 noise を避ける。
+    """
+    if char_count < NOVEL_DB_MIN_BODY_CHARS:
+        return True
+    margin = NOVEL_DB_BODY_PAGE_MARGIN
+    return page_no <= margin or page_no > page_count - margin
