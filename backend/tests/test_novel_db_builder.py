@@ -70,10 +70,6 @@ def test_rebuild_from_pages_creates_chunks(novel_db_env, monkeypatch):
 
     conn = sqlite3.connect(str(novel_db_env["db_path"]))
     try:
-        import sqlite_vec
-        conn.enable_load_extension(True)
-        sqlite_vec.load(conn)
-        conn.enable_load_extension(False)
         init_schema(conn)
         _populate_pages(conn, book_name, ["Page one content. Hello world."] * 3)
 
