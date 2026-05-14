@@ -20,7 +20,7 @@ novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、�
 - **疎結合**: 既存 backend にミニマル追加。`routers/novel_db.py` と `services/novel_db/` 配下に閉じる
 - **既存パターン踏襲**: routers / services 分離・`_deps.py` の validated_source・`utils/path_utils.py` の validate_safe_path を流用（[CLAUDE.md backend conventions](../../.claude/CLAUDE.md)）
 - **SQLite 単一ファイル**: 書籍データ・チャンク・ベクトル・履歴・ジョブをすべて 1 ファイルにまとめ、DB 配置・バックアップを単純化
-- **既存 series / meta は流用**: 書籍 ↔ シリーズの紐付けは既存 `series.router` / `data/meta/novel/meta.json` をそのまま参照
+- **既存 series / meta は流用**: 書籍 ↔ シリーズの紐付けは既存 `series.router` / `services/meta_store.py` 経由で `data/meta.db` を参照（Phase 64 で JSON → SQLite 移行済み）
 - **LLM クライアントは共通モジュール**: thinking モデルの呼び出しロジックは `D:\61.tool\common\llm`（A-0 リネーム前は `Qwen/`）に切り出し、他プロジェクトと共有（詳細は [ADR-0007](../02_基本設計/ADR/0007_llm-extraction-qwen-adoption.md)）
 - **リアルタイム配信は SSE**: Qwen3.6 の応答（80〜130 秒）を Server-Sent Events で逐次配信
 
@@ -250,8 +250,8 @@ CREATE INDEX idx_rebuild_jobs_state ON rebuild_jobs(state, enqueued_at);
 ### 4.1. シリーズ ID の扱い
 
 - `qa_history.scope_id` には文字列で series_id を保存
-- series_id の実体は既存の `data/meta/novel/meta.json` の series 情報（既存 `services/series_detector.py` が生成）に従う
-- novel.db 内には series テーブルを作らず、参照のたびに meta.json から取得（書籍数 11 冊規模では速度問題なし）
+- series_id の実体は `meta.db` の `meta` テーブルの `series_id` カラム（`services/series_detector.py` が生成）に従う（Phase 64 で JSON → SQLite 移行済み）
+- novel.db 内には series テーブルを作らず、参照のたびに `services/meta_store.py` 経由で `meta.db` から取得（書籍数 11 冊規模では速度問題なし）
 
 ---
 
@@ -753,11 +753,11 @@ class ScopeFilter:
         if self.type == "book":
             return "AND b.name = :scope_id"
         if self.type == "series":
-            # series_id は meta.json 参照で book_name のリストに展開
+            # series_id は meta.db 参照で book_name のリストに展開
             ...
 ```
 
-シリーズスコープでは `meta.json` から該当 series_id の書籍リストを取得し、`b.name IN (...)` で SQL に展開する。
+シリーズスコープでは `meta.db` の meta テーブルから該当 series_id の書籍リストを取得し、`b.name IN (...)` で SQL に展開する。
 
 ### 6.3. ハイライト
 
@@ -1295,7 +1295,7 @@ def _check_locked(queue: NovelDbJobQueue) -> None:
 ```python
 def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
     """data/kindle_novel/images/ のサブディレクトリを起点に書籍リストを構築し、
-    novel.db の DB 状態（is_indexed / page_count / indexed_at）と meta.json を結合して返す。
+    novel.db の DB 状態（is_indexed / page_count / indexed_at）と meta.db を結合して返す。
 
     ※ PDFs ではなく images/ ディレクトリを起点とする（PDFs は廃止済み）。
     """
@@ -1377,11 +1377,11 @@ app.include_router(novel_db.router, prefix="/api", tags=["novel_db"])
 
 画像配信は `/kindle_novel/images/{書籍名}/{連番}.png` を継続利用。フロント側で URL を組み立てる。
 
-### 11.2. meta.json / シリーズ機能
+### 11.2. meta.db / シリーズ機能
 
-- `data/meta/novel/meta.json` はそのまま残す（authors / hidden / read_state / series_id）
-- 既存 `services/series_detector.py` / `services/meta_store.py` を novel_db でも参照
-- novel_db.py は meta.json には書き込まない（read-only 参照）
+- 書籍メタ（authors / hidden / read_state / series_id）は `meta.db` の `meta` テーブルで管理（Phase 64 移行済み）
+- 既存 `services/series_detector.py` / `services/meta_store.py` / `services/meta_db.py` を novel_db でも参照
+- novel_db.py は meta テーブルには書き込まない（read-only 参照）
 
 ### 11.3. 既存 `routers/library.py` との棲み分け
 
@@ -1420,7 +1420,7 @@ embedding / LLM の Ollama 呼び出しは `responses` ライブラリ等でモ�
 - [frontend/src/config/api.ts:110](../../frontend/src/config/api.ts#L110) の `source === 'novel'` 分岐を削除
 - `backend/data/kindle_novel/pdfs/` 配下の PDF を削除（`thumbnails/` も novel ビューアで使っていたら見直し）
 - `kindle-pdf/batch_ocr.py` / `searchable_pdf.py` は kindle 用途で残す（novel 用途のみ撤去）
-- 既存 `data/meta/novel/meta.json` の `pdf_path` フィールド等が PDF 前提なら整理
+- `meta.db` の `meta` テーブルに残る `pdf_path` 相当フィールド等が PDF 前提なら整理（Phase 64 移行後は SQLite 直接編集）
 
 ### 永続資産（削除しない）
 - `backend/data/kindle_novel/images/{書籍名}/*.png`: 画像表示・再 OCR 用途

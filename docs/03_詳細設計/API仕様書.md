@@ -218,7 +218,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ---
 
 ### §1.6 `GET /api/genres`
-ソース別のジャンルリスト（表示順）を返す。ファイルが未作成の場合は meta.json から既存 `genre` フィールドを収集して初期リストを返す。
+ソース別のジャンルリスト（表示順）を返す。ファイルが未作成の場合は meta.db の meta テーブルから既存 `genre` フィールドを収集して初期リストを返す。
 
 **クエリパラメータ**: `source=doujin`（省略可）
 
@@ -896,7 +896,7 @@ novel タブのテキスト DB ビューア機能。設計の詳細は [小説�
 
 ### §7.1 `GET /api/novel_db/books`
 
-novel ソースに登録された書籍一覧と DB 状態を返す。`data/kindle_novel/images/` 配下のサブディレクトリを起点とし、`data/meta/novel/meta.json` の作者・シリーズ情報と `novel.db` の DB 状態を結合。
+novel ソースに登録された書籍一覧と DB 状態を返す。`data/kindle_novel/images/` 配下のサブディレクトリを起点とし、`meta.db` の作者・シリーズ情報と `novel.db` の DB 状態を結合。
 
 **クエリパラメータ**: なし
 
@@ -1498,13 +1498,13 @@ data: {"type": "error", "message": "本文が長すぎます（推定 120,000 �
 
 ## §9. Amazon CSV インポート（amazon_import）
 
-Amazon 購入履歴 CSV から novel / comic ライブラリの `meta.json` を著者・ASIN で補完するエンドポイント。CSV はサーバー側の固定パス（`AMAZON_DATA_DIR`）から自動読み込みするため、ファイルアップロード不要。
+Amazon 購入履歴 CSV から novel / comic ライブラリの `meta.db` を著者・ASIN で補完するエンドポイント。CSV はサーバー側の固定パス（`AMAZON_DATA_DIR`）から自動読み込みするため、ファイルアップロード不要。
 
 ---
 
 ### §9.1 `POST /api/amazon/import`
 
-固定パスの Amazon CSV を読み込み、指定ソース（`novel` または `comic`）の `meta.json` を著者・ASIN で補完する。既存値は上書きしない（空欄のみ補完）。
+固定パスの Amazon CSV を読み込み、指定ソース（`novel` または `comic`）の `meta.db` を著者・ASIN で補完する。既存値は上書きしない（空欄のみ補完）。
 
 **クエリパラメータ**:
 

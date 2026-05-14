@@ -458,7 +458,7 @@ function useNovelDbRebuildJob(): {
 };
 ```
 
-- `status` は 5 秒間隔でポーリング（既存 `usePolling` フック流用）
+- `status` は 5 秒間隔でポーリング（`@tanstack/react-query` の `useQuery` + `refetchInterval: 5000` で実装。Phase 65 で `usePolling` を廃止）
 - `enqueue` 後にステータス即時 refetch
 - ジョブ完了を検知したら `useNovelDbBooks.refetch` をトリガ（イベントバスや context で連携）
 
