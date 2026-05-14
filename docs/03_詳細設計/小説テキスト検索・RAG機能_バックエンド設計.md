@@ -129,7 +129,11 @@ backend/
         ├── contextualizer.py        # gemma4:e4b でチャンクごとの位置説明を生成（B-9）。should_skip_context() を公開（Phase 55-2）
         ├── query_expander.py        # gemma4:e4b で QA 質問を 3 個の検索クエリに展開（B-11）
         ├── retrieval.py             # post_qa / post_chat_session_start 共通の検索・コンテキスト構築（Phase 55-3: RetrievalResult + retrieve()）
-        ├── search.py                # FTS5 OR + ベクトル検索 + RRF + フィルタ + 主要キャラ JOIN + サマリ vec 検索（Scope frozen=True / _resolve_book_names lru_cache, Phase 55-4）
+        ├── _search_types.py         # 共有型（Scope / SearchHit）・_resolve_book_names(lru_cache) / _fetch_main_characters — Phase 70 抽出
+        ├── fts5_search.py           # FTS5 BM25 クエリ整形・sanitize_snippet・fts_search — Phase 70 抽出
+        ├── vector_search.py         # LanceDB KNN チャンク検索・search_book_summaries — Phase 70 抽出
+        ├── rrf_ranker.py            # RRF 融合 hybrid_search / load_all_pages_of_book — Phase 70 抽出
+        ├── search.py                # 後方互換再エクスポート（47 行）— Phase 70 で縮小
         ├── llm.py                   # 共通 Qwen モジュール経由のストリーミング（薄いラッパ）
         ├── builder.py               # 1 冊の DB 構築フロー（再構築含む）
         ├── _prompts.py              # プロンプトテンプレート・LLM オプション・parse_combined_output — Phase 60 抽出
@@ -697,7 +701,15 @@ uv run python scripts/build_character_summaries.py --all --min-pages 5    # page
 
 ---
 
-## 6. 検索（`search.py`）
+## 6. 検索（`search.py` → Phase 70 以降は 4 モジュールに分離）
+
+> **Phase 70 変更**: `search.py` は以下の 4 サブモジュールに分割済み。`search.py` は後方互換のため全シンボルを再エクスポートする薄いラッパーのみ。
+> | モジュール | 責務 |
+> |---|---|
+> | `_search_types.py` | `Scope` / `SearchHit` / `_resolve_book_names` / `_fetch_main_characters` |
+> | `fts5_search.py` | `build_fts5_or_query` / `sanitize_snippet` / `fts_search` |
+> | `vector_search.py` | `vec_search` / `search_book_summaries` |
+> | `rrf_ranker.py` | `hybrid_search` / `load_all_pages_of_book` |
 
 ### 6.1. ハイブリッド検索（FTS5 OR + ベクトル + RRF）
 
