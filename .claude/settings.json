@@ -188,7 +188,10 @@
       "PowerShell(git tag *)",
       "PowerShell(git log)",
       "PowerShell(git status)",
-      "PowerShell(git diff)"
+      "PowerShell(git diff)",
+      "PowerShell(ollama list)",
+      "PowerShell(ollama list *)",
+      "PowerShell(ollama search *)"
     ]
   },
   "hooks": {
