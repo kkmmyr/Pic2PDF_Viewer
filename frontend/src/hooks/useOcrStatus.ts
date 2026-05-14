@@ -10,7 +10,7 @@ import type { OcrStatusResponse } from '../types';
  * - 常時ポーリングが必要なため enabled は固定で true
  * - ポーリング間隔は 2000ms（usePolling のデフォルト）
  */
-export function useOcrStatus() {
+export function useOcrStatus(enabled = true) {
     const [status, setStatus] = useState<OcrStatusResponse['status']>('idle');
     const [logs, setLogs] = useState<string[]>([]);
 
@@ -24,7 +24,7 @@ export function useOcrStatus() {
         }
     }, []);
 
-    const { refetch } = usePolling(fetchStatus, { enabled: true });
+    const { refetch } = usePolling(fetchStatus, { enabled });
 
     const startOcr = useCallback(async (targetDir?: string) => {
         return apiClient.post(API_ENDPOINTS.OCR_RUN, { target_dir: targetDir });

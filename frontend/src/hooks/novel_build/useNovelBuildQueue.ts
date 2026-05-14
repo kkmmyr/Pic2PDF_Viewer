@@ -27,7 +27,7 @@ export interface UseNovelBuildQueue {
     cancel: (jobId: number) => Promise<void>;
 }
 
-export function useNovelBuildQueue(): UseNovelBuildQueue {
+export function useNovelBuildQueue(enabled = true): UseNovelBuildQueue {
     const [status, setStatus] = useState<BuildQueueStatus>(INITIAL_STATUS);
     const [isEnqueuing, setIsEnqueuing] = useState(false);
     const [enqueueError, setEnqueueError] = useState<string | null>(null);
@@ -35,6 +35,8 @@ export function useNovelBuildQueue(): UseNovelBuildQueue {
     const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
+        if (!enabled) return;
+
         function connect() {
             closeRef.current = connectBuildStream({
                 onStatus: setStatus,
@@ -53,7 +55,7 @@ export function useNovelBuildQueue(): UseNovelBuildQueue {
             closeRef.current?.();
             closeRef.current = null;
         };
-    }, []);
+    }, [enabled]);
 
     const enqueue = useCallback(
         async (

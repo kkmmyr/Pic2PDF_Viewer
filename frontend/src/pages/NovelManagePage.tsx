@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Download, HammerIcon, Layers, Loader2, Terminal, Wrench } from 'lucide-react';
+import { HammerIcon, Layers, Loader2, Terminal, Wrench } from 'lucide-react';
 
-import { API_ENDPOINTS } from '../config/api';
-import apiClient from '../config/api_client';
 import { useToast } from '../hooks';
 import { ToastContainer } from '../components/reader/ToastContainer';
 
 import {
+    AmazonImportButton,
     FinishedJobCard,
     QueuedJobCard,
     RunningJobCard,
@@ -36,13 +35,22 @@ function modeLabel(mode?: BuildMode): string {
 
 export default function NovelManagePage() {
     const [activeTab, setActiveTab] = useState<Tab>('ocr');
-    const { status, isEnqueuing, enqueueError, enqueue, cancel } = useNovelBuildQueue();
-    const { status: ocrStatus } = useOcrStatus();
+    // タブ初訪問時に有効化し、以後は常時アクティブにする遅延起動パターン。
+    // OCR タブは初期タブなので初めから有効。Build タブは初訪問時に有効化。
+    const [buildEnabled, setBuildEnabled] = useState(false);
+    const [ocrEnabled] = useState(true);
+
+    const handleTabChange = (tab: Tab) => {
+        setActiveTab(tab);
+        if (tab === 'build') setBuildEnabled(true);
+    };
+
+    const { status, isEnqueuing, enqueueError, enqueue, cancel } = useNovelBuildQueue(buildEnabled);
+    const { status: ocrStatus } = useOcrStatus(ocrEnabled);
     const [books, setBooks] = useState<BookSummary[]>([]);
     const [allBooks, setAllBooks] = useState(false);
     const [selectedBook, setSelectedBook] = useState('');
     const [showBuilt, setShowBuilt] = useState(false);
-    const [isImporting, setIsImporting] = useState(false);
     const { toasts, showToast, dismissToast } = useToast();
 
     useEffect(() => {
@@ -67,47 +75,6 @@ export default function NovelManagePage() {
         const next = books.filter((b) => (value ? b.indexed_at !== null : b.indexed_at === null));
         setShowBuilt(value);
         setSelectedBook(next.length > 0 ? next[0].name : '');
-    };
-
-    const handleAmazonImport = async () => {
-        setIsImporting(true);
-        try {
-            const [novelRes, comicRes] = await Promise.allSettled([
-                apiClient.post<{ updated: number; skipped: number; unmatched: number }>(
-                    API_ENDPOINTS.AMAZON_IMPORT('novel'),
-                ),
-                apiClient.post<{ updated: number; skipped: number; unmatched: number }>(
-                    API_ENDPOINTS.AMAZON_IMPORT('comic'),
-                ),
-            ]);
-
-            const novelData =
-                novelRes.status === 'fulfilled' ? novelRes.value.data : null;
-            const comicData =
-                comicRes.status === 'fulfilled' ? comicRes.value.data : null;
-
-            const updated = (novelData?.updated ?? 0) + (comicData?.updated ?? 0);
-            const skipped = (novelData?.skipped ?? 0) + (comicData?.skipped ?? 0);
-            const unmatched = (novelData?.unmatched ?? 0) + (comicData?.unmatched ?? 0);
-
-            const hasError =
-                novelRes.status === 'rejected' || comicRes.status === 'rejected';
-
-            if (hasError && updated === 0) {
-                const msg =
-                    novelRes.status === 'rejected'
-                        ? (novelRes.reason as Error).message
-                        : (comicRes.reason as Error).message;
-                showToast(`インポート失敗: ${msg}`, 'error');
-            } else {
-                showToast(
-                    `更新: ${updated} 件 / スキップ: ${skipped} 件 / 未マッチ: ${unmatched} 件`,
-                    'success',
-                );
-            }
-        } finally {
-            setIsImporting(false);
-        }
     };
 
     const handleEnqueue = (mode: 'full_build' | 'generate_contexts' = 'full_build') => {
@@ -203,33 +170,21 @@ export default function NovelManagePage() {
                         OCR → Full Build の順で実施する統合管理画面
                     </p>
                 </div>
-                <button
-                    onClick={() => void handleAmazonImport()}
-                    disabled={isImporting}
-                    className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-                    title="Amazon CSV から著者・ASIN を補完（novel + comic）"
-                >
-                    {isImporting ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <Download className="w-4 h-4" />
-                    )}
-                    Amazon CSV
-                </button>
+                <AmazonImportButton showToast={showToast} />
             </div>
 
             {/* タブ */}
             <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
                 <div className="flex">
                     <button
-                        onClick={() => setActiveTab('ocr')}
+                        onClick={() => handleTabChange('ocr')}
                         className={`${TAB_BASE} ${activeTab === 'ocr' ? TAB_ACTIVE : TAB_INACTIVE}`}
                     >
                         <Terminal className="w-4 h-4" />
                         OCR 管理
                     </button>
                     <button
-                        onClick={() => setActiveTab('build')}
+                        onClick={() => handleTabChange('build')}
                         className={`${TAB_BASE} ${activeTab === 'build' ? TAB_ACTIVE : TAB_INACTIVE}`}
                     >
                         <HammerIcon className="w-4 h-4" />
