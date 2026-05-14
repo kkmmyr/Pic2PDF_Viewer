@@ -25,7 +25,7 @@ def test_enqueue_creates_queued_job(queue):
     assert status["queued_jobs"][0]["id"] == job_id
     assert status["queued_jobs"][0]["type"] == "book"
     assert status["queued_jobs"][0]["target_id"] == "おこぼれ姫 1"
-    assert status["queued_jobs"][0]["mode"] == "pdf_text"
+    assert status["queued_jobs"][0]["mode"] == "rebuild"
 
 
 def test_enqueue_returns_correct_queue_position(queue):
@@ -89,9 +89,9 @@ def test_get_status_includes_recent_finished(queue):
 
 
 def test_enqueue_with_explicit_mode(queue):
-    job_id, _ = queue.enqueue("book", "a", mode="reocr")
+    job_id, _ = queue.enqueue("book", "a", mode="ocr")
     status = queue.get_status()
-    assert status["queued_jobs"][0]["mode"] == "reocr"
+    assert status["queued_jobs"][0]["mode"] == "ocr"
 
 
 def test_update_detail_writes_to_db(queue):
@@ -105,7 +105,7 @@ def test_update_detail_writes_to_db(queue):
         )
         conn.commit()
 
-    queue._update_detail(job_id, "embedding 10/100 チャンク")
+    queue._worker._update_detail(job_id, "embedding 10/100 チャンク")
 
     with with_db() as conn:
         row = conn.execute(
@@ -134,8 +134,8 @@ def test_get_status_current_job_includes_current_detail(queue):
 def test_update_detail_overwrites_previous_value(queue):
     """_update_detail を複数回呼ぶと最新値に上書きされる。"""
     job_id, _ = queue.enqueue("book", "c")
-    queue._update_detail(job_id, "first")
-    queue._update_detail(job_id, "second")
+    queue._worker._update_detail(job_id, "first")
+    queue._worker._update_detail(job_id, "second")
 
     with with_db() as conn:
         row = conn.execute(

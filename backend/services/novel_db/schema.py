@@ -115,7 +115,7 @@ def _ddl() -> str:
             id              INTEGER PRIMARY KEY,
             job_type        TEXT NOT NULL,
             target_id       TEXT,
-            mode            TEXT NOT NULL DEFAULT 'pdf_text',
+            mode            TEXT NOT NULL DEFAULT 'rebuild',
             state           TEXT NOT NULL DEFAULT 'queued',
             enqueued_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             started_at      TIMESTAMP,

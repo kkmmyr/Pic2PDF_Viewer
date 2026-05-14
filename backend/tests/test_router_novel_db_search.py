@@ -114,7 +114,7 @@ def test_post_search_validation_oversized_query(client, search_setup):
 
 def test_post_search_returns_503_when_rebuild_running(client, search_setup, monkeypatch):
     from services.novel_db.job_queue import job_queue
-    monkeypatch.setattr(job_queue, "_is_running", True, raising=False)
+    monkeypatch.setattr(job_queue._worker, "_is_running", True, raising=False)
     res = client.post(
         "/api/novel_db/search",
         json={"query": "デューク", "scope": {"type": "all"}},
@@ -190,7 +190,7 @@ def test_post_qa_validation_oversized_question(client, search_setup):
 
 def test_post_qa_returns_503_when_rebuild_running(client, search_setup, monkeypatch):
     from services.novel_db.job_queue import job_queue
-    monkeypatch.setattr(job_queue, "_is_running", True, raising=False)
+    monkeypatch.setattr(job_queue._worker, "_is_running", True, raising=False)
     res = client.post(
         "/api/novel_db/qa",
         json={"question": "Q", "scope": {"type": "all"}},

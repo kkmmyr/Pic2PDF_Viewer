@@ -131,7 +131,8 @@ backend/
         ├── llm.py                   # 共通 Qwen モジュール経由のストリーミング（薄いラッパ）
         ├── builder.py               # 1 冊の DB 構築フロー（再構築含む）
         ├── summarizer.py            # 1 冊の俯瞰サマリ生成（Qwen 1-shot、num_ctx=131072）
-        ├── job_queue.py             # 再構築ジョブの全体ロック + キュー
+        ├── job_queue.py             # 再構築ジョブの全体ロック + キュー API（NovelDbJobQueue）
+        ├── job_worker.py            # ジョブ実行 worker スレッド（NovelDbJobWorker）— Phase 59 抽出
         └── library.py               # 書籍一覧取得・DB 状態問い合わせ
 
 backend/scripts/                     # CLI 用ツール
@@ -302,9 +303,9 @@ def extract_pages(pdf_path: Path) -> list[dict]:
 
 PoC スクリプトで動作確認後、本実装に昇格（PoC ディレクトリ `tmp_poc/` は実装完了後に削除）。
 
-#### 5.1.1. 画像 OCR モード（`mode=ocr` / `mode=reocr`）（2026-05-13 追加）
+#### 5.1.1. 画像 OCR モード（`mode=ocr`）（2026-05-13 追加）
 
-`rebuild_jobs.mode` が `ocr` または `reocr` のとき、PDF テキスト層の代わりに `images/*.png` を yomitoku で OCR してページテキストを生成する。
+`rebuild_jobs.mode` が `ocr` のとき、PDF テキスト層の代わりに `images/*.png` を yomitoku で OCR してページテキストを生成する。旧称 `reocr` は Phase 59 で廃止（起動時 DB migration で `ocr` に正規化）。
 
 **実行方式: subprocess 分離**
 
@@ -1195,76 +1196,65 @@ async def event_stream(request: Request):
 
 ---
 
-## 8. 再構築ジョブ（`job_queue.py`）
+## 8. 再構築ジョブ（`job_queue.py` + `job_worker.py`）
 
 ### 8.1. 全体ロック + ジョブキュー
 
-- `services/novel_db/job_queue.py` に `NovelDbJobQueue` クラス
-- バックエンド起動時に `main.py` の lifespan で起動・停止
+Phase 59 でキュー管理と worker 実行を 2 クラスに分離した。
+
+| クラス | ファイル | 責務 |
+|---|---|---|
+| `NovelDbJobQueue` | `job_queue.py` | `enqueue` / `cancel` / `get_status` + ライフサイクル管理 |
+| `NovelDbJobWorker` | `job_worker.py` | worker スレッド実行・DB 更新・ジョブ実行ロジック |
+
+- バックエンド起動時に `main.py` の lifespan で `NovelDbJobQueue.start()` / `stop()` を呼ぶ
+- `start()` 内で旧 JobMode 名を DB 上でマイグレーション（`pdf_text` → `rebuild`、`reocr` → `ocr`）
 - 単一の worker スレッドで `rebuild_jobs` テーブルを polling し、`state='queued'` のジョブを古い順に実行
+- `is_running` は `NovelDbJobQueue` が `NovelDbJobWorker` に委譲
 
 ```python
 class NovelDbJobQueue:
     def __init__(self) -> None:
-        self._lock = threading.Lock()
         self._wakeup = threading.Event()
-        self._stop = threading.Event()
-        self._worker: threading.Thread | None = None
-        self.is_running: bool = False  # 検索 / 質問 API がチェック
+        self._stop_event = threading.Event()
+        self._worker_thread: threading.Thread | None = None
+        self._worker = NovelDbJobWorker(self._stop_event, self._wakeup)
+
+    @property
+    def is_running(self) -> bool:
+        return self._worker.is_running
 
     def start(self) -> None:
-        self._worker = threading.Thread(target=self._run, daemon=True)
-        self._worker.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-        self._wakeup.set()
-        if self._worker:
-            self._worker.join(timeout=10)
-
-    def enqueue(self, job_type: str, target_id: str | None = None) -> int:
-        """ジョブを rebuild_jobs に INSERT し、worker を起こす。job_id を返す。"""
-        with sqlite_conn() as conn:
-            cur = conn.execute(
-                "INSERT INTO rebuild_jobs (job_type, target_id) VALUES (?, ?)",
-                (job_type, target_id),
-            )
+        with with_db() as conn:
+            init_schema(conn)
+            conn.execute("UPDATE rebuild_jobs SET state='failed', error_message='aborted by server restart' WHERE state='running'")
+            conn.execute("UPDATE rebuild_jobs SET mode='rebuild' WHERE mode='pdf_text'")
+            conn.execute("UPDATE rebuild_jobs SET mode='ocr' WHERE mode='reocr'")
             conn.commit()
-            job_id = cur.lastrowid
-        self._wakeup.set()
-        return job_id
+        self._worker_thread = threading.Thread(target=self._worker.run, name="NovelDbJobQueue", daemon=True)
+        self._worker_thread.start()
 
-    def _run(self) -> None:
-        while not self._stop.is_set():
-            self._wakeup.wait(timeout=5)
-            self._wakeup.clear()
-            self._drain_queue()
+    def enqueue(self, job_type: JobType, target_id: str | None = None, mode: JobMode = "rebuild") -> tuple[int, int]:
+        ...  # INSERT + wakeup.set()
 
-    def _drain_queue(self) -> None:
-        while True:
-            with self._lock:
-                with sqlite_conn() as conn:
-                    row = conn.execute(
-                        "SELECT id, job_type, target_id FROM rebuild_jobs "
-                        "WHERE state='queued' ORDER BY enqueued_at LIMIT 1"
-                    ).fetchone()
-                    if not row:
-                        return
-                    conn.execute(
-                        "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') "
-                        "WHERE id=?",
-                        (row[0],),
-                    )
-                    conn.commit()
-                self.is_running = True
-            try:
-                self._execute_job(row)
-                self._mark_completed(row[0])
-            except Exception as e:
-                self._mark_failed(row[0], str(e))
-            finally:
-                self.is_running = False
+class NovelDbJobWorker:
+    def run(self) -> None: ...          # スレッドエントリー
+    def _drain_queue(self) -> None: ...
+    def _claim_next_job(self) -> dict | None: ...
+    def _mark_finished(...) -> None: ...
+    def _update_progress/step/detail(...) -> None: ...
+    def _execute_job(self, job: dict) -> None: ...  # mode 別分岐
+    def _resolve_targets(...) -> list[str]: ...
 ```
+
+**有効な JobMode**（Phase 59 で旧名を廃止）:
+
+| mode | 処理 |
+|---|---|
+| `rebuild` | pages.full_text → chunks / embeddings 再構築（旧 `pdf_text` と同義、DB 上は migrate 済み） |
+| `ocr` | images/*.png → yomitoku OCR → pages.full_text（旧 `reocr` と同義、DB 上は migrate 済み） |
+| `full_build` | rebuild → summarize → extract_chars → char_summary の統合フロー |
+| `generate_contexts` | チャンクごとの文脈付与 + 再 embedding（Step 3 単独） |
 
 ### 8.2. 検索 / 質問 API のロック確認
 
@@ -1278,7 +1268,7 @@ def _check_locked(queue: NovelDbJobQueue) -> None:
         )
 ```
 
-`routers/novel_db.py` の検索 / 質問エンドポイントの先頭で呼び出す。
+`routers/novel_db/_deps.py` の `require_not_locked()` として実装（Phase 57 移行済み）。検索 / 質問エンドポイントに `Depends(require_not_locked)` を付与する。
 
 ### 8.3. ジョブ進捗表示
 
@@ -1447,7 +1437,7 @@ embedding / LLM の Ollama 呼び出しは `responses` ライブラリ等でモ�
     - **B-9（2026-05-11）**: Anthropic 流の Contextual Retrieval。各チャンクに 80 字の位置説明を gemma4:e4b で生成し、`(contextual_text + chunk_text)` を再 embedding。検索 recall を 35〜49% 改善（§5.8）
 - **書籍単位の再 OCR 機能（実装済み, 2026-05-13）**: UI の「OCR」ボタンから `mode=ocr` / `mode=reocr` ジョブをキューに投入し、`images/*.png` を yomitoku で OCR して pages テーブルを更新する。実行方式の詳細は [§5.1.1](#511-画像-ocr-モードmodeocr--modereocr2026-05-13-追加) を参照。
   - OCR 実行は `ocr_worker.py` を `D:\61.tool\common\ocr\venv\Scripts\python.exe` で subprocess 起動する方式（yomitoku の GPU 依存を backend venv から分離）
-  - `rebuild_jobs.mode` カラムで `pdf_text` / `ocr` / `reocr` / `full_build` を切替
+  - `rebuild_jobs.mode` カラムで `rebuild` / `ocr` / `full_build` / `generate_contexts` を切替（旧 `pdf_text`/`reocr` は Phase 59 で廃止、起動時 migration で正規化）
 
 ---
 
