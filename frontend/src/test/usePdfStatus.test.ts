@@ -94,6 +94,6 @@ describe('usePdfStatus', () => {
         await act(async () => {
             await result.current.refetch();
         });
-        expect(result.current.statusItems).toHaveLength(1);
+        await waitFor(() => expect(result.current.statusItems).toHaveLength(1));
     });
 });

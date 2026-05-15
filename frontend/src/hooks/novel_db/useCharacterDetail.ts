@@ -13,6 +13,7 @@ export interface UseCharacterDetail {
     detail: CharacterDetail | null;
     isLoading: boolean;
     error: string | null;
+    refetch: () => Promise<void>;
 }
 
 export function useCharacterDetail(
@@ -23,11 +24,12 @@ export function useCharacterDetail(
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const load = useCallback(async (b: string, c: string) => {
+    const load = useCallback(async () => {
+        if (!bookName || !charName) return;
         setIsLoading(true);
         setError(null);
         try {
-            const d = await fetchCharacterDetail(b, c);
+            const d = await fetchCharacterDetail(bookName, charName);
             setDetail(d);
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e));
@@ -35,7 +37,7 @@ export function useCharacterDetail(
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [bookName, charName]);
 
     useEffect(() => {
         if (!bookName || !charName) {
@@ -43,8 +45,8 @@ export function useCharacterDetail(
             setError(null);
             return;
         }
-        void load(bookName, charName);
+        void load();
     }, [bookName, charName, load]);
 
-    return { detail, isLoading, error };
+    return { detail, isLoading, error, refetch: load };
 }

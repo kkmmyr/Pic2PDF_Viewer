@@ -9,6 +9,12 @@ if %errorlevel% equ 0 (
     for /f "tokens=5" %%p in ('netstat -ano ^| findstr " :8766 " ^| findstr "LISTENING"') do (
         powershell -noprofile -command "$par=(gwmi Win32_Process -Filter 'ProcessId=%%p').ParentProcessId; if ($par) { Stop-Process -Id $par -Force -EA SilentlyContinue }; Stop-Process -Id %%p -Force -EA SilentlyContinue"
     )
+    REM Also start Frontend if not running
+    netstat -ano | findstr " :5176 " | findstr "LISTENING" > nul 2>&1
+    if %errorlevel% neq 0 (
+        echo Starting Frontend...
+        wt new-tab --title "Frontend" cmd /k "cd /d D:\61.tool\Pic2PDF_Viewer\frontend && npm run dev"
+    )
 ) else (
     REM Not running -> start Backend + Frontend
     wt new-tab --title "Backend" cmd /k "d:\61.tool\Pic2PDF_Viewer\backend\start_server.bat" ; new-tab --title "Frontend" cmd /k "cd /d D:\61.tool\Pic2PDF_Viewer\frontend && npm run dev"

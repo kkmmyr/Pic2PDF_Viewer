@@ -7,7 +7,7 @@ interface UseBookDetail {
     detail: BookDetail | null;
     isLoading: boolean;
     error: string | null;
-    refetch: () => void;
+    refetch: () => Promise<void>;
 }
 
 export function useBookDetail(bookName: string): UseBookDetail {
@@ -15,20 +15,23 @@ export function useBookDetail(bookName: string): UseBookDetail {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const load = useCallback(() => {
+    const load = useCallback(async () => {
         if (!bookName) return;
         setIsLoading(true);
         setError(null);
-        fetchBookDetail(bookName)
-            .then(setDetail)
-            .catch((e: unknown) => {
-                setError(e instanceof Error ? e.message : '取得失敗');
-            })
-            .finally(() => setIsLoading(false));
+        try {
+            const d = await fetchBookDetail(bookName);
+            setDetail(d);
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : '取得失敗');
+            setDetail(null);
+        } finally {
+            setIsLoading(false);
+        }
     }, [bookName]);
 
     useEffect(() => {
-        load();
+        void load();
     }, [load]);
 
     return { detail, isLoading, error, refetch: load };

@@ -41,7 +41,6 @@ description: git の commit / PR 作成 / branch 操作 / mv / rm を行う際�
 ## 危険な操作
 
 - 以下はユーザーの明示許可がない限り **禁止**:
-    - `git push --force` / `--force-with-lease`
     - `git reset --hard`
     - `git checkout -- <file>`（未保存の変更を破棄）
     - `git commit --amend`（公開済みコミットの書き換え）

@@ -7,7 +7,7 @@ echo Syncing dependencies with uv...
 uv sync
 
 echo Starting Backend Server...
-uv run uvicorn main:app --reload --port 8766
+uv run uvicorn main:app --reload --reload-dir . --reload-exclude "tests" --reload-exclude "scripts" --port 8766
 
 echo.
 echo Backend stopped. Restarting in 3s... (Ctrl+C + Y to stop)
