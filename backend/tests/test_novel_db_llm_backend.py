@@ -1,51 +1,12 @@
-"""services/novel_db/llm.py + _llm_backend.py のバックエンド構築 / 委譲テスト。
+"""services/novel_db/llm.py の委譲テスト。
 
-A-3（local_llm 移行）以降は env var bridge ではなく `BackendConfig` を引数渡し
-する設計。テストの主眼は
-
-1. `_llm_backend.build_qwen_backend()` が `config.NOVEL_DB_LLM_BACKEND` に応じて
-   `LlamaServerBackend` / `OllamaBackend` を返すこと
-2. 既存呼び出し側（`build_prompt` / `stream_qa`）のシグネチャが両バックエンドで
-   変わらないことの回帰
-
-の 2 点。バックエンド固有の挙動（OpenAI SSE 変換等）は `common/llm/tests/` 側
-で網羅済みなのでここではスタブで確認するに留める。
+Phase 74 で `_llm_backend.py` を廃止。Backend は各サービスファイル内で直接
+インライン構築されるため、テストは `_astream_ask` / `astream_chat` の
+monkeypatch と `build_prompt` 安定性確認に絞る。
 """
 from __future__ import annotations
 
 import pytest
-from local_llm import LlamaServerBackend, LLMError
-
-import config
-from services.novel_db import _llm_backend
-
-
-class TestBuildQwenBackend:
-    """`_llm_backend.build_qwen_backend()` が config に従って正しい Backend を返す。"""
-
-    def test_llama_server_backend_by_default(self, monkeypatch):
-        monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "llama_server")
-        monkeypatch.setattr(config, "NOVEL_DB_LLAMA_SERVER_URL", "http://test:11435")
-        monkeypatch.setattr(config, "NOVEL_DB_LLM_MODEL", "qwen3.6-iq4xs")
-
-        backend = _llm_backend.build_qwen_backend()
-        assert isinstance(backend, LlamaServerBackend)
-        assert backend.config.base_url == "http://test:11435"
-        assert backend.config.model == "qwen3.6-iq4xs"
-
-    def test_unknown_backend_raises(self, monkeypatch):
-        """Phase C で `ollama` 分岐撤去。`llama_server` 以外は LLMError。"""
-        monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "ollama")
-
-        with pytest.raises(LLMError, match="unknown NOVEL_DB_LLM_BACKEND"):
-            _llm_backend.build_qwen_backend()
-
-    def test_unknown_vllm_backend_raises(self, monkeypatch):
-        """将来 vLLM 等の新バックエンドを env で試そうとした場合のフェイルセーフ。"""
-        monkeypatch.setattr(config, "NOVEL_DB_LLM_BACKEND", "vllm")
-
-        with pytest.raises(LLMError, match="unknown NOVEL_DB_LLM_BACKEND"):
-            _llm_backend.build_qwen_backend()
 
 
 class TestStreamQaPassthrough:

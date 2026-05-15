@@ -12,11 +12,10 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 """
 from __future__ import annotations
 
-from local_llm import LLMError
+import config
+from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError, OllamaBackend
 
 from config import NOVEL_DB_CHAR_EXTRACT_MODEL
-
-from ._llm_backend import build_short_answer_backend
 
 EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大 3 名挙げてください。
 判断基準:
@@ -46,7 +45,22 @@ _OPTIONS = {
 }
 
 # プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
-_BACKEND = build_short_answer_backend(NOVEL_DB_CHAR_EXTRACT_MODEL)
+if config.NOVEL_DB_GEMMA_BACKEND == "qwen":
+    if config.NOVEL_DB_LLM_BACKEND != "llama_server":
+        raise LLMError(
+            f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
+            f"(supported: 'llama_server')",
+        )
+    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
+        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
+        model=config.NOVEL_DB_LLM_MODEL,
+    ))
+else:
+    _BACKEND: Backend = OllamaBackend(BackendConfig(
+        base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
+        model=NOVEL_DB_CHAR_EXTRACT_MODEL,
+        timeout=120,
+    ))
 
 
 def extract_main_characters(

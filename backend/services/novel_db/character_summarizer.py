@@ -12,11 +12,21 @@ import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
 
+import config
+from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError
+
 from config import NOVEL_DB_LLM_MODEL
 
-from ._llm_backend import build_qwen_backend
-
-_BACKEND = build_qwen_backend()
+if config.NOVEL_DB_LLM_BACKEND == "llama_server":
+    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
+        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
+        model=config.NOVEL_DB_LLM_MODEL,
+    ))
+else:
+    raise LLMError(
+        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
+        f"(supported: 'llama_server')",
+    )
 
 
 # キャラ名は通常 5〜15 字、まれに敬称付きで 20 字程度。30 字超は誤抽出と判断。

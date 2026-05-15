@@ -16,13 +16,23 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+import config
 from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_NUM_CTX
+from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError
 
-from ._llm_backend import build_qwen_backend
 from .search import Scope, SearchHit
 
 # プロセス起動時に Backend を作る。Backend は stateless なので使い回しで OK。
-_BACKEND = build_qwen_backend()
+if config.NOVEL_DB_LLM_BACKEND == "llama_server":
+    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
+        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
+        model=config.NOVEL_DB_LLM_MODEL,
+    ))
+else:
+    raise LLMError(
+        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
+        f"(supported: 'llama_server')",
+    )
 
 # PoC で確定した QA 用 LLM パラメータ。num_ctx は config 化されており、B-13 段階 A〜C で
 # 段階拡大（既定 32768）。

@@ -19,12 +19,10 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 """
 from __future__ import annotations
 
-from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_MIN_BODY_CHARS
+import config
+from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError, OllamaBackend
 
-# `_llm_backend` を先に import することで local_llm の sys.path 注入を発火させる
-# （contextualizer をスクリプトから直接利用する経路で path が未注入なまま
-# `local_llm` を import すると失敗するため、Phase B の注入箇所に揃える）。
-from ._llm_backend import LLMError, build_short_answer_backend
+from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_MIN_BODY_CHARS
 
 # Anthropic 流のプロンプト。書名・俯瞰サマリ・チャンク本文を与えて
 # 「retrieval のための簡潔な位置説明」を返してもらう。
@@ -69,7 +67,22 @@ _OPTIONS = {
 }
 
 # プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
-_BACKEND = build_short_answer_backend(NOVEL_DB_CONTEXT_MODEL)
+if config.NOVEL_DB_GEMMA_BACKEND == "qwen":
+    if config.NOVEL_DB_LLM_BACKEND != "llama_server":
+        raise LLMError(
+            f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
+            f"(supported: 'llama_server')",
+        )
+    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
+        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
+        model=config.NOVEL_DB_LLM_MODEL,
+    ))
+else:
+    _BACKEND: Backend = OllamaBackend(BackendConfig(
+        base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
+        model=NOVEL_DB_CONTEXT_MODEL,
+        timeout=120,
+    ))
 
 
 def generate_chunk_context(

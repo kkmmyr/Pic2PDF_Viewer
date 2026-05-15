@@ -24,7 +24,9 @@ from config import (
     NOVEL_DB_MIN_BODY_CHARS,
 )
 
-from ._llm_backend import build_qwen_backend
+import config
+from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError
+
 from ._prompts import (
     CHAR_SUMMARY_TARGET_CHARS,
     COMBINED_MAX_CHARACTERS,
@@ -46,7 +48,16 @@ from .embedder import embed_batch
 from .lance_store import get_summaries_table
 
 # プロセス起動時に Backend を作る。Backend は stateless なので使い回しで OK。
-_BACKEND = build_qwen_backend()
+if config.NOVEL_DB_LLM_BACKEND == "llama_server":
+    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
+        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
+        model=config.NOVEL_DB_LLM_MODEL,
+    ))
+else:
+    raise LLMError(
+        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
+        f"(supported: 'llama_server')",
+    )
 
 
 # ---------------------------------------------------------------------------
