@@ -3,7 +3,7 @@
 - **Status**: Accepted（実装完了 2026-05-11、commit `a1eee28`）
 - **Date**: 2026-05-11
 - **決定者**: プロジェクトオーナー
-- **関連**: [ADR-0007](0007_llm-extraction-qwen-adoption.md) / [小説テキスト検索・RAG機能_バックエンド設計.md](../../03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md) / [小説RAG_技術知見.md](../../05_記録/小説RAG_技術知見.md) / [バックログ B-14](../../01_要件定義/バックログ.md) / [LLM 層リファクタリング_完了記録](../../99_アーカイブ/LLM層リファクタリング_完了記録.md)（A-0〜A-7、共通モジュールを `Qwen/` → `llm/` にリネーム + Backend 抽象化）
+- **関連**: [ADR-0007](0007_llm-extraction-qwen-adoption.md) / [小説テキスト検索・RAG機能_バックエンド設計.md](../../03_詳細設計/機能別/小説テキスト検索・RAG機能_バックエンド設計.md) / [小説RAG_技術知見.md](../../05_記録/小説RAG_技術知見.md) / [バックログ B-14](../../01_要件定義/バックログ.md) / [LLM 層リファクタリング_完了記録](../../99_アーカイブ/LLM層リファクタリング_完了記録.md)（A-0〜A-7、共通モジュールを `Qwen/` → `llm/` にリネーム + Backend 抽象化）
 - **パス更新注記**: 2026-05-11 の A-0 で共通モジュールを `D:\61.tool\common\Qwen\lib\qwen_client.py` → `D:\61.tool\common\llm\local_llm\` に再構成。本 ADR 内のパス・API 名（`qwen_client` / `QwenError` 等）は決定時の歴史的記録としてそのまま残置（現行は `local_llm` パッケージ / `LLMError`）
 
 ## コンテキスト
@@ -92,7 +92,7 @@ ADR-0007 で小説 RAG の QA LLM を `qwen3.6:35b-a3b`（後に IQ4_XS 量子�
   - `D:\61.tool\common\Qwen\lib\qwen_client.py` — llama-server バックエンドを追加（`_dispatch_backend` 関数で分岐）
   - `D:\61.tool\common\llama.cpp\b9101\start-qwen-server.bat` — 新規。起動コマンドをラップ
   - `docs/03_詳細設計/小説RAG_LLMバックエンド切替設計案.md` — 新規ドラフト（本 ADR 採用時に本体設計書にマージ。Phase A の A-7 で削除済み、内容は §7.1 へ移行）
-  - `docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md` — §7 LLM 呼び出し部分を更新
+  - `docs/03_詳細設計/機能別/小説テキスト検索・RAG機能_バックエンド設計.md` — §7 LLM 呼び出し部分を更新
   - `docs/03_詳細設計/詳細設計書_バックエンド編.md §1.5` — ファイルマップを更新
   - `docs/04_環境構築/GPU環境セットアップ.md` — llama.cpp Windows CUDA ビルド入手手順を追加
   - `docs/05_記録/小説RAG_技術知見.md` — §9 LLM 推論バックエンド検証として Phase 0〜4b 結果を追記

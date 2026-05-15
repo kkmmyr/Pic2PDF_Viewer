@@ -737,7 +737,7 @@ novel OCR を開始する。`services.ocr_service.OCRService` がスレッドを
 
 ## §6. hitomi.la 新着監視
 
-詳細設計: [hitomi新着監視設計書.md §6](hitomi新着監視設計書.md#6-api-仕様)
+詳細設計: [機能別/hitomi新着監視設計書.md §6](機能別/hitomi新着監視設計書.md#6-api-仕様)
 
 ### §6.1 `GET /api/hitomi/new-arrivals`
 
@@ -877,12 +877,12 @@ novel OCR を開始する。`services.ocr_service.OCRService` がスレッドを
 
 ## §7. 小説テキスト検索・RAG（novel_db）
 
-novel タブのテキスト DB ビューア機能。設計の詳細は [小説テキスト検索・RAG機能_バックエンド設計.md](小説テキスト検索・RAG機能_バックエンド設計.md)、要件は [小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
+novel タブのテキスト DB ビューア機能。設計の詳細は [機能別/小説テキスト検索・RAG機能_バックエンド設計.md](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)、要件は [小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) を参照。
 
 ### 共通仕様
 
 - すべてのエンドポイントは `prefix=/api/novel_db`、`tags=["novel_db"]` で登録
-- **再構築ジョブ実行中の検索 / 質問**: `503 Service Unavailable` を `Retry-After: 10` ヘッダ付きで返す（[バックエンド設計 §8.2](小説テキスト検索・RAG機能_バックエンド設計.md)）
+- **再構築ジョブ実行中の検索 / 質問**: `503 Service Unavailable` を `Retry-After: 10` ヘッダ付きで返す（[バックエンド設計 §8.2](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）
 - **共通エラーレスポンス**: `{"detail": "<message>"}` 形式（FastAPI 標準）
 - **スコープオブジェクト** (`Scope`): 検索 / 質問 / 履歴 で共通の構造
     ```json
@@ -1034,7 +1034,7 @@ novel ソースの全書籍から重複なし作者一覧を返す。作者未�
 }
 ```
 
-- `snippet` は `<mark>` タグのみ許可（バックエンドで HTML エスケープ済み、フロントは `dangerouslySetInnerHTML` で安全に描画可能、[バックエンド設計 §6.3.1](小説テキスト検索・RAG機能_バックエンド設計.md)）
+- `snippet` は `<mark>` タグのみ許可（バックエンドで HTML エスケープ済み、フロントは `dangerouslySetInnerHTML` で安全に描画可能、[バックエンド設計 §6.3.1](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）
 - `has_highlight=false` の場合は FTS5 ヒットなし、ベクトル検索のみのチャンク先頭 200 字（HTML エスケープのみ）
 - `image_url` は `null` 可（元画像が無い場合）
 
@@ -1080,7 +1080,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 - `token` イベント: 生成された 1 単位（モデル依存、概ね数文字 〜 数十文字）
 - `done` イベント: 生成完了。`history_id` は `qa_history` テーブルに保存された履歴 ID
 - `done_reason`: `"stop"`（自然終了） / `"length"`（num_predict に達した） / `"canceled"`（クライアント切断）
-- クライアントが接続切断（`AbortController.abort()`）した場合、サーバ側で `done_reason='canceled'` として途中までの応答を `qa_history.answer` に保存（[バックエンド設計 §7.6](小説テキスト検索・RAG機能_バックエンド設計.md)）
+- クライアントが接続切断（`AbortController.abort()`）した場合、サーバ側で `done_reason='canceled'` として途中までの応答を `qa_history.answer` に保存（[バックエンド設計 §7.6](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）
 
 **エラー**:
 - `422`: `question` が空 / 500 字超 / `scope` 不正
@@ -1175,7 +1175,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ### §7.8 `POST /api/novel_db/builds`
 
-再構築ジョブをキューに登録。即座に `job_id` を返し、worker スレッドが順次処理する（[バックエンド設計 §8](小説テキスト検索・RAG機能_バックエンド設計.md)）。
+再構築ジョブをキューに登録。即座に `job_id` を返し、worker スレッドが順次処理する（[バックエンド設計 §8](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）。
 
 **リクエストボディ**:
 ```json
@@ -1209,7 +1209,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ### §7.9 `GET /api/novel_db/builds/status`
 
-現在のジョブキュー状態を返す。フロントは 5 秒間隔でポーリング（[フロントエンド設計 §6.6](小説テキスト検索・RAG機能_フロントエンド設計.md)）。
+現在のジョブキュー状態を返す。フロントは 5 秒間隔でポーリング（[フロントエンド設計 §6.6](機能別/小説テキスト検索・RAG機能_フロントエンド設計.md)）。
 
 **レスポンス**:
 ```json
@@ -1258,13 +1258,13 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 **エラー**:
 - `404`: 該当 `job_id` なし
-- `409`: ジョブが実行中（実行中ジョブはキャンセル不可、[バックエンド設計 §8.4](小説テキスト検索・RAG機能_バックエンド設計.md)）
+- `409`: ジョブが実行中（実行中ジョブはキャンセル不可、[バックエンド設計 §8.4](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）
 
 ---
 
 ### §7.11 `GET /api/novel_db/books/{book_name}/characters`（B-15）
 
-書籍に登録済みのキャラ一覧を返す。`book_characters` テーブルが空（CLI 未実行）の書籍は `200 []` を返す。生成は `scripts/build_character_summaries.py` で行う（[バックエンド設計 §5.10](小説テキスト検索・RAG機能_バックエンド設計.md)）。
+書籍に登録済みのキャラ一覧を返す。`book_characters` テーブルが空（CLI 未実行）の書籍は `200 []` を返す。生成は `scripts/build_character_summaries.py` で行う（[バックエンド設計 §5.10](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）。
 
 **ソート順**: `page_count` 降順 → `first_page` 昇順 → `name` 昇順
 
@@ -1380,7 +1380,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ + 回答ルール）を組み立て、`(system, user)` の 2 メッセージを `qa_messages` に append したうえで LLM ストリーミングを開始する。
 
-**SSE イベント形式（[バックエンド設計 §5.12](小説テキスト検索・RAG機能_バックエンド設計.md)）**:
+**SSE イベント形式（[バックエンド設計 §5.12](機能別/小説テキスト検索・RAG機能_バックエンド設計.md)）**:
 - `data: {"token": "..."}` — 部分トークン
 - `data: {"done": true, "session_id": 12, "message_id": 22, "eval_count": 432, "done_reason": "stop"}` — 終端
 - `data: {"error": "..."}` — 失敗（バックエンド非対応含む）
