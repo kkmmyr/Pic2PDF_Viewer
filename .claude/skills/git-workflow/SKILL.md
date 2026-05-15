@@ -47,11 +47,6 @@ description: git の commit / PR 作成 / branch 操作 / mv / rm を行う際�
     - `--no-verify`（pre-commit hook のスキップ）
 - 変更を「なかったことにしたい」場合は、まず `git stash` を提案する。
 
-## 変更履歴との連動
-
-- ソースコードを変更したら、コミット前に `docs/05_記録/変更履歴.md` を更新する（`frontend-conventions` / `backend-conventions` の「変更手順」と整合）。
-- 1 コミットの中で「変更履歴 + 該当ソース」をまとめてステージする。
-
 ## 「事前変更が混ざっている」状況の扱い
 
 セッション開始時点で `git status` に M / ?? のファイルがある場合：

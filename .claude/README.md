@@ -59,6 +59,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `test-writing` | pytest / vitest のテストコード追加・修正時 |
 | `frontend-conventions` | `frontend/src/` 配下の React/TypeScript コード編集時 |
 | `backend-conventions` | `backend/` 配下の Python/FastAPI コード編集時 |
+| `worktree-workflow` | git worktree を使った並列作業（大型リファクタ・機能開発）を始める際 |
 
 定義は [skills/](skills/) を参照。詳細は各 SKILL.md および `references/` 配下に記載。
 
