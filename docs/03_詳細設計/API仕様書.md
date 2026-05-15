@@ -59,9 +59,9 @@
   - §7.5 `GET /api/novel_db/qa/history` — 履歴一覧
   - §7.6 `GET /api/novel_db/qa/history/{id}` — 履歴詳細
   - §7.7 `DELETE /api/novel_db/qa/history/{id}` — 履歴削除
-  - §7.8 `POST /api/novel_db/rebuild` — 再構築ジョブ起動
-  - §7.9 `GET /api/novel_db/rebuild/status` — ジョブキュー状態
-  - §7.10 `DELETE /api/novel_db/rebuild/{job_id}` — 待機中ジョブのキャンセル
+  - §7.8 `POST /api/novel_db/builds` — 再構築ジョブ起動
+  - §7.9 `GET /api/novel_db/builds/status` — ジョブキュー状態
+  - §7.10 `DELETE /api/novel_db/builds/{job_id}` — 待機中ジョブのキャンセル
   - §7.19 `POST /api/novel/discussion/generate` — 読書会ディスカッション生成（SSE, B-20）
   - §7.20 `GET /api/novel/discussion/history` — ディスカッション履歴一覧（B-20）
 - [§9. Amazon CSV インポート（amazon_import）](#9-amazon-csvインポートamazon_import)
@@ -852,7 +852,7 @@ novel OCR を開始する。`services.ocr_service.OCRService` がスレッドを
 監視スクリプトを同期実行する（Task Scheduler を待たず即時取得）。実行中の二重起動は 409 で拒否。
 
 **クエリパラメータ**:
-- `skip_recent_days` (オプション、default `3.0`) — 指定日数以内に確認済みの作者をスキップ。`0` で全作者強制再チェック
+- `force` (オプション、default `false`) — `true` のとき全作者を強制再チェック（通常は当日実行済みの場合スキップ）
 
 **レスポンス**:
 ```json
@@ -1173,7 +1173,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ---
 
-### §7.8 `POST /api/novel_db/rebuild`
+### §7.8 `POST /api/novel_db/builds`
 
 再構築ジョブをキューに登録。即座に `job_id` を返し、worker スレッドが順次処理する（[バックエンド設計 §8](小説テキスト検索・RAG機能_バックエンド設計.md)）。
 
@@ -1182,7 +1182,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 {
   "type": "book",
   "target_id": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
-  "mode": "pdf_text"
+  "mode": "rebuild"
 }
 ```
 
@@ -1190,7 +1190,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 |---|---|---|---|
 | `type` | ○ | `"book"` / `"series"` / `"all"` | ジョブ単位 |
 | `target_id` | △ | — | `type='book'` のとき書籍名、`type='series'` のときシリーズ ID。`type='all'` では省略 |
-| `mode` | × | `"pdf_text"` (default) / `"reocr"` | `pdf_text` = 既存 PDF テキスト層から抽出、`reocr` = 元画像から yomitoku 再 OCR（将来機能、現状未実装） |
+| `mode` | × | `"rebuild"` (default) / `"ocr"` / `"full_build"` / `"generate_contexts"` | `rebuild` = pages → chunk/embed 再構築（OCR 済み前提）、`ocr` = 元画像から yomitoku OCR → full_text 更新、`full_build` / `generate_contexts` は §8 の novel_build 管理画面からも指定可 |
 
 **レスポンス**:
 ```json
@@ -1203,11 +1203,11 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 - `queued_position`: キュー内の順番（1 = 次に実行）
 
 **エラー**:
-- `422`: 不正な `type` / `target_id` 不一致 / `mode='reocr'` を未実装段階で指定
+- `422`: 不正な `type` / `target_id` 不一致
 
 ---
 
-### §7.9 `GET /api/novel_db/rebuild/status`
+### §7.9 `GET /api/novel_db/builds/status`
 
 現在のジョブキュー状態を返す。フロントは 5 秒間隔でポーリング（[フロントエンド設計 §6.6](小説テキスト検索・RAG機能_フロントエンド設計.md)）。
 
@@ -1219,7 +1219,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
     "id": 7,
     "type": "all",
     "target_id": null,
-    "mode": "pdf_text",
+    "mode": "rebuild",
     "started_at": "2026-05-09T11:50:00Z",
     "progress_total": 11,
     "progress_done": 4
@@ -1229,7 +1229,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
       "id": 8,
       "type": "book",
       "target_id": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
-      "mode": "pdf_text",
+      "mode": "rebuild",
       "enqueued_at": "2026-05-09T11:55:00Z"
     }
   ],
@@ -1250,7 +1250,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ---
 
-### §7.10 `DELETE /api/novel_db/rebuild/{job_id}`
+### §7.10 `DELETE /api/novel_db/builds/{job_id}`
 
 待機中ジョブをキャンセル（`state='canceled'` に更新）。
 
@@ -1317,7 +1317,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ---
 
-### §7.13 `GET /api/novel_db/qa/sessions`（B-16）
+### §7.13 `GET /api/novel_db/sessions`（B-16）
 
 マルチターン会話 QA のセッション一覧。`last_message_at` 降順 → `started_at` 降順。
 
@@ -1340,7 +1340,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ---
 
-### §7.14 `GET /api/novel_db/qa/sessions/{session_id}`（B-16）
+### §7.14 `GET /api/novel_db/sessions/{session_id}`（B-16）
 
 セッション詳細（メッセージ全件含む）。`system` ロールのメッセージは LLM 投入用なので **レスポンスから除外**（UI には表示しない）。
 
@@ -1366,7 +1366,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 
 ---
 
-### §7.15 `POST /api/novel_db/qa/sessions`（B-16、SSE）
+### §7.15 `POST /api/novel_db/sessions`（B-16、SSE）
 
 会話セッションを新規作成し、初手の質問を SSE で配信する。
 
@@ -1389,7 +1389,7 @@ scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ
 
 ---
 
-### §7.16 `POST /api/novel_db/qa/sessions/{session_id}/messages`（B-16、SSE）
+### §7.16 `POST /api/novel_db/sessions/{session_id}/messages`（B-16、SSE）
 
 既存セッションに新ターンを追加する。
 
@@ -1406,7 +1406,7 @@ scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ
 
 ---
 
-### §7.17 `DELETE /api/novel_db/qa/sessions/{session_id}`（B-16）
+### §7.17 `DELETE /api/novel_db/sessions/{session_id}`（B-16）
 
 セッションを削除（`qa_messages` も CASCADE で連動削除）。
 
@@ -1415,7 +1415,7 @@ scope と question から system メッセージ（page 抜粋 + 俯瞰サマリ
 
 ---
 
-### §7.18 `PATCH /api/novel_db/qa/sessions/{session_id}/title`（B-16）
+### §7.18 `PATCH /api/novel_db/sessions/{session_id}/title`（B-16）
 
 セッションタイトルを手動更新する。
 
