@@ -1,0 +1,122 @@
+import { Document, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/TextLayer.css';
+import type { ReadingDirection } from '../../types';
+import { PageRenderer } from '../reader';
+
+// <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+    'pdfjs-dist/build/pdf.worker.min.mjs',
+    import.meta.url,
+).toString();
+
+// Searchable PDF（ReportLab 生成）に含まれる ASCII85 ストリーム中の `<` を pdf.js の lenient parser が
+// hex string 開始と誤読し getHexString warning を大量に出すため、verbosity を ERRORS に下げる。
+// Document の options は識別性が変わると再読込を誘発するためモジュールスコープで固定する。
+const PDF_DOCUMENT_OPTIONS = {
+    verbosity: pdfjs.VerbosityLevel.ERRORS,
+};
+
+interface ReaderPageViewProps {
+    pageNumber: number;
+    numPages: number;
+    windowHeight: number;
+    isSpread: boolean;
+    direction: ReadingDirection;
+    onNext: (e: React.MouseEvent) => void;
+    onPrev: (e: React.MouseEvent) => void;
+    isImageMode: boolean;
+    imageUrls: string[] | null;
+    searchText: string;
+    customTextRenderer?: (props: { str: string; itemIndex: number }) => string;
+    handlePageSize: (width: number, height: number) => void;
+    pdfUrl: string;
+    onDocumentLoadSuccess: (pdf: pdfjs.PDFDocumentProxy) => void;
+}
+
+/**
+ * リーダーのメインコンテンツ描画コンポーネント。
+ * - 画像モード: WebP 画像を直接表示
+ * - PDF モード: react-pdf <Document> 配下で <Page> を表示
+ * renderPageItem / renderSpreadPages のロジックを集約する。
+ */
+export function ReaderPageView({
+    pageNumber,
+    numPages,
+    windowHeight,
+    isSpread,
+    direction,
+    onNext,
+    onPrev,
+    isImageMode,
+    imageUrls,
+    searchText,
+    customTextRenderer,
+    handlePageSize,
+    pdfUrl,
+    onDocumentLoadSuccess,
+}: ReaderPageViewProps) {
+    const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => (
+        <PageRenderer
+            key={`page-${pNum}`}
+            pageNumber={pNum}
+            numPages={numPages}
+            windowHeight={windowHeight}
+            side={side}
+            direction={direction}
+            onNext={onNext}
+            onPrev={onPrev}
+            isImageMode={isImageMode}
+            imageUrl={imageUrls ? imageUrls[pNum - 1] : null}
+            searchText={searchText}
+            customTextRenderer={!isImageMode && searchText ? customTextRenderer : undefined}
+            isSpread={isSpread}
+            onPageSize={handlePageSize}
+        />
+    );
+
+    const renderSpreadPages = () => {
+        const p1 = pageNumber;
+        const p2 = pageNumber + 1;
+        if (direction === 'rtl') {
+            if (pageNumber === 1) return <>{renderPageItem(p1, 'single')}</>;
+            return (
+                <>
+                    {renderPageItem(p2, 'left')}
+                    {renderPageItem(p1, 'right')}
+                </>
+            );
+        }
+        return (
+            <>
+                {renderPageItem(p1, 'left')}
+                {renderPageItem(p2, 'right')}
+            </>
+        );
+    };
+
+    if (isImageMode) {
+        return (
+            <div className="flex gap-0 shadow-2xl justify-center bg-gray-900">
+                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
+            </div>
+        );
+    }
+
+    return (
+        <Document
+            file={pdfUrl}
+            options={PDF_DOCUMENT_OPTIONS}
+            onLoadSuccess={onDocumentLoadSuccess}
+            className="flex justify-center"
+            loading={
+                <div className="flex items-center justify-center h-96">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
+                </div>
+            }
+        >
+            <div className="flex shadow-2xl">
+                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
+            </div>
+        </Document>
+    );
+}
