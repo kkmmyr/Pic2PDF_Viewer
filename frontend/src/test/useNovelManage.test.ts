@@ -129,7 +129,7 @@ describe('useNovelManage', () => {
         expect(result.current.books.map((b) => b.name)).toEqual(['対象A', '対象B']);
     });
 
-    it('初期 selectedBook は未ビルドの最初の書籍', async () => {
+    it('初期 selectedBook / selectedBookCtx はともに未ビルドの最初の書籍', async () => {
         mockedFetchBooks.mockResolvedValue([
             makeBook({ name: '未完了1', ocr_done_at: '2024-01-01', indexed_at: null }),
             makeBook({ name: '完了済み', ocr_done_at: null, indexed_at: '2024-02-01' }),
@@ -137,6 +137,7 @@ describe('useNovelManage', () => {
 
         const { result } = renderHook(() => useNovelManage());
         await waitFor(() => expect(result.current.selectedBook).toBe('未完了1'));
+        expect(result.current.selectedBookCtx).toBe('未完了1');
     });
 
     // --- handleShowBuiltChange ---
@@ -178,9 +179,9 @@ describe('useNovelManage', () => {
         expect(result.current.selectedBook).toBe('未完了');
     });
 
-    // --- handleEnqueue ---
+    // --- handleEnqueueBuild ---
 
-    it('handleEnqueue — selectedBook あり allBooks=false で enqueue(book, false, mode) が呼ばれる', async () => {
+    it('handleEnqueueBuild — selectedBook あり allBooks=false で enqueue(book, false, full_build) が呼ばれる', async () => {
         mockedFetchBooks.mockResolvedValue([
             makeBook({ name: '花太郎', ocr_done_at: '2024-01-01', indexed_at: null }),
         ]);
@@ -190,13 +191,13 @@ describe('useNovelManage', () => {
         await waitFor(() => expect(result.current.selectedBook).toBe('花太郎'));
 
         act(() => {
-            result.current.handleEnqueue('full_build');
+            result.current.handleEnqueueBuild();
         });
 
         expect(mockEnqueue).toHaveBeenCalledWith('花太郎', false, 'full_build');
     });
 
-    it('handleEnqueue — allBooks=true で enqueue(null, true, mode) が呼ばれる', async () => {
+    it('handleEnqueueBuild — allBooks=true で enqueue(null, true, full_build) が呼ばれる', () => {
         mockEnqueue.mockResolvedValue(undefined);
         const { result } = renderHook(() => useNovelManage());
 
@@ -204,23 +205,65 @@ describe('useNovelManage', () => {
             result.current.setAllBooks(true);
         });
         act(() => {
-            result.current.handleEnqueue('generate_contexts');
+            result.current.handleEnqueueBuild();
         });
 
-        expect(mockEnqueue).toHaveBeenCalledWith(null, true, 'generate_contexts');
+        expect(mockEnqueue).toHaveBeenCalledWith(null, true, 'full_build');
     });
 
-    it('handleEnqueue — selectedBook が空で allBooks=false のとき enqueue を呼ばない', () => {
+    it('handleEnqueueBuild — selectedBook が空で allBooks=false のとき enqueue を呼ばない', () => {
         const { result } = renderHook(() => useNovelManage());
 
         act(() => {
-            result.current.handleEnqueue();
+            result.current.handleEnqueueBuild();
         });
 
         expect(mockEnqueue).not.toHaveBeenCalled();
     });
 
-    it('handleEnqueue — mode 省略時は full_build がデフォルト', async () => {
+    // --- handleEnqueueCtx ---
+
+    it('handleEnqueueCtx — selectedBookCtx あり allBooksCtx=false で enqueue(book, false, generate_contexts) が呼ばれる', async () => {
+        mockedFetchBooks.mockResolvedValue([
+            makeBook({ name: '花太郎', ocr_done_at: '2024-01-01', indexed_at: null }),
+        ]);
+        mockEnqueue.mockResolvedValue(undefined);
+
+        const { result } = renderHook(() => useNovelManage());
+        await waitFor(() => expect(result.current.selectedBookCtx).toBe('花太郎'));
+
+        act(() => {
+            result.current.handleEnqueueCtx();
+        });
+
+        expect(mockEnqueue).toHaveBeenCalledWith('花太郎', false, 'generate_contexts');
+    });
+
+    it('handleEnqueueCtx — allBooksCtx=true で enqueue(null, true, generate_contexts) が呼ばれる', () => {
+        mockEnqueue.mockResolvedValue(undefined);
+        const { result } = renderHook(() => useNovelManage());
+
+        act(() => {
+            result.current.setAllBooksCtx(true);
+        });
+        act(() => {
+            result.current.handleEnqueueCtx();
+        });
+
+        expect(mockEnqueue).toHaveBeenCalledWith(null, true, 'generate_contexts');
+    });
+
+    it('handleEnqueueCtx — selectedBookCtx が空で allBooksCtx=false のとき enqueue を呼ばない', () => {
+        const { result } = renderHook(() => useNovelManage());
+
+        act(() => {
+            result.current.handleEnqueueCtx();
+        });
+
+        expect(mockEnqueue).not.toHaveBeenCalled();
+    });
+
+    it('handleEnqueueBuild と handleEnqueueCtx は独立して動作する', async () => {
         mockedFetchBooks.mockResolvedValue([
             makeBook({ name: '本A', ocr_done_at: '2024-01-01', indexed_at: null }),
         ]);
@@ -230,10 +273,15 @@ describe('useNovelManage', () => {
         await waitFor(() => expect(result.current.selectedBook).toBe('本A'));
 
         act(() => {
-            result.current.handleEnqueue();
+            result.current.setAllBooks(true);          // Full Build は全冊
+            result.current.setAllBooksCtx(false);       // コンテキストは個別
         });
 
-        expect(mockEnqueue).toHaveBeenCalledWith('本A', false, 'full_build');
+        act(() => { result.current.handleEnqueueBuild(); });
+        act(() => { result.current.handleEnqueueCtx(); });
+
+        expect(mockEnqueue).toHaveBeenNthCalledWith(1, null, true, 'full_build');
+        expect(mockEnqueue).toHaveBeenNthCalledWith(2, '本A', false, 'generate_contexts');
     });
 
     // --- unifiedRows 構築 ---

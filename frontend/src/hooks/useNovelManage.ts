@@ -30,6 +30,7 @@ export interface UseNovelManage {
     cancel: (jobId: number) => Promise<void>;
     ocrStatus: ReturnType<typeof useOcrStatus>['status'];
     books: BookSummary[];
+    // Full Build 用
     allBooks: boolean;
     setAllBooks: (v: boolean) => void;
     selectedBook: string;
@@ -37,7 +38,16 @@ export interface UseNovelManage {
     showBuilt: boolean;
     handleShowBuiltChange: (v: boolean) => void;
     filteredBooks: BookSummary[];
-    handleEnqueue: (mode?: BuildMode) => void;
+    handleEnqueueBuild: () => void;
+    // コンテキスト生成用
+    allBooksCtx: boolean;
+    setAllBooksCtx: (v: boolean) => void;
+    selectedBookCtx: string;
+    setSelectedBookCtx: (v: string) => void;
+    showBuiltCtx: boolean;
+    handleShowBuiltCtxChange: (v: boolean) => void;
+    filteredBooksCtx: BookSummary[];
+    handleEnqueueCtx: () => void;
     unifiedRows: UnifiedRow[];
 }
 
@@ -51,9 +61,14 @@ export function useNovelManage(): UseNovelManage {
     const { status: ocrStatus } = useOcrStatus(ocrEnabled);
 
     const [books, setBooks] = useState<BookSummary[]>([]);
+    // Full Build 用
     const [allBooks, setAllBooks] = useState(false);
     const [selectedBook, setSelectedBook] = useState('');
     const [showBuilt, setShowBuilt] = useState(false);
+    // コンテキスト生成用
+    const [allBooksCtx, setAllBooksCtx] = useState(false);
+    const [selectedBookCtx, setSelectedBookCtx] = useState('');
+    const [showBuiltCtx, setShowBuiltCtx] = useState(false);
 
     useEffect(() => {
         fetchBooks()
@@ -64,7 +79,9 @@ export function useNovelManage(): UseNovelManage {
                 );
                 setBooks(buildable);
                 const unbuilt = buildable.filter((b) => b.indexed_at === null);
-                setSelectedBook(unbuilt.length > 0 ? unbuilt[0].name : '');
+                const first = unbuilt.length > 0 ? unbuilt[0].name : '';
+                setSelectedBook(first);
+                setSelectedBookCtx(first);
             })
             .catch(() => {});
     }, []);
@@ -78,6 +95,10 @@ export function useNovelManage(): UseNovelManage {
         showBuilt ? b.indexed_at !== null : b.indexed_at === null,
     );
 
+    const filteredBooksCtx = books.filter((b) =>
+        showBuiltCtx ? b.indexed_at !== null : b.indexed_at === null,
+    );
+
     const handleShowBuiltChange = useCallback(
         (value: boolean) => {
             const next = books.filter((b) =>
@@ -89,17 +110,34 @@ export function useNovelManage(): UseNovelManage {
         [books],
     );
 
-    const handleEnqueue = useCallback(
-        (mode: BuildMode = 'full_build') => {
-            if (allBooks) {
-                void enqueue(null, true, mode);
-            } else {
-                if (!selectedBook) return;
-                void enqueue(selectedBook, false, mode);
-            }
+    const handleShowBuiltCtxChange = useCallback(
+        (value: boolean) => {
+            const next = books.filter((b) =>
+                value ? b.indexed_at !== null : b.indexed_at === null,
+            );
+            setShowBuiltCtx(value);
+            setSelectedBookCtx(next.length > 0 ? next[0].name : '');
         },
-        [allBooks, selectedBook, enqueue],
+        [books],
     );
+
+    const handleEnqueueBuild = useCallback(() => {
+        if (allBooks) {
+            void enqueue(null, true, 'full_build');
+        } else {
+            if (!selectedBook) return;
+            void enqueue(selectedBook, false, 'full_build');
+        }
+    }, [allBooks, selectedBook, enqueue]);
+
+    const handleEnqueueCtx = useCallback(() => {
+        if (allBooksCtx) {
+            void enqueue(null, true, 'generate_contexts');
+        } else {
+            if (!selectedBookCtx) return;
+            void enqueue(selectedBookCtx, false, 'generate_contexts');
+        }
+    }, [allBooksCtx, selectedBookCtx, enqueue]);
 
     // 全ジョブ履歴行を構築
     const unifiedRows: UnifiedRow[] = [];
@@ -182,7 +220,15 @@ export function useNovelManage(): UseNovelManage {
         showBuilt,
         handleShowBuiltChange,
         filteredBooks,
-        handleEnqueue,
+        handleEnqueueBuild,
+        allBooksCtx,
+        setAllBooksCtx,
+        selectedBookCtx,
+        setSelectedBookCtx,
+        showBuiltCtx,
+        handleShowBuiltCtxChange,
+        filteredBooksCtx,
+        handleEnqueueCtx,
         unifiedRows,
     };
 }
