@@ -38,10 +38,12 @@ export function useUrlState() {
     );
 
     const clearPdf = useCallback(
-        (currentPath: string) => {
-            const newParams = new URLSearchParams();
-            if (currentPath) newParams.set('path', currentPath);
-            setSearchParams(newParams);
+        () => {
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete('file');
+                return next;
+            });
         },
         [setSearchParams],
     );

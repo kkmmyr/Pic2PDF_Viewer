@@ -65,7 +65,16 @@ describe('useUrlState', () => {
         const { result } = renderHook(() => useUrlState(), {
             wrapper: wrapper('/?file=x.pdf&path=sub'),
         });
-        act(() => result.current.clearPdf('sub'));
+        act(() => result.current.clearPdf());
+        expect(result.current.selectedPdf).toBeNull();
+        expect(result.current.currentPath).toBe('sub');
+    });
+
+    it('clearPdf で author / series フィルターが保持される', () => {
+        const { result } = renderHook(() => useUrlState(), {
+            wrapper: wrapper('/?file=x.pdf&path=sub&author=foo&series=bar'),
+        });
+        act(() => result.current.clearPdf());
         expect(result.current.selectedPdf).toBeNull();
         expect(result.current.currentPath).toBe('sub');
     });

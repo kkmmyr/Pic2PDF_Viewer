@@ -44,7 +44,7 @@ function LibraryView() {
                     currentPath={currentPath}
                     currentSource={currentSource}
                     onPdfUpdated={bumpVersion}
-                    onClose={() => clearPdf(currentPath)}
+                    onClose={clearPdf}
                     onSelectPdf={handlePdfClick}
                 />
             )}
