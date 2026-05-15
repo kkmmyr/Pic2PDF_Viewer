@@ -98,13 +98,19 @@ frontend/src/
 │       ├── index.ts
 │       ├── NovelDbHeader.tsx            # スコープドロップダウン + 設定ボタン
 │       ├── ScopeSelector.tsx            # 全件 / シリーズ / 単冊 切替
-│       ├── LibrarySection.tsx           # 書籍一覧（グループカードグリッド + ドリルダウン）
+│       ├── LibrarySection.tsx           # 書籍一覧オーケストレーター（Phase 68 で 3 分割）
+│       ├── LibraryViewModeSelector.tsx  # 見出し + グループ切替ボタン + 選択トグル
+│       ├── BulkActionsPanel.tsx         # 選択中アクションバー（全選択/作者設定/シリーズ登録）
+│       ├── SeriesDrilldownPanel.tsx     # パンくず + BulkActionsPanel + DnD ビュー切替
 │       ├── BookCard.tsx                 # 1 冊分カード（サムネイル + メタ + DB 状態 + 再構築ボタン）
 │       ├── BookMetaEditModal.tsx        # novel 書籍メタ手動編集モーダル（4.3 /「編集」ボタンから開く）
 │       ├── BookMetaList.tsx             # メタ情報表示（card: コンパクト / detail: dl 形式）
 │       ├── CharactersPanel.tsx          # BookCard 内折りたたみ登場人物一覧（B-15、expanded 時のみ API 呼び出し）
 │       ├── CharacterDetailDialog.tsx    # キャラクター詳細ダイアログ（B-15 / サマリ + 主要シーン top5）
-│       ├── ChatSection.tsx              # マルチターン会話 QA セクション（B-16 / ChatGPT 風左右 2 ペイン）
+│       ├── ChatSection.tsx              # マルチターン会話 QA セクション（B-16、Phase 69 で 3 分割）
+│       ├── SessionSidebar.tsx           # セッション一覧・新規作成・切替（左パネル）
+│       ├── ChatMessageList.tsx          # scrollRef・メッセージバブル描画・ストリーミング表示
+│       ├── ChatInput.tsx                # textarea・送信/停止ボタン・Ctrl+Enter ショートカット
 │       ├── DiscussionHistoryItem.tsx    # 読書会ディスカッション履歴アイテム（折りたたみカード / NovelDiscussionPage / NovelDetailPage 共用）
 │       ├── NovelBulkAuthorDialog.tsx    # 複数書籍への作者名一括設定ダイアログ（`<Dialog>` ベース）
 │       ├── NovelBulkSeriesAssignDialog.tsx # 複数書籍を一度にシリーズへ登録するダイアログ
