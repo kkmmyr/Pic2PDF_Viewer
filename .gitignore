@@ -51,3 +51,4 @@ frontend/public/site/
 backend/scripts/results/
 
 experiments/.venv
+experiments/*.ipynb
