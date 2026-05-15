@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { HammerIcon, Layers, Loader2, Terminal, Wrench } from 'lucide-react';
 
 import { useToast } from '../hooks';
@@ -12,150 +11,33 @@ import {
     SectionHeader,
 } from '../components/novel_build';
 import { OCRPanel } from '../features/ocr/OCRPanel';
-import { fetchBooks } from '../features/novel_db/api';
-import type { BookSummary } from '../features/novel_db/types';
-import type { BuildMode } from '../features/novel_build/types';
-import { useNovelBuildQueue } from '../hooks/novel_build';
-import { useOcrStatus } from '../hooks/useOcrStatus';
+import { useNovelManage } from '../hooks/useNovelManage';
 
-type Tab = 'ocr' | 'build';
-
-interface UnifiedRow {
-    key: string;
-    type: string;
-    target: string;
-    state: string;
-    stateClass: string;
-    time?: string;
-}
-
-function modeLabel(mode?: BuildMode): string {
-    return mode === 'generate_contexts' ? 'コンテキスト生成' : 'Full Build';
-}
+const TAB_BASE =
+    'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors';
+const TAB_ACTIVE = 'border-primary-500 text-primary-600 dark:text-primary-400';
+const TAB_INACTIVE =
+    'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600';
 
 export default function NovelManagePage() {
-    const [activeTab, setActiveTab] = useState<Tab>('ocr');
-    // タブ初訪問時に有効化し、以後は常時アクティブにする遅延起動パターン。
-    // OCR タブは初期タブなので初めから有効。Build タブは初訪問時に有効化。
-    const [buildEnabled, setBuildEnabled] = useState(false);
-    const [ocrEnabled] = useState(true);
-
-    const handleTabChange = (tab: Tab) => {
-        setActiveTab(tab);
-        if (tab === 'build') setBuildEnabled(true);
-    };
-
-    const { status, isEnqueuing, enqueueError, enqueue, cancel } = useNovelBuildQueue(buildEnabled);
-    const { status: ocrStatus } = useOcrStatus(ocrEnabled);
-    const [books, setBooks] = useState<BookSummary[]>([]);
-    const [allBooks, setAllBooks] = useState(false);
-    const [selectedBook, setSelectedBook] = useState('');
-    const [showBuilt, setShowBuilt] = useState(false);
+    const {
+        activeTab,
+        handleTabChange,
+        status,
+        isEnqueuing,
+        enqueueError,
+        cancel,
+        allBooks,
+        setAllBooks,
+        selectedBook,
+        setSelectedBook,
+        showBuilt,
+        handleShowBuiltChange,
+        filteredBooks,
+        handleEnqueue,
+        unifiedRows,
+    } = useNovelManage();
     const { toasts, showToast, dismissToast } = useToast();
-
-    useEffect(() => {
-        fetchBooks()
-            .then((data) => {
-                // ocr_done_at または indexed_at があれば Build 対象（pdf_text モードは ocr_done_at を立てない）
-                const buildable = data.filter(
-                    (b) => b.ocr_done_at !== null || b.indexed_at !== null,
-                );
-                setBooks(buildable);
-                const unbuilt = buildable.filter((b) => b.indexed_at === null);
-                setSelectedBook(unbuilt.length > 0 ? unbuilt[0].name : '');
-            })
-            .catch(() => {});
-    }, []);
-
-    const filteredBooks = books.filter((b) =>
-        showBuilt ? b.indexed_at !== null : b.indexed_at === null,
-    );
-
-    const handleShowBuiltChange = (value: boolean) => {
-        const next = books.filter((b) => (value ? b.indexed_at !== null : b.indexed_at === null));
-        setShowBuilt(value);
-        setSelectedBook(next.length > 0 ? next[0].name : '');
-    };
-
-    const handleEnqueue = (mode: 'full_build' | 'generate_contexts' = 'full_build') => {
-        if (allBooks) {
-            void enqueue(null, true, mode);
-        } else {
-            if (!selectedBook) return;
-            void enqueue(selectedBook, false, mode);
-        }
-    };
-
-    // 全ジョブ履歴行を構築
-    const unifiedRows: UnifiedRow[] = [];
-
-    if (ocrStatus === 'running') {
-        unifiedRows.push({
-            key: 'ocr-running',
-            type: 'OCR',
-            target: '-',
-            state: '実行中',
-            stateClass:
-                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-        });
-    } else if (ocrStatus === 'error') {
-        unifiedRows.push({
-            key: 'ocr-error',
-            type: 'OCR',
-            target: '-',
-            state: 'エラー',
-            stateClass: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-        });
-    }
-
-    if (status.current_job) {
-        const j = status.current_job;
-        unifiedRows.push({
-            key: `build-running-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: '実行中',
-            stateClass:
-                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-            time: j.started_at,
-        });
-    }
-
-    for (const j of status.queued_jobs) {
-        unifiedRows.push({
-            key: `build-queued-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: '待機中',
-            stateClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-            time: j.enqueued_at,
-        });
-    }
-
-    for (const j of status.recent_finished) {
-        const stateLabel =
-            { completed: '完了', failed: '失敗', canceled: 'キャンセル' }[j.state] ?? '完了';
-        const stateClass =
-            {
-                completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-                failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-                canceled: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-            }[j.state] ?? 'bg-gray-100 text-gray-600';
-        unifiedRows.push({
-            key: `build-finished-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: stateLabel,
-            stateClass,
-            time: j.finished_at,
-        });
-    }
-
-    const TAB_BASE =
-        'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors';
-    const TAB_ACTIVE = 'border-primary-500 text-primary-600 dark:text-primary-400';
-    const TAB_INACTIVE =
-        'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600';
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8">
