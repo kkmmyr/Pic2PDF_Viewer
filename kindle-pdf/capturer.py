@@ -35,9 +35,8 @@ class Config:
     IMG_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'comic', 'images'))
     PDF_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'comic', 'pdfs'))
 
-    # タイトルクリーニング用
-    TITLE_PREFIX: str = "Kindle for PC - "
-    REMOVE_AUTHOR_STR: str = "工藤智康さんの"
+    # タイトルクリーニング用 (正規表現で PC 後のバージョン番号に対応)
+    TITLE_PATTERN: str = r'Kindle for PC\d*\s*-\s*(.+)'
 
 class BookInfoDialog(simpledialog.Dialog):
     def __init__(self, parent, title, initialvalue):
@@ -131,13 +130,13 @@ class KindleCapturer:
         window_text = buff.value
 
         default_title = ""
-        if self.config.TITLE_PREFIX in window_text:
-            default_title = window_text.replace(self.config.TITLE_PREFIX, "")
-            default_title = default_title.replace(self.config.REMOVE_AUTHOR_STR, "")
-            
+        m = re.search(self.config.TITLE_PATTERN, window_text)
+        if m:
+            default_title = m.group(1)
+
             # 空白・改行の正規化
             default_title = re.sub(r'\s+', ' ', default_title).strip()
-            
+
             # 禁止文字の置換
             invalid_chars = '<>:"/\\|?*'
             for char in invalid_chars:
