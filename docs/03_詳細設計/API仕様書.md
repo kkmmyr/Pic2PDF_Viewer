@@ -53,7 +53,7 @@
   - §7.1 `GET /api/novel_db/books` — 書籍一覧 + DB 状態
   - §7.2 `GET /api/novel_db/series` — novel シリーズ一覧
   - §7.2b `GET /api/novel_db/authors` — novel 作者一覧（B-21）
-  - §7.21 `GET /api/novel_db/books/{book_name}/detail` — 単一書籍の詳細情報
+  - §7.21 `GET /api/novel_db/books/{book_name}` — 単一書籍の詳細情報
   - §7.3 `POST /api/novel_db/search` — ハイブリッド検索（FTS5 + ベクトル + RRF）
   - §7.4 `POST /api/novel_db/qa` — RAG 質問応答（SSE）
   - §7.5 `GET /api/novel_db/qa/history` — 履歴一覧
@@ -71,6 +71,13 @@
   - §8.2 `GET /api/novel/build/status` — Full Build キュー状態スナップショット
   - §8.3 `DELETE /api/novel/build/jobs/{job_id}` — 待機中 Full Build ジョブキャンセル
   - §8.4 `GET /api/novel/build/stream` — Full Build キュー状態 SSE ストリーム
+- [§10. キャラクタ関係グラフ（novel_graph）](#10-キャラクタ関係グラフnovel_graph)（C-12）
+  - §10.1 `GET /api/novel_graph/series` — 関係データ存在シリーズ一覧
+  - §10.2 `GET /api/novel_graph/series/{series_id}/books` — シリーズ内書籍一覧
+  - §10.3 `GET /api/novel_graph/series/{series_id}/graph` — グラフデータ取得
+- [§11. meta.db バックアップ（meta_db_backup）](#11-metadb-バックアップmeta_db_backup)（B-25）
+  - §11.1 `POST /api/meta_db/backup` — meta.db バックアップ実行
+  - §11.2 `GET /api/meta_db/backup/status` — 最新バックアップ情報
 
 ---
 
@@ -955,7 +962,7 @@ novel ソースの全書籍から重複なし作者一覧を返す。作者未�
 
 ---
 
-### §7.21 `GET /api/novel_db/books/{book_name}/detail`
+### §7.21 `GET /api/novel_db/books/{book_name}`
 
 単一書籍の詳細情報（要約・キャラクター数・ディスカッション数含む）を返す。`NovelDetailPage`（`/novel/detail/:bookName`）から利用。
 
@@ -1190,7 +1197,7 @@ data: {"done": true, "history_id": 42, "eval_count": 1240, "done_reason": "stop"
 |---|---|---|---|
 | `type` | ○ | `"book"` / `"series"` / `"all"` | ジョブ単位 |
 | `target_id` | △ | — | `type='book'` のとき書籍名、`type='series'` のときシリーズ ID。`type='all'` では省略 |
-| `mode` | × | `"rebuild"` (default) / `"ocr"` / `"full_build"` / `"generate_contexts"` | `rebuild` = pages → chunk/embed 再構築（OCR 済み前提）、`ocr` = 元画像から yomitoku OCR → full_text 更新、`full_build` / `generate_contexts` は §8 の novel_build 管理画面からも指定可 |
+| `mode` | × | `"rebuild"` (default) / `"ocr"` / `"full_build"` / `"generate_contexts"` / `"generate_relations"` | `rebuild` = pages → chunk/embed 再構築（OCR 済み前提）、`ocr` = 元画像から yomitoku OCR → full_text 更新、`full_build` / `generate_contexts` は §8 の novel_build 管理画面からも指定可、`generate_relations` = キャラ共起カウント + Qwen 関係抽出 → `character_relations` テーブル更新（C-12） |
 
 **レスポンス**:
 ```json
@@ -1556,7 +1563,7 @@ Build ジョブをキューに登録する。即座に `job_id` を返す。
 |---|---|---|
 | `book_name` | △ | 書籍名（`all_books=false` のとき必須） |
 | `all_books` | × | `true` のとき全冊一括。省略時 `false` |
-| `mode` | × | `"full_build"`（省略時デフォルト）/ `"generate_contexts"`（Step 3 単独、B-23） |
+| `mode` | × | `"full_build"`（省略時デフォルト）/ `"generate_contexts"`（Step 3 単独、B-23）/ `"generate_relations"`（キャラ関係グラフ生成、C-12） |
 
 **レスポンス**:
 ```json
@@ -1628,3 +1635,112 @@ data: {"is_running": true, "current_job": {...}, "queued_jobs": [...], "recent_f
 
 - クライアント切断で自動終了
 - `Content-Type: text/event-stream`
+
+---
+
+## §10. キャラクタ関係グラフ（novel_graph）
+
+キャラクタ共起カウント + Qwen 関係抽出で生成した `character_relations` テーブルを可視化する API 群（C-12）。生成は `mode=generate_relations` のジョブ（§7.8）で行い、本セクションは読み取り専用エンドポイントのみ。
+
+### §10.1 `GET /api/novel_graph/series`
+
+`character_relations` データが存在するシリーズ一覧を返す。
+
+**レスポンス**:
+```json
+["おこぼれ姫と円卓の騎士", "七星の剣士"]
+```
+
+文字列配列（`series_id` 昇順）。データ未生成の場合は空配列。
+
+---
+
+### §10.2 `GET /api/novel_graph/series/{series_id}/books`
+
+シリーズに含まれる書籍一覧を返す（`character_relations` にデータが存在するもののみ）。
+
+**パスパラメータ**:
+- `series_id` — シリーズ ID（URL エンコード必須）
+
+**レスポンス**:
+```json
+[
+  { "id": 3, "name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)" },
+  { "id": 4, "name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)" }
+]
+```
+
+---
+
+### §10.3 `GET /api/novel_graph/series/{series_id}/graph`
+
+シリーズのグラフデータ（nodes / edges）を返す。`NovelGraphPage`（`/novel/graph`）の vis-network 描画に使用。
+
+**パスパラメータ**:
+- `series_id` — シリーズ ID（URL エンコード必須）
+
+**クエリパラメータ**:
+- `book_ids` (オプション) — カンマ区切りの book_id リスト（省略時は全冊）
+
+**レスポンス**:
+```json
+{
+  "nodes": [
+    { "id": 0, "label": "レティ", "book_id": 3 },
+    { "id": 1, "label": "デューク", "book_id": 3 }
+  ],
+  "edges": [
+    { "id": 1, "from": 0, "to": 1, "label": "師弟", "weight": 42.0 }
+  ]
+}
+```
+
+- `nodes[].id` — グラフ内一意の整数 ID（冊単位で独立。同名キャラも冊が違えば別ノード）
+- `edges[].label` — Qwen が抽出した関係タイプ（未抽出時は空文字）
+- `edges[].weight` — 同一ページ共起回数
+
+**エラー**:
+- `400`: `book_ids` が整数のカンマ区切りでない
+- `404`: 指定 `series_id` の関係データが存在しない
+
+---
+
+## §11. meta.db バックアップ（meta_db_backup）
+
+meta.db を `sqlite3.backup()` で OneDrive 等にスナップショットコピーする API（B-25）。ファイル名形式: `meta_YYYYMMDD_HHMMSS.db`。
+
+### §11.1 `POST /api/meta_db/backup`
+
+meta.db を `META_DB_BACKUP_DIR`（env: `META_DB_BACKUP_DIR`、デフォルト `OneDrive/61.tool/meta_db_backup/`）にコピーする。
+
+**リクエストボディ**: なし
+
+**レスポンス**:
+```json
+{
+  "path": "C:\\Users\\...\\meta_db_backup\\meta_20260517_120000.db",
+  "size_bytes": 2097152,
+  "backed_up_at": "2026-05-17T12:00:00"
+}
+```
+
+---
+
+### §11.2 `GET /api/meta_db/backup/status`
+
+最新バックアップの情報を返す。
+
+**レスポンス**:
+```json
+{
+  "last_backup": {
+    "path": "C:\\Users\\...\\meta_db_backup\\meta_20260517_120000.db",
+    "size_bytes": 2097152,
+    "backed_up_at": "2026-05-17T12:00:00"
+  },
+  "backup_dir": "C:\\Users\\...\\meta_db_backup",
+  "total_backups": 5
+}
+```
+
+- バックアップが 1 件もない場合は `last_backup: null`、`total_backups: 0`
