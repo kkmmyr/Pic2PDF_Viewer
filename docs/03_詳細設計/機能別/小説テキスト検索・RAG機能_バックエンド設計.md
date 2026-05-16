@@ -1270,13 +1270,15 @@ class NovelDbJobWorker:
 | `_list_all_book_names()` | `KINDLE_NOVEL_IMAGES_DIR` 配下の全サブディレクトリ名 |
 | `_list_books_needing_ocr()` | images_dir に存在 かつ `books.ocr_done_at IS NULL`（OCR 未完了） |
 | `_list_books_with_ocr_done()` | `books.ocr_done_at IS NOT NULL`（OCR 完了済み） |
+| `_list_books_needing_full_build()` | `ocr_done_at IS NOT NULL AND indexed_at IS NULL`（Full Build 未完了） |
+| `_list_books_needing_contexts()` | `contextual_text IS NULL` のチャンクを持つ書籍（コンテキスト生成未完了） |
 | `_list_books_in_series(series_id)` | 指定シリーズに属する novel 書籍 |
 
 **`_resolve_targets` の選択ロジック**（`job_type="all"` 時）:
-- `mode="ocr"` → `_list_books_needing_ocr()`: OCR 済み書籍の重複処理を防ぐ
-- それ以外（`full_build` / `generate_contexts` / `rebuild`）→ `_list_books_with_ocr_done()`: OCR が前提条件のため
-
-> **注意**: `generate_contexts` は `build_book_contexts()` 内でチャンク単位に `contextual_text IS NULL` スキップが実装済みのため、全冊対象でも実質的に未処理チャンクのみ処理する。
+- `mode="ocr"` → `_list_books_needing_ocr()`: OCR 未完了書籍のみ（重複処理防止）
+- `mode="full_build"` → `_list_books_needing_full_build()`: Full Build 未完了書籍のみ（`indexed_at IS NULL`）
+- `mode="generate_contexts"` → `_list_books_needing_contexts()`: コンテキスト未生成チャンクを持つ書籍のみ
+- それ以外（`rebuild`）→ `_list_books_with_ocr_done()`: OCR 完了済み全冊
 
 **有効な JobMode**（Phase 59 で旧名を廃止）:
 

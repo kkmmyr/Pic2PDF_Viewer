@@ -8,6 +8,8 @@
 > **2026-05-09 注記**: novel ソース（`backend/data/kindle_novel/`）については、Searchable PDF を中間成果物として持つ運用から、**OCR テキストを SQLite に取り込み検索・質問応答する新機能** に移行する方針が確定。novel タブの新ビューア仕様は [小説テキスト検索・RAG機能.md](../01_要件定義/小説テキスト検索・RAG機能.md) / [バックエンド設計](小説テキスト検索・RAG機能_バックエンド設計.md) / [フロントエンド設計](小説テキスト検索・RAG機能_フロントエンド設計.md) を参照。
 
 > **2026-05-13 更新**: `ocr_service.py` を `start_batch_ocr.bat` 経由のサブプロセス起動からスレッドベース実装に刷新。`POST /api/ocr/run` は管理画面「OCR」タブから直接 `run_ocr_subprocess` + `_store_ocr_pages` を呼ぶ方式で再び動作する。
+>
+> **2026-05-17 更新**: `ocr_service._run_ocr()` の全件実行（`target_dir=None`）に skip ロジックを追加。`novel.db` の `books.ocr_done_at IS NOT NULL` な書籍を除外することで、2 回目以降は未 OCR の書籍のみを処理する。全件 OCR 済みの場合は "No books to process (all already OCR'd)." をログ出力して即終了する。
 
 ---
 
