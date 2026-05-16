@@ -1260,8 +1260,23 @@ class NovelDbJobWorker:
     def _mark_finished(...) -> None: ...
     def _update_progress/step/detail(...) -> None: ...
     def _execute_job(self, job: dict) -> None: ...  # mode 別分岐
-    def _resolve_targets(...) -> list[str]: ...
+    def _resolve_targets(self, job_type, target_id, mode) -> list[str]: ...
 ```
+
+**ヘルパー関数（モジュールレベル）**:
+
+| 関数 | 返す書籍 |
+|---|---|
+| `_list_all_book_names()` | `KINDLE_NOVEL_IMAGES_DIR` 配下の全サブディレクトリ名 |
+| `_list_books_needing_ocr()` | images_dir に存在 かつ `books.ocr_done_at IS NULL`（OCR 未完了） |
+| `_list_books_with_ocr_done()` | `books.ocr_done_at IS NOT NULL`（OCR 完了済み） |
+| `_list_books_in_series(series_id)` | 指定シリーズに属する novel 書籍 |
+
+**`_resolve_targets` の選択ロジック**（`job_type="all"` 時）:
+- `mode="ocr"` → `_list_books_needing_ocr()`: OCR 済み書籍の重複処理を防ぐ
+- それ以外（`full_build` / `generate_contexts` / `rebuild`）→ `_list_books_with_ocr_done()`: OCR が前提条件のため
+
+> **注意**: `generate_contexts` は `build_book_contexts()` 内でチャンク単位に `contextual_text IS NULL` スキップが実装済みのため、全冊対象でも実質的に未処理チャンクのみ処理する。
 
 **有効な JobMode**（Phase 59 で旧名を廃止）:
 
