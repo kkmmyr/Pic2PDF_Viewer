@@ -52,3 +52,8 @@ backend/scripts/results/
 
 experiments/.venv
 experiments/*.ipynb
+
+# 日次同期チェック（機械固有の実行状態・ローカルレポート）
+.claude/daily-flags/
+.claude/daily-reports/
+sync_daily.log
