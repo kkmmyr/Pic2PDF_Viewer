@@ -53,6 +53,7 @@ export default function NovelManagePage() {
         selectedBookRel,
         setSelectedBookRel,
         handleEnqueueRelations,
+        books,
         unifiedRows,
     } = useNovelManage();
     const { toasts, showToast, dismissToast } = useToast();
@@ -294,7 +295,9 @@ export default function NovelManagePage() {
                                         onChange={() => setAllBooksRel(false)}
                                         className="text-primary-500"
                                     />
-                                    <span className="text-gray-700 dark:text-gray-300">個別指定</span>
+                                    <span className="text-gray-700 dark:text-gray-300">
+                                        個別指定
+                                    </span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input

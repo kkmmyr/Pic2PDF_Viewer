@@ -22,7 +22,7 @@ export interface UseNovelBuildQueue {
     enqueue: (
         bookName: string | null,
         allBooks: boolean,
-        mode?: 'full_build' | 'generate_contexts',
+        mode?: 'full_build' | 'generate_contexts' | 'generate_relations',
     ) => Promise<void>;
     cancel: (jobId: number) => Promise<void>;
 }
@@ -61,7 +61,7 @@ export function useNovelBuildQueue(enabled = true): UseNovelBuildQueue {
         async (
             bookName: string | null,
             allBooks: boolean,
-            mode: 'full_build' | 'generate_contexts' = 'full_build',
+            mode: 'full_build' | 'generate_contexts' | 'generate_relations' = 'full_build',
         ) => {
             setEnqueueError(null);
             setIsEnqueuing(true);

@@ -9,7 +9,7 @@ const PREFIX = '/api/novel/build';
 export function enqueueBuild(
     bookName: string | null,
     allBooks: boolean,
-    mode: 'full_build' | 'generate_contexts' = 'full_build',
+    mode: 'full_build' | 'generate_contexts' | 'generate_relations' = 'full_build',
 ): Promise<void> {
     return apiClient.post(`${PREFIX}/enqueue`, { book_name: bookName, all_books: allBooks, mode });
 }
