@@ -40,7 +40,11 @@ KINDLE_IMAGES_DIR    = os.path.join(KINDLE_DIR, "images")
 KINDLE_NOVEL_DIR           = os.path.join(DATA_DIR, "kindle_novel")
 KINDLE_NOVEL_PDF_DIR       = os.path.join(KINDLE_NOVEL_DIR, "pdfs")
 KINDLE_NOVEL_THUMBNAIL_DIR = os.path.join(KINDLE_NOVEL_DIR, "thumbnails")
-KINDLE_NOVEL_IMAGES_DIR    = os.path.join(KINDLE_NOVEL_DIR, "images")
+# 画像出力先は env で上書き可能（キャプチャツール kindle-pdf/ と同じ env を共有）
+KINDLE_NOVEL_IMAGES_DIR    = os.environ.get(
+    "KINDLE_NOVEL_IMAGES_DIR",
+    os.path.join(KINDLE_NOVEL_DIR, "images"),
+)
 
 # Novel DB（小説テキスト検索・RAG 機能の SQLite ファイル格納）
 NOVEL_DB_DIR  = os.path.join(DATA_DIR, "novel_db")

@@ -8,6 +8,7 @@ dependencies = [
     "pillow",
     "opencv-python",
     "numpy",
+    "python-dotenv",
 ]
 
 [dependency-groups]

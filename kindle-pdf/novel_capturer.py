@@ -11,27 +11,30 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from capturer import AutoKindleCapturer, AutoConfig, KindleCapturer
 
+# プロジェクトルートの .env を読み込む（存在しない場合・dotenv 未インストール時は無視）
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+except ImportError:
+    pass
+
+
+def _resolve_images_dir() -> str:
+    """画像出力先を解決する。env `KINDLE_NOVEL_IMAGES_DIR` が指定されていればそちら、
+    なければ <repo>/backend/data/kindle_novel/images を返す。"""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    default = os.path.abspath(os.path.join(base_dir, '..', 'backend', 'data', 'kindle_novel', 'images'))
+    return os.environ.get("KINDLE_NOVEL_IMAGES_DIR", default)
+
+
 @dataclass
 class NovelConfig(AutoConfig):
     """小説用設定 (白背景前提)"""
     # 白背景判定の閾値 (RGB各値がこれ以上なら白とみなす)
     WHITE_THRESHOLD: int = 240
-    
-    # OCR Engine Removed
-    # OCR_ENGINE: str = 'yomitoku'
-    
-    # Update Output Dir to backend/data/kindle_novel/images
-    # We need to access backend config or hardcode relative path?
-    # backend/config.py has KINDLE_NOVEL_IMAGES_DIR.
-    # Since capturer.py uses a relative path from __file__, we can do the same here or just override Config defaults.
-    # Base Config has IMG_OUTPUT_DIR relative to backend/data/kindle/images.
-    # We want backend/data/kindle_novel/images.
-    
-    # Path: ../backend/data/kindle_novel/images
-    # Current file is in kindle-pdf/.
-    # So: ../backend/data/kindle_novel/images
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    IMG_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'kindle_novel', 'images'))
+
+    # 画像出力先（env KINDLE_NOVEL_IMAGES_DIR で上書き可。backend と同じ env を参照）
+    IMG_OUTPUT_DIR: str = _resolve_images_dir()
 
 class NovelKindleCapturer(AutoKindleCapturer):
     """小説用キャプチャクラス (白背景検出 + OCR)"""
