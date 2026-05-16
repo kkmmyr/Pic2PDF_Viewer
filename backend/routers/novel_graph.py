@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from services.novel_db.connection import with_db
-from services.novel_db.relation_extractor import (
+from services.novel_db.graph_query import (
     get_graph_for_series,
     list_books_in_relation_series,
     list_series_with_relations,
