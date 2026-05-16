@@ -7,6 +7,7 @@ worker スレッドが 1 つ走り、rebuild_jobs テーブルから queued ジ�
 """
 from __future__ import annotations
 
+import asyncio
 import threading
 from typing import Literal
 
@@ -19,7 +20,7 @@ from .schema import init_schema
 logger = get_logger(__name__)
 
 JobType = Literal["book", "series", "all"]
-JobMode = Literal["rebuild", "ocr", "full_build", "generate_contexts"]
+JobMode = Literal["rebuild", "ocr", "full_build", "generate_contexts", "generate_relations"]
 JobState = Literal["queued", "running", "completed", "failed", "canceled"]
 
 
@@ -29,13 +30,13 @@ class NovelDbJobQueue:
     - `enqueue()`: ジョブを INSERT して worker を起こす
     - `cancel()`: queued なジョブのみ canceled に更新
     - `is_running`: worker が現在ジョブ実行中かどうか
-    - `start() / stop()`: アプリ lifespan で呼ぶ
+    - `start() / stop()`: アプリ lifespan で await して呼ぶ
     """
 
     def __init__(self) -> None:
         self._wakeup = threading.Event()
         self._stop_event = threading.Event()
-        self._worker_thread: threading.Thread | None = None
+        self._worker_task: asyncio.Task | None = None
         self._worker = NovelDbJobWorker(self._stop_event, self._wakeup)
 
     @property
@@ -44,8 +45,8 @@ class NovelDbJobQueue:
 
     # ----- ライフサイクル -----
 
-    def start(self) -> None:
-        """schema 初期化 + 旧 JobMode migration + worker スレッド起動。"""
+    async def start(self) -> None:
+        """schema 初期化 + 旧 JobMode migration + worker タスク起動。"""
         with with_db() as conn:
             init_schema(conn)
             conn.execute(
@@ -58,21 +59,24 @@ class NovelDbJobQueue:
             conn.execute("UPDATE rebuild_jobs SET mode='ocr' WHERE mode='reocr'")
             conn.commit()
 
-        if self._worker_thread and self._worker_thread.is_alive():
+        if self._worker_task and not self._worker_task.done():
             return
         self._stop_event.clear()
-        self._worker_thread = threading.Thread(
-            target=self._worker.run, name="NovelDbJobQueue", daemon=True
+        self._worker_task = asyncio.create_task(
+            asyncio.to_thread(self._worker.run),
+            name="NovelDbJobQueue",
         )
-        self._worker_thread.start()
         logger.info("NovelDbJobQueue started")
 
-    def stop(self, timeout: float = 10.0) -> None:
+    async def stop(self, timeout: float = 10.0) -> None:
         self._stop_event.set()
         self._wakeup.set()
-        if self._worker_thread:
-            self._worker_thread.join(timeout=timeout)
-            self._worker_thread = None
+        if self._worker_task and not self._worker_task.done():
+            try:
+                await asyncio.wait_for(asyncio.shield(self._worker_task), timeout=timeout)
+            except TimeoutError:
+                logger.warning("NovelDbJobQueue worker did not stop within %.1fs", timeout)
+        self._worker_task = None
         logger.info("NovelDbJobQueue stopped")
 
     # ----- 公開 API -----
