@@ -120,7 +120,7 @@ class NovelDbJobWorker:
         target_id = job["target_id"]
         mode = job["mode"]
 
-        targets = self._resolve_targets(job_type, target_id)
+        targets = self._resolve_targets(job_type, target_id, mode)
         total = len(targets)
         self._update_progress(job_id, 0, total)
 
@@ -166,14 +166,21 @@ class NovelDbJobWorker:
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d rebuild progress: %d/%d (%s)", job_id, done, total, book_name)
 
-    def _resolve_targets(self, job_type: str, target_id: str | None) -> list[str]:
-        """job_type に応じて再構築対象書籍名のリストを返す。"""
+    def _resolve_targets(self, job_type: str, target_id: str | None, mode: str) -> list[str]:
+        """job_type と mode に応じて再構築対象書籍名のリストを返す。
+
+        job_type="all" の場合:
+          - mode="ocr"          → OCR 未完了の書籍のみ（images_dir 存在 & ocr_done_at 未設定）
+          - それ以外            → OCR 完了済みの書籍のみ（ocr_done_at 設定済み）
+        """
         if job_type == "book":
             if not target_id:
                 raise ValueError("'book' job requires target_id")
             return [target_id]
         if job_type == "all":
-            return _list_all_book_names()
+            if mode == "ocr":
+                return _list_books_needing_ocr()
+            return _list_books_with_ocr_done()
         if job_type == "series":
             if not target_id:
                 raise ValueError("'series' job requires target_id (series_id)")
@@ -187,6 +194,31 @@ def _list_all_book_names() -> list[str]:
     if not images_dir.exists():
         return []
     return sorted(d.name for d in images_dir.iterdir() if d.is_dir())
+
+
+def _list_books_needing_ocr() -> list[str]:
+    """OCR 未完了の書籍ディレクトリ一覧（images_dir に存在 かつ ocr_done_at 未設定）。"""
+    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    if not images_dir.exists():
+        return []
+    all_dirs = {d.name for d in images_dir.iterdir() if d.is_dir()}
+    if not all_dirs:
+        return []
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT name FROM books WHERE ocr_done_at IS NOT NULL"
+        ).fetchall()
+    done = {r[0] for r in rows}
+    return sorted(all_dirs - done)
+
+
+def _list_books_with_ocr_done() -> list[str]:
+    """OCR 完了済みの書籍名一覧を novel.db の books テーブルから返す。"""
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT name FROM books WHERE ocr_done_at IS NOT NULL ORDER BY name"
+        ).fetchall()
+    return [r[0] for r in rows]
 
 
 def _list_books_in_series(series_id: str) -> list[str]:
