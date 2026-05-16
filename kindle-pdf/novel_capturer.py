@@ -20,11 +20,18 @@ except ImportError:
 
 
 def _resolve_images_dir() -> str:
-    """画像出力先を解決する。env `KINDLE_NOVEL_IMAGES_DIR` が指定されていればそちら、
-    なければ <repo>/backend/data/kindle_novel/images を返す。"""
+    """画像出力先を解決する。優先順:
+    1. env KINDLE_NOVEL_IMAGES_DIR（明示指定）
+    2. env PIC2PDF_DATA_DIR/kindle_novel/images（OneDrive 等の共有場所）
+    3. <repo>/backend/data/kindle_novel/images（ローカルデフォルト）
+    """
+    if val := os.environ.get("KINDLE_NOVEL_IMAGES_DIR"):
+        return val
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    default = os.path.abspath(os.path.join(base_dir, '..', 'backend', 'data', 'kindle_novel', 'images'))
-    return os.environ.get("KINDLE_NOVEL_IMAGES_DIR", default)
+    data_dir = os.environ.get("PIC2PDF_DATA_DIR")
+    if data_dir:
+        return os.path.join(data_dir, "kindle_novel", "images")
+    return os.path.abspath(os.path.join(base_dir, '..', 'backend', 'data', 'kindle_novel', 'images'))
 
 
 @dataclass

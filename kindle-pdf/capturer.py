@@ -15,6 +15,24 @@ from PIL import ImageGrab, Image
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
+# プロジェクトルートの .env を読み込む（存在しない場合・dotenv 未インストール時は無視）
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+except ImportError:
+    pass
+
+
+def _resolve_comic_dir(subdir: str) -> str:
+    """漫画キャプチャの出力先を解決する。
+    PIC2PDF_DATA_DIR が設定されていればその配下、なければ backend/data/comic/ を使う。"""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.environ.get("PIC2PDF_DATA_DIR")
+    if data_dir:
+        return os.path.join(data_dir, "comic", subdir)
+    return os.path.abspath(os.path.join(base_dir, '..', 'backend', 'data', 'comic', subdir))
+
+
 @dataclass
 class Config:
     """アプリケーション設定"""
@@ -30,10 +48,10 @@ class Config:
     CROP_X2: int = 1314
     CROP_Y2: int = 1822
 
-    # 出力先パス（backend/data/comic/ = comic ソース。旧称 kindle）
+    # 出力先パス（env PIC2PDF_DATA_DIR/comic/ または backend/data/comic/）
     BASE_DIR: str = os.path.dirname(os.path.abspath(__file__))
-    IMG_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'comic', 'images'))
-    PDF_OUTPUT_DIR: str = os.path.abspath(os.path.join(BASE_DIR, '..', 'backend', 'data', 'comic', 'pdfs'))
+    IMG_OUTPUT_DIR: str = _resolve_comic_dir("images")
+    PDF_OUTPUT_DIR: str = _resolve_comic_dir("pdfs")
 
     # タイトルクリーニング用 (正規表現で PC 後のバージョン番号に対応)
     TITLE_PATTERN: str = r'Kindle for PC\d*\s*-\s*(.+)'
