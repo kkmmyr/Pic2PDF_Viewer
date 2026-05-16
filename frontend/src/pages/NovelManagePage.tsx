@@ -1,4 +1,4 @@
-import { HammerIcon, Layers, Loader2, Terminal, Wrench } from 'lucide-react';
+import { HammerIcon, Layers, Loader2, Share2, Terminal, Wrench } from 'lucide-react';
 
 import { useToast } from '../hooks';
 import { ToastContainer } from '../components/reader/ToastContainer';
@@ -48,6 +48,11 @@ export default function NovelManagePage() {
         handleShowBuiltCtxChange,
         filteredBooksCtx,
         handleEnqueueCtx,
+        allBooksRel,
+        setAllBooksRel,
+        selectedBookRel,
+        setSelectedBookRel,
+        handleEnqueueRelations,
         unifiedRows,
     } = useNovelManage();
     const { toasts, showToast, dismissToast } = useToast();
@@ -270,6 +275,66 @@ export default function NovelManagePage() {
                                     <Layers className="w-4 h-4" />
                                 )}
                                 コンテキスト生成
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 関係グラフ生成セクション */}
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
+                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                            <Share2 className="w-4 h-4" />
+                            関係グラフ生成を実行
+                        </h2>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex gap-4 text-sm">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        checked={!allBooksRel}
+                                        onChange={() => setAllBooksRel(false)}
+                                        className="text-primary-500"
+                                    />
+                                    <span className="text-gray-700 dark:text-gray-300">個別指定</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="radio"
+                                        checked={allBooksRel}
+                                        onChange={() => setAllBooksRel(true)}
+                                        className="text-primary-500"
+                                    />
+                                    <span className="text-gray-700 dark:text-gray-300">全冊</span>
+                                </label>
+                            </div>
+
+                            {!allBooksRel && (
+                                <select
+                                    value={selectedBookRel}
+                                    onChange={(e) => setSelectedBookRel(e.target.value)}
+                                    className={SELECT_CLASS}
+                                >
+                                    {books.map((b) => (
+                                        <option key={b.name} value={b.name}>
+                                            {b.name}
+                                        </option>
+                                    ))}
+                                    {books.length === 0 && (
+                                        <option value="">（書籍が見つかりません）</option>
+                                    )}
+                                </select>
+                            )}
+
+                            <button
+                                onClick={handleEnqueueRelations}
+                                disabled={isEnqueuing || (!allBooksRel && !selectedBookRel)}
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                                {isEnqueuing ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Share2 className="w-4 h-4" />
+                                )}
+                                関係グラフ生成
                             </button>
                         </div>
                     </div>

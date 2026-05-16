@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchBooks } from '../features/novel_db/api';
 import type { BookSummary } from '../features/novel_db/types';
@@ -18,7 +18,9 @@ export interface UnifiedRow {
 }
 
 function modeLabel(mode?: BuildMode): string {
-    return mode === 'generate_contexts' ? 'コンテキスト生成' : 'Full Build';
+    if (mode === 'generate_contexts') return 'コンテキスト生成';
+    if (mode === 'generate_relations') return '関係グラフ生成';
+    return 'Full Build';
 }
 
 export interface UseNovelManage {
@@ -48,6 +50,12 @@ export interface UseNovelManage {
     handleShowBuiltCtxChange: (v: boolean) => void;
     filteredBooksCtx: BookSummary[];
     handleEnqueueCtx: () => void;
+    // 関係グラフ生成用
+    allBooksRel: boolean;
+    setAllBooksRel: (v: boolean) => void;
+    selectedBookRel: string;
+    setSelectedBookRel: (v: string) => void;
+    handleEnqueueRelations: () => void;
     unifiedRows: UnifiedRow[];
 }
 
@@ -69,8 +77,11 @@ export function useNovelManage(): UseNovelManage {
     const [allBooksCtx, setAllBooksCtx] = useState(false);
     const [selectedBookCtx, setSelectedBookCtx] = useState('');
     const [showBuiltCtx, setShowBuiltCtx] = useState(false);
+    // 関係グラフ生成用
+    const [allBooksRel, setAllBooksRel] = useState(false);
+    const [selectedBookRel, setSelectedBookRel] = useState('');
 
-    useEffect(() => {
+    const refreshBooks = useCallback((initSelect = false) => {
         fetchBooks()
             .then((data) => {
                 // ocr_done_at または indexed_at があれば Build 対象（pdf_text モードは ocr_done_at を立てない）
@@ -78,13 +89,30 @@ export function useNovelManage(): UseNovelManage {
                     (b) => b.ocr_done_at !== null || b.indexed_at !== null,
                 );
                 setBooks(buildable);
-                const unbuilt = buildable.filter((b) => b.indexed_at === null);
-                const first = unbuilt.length > 0 ? unbuilt[0].name : '';
-                setSelectedBook(first);
-                setSelectedBookCtx(first);
+                if (initSelect) {
+                    const unbuilt = buildable.filter((b) => b.indexed_at === null);
+                    const first = unbuilt.length > 0 ? unbuilt[0].name : '';
+                    setSelectedBook(first);
+                    setSelectedBookCtx(first);
+                    setSelectedBookRel(buildable.length > 0 ? buildable[0].name : '');
+                }
             })
             .catch(() => {});
     }, []);
+
+    useEffect(() => {
+        refreshBooks(true);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ジョブ完了時（running → 非 running）に書籍一覧を再取得
+    const prevIsRunningRef = useRef(false);
+    useEffect(() => {
+        if (prevIsRunningRef.current && !status.is_running) {
+            refreshBooks();
+        }
+        prevIsRunningRef.current = status.is_running;
+    }, [status.is_running, refreshBooks]);
 
     const handleTabChange = useCallback((tab: Tab) => {
         setActiveTab(tab);
@@ -138,6 +166,15 @@ export function useNovelManage(): UseNovelManage {
             void enqueue(selectedBookCtx, false, 'generate_contexts');
         }
     }, [allBooksCtx, selectedBookCtx, enqueue]);
+
+    const handleEnqueueRelations = useCallback(() => {
+        if (allBooksRel) {
+            void enqueue(null, true, 'generate_relations');
+        } else {
+            if (!selectedBookRel) return;
+            void enqueue(selectedBookRel, false, 'generate_relations');
+        }
+    }, [allBooksRel, selectedBookRel, enqueue]);
 
     // 全ジョブ履歴行を構築
     const unifiedRows: UnifiedRow[] = [];
@@ -229,6 +266,11 @@ export function useNovelManage(): UseNovelManage {
         handleShowBuiltCtxChange,
         filteredBooksCtx,
         handleEnqueueCtx,
+        allBooksRel,
+        setAllBooksRel,
+        selectedBookRel,
+        setSelectedBookRel,
+        handleEnqueueRelations,
         unifiedRows,
     };
 }

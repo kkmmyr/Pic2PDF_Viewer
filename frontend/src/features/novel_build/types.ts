@@ -3,7 +3,7 @@
  * バックエンド API §8 スキーマと一致させる。
  */
 
-export type BuildMode = 'full_build' | 'generate_contexts';
+export type BuildMode = 'full_build' | 'generate_contexts' | 'generate_relations';
 
 export interface BuildJob {
     id: number;

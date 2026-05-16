@@ -9,6 +9,7 @@ import NovelManagePage from './pages/NovelManagePage';
 import NovelDetailPage from './pages/NovelDetailPage';
 import NovelDiscussionPage from './pages/NovelDiscussionPage';
 import NovelReaderPage from './pages/NovelReaderPage';
+import NovelGraphPage from './pages/NovelGraphPage';
 
 function App() {
     return (
@@ -87,6 +88,14 @@ function App() {
                             element={
                                 <ErrorBoundary>
                                     <NovelReaderPage />
+                                </ErrorBoundary>
+                            }
+                        />
+                        <Route
+                            path="novel/graph"
+                            element={
+                                <ErrorBoundary>
+                                    <NovelGraphPage />
                                 </ErrorBoundary>
                             }
                         />

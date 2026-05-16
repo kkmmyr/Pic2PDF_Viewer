@@ -8,6 +8,7 @@ import {
     MessageSquare,
     Moon,
     Settings,
+    Share2,
     Sparkles,
     Sun,
     Wrench,
@@ -45,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
         items: [
             { to: '/novel/db', icon: BookOpen, label: 'DB' },
             { to: '/novel/discussion', icon: MessageSquare, label: '読書会' },
+            { to: '/novel/graph', icon: Share2, label: '関係グラフ' },
             { to: '/novel/manage', icon: Wrench, label: '管理' },
         ],
     },
