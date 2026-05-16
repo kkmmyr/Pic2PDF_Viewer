@@ -1,10 +1,11 @@
-import { HammerIcon, Layers, Loader2, Share2, Terminal, Wrench } from 'lucide-react';
+import { HammerIcon, Layers, Share2, Terminal, Wrench } from 'lucide-react';
 
 import { useToast } from '../hooks';
 import { ToastContainer } from '../components/reader/ToastContainer';
 
 import {
     AmazonImportButton,
+    BookSelectorPanel,
     FinishedJobCard,
     QueuedJobCard,
     RunningJobCard,
@@ -18,9 +19,6 @@ const TAB_BASE =
 const TAB_ACTIVE = 'border-primary-500 text-primary-600 dark:text-primary-400';
 const TAB_INACTIVE =
     'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600';
-
-const SELECT_CLASS =
-    'w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
 export default function NovelManagePage() {
     const {
@@ -48,6 +46,7 @@ export default function NovelManagePage() {
         handleShowBuiltCtxChange,
         filteredBooksCtx,
         handleEnqueueCtx,
+        // 関係グラフ生成
         allBooksRel,
         setAllBooksRel,
         selectedBookRel,
@@ -104,243 +103,57 @@ export default function NovelManagePage() {
             {/* Full Build タブ */}
             {activeTab === 'build' && (
                 <>
-                    {/* Full Build セクション */}
-                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-4">
-                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-                            <HammerIcon className="w-4 h-4" />
-                            Full Build を実行
-                        </h2>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex gap-4 text-sm">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        checked={!allBooks}
-                                        onChange={() => setAllBooks(false)}
-                                        className="text-primary-500"
-                                    />
-                                    <span className="text-gray-700 dark:text-gray-300">
-                                        個別指定
-                                    </span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        checked={allBooks}
-                                        onChange={() => setAllBooks(true)}
-                                        className="text-primary-500"
-                                    />
-                                    <span className="text-gray-700 dark:text-gray-300">全冊</span>
-                                </label>
-                            </div>
+                    <BookSelectorPanel
+                        title="Full Build を実行"
+                        icon={<HammerIcon className="w-4 h-4" />}
+                        allBooks={allBooks}
+                        setAllBooks={setAllBooks}
+                        showBuilt={showBuilt}
+                        onShowBuiltChange={handleShowBuiltChange}
+                        books={filteredBooks}
+                        selectedBook={selectedBook}
+                        setSelectedBook={setSelectedBook}
+                        onEnqueue={handleEnqueueBuild}
+                        isEnqueuing={isEnqueuing}
+                        buttonLabel="Full Build"
+                        buttonIcon={<HammerIcon className="w-4 h-4" />}
+                        buttonVariant="primary"
+                        className="mb-4"
+                    />
 
-                            {!allBooks && (
-                                <>
-                                    <div className="flex gap-4 text-sm ml-1">
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                checked={!showBuilt}
-                                                onChange={() => handleShowBuiltChange(false)}
-                                                className="text-primary-500"
-                                            />
-                                            <span className="text-gray-600 dark:text-gray-400">
-                                                未完了
-                                            </span>
-                                        </label>
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                checked={showBuilt}
-                                                onChange={() => handleShowBuiltChange(true)}
-                                                className="text-primary-500"
-                                            />
-                                            <span className="text-gray-600 dark:text-gray-400">
-                                                完了済み
-                                            </span>
-                                        </label>
-                                    </div>
-                                    <select
-                                        value={selectedBook}
-                                        onChange={(e) => setSelectedBook(e.target.value)}
-                                        className={SELECT_CLASS}
-                                    >
-                                        {filteredBooks.map((b) => (
-                                            <option key={b.name} value={b.name}>
-                                                {b.name}
-                                            </option>
-                                        ))}
-                                        {filteredBooks.length === 0 && (
-                                            <option value="">（書籍が見つかりません）</option>
-                                        )}
-                                    </select>
-                                </>
-                            )}
+                    <BookSelectorPanel
+                        title="コンテキスト生成を実行"
+                        icon={<Layers className="w-4 h-4" />}
+                        allBooks={allBooksCtx}
+                        setAllBooks={setAllBooksCtx}
+                        showBuilt={showBuiltCtx}
+                        onShowBuiltChange={handleShowBuiltCtxChange}
+                        books={filteredBooksCtx}
+                        selectedBook={selectedBookCtx}
+                        setSelectedBook={setSelectedBookCtx}
+                        onEnqueue={handleEnqueueCtx}
+                        isEnqueuing={isEnqueuing}
+                        buttonLabel="コンテキスト生成"
+                        buttonIcon={<Layers className="w-4 h-4" />}
+                        buttonVariant="secondary"
+                        className="mb-4"
+                    />
 
-                            <button
-                                onClick={handleEnqueueBuild}
-                                disabled={isEnqueuing || (!allBooks && !selectedBook)}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
-                            >
-                                {isEnqueuing ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <HammerIcon className="w-4 h-4" />
-                                )}
-                                Full Build
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* コンテキスト生成セクション */}
-                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
-                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-                            <Layers className="w-4 h-4" />
-                            コンテキスト生成を実行
-                        </h2>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex gap-4 text-sm">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        checked={!allBooksCtx}
-                                        onChange={() => setAllBooksCtx(false)}
-                                        className="text-primary-500"
-                                    />
-                                    <span className="text-gray-700 dark:text-gray-300">
-                                        個別指定
-                                    </span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        checked={allBooksCtx}
-                                        onChange={() => setAllBooksCtx(true)}
-                                        className="text-primary-500"
-                                    />
-                                    <span className="text-gray-700 dark:text-gray-300">全冊</span>
-                                </label>
-                            </div>
-
-                            {!allBooksCtx && (
-                                <>
-                                    <div className="flex gap-4 text-sm ml-1">
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                checked={!showBuiltCtx}
-                                                onChange={() => handleShowBuiltCtxChange(false)}
-                                                className="text-primary-500"
-                                            />
-                                            <span className="text-gray-600 dark:text-gray-400">
-                                                未完了
-                                            </span>
-                                        </label>
-                                        <label className="flex items-center gap-1.5 cursor-pointer">
-                                            <input
-                                                type="radio"
-                                                checked={showBuiltCtx}
-                                                onChange={() => handleShowBuiltCtxChange(true)}
-                                                className="text-primary-500"
-                                            />
-                                            <span className="text-gray-600 dark:text-gray-400">
-                                                完了済み
-                                            </span>
-                                        </label>
-                                    </div>
-                                    <select
-                                        value={selectedBookCtx}
-                                        onChange={(e) => setSelectedBookCtx(e.target.value)}
-                                        className={SELECT_CLASS}
-                                    >
-                                        {filteredBooksCtx.map((b) => (
-                                            <option key={b.name} value={b.name}>
-                                                {b.name}
-                                            </option>
-                                        ))}
-                                        {filteredBooksCtx.length === 0 && (
-                                            <option value="">（書籍が見つかりません）</option>
-                                        )}
-                                    </select>
-                                </>
-                            )}
-
-                            <button
-                                onClick={handleEnqueueCtx}
-                                disabled={isEnqueuing || (!allBooksCtx && !selectedBookCtx)}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
-                            >
-                                {isEnqueuing ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Layers className="w-4 h-4" />
-                                )}
-                                コンテキスト生成
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 関係グラフ生成セクション */}
-                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-5 mb-8">
-                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
-                            <Share2 className="w-4 h-4" />
-                            関係グラフ生成を実行
-                        </h2>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex gap-4 text-sm">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        checked={!allBooksRel}
-                                        onChange={() => setAllBooksRel(false)}
-                                        className="text-primary-500"
-                                    />
-                                    <span className="text-gray-700 dark:text-gray-300">
-                                        個別指定
-                                    </span>
-                                </label>
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        checked={allBooksRel}
-                                        onChange={() => setAllBooksRel(true)}
-                                        className="text-primary-500"
-                                    />
-                                    <span className="text-gray-700 dark:text-gray-300">全冊</span>
-                                </label>
-                            </div>
-
-                            {!allBooksRel && (
-                                <select
-                                    value={selectedBookRel}
-                                    onChange={(e) => setSelectedBookRel(e.target.value)}
-                                    className={SELECT_CLASS}
-                                >
-                                    {books.map((b) => (
-                                        <option key={b.name} value={b.name}>
-                                            {b.name}
-                                        </option>
-                                    ))}
-                                    {books.length === 0 && (
-                                        <option value="">（書籍が見つかりません）</option>
-                                    )}
-                                </select>
-                            )}
-
-                            <button
-                                onClick={handleEnqueueRelations}
-                                disabled={isEnqueuing || (!allBooksRel && !selectedBookRel)}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white text-sm font-medium rounded-lg transition-colors"
-                            >
-                                {isEnqueuing ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <Share2 className="w-4 h-4" />
-                                )}
-                                関係グラフ生成
-                            </button>
-                        </div>
-                    </div>
+                    <BookSelectorPanel
+                        title="関係グラフ生成を実行"
+                        icon={<Share2 className="w-4 h-4" />}
+                        allBooks={allBooksRel}
+                        setAllBooks={setAllBooksRel}
+                        books={books}
+                        selectedBook={selectedBookRel}
+                        setSelectedBook={setSelectedBookRel}
+                        onEnqueue={handleEnqueueRelations}
+                        isEnqueuing={isEnqueuing}
+                        buttonLabel="関係グラフ生成"
+                        buttonIcon={<Share2 className="w-4 h-4" />}
+                        buttonVariant="indigo"
+                        className="mb-8"
+                    />
 
                     {enqueueError && (
                         <p className="text-sm text-red-500 dark:text-red-400 -mt-6 mb-6">
