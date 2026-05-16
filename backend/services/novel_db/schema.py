@@ -118,6 +118,19 @@ def _ddl() -> str:
             current_detail  TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_rebuild_jobs_state ON rebuild_jobs(state, enqueued_at);
+
+        CREATE TABLE IF NOT EXISTS character_relations (
+            id            INTEGER PRIMARY KEY,
+            series_id     TEXT    NOT NULL,
+            book_id       INTEGER NOT NULL,
+            char_a        TEXT    NOT NULL,
+            char_b        TEXT    NOT NULL,
+            relation_type TEXT,
+            weight        REAL    NOT NULL DEFAULT 1.0,
+            generated_at  TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_char_relations_series ON character_relations(series_id);
+        CREATE INDEX IF NOT EXISTS idx_char_relations_book ON character_relations(book_id);
     """
 
 

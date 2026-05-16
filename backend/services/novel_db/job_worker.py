@@ -16,6 +16,7 @@ from .builder import _resolve_images_dir, _store_ocr_pages, rebuild_from_pages
 from .connection import with_db
 from .extractor import run_ocr_subprocess
 from .full_builder import build_book_contexts, build_book_full
+from .relation_extractor import generate_book_relations
 
 logger = get_logger(__name__)
 
@@ -158,6 +159,20 @@ class NovelDbJobWorker:
                 build_book_contexts(book_name, step_callback=_ctx_step_cb, detail_callback=_ctx_detail_cb)
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d generate_contexts progress: %d/%d (%s)", job_id, done, total, book_name)
+        elif mode == "generate_relations":
+            def _rel_detail_cb(detail: str, _jid: int = job_id) -> None:
+                self._update_detail(_jid, detail)
+
+            for done, book_name in enumerate(targets, start=1):
+                series_id = _get_series_id(book_name)
+                if not series_id:
+                    logger.warning("Job %d: no series_id for %s, skipping", job_id, book_name)
+                    self._update_progress(job_id, done, total)
+                    continue
+                with with_db() as conn:
+                    generate_book_relations(conn, book_name, series_id, detail_callback=_rel_detail_cb)
+                self._update_progress(job_id, done, total)
+                logger.info("Job %d generate_relations progress: %d/%d (%s)", job_id, done, total, book_name)
         else:
             # rebuild: pages.full_text → chunks/embeddings
             for done, book_name in enumerate(targets, start=1):
@@ -170,8 +185,10 @@ class NovelDbJobWorker:
         """job_type と mode に応じて再構築対象書籍名のリストを返す。
 
         job_type="all" の場合:
-          - mode="ocr"          → OCR 未完了の書籍のみ（images_dir 存在 & ocr_done_at 未設定）
-          - それ以外            → OCR 完了済みの書籍のみ（ocr_done_at 設定済み）
+          - mode="ocr"               → OCR 未完了の書籍のみ（images_dir 存在 & ocr_done_at 未設定）
+          - mode="full_build"        → Full Build 未完了の書籍のみ（ocr_done_at 設定済み & indexed_at 未設定）
+          - mode="generate_contexts" → コンテキスト未生成チャンクが存在する書籍のみ
+          - それ以外（rebuild）      → OCR 完了済みの書籍のみ（ocr_done_at 設定済み）
         """
         if job_type == "book":
             if not target_id:
@@ -180,6 +197,12 @@ class NovelDbJobWorker:
         if job_type == "all":
             if mode == "ocr":
                 return _list_books_needing_ocr()
+            if mode == "full_build":
+                return _list_books_needing_full_build()
+            if mode == "generate_contexts":
+                return _list_books_needing_contexts()
+            if mode == "generate_relations":
+                return _list_books_with_ocr_done()
             return _list_books_with_ocr_done()
         if job_type == "series":
             if not target_id:
@@ -219,6 +242,38 @@ def _list_books_with_ocr_done() -> list[str]:
             "SELECT name FROM books WHERE ocr_done_at IS NOT NULL ORDER BY name"
         ).fetchall()
     return [r[0] for r in rows]
+
+
+def _list_books_needing_full_build() -> list[str]:
+    """Full Build 未完了の書籍名一覧（OCR 済み & indexed_at 未設定）。"""
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT name FROM books "
+            "WHERE ocr_done_at IS NOT NULL AND indexed_at IS NULL ORDER BY name"
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
+def _list_books_needing_contexts() -> list[str]:
+    """contextual_text が未設定のチャンクを持つ書籍名一覧。"""
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT b.name FROM books b "
+            "JOIN pages p ON p.book_id = b.id "
+            "JOIN chunks c ON c.page_id = p.id "
+            "WHERE b.ocr_done_at IS NOT NULL AND c.contextual_text IS NULL "
+            "ORDER BY b.name"
+        ).fetchall()
+    return [r[0] for r in rows]
+
+
+def _get_series_id(book_name: str) -> str | None:
+    """meta.json から書籍 stem に対応する series_id を返す。なければ None。"""
+    from services.meta_store import load_meta
+    meta = load_meta("novel")
+    key = f"{book_name}.pdf"
+    entry = meta.get(key, {})
+    return entry.get("series_id") or None
 
 
 def _list_books_in_series(series_id: str) -> list[str]:
