@@ -79,6 +79,12 @@ AMAZON_DATA_DIR: str = os.environ.get(
 # .env の GEMMA_TOOL_DIR で上書き可能
 GEMMA_TOOL_DIR: str = os.environ.get("GEMMA_TOOL_DIR", r"D:\61.tool\Gemma 4")
 
+# meta.db バックアップ先（env: META_DB_BACKUP_DIR。OneDrive 等の共有場所を推奨）
+META_DB_BACKUP_DIR: str = os.environ.get(
+    "META_DB_BACKUP_DIR",
+    r"C:\Users\amashio\OneDrive\61.tool\meta_db_backup",
+)
+
 # ---------------------------------------------------------------------------
 # ソース識別子
 # ---------------------------------------------------------------------------
