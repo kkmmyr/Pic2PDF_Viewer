@@ -135,19 +135,38 @@ def list_sessions(
     *,
     offset: int = 0,
     limit: int = 20,
+    scope_type: str | None = None,
+    scope_id: str | None = None,
 ) -> list[SessionMeta]:
-    """セッション一覧。`last_message_at` 降順（活動順）→ `started_at` 降順。"""
+    """セッション一覧。`last_message_at` 降順（活動順）→ `started_at` 降順。
+
+    scope_type を指定すると scope_type + scope_id の完全一致で絞り込む。
+    scope_type='all' のときは scope_id が NULL のセッションを対象とする。
+    """
+    where_parts: list[str] = []
+    params: list = []
+    if scope_type is not None:
+        where_parts.append("s.scope_type = ?")
+        params.append(scope_type)
+        if scope_id is not None:
+            where_parts.append("s.scope_id = ?")
+            params.append(scope_id)
+        else:
+            where_parts.append("s.scope_id IS NULL")
+
+    where_sql = f"WHERE {' AND '.join(where_parts)}" if where_parts else ""
     rows = conn.execute(
-        """
+        f"""
         SELECT s.id, s.scope_type, s.scope_id, s.title, s.started_at,
                s.last_message_at,
                (SELECT COUNT(*) FROM qa_messages m WHERE m.session_id = s.id)
                   AS message_count
         FROM qa_sessions s
+        {where_sql}
         ORDER BY COALESCE(s.last_message_at, s.started_at) DESC, s.id DESC
         LIMIT ? OFFSET ?
         """,
-        (limit, offset),
+        params + [limit, offset],
     ).fetchall()
     return [
         SessionMeta(

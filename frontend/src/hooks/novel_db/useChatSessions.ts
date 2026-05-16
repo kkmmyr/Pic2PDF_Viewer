@@ -16,6 +16,7 @@ import type {
     ChatMessage,
     ChatSessionDetail,
     ChatSessionSummary,
+    Scope,
 } from '../../features/novel_db/types';
 
 export interface UseChatSessions {
@@ -26,23 +27,27 @@ export interface UseChatSessions {
     remove: (id: number) => Promise<void>;
 }
 
-export function useChatSessions(): UseChatSessions {
+export function useChatSessions(scope?: Scope): UseChatSessions {
     const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const scopeType = scope?.type;
+    const scopeId = scope?.id ?? null;
 
     const refetch = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const list = await fetchChatSessions(0, 50);
+            const filterScope = scopeType ? { type: scopeType, id: scopeId } : undefined;
+            const list = await fetchChatSessions(0, 50, filterScope);
             setSessions(Array.isArray(list) ? list : []);
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e));
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [scopeType, scopeId]);
 
     const remove = useCallback(
         async (id: number) => {

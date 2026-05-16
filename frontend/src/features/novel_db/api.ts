@@ -127,9 +127,19 @@ export function fetchCharacterDetail(bookName: string, charName: string): Promis
 // マルチターン会話 QA（B-16）
 // ---------------------------------------------------------------------------
 
-export function fetchChatSessions(offset = 0, limit = 20): Promise<ChatSessionSummary[]> {
+export function fetchChatSessions(
+    offset = 0,
+    limit = 20,
+    scope?: Pick<Scope, 'type' | 'id'>,
+): Promise<ChatSessionSummary[]> {
     return apiClient.get<unknown, ChatSessionSummary[]>(`${PREFIX}/sessions`, {
-        params: { offset, limit },
+        params: {
+            offset,
+            limit,
+            ...(scope
+                ? { scope_type: scope.type, ...(scope.id != null ? { scope_id: scope.id } : {}) }
+                : {}),
+        },
     });
 }
 

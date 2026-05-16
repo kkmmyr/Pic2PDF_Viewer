@@ -108,12 +108,17 @@ async def _chat_event_stream(
 
 @router.get("/sessions")
 @log_and_raise_500("novel_db/sessions")
-def get_chat_sessions(offset: int = 0, limit: int = 20) -> list[ChatSessionSummary]:
-    """会話セッション一覧（B-16）。"""
+def get_chat_sessions(
+    offset: int = 0,
+    limit: int = 20,
+    scope_type: str | None = None,
+    scope_id: str | None = None,
+) -> list[ChatSessionSummary]:
+    """会話セッション一覧（B-16）。scope_type / scope_id で絞り込み可能。"""
     if offset < 0 or limit < 1 or limit > 100:
         raise HTTPException(status_code=422, detail="invalid offset/limit")
     with with_db() as conn:
-        rows = list_sessions(conn, offset=offset, limit=limit)
+        rows = list_sessions(conn, offset=offset, limit=limit, scope_type=scope_type, scope_id=scope_id)
     return [
         ChatSessionSummary(
             id=r.id, scope_type=r.scope_type, scope_id=r.scope_id,

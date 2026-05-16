@@ -46,6 +46,33 @@ def test_get_sessions_returns_meta_with_message_count(client, db_initialized):
     assert item["message_count"] == 2
 
 
+def test_get_sessions_scope_filter(client, db_initialized):
+    """scope_type / scope_id フィルタが機能し、別スコープのセッションを除外する。"""
+    with with_db() as conn:
+        create_session(conn, Scope(type="book", id="bookA"), title="A")
+        create_session(conn, Scope(type="book", id="bookB"), title="B")
+        create_session(conn, Scope(type="all", id=None), title="all")
+
+    # bookA のみ返る
+    res = client.get("/api/novel_db/sessions?scope_type=book&scope_id=bookA")
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["scope_id"] == "bookA"
+
+    # scope=all（scope_id なし）のみ返る
+    res = client.get("/api/novel_db/sessions?scope_type=all")
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body) == 1
+    assert body[0]["scope_type"] == "all"
+
+    # フィルタなしは全件
+    res = client.get("/api/novel_db/sessions")
+    assert res.status_code == 200
+    assert len(res.json()) == 3
+
+
 def test_get_session_detail_excludes_system_messages(client, db_initialized):
     """詳細は user/assistant のみ。system は LLM 投入用なので UI には返さない。"""
     with with_db() as conn:

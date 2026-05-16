@@ -26,7 +26,7 @@ export default function ChatSection({ scope, disabled }: Props) {
         isLoading: sessionsLoading,
         refetch: refetchSessions,
         remove,
-    } = useChatSessions();
+    } = useChatSessions(scope);
     const [activeId, setActiveId] = useState<number | null>(null);
     const { detail, streamingAnswer, setStreamingAnswer, reload, appendOptimisticUserMessage } =
         useChatSessionDetail(activeId);
