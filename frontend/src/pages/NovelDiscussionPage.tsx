@@ -1,131 +1,39 @@
 /**
  * B-20 読書会ディスカッション生成ページ（/novel/discussion）。
  *
- * 1 冊を選択し 2 人のペルソナ設定 + 発話数を指定して生成ボタンを押すと、
- * Qwen が読書会風の対話を SSE でリアルタイム配信する。
- * 生成完了後は自動保存され、過去の履歴も同ページで閲覧できる。
+ * ロジックは useDiscussion フックに委譲し、このページは JSX の
+ * オーケストレーターのみとなっている。
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Loader2, MessageSquare, Square } from 'lucide-react';
 
 import DiscussionHistoryItemCard, { TurnCard } from '../components/novel_db/DiscussionHistoryItem';
-import PersonaPanel, {
-    type PersonaState,
-    buildStyleDesc,
-} from '../components/novel_db/PersonaPanel';
-import { type DiscussionHistoryItem, fetchDiscussionHistory } from '../features/novel_db/api';
-import { type DiscussionTurnEvent, streamDiscussion } from '../features/novel_db/sse';
+import PersonaPanel from '../components/novel_db/PersonaPanel';
+import { useDiscussion } from '../hooks/novel_db/useDiscussion';
 import { useNovelDbBooks } from '../hooks/novel_db';
-
-// ---------------------------------------------------------------------------
-// ペルソナデフォルト値
-// ---------------------------------------------------------------------------
-
-const DEFAULT_A: PersonaState = {
-    name: '批評家',
-    readingStyle: '批評家',
-    tone: '敬語丁寧',
-    perspective: '文学評論',
-    useCustom: false,
-    customDesc: '',
-};
-const DEFAULT_B: PersonaState = {
-    name: 'ファン',
-    readingStyle: 'ファン',
-    tone: 'フランク',
-    perspective: '感情重視',
-    useCustom: false,
-    customDesc: '',
-};
-
-// ---------------------------------------------------------------------------
-// メインページ
-// ---------------------------------------------------------------------------
 
 export default function NovelDiscussionPage() {
     const { books } = useNovelDbBooks();
-    const [searchParams] = useSearchParams();
-
-    const [selectedBook, setSelectedBook] = useState(() => searchParams.get('book') ?? '');
-    const [personaA, setPersonaA] = useState<PersonaState>(DEFAULT_A);
-    const [personaB, setPersonaB] = useState<PersonaState>(DEFAULT_B);
-    const [numTurns, setNumTurns] = useState(6);
-
-    const [turns, setTurns] = useState<DiscussionTurnEvent[]>([]);
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const [history, setHistory] = useState<DiscussionHistoryItem[]>([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-
-    const abortRef = useRef<AbortController | null>(null);
-    const bottomRef = useRef<HTMLDivElement>(null);
-
-    const loadHistory = useCallback(async (bookName: string) => {
-        if (!bookName) return;
-        setHistoryLoading(true);
-        try {
-            const items = await fetchDiscussionHistory(bookName);
-            setHistory(items);
-        } catch {
-            // 履歴なしは静かに無視
-        } finally {
-            setHistoryLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        void loadHistory(selectedBook);
-    }, [selectedBook, loadHistory]);
-
-    // 新ターン追加時にスクロール
-    useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [turns.length]);
-
-    const handleGenerate = () => {
-        if (!selectedBook) return;
-        setTurns([]);
-        setError(null);
-        setIsGenerating(true);
-
-        const ctrl = new AbortController();
-        abortRef.current = ctrl;
-
-        void streamDiscussion(
-            {
-                book_name: selectedBook,
-                personas: [
-                    { name: personaA.name, style_description: buildStyleDesc(personaA) },
-                    { name: personaB.name, style_description: buildStyleDesc(personaB) },
-                ],
-                num_turns: numTurns,
-            },
-            {
-                onTurn: (ev) => setTurns((prev) => [...prev, ev]),
-                onDone: () => {
-                    setIsGenerating(false);
-                    void loadHistory(selectedBook);
-                },
-                onError: (e) => {
-                    setError(e.message);
-                    setIsGenerating(false);
-                },
-            },
-            ctrl.signal,
-        );
-    };
-
-    const handleCancel = () => {
-        abortRef.current?.abort();
-        setIsGenerating(false);
-    };
-
-    const nameA = personaA.name || 'A';
-    const nameB = personaB.name || 'B';
-    const canGenerate =
-        !!selectedBook && !isGenerating && buildStyleDesc(personaA) && buildStyleDesc(personaB);
+    const {
+        selectedBook,
+        setSelectedBook,
+        personaA,
+        setPersonaA,
+        personaB,
+        setPersonaB,
+        numTurns,
+        setNumTurns,
+        turns,
+        isGenerating,
+        error,
+        nameA,
+        nameB,
+        canGenerate,
+        history,
+        historyLoading,
+        handleGenerate,
+        handleCancel,
+        bottomRef,
+    } = useDiscussion();
 
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
