@@ -24,9 +24,7 @@ from config import (
     NOVEL_DB_MIN_BODY_CHARS,
 )
 
-import config
-from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError
-
+from ._llm_backend import QWEN_BACKEND
 from ._prompts import (
     CHAR_SUMMARY_TARGET_CHARS,
     COMBINED_MAX_CHARACTERS,
@@ -46,19 +44,6 @@ from ._prompts import (
 )
 from .embedder import embed_batch
 from .lance_store import get_summaries_table
-
-# プロセス起動時に Backend を作る。Backend は stateless なので使い回しで OK。
-if config.NOVEL_DB_LLM_BACKEND == "llama_server":
-    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
-        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
-        model=config.NOVEL_DB_LLM_MODEL,
-    ))
-else:
-    raise LLMError(
-        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
-        f"(supported: 'llama_server')",
-    )
-
 
 # ---------------------------------------------------------------------------
 # 公開 API
@@ -113,7 +98,7 @@ def summarize_book(
             book_name=book_name, text=body_text,
             target=FINAL_SUMMARY_TARGET_CHARS,
         )
-        return _BACKEND.ask(prompt, model=model, options=ONE_SHOT_OPTIONS).strip()
+        return QWEN_BACKEND.ask(prompt, model=model, options=ONE_SHOT_OPTIONS).strip()
 
     return _run_map_reduce_summary(book_name, body_text, model=model, progress=progress)
 
@@ -173,7 +158,7 @@ def summarize_book_with_characters(
         char_target=CHAR_SUMMARY_TARGET_CHARS,
         max_chars=max_characters,
     )
-    response = _BACKEND.ask(prompt, model=model, options=COMBINED_OPTIONS).strip()
+    response = QWEN_BACKEND.ask(prompt, model=model, options=COMBINED_OPTIONS).strip()
     summary, char_summaries = parse_combined_output(response)
 
     if not summary:
@@ -296,7 +281,7 @@ def _run_map_reduce_summary(
     for i, chunk in enumerate(chunks, 1):
         _log(progress, f"  map {i}/{len(chunks)} (chars={len(chunk):,})...")
         prompt = MAP_PROMPT.format(book_name=book_name, i=i, n=len(chunks), text=chunk)
-        intermediates.append(_BACKEND.ask(prompt, model=model, options=MAP_OPTIONS).strip())
+        intermediates.append(QWEN_BACKEND.ask(prompt, model=model, options=MAP_OPTIONS).strip())
 
     _log(progress, f"  reduce ({sum(len(s) for s in intermediates):,} chars)...")
     summaries_block = "\n\n".join(
@@ -306,7 +291,7 @@ def _run_map_reduce_summary(
         book_name=book_name, summaries=summaries_block,
         target=FINAL_SUMMARY_TARGET_CHARS,
     )
-    return _BACKEND.ask(prompt, model=model, options=REDUCE_OPTIONS).strip()
+    return QWEN_BACKEND.ask(prompt, model=model, options=REDUCE_OPTIONS).strip()
 
 
 def _index_summary_vector(

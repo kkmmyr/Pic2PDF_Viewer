@@ -237,7 +237,7 @@ def test_list_characters_sorts_by_page_count(db_with_characters):
 def test_summarize_character_calls_backend_with_book_and_name():
     pages = [(3, "本文ページ3"), (4, "本文ページ4")]
     with patch(
-        "services.novel_db.character_summarizer._BACKEND.ask",
+        "services.novel_db._llm_backend.QWEN_BACKEND.ask",
     ) as mock_ask:
         mock_ask.return_value = "  人物像です。  "
         out = summarize_character("テスト本", "レティ", pages)

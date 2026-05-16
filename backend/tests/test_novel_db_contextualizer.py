@@ -41,7 +41,7 @@ def test_clean_response_returns_empty_for_empty_input():
 
 def test_generate_returns_empty_for_empty_chunk():
     """空チャンクは LLM を呼ばずに空文字を返す。"""
-    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.GEMMA_BACKEND.ask") as mock_ask:
         out = generate_chunk_context("book", "summary", "")
     assert out == ""
     mock_ask.assert_not_called()
@@ -49,7 +49,7 @@ def test_generate_returns_empty_for_empty_chunk():
 
 def test_generate_returns_empty_when_summary_missing():
     """書籍サマリ未生成のときは LLM を呼ばずに空文字を返す。"""
-    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.GEMMA_BACKEND.ask") as mock_ask:
         out = generate_chunk_context("book", "", "本文があるよ")
     assert out == ""
     mock_ask.assert_not_called()
@@ -59,7 +59,7 @@ def test_generate_handles_llm_error_gracefully():
     """LLM 接続エラー時 (LLMError) は空文字を返す（例外を伝播させない）。"""
     from local_llm import LLMError
 
-    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.GEMMA_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = LLMError("Ollama request failed: connection refused")
         out = generate_chunk_context("book", "summary", "本文")
     assert out == ""
@@ -67,7 +67,7 @@ def test_generate_handles_llm_error_gracefully():
 
 def test_generate_calls_backend_with_prompt_and_options():
     """_BACKEND.ask に書籍名・サマリ・チャンクを含むプロンプトと適切な options が渡る。"""
-    with patch("services.novel_db.contextualizer._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.GEMMA_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "page 50 の対話シーン"
         out = generate_chunk_context("テスト書籍", "サマリ本文", "チャンク本文")
 

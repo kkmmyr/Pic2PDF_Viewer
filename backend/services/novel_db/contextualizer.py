@@ -19,10 +19,11 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 """
 from __future__ import annotations
 
-import config
-from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError, OllamaBackend
+from local_llm import LLMError
 
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_MIN_BODY_CHARS
+
+from ._llm_backend import GEMMA_BACKEND
 
 # Anthropic 流のプロンプト。書名・俯瞰サマリ・チャンク本文を与えて
 # 「retrieval のための簡潔な位置説明」を返してもらう。
@@ -66,24 +67,6 @@ _OPTIONS = {
     "num_ctx": 8192,
 }
 
-# プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
-if config.NOVEL_DB_GEMMA_BACKEND == "qwen":
-    if config.NOVEL_DB_LLM_BACKEND != "llama_server":
-        raise LLMError(
-            f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
-            f"(supported: 'llama_server')",
-        )
-    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
-        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
-        model=config.NOVEL_DB_LLM_MODEL,
-    ))
-else:
-    _BACKEND: Backend = OllamaBackend(BackendConfig(
-        base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
-        model=NOVEL_DB_CONTEXT_MODEL,
-        timeout=120,
-    ))
-
 
 def generate_chunk_context(
     book_name: str,
@@ -118,7 +101,7 @@ def generate_chunk_context(
         chunk_text=chunk_text[:_MAX_CHUNK_CHARS],
     )
     try:
-        answer = _BACKEND.ask(prompt, model=model, options=_OPTIONS)
+        answer = GEMMA_BACKEND.ask(prompt, model=model, options=_OPTIONS)
     except LLMError:
         return ""
 

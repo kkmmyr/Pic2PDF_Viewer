@@ -74,7 +74,7 @@ def test_extract_calls_backend_and_parses_response():
     Phase B（2026-05-11）以降、urllib 直叩きから OllamaBackend 経由に切替。
     Backend 内部のストリーミング解析は common/llm 側でテスト済み（test_local_llm.py）。
     """
-    with patch("services.novel_db.character_extractor._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.GEMMA_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "レティ, デューク"
         result = extract_main_characters("これは十分に長い本文テキストです。" * 5)
 
@@ -90,7 +90,7 @@ def test_extract_returns_empty_on_llm_error():
     """Ollama 接続失敗時 (LLMError) は例外を伝播せず空リストを返す。"""
     from local_llm import LLMError
 
-    with patch("services.novel_db.character_extractor._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.GEMMA_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = LLMError("Ollama request failed: connection refused")
         result = extract_main_characters("これは十分に長い本文テキストです。" * 5)
 

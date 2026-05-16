@@ -16,13 +16,14 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 """
 from __future__ import annotations
 
-import config
-from local_llm import BackendConfig, LLMError, OllamaBackend
+from local_llm import LLMError
 
 from config import (
     NOVEL_DB_QA_EXPAND_MODEL,
     NOVEL_DB_QA_EXPAND_N,
 )
+
+from ._llm_backend import QUERY_BACKEND
 
 _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意味検索するための短い検索クエリを {n} 個生成してください。
 
@@ -47,12 +48,6 @@ _OPTIONS = {
     "num_ctx": 4096,
 }
 
-# プロセス起動時に Backend を作る（Backend は stateless で使い回し OK）
-_BACKEND = OllamaBackend(BackendConfig(
-    base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
-    model=NOVEL_DB_QA_EXPAND_MODEL,
-    timeout=_TIMEOUT_SEC,
-))
 
 
 def expand_query(
@@ -82,7 +77,7 @@ def expand_query(
 
     prompt = _EXPAND_PROMPT.format(question=question.strip(), n=n - 1)
     try:
-        response = _BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
+        response = QUERY_BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
     except LLMError:
         return [question]
 

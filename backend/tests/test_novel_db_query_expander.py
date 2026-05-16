@@ -75,7 +75,7 @@ def test_parse_empty_response():
 
 def test_expand_returns_question_only_for_empty_input():
     """空文字の質問は LLM を呼ばずに元の文字列を返す。"""
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         assert expand_query("") == [""]
         assert expand_query("   ") == ["   "]
     mock_ask.assert_not_called()
@@ -83,7 +83,7 @@ def test_expand_returns_question_only_for_empty_input():
 
 def test_expand_returns_question_only_when_n_is_one():
     """n=1 のときは LLM を呼ばず元の質問だけ返す。"""
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         out = expand_query("質問", n=1)
     assert out == ["質問"]
     mock_ask.assert_not_called()
@@ -91,7 +91,7 @@ def test_expand_returns_question_only_when_n_is_one():
 
 def test_expand_question_is_always_first():
     """元の質問は必ず結果の先頭に来る。"""
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "ベルナード 弁護士\nソレス王子 裁判\nレティ 連携"
         out = expand_query("ベルナードの裁判での役割は？", n=4)
     assert out[0] == "ベルナードの裁判での役割は？"
@@ -100,7 +100,7 @@ def test_expand_question_is_always_first():
 
 def test_expand_dedupes_against_question():
     """LLM が元の質問とまったく同じクエリを生成しても重複は除く。"""
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "質問\n別のクエリ\nさらに別\n4 個目"
         out = expand_query("質問", n=4)
     assert out.count("質問") == 1
@@ -112,7 +112,7 @@ def test_expand_handles_llm_error_gracefully():
     """LLM 接続エラー時 (LLMError) は元の質問のみのリストを返す（後方互換フォールバック）。"""
     from local_llm import LLMError
 
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = LLMError("Ollama request failed: connection refused")
         out = expand_query("質問", n=4)
     assert out == ["質問"]
@@ -120,7 +120,7 @@ def test_expand_handles_llm_error_gracefully():
 
 def test_expand_caps_to_n():
     """LLM がたくさん展開しても結果は n 件に制限される。"""
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "q1\nq2\nq3\nq4\nq5\nq6\nq7\nq8"
         out = expand_query("元", n=3)
     assert len(out) == 3
@@ -129,7 +129,7 @@ def test_expand_caps_to_n():
 
 def test_expand_passes_correct_options_to_backend():
     """_BACKEND.ask に query_expander 用の options が渡される。"""
-    with patch("services.novel_db.query_expander._BACKEND.ask") as mock_ask:
+    with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "q1\nq2"
         expand_query("元の質問", n=3)
 

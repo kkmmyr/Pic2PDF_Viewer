@@ -11,24 +11,14 @@ import json
 import sqlite3
 from collections import Counter
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from itertools import combinations
 
-import config
-from local_llm import Backend, BackendConfig, LlamaServerBackend, LLMError
+from local_llm import LLMError
 
 from config import NOVEL_DB_LLM_MODEL
 
-if config.NOVEL_DB_LLM_BACKEND == "llama_server":
-    _BACKEND: Backend = LlamaServerBackend(BackendConfig(
-        base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
-        model=config.NOVEL_DB_LLM_MODEL,
-    ))
-else:
-    raise LLMError(
-        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} "
-        f"(supported: 'llama_server')",
-    )
+from ._llm_backend import QWEN_BACKEND
 
 _RELATION_PROMPT = """以下は小説『{book_name}』のキャラクター辞典サマリのリストです。
 各キャラクターのサマリを読み、登場人物間の関係タイプを抽出してください。
@@ -113,7 +103,7 @@ def extract_relations_with_qwen(
 
     prompt = _RELATION_PROMPT.format(book_name=book_name, characters=chars_text)
     try:
-        raw = _BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
+        raw = QWEN_BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
     except LLMError:
         return []
 
@@ -159,7 +149,7 @@ def store_relations(
     Returns:
         挿入した行数
     """
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # 既存データを削除して書き直し
     conn.execute(
