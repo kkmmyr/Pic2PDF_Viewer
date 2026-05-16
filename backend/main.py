@@ -26,9 +26,11 @@ from routers import (
     hitomi,
     library,
     meta,
+    meta_db_backup,
     novel_build,
     novel_db,
     novel_discussion,
+    novel_graph,
     ocr,
     pdfs,
     series,
@@ -47,11 +49,11 @@ async def lifespan(app: FastAPI):
     """起動時に meta_db / novel_db の初期化・マイグレーションと job_queue worker を起動する。"""
     init_db()
     upgrade_head()
-    job_queue.start()
+    await job_queue.start()
     try:
         yield
     finally:
-        job_queue.stop()
+        await job_queue.stop()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -113,6 +115,8 @@ app.include_router(novel_db.router,         prefix="/api", tags=["novel_db"])
 app.include_router(novel_discussion.router, prefix="/api", tags=["novel_discussion"])
 app.include_router(novel_build.router,      prefix="/api", tags=["novel_build"])
 app.include_router(amazon_import.router,    prefix="/api", tags=["amazon_import"])
+app.include_router(meta_db_backup.router,  prefix="/api", tags=["meta_db_backup"])
+app.include_router(novel_graph.router,     prefix="/api", tags=["novel_graph"])
 
 # ---------------------------------------------------------------------------
 # 設計ドキュメント HTML 配信（mkdocs ビルド成果物）
