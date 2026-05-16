@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from collections.abc import Iterator
@@ -35,7 +36,8 @@ def run_ocr_subprocess(images_dirs: list[Path]) -> Iterator[tuple[str, list[Page
     stderr は backend の stdout に流れる（GPU/モデルロードログが見える）。
     """
     cmd = [_OCR_VENV_PYTHON, str(_OCR_WORKER_SCRIPT)] + [str(d) for d in images_dirs]
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, encoding="utf-8", env=env)
     assert proc.stdout is not None
 
     for line in proc.stdout:
