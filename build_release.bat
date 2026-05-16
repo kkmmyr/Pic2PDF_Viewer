@@ -14,5 +14,8 @@ if errorlevel 1 (
 )
 
 echo.
-echo [OK] dist/ updated. You can now launch start_release.bat
+echo [OK] dist/ updated.
+echo.
+echo Next step: run restart_service.bat (as Administrator) to reload code.
+echo.
 pause
