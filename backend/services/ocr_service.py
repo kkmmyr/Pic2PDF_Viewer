@@ -81,6 +81,7 @@ class OCRService:
     def _run_ocr(self, target_dir: str | None) -> None:
         """OCR スレッド本体。run_ocr_subprocess + _store_ocr_pages を直接呼ぶ。"""
         from services.novel_db.builder import _store_ocr_pages
+        from services.novel_db.connection import with_db
         from services.novel_db.extractor import run_ocr_subprocess
 
         images_base = Path(KINDLE_NOVEL_IMAGES_DIR)
@@ -89,10 +90,17 @@ class OCRService:
         else:
             if not images_base.exists():
                 raise FileNotFoundError(f"Images dir not found: {images_base}")
-            dirs = sorted(d for d in images_base.iterdir() if d.is_dir())
+            all_dirs = [d for d in images_base.iterdir() if d.is_dir()]
+            with with_db() as conn:
+                rows = conn.execute(
+                    "SELECT name FROM books WHERE ocr_done_at IS NOT NULL"
+                ).fetchall()
+            done_names = {r[0] for r in rows}
+            dirs = sorted(d for d in all_dirs if d.name not in done_names)
 
         if not dirs:
-            self.logs.append("No image directories found.")
+            msg = "No books to process (all already OCR'd)." if not target_dir else "No image directories found."
+            self.logs.append(msg)
             with self._lock:
                 self.status = "idle"
                 self.last_return_code = 0
