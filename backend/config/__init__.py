@@ -20,8 +20,12 @@ load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file_
 # backend/ の親ディレクトリ（プロジェクトルート）
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# backend/data/
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+# デフォルトのローカル data/ パス（backend/data/）
+_DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+
+# メインデータディレクトリ（画像・PDF・サムネイル・hitomi JSON）
+# env: PIC2PDF_DATA_DIR で OneDrive 等の共有場所に変更可能
+DATA_DIR = os.environ.get("PIC2PDF_DATA_DIR", _DEFAULT_DATA_DIR)
 
 # Doujin (default)
 MAIN_DATA_DIR      = os.path.join(DATA_DIR, "doujin")
@@ -46,8 +50,16 @@ KINDLE_NOVEL_IMAGES_DIR    = os.environ.get(
     os.path.join(KINDLE_NOVEL_DIR, "images"),
 )
 
-# Novel DB（小説テキスト検索・RAG 機能の SQLite ファイル格納）
-NOVEL_DB_DIR  = os.path.join(DATA_DIR, "novel_db")
+# hitomi.la 新着監視データ（JSON ファイル群。DATA_DIR 配下で共有可）
+HITOMI_DATA_DIR = os.path.join(DATA_DIR, "hitomi")
+
+# 書誌メタ DB（SQLite。OneDrive 非推奨のためローカルに固定）
+# env: META_DB_DIR で個別パスを上書き可能
+META_DB_DIR = os.environ.get("META_DB_DIR", _DEFAULT_DATA_DIR)
+
+# Novel DB（SQLite + LanceDB。OneDrive 非推奨のためローカルに固定）
+# env: NOVEL_DB_DIR で個別パスを上書き可能
+NOVEL_DB_DIR  = os.environ.get("NOVEL_DB_DIR", os.path.join(_DEFAULT_DATA_DIR, "novel_db"))
 NOVEL_DB_PATH = os.path.join(NOVEL_DB_DIR, "novel.db")
 
 # Novel DB の env 設定（モデル・LLM・検索パラメータ等）は novel_db サブモジュールに分離。
@@ -118,6 +130,7 @@ _REQUIRED_DIRS: list[str] = [
     KINDLE_NOVEL_PDF_DIR,
     KINDLE_NOVEL_THUMBNAIL_DIR,
     KINDLE_NOVEL_IMAGES_DIR,
+    HITOMI_DATA_DIR,
     NOVEL_DB_DIR,
 ]
 

@@ -18,7 +18,9 @@ _log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data" / "hitomi"
+from config import HITOMI_DATA_DIR as _hitomi_data_dir
+
+DATA_DIR = Path(_hitomi_data_dir)
 
 # 同期 run-now の二重起動を防ぐ排他ロック
 _run_lock = threading.Lock()

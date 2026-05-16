@@ -3,12 +3,13 @@
 DATA_DIR はモジュールレベル変数として保持するので、テスト時は
   monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
 でパスを切り替えられる。
+実際の値は config.META_DB_DIR（env: META_DB_DIR、デフォルト backend/data/）から来る。
 """
 import json
 import os
 import sqlite3
 
-from config import DATA_DIR  # noqa: F401 – テスト用にモジュール名前空間に公開
+from config import META_DB_DIR as DATA_DIR  # noqa: F401 – テスト用にモジュール名前空間に公開
 
 _CREATE_DDL = """
 CREATE TABLE IF NOT EXISTS books_meta (
