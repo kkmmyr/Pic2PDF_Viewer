@@ -33,14 +33,13 @@ export function AmazonImportButton({ showToast }: Props) {
             const updated = (novelData?.updated ?? 0) + (comicData?.updated ?? 0);
             const skipped = (novelData?.skipped ?? 0) + (comicData?.skipped ?? 0);
             const unmatched = (novelData?.unmatched ?? 0) + (comicData?.unmatched ?? 0);
-            const hasError =
-                novelRes.status === 'rejected' || comicRes.status === 'rejected';
+            const hasError = novelRes.status === 'rejected' || comicRes.status === 'rejected';
 
             if (hasError && updated === 0) {
                 const msg =
                     novelRes.status === 'rejected'
                         ? (novelRes.reason as Error).message
-                        : (comicRes.reason as Error).message;
+                        : ((comicRes as PromiseRejectedResult).reason as Error).message;
                 showToast(`インポート失敗: ${msg}`, 'error');
             } else {
                 showToast(

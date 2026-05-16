@@ -18,6 +18,10 @@ const BOOKS: BookSummary[] = [
         indexed_at: null,
         ocr_done_at: null,
         thumbnail_url: null,
+        volume: null,
+        publisher: null,
+        asin: null,
+        series_index: null,
     },
     {
         name: 'book-2',
@@ -29,6 +33,10 @@ const BOOKS: BookSummary[] = [
         indexed_at: null,
         ocr_done_at: null,
         thumbnail_url: null,
+        volume: null,
+        publisher: null,
+        asin: null,
+        series_index: null,
     },
 ];
 

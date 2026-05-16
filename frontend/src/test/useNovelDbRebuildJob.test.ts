@@ -24,7 +24,7 @@ const IDLE_STATUS: RebuildStatus = {
 
 const RUNNING_STATUS: RebuildStatus = {
     is_running: true,
-    current_job: { id: 1, book_name: 'テスト本', status: 'running', started_at: null, finished_at: null, error: null },
+    current_job: { id: 1, type: 'book', target_id: 'テスト本', mode: 'rebuild', state: 'running' },
     queued_jobs: [],
     recent_finished: [],
 };
@@ -88,7 +88,9 @@ describe('useNovelDbRebuildJob', () => {
             .mockResolvedValue(IDLE_STATUS);
 
         const onCompleted = vi.fn();
-        const { result } = renderHook(() => useNovelDbRebuildJob(onCompleted), { wrapper: createWrapper() });
+        const { result } = renderHook(() => useNovelDbRebuildJob(onCompleted), {
+            wrapper: createWrapper(),
+        });
 
         // 1 回目 fetch: running — wait for state to propagate
         await waitFor(() => {
@@ -114,10 +116,10 @@ describe('useNovelDbRebuildJob', () => {
 
         let res: { job_id: number; queued_position: number } | undefined;
         await act(async () => {
-            res = await result.current.enqueue({ book_name: 'テスト本' });
+            res = await result.current.enqueue({ type: 'book', target_id: 'テスト本' });
         });
 
-        expect(api.postRebuild).toHaveBeenCalledWith({ book_name: 'テスト本' });
+        expect(api.postRebuild).toHaveBeenCalledWith({ type: 'book', target_id: 'テスト本' });
         expect(res?.job_id).toBe(1);
         // enqueue 後に refresh も呼ばれる（合計 2 回以上）
         await waitFor(() => expect(api.fetchRebuildStatus).toHaveBeenCalledTimes(2));
@@ -133,7 +135,9 @@ describe('useNovelDbRebuildJob', () => {
         });
 
         await act(async () => {
-            await expect(result.current.enqueue({ book_name: 'テスト本' })).rejects.toThrow('server error');
+            await expect(
+                result.current.enqueue({ type: 'book', target_id: 'テスト本' }),
+            ).rejects.toThrow('server error');
         });
     });
 

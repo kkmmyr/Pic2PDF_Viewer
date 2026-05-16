@@ -7,6 +7,7 @@ vi.mock('../features/novel_db/api', () => ({
 }));
 
 import { fetchBooks, fetchSeries } from '../features/novel_db/api';
+import type { BookSummary, SeriesSummary } from '../features/novel_db/types';
 import { useNovelBooksStore } from '../stores/novelBooksStore';
 import { useNovelDbBooks } from '../hooks/novel_db/useNovelDbBooks';
 
@@ -39,13 +40,15 @@ describe('useNovelDbBooks', () => {
 
         renderHook(() => useNovelDbBooks());
 
-        await act(async () => { await Promise.resolve(); });
+        await act(async () => {
+            await Promise.resolve();
+        });
         expect(mockedFetchBooks).not.toHaveBeenCalled();
     });
 
     it('store の books/series/isLoading/error が返る', async () => {
-        const books = [{ name: '本A' }];
-        const series = [{ id: 's1' }];
+        const books = [{ name: '本A' }] as BookSummary[];
+        const series = [{ id: 's1' }] as SeriesSummary[];
         useNovelBooksStore.setState({ books, series, isLoading: false, error: null });
 
         const { result } = renderHook(() => useNovelDbBooks());

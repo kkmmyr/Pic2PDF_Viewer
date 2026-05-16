@@ -1,11 +1,13 @@
 import { useRef, useEffect } from 'react';
 
+import type { ReadState } from '../types';
+
 interface UseReadProgressTrackerProps {
     selectedPdf: string;
     currentPath: string;
     isAtLastSpread: boolean;
     getReadState: (path: string, name: string) => string | undefined;
-    setReadState: (path: string, names: string[], state: string) => Promise<void>;
+    setReadState: (path: string, names: string[], state: ReadState | '') => Promise<void>;
 }
 
 /**

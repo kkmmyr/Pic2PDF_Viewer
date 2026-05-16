@@ -44,7 +44,9 @@ describe('useCharacterDetail', () => {
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetch.mockRejectedValueOnce(new Error('not found'));
-        await act(async () => { await result.current.refetch(); });
+        await act(async () => {
+            await result.current.refetch();
+        });
 
         expect(result.current.error).toBeTruthy();
         expect(result.current.detail).toBeNull();
@@ -55,7 +57,12 @@ describe('useCharacterDetail', () => {
         const { result, rerender } = renderHook(
             ({ book, char }: { book: string | null; char: string | null }) =>
                 useCharacterDetail(book, char),
-            { initialProps: { book: 'book.pdf', char: 'キャラA' } },
+            {
+                initialProps: {
+                    book: 'book.pdf' as string | null,
+                    char: 'キャラA' as string | null,
+                },
+            },
         );
 
         await waitFor(() => expect(result.current.detail).not.toBeNull());
