@@ -26,6 +26,7 @@ import type {
     Scope,
     SearchResponse,
     SeriesSummary,
+    SimilarBook,
 } from './types';
 
 export type { DiscussionHistoryItem };
@@ -46,6 +47,13 @@ export function fetchSeries(): Promise<SeriesSummary[]> {
 
 export function fetchNovelAuthors(): Promise<string[]> {
     return apiClient.get<unknown, string[]>(`${PREFIX}/authors`);
+}
+
+export function fetchSimilarBooks(bookName: string, top = 5): Promise<SimilarBook[]> {
+    return apiClient.get<unknown, SimilarBook[]>(
+        `${PREFIX}/books/${encodeURIComponent(bookName)}/similar`,
+        { params: { top } },
+    );
 }
 
 // ---------------------------------------------------------------------------

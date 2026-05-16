@@ -6,9 +6,9 @@ from __future__ import annotations
 
 import sqlite3
 
+from ._search_types import Scope, _resolve_book_names
 from .embedder import embed_batch
 from .lance_store import get_chunks_table, get_summaries_table
-from ._search_types import Scope, _resolve_book_names
 
 
 def vec_search(
@@ -98,3 +98,33 @@ def search_book_summaries(
     results = query_builder.to_list()
     results.sort(key=lambda r: r["_distance"])
     return [(r["book_name"], r["_distance"]) for r in results[:top]]
+
+
+def find_similar_books(book_name: str, *, top: int = 5) -> list[dict]:
+    """指定書籍に意味的に近い書籍を返す（サマリ embedding の KNN、自身は除外）。
+
+    Returns:
+        [{"name": book_name, "score": float}, ...] score = コサイン類似度近似 (0〜1)
+    """
+    table = get_summaries_table()
+    if table.count_rows() == 0:
+        return []
+
+    # 対象書籍の embedding を取得（SQL インジェクション対策でシングルクォートをエスケープ）
+    safe_name = book_name.replace("'", "''")
+    matched = table.search().where(f"book_name = '{safe_name}'").to_list()
+    if not matched:
+        return []
+
+    emb = matched[0]["embedding"]
+
+    # 自身を除くために top+1 件取得
+    results = table.search(emb).limit(top + 1).to_list()
+    results.sort(key=lambda r: r["_distance"])
+
+    # BGE-M3 は正規化 embedding なので L2 距離 ≈ 2*(1-cosine)
+    return [
+        {"name": r["book_name"], "score": round(max(0.0, 1.0 - r["_distance"] / 2.0), 4)}
+        for r in results
+        if r["book_name"] != book_name
+    ][:top]

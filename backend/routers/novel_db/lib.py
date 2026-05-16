@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from routers._deps import log_and_raise_500
 from services.novel_db import with_db
 from services.novel_db.library import get_book_detail, list_authors, list_books, list_series
+from services.novel_db.vector_search import find_similar_books
 
 router = APIRouter()
 
@@ -34,6 +35,13 @@ def get_authors() -> list[str]:
     """novel ソースの全書籍から作者一覧（重複なし・アルファベット順）を返す（B-21）。"""
     with with_db() as conn:
         return list_authors(conn)
+
+
+@router.get("/books/{book_name}/similar")
+@log_and_raise_500("novel_db/books/similar")
+def get_similar_books(book_name: str, top: int = 5) -> list[dict]:
+    """指定書籍に意味的に近い書籍を返す（B-19）。サマリ embedding の KNN。"""
+    return find_similar_books(book_name, top=min(top, 20))
 
 
 @router.get("/books/{book_name:path}")

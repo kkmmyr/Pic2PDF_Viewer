@@ -35,6 +35,12 @@ export interface BookDetail extends BookSummary {
     discussion_count: number;
 }
 
+export interface SimilarBook {
+    name: string;
+    /** コサイン類似度近似 (0〜1)。高いほど類似 */
+    score: number;
+}
+
 // ---------------------------------------------------------------------------
 // 書籍メタ編集（4.3）
 // ---------------------------------------------------------------------------

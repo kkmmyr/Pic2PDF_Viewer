@@ -16,6 +16,7 @@ import {
     Pencil,
     RefreshCw,
     ScanText,
+    Sparkles,
     Wand2,
 } from 'lucide-react';
 
@@ -31,13 +32,9 @@ import {
 import BookMetaList from '../components/novel_db/BookMetaList';
 import DiscussionHistoryItemCard from '../components/novel_db/DiscussionHistoryItem';
 import type { DiscussionHistoryItem } from '../features/novel_db/api';
-import { fetchDiscussionHistory } from '../features/novel_db/api';
-import type { BookDetail } from '../features/novel_db/types';
-import {
-    useBookDetail,
-    useNovelDbHistory,
-    useNovelDbRebuildJob,
-} from '../hooks/novel_db';
+import { fetchDiscussionHistory, fetchSimilarBooks } from '../features/novel_db/api';
+import type { BookDetail, SimilarBook } from '../features/novel_db/types';
+import { useBookDetail, useNovelDbHistory, useNovelDbRebuildJob } from '../hooks/novel_db';
 import { formatSqliteUtcAsJst } from '../utils/date';
 
 export default function NovelDetailPage() {
@@ -64,6 +61,9 @@ export default function NovelDetailPage() {
     const [discussions, setDiscussions] = useState<DiscussionHistoryItem[]>([]);
     const [discussionsLoading, setDiscussionsLoading] = useState(false);
 
+    const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
+    const [similarLoading, setSimilarLoading] = useState(false);
+
     useEffect(() => {
         if (!decodedName) return;
         setDiscussionsLoading(true);
@@ -73,8 +73,16 @@ export default function NovelDetailPage() {
             .finally(() => setDiscussionsLoading(false));
     }, [decodedName]);
 
-    const handleRead = () =>
-        void navigate(`/novel/reader/${encodeURIComponent(decodedName)}`);
+    useEffect(() => {
+        if (!decodedName || !detail?.is_indexed) return;
+        setSimilarLoading(true);
+        fetchSimilarBooks(decodedName)
+            .then(setSimilarBooks)
+            .catch(() => {})
+            .finally(() => setSimilarLoading(false));
+    }, [decodedName, detail?.is_indexed]);
+
+    const handleRead = () => void navigate(`/novel/reader/${encodeURIComponent(decodedName)}`);
 
     const handleOpenScene = useCallback(
         (book: string, pageNo: number) =>
@@ -236,6 +244,39 @@ export default function NovelDetailPage() {
                             setCharDialog({ book: decodedName, char: charName })
                         }
                     />
+                </section>
+            )}
+
+            {/* 似ているテーマの本セクション */}
+            {detail.is_indexed && (
+                <section className="space-y-2">
+                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                        似ているテーマの本
+                        {similarLoading && (
+                            <Loader2 className="inline w-3.5 h-3.5 ml-1 animate-spin text-gray-400" />
+                        )}
+                    </h2>
+                    {!similarLoading && similarBooks.length === 0 ? (
+                        <p className="text-sm text-gray-400 dark:text-gray-500 italic">
+                            類似書籍が見つかりません（サマリ未生成の可能性があります）
+                        </p>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {similarBooks.map((b) => (
+                                <button
+                                    key={b.name}
+                                    onClick={() =>
+                                        void navigate(`/novel/detail/${encodeURIComponent(b.name)}`)
+                                    }
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+                                >
+                                    <BookOpen className="w-3.5 h-3.5 shrink-0" />
+                                    <span className="truncate max-w-48">{b.name}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </section>
             )}
 

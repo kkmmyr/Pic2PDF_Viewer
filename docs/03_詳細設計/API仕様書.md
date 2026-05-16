@@ -1503,6 +1503,26 @@ data: {"type": "error", "message": "本文が長すぎます（推定 120,000 �
 
 ---
 
+### §7.21 `GET /api/novel_db/books/{book_name}/similar`（B-19）
+
+指定書籍のサマリ embedding を使い、ライブラリ内の意味的に近い書籍を返す（LanceDB KNN）。自身は除外。サマリが未生成の場合は空配列。
+
+**パスパラメータ**: `book_name` — 書籍名（URL エンコード）
+
+**クエリパラメータ**: `top` — 返す件数（デフォルト: 5、最大: 20）
+
+**レスポンス**:
+```json
+[
+  { "name": "ビーズログ文庫の例 1", "score": 0.7321 },
+  { "name": "ビーズログ文庫の例 2", "score": 0.6894 }
+]
+```
+
+`score` は BGE-M3 正規化 embedding のコサイン類似度近似（0〜1、高いほど類似）。
+
+---
+
 ## §9. Amazon CSV インポート（amazon_import）
 
 Amazon 購入履歴 CSV から novel / comic ライブラリの `meta.db` を著者・ASIN で補完するエンドポイント。CSV はサーバー側の固定パス（`AMAZON_DATA_DIR`）から自動読み込みするため、ファイルアップロード不要。
