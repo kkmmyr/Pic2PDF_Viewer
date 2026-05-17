@@ -63,7 +63,7 @@ export interface UseDiscussionReturn {
     handleGenerate: () => void;
     handleCancel: () => void;
     // refs
-    bottomRef: React.RefObject<HTMLDivElement>;
+    bottomRef: React.RefObject<HTMLDivElement | null>;
 }
 
 // ---------------------------------------------------------------------------
