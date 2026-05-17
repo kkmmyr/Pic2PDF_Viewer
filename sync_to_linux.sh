@@ -10,35 +10,40 @@ LINUX="${LINUX_USER}@${LINUX_HOST}"
 DEST=/opt/pic2pdf-viewer/data
 TARGET=${1:-all}
 
-# Windows の Git Bash / WSL でのパス解決用
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DATA_DIR="${SCRIPT_DIR}/backend/data"
+# データ格納場所
+ONEDRIVE_DATA="/c/Users/amashio/OneDrive/61.tool/Pic2PDF"
+DB_DATA="/d/61.tool/Pic2PDF_Viewer/backend/data"
 
-sync_dir() {
+sync_tar() {
     local src=$1 dst=$2
+    if [[ ! -d "$src" ]]; then
+        echo "Skip (not found): $src"
+        return
+    fi
     echo "Syncing: $src → $LINUX:$dst"
-    rsync -avz --progress "$src/" "${LINUX}:${dst}/"
+    tar czf - -C "$(dirname "$src")" "$(basename "$src")" \
+        | ssh "$LINUX" "mkdir -p '$dst' && tar xzf - -C '$(dirname "$dst")'"
 }
 
 sync_db() {
     echo "Syncing DB..."
-    rsync -avz --progress "${DATA_DIR}/meta.db"   "${LINUX}:${DEST}/"
-    rsync -avz --progress "${DATA_DIR}/novel_db/"  "${LINUX}:${DEST}/novel_db/"
+    tar czf - -C "${DB_DATA}" meta.db novel_db \
+        | ssh "$LINUX" "tar xzf - -C '${DEST}/'"
 }
 
 if [[ "$TARGET" == "doujin" || "$TARGET" == "all" ]]; then
-    sync_dir "${DATA_DIR}/doujin/pdfs_compressed" "${DEST}/doujin/pdfs_compressed"
-    sync_dir "${DATA_DIR}/doujin/thumbnails"      "${DEST}/doujin/thumbnails"
+    sync_tar "${ONEDRIVE_DATA}/doujin/thumbnails" "${DEST}/doujin/thumbnails"
+    sync_tar "${ONEDRIVE_DATA}/doujin/images"     "${DEST}/doujin/images"
 fi
 
 if [[ "$TARGET" == "comic" || "$TARGET" == "all" ]]; then
-    sync_dir "${DATA_DIR}/comic/pdfs"       "${DEST}/comic/pdfs"
-    sync_dir "${DATA_DIR}/comic/thumbnails" "${DEST}/comic/thumbnails"
+    sync_tar "${ONEDRIVE_DATA}/comic/thumbnails" "${DEST}/comic/thumbnails"
+    sync_tar "${ONEDRIVE_DATA}/comic/images"     "${DEST}/comic/images"
 fi
 
 if [[ "$TARGET" == "novel" || "$TARGET" == "all" ]]; then
-    sync_dir "${DATA_DIR}/novel/pdfs"       "${DEST}/novel/pdfs"
-    sync_dir "${DATA_DIR}/novel/thumbnails" "${DEST}/novel/thumbnails"
+    sync_tar "${ONEDRIVE_DATA}/kindle_novel/thumbnails" "${DEST}/kindle_novel/thumbnails"
+    sync_tar "${ONEDRIVE_DATA}/kindle_novel/images"     "${DEST}/kindle_novel/images"
 fi
 
 sync_db

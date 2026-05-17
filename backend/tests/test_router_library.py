@@ -10,8 +10,7 @@ routers.library のユニットテスト。
 """
 import os
 
-from services.meta_store import load_meta, save_meta
-
+from services.meta_store import load_meta, save_meta  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # GET /api/pdfs (generated: images/ 走査)
@@ -95,37 +94,52 @@ class TestListPdfsGenerated:
 
 
 # ---------------------------------------------------------------------------
-# GET /api/pdfs (kindle: PDF ファイル走査)
+# GET /api/pdfs (comic/novel: images/ サブディレクトリ走査)
+# Kindle キャプチャは PNG として images/{book}/ に保存される。
 # ---------------------------------------------------------------------------
 
 class TestListPdfsKindle:
-    def test_lists_pdf_files(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        make_pdf(os.path.join(pdf_dir, "book1.pdf"))
-        make_pdf(os.path.join(pdf_dir, "book2.pdf"))
+    def test_lists_books_with_pngs(self, client, tmp_data_dir, make_png):
+        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
+        make_png(os.path.join(img_dir, "book1", "001.png"))
+        make_png(os.path.join(img_dir, "book2", "001.png"))
 
         res = client.get("/api/pdfs?source=comic")
         assert res.status_code == 200
         names = {f["name"] for f in res.json()["files"]}
         assert names == {"book1.pdf", "book2.pdf"}
 
-    def test_excludes_non_pdf(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        make_pdf(os.path.join(pdf_dir, "book.pdf"))
-        with open(os.path.join(pdf_dir, "readme.txt"), "w") as f:
-            f.write("hi")
+    def test_excludes_empty_directories(self, client, tmp_data_dir, make_png):
+        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
+        make_png(os.path.join(img_dir, "has_image", "001.png"))
+        os.makedirs(os.path.join(img_dir, "empty_dir"))
 
         res = client.get("/api/pdfs?source=comic")
         names = {f["name"] for f in res.json()["files"]}
-        assert names == {"book.pdf"}
+        assert names == {"has_image.pdf"}
 
-    def test_subdirectory_path(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        make_pdf(os.path.join(pdf_dir, "series_a", "vol1.pdf"))
+    def test_thumbnail_url_when_thumb_exists(self, client, tmp_data_dir, make_png):
+        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
+        thumb_dir = tmp_data_dir["KINDLE_THUMBNAIL_DIR"]
+        make_png(os.path.join(img_dir, "book", "001.png"))
+        thumb_path = os.path.join(thumb_dir, "book.jpg")
+        os.makedirs(thumb_dir, exist_ok=True)
+        with open(thumb_path, "wb") as f:
+            f.write(b"\xff\xd8\xff\xe0")  # JPEG magic
 
-        res = client.get("/api/pdfs?path=series_a&source=comic")
+        res = client.get("/api/pdfs?source=comic")
+        files = res.json()["files"]
+        book = next(f for f in files if f["name"] == "book.pdf")
+        assert book["thumbnail"] == "/comic/thumbnails/book.jpg"
+
+    def test_novel_source_lists_books(self, client, tmp_data_dir, make_png):
+        img_dir = tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]
+        make_png(os.path.join(img_dir, "novel1", "001.png"))
+
+        res = client.get("/api/pdfs?source=novel")
+        assert res.status_code == 200
         names = {f["name"] for f in res.json()["files"]}
-        assert names == {"vol1.pdf"}
+        assert names == {"novel1.pdf"}
 
     def test_invalid_source_returns_400(self, client, tmp_data_dir):
         """generated/kindle/novel 以外は 400 で弾かれる（Depends(validated_source) 経由）。"""

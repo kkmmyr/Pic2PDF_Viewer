@@ -152,3 +152,14 @@ def make_webp():
         img.save(path, "WEBP")
 
     return _make
+
+
+@pytest.fixture
+def make_png():
+    """指定パスに PNG 画像を生成する関数（Kindle キャプチャのテスト用）。"""
+    def _make(path: str, color: tuple = (0, 128, 255), size: tuple = (100, 100)) -> None:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        img = Image.new("RGB", size, color)
+        img.save(path, "PNG")
+
+    return _make

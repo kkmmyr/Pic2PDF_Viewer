@@ -10,9 +10,8 @@ from routers._deps import assert_valid_source, log_and_raise_500, validate_reque
 from services.file_manager import FileManager
 from services.meta_store import make_key, update_meta_locked
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
-from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
-from utils.file_utils import is_image_file, is_pdf_file
+from utils.file_utils import is_image_file
 from utils.logger import get_logger
 from utils.path_utils import join_path, validate_safe_name, validate_safe_path
 
@@ -22,10 +21,10 @@ router = APIRouter()
 
 
 def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) -> dict:
-    """generated ソース用: images/ サブディレクトリを走査して書籍一覧を返す。
+    """images/ サブディレクトリを走査して書籍一覧を返す（全ソース共通）。
 
-    pdfs_compressed/ の代わりに images/{book}/ ディレクトリを正とする。
-    返却する name は "{dirname}.pdf" として meta.json のキー互換を保つ。
+    images/{book}/ ディレクトリを正とし、WebP / PNG / JPG 等任意の画像形式に対応。
+    返却する name は "{dirname}.pdf" として meta.db のキー互換を保つ。
     """
     base_img_dir = dirs["img"]
     base_thumb_dir = dirs["thumb"]
@@ -45,8 +44,8 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) 
         item_path = join_path(target_img_dir, item)
         if not os.path.isdir(item_path):
             continue
-        webps = natsorted([f for f in os.listdir(item_path) if f.lower().endswith('.webp')])
-        if not webps:
+        imgs = natsorted([f for f in os.listdir(item_path) if is_image_file(f)])
+        if not imgs:
             continue
 
         pdf_name = f"{item}.pdf"
@@ -59,9 +58,9 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) 
             encoded = '/'.join(quote(seg, safe='') for seg in rel.replace(os.sep, '/').split('/'))
             thumb_url = f"{url_prefix_thumb}/{encoded}"
         else:
-            # generated は image-only モード。fitz では WebP を読めないため PIL 経路を使う。
-            first_webp = join_path(item_path, webps[0])
-            background_tasks.add_task(generate_thumbnail_from_image, first_webp, thumb_path)
+            # fitz は WebP を読めないため PIL 経路で生成（PNG/JPG も同様に対応）
+            first_img = join_path(item_path, imgs[0])
+            background_tasks.add_task(generate_thumbnail_from_image, first_img, thumb_path)
 
         created_at = int(os.path.getctime(item_path))
         files.append({
@@ -79,51 +78,8 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = D
 
     dirs = get_dirs_by_source(source)
 
-    # generated ソースは images/ サブディレクトリを走査（pdfs_compressed 不要）
-    if source == "doujin":
-        return _list_from_images(background_tasks, path, dirs)
-
-    # kindle / novel: 従来通り PDF ファイルを走査
-    base_pdf_dir = dirs["pdf"]
-    base_thumb_dir = dirs["thumb"]
-    url_prefix_thumb = dirs["thumb_url_prefix"]
-
-    target_pdf_dir = join_path(base_pdf_dir, path)
-    target_thumb_dir = join_path(base_thumb_dir, path)
-
-    if not os.path.exists(target_pdf_dir):
-        return {"files": [], "current_path": path}
-
-    if not os.path.isdir(target_pdf_dir):
-        raise HTTPException(status_code=400, detail="Not a directory")
-
-    items = os.listdir(target_pdf_dir)
-    files = []
-
-    for item in items:
-        item_path = join_path(target_pdf_dir, item)
-        if os.path.isdir(item_path):
-            continue
-        elif is_pdf_file(item):
-            thumb_name = get_thumbnail_name(item)
-            thumb_path = join_path(target_thumb_dir, thumb_name)
-
-            thumb_url = None
-            if os.path.exists(thumb_path):
-                rel_path = join_path(path, thumb_name) if path else thumb_name
-                encoded = '/'.join(quote(seg, safe='') for seg in rel_path.replace(os.sep, '/').split('/'))
-                thumb_url = f"{url_prefix_thumb}/{encoded}"
-            else:
-                background_tasks.add_task(ThumbnailService.generate_thumbnail, item_path, thumb_path)
-
-            created_at = int(os.path.getctime(item_path))
-            files.append({
-                "name": item,
-                "thumbnail": thumb_url,
-                "created_at": created_at,
-            })
-
-    return {"files": files, "current_path": path}
+    # 全ソース共通: images/ サブディレクトリを走査（WebP / PNG / JPG を含むフォルダを書籍として返す）
+    return _list_from_images(background_tasks, path, dirs)
 
 @router.get("/books/{path:path}/images")
 @log_and_raise_500("list_book_images")
