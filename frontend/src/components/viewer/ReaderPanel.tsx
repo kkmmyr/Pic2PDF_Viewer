@@ -1,5 +1,6 @@
 import type { LibrarySource } from '../../types';
 import { useReaderState } from '../../hooks/useReaderState';
+import { useTouchSwipe } from '../../hooks/useTouchSwipe';
 import { ReaderHeader, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
 import { EdgeHoverZones } from '../reader/EdgeHoverZones';
 import { PageGridOverlay } from '../reader/PageGridOverlay';
@@ -38,9 +39,11 @@ export function ReaderPanel(props: ReaderPanelProps) {
         showHeader,
         showHeaderOn,
         showHeaderOff,
+        showHeaderOnTouch,
         showSlider,
         showSliderOn,
         showSliderOff,
+        showSliderOnTouch,
         isSearchOpen,
         toggleSearch,
         isHelpOpen,
@@ -83,9 +86,19 @@ export function ReaderPanel(props: ReaderPanelProps) {
         handleClose,
     } = useReaderState(props);
 
+    const { onTouchStart, onTouchEnd } = useTouchSwipe({
+        onSwipeLeft: handleNext,
+        onSwipeRight: handlePrev,
+    });
+
     return (
         <>
-            <EdgeHoverZones onEnterTop={showHeaderOn} onEnterBottom={showSliderOn} />
+            <EdgeHoverZones
+                onEnterTop={showHeaderOn}
+                onEnterBottom={showSliderOn}
+                onTouchTop={showHeaderOnTouch}
+                onTouchBottom={showSliderOnTouch}
+            />
 
             <ReaderHeader
                 selectedPdf={selectedPdf}
@@ -151,6 +164,8 @@ export function ReaderPanel(props: ReaderPanelProps) {
                     <div
                         className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
                         onClick={handleNext}
+                        onTouchStart={onTouchStart}
+                        onTouchEnd={onTouchEnd}
                     >
                         <ReaderPageView
                             pageNumber={pageNumber}

@@ -1,4 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
+
+const TOUCH_AUTO_HIDE_MS = 3000;
 
 /**
  * リーダー画面の UI トグル系状態（ヘッダー / スライダー / 検索 / ヘルプ）を集約するフック。
@@ -10,6 +12,9 @@ export function useReaderUIState() {
     const [showSlider, setShowSlider] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+    const headerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const sliderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const openSearch = useCallback(() => setIsSearchOpen(true), []);
     const closeSearch = useCallback(() => setIsSearchOpen(false), []);
@@ -23,13 +28,28 @@ export function useReaderUIState() {
     const showSliderOn = useCallback(() => setShowSlider(true), []);
     const showSliderOff = useCallback(() => setShowSlider(false), []);
 
+    // タッチ用: 表示して 3 秒後に自動的に非表示にする
+    const showHeaderOnTouch = useCallback(() => {
+        setShowHeader(true);
+        if (headerTimerRef.current !== null) clearTimeout(headerTimerRef.current);
+        headerTimerRef.current = setTimeout(() => setShowHeader(false), TOUCH_AUTO_HIDE_MS);
+    }, []);
+
+    const showSliderOnTouch = useCallback(() => {
+        setShowSlider(true);
+        if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
+        sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
+    }, []);
+
     return {
         showHeader,
         showHeaderOn,
         showHeaderOff,
+        showHeaderOnTouch,
         showSlider,
         showSliderOn,
         showSliderOff,
+        showSliderOnTouch,
         isSearchOpen,
         openSearch,
         closeSearch,

@@ -57,20 +57,21 @@ export function useReaderState({
         handleDocumentLoadSuccess,
     } = usePdfDocumentState();
 
-    const { imageUrls, numPages: imageNumPages, isImageMode } = useBookImages(
-        selectedPdf,
-        currentPath,
-        currentSource,
-        pdfVersion,
-    );
+    const {
+        imageUrls,
+        numPages: imageNumPages,
+        isImageMode,
+    } = useBookImages(selectedPdf, currentPath, currentSource, pdfVersion);
 
     const {
         showHeader,
         showHeaderOn,
         showHeaderOff,
+        showHeaderOnTouch,
         showSlider,
         showSliderOn,
         showSliderOff,
+        showSliderOnTouch,
         isSearchOpen,
         openSearch,
         closeSearch,
@@ -85,8 +86,7 @@ export function useReaderState({
     const { isFullscreen, toggleFullscreen } = useFullscreen();
     const { toasts, showToast, dismissToast } = useToast();
 
-    const { meta, getSeries, recordView, getReadState, setReadState } =
-        useBookMeta(currentSource);
+    const { meta, getSeries, recordView, getReadState, setReadState } = useBookMeta(currentSource);
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const prevVolume = usePrevSeriesVolume(meta, getSeries, currentPath, selectedPdf);
     const relatedBooks = useRelatedBooks(meta, currentPath, selectedPdf);
@@ -192,7 +192,15 @@ export function useReaderState({
         handleCloseSearch();
         resetPage();
         setIsOnRelatedPage(false);
-    }, [selectedPdf, resetPage, handleCloseSearch, resetEditMode, resetAutoSpread, resetNumPages, setIsOnRelatedPage]);
+    }, [
+        selectedPdf,
+        resetPage,
+        handleCloseSearch,
+        resetEditMode,
+        resetAutoSpread,
+        resetNumPages,
+        setIsOnRelatedPage,
+    ]);
 
     // ページペア切替時に Auto 見開き判定をリセット。直後に PageRenderer の onRenderSuccess
     // で左右両ページの寸法が通知され、片方でも横長なら 1 ページ表示に確定する。
@@ -238,9 +246,11 @@ export function useReaderState({
         showHeader,
         showHeaderOn,
         showHeaderOff,
+        showHeaderOnTouch,
         showSlider,
         showSliderOn,
         showSliderOff,
+        showSliderOnTouch,
         isSearchOpen,
         toggleSearch,
         isHelpOpen,
