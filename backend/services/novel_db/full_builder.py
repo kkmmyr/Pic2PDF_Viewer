@@ -158,7 +158,7 @@ def _run_combined_step(
             conn.execute(
                 """INSERT INTO book_characters
                        (book_id, name, summary, first_page, page_count, generated_at)
-                   VALUES (?, ?, ?, ?, ?, datetime('now'))""",
+                   VALUES (?, ?, ?, ?, ?, datetime('now', '+9 hours'))""",
                 (book_id, name, char_summary, first_page, page_count),
             )
         conn.commit()

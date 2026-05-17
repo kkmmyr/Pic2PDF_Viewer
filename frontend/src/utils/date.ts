@@ -41,18 +41,18 @@ export function formatDateTimeJa(iso: string | null | undefined): string {
 }
 
 /**
- * SQLite の `datetime('now')` が返す UTC 文字列を Date に変換する。
+ * SQLite の `datetime('now', '+9 hours')` が返す JST 文字列を Date に変換する。
  *
- * SQLite の出力は `"2026-05-11 13:30:45"`（スペース区切り、タイムゾーン情報なし）。
+ * SQLite の出力は `"2026-05-11 22:30:45"`（スペース区切り、タイムゾーン情報なし）。
  * JS の `new Date()` はこの形式をローカル時刻として誤解釈するため、明示的に
- * `"2026-05-11T13:30:45Z"` に整形してから Date 化する。
+ * `"2026-05-11T22:30:45+09:00"` に整形してから Date 化する。
  * パース失敗時は `null` を返す。
  */
 export function parseSqliteUtc(s: string | null | undefined): Date | null {
     if (!s) return null;
     // ISO 8601 風（`T` 区切り）にし、Z が無ければ付与
     const normalized = s.includes('T') ? s : s.replace(' ', 'T');
-    const withZ = /[Zz]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`;
+    const withZ = /[Zz]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}+09:00`;
     const d = new Date(withZ);
     return isNaN(d.getTime()) ? null : d;
 }

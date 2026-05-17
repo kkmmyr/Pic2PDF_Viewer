@@ -73,7 +73,7 @@ class NovelDbJobWorker:
             job_id, job_type, target_id, mode = row
             conn.execute(
                 "UPDATE rebuild_jobs SET state='running', "
-                "started_at=datetime('now') WHERE id = ?",
+                "started_at=datetime('now', '+9 hours') WHERE id = ?",
                 (job_id,),
             )
             conn.commit()
@@ -83,7 +83,7 @@ class NovelDbJobWorker:
     def _mark_finished(self, job_id: int, state: str, *, error: str | None = None) -> None:
         with with_db() as conn:
             conn.execute(
-                "UPDATE rebuild_jobs SET state = ?, finished_at = datetime('now'), "
+                "UPDATE rebuild_jobs SET state = ?, finished_at = datetime('now', '+9 hours'), "
                 "error_message = ? WHERE id = ?",
                 (state, error, job_id),
             )

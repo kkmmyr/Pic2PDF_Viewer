@@ -205,7 +205,7 @@ def upsert_character(
         """
         INSERT INTO book_characters
             (book_id, name, summary, first_page, page_count, generated_at)
-        VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now') ELSE NULL END)
+        VALUES (?, ?, ?, ?, ?, CASE WHEN ? THEN datetime('now', '+9 hours') ELSE NULL END)
         ON CONFLICT(book_id, name) DO UPDATE SET
             summary = CASE WHEN ? THEN excluded.summary ELSE book_characters.summary END,
             first_page = excluded.first_page,

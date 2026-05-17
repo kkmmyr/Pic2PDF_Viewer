@@ -50,7 +50,7 @@ def save_finish(
     eval_count: int | None,
 ) -> None:
     conn.execute(
-        "UPDATE qa_history SET answer = ?, finished_at = datetime('now'), "
+        "UPDATE qa_history SET answer = ?, finished_at = datetime('now', '+9 hours'), "
         "done_reason = ?, eval_count = ? WHERE id = ?",
         (answer, done_reason, eval_count, history_id),
     )
@@ -59,7 +59,7 @@ def save_finish(
 
 def save_error(conn: sqlite3.Connection, history_id: int, error: str) -> None:
     conn.execute(
-        "UPDATE qa_history SET error_message = ?, finished_at = datetime('now'), "
+        "UPDATE qa_history SET error_message = ?, finished_at = datetime('now', '+9 hours'), "
         "done_reason = 'error' WHERE id = ?",
         (error, history_id),
     )

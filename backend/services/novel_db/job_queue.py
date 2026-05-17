@@ -121,7 +121,7 @@ class NovelDbJobQueue:
                 return "running" if row[0] == "running" else "not_found"
             conn.execute(
                 "UPDATE rebuild_jobs SET state='canceled', "
-                "finished_at=datetime('now') WHERE id = ? AND state='queued'",
+                "finished_at=datetime('now', '+9 hours') WHERE id = ? AND state='queued'",
                 (job_id,),
             )
             conn.commit()

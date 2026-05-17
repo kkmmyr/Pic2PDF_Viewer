@@ -14,7 +14,7 @@ def _ddl() -> str:
             images_dir           TEXT NOT NULL,
             page_count           INTEGER NOT NULL,
             indexed_at           TIMESTAMP,
-            created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at           TIMESTAMP DEFAULT (datetime('now', '+9 hours')),
             summary              TEXT,
             summary_generated_at TIMESTAMP,
             ocr_done_at          TIMESTAMP
@@ -53,7 +53,7 @@ def _ddl() -> str:
 
         CREATE TABLE IF NOT EXISTS qa_history (
             id            INTEGER PRIMARY KEY,
-            asked_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            asked_at      TIMESTAMP DEFAULT (datetime('now', '+9 hours')),
             finished_at   TIMESTAMP,
             scope_type    TEXT NOT NULL,
             scope_id      TEXT,
@@ -86,7 +86,7 @@ def _ddl() -> str:
             scope_type      TEXT NOT NULL,
             scope_id        TEXT,
             title           TEXT,
-            started_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            started_at      TIMESTAMP DEFAULT (datetime('now', '+9 hours')),
             last_message_at TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_qa_sessions_started ON qa_sessions(started_at DESC);
@@ -98,7 +98,7 @@ def _ddl() -> str:
             content      TEXT NOT NULL,
             eval_count   INTEGER,
             done_reason  TEXT,
-            created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at   TIMESTAMP DEFAULT (datetime('now', '+9 hours'))
         );
         CREATE INDEX IF NOT EXISTS idx_qa_messages_session ON qa_messages(session_id, id);
 
@@ -108,7 +108,7 @@ def _ddl() -> str:
             target_id       TEXT,
             mode            TEXT NOT NULL DEFAULT 'rebuild',
             state           TEXT NOT NULL DEFAULT 'queued',
-            enqueued_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            enqueued_at     TIMESTAMP DEFAULT (datetime('now', '+9 hours')),
             started_at      TIMESTAMP,
             finished_at     TIMESTAMP,
             progress_total  INTEGER,

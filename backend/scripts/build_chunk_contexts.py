@@ -149,7 +149,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
         with with_db() as conn:
             conn.execute(
                 "UPDATE chunks SET contextual_text = ?, "
-                "contextual_generated_at = datetime('now') WHERE id = ?",
+                "contextual_generated_at = datetime('now', '+9 hours') WHERE id = ?",
                 (ctx, chunk_id),
             )
             conn.commit()

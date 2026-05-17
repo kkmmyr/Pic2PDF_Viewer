@@ -91,14 +91,14 @@ describe('parseSqliteUtc', () => {
         expect(parseSqliteUtc(null)).toBe(null);
     });
 
-    it('SQLite 形式（スペース区切り、Z なし）を UTC として解釈', () => {
+    it('SQLite 形式（スペース区切り、Z なし）を JST として解釈', () => {
         const d = parseSqliteUtc('2026-05-11 13:30:45');
         expect(d).not.toBe(null);
-        // UTC 13:30:45 が正しく取れているか
+        // JST 13:30:45 = UTC 04:30:45
         expect(d?.getUTCFullYear()).toBe(2026);
         expect(d?.getUTCMonth()).toBe(4); // 0-indexed
         expect(d?.getUTCDate()).toBe(11);
-        expect(d?.getUTCHours()).toBe(13);
+        expect(d?.getUTCHours()).toBe(4);
         expect(d?.getUTCMinutes()).toBe(30);
     });
 
@@ -122,18 +122,16 @@ describe('formatSqliteUtcAsJst', () => {
         expect(formatSqliteUtcAsJst(null)).toBe('—');
     });
 
-    it('UTC 13:30 が JST 22:30 として表示される（9 時間進む）', () => {
+    it('JST 13:30 がそのまま 13:30 として表示される', () => {
         const out = formatSqliteUtcAsJst('2026-05-11 13:30:45');
-        // toLocaleString('ja-JP') のフォーマット差異を許容するため、年と分を確認
         expect(out).toContain('2026');
-        expect(out).toContain('22:30');
+        expect(out).toContain('13:30');
     });
 
-    it('UTC 23:30（深夜）は JST 翌日 08:30 になる', () => {
+    it('JST 23:30（深夜）は同日 23:30 として表示される', () => {
         const out = formatSqliteUtcAsJst('2026-05-11 23:30:00');
-        expect(out).toContain('08:30');
-        // 日付が 12 日に繰り上がっている
-        expect(out).toContain('12');
+        expect(out).toContain('23:30');
+        expect(out).toContain('11');
     });
 
     it('パース失敗時は元の文字列を返す', () => {

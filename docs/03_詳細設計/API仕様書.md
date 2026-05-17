@@ -81,6 +81,20 @@
 
 ---
 
+## 共通仕様
+
+### タイムスタンプ形式
+
+SQLite に保存・API で返されるタイムスタンプはすべて **JST (Asia/Tokyo, UTC+9)** で格納する。
+
+- **SQLite**: `datetime('now', '+9 hours')` で挿入（スペース区切り `YYYY-MM-DD HH:MM:SS` 形式、タイムゾーン接尾辞なし）
+- **Python**: `datetime.now(ZoneInfo("Asia/Tokyo"))` を使用（`utils.dt.jst_now()` ラッパー経由）
+- **フロントエンド**: `utils/date.ts` の `parseSqliteUtc` が `+09:00` を付与して Date 化し、`formatSqliteUtcAsJst` で JST 表示する
+
+> **既存 DB データの注意**: 移行前（UTC 保存時代）のレコードには `+09:00` が付与されるため、9 時間早い表示になる。rebuild / 再生成後のデータから正しい JST 時刻に切り替わる。
+
+---
+
 ## §1. PDFライブラリ・ファイル操作
 
 ### §1.1 `GET /api/pdfs`

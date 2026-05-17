@@ -11,12 +11,13 @@ import json
 import sqlite3
 from collections import Counter
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import datetime
 from itertools import combinations
 
 from local_llm import LLMError
 
 from config import NOVEL_DB_LLM_MODEL
+from utils.dt import JST
 
 from ._llm_backend import QWEN_BACKEND
 
@@ -149,7 +150,7 @@ def store_relations(
     Returns:
         挿入した行数
     """
-    now = datetime.now(UTC).isoformat()
+    now = datetime.now(JST).isoformat()
 
     # 既存データを削除して書き直し
     conn.execute(

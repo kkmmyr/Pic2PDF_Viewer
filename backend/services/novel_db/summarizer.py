@@ -186,7 +186,7 @@ def update_book_summary(
     book_id = row[0]
 
     conn.execute(
-        "UPDATE books SET summary = ?, summary_generated_at = datetime('now') "
+        "UPDATE books SET summary = ?, summary_generated_at = datetime('now', '+9 hours') "
         "WHERE id = ?",
         (summary, book_id),
     )

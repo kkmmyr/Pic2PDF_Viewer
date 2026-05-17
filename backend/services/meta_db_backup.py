@@ -11,6 +11,7 @@ from pathlib import Path
 
 import services.meta_db as meta_db_module
 from config import META_DB_BACKUP_DIR
+from utils.dt import JST
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +23,7 @@ def backup_meta_db() -> dict:
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     src_path = meta_db_module._db_path()
-    dest_filename = f"meta_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+    dest_filename = f"meta_{datetime.now(JST).strftime('%Y%m%d_%H%M%S')}.db"
     dest_path = dest_dir / dest_filename
 
     src = sqlite3.connect(src_path)
@@ -34,7 +35,7 @@ def backup_meta_db() -> dict:
         src.close()
 
     size = dest_path.stat().st_size
-    backed_up_at = datetime.now().isoformat()
+    backed_up_at = datetime.now(JST).isoformat()
     logger.info("meta.db backed up to %s (%d bytes)", dest_path, size)
     return {
         "path": str(dest_path),
@@ -58,7 +59,7 @@ def get_backup_status() -> dict:
         "last_backup": {
             "path": str(latest),
             "size_bytes": latest.stat().st_size,
-            "backed_up_at": datetime.fromtimestamp(latest.stat().st_mtime).isoformat(),
+            "backed_up_at": datetime.fromtimestamp(latest.stat().st_mtime, tz=JST).isoformat(),
         },
         "backup_dir": str(backup_dir),
         "total_backups": len(backups),

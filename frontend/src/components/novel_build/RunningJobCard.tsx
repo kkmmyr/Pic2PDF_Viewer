@@ -1,5 +1,7 @@
 import { Loader2 } from 'lucide-react';
 
+import { formatSqliteUtcAsJst } from '../../utils/date';
+
 import type { BuildJob } from '../../features/novel_build/types';
 
 function ProgressBar({ done, total }: { done: number; total: number }) {
@@ -61,7 +63,7 @@ export default function RunningJobCard({ job }: { job: BuildJob }) {
             <ProgressBar done={job.progress_done ?? 0} total={job.progress_total ?? 1} />
             {job.started_at && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    開始: {new Date(job.started_at).toLocaleString('ja-JP')}
+                    開始: {formatSqliteUtcAsJst(job.started_at)}
                 </p>
             )}
         </div>

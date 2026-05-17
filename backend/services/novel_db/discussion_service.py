@@ -12,7 +12,7 @@ import json
 import re
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,7 @@ from config import (
     NOVEL_DB_LLM_MODEL,
     NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
 )
+from utils.dt import JST
 
 from .llm import astream_chat as _astream_chat
 from .search import SearchHit
@@ -182,7 +183,7 @@ def save_discussion(
     """ディスカッション結果を JSON 保存し、保存先パス文字列を返す。"""
     book_dir = DISCUSSIONS_DIR / book_name
     book_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    ts = datetime.now(JST).strftime("%Y%m%dT%H%M%SZ")
     out_path = book_dir / f"{ts}.json"
     data = {
         "book": book_name,
@@ -192,7 +193,7 @@ def save_discussion(
         ],
         "turns": turns,
         "partial": False,
-        "created_at": datetime.now(UTC).isoformat(),
+        "created_at": datetime.now(JST).isoformat(),
     }
     out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
     return str(out_path)

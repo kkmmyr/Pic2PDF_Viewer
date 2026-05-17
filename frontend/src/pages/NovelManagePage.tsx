@@ -1,6 +1,7 @@
 import { HammerIcon, Layers, Share2, Terminal, Wrench } from 'lucide-react';
 
 import { useToast } from '../hooks';
+import { formatSqliteUtcAsJst } from '../utils/date';
 import { ToastContainer } from '../components/reader/ToastContainer';
 
 import {
@@ -234,12 +235,7 @@ export default function NovelManagePage() {
                                 </span>
                                 {row.time && (
                                     <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                                        {new Date(row.time).toLocaleString('ja-JP', {
-                                            month: 'numeric',
-                                            day: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                        })}
+                                        {formatSqliteUtcAsJst(row.time)}
                                     </span>
                                 )}
                             </div>

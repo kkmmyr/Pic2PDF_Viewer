@@ -22,6 +22,7 @@ from services.meta_store import (
     merge_entry_fields,
     update_meta_locked,
 )
+from utils.dt import JST
 from utils.path_utils import validate_safe_name, validate_safe_path
 
 router = APIRouter()
@@ -77,7 +78,7 @@ def export_meta(source: str = Depends(validated_source)) -> Response:
     """
     data = load_meta(source)
     json_bytes = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
-    date_str = datetime.now().strftime("%Y%m%d")
+    date_str = datetime.now(JST).strftime("%Y%m%d")
     filename = f"meta_{source}_{date_str}.json"
     return Response(
         content=json_bytes,

@@ -58,14 +58,14 @@ def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
                 cur = conn.execute(
                     "INSERT INTO books "
                     "(name, pdf_path, images_dir, page_count, indexed_at, ocr_done_at) "
-                    "VALUES (?, ?, ?, ?, NULL, datetime('now'))",
+                    "VALUES (?, ?, ?, ?, NULL, datetime('now', '+9 hours'))",
                     (book_name, "", str(images_dir), len(pages)),
                 )
                 book_id = cur.lastrowid
             else:
                 book_id = existing[0]
                 conn.execute(
-                    "UPDATE books SET page_count = ?, ocr_done_at = datetime('now') "
+                    "UPDATE books SET page_count = ?, ocr_done_at = datetime('now', '+9 hours') "
                     "WHERE id = ?",
                     (len(pages), book_id),
                 )
@@ -234,7 +234,7 @@ def rebuild_from_pages(
                 progress_callback(done, total_chunks)
 
         conn.execute(
-            "UPDATE books SET indexed_at = datetime('now') WHERE id = ?",
+            "UPDATE books SET indexed_at = datetime('now', '+9 hours') WHERE id = ?",
             (book_id,),
         )
 

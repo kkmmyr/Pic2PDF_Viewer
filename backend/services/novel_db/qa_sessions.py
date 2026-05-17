@@ -96,7 +96,7 @@ def append_message(
         (session_id, role, content, eval_count, done_reason),
     )
     conn.execute(
-        "UPDATE qa_sessions SET last_message_at = datetime('now') WHERE id = ?",
+        "UPDATE qa_sessions SET last_message_at = datetime('now', '+9 hours') WHERE id = ?",
         (session_id,),
     )
     conn.commit()

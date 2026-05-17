@@ -1,6 +1,7 @@
 import { CheckCircle, XCircle } from 'lucide-react';
 
 import type { FinishedJob } from '../../features/novel_build/types';
+import { formatSqliteUtcAsJst } from '../../utils/date';
 
 export default function FinishedJobCard({ job }: { job: FinishedJob }) {
     const isOk = job.state === 'completed';
@@ -20,7 +21,7 @@ export default function FinishedJobCard({ job }: { job: FinishedJob }) {
                 </p>
                 {job.finished_at && (
                     <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {new Date(job.finished_at).toLocaleString('ja-JP')}
+                        {formatSqliteUtcAsJst(job.finished_at)}
                     </p>
                 )}
                 {job.error_message && (
