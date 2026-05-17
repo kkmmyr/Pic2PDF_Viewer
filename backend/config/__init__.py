@@ -69,21 +69,14 @@ from .novel_db import *  # noqa: E402 F401 F403
 # フロントエンド配信ディレクトリ（リリースモード用）
 FRONTEND_DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
 
-# Amazon 購入履歴 CSV ルートディレクトリ（環境変数で上書き可能）
-AMAZON_DATA_DIR: str = os.environ.get(
-    "AMAZON_DATA_DIR",
-    r"C:\Users\amashio\OneDrive\61.tool\amazon_data",
-)
+# Amazon 購入履歴 CSV ルートディレクトリ（環境変数で設定。未設定時は CSV インポート無効）
+AMAZON_DATA_DIR: str | None = os.environ.get("AMAZON_DATA_DIR") or None
 
-# Gemma 4 ツールディレクトリ（web_extract モジュールの場所）
-# .env の GEMMA_TOOL_DIR で上書き可能
-GEMMA_TOOL_DIR: str = os.environ.get("GEMMA_TOOL_DIR", r"D:\61.tool\Gemma 4")
+# Gemma 4 ツールディレクトリ（web_extract モジュールの場所。未設定時は Gemma 連携無効）
+GEMMA_TOOL_DIR: str | None = os.environ.get("GEMMA_TOOL_DIR") or None
 
-# meta.db バックアップ先（env: META_DB_BACKUP_DIR。OneDrive 等の共有場所を推奨）
-META_DB_BACKUP_DIR: str = os.environ.get(
-    "META_DB_BACKUP_DIR",
-    r"C:\Users\amashio\OneDrive\61.tool\meta_db_backup",
-)
+# meta.db バックアップ先（env: META_DB_BACKUP_DIR。未設定時はバックアップ無効）
+META_DB_BACKUP_DIR: str | None = os.environ.get("META_DB_BACKUP_DIR") or None
 
 # ---------------------------------------------------------------------------
 # ソース識別子

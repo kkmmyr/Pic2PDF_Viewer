@@ -19,6 +19,8 @@ logger = get_logger(__name__)
 
 def backup_meta_db() -> dict:
     """meta.db を META_DB_BACKUP_DIR に sqlite3.backup() でスナップショット保存する。"""
+    if not META_DB_BACKUP_DIR:
+        raise ValueError("META_DB_BACKUP_DIR が設定されていません。.env で META_DB_BACKUP_DIR を指定してください。")
     dest_dir = Path(META_DB_BACKUP_DIR)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -46,6 +48,8 @@ def backup_meta_db() -> dict:
 
 def get_backup_status() -> dict:
     """最新バックアップの情報を返す。"""
+    if not META_DB_BACKUP_DIR:
+        return {"last_backup": None, "backup_dir": None, "total_backups": 0}
     backup_dir = Path(META_DB_BACKUP_DIR)
     if not backup_dir.exists():
         return {"last_backup": None, "backup_dir": str(backup_dir), "total_backups": 0}

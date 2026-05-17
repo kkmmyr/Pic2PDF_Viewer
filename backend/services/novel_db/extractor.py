@@ -19,7 +19,10 @@ import fitz
 
 _NEWLINE_RE = re.compile(r"\n+")
 
-_OCR_VENV_PYTHON = r"D:\61.tool\common\ocr\venv\Scripts\python.exe"
+_OCR_VENV_PYTHON = os.environ.get(
+    "OCR_PYTHON",
+    r"D:\61.tool\common\ocr\venv\Scripts\python.exe",
+)
 _OCR_WORKER_SCRIPT = Path(__file__).parent / "ocr_worker.py"
 
 

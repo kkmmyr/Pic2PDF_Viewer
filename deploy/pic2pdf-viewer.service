@@ -1,0 +1,17 @@
+[Unit]
+Description=Pic2PDF Viewer
+After=network.target
+
+[Service]
+Type=simple
+User=amashio
+WorkingDirectory=/opt/pic2pdf-viewer/backend
+EnvironmentFile=/opt/pic2pdf-viewer/.env
+ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/uvicorn main:app --host 0.0.0.0 --port 8090
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/pic2pdf-viewer/logs/service-stdout.log
+StandardError=append:/opt/pic2pdf-viewer/logs/service-stderr.log
+
+[Install]
+WantedBy=multi-user.target

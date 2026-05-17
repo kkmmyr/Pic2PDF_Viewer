@@ -24,9 +24,9 @@ from services.meta_store import update_meta_locked
 # ---------------------------------------------------------------------------
 # 固定パス
 # ---------------------------------------------------------------------------
-_ROOT = Path(AMAZON_DATA_DIR)
-_DIGITAL_ORDERS_PATH = _ROOT / "amazon-order" / "Your Amazon Orders" / "Digital Content Orders.csv"
-_MONTHLY_CSV_DIR = _ROOT / "amazon-order_digital"
+_ROOT = Path(AMAZON_DATA_DIR) if AMAZON_DATA_DIR else None
+_DIGITAL_ORDERS_PATH = _ROOT / "amazon-order" / "Your Amazon Orders" / "Digital Content Orders.csv" if _ROOT else None
+_MONTHLY_CSV_DIR = _ROOT / "amazon-order_digital" if _ROOT else None
 
 # ---------------------------------------------------------------------------
 # サブスク / 音楽除外
@@ -249,6 +249,9 @@ def run_import(source: str) -> ImportResult:
     Raises:
         ValueError: CSV が 1 件も見つからない場合
     """
+    if _DIGITAL_ORDERS_PATH is None or _MONTHLY_CSV_DIR is None:
+        raise ValueError("AMAZON_DATA_DIR が設定されていません。.env で AMAZON_DATA_DIR を指定してください。")
+
     digital = _parse_digital_orders(_DIGITAL_ORDERS_PATH)
     monthly = _parse_monthly(_MONTHLY_CSV_DIR)
 
