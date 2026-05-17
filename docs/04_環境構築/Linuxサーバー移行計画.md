@@ -98,7 +98,7 @@ Type=simple
 User=<実行ユーザー>
 WorkingDirectory=/opt/pic2pdf-viewer/backend
 Environment=PIC2PDF_DATA_DIR=/opt/pic2pdf-viewer/data
-ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/uvicorn main:app --port 8090
+ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/uvicorn main:app --host 127.0.0.1 --port 8091
 Restart=on-failure
 StandardOutput=append:/opt/pic2pdf-viewer/logs/service-stdout.log
 StandardError=append:/opt/pic2pdf-viewer/logs/service-stderr.log
@@ -339,27 +339,48 @@ sudo systemctl enable --now pic2pdf-viewer
 sudo systemctl status pic2pdf-viewer
 ```
 
-### F-8: Caddy（リバースプロキシ + HTTPS）
+### F-8: nginx リバースプロキシ（静的ファイル高速化）
 
-外部公開・HTTPS 化が必要な場合に導入。Tailscale 内のみでの利用なら省略可。
-
-```bash
-sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-sudo apt update && sudo apt install caddy
-```
-
-`/etc/caddy/Caddyfile`:
-```
-homeserver.tailnet-xxxx.ts.net {
-    reverse_proxy localhost:8090
-}
-```
+nginx を前段に置き、画像・サムネイル等の静的ファイルを Python を経由せず直接ディスクから配信する。
+uvicorn は `127.0.0.1:8091`（ローカルのみ）に移動し、API リクエストのみを受け持つ。
 
 ```bash
-sudo systemctl reload caddy
+sudo apt install -y nginx
 ```
+
+設定ファイルをリポジトリから配置：
+
+```bash
+sudo cp /opt/pic2pdf-viewer/deploy/nginx-pic2pdf-viewer.conf \
+        /etc/nginx/sites-available/pic2pdf-viewer
+sudo ln -s /etc/nginx/sites-available/pic2pdf-viewer \
+           /etc/nginx/sites-enabled/pic2pdf-viewer
+# デフォルト設定を無効化（port 80 を占有している場合の競合を防ぐ）
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl enable --now nginx
+```
+
+systemd サービスも更新（uvicorn を 8091 ローカルに変更）：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart pic2pdf-viewer nginx
+sudo systemctl status pic2pdf-viewer nginx --no-pager
+```
+
+動作確認：
+
+```bash
+curl -I http://localhost:8090/        # nginx 経由で index.html
+curl -I http://localhost:8090/api/health  # uvicorn へのプロキシ
+```
+
+**ポート構成**:
+- `:8090` — nginx（外部公開）
+- `:8091` — uvicorn（localhost のみ、nginx からのみアクセス）
+
+**キャッシュ設定**: 画像・アセットは `Cache-Control: public, immutable, max-age=2592000`（30日）。
+HTML（index.html）は `no-cache`（デプロイ即反映）。
 
 ### F-9: ufw ファイアウォール設定
 
