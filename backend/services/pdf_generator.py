@@ -59,6 +59,17 @@ def generate_thumbnail(image_path: str, output_path: str) -> bool:
         return False
 
 
+def _sanitize_fs_name(name: str) -> str:
+    """Windows ファイルシステムで問題になる末尾のドット・スペースを除去する。
+
+    Windows の CreateDirectoryW（makedirs）は末尾のドット・スペースを自動除去するが、
+    CreateFileW（open / shutil.copy2）の中間パス解決では除去されない。
+    makedirs で作成されるフォルダ名と copy2 で参照するパスが不一致になり
+    FileNotFoundError が発生するため、事前に正規化する。
+    """
+    return name.rstrip('. ')
+
+
 def _collect_images(images_dir: str) -> list[str]:
     """ディレクトリ内の WebP 画像を自然順で収集する。"""
     files = [f for f in os.listdir(images_dir) if is_webp_file(f)]
@@ -129,7 +140,7 @@ class PdfGenerator:
     # ZIP 処理: images_dir に展開 → 共通フローへ
     # ------------------------------------------------------------------
     def process_zip(self, root: str, zip_filename: str) -> None:
-        item_name = os.path.splitext(zip_filename)[0]
+        item_name = _sanitize_fs_name(os.path.splitext(zip_filename)[0])
         zip_path = os.path.join(root, zip_filename)
 
         if not os.path.exists(zip_path):
@@ -171,7 +182,7 @@ class PdfGenerator:
     # ディレクトリ処理: images_dir にコピー → 共通フローへ
     # ------------------------------------------------------------------
     def process_directory(self, root: str, webp_files: list[str], is_root: bool) -> None:
-        folder_name = os.path.basename(root)
+        folder_name = _sanitize_fs_name(os.path.basename(root))
 
         if self.progress_callback:
             self.progress_callback(folder_name)
