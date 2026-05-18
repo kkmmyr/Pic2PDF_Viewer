@@ -13,22 +13,22 @@ export function EdgeHoverZones({
 }: EdgeHoverZonesProps) {
     return (
         <>
-            {/* ヘッダー表示トリガー: iOS ステータスバーから 50px 離す */}
+            {/* ヘッダー表示トリガー: 画面上端から始め safe-area + 4rem の高さ */}
             <div
                 className="fixed left-0 right-0 z-overlay-bar"
                 style={{
-                    top: 'calc(env(safe-area-inset-top, 0px) + 50px)',
-                    height: '3.5rem',
+                    top: 0,
+                    height: 'calc(env(safe-area-inset-top, 0px) + 4rem)',
                 }}
                 onMouseEnter={onEnterTop}
                 onTouchStart={onTouchTop}
             />
-            {/* スライダー表示トリガー: iOS ホームジェスチャーエリアから 50px 離す */}
+            {/* スライダー表示トリガー: 画面下端から始め safe-area + 3.5rem の高さ */}
             <div
                 className="fixed left-0 right-0 z-overlay-bar"
                 style={{
-                    bottom: 'calc(env(safe-area-inset-bottom, 20px) + 50px)',
-                    height: '3.5rem',
+                    bottom: 0,
+                    height: 'calc(env(safe-area-inset-bottom, 0px) + 3.5rem)',
                 }}
                 onMouseEnter={onEnterBottom}
                 onTouchStart={onTouchBottom}

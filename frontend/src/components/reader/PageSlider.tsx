@@ -81,57 +81,62 @@ export function PageSlider({
 
     return (
         <div
-            className={`fixed bottom-0 left-0 right-0 h-12 z-overlay-bar transition-transform duration-300 ${
+            className={`fixed bottom-0 left-0 right-0 z-overlay-bar transition-transform duration-300 ${
                 !show ? 'translate-y-full' : 'translate-y-0'
-            } bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700 flex items-center px-6 gap-3`}
+            } bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700`}
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
             onMouseLeave={onMouseLeave}
         >
-            <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0 w-14 text-right">
-                P.{displayPage}
-            </span>
-            <div className="relative flex-1">
-                {isDragging && (
-                    <div
-                        className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none"
-                        style={{
-                            left: `clamp(0px, calc(${tooltipLeft * 100}% - 200px), calc(100% - 400px))`,
-                        }}
-                    >
-                        <div className="bg-gray-900/90 dark:bg-gray-700/90 rounded shadow-lg overflow-hidden">
-                            <img
-                                src={thumbUrl}
-                                alt=""
-                                width={400}
-                                className="w-[400px] h-auto block"
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = 'none';
-                                }}
-                            />
-                            <p className="text-white text-xs text-center tabular-nums px-1.5 py-0.5">
-                                P. {pendingPage}
-                            </p>
+            <div className="h-14 flex items-center px-6 gap-3">
+                <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0 w-14 text-right">
+                    P.{displayPage}
+                </span>
+                <div className="relative flex-1">
+                    {isDragging && (
+                        <div
+                            className="absolute bottom-full mb-2 flex flex-col items-center pointer-events-none"
+                            style={{
+                                left: `clamp(0px, calc(${tooltipLeft * 100}% - 200px), calc(100% - 400px))`,
+                            }}
+                        >
+                            <div className="bg-gray-900/90 dark:bg-gray-700/90 rounded shadow-lg overflow-hidden">
+                                <img
+                                    src={thumbUrl}
+                                    alt=""
+                                    width={400}
+                                    className="w-[400px] h-auto block"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                    }}
+                                />
+                                <p className="text-white text-xs text-center tabular-nums px-1.5 py-0.5">
+                                    P. {pendingPage}
+                                </p>
+                            </div>
                         </div>
-                    </div>
-                )}
-                <input
-                    type="range"
-                    tabIndex={-1}
-                    min={1}
-                    max={numPages}
-                    value={displayPage}
-                    onChange={(e) => {
-                        setIsDragging(true);
-                        setPendingPage(Number(e.target.value));
-                    }}
-                    onPointerUp={(e) => commitPage(Number((e.target as HTMLInputElement).value))}
-                    onFocus={(e) => e.target.blur()}
-                    className="w-full cursor-pointer accent-primary-600"
-                    style={direction === 'rtl' ? { transform: 'scaleX(-1)' } : undefined}
-                />
+                    )}
+                    <input
+                        type="range"
+                        tabIndex={-1}
+                        min={1}
+                        max={numPages}
+                        value={displayPage}
+                        onChange={(e) => {
+                            setIsDragging(true);
+                            setPendingPage(Number(e.target.value));
+                        }}
+                        onPointerUp={(e) =>
+                            commitPage(Number((e.target as HTMLInputElement).value))
+                        }
+                        onFocus={(e) => e.target.blur()}
+                        className="w-full cursor-pointer accent-primary-600"
+                        style={direction === 'rtl' ? { transform: 'scaleX(-1)' } : undefined}
+                    />
+                </div>
+                <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0 w-14">
+                    / {numPages}
+                </span>
             </div>
-            <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0 w-14">
-                / {numPages}
-            </span>
         </div>
     );
 }
