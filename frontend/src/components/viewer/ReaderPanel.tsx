@@ -90,6 +90,12 @@ export function ReaderPanel(props: ReaderPanelProps) {
         onSwipeRight: handlePrev,
     });
 
+    // 最終ページ（関連書籍確認画面）では両方向スワイプで前ページへ戻る
+    const { onTouchStart: onRelatedTouchStart, onTouchEnd: onRelatedTouchEnd } = useTouchSwipe({
+        onSwipeLeft: handlePrev,
+        onSwipeRight: handlePrev,
+    });
+
     // 画面を左 1/3 / 中央 1/3 / 右 1/3 に分割してタップ動作を振り分ける。
     // 方向考慮: RTL では左=進む・右=戻る、LTR では右=進む・左=戻る。
     // 中央ゾーン: ヘッダー+スライダーの表示/非表示をトグル。
@@ -118,7 +124,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
                 pageNumber={pageNumber}
                 numPages={numPages}
                 isEditMode={isEditMode}
-                showHeader={showHeader || isSearchOpen}
+                showHeader={showHeader || isSearchOpen || isOnRelatedPage}
                 isSearchOpen={isSearchOpen}
                 isFullscreen={isFullscreen}
                 hidePageIndicator={isOnRelatedPage}
@@ -137,7 +143,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
                 numPages={numPages}
                 isSpread={isSpread}
                 direction={direction}
-                show={showSlider && !isOnRelatedPage}
+                show={showSlider || isOnRelatedPage}
                 selectedPdf={selectedPdf}
                 currentPath={currentPath}
                 currentSource={currentSource}
@@ -162,6 +168,8 @@ export function ReaderPanel(props: ReaderPanelProps) {
             {isOnRelatedPage ? (
                 <div
                     className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
+                    onTouchStart={onRelatedTouchStart}
+                    onTouchEnd={onRelatedTouchEnd}
                 >
                     <RelatedBooksPage
                         related={relatedBooks}

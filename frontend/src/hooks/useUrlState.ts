@@ -30,23 +30,24 @@ export function useUrlState() {
 
     const selectPdf = useCallback(
         (pdfName: string, currentPath: string) => {
-            const params: Record<string, string> = { file: pdfName };
-            if (currentPath) params.path = currentPath;
-            setSearchParams(params);
-        },
-        [setSearchParams],
-    );
-
-    const clearPdf = useCallback(
-        () => {
             setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
-                next.delete('file');
+                next.set('file', pdfName);
+                if (currentPath) next.set('path', currentPath);
+                else next.delete('path');
                 return next;
             });
         },
         [setSearchParams],
     );
+
+    const clearPdf = useCallback(() => {
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.delete('file');
+            return next;
+        });
+    }, [setSearchParams]);
 
     return {
         currentPath,
