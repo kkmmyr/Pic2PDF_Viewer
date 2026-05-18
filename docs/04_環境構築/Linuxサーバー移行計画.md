@@ -1,9 +1,20 @@
 # Linux サーバー移行計画
 
-**ステータス**: 計画中（未着手）  
+**ステータス**: 稼働中（2026-05-18 移行完了）  
 **作成日**: 2026-05-17  
-**OS**: Ubuntu Server（LTS 推奨）  
+**OS**: Ubuntu Server 24.04 LTS（HP Spectre x360、NVMe 512GB）  
 **前提**: キャプチャ・OCR・LLM 推論は引き続き Windows で行い、Web アプリ（閲覧・検索・PDF 生成）を Linux サーバーに移行するハイブリッド構成。
+
+## 現在の運用状態（2026-05-18）
+
+| 項目 | 状態 |
+|---|---|
+| nginx + uvicorn | 稼働中。nginx :8090 が外部公開、uvicorn 127.0.0.1:8091 が API 専任 |
+| systemd サービス | `pic2pdf-viewer.service` 有効・自動起動 |
+| データ | `/opt/pic2pdf-viewer/data/`（doujin/comic/kindle_novel/hitomi） |
+| Tailscale | 導入済み。iPad・外部 PC からアクセス可 |
+| コードデプロイ | `bash deploy_to_linux.sh`（Windows 側から実行） |
+| データ同期 | `bash sync_to_linux.sh [doujin\|comic\|novel\|hitomi\|all]` |
 
 ---
 
@@ -171,55 +182,47 @@ NOVEL_DB_DIR=/opt/pic2pdf-viewer/data/novel_db
 
 ---
 
-## Phase D: 継続運用（バッチ後の差分 push）
+## Phase D: 継続運用
 
-Windows でキャプチャ・OCR・PDF 生成を行うたびに、Linux へ差分を push する。  
-`--delete` は不要（削除は手動で管理）。差分転送なので 2 回目以降は高速。
+### D-1: コードデプロイ（`deploy_to_linux.sh`）
 
-### D-1: push スクリプト（Windows 側）
-
-`sync_to_linux.sh`（Git Bash / WSL から実行）として保存しておく：
+アプリコード（Python ソース・フロントエンド）を更新したときに実行する。  
+Windows の Git Bash から1コマンドで完結：
 
 ```bash
-#!/bin/bash
-# 使い方: bash sync_to_linux.sh [doujin|comic|novel|all]
-set -e
-LINUX=user@linux-server
-DEST=/opt/pic2pdf-viewer/data
-TARGET=${1:-all}
-
-sync_source() {
-    local src=$1 dst=$2
-    rsync -avz --progress "$src" "$LINUX:$dst"
-}
-
-if [[ $TARGET == "doujin" || $TARGET == "all" ]]; then
-    sync_source backend/data/doujin/pdfs_compressed/ $DEST/doujin/pdfs_compressed/
-    sync_source backend/data/doujin/thumbnails/      $DEST/doujin/thumbnails/
-fi
-if [[ $TARGET == "comic" || $TARGET == "all" ]]; then
-    sync_source backend/data/comic/pdfs/       $DEST/comic/pdfs/
-    sync_source backend/data/comic/thumbnails/ $DEST/comic/thumbnails/
-fi
-if [[ $TARGET == "novel" || $TARGET == "all" ]]; then
-    sync_source backend/data/novel/pdfs/       $DEST/novel/pdfs/
-    sync_source backend/data/novel/thumbnails/ $DEST/novel/thumbnails/
-fi
-
-# DB は常に同期（OCR/ビルド後は必ず実行）
-sync_source backend/data/meta.db   $DEST/
-sync_source backend/data/novel_db/ $DEST/novel_db/
-
-echo "Sync complete."
+bash deploy_to_linux.sh
 ```
 
-使い方：
+**内部動作（3ステップ）:**
+1. `npm run build` でフロントエンドをビルド
+2. `backend/`（`.venv`・`data`・`complete` 等を除外）と `frontend/dist/` を tar+ssh で転送
+3. `sudo systemctl restart pic2pdf-viewer` でサービス再起動
+
+**sudoers 設定（初回のみ・Linux 側で実行）:**
 ```bash
-bash sync_to_linux.sh novel   # 小説だけ
-bash sync_to_linux.sh all     # 全カテゴリ
+echo "amashio ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pic2pdf-viewer, /usr/bin/systemctl status pic2pdf-viewer" \
+  | sudo tee /etc/sudoers.d/pic2pdf-viewer
 ```
 
-### D-2: タイミングの目安
+> **注意**: Git Bash の tar は `--exclude` フラグが正しく動作しない。`find -prune` でファイルリストを作り `--files-from` に渡す方式を採用。
+
+### D-2: データ同期（`sync_to_linux.sh`）
+
+Windows でキャプチャ・OCR・PDF 生成を行うたびに実行する。
+
+```bash
+bash sync_to_linux.sh doujin   # 同人誌のみ
+bash sync_to_linux.sh comic    # 漫画のみ
+bash sync_to_linux.sh novel    # 小説のみ
+bash sync_to_linux.sh hitomi   # hitomi データのみ
+bash sync_to_linux.sh all      # 全カテゴリ + DB
+```
+
+- `thumbnails/` はフル同期（毎回上書き）
+- `images/` は差分同期（サーバーに存在しない書籍ディレクトリのみ転送）
+- DB（`meta.db` + `novel_db/`）は常に同期
+
+### D-3: タイミングの目安
 
 | 操作 | push のタイミング |
 |---|---|
