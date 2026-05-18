@@ -14,6 +14,8 @@ interface PageSliderProps {
     currentSource: LibrarySource;
     onPageJump: (page: number) => void;
     onMouseLeave?: () => void;
+    onDragStart?: () => void;
+    onDragEnd?: () => void;
 }
 
 /**
@@ -52,6 +54,8 @@ export function PageSlider({
     currentSource,
     onPageJump,
     onMouseLeave,
+    onDragStart,
+    onDragEnd,
 }: PageSliderProps) {
     const [isDragging, setIsDragging] = useState(false);
     const [pendingPage, setPendingPage] = useState(1);
@@ -122,12 +126,14 @@ export function PageSlider({
                         max={numPages}
                         value={displayPage}
                         onChange={(e) => {
+                            if (!isDragging) onDragStart?.();
                             setIsDragging(true);
                             setPendingPage(Number(e.target.value));
                         }}
-                        onPointerUp={(e) =>
-                            commitPage(Number((e.target as HTMLInputElement).value))
-                        }
+                        onPointerUp={(e) => {
+                            commitPage(Number((e.target as HTMLInputElement).value));
+                            onDragEnd?.();
+                        }}
                         onFocus={(e) => e.target.blur()}
                         className="w-full cursor-pointer accent-primary-600"
                         style={direction === 'rtl' ? { transform: 'scaleX(-1)' } : undefined}

@@ -44,6 +44,8 @@ export function ReaderPanel(props: ReaderPanelProps) {
         showSliderOn,
         showSliderOff,
         showSliderOnTouch,
+        pauseSliderTimer,
+        resumeSliderTimer,
         isSearchOpen,
         toggleSearch,
         isHelpOpen,
@@ -132,6 +134,8 @@ export function ReaderPanel(props: ReaderPanelProps) {
                 currentSource={currentSource}
                 onPageJump={setPageNumber}
                 onMouseLeave={showSliderOff}
+                onDragStart={pauseSliderTimer}
+                onDragEnd={resumeSliderTimer}
             />
 
             {isSearchOpen && (

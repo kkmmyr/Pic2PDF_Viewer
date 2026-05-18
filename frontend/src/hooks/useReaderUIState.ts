@@ -41,6 +41,20 @@ export function useReaderUIState() {
         sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
     }, []);
 
+    // スライダードラッグ中はタイマーを停止して黒帯を維持する
+    const pauseSliderTimer = useCallback(() => {
+        if (sliderTimerRef.current !== null) {
+            clearTimeout(sliderTimerRef.current);
+            sliderTimerRef.current = null;
+        }
+    }, []);
+
+    // ドラッグ終了後にタイマーを再開する
+    const resumeSliderTimer = useCallback(() => {
+        if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
+        sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
+    }, []);
+
     return {
         showHeader,
         showHeaderOn,
@@ -50,6 +64,8 @@ export function useReaderUIState() {
         showSliderOn,
         showSliderOff,
         showSliderOnTouch,
+        pauseSliderTimer,
+        resumeSliderTimer,
         isSearchOpen,
         openSearch,
         closeSearch,
