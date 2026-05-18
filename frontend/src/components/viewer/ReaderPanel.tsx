@@ -90,10 +90,12 @@ export function ReaderPanel(props: ReaderPanelProps) {
         onSwipeRight: handlePrev,
     });
 
-    // 最終ページ（関連書籍確認画面）では両方向スワイプで前ページへ戻る
+    // 最終ページ（関連書籍確認画面）では「戻る方向」のスワイプのみ前ページへ戻る。
+    // RTL では左スワイプ、LTR では右スワイプが「戻る」方向。進む操作は不要のため no-op。
+    const noop = useCallback(() => {}, []);
     const { onTouchStart: onRelatedTouchStart, onTouchEnd: onRelatedTouchEnd } = useTouchSwipe({
-        onSwipeLeft: handlePrev,
-        onSwipeRight: handlePrev,
+        onSwipeLeft: direction === 'rtl' ? handlePrev : noop,
+        onSwipeRight: direction === 'rtl' ? noop : handlePrev,
     });
 
     // 画面を左 1/3 / 中央 1/3 / 右 1/3 に分割してタップ動作を振り分ける。
