@@ -91,13 +91,14 @@ def sync_after_generate(
     dest_thumbs = f"{_LINUX_DEST}/doujin/thumbnails"
 
     for book_name in book_names:
+        stem = Path(book_name).stem  # "book.pdf" → "book"
         try:
-            _tar_and_send(images_root / book_name, dest_images)
+            _tar_and_send(images_root / stem, dest_images)
         except Exception as exc:
             logger.error("linux_sync: images sync failed [%s]: %s", book_name, exc)
 
         try:
-            _tar_and_send(thumbs_root / book_name, dest_thumbs)
+            _send_file(thumbs_root / f"{stem}.jpg", dest_thumbs)
         except Exception as exc:
             logger.error("linux_sync: thumbnails sync failed [%s]: %s", book_name, exc)
 
