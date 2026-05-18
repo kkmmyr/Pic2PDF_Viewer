@@ -23,60 +23,54 @@ export function useReaderUIState() {
     const openHelp = useCallback(() => setIsHelpOpen(true), []);
     const closeHelp = useCallback(() => setIsHelpOpen(false), []);
 
-    const showHeaderOn = useCallback(() => setShowHeader(true), []);
     const showHeaderOff = useCallback(() => setShowHeader(false), []);
-    const showSliderOn = useCallback(() => setShowSlider(true), []);
     const showSliderOff = useCallback(() => setShowSlider(false), []);
 
-    // タッチ用: 表示して 3 秒後に自動的に非表示にする
-    const showHeaderOnTouch = useCallback(() => {
-        setShowHeader(true);
-        if (headerTimerRef.current !== null) clearTimeout(headerTimerRef.current);
-        headerTimerRef.current = setTimeout(() => setShowHeader(false), TOUCH_AUTO_HIDE_MS);
-    }, []);
-
-    const showSliderOnTouch = useCallback(() => {
-        setShowSlider(true);
-        if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
-        sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
-    }, []);
-
-    // スライダードラッグ中はタイマーを停止して黒帯を維持する
+    // スライダードラッグ中はヘッダー・スライダー両方のタイマーを停止して黒帯を維持する
     const pauseSliderTimer = useCallback(() => {
+        if (headerTimerRef.current !== null) {
+            clearTimeout(headerTimerRef.current);
+            headerTimerRef.current = null;
+        }
         if (sliderTimerRef.current !== null) {
             clearTimeout(sliderTimerRef.current);
             sliderTimerRef.current = null;
         }
     }, []);
 
-    // ドラッグ終了後にタイマーを再開する
+    // ドラッグ終了後にヘッダー・スライダー両方のタイマーを再開する
     const resumeSliderTimer = useCallback(() => {
-        if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
-        sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
-    }, []);
-
-    // ヘッダー＋スライダーを同時に表示して 3 秒後に自動非表示（中央ゾーンタップ用）
-    const showBothOnTouch = useCallback(() => {
-        setShowHeader(true);
-        setShowSlider(true);
         if (headerTimerRef.current !== null) clearTimeout(headerTimerRef.current);
         if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
         headerTimerRef.current = setTimeout(() => setShowHeader(false), TOUCH_AUTO_HIDE_MS);
         sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
     }, []);
 
+    // 中央ゾーンタップ用: 両方表示中なら非表示に、そうでなければ表示して 3 秒後に自動非表示
+    const toggleBothUI = useCallback((currentHeader: boolean, currentSlider: boolean) => {
+        if (currentHeader && currentSlider) {
+            if (headerTimerRef.current !== null) clearTimeout(headerTimerRef.current);
+            if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
+            setShowHeader(false);
+            setShowSlider(false);
+        } else {
+            if (headerTimerRef.current !== null) clearTimeout(headerTimerRef.current);
+            if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
+            setShowHeader(true);
+            setShowSlider(true);
+            headerTimerRef.current = setTimeout(() => setShowHeader(false), TOUCH_AUTO_HIDE_MS);
+            sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
+        }
+    }, []);
+
     return {
         showHeader,
-        showHeaderOn,
         showHeaderOff,
-        showHeaderOnTouch,
         showSlider,
-        showSliderOn,
         showSliderOff,
-        showSliderOnTouch,
         pauseSliderTimer,
         resumeSliderTimer,
-        showBothOnTouch,
+        toggleBothUI,
         isSearchOpen,
         openSearch,
         closeSearch,

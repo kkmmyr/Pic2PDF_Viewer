@@ -3,7 +3,6 @@ import type { LibrarySource } from '../../types';
 import { useReaderState } from '../../hooks/useReaderState';
 import { useTouchSwipe } from '../../hooks/useTouchSwipe';
 import { ReaderHeader, PdfSearchBar, ToastContainer, PageSlider } from '../reader';
-import { EdgeHoverZones } from '../reader/EdgeHoverZones';
 import { PageGridOverlay } from '../reader/PageGridOverlay';
 import { RelatedBooksPage } from '../reader/RelatedBooksPage';
 import { ShortcutsHelpDialog } from '../reader/ShortcutsHelpDialog';
@@ -38,16 +37,12 @@ export function ReaderPanel(props: ReaderPanelProps) {
         imageUrls,
         isImageMode,
         showHeader,
-        showHeaderOn,
         showHeaderOff,
-        showHeaderOnTouch,
         showSlider,
-        showSliderOn,
         showSliderOff,
-        showSliderOnTouch,
         pauseSliderTimer,
         resumeSliderTimer,
-        showBothOnTouch,
+        toggleBothUI,
         isSearchOpen,
         toggleSearch,
         isHelpOpen,
@@ -97,6 +92,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
 
     // 画面を左 1/3 / 中央 1/3 / 右 1/3 に分割してタップ動作を振り分ける。
     // 方向考慮: RTL では左=進む・右=戻る、LTR では右=進む・左=戻る。
+    // 中央ゾーン: ヘッダー+スライダーの表示/非表示をトグル。
     const handleContentClick = useCallback(
         (e: React.MouseEvent) => {
             const zone = e.clientX / window.innerWidth;
@@ -107,21 +103,14 @@ export function ReaderPanel(props: ReaderPanelProps) {
                 if (direction === 'rtl') handlePrev();
                 else handleNext();
             } else {
-                showBothOnTouch();
+                toggleBothUI(showHeader, showSlider);
             }
         },
-        [direction, handleNext, handlePrev, showBothOnTouch],
+        [direction, handleNext, handlePrev, toggleBothUI, showHeader, showSlider],
     );
 
     return (
         <>
-            <EdgeHoverZones
-                onEnterTop={showHeaderOn}
-                onEnterBottom={showSliderOn}
-                onTouchTop={showHeaderOnTouch}
-                onTouchBottom={showSliderOnTouch}
-            />
-
             <ReaderHeader
                 selectedPdf={selectedPdf}
                 direction={direction}
