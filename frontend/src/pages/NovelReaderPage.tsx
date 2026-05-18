@@ -7,7 +7,6 @@ import { useFullscreen } from '../hooks/useFullscreen';
 import { useReaderNavigation } from '../hooks/useReaderNavigation';
 import { useReaderUIState } from '../hooks/useReaderUIState';
 import { useSpreadMode } from '../hooks/useSpreadMode';
-import { EdgeHoverZones } from '../components/reader/EdgeHoverZones';
 import { fetchBooks } from '../features/novel_db/api';
 import type { SpreadMode } from '../types';
 
@@ -51,8 +50,7 @@ export default function NovelReaderPage() {
     const { height: windowHeight } = useWindowSize();
     const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
-    const { showHeader, showHeaderOn, showHeaderOff, showSlider, showSliderOn, showSliderOff } =
-        useReaderUIState();
+    const { showHeader, showHeaderOff, showSlider, showSliderOff } = useReaderUIState();
 
     const { pageNumber, setPageNumber, handleNext, handlePrev } = useReaderNavigation({
         numPages,
@@ -271,7 +269,6 @@ export default function NovelReaderPage() {
                 </div>
             )}
 
-            <EdgeHoverZones onEnterTop={showHeaderOn} onEnterBottom={showSliderOn} />
         </div>
     );
 }
