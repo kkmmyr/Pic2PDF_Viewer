@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '../config/api_client';
+import generateApiClient from '../config/generate_api_client';
 import { API_ENDPOINTS } from '../config/api';
 import type { StatusItem, StatusResponse } from '../types';
 
@@ -14,7 +14,7 @@ export function usePdfStatus(sourceDir: string, enabled: boolean = false) {
     const { data, refetch: queryRefetch } = useQuery<StatusResponse>({
         queryKey: ['pdfStatus', sourceDir],
         queryFn: () =>
-            apiClient.get<unknown, StatusResponse>(API_ENDPOINTS.STATUS, {
+            generateApiClient.get<unknown, StatusResponse>(API_ENDPOINTS.STATUS, {
                 params: { source_dir: sourceDir },
             }),
         enabled: enabled && !!sourceDir,

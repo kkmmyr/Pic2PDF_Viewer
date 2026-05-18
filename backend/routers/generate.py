@@ -15,10 +15,12 @@ from pydantic import BaseModel
 from config import (
     COMPLETE_DIR,
     IMAGES_DIR,
+    META_DB_DIR,
     PDF_COMPRESSED_DIR,
     THUMBNAIL_DIR,
 )
 from routers._deps import log_and_raise_500
+from services import linux_sync
 from services.job_manager import GenerateJob, JobStatus, JobStore
 from services.meta_store import update_meta_locked
 from services.pdf_generator import batch_compress, scan_and_generate
@@ -84,6 +86,15 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
         )
         logger.info("Job %s completed: %d files, %d failed",
                     job.job_id, len(result.generated), len(failed_dicts))
+
+        # 生成した書籍を Linux サーバーへ自動転送（LINUX_SYNC_ENABLED=true 時のみ）
+        if result.generated:
+            linux_sync.sync_after_generate(
+                result.generated,
+                IMAGES_DIR,
+                THUMBNAIL_DIR,
+                os.path.join(META_DB_DIR, "meta.db"),
+            )
     except Exception as e:
         logger.exception("Job %s failed", job.job_id)
         job.update(status=JobStatus.FAILED, current_item=None, error=str(e))

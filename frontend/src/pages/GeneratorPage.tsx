@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { FolderSearch, Loader2, Zap } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
-import apiClient from '../config/api_client';
+import generateApiClient from '../config/generate_api_client';
 import { usePdfStatus } from '../hooks/usePdfStatus';
 import { useGenerateJob } from '../hooks/useGenerateJob';
 import { JobProgress } from '../components/generator/JobProgress';
@@ -53,7 +53,7 @@ export default function GeneratorPage() {
         setError(null);
         setResult(null);
         try {
-            const data = await apiClient.post<unknown, { job_id: string; status: string }>(
+            const data = await generateApiClient.post<unknown, { job_id: string; status: string }>(
                 API_ENDPOINTS.GENERATE,
                 { source_dir: sourceDir },
             );
@@ -68,7 +68,7 @@ export default function GeneratorPage() {
         setError(null);
         setResult(null);
         try {
-            const data = await apiClient.post<unknown, { message: string; files: string[] }>(
+            const data = await generateApiClient.post<unknown, { message: string; files: string[] }>(
                 API_ENDPOINTS.BATCH_COMPRESS,
                 { quality },
             );

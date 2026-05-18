@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiClient, { ApiError } from '../config/api_client';
+import { ApiError } from '../config/api_client';
+import generateApiClient from '../config/generate_api_client';
 import { API_ENDPOINTS } from '../config/api';
 import { STORAGE_KEYS, API_CONFIG } from '../constants';
 import { getStorageJson, setStorageJson, removeStorage } from '../utils/storage';
@@ -50,7 +51,7 @@ export function useGenerateJob(
     const { data: fetchedJob, error } = useQuery<GenerateJob>({
         queryKey: ['generateJob', currentJobId],
         queryFn: () =>
-            apiClient.get<unknown, GenerateJob>(API_ENDPOINTS.GENERATE_JOB(currentJobId!)),
+            generateApiClient.get<unknown, GenerateJob>(API_ENDPOINTS.GENERATE_JOB(currentJobId!)),
         enabled: currentJobId !== null,
         refetchInterval: (query) => {
             const status = query.state.data?.status;

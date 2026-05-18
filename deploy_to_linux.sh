@@ -13,7 +13,8 @@ SRC="/d/61.tool/Pic2PDF_Viewer"
 # ---- 1. フロントエンドをローカルでビルド ----
 echo "=== [1/3] Frontend build ==="
 cd "${SRC}/frontend"
-npm run build
+# Generator API は Windows バックエンド（Tailscale 経由）へ向ける
+VITE_GENERATE_API_URL=http://100.76.210.48:8090 npm run build
 cd "${SRC}"
 
 # ---- 2. コードをサーバーへ転送 ----
