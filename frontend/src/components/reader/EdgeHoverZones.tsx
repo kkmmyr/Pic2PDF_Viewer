@@ -23,12 +23,12 @@ export function EdgeHoverZones({
                 onMouseEnter={onEnterTop}
                 onTouchStart={onTouchTop}
             />
-            {/* スライダー表示トリガー: iOS ホームインジケーター上端で終わる */}
+            {/* スライダー表示トリガー: iOS ホームジェスチャーエリアから 16px 離す */}
             <div
                 className="fixed left-0 right-0 z-overlay-bar"
                 style={{
-                    bottom: 'env(safe-area-inset-bottom, 0px)',
-                    height: 'calc(3rem + env(safe-area-inset-bottom, 0px))',
+                    bottom: 'calc(env(safe-area-inset-bottom, 20px) + 16px)',
+                    height: '3.5rem',
                 }}
                 onMouseEnter={onEnterBottom}
                 onTouchStart={onTouchBottom}

@@ -44,7 +44,6 @@ export function ReaderPanel(props: ReaderPanelProps) {
         showSliderOn,
         showSliderOff,
         showSliderOnTouch,
-        showBothOnTouch,
         isSearchOpen,
         toggleSearch,
         isHelpOpen,
@@ -90,7 +89,6 @@ export function ReaderPanel(props: ReaderPanelProps) {
     const { onTouchStart, onTouchEnd } = useTouchSwipe({
         onSwipeLeft: handleNext,
         onSwipeRight: handlePrev,
-        onTap: showBothOnTouch,
     });
 
     return (
