@@ -55,6 +55,16 @@ export function useReaderUIState() {
         sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
     }, []);
 
+    // ヘッダー＋スライダーを同時に表示して 3 秒後に自動非表示（中央ゾーンタップ用）
+    const showBothOnTouch = useCallback(() => {
+        setShowHeader(true);
+        setShowSlider(true);
+        if (headerTimerRef.current !== null) clearTimeout(headerTimerRef.current);
+        if (sliderTimerRef.current !== null) clearTimeout(sliderTimerRef.current);
+        headerTimerRef.current = setTimeout(() => setShowHeader(false), TOUCH_AUTO_HIDE_MS);
+        sliderTimerRef.current = setTimeout(() => setShowSlider(false), TOUCH_AUTO_HIDE_MS);
+    }, []);
+
     return {
         showHeader,
         showHeaderOn,
@@ -66,6 +76,7 @@ export function useReaderUIState() {
         showSliderOnTouch,
         pauseSliderTimer,
         resumeSliderTimer,
+        showBothOnTouch,
         isSearchOpen,
         openSearch,
         closeSearch,

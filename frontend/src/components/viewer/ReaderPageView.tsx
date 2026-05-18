@@ -22,8 +22,6 @@ interface ReaderPageViewProps {
     windowHeight: number;
     isSpread: boolean;
     direction: ReadingDirection;
-    onNext: (e: React.MouseEvent) => void;
-    onPrev: (e: React.MouseEvent) => void;
     isImageMode: boolean;
     imageUrls: string[] | null;
     searchText: string;
@@ -38,6 +36,7 @@ interface ReaderPageViewProps {
  * - 画像モード: WebP 画像を直接表示
  * - PDF モード: react-pdf <Document> 配下で <Page> を表示
  * renderPageItem / renderSpreadPages のロジックを集約する。
+ * ナビゲーションは親の ReaderPanel がクリックゾーンで一元管理する。
  */
 export function ReaderPageView({
     pageNumber,
@@ -45,8 +44,6 @@ export function ReaderPageView({
     windowHeight,
     isSpread,
     direction,
-    onNext,
-    onPrev,
     isImageMode,
     imageUrls,
     searchText,
@@ -55,16 +52,12 @@ export function ReaderPageView({
     pdfUrl,
     onDocumentLoadSuccess,
 }: ReaderPageViewProps) {
-    const renderPageItem = (pNum: number, side: 'left' | 'right' | 'single') => (
+    const renderPageItem = (pNum: number) => (
         <PageRenderer
             key={`page-${pNum}`}
             pageNumber={pNum}
             numPages={numPages}
             windowHeight={windowHeight}
-            side={side}
-            direction={direction}
-            onNext={onNext}
-            onPrev={onPrev}
             isImageMode={isImageMode}
             imageUrl={imageUrls ? imageUrls[pNum - 1] : null}
             searchText={searchText}
@@ -78,18 +71,18 @@ export function ReaderPageView({
         const p1 = pageNumber;
         const p2 = pageNumber + 1;
         if (direction === 'rtl') {
-            if (pageNumber === 1) return <>{renderPageItem(p1, 'single')}</>;
+            if (pageNumber === 1) return <>{renderPageItem(p1)}</>;
             return (
                 <>
-                    {renderPageItem(p2, 'left')}
-                    {renderPageItem(p1, 'right')}
+                    {renderPageItem(p2)}
+                    {renderPageItem(p1)}
                 </>
             );
         }
         return (
             <>
-                {renderPageItem(p1, 'left')}
-                {renderPageItem(p2, 'right')}
+                {renderPageItem(p1)}
+                {renderPageItem(p2)}
             </>
         );
     };
@@ -97,7 +90,7 @@ export function ReaderPageView({
     if (isImageMode) {
         return (
             <div className="flex gap-0 shadow-2xl justify-center bg-gray-900">
-                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
+                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber)}
             </div>
         );
     }
@@ -115,7 +108,7 @@ export function ReaderPageView({
             }
         >
             <div className="flex shadow-2xl">
-                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber, 'single')}
+                {isSpread ? renderSpreadPages() : renderPageItem(pageNumber)}
             </div>
         </Document>
     );

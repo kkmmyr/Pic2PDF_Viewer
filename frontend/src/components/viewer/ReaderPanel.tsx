@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import type { LibrarySource } from '../../types';
 import { useReaderState } from '../../hooks/useReaderState';
 import { useTouchSwipe } from '../../hooks/useTouchSwipe';
@@ -46,6 +47,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
         showSliderOnTouch,
         pauseSliderTimer,
         resumeSliderTimer,
+        showBothOnTouch,
         isSearchOpen,
         toggleSearch,
         isHelpOpen,
@@ -92,6 +94,24 @@ export function ReaderPanel(props: ReaderPanelProps) {
         onSwipeLeft: handleNext,
         onSwipeRight: handlePrev,
     });
+
+    // 画面を左 1/3 / 中央 1/3 / 右 1/3 に分割してタップ動作を振り分ける。
+    // 方向考慮: RTL では左=進む・右=戻る、LTR では右=進む・左=戻る。
+    const handleContentClick = useCallback(
+        (e: React.MouseEvent) => {
+            const zone = e.clientX / window.innerWidth;
+            if (zone < 1 / 3) {
+                if (direction === 'rtl') handleNext();
+                else handlePrev();
+            } else if (zone > 2 / 3) {
+                if (direction === 'rtl') handlePrev();
+                else handleNext();
+            } else {
+                showBothOnTouch();
+            }
+        },
+        [direction, handleNext, handlePrev, showBothOnTouch],
+    );
 
     return (
         <>
@@ -167,7 +187,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
                 >
                     <div
                         className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
-                        onClick={handleNext}
+                        onClick={handleContentClick}
                         onTouchStart={onTouchStart}
                         onTouchEnd={onTouchEnd}
                     >
@@ -177,8 +197,6 @@ export function ReaderPanel(props: ReaderPanelProps) {
                             windowHeight={windowHeight}
                             isSpread={isSpread}
                             direction={direction}
-                            onNext={handleNext}
-                            onPrev={handlePrev}
                             isImageMode={isImageMode}
                             imageUrls={imageUrls}
                             searchText={searchText}

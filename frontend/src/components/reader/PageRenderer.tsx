@@ -1,15 +1,10 @@
 import { Page } from 'react-pdf';
 import { buildStaticUrl } from '../../config/api';
-import type { PageSide, ReadingDirection } from '../../types';
 
 interface PageRendererProps {
     pageNumber: number;
     numPages: number;
     windowHeight: number;
-    side: PageSide;
-    direction: ReadingDirection;
-    onNext: (e: React.MouseEvent) => void;
-    onPrev: (e: React.MouseEvent) => void;
     /** 現在の実効見開き状態。1 ページ表示時は max-width を全幅に拡大して表示する */
     isSpread: boolean;
     // Image mode props
@@ -30,15 +25,13 @@ interface PageRendererProps {
  *
  * 編集モードでのページ選択 UI は本コンポーネントには持たない。
  * 削除対象ページの選択は `<PageGridOverlay>`（全画面オーバーレイ）で行う。
+ *
+ * ナビゲーション（prev/next）は親の ReaderPanel がクリックゾーンで一元管理する。
  */
 export function PageRenderer({
     pageNumber,
     numPages,
     windowHeight,
-    side,
-    direction,
-    onNext,
-    onPrev,
     isSpread,
     imageUrl,
     isImageMode = false,
@@ -64,21 +57,9 @@ export function PageRenderer({
         );
     }
 
-    const handleClick = (e: React.MouseEvent) => {
-        if (side === 'left') {
-            if (direction === 'rtl') onNext(e);
-            else onPrev(e);
-        } else if (side === 'right') {
-            if (direction === 'rtl') onPrev(e);
-            else onNext(e);
-        } else {
-            onNext(e);
-        }
-    };
-
     if (isImageMode && imageUrl) {
         return (
-            <div className="relative" onClick={handleClick}>
+            <div className="relative">
                 <img
                     src={buildStaticUrl(imageUrl)}
                     alt={`Page ${pageNumber}`}
@@ -105,7 +86,6 @@ export function PageRenderer({
     return (
         <div
             className={`shadow-2xl cursor-pointer shrink-0 ${maxWidthClass} flex justify-center relative`}
-            onClick={handleClick}
         >
             <Page
                 pageNumber={pageNumber}
