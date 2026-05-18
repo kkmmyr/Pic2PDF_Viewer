@@ -14,7 +14,7 @@
 | データ | `/opt/pic2pdf-viewer/data/`（doujin/comic/kindle_novel/hitomi） |
 | Tailscale | 導入済み。iPad・外部 PC からアクセス可 |
 | コードデプロイ | `bash deploy_to_linux.sh`（Windows 側から実行） |
-| データ同期 | `bash sync_to_linux.sh [doujin\|comic\|novel\|hitomi\|all]` |
+| データ同期 | `bash sync_to_linux.sh [doujin\|comic\|novel\|hitomi\|db\|all]` |
 
 ---
 
@@ -211,7 +211,8 @@ echo "amashio ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pic2pdf-viewer, /us
 Windows でキャプチャ・OCR・PDF 生成を行うたびに実行する。
 
 ```bash
-bash sync_to_linux.sh doujin   # 同人誌のみ
+bash sync_to_linux.sh db       # meta.db + novel_db のみ（数秒・メタ編集後に実行）
+bash sync_to_linux.sh doujin   # 同人誌のみ（画像 + サムネイル + DB）
 bash sync_to_linux.sh comic    # 漫画のみ
 bash sync_to_linux.sh novel    # 小説のみ
 bash sync_to_linux.sh hitomi   # hitomi データのみ
@@ -219,8 +220,12 @@ bash sync_to_linux.sh all      # 全カテゴリ + DB
 ```
 
 - `thumbnails/` はフル同期（毎回上書き）
-- `images/` は差分同期（サーバーに存在しない書籍ディレクトリのみ転送）
-- DB（`meta.db` + `novel_db/`）は常に同期
+- `images/` は差分同期（サーバーにファイルが 1 件以上あるディレクトリはスキップ）
+- DB（`meta.db` + `novel_db/`）は `db` 以外のターゲットでも常に同期
+
+> **⚠️ メタ編集後の注意**: Windows でジャンル・作者・シリーズを設定した後は必ず `bash sync_to_linux.sh db` を実行すること。実行しないと Linux の meta.db が古いままとなり、ジャンルフィルター等から書籍が除外される。
+
+> **コマンドまとめ**: `docs/04_環境構築/サーバー連携よく利用するコマンド.md` を参照。
 
 ### D-3: タイミングの目安
 
@@ -228,7 +233,7 @@ bash sync_to_linux.sh all      # 全カテゴリ + DB
 |---|---|
 | Kindle キャプチャ → PDF 生成 | PDF 生成バッチ完了後 |
 | OCR バッチ完了 | OCR 完了後（`novel_db/` が更新される） |
-| 書誌メタ編集（タイトル・著者等） | 編集後に `meta.db` だけ push |
+| 書誌メタ編集（ジャンル・著者・シリーズ） | 編集後すぐに `bash sync_to_linux.sh db` |
 | 同人誌 ZIP → PDF 変換 | 変換バッチ完了後 |
 
 **DB 転送中の競合について**: Linux 側が閲覧中でも SQLite の WAL モードなら読み取りは継続できる。手動 push 運用（バッチ完了後に実行）であれば問題ない。
