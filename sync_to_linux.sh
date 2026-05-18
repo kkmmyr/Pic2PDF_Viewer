@@ -1,6 +1,6 @@
 #!/bin/bash
 # Windows → Linux サーバーへ同期するスクリプト
-# 使い方: bash sync_to_linux.sh [doujin|comic|novel|hitomi|all]
+# 使い方: bash sync_to_linux.sh [doujin|comic|novel|hitomi|db|all]
 # 前提: Tailscale が起動していること、SSH 鍵認証が設定済みであること
 set -e
 
