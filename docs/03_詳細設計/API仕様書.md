@@ -54,6 +54,7 @@
   - §7.2 `GET /api/novel_db/series` — novel シリーズ一覧
   - §7.2b `GET /api/novel_db/authors` — novel 作者一覧（B-21）
   - §7.21 `GET /api/novel_db/books/{book_name}` — 単一書籍の詳細情報
+  - §7.22 `GET /api/novel_db/books/{book_name}/similar` — 書籍類似度推薦（B-19）
   - §7.3 `POST /api/novel_db/search` — ハイブリッド検索（FTS5 + ベクトル + RRF）
   - §7.4 `POST /api/novel_db/qa` — RAG 質問応答（SSE）
   - §7.5 `GET /api/novel_db/qa/history` — 履歴一覧
@@ -261,7 +262,7 @@ PDF ファイルまたはフォルダの名前を変更する。PDF の場合は
 ### §1.8 `DELETE /api/genres/{name}`
 指定ジャンルをリストから削除する（既存書籍の `genre` フィールドは変更しない）。
 
-**クエリパラメータ**: `source=generated`
+**クエリパラメータ**: `source=doujin`
 
 **レスポンス**: `{"genres": ["オリジナル", "Voiceloid"]}`
 
@@ -1517,7 +1518,7 @@ data: {"type": "error", "message": "本文が長すぎます（推定 120,000 �
 
 ---
 
-### §7.21 `GET /api/novel_db/books/{book_name}/similar`（B-19）
+### §7.22 `GET /api/novel_db/books/{book_name}/similar`（B-19）
 
 指定書籍のサマリ embedding を使い、ライブラリ内の意味的に近い書籍を返す（LanceDB KNN）。自身は除外。サマリが未生成の場合は空配列。
 
