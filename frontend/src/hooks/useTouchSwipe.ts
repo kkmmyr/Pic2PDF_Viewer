@@ -1,20 +1,23 @@
 import { useRef, useCallback } from 'react';
 
 const SWIPE_THRESHOLD_PX = 50;
+const TAP_THRESHOLD_PX = 10;
 
 interface UseTouchSwipeProps {
     onSwipeLeft: () => void;
     onSwipeRight: () => void;
+    /** 指がほぼ動かずに離れた（タップ）場合に呼ばれる */
+    onTap?: () => void;
 }
 
 /**
- * 左右スワイプを検出してページ送りに使うフック。
+ * 左右スワイプ・タップを検出するフック。
  *
- * - |dx| が閾値（50px）以上かつ縦方向より横方向の移動が大きければスワイプと判定
- * - touchend で e.preventDefault() を呼び、後続のクリックイベントを抑止する
- * - 縦スクロール・ピンチ操作には干渉しない
+ * - |dx| >= 50px かつ縦より横の移動が大きければスワイプ → ページ送り
+ * - |dx| < 10px かつ |dy| < 10px ならタップ → onTap()
+ * - それ以外（縦スクロール・中間的なジェスチャー）は無視
  */
-export function useTouchSwipe({ onSwipeLeft, onSwipeRight }: UseTouchSwipeProps) {
+export function useTouchSwipe({ onSwipeLeft, onSwipeRight, onTap }: UseTouchSwipeProps) {
     const startXRef = useRef<number | null>(null);
     const startYRef = useRef<number | null>(null);
 
@@ -31,15 +34,24 @@ export function useTouchSwipe({ onSwipeLeft, onSwipeRight }: UseTouchSwipeProps)
             startXRef.current = null;
             startYRef.current = null;
 
-            // 縦スクロール or 閾値未満のタップは無視
-            if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < SWIPE_THRESHOLD_PX) return;
+            const absDx = Math.abs(dx);
+            const absDy = Math.abs(dy);
+
+            // タップ判定: 指がほぼ動いていない
+            if (absDx < TAP_THRESHOLD_PX && absDy < TAP_THRESHOLD_PX) {
+                onTap?.();
+                return;
+            }
+
+            // 縦スクロール or 横移動が閾値未満 → 無視
+            if (absDy > absDx || absDx < SWIPE_THRESHOLD_PX) return;
 
             // 横スワイプ確定: 後続クリックを抑止してページ送り
             e.preventDefault();
             if (dx < 0) onSwipeLeft();
             else onSwipeRight();
         },
-        [onSwipeLeft, onSwipeRight],
+        [onSwipeLeft, onSwipeRight, onTap],
     );
 
     return { onTouchStart, onTouchEnd };
