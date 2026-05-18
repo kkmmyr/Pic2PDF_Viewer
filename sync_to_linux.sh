@@ -26,7 +26,7 @@ sync_tar() {
         | ssh "$LINUX" "mkdir -p '$dst' && tar xzf - -C '$(dirname "$dst")'"
 }
 
-# 差分同期: images/ 向け（サーバーに存在しない書籍ディレクトリのみ転送）
+# 差分同期: images/ 向け（サーバーに存在しない or 空の書籍ディレクトリのみ転送）
 sync_new_books() {
     local src=$1 dst=$2
     if [[ ! -d "$src" ]]; then
@@ -34,19 +34,21 @@ sync_new_books() {
         return
     fi
     echo "Syncing new books: $src → $LINUX:$dst"
+    # サーバー側の「ファイルが1件以上あるディレクトリ」のみをスキップ対象にする
+    # 空ディレクトリは再送する（前回の転送失敗でフォルダだけ残っているケース対応）
     local existing
-    existing=$(ssh "$LINUX" "ls '$dst' 2>/dev/null || true")
+    existing=$(ssh "$LINUX" "find '$dst' -maxdepth 2 -type f 2>/dev/null | sed 's|$dst/||' | cut -d/ -f1 | sort -u || true")
     local count=0
     for book_dir in "$src"/*/; do
         [[ -d "$book_dir" ]] || continue
         local book
         book=$(basename "$book_dir")
-        if echo "$existing" | grep -qx "$book"; then
+        if echo "$existing" | grep -Fqx "$book"; then
             echo "  Skip (exists): $book"
         else
             echo "  Sending: $book"
             tar czf - -C "$src" "$book" \
-                | ssh "$LINUX" "mkdir -p '$dst' && tar xzf - -C '$dst'"
+                | ssh "$LINUX" "tar xzf - -C '$dst'"
             count=$((count + 1))
         fi
     done
