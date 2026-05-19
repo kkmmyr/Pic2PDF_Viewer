@@ -86,8 +86,8 @@ export function ReaderPanel(props: ReaderPanelProps) {
     } = useReaderState(props);
 
     const { onTouchStart, onTouchEnd } = useTouchSwipe({
-        onSwipeLeft: handleNext,
-        onSwipeRight: handlePrev,
+        onSwipeLeft: direction === 'rtl' ? handlePrev : handleNext,
+        onSwipeRight: direction === 'rtl' ? handleNext : handlePrev,
     });
 
     // 最終ページ（関連書籍確認画面）では「戻る方向」のスワイプのみ前ページへ戻る。
