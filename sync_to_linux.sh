@@ -86,7 +86,9 @@ if [[ "$TARGET" == "hitomi" || "$TARGET" == "all" ]]; then
     sync_hitomi
 fi
 
-sync_db
+if [[ "$TARGET" == "db" ]]; then
+    sync_db
+fi
 
 echo ""
 echo "Sync complete: $TARGET"
