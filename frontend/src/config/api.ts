@@ -79,6 +79,12 @@ export const API_ENDPOINTS = {
     GENRES_REORDER: '/api/genres/reorder',
     /** Amazon CSV 固定パスインポート（authors/asin 空欄補完） */
     AMAZON_IMPORT: (source: string) => `/api/amazon/import?source=${encodeURIComponent(source)}`,
+    /** UI プリファレンス（フィルター + ピン）取得 */
+    PREFS: (source: string) => `/api/prefs?source=${encodeURIComponent(source)}`,
+    /** UI フィルター更新 */
+    PREFS_FILTERS: '/api/prefs/filters',
+    /** グループピン登録 / 上書き */
+    PREFS_PINS: '/api/prefs/pins',
     /** 指定ページのサムネイル画像をオンデマンド生成（ページスライダー / 編集モードグリッド用） */
     PAGE_THUMBNAIL: (
         name: string,

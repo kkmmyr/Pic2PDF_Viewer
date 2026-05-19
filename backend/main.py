@@ -33,6 +33,7 @@ from routers import (
     novel_graph,
     ocr,
     pdfs,
+    prefs,
     series,
     thumbnails,
 )
@@ -117,6 +118,7 @@ app.include_router(novel_build.router,      prefix="/api", tags=["novel_build"])
 app.include_router(amazon_import.router,    prefix="/api", tags=["amazon_import"])
 app.include_router(meta_db_backup.router,  prefix="/api", tags=["meta_db_backup"])
 app.include_router(novel_graph.router,     prefix="/api", tags=["novel_graph"])
+app.include_router(prefs.router,           prefix="/api", tags=["prefs"])
 
 # ---------------------------------------------------------------------------
 # 設計ドキュメント HTML 配信（mkdocs ビルド成果物）

@@ -40,7 +40,7 @@ interface LibraryPanelProps {
  *
  * 大半のロジックは責務別カスタムフックに委譲し、本体は合成 + JSX に集中する:
  * - `useUrlFilters`: author/series の URL クエリ同期
- * - `useLibrarySettings`: sort/groupMode/showHidden の localStorage 永続化
+ * - `useLibrarySettings`: sort/groupMode/showHidden の localStorage 永続化 / readStateFilter・genreFilter の API 永続化
  * - `useLibraryBulkActions`: 一括操作（authors/hidden/thumbnail/merge/series）
  * - `useLibraryDisplay`: effectiveGroupMode / displayPdfs / breadcrumbs の派生計算
  * - `useScrollMemory`: URL キーごとのスクロール位置保存・復元
@@ -85,7 +85,7 @@ export function LibraryPanel({ onPdfClick, onUpClick }: LibraryPanelProps) {
         setReadStateFilter,
         genreFilter,
         setGenreFilter,
-    } = useLibrarySettings();
+    } = useLibrarySettings(currentSource);
 
     // パスまたはソース変更時に検索テキストをリセット。
     // author/series は URL 同期されており、useUrlState の navigate

@@ -79,6 +79,11 @@
 - [§11. meta.db バックアップ（meta_db_backup）](#11-metadb-バックアップmeta_db_backup)（B-25）
   - §11.1 `POST /api/meta_db/backup` — meta.db バックアップ実行
   - §11.2 `GET /api/meta_db/backup/status` — 最新バックアップ情報
+- [§12. UI プリファレンス（prefs）](#12-uiプリファレンスprefs)
+  - §12.1 `GET /api/prefs` — フィルター + ピン一括取得
+  - §12.2 `PATCH /api/prefs/filters` — フィルター更新
+  - §12.3 `PUT /api/prefs/pins` — ピン登録 / 上書き
+  - §12.4 `DELETE /api/prefs/pins` — ピン削除
 
 ---
 
@@ -1779,3 +1784,111 @@ meta.db を `META_DB_BACKUP_DIR`（env: `META_DB_BACKUP_DIR`、デフォルト `
 ```
 
 - バックアップが 1 件もない場合は `last_backup: null`、`total_backups: 0`
+
+---
+
+## §12. UI プリファレンス（prefs）
+
+ユーザーの UI 設定（ライブラリフィルター・グループピン）をサーバーサイド（`meta.db`）に永続化する API。
+デバイス間共有・localStorage 依存の解消を目的とする。
+
+**DB テーブル**:
+- `ui_filters(source PK, read_state_filter, genre_filter)` — ソース別フィルター設定
+- `group_pins(source, pin_type, group_id, book_name; PK=(source,pin_type,group_id))` — シリーズ/作者カードの代表ピン
+
+---
+
+### §12.1 `GET /api/prefs`
+
+指定ソースのフィルター設定とピン情報を一括取得する。
+
+**クエリパラメーター**:
+
+| 名前 | 型 | デフォルト | 説明 |
+|---|---|---|---|
+| `source` | string | `"doujin"` | `doujin` / `comic` / `novel` |
+
+**レスポンス**:
+```json
+{
+  "read_state_filter": "unread",
+  "genre_filter": "",
+  "series_pins": { "series_id_1": "vol3.pdf" },
+  "author_pins": { "Author A\nAuthor B": "bookA.pdf" }
+}
+```
+
+- 未設定のフィルターは空文字 `""`
+- ピンが 0 件の場合は空オブジェクト `{}`
+
+---
+
+### §12.2 `PATCH /api/prefs/filters`
+
+readStateFilter / genreFilter を部分更新する。省略されたフィールドは変更しない。
+
+**リクエストボディ**:
+```json
+{
+  "source": "doujin",
+  "read_state_filter": "reading",
+  "genre_filter": null
+}
+```
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `source` | string | ✓ | `doujin` / `comic` / `novel` |
+| `read_state_filter` | `""` \| `"unread"` \| `"reading"` \| `"done"` \| null | — | null なら変更しない |
+| `genre_filter` | string \| null | — | 空文字でフィルター解除。null なら変更しない |
+
+**レスポンス** `200`:
+```json
+{ "message": "Updated" }
+```
+
+---
+
+### §12.3 `PUT /api/prefs/pins`
+
+グループピンを登録または上書きする。1 グループにつき 1 冊のみ保持される。
+
+**リクエストボディ**:
+```json
+{
+  "source": "doujin",
+  "pin_type": "series",
+  "group_id": "series_id_1",
+  "book_name": "vol3.pdf"
+}
+```
+
+| フィールド | 型 | 説明 |
+|---|---|---|
+| `pin_type` | `"series"` \| `"author"` | ピン種別 |
+| `group_id` | string | シリーズ ID または作者キー（複数作者は `\n` 結合） |
+| `book_name` | string | 代表とするファイル名 |
+
+**レスポンス** `200`:
+```json
+{ "message": "Pinned" }
+```
+
+---
+
+### §12.4 `DELETE /api/prefs/pins`
+
+グループピンを削除する。存在しない場合も成功とする。
+
+**クエリパラメーター**:
+
+| 名前 | 型 | 説明 |
+|---|---|---|
+| `source` | string | `doujin` / `comic` / `novel` |
+| `pin_type` | string | `series` \| `author` |
+| `group_id` | string | 削除するグループ ID |
+
+**レスポンス** `200`:
+```json
+{ "message": "Unpinned" }
+```

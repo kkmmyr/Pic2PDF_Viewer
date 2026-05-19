@@ -38,6 +38,21 @@ CREATE TABLE IF NOT EXISTS genres (
     sort_order  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (source, genre)
 );
+
+CREATE TABLE IF NOT EXISTS ui_filters (
+    source              TEXT NOT NULL,
+    read_state_filter   TEXT NOT NULL DEFAULT '',
+    genre_filter        TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (source)
+);
+
+CREATE TABLE IF NOT EXISTS group_pins (
+    source    TEXT NOT NULL,
+    pin_type  TEXT NOT NULL,
+    group_id  TEXT NOT NULL,
+    book_name TEXT NOT NULL,
+    PRIMARY KEY (source, pin_type, group_id)
+);
 """
 
 
