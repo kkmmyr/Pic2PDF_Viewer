@@ -1,7 +1,8 @@
 #!/bin/bash
 # Windows → Linux サーバーへ同期するスクリプト
-# 使い方: bash sync_to_linux.sh [doujin|comic|novel|hitomi|db|all]
+# 使い方: bash sync_to_linux.sh [doujin|comic|novel|hitomi|all]
 # 前提: Tailscale が起動していること、SSH 鍵認証が設定済みであること
+# 注意: meta.db はサーバー側が正とするため DB 同期機能は提供しない
 set -e
 
 LINUX_USER=amashio
@@ -12,7 +13,6 @@ TARGET=${1:-all}
 
 # データ格納場所
 ONEDRIVE_DATA="/c/Users/amashio/OneDrive/61.tool/Pic2PDF"
-DB_DATA="/d/61.tool/Pic2PDF_Viewer/backend/data"
 
 # フル同期: サムネイル・小ファイル向け（毎回上書き）
 sync_tar() {
@@ -55,12 +55,6 @@ sync_new_books() {
     echo "  Done: ${count} new book(s) transferred"
 }
 
-sync_db() {
-    echo "Syncing DB..."
-    tar czf - -C "${DB_DATA}" meta.db novel_db \
-        | ssh "$LINUX" "tar xzf - -C '${DEST}/'"
-}
-
 sync_hitomi() {
     echo "Syncing hitomi..."
     tar czf - -C "${ONEDRIVE_DATA}" hitomi \
@@ -84,10 +78,6 @@ fi
 
 if [[ "$TARGET" == "hitomi" || "$TARGET" == "all" ]]; then
     sync_hitomi
-fi
-
-if [[ "$TARGET" == "db" ]]; then
-    sync_db
 fi
 
 echo ""
