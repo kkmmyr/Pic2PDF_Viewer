@@ -185,7 +185,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
                     className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
                 >
                     <div
-                        className="min-h-full flex items-center justify-center p-4 w-fit mx-auto"
+                        className="min-h-full flex items-center justify-center p-4 w-full"
                         onClick={handleContentClick}
                         onTouchStart={onTouchStart}
                         onTouchEnd={onTouchEnd}
