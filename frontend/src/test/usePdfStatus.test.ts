@@ -3,14 +3,14 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('../config/api_client', () => ({
+vi.mock('../config/generate_api_client', () => ({
     default: { get: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
+import generateApiClient from '../config/generate_api_client';
 import { usePdfStatus } from '../hooks/usePdfStatus';
 
-const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
+const mockedGet = generateApiClient.get as ReturnType<typeof vi.fn>;
 
 const createWrapper = () => {
     const queryClient = new QueryClient({

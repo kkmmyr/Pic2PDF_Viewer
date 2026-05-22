@@ -3,20 +3,16 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('../config/api_client', async () => {
-    const actual =
-        await vi.importActual<typeof import('../config/api_client')>('../config/api_client');
-    return {
-        default: { get: vi.fn() },
-        ApiError: actual.ApiError,
-    };
-});
+vi.mock('../config/generate_api_client', () => ({
+    default: { get: vi.fn() },
+}));
 
-import apiClient, { ApiError } from '../config/api_client';
+import generateApiClient from '../config/generate_api_client';
+import { ApiError } from '../config/api_client';
 import { useGenerateJob } from '../hooks/useGenerateJob';
 import type { GenerateJob } from '../types';
 
-const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
+const mockedGet = generateApiClient.get as ReturnType<typeof vi.fn>;
 
 const STORAGE_KEY = 'generator_active_job';
 
