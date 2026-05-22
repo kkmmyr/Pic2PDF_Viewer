@@ -5,7 +5,7 @@
  * リーダー・読書会ページへの導線を提供する。
  * 既存セクションの下に検索・会話 QA・質問＋履歴をこの本固定スコープで追加（2026-05-14）。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
     BookOpen,
@@ -31,10 +31,8 @@ import {
 } from '../components/novel_db';
 import BookMetaList from '../components/novel_db/BookMetaList';
 import DiscussionHistoryItemCard from '../components/novel_db/DiscussionHistoryItem';
-import type { DiscussionHistoryItem } from '../features/novel_db/api';
-import { fetchDiscussionHistory, fetchSimilarBooks } from '../features/novel_db/api';
-import type { BookDetail, SimilarBook } from '../features/novel_db/types';
-import { useBookDetail, useNovelDbHistory, useNovelDbRebuildJob } from '../hooks/novel_db';
+import type { BookDetail } from '../features/novel_db/types';
+import { useBookDetail, useNovelDbHistory, useNovelDbRebuildJob, useNovelDetailData } from '../hooks/novel_db';
 import { formatSqliteUtcAsJst } from '../utils/date';
 
 export default function NovelDetailPage() {
@@ -58,29 +56,10 @@ export default function NovelDetailPage() {
     const [charDialog, setCharDialog] = useState<{ book: string; char: string } | null>(null);
     const [editBook, setEditBook] = useState<BookDetail | null>(null);
 
-    const [discussions, setDiscussions] = useState<DiscussionHistoryItem[]>([]);
-    const [discussionsLoading, setDiscussionsLoading] = useState(false);
-
-    const [similarBooks, setSimilarBooks] = useState<SimilarBook[]>([]);
-    const [similarLoading, setSimilarLoading] = useState(false);
-
-    useEffect(() => {
-        if (!decodedName) return;
-        setDiscussionsLoading(true);
-        fetchDiscussionHistory(decodedName)
-            .then(setDiscussions)
-            .catch(() => {})
-            .finally(() => setDiscussionsLoading(false));
-    }, [decodedName]);
-
-    useEffect(() => {
-        if (!decodedName || !detail?.is_indexed) return;
-        setSimilarLoading(true);
-        fetchSimilarBooks(decodedName)
-            .then(setSimilarBooks)
-            .catch(() => {})
-            .finally(() => setSimilarLoading(false));
-    }, [decodedName, detail?.is_indexed]);
+    const { discussions, discussionsLoading, similarBooks, similarLoading } = useNovelDetailData(
+        decodedName,
+        detail?.is_indexed ?? false,
+    );
 
     const handleRead = () => void navigate(`/novel/reader/${encodeURIComponent(decodedName)}`);
 

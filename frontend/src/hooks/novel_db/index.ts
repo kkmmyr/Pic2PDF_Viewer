@@ -1,5 +1,6 @@
 export { useBookCharacters } from './useBookCharacters';
 export { useDiscussion } from './useDiscussion';
+export { useNovelDetailData } from './useNovelDetailData';
 export { useBookDetail } from './useBookDetail';
 export { useChatSessionDetail, useChatSessions } from './useChatSessions';
 export { useCharacterDetail } from './useCharacterDetail';
