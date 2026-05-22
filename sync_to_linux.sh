@@ -1,6 +1,6 @@
 #!/bin/bash
 # Windows → Linux サーバーへ同期するスクリプト
-# 使い方: bash sync_to_linux.sh [doujin|comic|novel|hitomi|all]
+# 使い方: bash sync_to_linux.sh [doujin|comic|novel|all]
 # 前提: Tailscale が起動していること、SSH 鍵認証が設定済みであること
 # 注意: meta.db はサーバー側が正とするため DB 同期機能は提供しない
 set -e
@@ -55,12 +55,6 @@ sync_new_books() {
     echo "  Done: ${count} new book(s) transferred"
 }
 
-sync_hitomi() {
-    echo "Syncing hitomi..."
-    tar czf - -C "${ONEDRIVE_DATA}" hitomi \
-        | ssh "$LINUX" "tar xzf - -C '${DEST}/'"
-}
-
 if [[ "$TARGET" == "doujin" || "$TARGET" == "all" ]]; then
     sync_tar      "${ONEDRIVE_DATA}/doujin/thumbnails" "${DEST}/doujin/thumbnails"
     sync_new_books "${ONEDRIVE_DATA}/doujin/images"    "${DEST}/doujin/images"
@@ -74,10 +68,6 @@ fi
 if [[ "$TARGET" == "novel" || "$TARGET" == "all" ]]; then
     sync_tar      "${ONEDRIVE_DATA}/kindle_novel/thumbnails" "${DEST}/kindle_novel/thumbnails"
     sync_new_books "${ONEDRIVE_DATA}/kindle_novel/images"    "${DEST}/kindle_novel/images"
-fi
-
-if [[ "$TARGET" == "hitomi" || "$TARGET" == "all" ]]; then
-    sync_hitomi
 fi
 
 echo ""
