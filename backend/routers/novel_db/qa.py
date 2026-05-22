@@ -7,7 +7,8 @@ from fastapi.responses import StreamingResponse
 from config import NOVEL_DB_LLM_MODEL
 from routers._deps import log_and_raise_500, sse_event
 from services.novel_db import Scope, with_db
-from services.novel_db.llm import build_prompt, stream_qa
+from services.novel_db.llm import stream_qa
+from services.novel_db.prompt_builder import build_prompt
 from services.novel_db.qa_history import (
     delete_history,
     get_history_detail,

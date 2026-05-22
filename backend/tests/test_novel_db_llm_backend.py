@@ -67,7 +67,7 @@ class TestBuildPromptStability:
     """B-14 で build_prompt のシグネチャ・出力が変わっていないことの回帰確認。"""
 
     def test_book_scope_omits_book_name_in_header(self):
-        from services.novel_db.llm import build_prompt
+        from services.novel_db.prompt_builder import build_prompt
         from services.novel_db.search import Scope, SearchHit
 
         hits = [
@@ -85,7 +85,7 @@ class TestBuildPromptStability:
         assert "主要登場人物: 太郎" in prompt
 
     def test_summaries_block_for_all_scope(self):
-        from services.novel_db.llm import build_prompt
+        from services.novel_db.prompt_builder import build_prompt
         from services.novel_db.search import Scope, SearchHit
 
         hits = [

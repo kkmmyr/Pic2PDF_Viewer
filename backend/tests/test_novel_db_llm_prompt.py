@@ -2,7 +2,7 @@
 
 書籍俯瞰サマリの埋め込み（B-5）と、scope ごとのヘッダ生成を確認する。
 """
-from services.novel_db.llm import build_prompt
+from services.novel_db.prompt_builder import build_prompt
 from services.novel_db.search import Scope, SearchHit
 
 

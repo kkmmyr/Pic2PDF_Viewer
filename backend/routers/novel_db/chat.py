@@ -10,11 +10,10 @@ from fastapi.responses import StreamingResponse
 from config import NOVEL_DB_QA_FULL_BOOK_MODE, NOVEL_DB_QA_FULL_BOOK_NUM_CTX
 from routers._deps import log_and_raise_500, sse_event
 from services.novel_db import Scope, with_db
-from services.novel_db.llm import (
-    LLM_OPTIONS,
+from services.novel_db.llm import LLM_OPTIONS, stream_chat
+from services.novel_db.prompt_builder import (
     build_chat_context_block,
     build_chat_system_message,
-    stream_chat,
 )
 from services.novel_db.qa_sessions import (
     append_message,
