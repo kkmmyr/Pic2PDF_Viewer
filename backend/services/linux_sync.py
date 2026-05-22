@@ -1,7 +1,8 @@
 """Linux サーバーへのファイル同期サービス。
 
-Windows バックエンドで生成した画像・サムネイル・meta.db を
+Windows バックエンドで生成した画像・サムネイルを
 SSH + Python tarfile を使って Linux サーバーへ転送する。
+meta.db はサーバー側が正のため送信しない。
 
 設定 (環境変数):
   LINUX_SYNC_ENABLED  - "true" の場合のみ同期を実行（デフォルト: false）
@@ -73,10 +74,10 @@ def sync_after_generate(
     book_names: list[str],
     images_dir: str,
     thumbnails_dir: str,
-    meta_db_path: str,
 ) -> None:
-    """生成完了後に新規書籍と meta.db を Linux へ同期する。
+    """生成完了後に新規書籍の画像・サムネイルを Linux へ同期する。
 
+    meta.db はサーバー側が正とするため送信しない。
     LINUX_SYNC_ENABLED が true でない場合は即リターン。
     エラーが発生しても例外は握り潰してログに残す（生成ジョブには影響させない）。
     """
@@ -101,10 +102,5 @@ def sync_after_generate(
             _send_file(thumbs_root / f"{stem}.jpg", dest_thumbs)
         except Exception as exc:
             logger.error("linux_sync: thumbnails sync failed [%s]: %s", book_name, exc)
-
-    try:
-        _send_file(Path(meta_db_path), _LINUX_DEST)
-    except Exception as exc:
-        logger.error("linux_sync: meta.db sync failed: %s", exc)
 
     logger.info("linux_sync: sync complete")

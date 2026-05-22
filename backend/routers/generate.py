@@ -15,7 +15,6 @@ from pydantic import BaseModel
 from config import (
     COMPLETE_DIR,
     IMAGES_DIR,
-    META_DB_DIR,
     PDF_COMPRESSED_DIR,
     THUMBNAIL_DIR,
 )
@@ -93,7 +92,6 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
                 result.generated,
                 IMAGES_DIR,
                 THUMBNAIL_DIR,
-                os.path.join(META_DB_DIR, "meta.db"),
             )
     except Exception as e:
         logger.exception("Job %s failed", job.job_id)

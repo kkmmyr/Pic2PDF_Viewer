@@ -2,11 +2,9 @@
 
 SSH 接続はモック化して、パス解決ロジック・有効/無効フラグを検証する。
 """
-import os
+import logging
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 import services.linux_sync as ls
 
@@ -33,7 +31,7 @@ class TestSyncDisabled:
         monkeypatch.setattr(ls, "_SYNC_ENABLED", False)
 
         with patch("subprocess.run") as mock_run:
-            ls.sync_after_generate(["book.pdf"], str(tmp_path), str(tmp_path), str(tmp_path / "meta.db"))
+            ls.sync_after_generate(["book.pdf"], str(tmp_path), str(tmp_path))
 
         mock_run.assert_not_called()
 
@@ -49,13 +47,11 @@ class TestSyncPathResolution:
 
         images_dir = tmp_path / "images"
         thumbs_dir = tmp_path / "thumbnails"
-        meta_db = tmp_path / "meta.db"
 
         # 正しいパス: images/stem (拡張子なし)
         _make_dir(images_dir / "mybook")
         _make_file(images_dir / "mybook" / "01.webp")
         _make_file(thumbs_dir / "mybook.jpg")
-        _make_file(meta_db)
 
         captured = []
 
@@ -65,10 +61,10 @@ class TestSyncPathResolution:
 
         monkeypatch.setattr("subprocess.run", _fake_run)
 
-        ls.sync_after_generate(["mybook.pdf"], str(images_dir), str(thumbs_dir), str(meta_db))
+        ls.sync_after_generate(["mybook.pdf"], str(images_dir), str(thumbs_dir))
 
-        # SSH が 3 回呼ばれる: images tar / thumbnail send / meta.db send
-        assert len(captured) == 3
+        # SSH が 2 回呼ばれる: images tar / thumbnail send
+        assert len(captured) == 2
         # images: tar が images/mybook を対象にする（.pdf 付きではない）
         ssh_images_cmd = captured[0]
         assert "tar" in ssh_images_cmd[-1] or "images" in str(captured[0])
@@ -79,11 +75,9 @@ class TestSyncPathResolution:
 
         images_dir = tmp_path / "images"
         thumbs_dir = tmp_path / "thumbnails"
-        meta_db = tmp_path / "meta.db"
 
         _make_dir(images_dir / "book1")
         _make_file(thumbs_dir / "book1.jpg")
-        _make_file(meta_db)
 
         ssh_cmds = []
 
@@ -93,7 +87,7 @@ class TestSyncPathResolution:
 
         monkeypatch.setattr("subprocess.run", _fake_run)
 
-        ls.sync_after_generate(["book1.pdf"], str(images_dir), str(thumbs_dir), str(meta_db))
+        ls.sync_after_generate(["book1.pdf"], str(images_dir), str(thumbs_dir))
 
         # サムネイル転送コマンドに "cat >" が含まれる（_send_file 経由）
         assert any("cat >" in c for c in ssh_cmds), f"Expected 'cat >' in one of: {ssh_cmds}"
@@ -104,19 +98,16 @@ class TestSyncPathResolution:
 
         images_dir = tmp_path / "images"   # 作らない
         thumbs_dir = tmp_path / "thumbnails"
-        meta_db = tmp_path / "meta.db"
 
         _make_file(thumbs_dir / "book.jpg")
-        _make_file(meta_db)
 
         def _fake_run(cmd, **kw):
             return MagicMock(returncode=0)
 
         monkeypatch.setattr("subprocess.run", _fake_run)
 
-        import logging
         with caplog.at_level(logging.WARNING, logger="services.linux_sync"):
-            ls.sync_after_generate(["book.pdf"], str(images_dir), str(thumbs_dir), str(meta_db))
+            ls.sync_after_generate(["book.pdf"], str(images_dir), str(thumbs_dir))
 
         assert any("source not found" in r.message for r in caplog.records)
 
@@ -126,12 +117,10 @@ class TestSyncPathResolution:
 
         images_dir = tmp_path / "images"
         thumbs_dir = tmp_path / "thumbnails"
-        meta_db = tmp_path / "meta.db"
 
         for name in ["alpha", "beta"]:
             _make_dir(images_dir / name)
             _make_file(thumbs_dir / f"{name}.jpg")
-        _make_file(meta_db)
 
         call_count = {"n": 0}
 
@@ -143,8 +132,8 @@ class TestSyncPathResolution:
 
         ls.sync_after_generate(
             ["alpha.pdf", "beta.pdf"],
-            str(images_dir), str(thumbs_dir), str(meta_db),
+            str(images_dir), str(thumbs_dir),
         )
 
-        # 各書籍 2 回 (images tar + thumbnail) + meta.db 1 回 = 5 回
-        assert call_count["n"] == 5
+        # 各書籍 2 回 (images tar + thumbnail) = 4 回
+        assert call_count["n"] == 4
