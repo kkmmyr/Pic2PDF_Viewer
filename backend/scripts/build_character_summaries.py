@@ -33,12 +33,12 @@ if str(_BACKEND_DIR) not in sys.path:
 
 from services.meta_store import load_meta  # noqa: E402
 from services.novel_db import init_schema, with_db  # noqa: E402
-from services.novel_db.character_summarizer import (  # noqa: E402
+from services.novel_db.character_db import (  # noqa: E402
     collect_character_pages,
     list_book_characters_in_db,
-    summarize_character,
     upsert_character,
 )
+from services.novel_db.character_summarizer import summarize_character  # noqa: E402
 
 
 def _list_target_books(

@@ -2,7 +2,7 @@
 import pytest
 
 from services.novel_db import init_schema, with_db
-from services.novel_db.character_summarizer import CharacterStat, upsert_character
+from services.novel_db.character_db import CharacterStat, upsert_character
 
 
 @pytest.fixture

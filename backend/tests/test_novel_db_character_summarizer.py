@@ -14,17 +14,17 @@ from unittest.mock import patch
 import pytest
 
 from services.novel_db import init_schema, with_db
-from services.novel_db.character_summarizer import (
+from services.novel_db.character_db import (
     CharacterStat,
     _parse_main_characters,
     collect_character_pages,
     get_character,
     list_book_characters_in_db,
     list_characters,
-    summarize_character,
     top_scenes_for_character,
     upsert_character,
 )
+from services.novel_db.character_summarizer import summarize_character
 
 # ---------------------------------------------------------------------------
 # _parse_main_characters

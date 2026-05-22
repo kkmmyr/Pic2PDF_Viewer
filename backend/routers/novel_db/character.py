@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from routers._deps import log_and_raise_500
 from services.novel_db import with_db
-from services.novel_db.character_summarizer import (
+from services.novel_db.character_db import (
     get_character,
     list_characters,
     top_scenes_for_character,
