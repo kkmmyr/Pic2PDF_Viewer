@@ -5,6 +5,7 @@ import type { BookSummary } from '../features/novel_db/types';
 import type { BuildMode } from '../features/novel_build/types';
 import { useNovelBuildQueue } from './novel_build';
 import { useOcrStatus } from './useOcrStatus';
+import { useBuildTarget } from './useBuildTarget';
 
 export type Tab = 'ocr' | 'build';
 
@@ -21,6 +22,77 @@ function modeLabel(mode?: BuildMode): string {
     if (mode === 'generate_contexts') return 'コンテキスト生成';
     if (mode === 'generate_relations') return '関係グラフ生成';
     return 'Full Build';
+}
+
+function buildUnifiedRows(
+    ocrStatus: ReturnType<typeof useOcrStatus>['status'],
+    status: ReturnType<typeof useNovelBuildQueue>['status'],
+): UnifiedRow[] {
+    const rows: UnifiedRow[] = [];
+
+    if (ocrStatus === 'running') {
+        rows.push({
+            key: 'ocr-running',
+            type: 'OCR',
+            target: '-',
+            state: '実行中',
+            stateClass:
+                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
+        });
+    } else if (ocrStatus === 'error') {
+        rows.push({
+            key: 'ocr-error',
+            type: 'OCR',
+            target: '-',
+            state: 'エラー',
+            stateClass: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+        });
+    }
+
+    if (status.current_job) {
+        const j = status.current_job;
+        rows.push({
+            key: `build-running-${j.id}`,
+            type: modeLabel(j.mode),
+            target: j.target_id ?? '全冊',
+            state: '実行中',
+            stateClass:
+                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
+            time: j.started_at,
+        });
+    }
+
+    for (const j of status.queued_jobs) {
+        rows.push({
+            key: `build-queued-${j.id}`,
+            type: modeLabel(j.mode),
+            target: j.target_id ?? '全冊',
+            state: '待機中',
+            stateClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+            time: j.enqueued_at,
+        });
+    }
+
+    for (const j of status.recent_finished) {
+        const stateLabel =
+            { completed: '完了', failed: '失敗', canceled: 'キャンセル' }[j.state] ?? '完了';
+        const stateClass =
+            {
+                completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
+                failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                canceled: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+            }[j.state] ?? 'bg-gray-100 text-gray-600';
+        rows.push({
+            key: `build-finished-${j.id}`,
+            type: modeLabel(j.mode),
+            target: j.target_id ?? '全冊',
+            state: stateLabel,
+            stateClass,
+            time: j.finished_at,
+        });
+    }
+
+    return rows;
 }
 
 export interface UseNovelManage {
@@ -69,36 +141,37 @@ export function useNovelManage(): UseNovelManage {
     const { status: ocrStatus } = useOcrStatus(ocrEnabled);
 
     const [books, setBooks] = useState<BookSummary[]>([]);
-    // Full Build 用
-    const [allBooks, setAllBooks] = useState(false);
-    const [selectedBook, setSelectedBook] = useState('');
-    const [showBuilt, setShowBuilt] = useState(false);
-    // コンテキスト生成用
-    const [allBooksCtx, setAllBooksCtx] = useState(false);
-    const [selectedBookCtx, setSelectedBookCtx] = useState('');
-    const [showBuiltCtx, setShowBuiltCtx] = useState(false);
-    // 関係グラフ生成用
-    const [allBooksRel, setAllBooksRel] = useState(false);
-    const [selectedBookRel, setSelectedBookRel] = useState('');
 
-    const refreshBooks = useCallback((initSelect = false) => {
-        fetchBooks()
-            .then((data) => {
-                // ocr_done_at または indexed_at があれば Build 対象（pdf_text モードは ocr_done_at を立てない）
-                const buildable = data.filter(
-                    (b) => b.ocr_done_at !== null || b.indexed_at !== null,
-                );
-                setBooks(buildable);
-                if (initSelect) {
-                    const unbuilt = buildable.filter((b) => b.indexed_at === null);
-                    const first = unbuilt.length > 0 ? unbuilt[0].name : '';
-                    setSelectedBook(first);
-                    setSelectedBookCtx(first);
-                    setSelectedBookRel(buildable.length > 0 ? buildable[0].name : '');
-                }
-            })
-            .catch(() => {});
-    }, []);
+    const buildTarget = useBuildTarget('full_build', books, enqueue);
+    const ctxTarget = useBuildTarget('generate_contexts', books, enqueue);
+    const relTarget = useBuildTarget('generate_relations', books, enqueue);
+
+    // 各 setSelected は useState setter のため安定した参照
+    const { setSelected: setBuildSelected } = buildTarget;
+    const { setSelected: setCtxSelected } = ctxTarget;
+    const { setSelected: setRelSelected } = relTarget;
+
+    const refreshBooks = useCallback(
+        (initSelect = false) => {
+            fetchBooks()
+                .then((data) => {
+                    // ocr_done_at または indexed_at があれば Build 対象
+                    const buildable = data.filter(
+                        (b) => b.ocr_done_at !== null || b.indexed_at !== null,
+                    );
+                    setBooks(buildable);
+                    if (initSelect) {
+                        const unbuilt = buildable.filter((b) => b.indexed_at === null);
+                        const first = unbuilt.length > 0 ? unbuilt[0].name : '';
+                        setBuildSelected(first);
+                        setCtxSelected(first);
+                        setRelSelected(buildable.length > 0 ? buildable[0].name : '');
+                    }
+                })
+                .catch(() => {});
+        },
+        [setBuildSelected, setCtxSelected, setRelSelected],
+    );
 
     useEffect(() => {
         refreshBooks(true);
@@ -119,128 +192,6 @@ export function useNovelManage(): UseNovelManage {
         if (tab === 'build') setBuildEnabled(true);
     }, []);
 
-    const filteredBooks = books.filter((b) =>
-        showBuilt ? b.indexed_at !== null : b.indexed_at === null,
-    );
-
-    const filteredBooksCtx = books.filter((b) =>
-        showBuiltCtx ? b.indexed_at !== null : b.indexed_at === null,
-    );
-
-    const handleShowBuiltChange = useCallback(
-        (value: boolean) => {
-            const next = books.filter((b) =>
-                value ? b.indexed_at !== null : b.indexed_at === null,
-            );
-            setShowBuilt(value);
-            setSelectedBook(next.length > 0 ? next[0].name : '');
-        },
-        [books],
-    );
-
-    const handleShowBuiltCtxChange = useCallback(
-        (value: boolean) => {
-            const next = books.filter((b) =>
-                value ? b.indexed_at !== null : b.indexed_at === null,
-            );
-            setShowBuiltCtx(value);
-            setSelectedBookCtx(next.length > 0 ? next[0].name : '');
-        },
-        [books],
-    );
-
-    const handleEnqueueBuild = useCallback(() => {
-        if (allBooks) {
-            void enqueue(null, true, 'full_build');
-        } else {
-            if (!selectedBook) return;
-            void enqueue(selectedBook, false, 'full_build');
-        }
-    }, [allBooks, selectedBook, enqueue]);
-
-    const handleEnqueueCtx = useCallback(() => {
-        if (allBooksCtx) {
-            void enqueue(null, true, 'generate_contexts');
-        } else {
-            if (!selectedBookCtx) return;
-            void enqueue(selectedBookCtx, false, 'generate_contexts');
-        }
-    }, [allBooksCtx, selectedBookCtx, enqueue]);
-
-    const handleEnqueueRelations = useCallback(() => {
-        if (allBooksRel) {
-            void enqueue(null, true, 'generate_relations');
-        } else {
-            if (!selectedBookRel) return;
-            void enqueue(selectedBookRel, false, 'generate_relations');
-        }
-    }, [allBooksRel, selectedBookRel, enqueue]);
-
-    // 全ジョブ履歴行を構築
-    const unifiedRows: UnifiedRow[] = [];
-
-    if (ocrStatus === 'running') {
-        unifiedRows.push({
-            key: 'ocr-running',
-            type: 'OCR',
-            target: '-',
-            state: '実行中',
-            stateClass:
-                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-        });
-    } else if (ocrStatus === 'error') {
-        unifiedRows.push({
-            key: 'ocr-error',
-            type: 'OCR',
-            target: '-',
-            state: 'エラー',
-            stateClass: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-        });
-    }
-
-    if (status.current_job) {
-        const j = status.current_job;
-        unifiedRows.push({
-            key: `build-running-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: '実行中',
-            stateClass:
-                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-            time: j.started_at,
-        });
-    }
-
-    for (const j of status.queued_jobs) {
-        unifiedRows.push({
-            key: `build-queued-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: '待機中',
-            stateClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-            time: j.enqueued_at,
-        });
-    }
-
-    for (const j of status.recent_finished) {
-        const stateLabel =
-            { completed: '完了', failed: '失敗', canceled: 'キャンセル' }[j.state] ?? '完了';
-        const stateClass =
-            {
-                completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-                failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-                canceled: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-            }[j.state] ?? 'bg-gray-100 text-gray-600';
-        unifiedRows.push({
-            key: `build-finished-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: stateLabel,
-            stateClass,
-            time: j.finished_at,
-        });
-    }
-
     return {
         activeTab,
         handleTabChange,
@@ -250,27 +201,30 @@ export function useNovelManage(): UseNovelManage {
         cancel,
         ocrStatus,
         books,
-        allBooks,
-        setAllBooks,
-        selectedBook,
-        setSelectedBook,
-        showBuilt,
-        handleShowBuiltChange,
-        filteredBooks,
-        handleEnqueueBuild,
-        allBooksCtx,
-        setAllBooksCtx,
-        selectedBookCtx,
-        setSelectedBookCtx,
-        showBuiltCtx,
-        handleShowBuiltCtxChange,
-        filteredBooksCtx,
-        handleEnqueueCtx,
-        allBooksRel,
-        setAllBooksRel,
-        selectedBookRel,
-        setSelectedBookRel,
-        handleEnqueueRelations,
-        unifiedRows,
+        // Full Build（buildTarget から展開してインターフェースを維持）
+        allBooks: buildTarget.all,
+        setAllBooks: buildTarget.setAll,
+        selectedBook: buildTarget.selected,
+        setSelectedBook: buildTarget.setSelected,
+        showBuilt: buildTarget.showBuilt,
+        handleShowBuiltChange: buildTarget.handleShowBuiltChange,
+        filteredBooks: buildTarget.filtered,
+        handleEnqueueBuild: buildTarget.handleEnqueue,
+        // コンテキスト生成
+        allBooksCtx: ctxTarget.all,
+        setAllBooksCtx: ctxTarget.setAll,
+        selectedBookCtx: ctxTarget.selected,
+        setSelectedBookCtx: ctxTarget.setSelected,
+        showBuiltCtx: ctxTarget.showBuilt,
+        handleShowBuiltCtxChange: ctxTarget.handleShowBuiltChange,
+        filteredBooksCtx: ctxTarget.filtered,
+        handleEnqueueCtx: ctxTarget.handleEnqueue,
+        // 関係グラフ生成
+        allBooksRel: relTarget.all,
+        setAllBooksRel: relTarget.setAll,
+        selectedBookRel: relTarget.selected,
+        setSelectedBookRel: relTarget.setSelected,
+        handleEnqueueRelations: relTarget.handleEnqueue,
+        unifiedRows: buildUnifiedRows(ocrStatus, status),
     };
 }
