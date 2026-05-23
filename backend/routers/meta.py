@@ -6,6 +6,7 @@
 キー: "{path}/{filename}" の相対パス（path が空の場合は "{filename}"）
 """
 import json
+import os
 import time
 from datetime import datetime
 
@@ -13,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from config import get_dirs_by_source
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
 from services.meta_store import (
     VALID_READ_STATES,
@@ -23,6 +25,7 @@ from services.meta_store import (
     update_meta_locked,
 )
 from utils.dt import JST
+from utils.file_utils import is_image_file
 from utils.path_utils import validate_safe_name, validate_safe_path
 
 router = APIRouter()
@@ -199,6 +202,56 @@ def patch_novel_meta(book_key: str, request: NovelMetaPatchRequest) -> dict:
 
     update_meta_locked("novel", _apply)
     return {"message": "Updated"}
+
+
+@router.post("/meta/init-genre-original")
+def init_genre_original(source: str = Depends(validated_source)) -> dict:
+    """genre 未設定の書籍に genre=オリジナル を一括設定する。
+
+    - meta.db にエントリがあるが genre が空のもの → オリジナルに更新
+    - images/ ディレクトリにあるが meta.db に未登録のもの → エントリを新規追加
+    """
+    dirs = get_dirs_by_source(source)
+    img_root = dirs["img"]
+
+    # images/ 配下の書籍ディレクトリを再帰収集
+    fs_book_ids: set[str] = set()
+    _collect_book_ids(img_root, "", fs_book_ids)
+
+    updated = 0
+    inserted = 0
+
+    def _apply(data: dict) -> None:
+        nonlocal updated, inserted
+        for entry in data.values():
+            if not entry.get("genre"):
+                entry["genre"] = "オリジナル"
+                updated += 1
+        for book_id in fs_book_ids:
+            if book_id not in data:
+                data[book_id] = {"authors": [], "genre": "オリジナル"}
+                inserted += 1
+
+    update_meta_locked(source, _apply)
+    return {"updated": updated, "inserted": inserted}
+
+
+def _collect_book_ids(img_root: str, rel_path: str, result: set[str]) -> None:
+    """images/ を再帰走査し、画像を直接含むディレクトリの book_id を収集する。"""
+    target = os.path.join(img_root, rel_path) if rel_path else img_root
+    if not os.path.isdir(target):
+        return
+    for item in os.listdir(target):
+        item_abs = os.path.join(target, item)
+        if not os.path.isdir(item_abs):
+            continue
+        has_images = any(is_image_file(f) for f in os.listdir(item_abs))
+        if has_images:
+            book_id = f"{rel_path}/{item}.pdf" if rel_path else f"{item}.pdf"
+            result.add(book_id)
+        else:
+            next_rel = f"{rel_path}/{item}" if rel_path else item
+            _collect_book_ids(img_root, next_rel, result)
 
 
 @router.post("/meta/view")

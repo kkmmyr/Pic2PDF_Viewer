@@ -5,11 +5,14 @@ routers.meta の追補ユニットテスト。
 - GET  /api/meta
 - GET  /api/meta/export
 - PATCH /api/meta の genre フィールド・空 list 削除挙動
+- POST /api/meta/init-genre-original
 
 実行方法:
     cd backend
     uv run pytest tests/test_router_meta.py -v
 """
+import os
+
 from services.meta_store import load_meta, save_meta
 
 
@@ -148,4 +151,74 @@ class TestUpdateMetaEntryDeletion:
             "names": ["a.pdf"],
             "source": "doujin",
         })
+        assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# POST /api/meta/init-genre-original
+# ---------------------------------------------------------------------------
+
+def _make_book_in_images(images_dir: str, book_stem: str, subdir: str = "") -> None:
+    """images/{subdir}/{book_stem}/ に画像ファイルを置いて書籍ディレクトリを作る。"""
+    base = os.path.join(images_dir, subdir) if subdir else images_dir
+    book_dir = os.path.join(base, book_stem)
+    os.makedirs(book_dir, exist_ok=True)
+    (open(os.path.join(book_dir, "001.webp"), "wb")).close()
+
+
+class TestInitGenreOriginal:
+    def test_updates_entries_without_genre(self, client, tmp_data_dir):
+        """genre が未設定のエントリは オリジナル に更新され、設定済みは保持される。"""
+        _seed_meta("doujin", {
+            "no_genre.pdf": {"authors": ["A"]},
+            "has_genre.pdf": {"authors": ["B"], "genre": "魔法少女"},
+        })
+
+        res = client.post("/api/meta/init-genre-original?source=doujin")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["updated"] == 1
+
+        meta = load_meta("doujin")
+        assert meta["no_genre.pdf"]["genre"] == "オリジナル"
+        assert meta["has_genre.pdf"]["genre"] == "魔法少女"  # 保持
+
+    def test_inserts_fs_books_not_in_meta(self, client, tmp_data_dir):
+        """images/ にあるが meta 未登録の書籍にエントリを追加する。"""
+        images_dir = tmp_data_dir["IMAGES_DIR"]
+        _make_book_in_images(images_dir, "new_book")
+
+        res = client.post("/api/meta/init-genre-original?source=doujin")
+        assert res.status_code == 200
+        body = res.json()
+        assert body["inserted"] == 1
+
+        meta = load_meta("doujin")
+        assert meta["new_book.pdf"]["genre"] == "オリジナル"
+
+    def test_inserts_subdirectory_books(self, client, tmp_data_dir):
+        """サブディレクトリ内の書籍も正しい book_id で登録される。"""
+        images_dir = tmp_data_dir["IMAGES_DIR"]
+        _make_book_in_images(images_dir, "vol1", subdir="series_a")
+
+        res = client.post("/api/meta/init-genre-original?source=doujin")
+        assert res.status_code == 200
+
+        meta = load_meta("doujin")
+        assert meta["series_a/vol1.pdf"]["genre"] == "オリジナル"
+
+    def test_does_not_overwrite_existing_fs_book_with_genre(self, client, tmp_data_dir):
+        """images/ に存在し、かつ genre 設定済みのエントリは変更しない。"""
+        images_dir = tmp_data_dir["IMAGES_DIR"]
+        _make_book_in_images(images_dir, "precious")
+        _seed_meta("doujin", {"precious.pdf": {"authors": [], "genre": "ファンタジー"}})
+
+        res = client.post("/api/meta/init-genre-original?source=doujin")
+        assert res.status_code == 200
+
+        meta = load_meta("doujin")
+        assert meta["precious.pdf"]["genre"] == "ファンタジー"
+
+    def test_invalid_source_400(self, client, tmp_data_dir):
+        res = client.post("/api/meta/init-genre-original?source=invalid")
         assert res.status_code == 400
