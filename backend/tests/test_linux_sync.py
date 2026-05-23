@@ -8,7 +8,6 @@ from unittest.mock import MagicMock, patch
 
 import services.linux_sync as ls
 
-
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
@@ -63,8 +62,8 @@ class TestSyncPathResolution:
 
         ls.sync_after_generate(["mybook.pdf"], str(images_dir), str(thumbs_dir))
 
-        # SSH が 2 回呼ばれる: images tar / thumbnail send
-        assert len(captured) == 2
+        # SSH が 3 回呼ばれる: images tar / thumbnail send / meta init
+        assert len(captured) == 3
         # images: tar が images/mybook を対象にする（.pdf 付きではない）
         ssh_images_cmd = captured[0]
         assert "tar" in ssh_images_cmd[-1] or "images" in str(captured[0])
@@ -135,5 +134,71 @@ class TestSyncPathResolution:
             str(images_dir), str(thumbs_dir),
         )
 
-        # 各書籍 2 回 (images tar + thumbnail) = 4 回
-        assert call_count["n"] == 4
+        # 各書籍 2 回 (images tar + thumbnail) × 2 冊 + meta init 1 回 = 5 回
+        assert call_count["n"] == 5
+
+
+# ---------------------------------------------------------------------------
+# _init_meta_on_linux — meta.db 初期化スクリプトの検証
+# ---------------------------------------------------------------------------
+
+class TestInitMetaOnLinux:
+    def test_sends_python_script_via_stdin(self, monkeypatch):
+        """SSH 経由で python3 に書籍名リストを含むスクリプトを送信する。"""
+        monkeypatch.setattr(ls, "_SYNC_ENABLED", True)
+
+        captured = {}
+
+        def _fake_run(cmd, input=None, **kw):
+            captured["cmd"] = cmd
+            captured["input"] = input
+            return MagicMock(returncode=0)
+
+        monkeypatch.setattr("subprocess.run", _fake_run)
+
+        ls._init_meta_on_linux(["book1.pdf", "book2.pdf"])
+
+        # python3 へ stdin でスクリプトを渡す
+        assert captured["cmd"][-1] == "python3"
+        script = captured["input"].decode("utf-8")
+        # 書籍名・INSERT 文・オリジナルが含まれる
+        assert "book1.pdf" in script
+        assert "book2.pdf" in script
+        assert "INSERT OR IGNORE" in script
+        assert "オリジナル" in script or "\\u30aa\\u30ea\\u30b8\\u30ca\\u30eb" in script
+
+    def test_ssh_error_raises(self, monkeypatch):
+        """SSH が失敗した場合は RuntimeError を投げる。"""
+        monkeypatch.setattr(ls, "_SYNC_ENABLED", True)
+
+        def _fake_run(cmd, **kw):
+            return MagicMock(returncode=1, stderr=b"connection refused")
+
+        monkeypatch.setattr("subprocess.run", _fake_run)
+
+        import pytest
+        with pytest.raises(RuntimeError):
+            ls._init_meta_on_linux(["book.pdf"])
+
+    def test_meta_init_error_does_not_abort_sync(self, tmp_path, monkeypatch):
+        """meta init が失敗しても sync_after_generate 全体は成功扱いになる。"""
+        monkeypatch.setattr(ls, "_SYNC_ENABLED", True)
+
+        images_dir = tmp_path / "images"
+        thumbs_dir = tmp_path / "thumbnails"
+        _make_dir(images_dir / "book")
+        _make_file(thumbs_dir / "book.jpg")
+
+        call_count = {"n": 0}
+
+        def _fake_run(cmd, **kw):
+            call_count["n"] += 1
+            # 3 回目（meta init）は失敗させる
+            if call_count["n"] == 3:
+                return MagicMock(returncode=1, stderr=b"error")
+            return MagicMock(returncode=0)
+
+        monkeypatch.setattr("subprocess.run", _fake_run)
+
+        # 例外なく完了する
+        ls.sync_after_generate(["book.pdf"], str(images_dir), str(thumbs_dir))

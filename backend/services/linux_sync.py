@@ -2,7 +2,8 @@
 
 Windows バックエンドで生成した画像・サムネイルを
 SSH + Python tarfile を使って Linux サーバーへ転送する。
-meta.db はサーバー側が正のため送信しない。
+meta.db はサーバー側が正のため全体は送信しないが、
+新規書籍の初期エントリ（genre=オリジナル）のみ SSH 経由で INSERT する。
 
 設定 (環境変数):
   LINUX_SYNC_ENABLED  - "true" の場合のみ同期を実行（デフォルト: false）
@@ -11,6 +12,7 @@ meta.db はサーバー側が正のため送信しない。
   LINUX_SYNC_DEST_DIR - Linux 側のデータルートパス（デフォルト: /opt/pic2pdf-viewer/data）
 """
 import io
+import json
 import os
 import subprocess
 import tarfile
@@ -70,14 +72,46 @@ def _send_file(src_file: Path, dest_dir: str) -> None:
     logger.info("linux_sync: sent %s → %s:%s", src_file.name, _LINUX_HOST, dest_path)
 
 
+def _init_meta_on_linux(book_names: list[str]) -> None:
+    """Linux の meta.db に新規書籍の初期エントリ（genre=オリジナル）を INSERT する。
+
+    既存エントリは変更しない（INSERT OR IGNORE）。
+    Python スクリプトを SSH 経由で stdin に流し込むことでシェルクォート問題を回避する。
+    """
+    db_path = f"{_LINUX_DEST}/meta.db"
+    books_json = json.dumps(book_names, ensure_ascii=False)
+    py_script = (
+        "import sqlite3, json\n"
+        f"books = json.loads({books_json!r})\n"
+        f"conn = sqlite3.connect({db_path!r})\n"
+        "for b in books:\n"
+        "    conn.execute(\n"
+        "        'INSERT OR IGNORE INTO books_meta'\n"
+        "        ' (source, book_id, authors, genre)'\n"
+        "        \" VALUES ('doujin', ?, '[]', '\\u30aa\\u30ea\\u30b8\\u30ca\\u30eb')\",\n"
+        "        (b,),\n"
+        "    )\n"
+        "conn.commit()\n"
+        "conn.close()\n"
+    )
+    result = subprocess.run(
+        ["ssh", f"{_LINUX_USER}@{_LINUX_HOST}", "python3"],
+        input=py_script.encode("utf-8"),
+        capture_output=True,
+        timeout=_SSH_TIMEOUT,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.decode(errors="replace").strip())
+    logger.info("linux_sync: meta init done for %d book(s)", len(book_names))
+
+
 def sync_after_generate(
     book_names: list[str],
     images_dir: str,
     thumbnails_dir: str,
 ) -> None:
-    """生成完了後に新規書籍の画像・サムネイルを Linux へ同期する。
+    """生成完了後に新規書籍の画像・サムネイルを Linux へ同期し、meta の初期エントリを書き込む。
 
-    meta.db はサーバー側が正とするため送信しない。
     LINUX_SYNC_ENABLED が true でない場合は即リターン。
     エラーが発生しても例外は握り潰してログに残す（生成ジョブには影響させない）。
     """
@@ -102,5 +136,10 @@ def sync_after_generate(
             _send_file(thumbs_root / f"{stem}.jpg", dest_thumbs)
         except Exception as exc:
             logger.error("linux_sync: thumbnails sync failed [%s]: %s", book_name, exc)
+
+    try:
+        _init_meta_on_linux(book_names)
+    except Exception as exc:
+        logger.error("linux_sync: meta init failed: %s", exc)
 
     logger.info("linux_sync: sync complete")
