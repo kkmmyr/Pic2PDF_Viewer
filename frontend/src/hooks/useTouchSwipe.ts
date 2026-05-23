@@ -36,5 +36,11 @@ export function useTouchSwipe({ onSwipeLeft, onSwipeRight }: UseTouchSwipeProps)
         [onSwipeLeft, onSwipeRight],
     );
 
-    return { onTouchStart, onTouchEnd };
+    // ブラウザがスクロール等でタッチを横取りした際にリセット
+    const onTouchCancel = useCallback(() => {
+        startXRef.current = null;
+        startYRef.current = null;
+    }, []);
+
+    return { onTouchStart, onTouchEnd, onTouchCancel };
 }

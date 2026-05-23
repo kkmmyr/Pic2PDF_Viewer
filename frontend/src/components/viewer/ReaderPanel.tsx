@@ -85,7 +85,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
         handleClose,
     } = useReaderState(props);
 
-    const { onTouchStart, onTouchEnd } = useTouchSwipe({
+    const { onTouchStart, onTouchEnd, onTouchCancel } = useTouchSwipe({
         onSwipeLeft: direction === 'rtl' ? handlePrev : handleNext,
         onSwipeRight: direction === 'rtl' ? handleNext : handlePrev,
     });
@@ -93,7 +93,11 @@ export function ReaderPanel(props: ReaderPanelProps) {
     // 最終ページ（関連書籍確認画面）では「戻る方向」のスワイプのみ前ページへ戻る。
     // RTL では左スワイプ、LTR では右スワイプが「戻る」方向。進む操作は不要のため no-op。
     const noop = useCallback(() => {}, []);
-    const { onTouchStart: onRelatedTouchStart, onTouchEnd: onRelatedTouchEnd } = useTouchSwipe({
+    const {
+        onTouchStart: onRelatedTouchStart,
+        onTouchEnd: onRelatedTouchEnd,
+        onTouchCancel: onRelatedTouchCancel,
+    } = useTouchSwipe({
         onSwipeLeft: direction === 'rtl' ? handlePrev : noop,
         onSwipeRight: direction === 'rtl' ? noop : handlePrev,
     });
@@ -172,6 +176,7 @@ export function ReaderPanel(props: ReaderPanelProps) {
                     className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
                     onTouchStart={onRelatedTouchStart}
                     onTouchEnd={onRelatedTouchEnd}
+                    onTouchCancel={onRelatedTouchCancel}
                 >
                     <RelatedBooksPage
                         related={relatedBooks}
@@ -186,9 +191,11 @@ export function ReaderPanel(props: ReaderPanelProps) {
                 >
                     <div
                         className="min-h-full flex items-center justify-center p-4 w-full"
+                        style={{ touchAction: 'pan-y' }}
                         onClick={handleContentClick}
                         onTouchStart={onTouchStart}
                         onTouchEnd={onTouchEnd}
+                        onTouchCancel={onTouchCancel}
                     >
                         <ReaderPageView
                             pageNumber={pageNumber}
