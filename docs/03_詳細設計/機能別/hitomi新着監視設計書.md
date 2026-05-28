@@ -2,7 +2,7 @@
 
 特定作者の新着ギャラリーを定期監視して、ライブラリ画面から確認・hitomi.la へのリンクで遷移できる機能の設計書。本機能は **既存の Pic2PDF_Viewer 本体機能とは独立** しており、設計上も実行プロセスとしても疎結合に組む。本機能に関する仕様・実装・運用はすべて本ファイルに集約する。
 
-最終更新: 2026-05-01（Task Scheduler 登録完了を反映）
+最終更新: 2026-05-28（定期実行を Windows Task Scheduler → Linux systemd timer に移行）
 
 ---
 
@@ -35,7 +35,8 @@ hitomi.la に登録された特定作者の **新着ギャラリーを自動的�
 ### 2.1. 全体構成
 
 ```
-┌─ Windows Task Scheduler (週1回 起動)
+┌─ Linux systemd timer (毎日 03:00 起動)
+│    hitomi-monitor.timer → hitomi-monitor.service (oneshot)
 │
 └→ [hitomi_monitor.py]  ← 単発実行・終了
       │
@@ -44,21 +45,28 @@ hitomi.la に登録された特定作者の **新着ギャラリーを自動的�
       ├─ 差分検出
       ├─ /galleries/<id>.js でメタデータ取得
       └─ new_arrivals.json / state.json に書き出し
+         (/opt/pic2pdf-viewer/backend/data/hitomi/)
 
 [FastAPI] ──(JSON ファイル読込のみ)──→ [新着画面 React]
                                        └→ hitomi.la/<id>.html へリンク
 ```
 
+> **旧構成メモ**: 2026-05-01〜2026-05-28 は Windows Task Scheduler（週1・月曜03:00）で動作していた。
+> Linux サーバー常時稼働により systemd timer に移行。Windows 側タスクは削除済み。
+
 ### 2.2. 設計判断（Why）
 
 - **既存 FastAPI に組み込まない理由:**
-    - 監視を動かすにはバックエンド常駐が必要 → 個人用の起動運用と相性が悪い
     - ポーリング側でリソースリーク・ハングが起きると Web 全体に波及する
     - 1 回の監視はミリ秒で完了する単発タスクで、cron 的実行と相性が極めて良い
 - **JSON ファイル経由で連携する理由:**
     - プロセス間 IPC 不要、最小コスト
     - スクリプトとバックエンドのライフサイクルが完全独立（片方が死んでも片方は動く）
     - state ファイルのバージョン管理 / バックアップが容易
+- **Linux systemd timer を選んだ理由（2026-05-28）:**
+    - Linux サーバーが常時稼働中 → Windows PC のスリープ・シャットダウンに影響されない
+    - `new_arrivals.json` / `state.json` を FastAPI と同一ホストで読み書きできる
+    - `Persistent=true` で起動遅延時の missed run を自動補完できる
 
 ### 2.3. NOZOMI を使う理由
 
@@ -567,38 +575,64 @@ JS ファイル冒頭に `var galleryinfo = {...};` の形式で JSON が埋め�
 
 ---
 
-## 10. 運用（Task Scheduler 登録）
+## 10. 運用（Linux systemd timer）
 
-### 10.1. 動作確認（初回）
+systemd ユニットファイルは `deploy/hitomi-monitor.service` / `deploy/hitomi-monitor.timer` に格納。
+`deploy_to_linux.sh` でサーバーへ転送される。
 
-```powershell
-cd D:\61.tool\Pic2PDF_Viewer\backend
-uv run python -m tools.hitomi_monitor
+### 10.1. 初回登録（SSH 接続後に一度だけ実行）
+
+```bash
+ssh amashio@medaroserver
+
+# ユニットファイルをコピー
+sudo cp /opt/pic2pdf-viewer/deploy/hitomi-monitor.service /etc/systemd/system/
+sudo cp /opt/pic2pdf-viewer/deploy/hitomi-monitor.timer   /etc/systemd/system/
+
+# 有効化・起動
+sudo systemctl daemon-reload
+sudo systemctl enable --now hitomi-monitor.timer
+
+# 登録確認
+systemctl list-timers hitomi-monitor.timer
 ```
 
-正常終了するとコンソールに「監視完了: 新着 N 件、エラー 0 件」のような出力。`backend/data/hitomi/state.json` に `last_run_at` が記録される。
+### 10.2. 動作確認（手動実行）
 
-### 10.2. タスクスケジューラへの登録（週 1 回）
+```bash
+# タイマーを待たず今すぐ実行
+sudo systemctl start hitomi-monitor.service
 
-1. **タスクスケジューラ** → 「タスクの作成」
-2. **全般** タブ
-    - 名前: `Pic2PDF Hitomi Monitor`
-    - 「ユーザーがログオンしているかどうかにかかわらず実行する」をチェック
-3. **トリガー** タブ → 新規
-    - 「毎週」、月曜 03:00 等
-4. **操作** タブ → 新規
-    - プログラム: `D:\61.tool\Pic2PDF_Viewer\backend\.venv\Scripts\python.exe`（`uv run` 経由でも可）
-    - 引数: `-m tools.hitomi_monitor`
-    - 開始 (作業フォルダ): `D:\61.tool\Pic2PDF_Viewer\backend`
-5. **条件** タブ
-    - 「コンピューターが AC 電源で動作している場合のみタスクを開始する」のチェックは任意
-6. 保存後、右クリック「実行」で動作確認
+# ログ確認
+tail -f /opt/pic2pdf-viewer/logs/hitomi-monitor.log
+```
 
-### 10.3. ヘルス確認
+### 10.3. ユニットファイル更新後の反映
+
+`deploy_to_linux.sh` 実行後、SSH でリロードする。
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl restart hitomi-monitor.timer
+```
+
+### 10.4. ヘルス確認
+
+```bash
+# タイマー次回実行時刻・最終実行の確認
+systemctl list-timers hitomi-monitor.timer
+
+# 最新ログ
+tail -50 /opt/pic2pdf-viewer/logs/hitomi-monitor.log
+```
 
 - バックエンドの新着画面に「最終実行: YYYY-MM-DD HH:MM / ステータス: ok」と表示される
-- 1 週間以上 `last_run_at` が更新されない場合、タスクスケジューラの履歴を確認
 - `last_run_status: error` が続く場合は NOZOMI URL の仕様変更を疑う（§8 を参照して再検証）
+
+### 10.5. ⚠️ Windows Task Scheduler について
+
+2026-05-28 以降、Windows 側の `Pic2PDF Hitomi Monitor` タスクは**削除済み**。
+二重実行を避けるためタスクスケジューラから削除すること（削除済みなら無視）。
 
 ---
 

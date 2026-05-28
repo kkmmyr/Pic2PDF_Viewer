@@ -1,0 +1,10 @@
+[Unit]
+Description=Pic2PDF meta2.db daily backup timer
+Requires=backup-meta.service
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

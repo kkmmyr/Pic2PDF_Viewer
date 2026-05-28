@@ -37,8 +37,12 @@ tar czf - -C "${SRC}/frontend" dist \
 tar czf - -C "${SRC}" deploy \
     | ssh "${LINUX}" "tar xzf - -C '${APP_ROOT}'"
 
-# ---- 3. サービス再起動 ----
-echo "=== [3/3] Restarting pic2pdf-viewer service ==="
+# ---- 3. デプロイ前バックアップ ----
+echo "=== [3/4] Backing up meta2.db ==="
+ssh "${LINUX}" "bash '${APP_ROOT}/deploy/backup-meta.sh' \$(date +%Y-%m-%d_%H%M%S)_pre-deploy"
+
+# ---- 4. サービス再起動 ----
+echo "=== [4/4] Restarting pic2pdf-viewer service ==="
 ssh "${LINUX}" "sudo systemctl restart pic2pdf-viewer && sudo systemctl status pic2pdf-viewer"
 
 echo ""

@@ -1,0 +1,13 @@
+[Unit]
+Description=Pic2PDF Hitomi Monitor (oneshot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=amashio
+WorkingDirectory=/opt/pic2pdf-viewer/backend
+EnvironmentFile=/opt/pic2pdf-viewer/.env
+ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/python -m tools.hitomi_monitor
+StandardOutput=append:/opt/pic2pdf-viewer/logs/hitomi-monitor.log
+StandardError=append:/opt/pic2pdf-viewer/logs/hitomi-monitor.log

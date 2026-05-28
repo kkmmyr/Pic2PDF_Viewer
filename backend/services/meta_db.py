@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS group_pins (
 def _db_path() -> str:
     """DATA_DIR を呼び出し時に解決する（monkeypatch 対応）。"""
     import services.meta_db as _self
-    return os.path.join(_self.DATA_DIR, "meta.db")
+    return os.path.join(_self.DATA_DIR, "meta2.db")
 
 
 def connect() -> sqlite3.Connection:
