@@ -4,6 +4,8 @@
 
 ## uv のインストール
 
+### Windows
+
 PowerShell（管理者権限不要）：
 
 ```powershell
@@ -16,11 +18,19 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 winget install --id=astral-sh.uv -e
 ```
 
-インストール確認：
+### Mac
+
+```bash
+brew install uv
+```
+
+### インストール確認
 
 ```bash
 uv --version
 ```
+
+> Mac でのフル開発環境セットアップは `Mac開発環境セットアップ.md` を参照。
 
 ## プロジェクト構成
 
