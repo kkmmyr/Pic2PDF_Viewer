@@ -1,0 +1,25 @@
+# テキストファイルの行末を LF に統一（Windows/Mac 共通）
+* text=auto eol=lf
+
+# Windows バッチファイルは CRLF を維持（cmd.exe が LF のみだと誤動作する場合がある）
+*.bat eol=crlf
+*.cmd eol=crlf
+
+# バイナリファイル（行末変換しない）
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.db  binary
+*.sqlite binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.gz  binary
+*.pkl binary
+*.npy binary

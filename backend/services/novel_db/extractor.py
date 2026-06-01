@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import subprocess
 from collections.abc import Iterator
@@ -19,10 +20,13 @@ import fitz
 
 _NEWLINE_RE = re.compile(r"\n+")
 
-_OCR_VENV_PYTHON = os.environ.get(
-    "OCR_PYTHON",
-    r"D:\61.tool\common\ocr\venv\Scripts\python.exe",
+# Windows: Scripts/python.exe、それ以外: bin/python（OCR_PYTHON 環境変数で上書き可能）
+_DEFAULT_OCR_PYTHON = (
+    r"D:\61.tool\common\ocr\venv\Scripts\python.exe"
+    if platform.system() == "Windows"
+    else str(Path.home() / ".venv" / "ocr" / "bin" / "python")
 )
+_OCR_VENV_PYTHON = os.environ.get("OCR_PYTHON", _DEFAULT_OCR_PYTHON)
 _OCR_WORKER_SCRIPT = Path(__file__).parent / "ocr_worker.py"
 
 
