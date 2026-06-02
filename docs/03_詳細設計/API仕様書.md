@@ -649,15 +649,16 @@ novel ソース 1 冊のメタデータを部分更新する。`{book_key}` は 
 ## §4. PDF生成
 
 ### §4.1 `POST /api/generate`
-指定ディレクトリ内の画像から PDF を生成する（doujin ソースは image-only モードのため PDF 生成をスキップし `data/doujin/images/` に WebP を配置する）。comic / novel ソースは PDF を `data/{source}/pdfs/` に保存する。`/pdfs` 静的マウントは廃止済み（[ADR-0003](../02_基本設計/ADR/0003_generated-image-only-mode.md)）。
+サーバー設定の入力ディレクトリ（`DOUJIN_INPUT_DIR`、既定 `data/doujin/input/`）内の画像から PDF を生成する（doujin ソースは image-only モードのため PDF 生成をスキップし `data/doujin/images/` に WebP を配置する）。`/pdfs` 静的マウントは廃止済み（[ADR-0003](../02_基本設計/ADR/0003_generated-image-only-mode.md)）。
 
-**リクエストボディ**:
-```json
-{
-  "source_dir": "C:\\Absolute\\Path\\To\\Images"
-}
-```
+> **入力ディレクトリの配置方法**: Linux サーバー上の `DOUJIN_INPUT_DIR` を Samba 共有（`\\medaroserver\pic2pdf-input`）でネットワークドライブとして公開しており、Windows から直接ファイルを置ける（[Samba セットアップ手順](../../docs/04_環境構築/Linux_Sambaセットアップ.md)）。
+
+**リクエストボディ**: なし（ボディ不要）
+
 - 圧縮品質を指定したい場合は、生成後に `POST /api/batch_compress` を別途呼び出す（生成APIは品質パラメータを受け付けない）
+
+**エラー**:
+- `503 Service Unavailable` — `DOUJIN_INPUT_DIR` が存在しない場合
 
 **レスポンス**:
 ```json
@@ -698,10 +699,9 @@ novel ソース 1 冊のメタデータを部分更新する。`{book_key}` は 
 ---
 
 ### §4.3 `GET /api/status`
-PDF生成処理の進捗状況を取得する。
+サーバー設定の入力ディレクトリ（`DOUJIN_INPUT_DIR`）を対象に PDF 生成処理の進捗状況を取得する。
 
-**クエリパラメータ**:
-- `source_dir` — スキャン対象のソースディレクトリ
+**クエリパラメータ**: なし
 
 **レスポンス**:
 ```json
