@@ -48,7 +48,6 @@ describe('useGenerateJob', () => {
         expect(result.current.currentJob).toBeNull();
         expect(result.current.isGenerating).toBe(false);
         expect(result.current.isRestoredJob).toBe(false);
-        expect(result.current.restoredSourceDir).toBeNull();
     });
 
     it('startJob で localStorage に保存され、currentJob が pending 状態になる', () => {
@@ -56,20 +55,20 @@ describe('useGenerateJob', () => {
             wrapper: createWrapper(),
         });
         act(() => {
-            result.current.startJob('jid-1', '/some/dir');
+            result.current.startJob('jid-1');
         });
         expect(result.current.currentJob?.job_id).toBe('jid-1');
         expect(result.current.currentJob?.status).toBe('pending');
         expect(result.current.isGenerating).toBe(true);
 
         const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-        expect(stored).toEqual({ job_id: 'jid-1', sourceDir: '/some/dir' });
+        expect(stored).toEqual({ job_id: 'jid-1' });
     });
 
     it('localStorage に既存ジョブがあるとマウント時に復元される（isRestoredJob=true）', () => {
         localStorage.setItem(
             STORAGE_KEY,
-            JSON.stringify({ job_id: 'restored', sourceDir: '/restored/dir' }),
+            JSON.stringify({ job_id: 'restored' }),
         );
         const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
             wrapper: createWrapper(),
@@ -77,11 +76,10 @@ describe('useGenerateJob', () => {
         expect(result.current.currentJob?.job_id).toBe('restored');
         expect(result.current.isGenerating).toBe(true);
         expect(result.current.isRestoredJob).toBe(true);
-        expect(result.current.restoredSourceDir).toBe('/restored/dir');
     });
 
     it('clearCurrentJob で localStorage と state が消える', () => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ job_id: 'jid-1', sourceDir: '/x' }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ job_id: 'jid-1' }));
         const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
             wrapper: createWrapper(),
         });
@@ -103,7 +101,7 @@ describe('useGenerateJob', () => {
             wrapper: createWrapper(),
         });
         act(() => {
-            result.current.startJob('jid-1', '/x');
+            result.current.startJob('jid-1');
         });
 
         await waitFor(() => expect(onCompleted).toHaveBeenCalledTimes(1));
@@ -121,7 +119,7 @@ describe('useGenerateJob', () => {
             wrapper: createWrapper(),
         });
         act(() => {
-            result.current.startJob('jid-1', '/x');
+            result.current.startJob('jid-1');
         });
 
         await waitFor(() => expect(onFailed).toHaveBeenCalledTimes(1));
@@ -138,7 +136,7 @@ describe('useGenerateJob', () => {
             wrapper: createWrapper(),
         });
         act(() => {
-            result.current.startJob('jid-1', '/x');
+            result.current.startJob('jid-1');
         });
 
         await waitFor(() => expect(result.current.currentJob).toBeNull());
@@ -154,7 +152,7 @@ describe('useGenerateJob', () => {
             wrapper: createWrapper(),
         });
         act(() => {
-            result.current.startJob('jid-1', '/x');
+            result.current.startJob('jid-1');
         });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());

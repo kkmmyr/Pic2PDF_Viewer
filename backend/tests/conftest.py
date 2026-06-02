@@ -39,6 +39,7 @@ def tmp_data_dir(tmp_path, monkeypatch):
         "THUMBNAIL_DIR": str(main / "thumbnails"),
         "IMAGES_DIR": str(main / "images"),
         "COMPLETE_DIR": str(main / "complete"),
+        "DOUJIN_INPUT_DIR": str(main / "input"),
         "KINDLE_DIR": str(kindle),
         "KINDLE_PDF_DIR": str(kindle / "pdfs"),
         "KINDLE_THUMBNAIL_DIR": str(kindle / "thumbnails"),
@@ -92,6 +93,7 @@ def _patch_imported_paths(monkeypatch, paths: dict) -> None:
         ("routers.generate", "THUMBNAIL_DIR", paths["THUMBNAIL_DIR"]),
         ("routers.generate", "IMAGES_DIR", paths["IMAGES_DIR"]),
         ("routers.generate", "COMPLETE_DIR", paths["COMPLETE_DIR"]),
+        ("routers.generate", "DOUJIN_INPUT_DIR", paths["DOUJIN_INPUT_DIR"]),
         # novel_db: 各モジュールが `from config import` でキャプチャしている定数
         ("services.novel_db.connection", "NOVEL_DB_DIR", paths["NOVEL_DB_DIR"]),
         ("services.novel_db.connection", "NOVEL_DB_PATH", paths["NOVEL_DB_PATH"]),

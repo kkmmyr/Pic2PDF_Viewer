@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { FolderSearch, Loader2, Zap } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
 import generateApiClient from '../config/generate_api_client';
@@ -10,11 +10,9 @@ import { Alert } from '../components/ui/Alert';
 import { errorMessage } from '../utils/error';
 import type { GenerateJob, GenerateFailedItem } from '../types';
 
-const DEFAULT_SOURCE_DIR = import.meta.env.VITE_DEFAULT_SOURCE_DIR || '';
 const DEFAULT_QUALITY = 50;
 
 export default function GeneratorPage() {
-    const [sourceDir, setSourceDir] = useState(DEFAULT_SOURCE_DIR);
     const [isCompressing, setIsCompressing] = useState(false);
     const [result, setResult] = useState<{
         message: string;
@@ -35,29 +33,23 @@ export default function GeneratorPage() {
         setError(job.error ?? '生成に失敗しました。');
     }, []);
 
-    const { currentJob, restoredSourceDir, isGenerating, isRestoredJob, startJob } = useGenerateJob(
+    const { currentJob, isGenerating, isRestoredJob, startJob } = useGenerateJob(
         onCompleted,
         onFailed,
     );
 
-    useEffect(() => {
-        if (restoredSourceDir) setSourceDir(restoredSourceDir);
-    }, [restoredSourceDir]);
-
     const isLoading = isGenerating || isCompressing;
 
-    const { statusItems, refetch: fetchStatus } = usePdfStatus(sourceDir, isLoading);
+    const { statusItems, refetch: fetchStatus } = usePdfStatus(isLoading);
 
     const handleGenerate = async () => {
-        if (!sourceDir) return;
         setError(null);
         setResult(null);
         try {
             const data = await generateApiClient.post<unknown, { job_id: string; status: string }>(
                 API_ENDPOINTS.GENERATE,
-                { source_dir: sourceDir },
             );
-            startJob(data.job_id, sourceDir);
+            startJob(data.job_id);
         } catch (err: unknown) {
             setError(errorMessage(err, '生成に失敗しました。'));
         }
@@ -95,38 +87,14 @@ export default function GeneratorPage() {
                             variant="warning"
                             icon={<Loader2 size={15} className="animate-spin shrink-0 mt-0.5" />}
                         >
-                            前回の生成ジョブが実行中です —{' '}
-                            <span className="font-medium truncate">{restoredSourceDir}</span>
+                            前回の生成ジョブが実行中です
                         </Alert>
                     )}
 
-                    {/* Source Directory Input */}
-                    <div>
-                        <label
-                            htmlFor="sourceDir"
-                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
-                        >
-                            変換元フォルダのパス
-                        </label>
-                        <div className="flex gap-2">
-                            <input
-                                type="text"
-                                id="sourceDir"
-                                value={sourceDir}
-                                onChange={(e) => setSourceDir(e.target.value)}
-                                placeholder="C:\画像フォルダ\のパスを入力"
-                                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none"
-                            />
-                            <button
-                                type="button"
-                                onClick={fetchStatus}
-                                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 transition-colors"
-                            >
-                                状態確認
-                            </button>
-                        </div>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            WebP 画像が入ったフォルダの絶対パスを入力してください。
+                    {/* 入力ディレクトリ説明 */}
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                        <p className="text-sm text-blue-800 dark:text-blue-200">
+                            サーバーの入力フォルダ（Samba 共有）に WebP 画像または ZIP を配置してから生成してください。
                         </p>
                     </div>
 
@@ -159,7 +127,7 @@ export default function GeneratorPage() {
                         <button
                             type="button"
                             onClick={handleGenerate}
-                            disabled={isLoading || !sourceDir}
+                            disabled={isLoading}
                             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 text-white font-medium text-base rounded-lg transition-colors"
                         >
                             {isGenerating ? (
@@ -173,6 +141,15 @@ export default function GeneratorPage() {
                                     スキャン &amp; 生成
                                 </>
                             )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={fetchStatus}
+                            disabled={isLoading}
+                            className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 transition-colors"
+                        >
+                            状態確認
                         </button>
 
                         <div className="relative">

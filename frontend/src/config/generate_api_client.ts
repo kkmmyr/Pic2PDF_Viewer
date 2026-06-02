@@ -1,14 +1,11 @@
 /**
- * Generator 専用 API クライアント。
- *
- * VITE_GENERATE_API_URL が設定されている場合（Linux 環境から Windows バックエンドを
- * 呼び出す場合など）はそちらを使用し、未設定時は通常の同一オリジン API に fallback する。
+ * Generator 専用 API クライアント。同一オリジンの backend へ送信する。
  */
 import axios, { AxiosError } from 'axios';
 import { API_CONFIG as API_TIMEOUT } from '../constants';
 import { ApiError } from './api_client';
 
-const GENERATE_BASE_URL: string = import.meta.env.VITE_GENERATE_API_URL ?? '';
+const GENERATE_BASE_URL: string = '';
 
 const generateApiClient = axios.create({
     baseURL: GENERATE_BASE_URL,

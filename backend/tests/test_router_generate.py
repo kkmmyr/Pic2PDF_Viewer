@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.generate のユニットテスト。
 
 PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証する。
@@ -19,9 +19,11 @@ from services.pdf_generator import GenerateResult
 # ---------------------------------------------------------------------------
 
 class TestGenerate:
-    def test_invalid_source_dir_returns_400(self, client, tmp_data_dir):
-        res = client.post("/api/generate", json={"source_dir": "/nope/does/not/exist/qwerty"})
-        assert res.status_code == 400
+    def test_missing_input_dir_returns_503(self, client, tmp_data_dir, monkeypatch):
+        import routers.generate as rg
+        monkeypatch.setattr(rg, "DOUJIN_INPUT_DIR", "/nope/does/not/exist/qwerty")
+        res = client.post("/api/generate")
+        assert res.status_code == 503
 
     def test_returns_job_id_and_pending(self, client, tmp_data_dir, monkeypatch):
         # scan_and_generate を即終了するモックに差し替え
@@ -30,10 +32,7 @@ class TestGenerate:
             lambda *a, **kw: GenerateResult(generated=[], failed_items=[]),
         )
 
-        src = os.path.join(tmp_data_dir["root"], "src")
-        os.makedirs(src)
-
-        res = client.post("/api/generate", json={"source_dir": src})
+        res = client.post("/api/generate")
         assert res.status_code == 200
         body = res.json()
         assert "job_id" in body
@@ -46,10 +45,7 @@ class TestGenerate:
             lambda *a, **kw: GenerateResult(generated=["new1.pdf", "new2.pdf"], failed_items=[]),
         )
 
-        src = os.path.join(tmp_data_dir["root"], "src")
-        os.makedirs(src)
-
-        res = client.post("/api/generate", json={"source_dir": src})
+        res = client.post("/api/generate")
         job_id = res.json()["job_id"]
 
         # ジョブ完了を待つ
@@ -73,10 +69,7 @@ class TestGenerate:
             lambda *a, **kw: GenerateResult(generated=["existing.pdf"], failed_items=[]),
         )
 
-        src = os.path.join(tmp_data_dir["root"], "src")
-        os.makedirs(src)
-
-        res = client.post("/api/generate", json={"source_dir": src})
+        res = client.post("/api/generate")
         job_id = res.json()["job_id"]
         for _ in range(50):
             if client.get(f"/api/generate/job/{job_id}").json()["status"] == "completed":
@@ -92,10 +85,7 @@ class TestGenerate:
             raise RuntimeError("boom!")
         monkeypatch.setattr("routers.generate.scan_and_generate", _boom)
 
-        src = os.path.join(tmp_data_dir["root"], "src")
-        os.makedirs(src)
-
-        res = client.post("/api/generate", json={"source_dir": src})
+        res = client.post("/api/generate")
         job_id = res.json()["job_id"]
         for _ in range(50):
             r = client.get(f"/api/generate/job/{job_id}").json()
@@ -113,10 +103,8 @@ class TestGenerate:
                 failed_items=[("bad.zip", "Corrupt zip")],
             ),
         )
-        src = os.path.join(tmp_data_dir["root"], "src")
-        os.makedirs(src)
 
-        res = client.post("/api/generate", json={"source_dir": src})
+        res = client.post("/api/generate")
         job_id = res.json()["job_id"]
         for _ in range(50):
             r = client.get(f"/api/generate/job/{job_id}").json()
@@ -142,38 +130,40 @@ class TestGetGenerateJob:
 # ---------------------------------------------------------------------------
 
 class TestStatus:
-    def test_empty_for_missing_dir(self, client, tmp_data_dir):
-        res = client.get("/api/status?source_dir=/nope/qwerty/zzz")
+    def test_empty_when_input_dir_missing(self, client, tmp_data_dir, monkeypatch):
+        import routers.generate as rg
+        monkeypatch.setattr(rg, "DOUJIN_INPUT_DIR", "/nope/qwerty/zzz")
+        res = client.get("/api/status")
         assert res.status_code == 200
         assert res.json() == {"items": []}
 
     def test_lists_folders_with_webp(self, client, tmp_data_dir, make_webp):
-        src = os.path.join(tmp_data_dir["root"], "src")
-        make_webp(os.path.join(src, "alpha", "1.webp"))
-        make_webp(os.path.join(src, "beta", "1.webp"))
+        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
+        make_webp(os.path.join(input_dir, "alpha", "1.webp"))
+        make_webp(os.path.join(input_dir, "beta", "1.webp"))
 
-        res = client.get(f"/api/status?source_dir={src}")
+        res = client.get("/api/status")
         items = res.json()["items"]
         names = {(it["name"], it["type"]) for it in items}
         assert ("alpha", "folder") in names
         assert ("beta", "folder") in names
 
     def test_status_completed_when_images_exist(self, client, tmp_data_dir, make_webp):
-        src = os.path.join(tmp_data_dir["root"], "src")
-        make_webp(os.path.join(src, "alpha", "1.webp"))
+        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
+        make_webp(os.path.join(input_dir, "alpha", "1.webp"))
         # IMAGES_DIR/alpha/ にファイルがあれば completed
         make_webp(os.path.join(tmp_data_dir["IMAGES_DIR"], "alpha", "1.webp"))
 
-        res = client.get(f"/api/status?source_dir={src}")
+        res = client.get("/api/status")
         items = res.json()["items"]
         alpha = next(it for it in items if it["name"] == "alpha")
         assert alpha["status"] == "completed"
 
     def test_status_not_started_when_no_images(self, client, tmp_data_dir, make_webp):
-        src = os.path.join(tmp_data_dir["root"], "src")
-        make_webp(os.path.join(src, "newone", "1.webp"))
+        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
+        make_webp(os.path.join(input_dir, "newone", "1.webp"))
 
-        res = client.get(f"/api/status?source_dir={src}")
+        res = client.get("/api/status")
         items = res.json()["items"]
         item = next(it for it in items if it["name"] == "newone")
         assert item["status"] == "not_started"

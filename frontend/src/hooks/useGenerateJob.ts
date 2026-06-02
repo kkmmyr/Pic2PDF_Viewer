@@ -9,7 +9,6 @@ import type { GenerateJob } from '../types';
 
 interface StoredJob {
     job_id: string;
-    sourceDir: string;
 }
 
 const STORAGE_KEY = STORAGE_KEYS.GENERATOR_JOB;
@@ -26,12 +25,10 @@ const pendingJob = (job_id: string): GenerateJob => ({
 
 interface UseGenerateJobReturn {
     currentJob: GenerateJob | null;
-    /** 画面遷移前に実行中だったジョブのソースディレクトリ（復元時のみ非null） */
-    restoredSourceDir: string | null;
     isGenerating: boolean;
     /** 画面遷移からの復元ジョブかどうか */
     isRestoredJob: boolean;
-    startJob: (jobId: string, sourceDir: string) => void;
+    startJob: (jobId: string) => void;
     clearCurrentJob: () => void;
 }
 
@@ -41,7 +38,6 @@ export function useGenerateJob(
 ): UseGenerateJobReturn {
     const stored = loadStoredJob();
     const [currentJobId, setCurrentJobId] = useState<string | null>(stored?.job_id ?? null);
-    const [restoredSourceDir] = useState<string | null>(stored?.sourceDir ?? null);
 
     const onCompletedRef = useRef(onCompleted);
     const onFailedRef = useRef(onFailed);
@@ -92,8 +88,8 @@ export function useGenerateJob(
         }
     }, [error]);
 
-    const startJob = useCallback((jobId: string, sourceDir: string) => {
-        setStorageJson<StoredJob>(STORAGE_KEY, { job_id: jobId, sourceDir });
+    const startJob = useCallback((jobId: string) => {
+        setStorageJson<StoredJob>(STORAGE_KEY, { job_id: jobId });
         setCurrentJobId(jobId);
     }, []);
 
@@ -104,7 +100,6 @@ export function useGenerateJob(
 
     return {
         currentJob,
-        restoredSourceDir,
         isGenerating,
         isRestoredJob,
         startJob,

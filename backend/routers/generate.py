@@ -2,7 +2,7 @@
 
 POST /generate         — バックグラウンドで PDF 生成ジョブを起動
 GET  /generate/job/:id — ジョブ進捗を取得
-GET  /status           — ソースディレクトリの変換状態を一覧
+GET  /status           — 入力ディレクトリ (DOUJIN_INPUT_DIR) の変換状態を一覧
 POST /batch_compress   — 既存 PDF を一括圧縮
 """
 import asyncio
@@ -14,12 +14,12 @@ from pydantic import BaseModel
 
 from config import (
     COMPLETE_DIR,
+    DOUJIN_INPUT_DIR,
     IMAGES_DIR,
     PDF_COMPRESSED_DIR,
     THUMBNAIL_DIR,
 )
 from routers._deps import log_and_raise_500
-from services import linux_sync
 from services.job_manager import GenerateJob, JobStatus, JobStore
 from services.meta_store import update_meta_locked
 from services.pdf_generator import batch_compress, scan_and_generate
@@ -40,11 +40,7 @@ class GenerateStatus(StrEnum):
 job_store = JobStore()
 
 
-class GenerateRequest(BaseModel):
-    source_dir: str
-
-
-def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
+def _run_generate_job(job: GenerateJob) -> None:
     """同期ワーカー: executor スレッドで PDF 生成ジョブを実行する。"""
     def progress_callback(item_name: str):
         job.update(current_item=item_name)
@@ -54,7 +50,7 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
         job.update(status=JobStatus.RUNNING, current_item="Starting...")
 
         result = scan_and_generate(
-            request.source_dir,
+            DOUJIN_INPUT_DIR,
             None,           # image-only モード: PDF 生成をスキップ
             THUMBNAIL_DIR,
             IMAGES_DIR,
@@ -86,30 +82,23 @@ def _run_generate_job(job: GenerateJob, request: GenerateRequest) -> None:
         logger.info("Job %s completed: %d files, %d failed",
                     job.job_id, len(result.generated), len(failed_dicts))
 
-        # 生成した書籍を Linux サーバーへ自動転送（LINUX_SYNC_ENABLED=true 時のみ）
-        if result.generated:
-            linux_sync.sync_after_generate(
-                result.generated,
-                IMAGES_DIR,
-                THUMBNAIL_DIR,
-            )
     except Exception as e:
         logger.exception("Job %s failed", job.job_id)
         job.update(status=JobStatus.FAILED, current_item=None, error=str(e))
 
 
-async def _run_generate_job_async(job: GenerateJob, request: GenerateRequest) -> None:
+async def _run_generate_job_async(job: GenerateJob) -> None:
     loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _run_generate_job, job, request)
+    await loop.run_in_executor(None, _run_generate_job, job)
 
 
 @router.post("/generate")
-async def generate_pdfs(request: GenerateRequest):
-    if not os.path.isdir(request.source_dir):
-        raise HTTPException(status_code=400, detail="Invalid directory path")
+async def generate_pdfs():
+    if not os.path.isdir(DOUJIN_INPUT_DIR):
+        raise HTTPException(status_code=503, detail=f"Input directory not found: {DOUJIN_INPUT_DIR}")
 
     job = job_store.create()
-    asyncio.create_task(_run_generate_job_async(job, request))
+    asyncio.create_task(_run_generate_job_async(job))
 
     return {"job_id": job.job_id, "status": "pending"}
 
@@ -124,19 +113,19 @@ def get_generate_job(job_id: str):
 
 
 @router.get("/status")
-def get_status(source_dir: str):
-    if not os.path.isdir(source_dir):
+def get_status():
+    if not os.path.isdir(DOUJIN_INPUT_DIR):
         return {"items": []}
 
     current_item = job_store.get_active_current_item()
     items_status = []
 
-    for root, _dirs, files in os.walk(source_dir):
+    for root, _dirs, files in os.walk(DOUJIN_INPUT_DIR):
         webp_files = [f for f in files if is_webp_file(f)]
         if webp_files:
             folder_name = os.path.basename(root)
-            if root == source_dir:
-                folder_name = os.path.basename(source_dir)
+            if root == DOUJIN_INPUT_DIR:
+                folder_name = os.path.basename(DOUJIN_INPUT_DIR)
 
             img_dir = os.path.join(IMAGES_DIR, folder_name)
 

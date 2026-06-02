@@ -33,6 +33,9 @@ PDF_COMPRESSED_DIR = os.path.join(MAIN_DATA_DIR, "pdfs_compressed")
 THUMBNAIL_DIR      = os.path.join(MAIN_DATA_DIR, "thumbnails")
 IMAGES_DIR         = os.path.join(MAIN_DATA_DIR, "images")
 COMPLETE_DIR       = os.path.join(MAIN_DATA_DIR, "complete")
+# Linux サーバー側でファイルを受け取る入力ディレクトリ（Samba 共有する）
+# env: DOUJIN_INPUT_DIR で上書き可能
+DOUJIN_INPUT_DIR   = os.environ.get("DOUJIN_INPUT_DIR", os.path.join(MAIN_DATA_DIR, "input"))
 
 # Comic
 KINDLE_DIR           = os.path.join(DATA_DIR, "comic")

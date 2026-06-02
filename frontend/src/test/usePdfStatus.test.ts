@@ -26,7 +26,7 @@ describe('usePdfStatus', () => {
     });
 
     it('enabled=false（既定）ではマウント時にフェッチしない', () => {
-        renderHook(() => usePdfStatus('/some/dir'), { wrapper: createWrapper() });
+        renderHook(() => usePdfStatus(), { wrapper: createWrapper() });
         expect(mockedGet).not.toHaveBeenCalled();
     });
 
@@ -37,33 +37,18 @@ describe('usePdfStatus', () => {
                 { name: 'b', type: 'folder', status: 'in_progress' as const },
             ],
         });
-        const { result } = renderHook(() => usePdfStatus('/some/dir', true), {
+        const { result } = renderHook(() => usePdfStatus(true), {
             wrapper: createWrapper(),
         });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-        expect(mockedGet).toHaveBeenCalledWith('/api/status', {
-            params: { source_dir: '/some/dir' },
-        });
+        expect(mockedGet).toHaveBeenCalledWith('/api/status');
         await waitFor(() => expect(result.current.statusItems).toHaveLength(2));
-    });
-
-    it('sourceDir が空文字なら fetch をスキップする', async () => {
-        const { result } = renderHook(() => usePdfStatus('', true), {
-            wrapper: createWrapper(),
-        });
-        expect(mockedGet).not.toHaveBeenCalled();
-
-        // refetch を手動呼び出しても空 sourceDir では fetch しない
-        await act(async () => {
-            await result.current.refetch();
-        });
-        expect(mockedGet).not.toHaveBeenCalled();
     });
 
     it('items 不在のレスポンスは空配列にフォールバック', async () => {
         mockedGet.mockResolvedValue({}); // items 欠落
-        const { result } = renderHook(() => usePdfStatus('/x', true), {
+        const { result } = renderHook(() => usePdfStatus(true), {
             wrapper: createWrapper(),
         });
 
@@ -73,7 +58,7 @@ describe('usePdfStatus', () => {
 
     it('GET が throw しても hook は壊れない（statusItems は初期値）', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => usePdfStatus('/x', true), {
+        const { result } = renderHook(() => usePdfStatus(true), {
             wrapper: createWrapper(),
         });
 
@@ -86,7 +71,7 @@ describe('usePdfStatus', () => {
         mockedGet.mockResolvedValueOnce({
             items: [{ name: 'x', type: 'pdf', status: 'completed' as const }],
         });
-        const { result } = renderHook(() => usePdfStatus('/x', true), {
+        const { result } = renderHook(() => usePdfStatus(true), {
             wrapper: createWrapper(),
         });
         await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(1));
