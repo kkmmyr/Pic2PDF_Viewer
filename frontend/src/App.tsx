@@ -13,7 +13,7 @@ import NovelGraphPage from './pages/NovelGraphPage';
 
 function App() {
     return (
-        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <BrowserRouter>
             <ErrorBoundary>
                 <Routes>
                     <Route path="/" element={<Layout />}>

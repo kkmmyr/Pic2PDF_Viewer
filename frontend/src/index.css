@@ -1,6 +1,60 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+    /* セマンティック色トークン */
+    --color-primary-50:  #eef2ff;
+    --color-primary-100: #e0e7ff;
+    --color-primary-200: #c7d2fe;
+    --color-primary-300: #a5b4fc;
+    --color-primary-400: #818cf8;
+    --color-primary-500: #6366f1;
+    --color-primary-600: #4f46e5;
+    --color-primary-700: #4338ca;
+    --color-primary-800: #3730a3;
+    --color-primary-900: #312e81;
+    --color-primary-950: #1e1b4b;
+
+    --color-accent-50:  #faf5ff;
+    --color-accent-100: #f3e8ff;
+    --color-accent-200: #e9d5ff;
+    --color-accent-300: #d8b4fe;
+    --color-accent-400: #c084fc;
+    --color-accent-500: #a855f7;
+    --color-accent-600: #9333ea;
+    --color-accent-700: #7e22ce;
+    --color-accent-800: #6b21a8;
+    --color-accent-900: #581c87;
+    --color-accent-950: #3b0764;
+
+    --color-success-50:  #ecfdf5;
+    --color-success-100: #d1fae5;
+    --color-success-200: #a7f3d0;
+    --color-success-300: #6ee7b7;
+    --color-success-400: #34d399;
+    --color-success-500: #10b981;
+    --color-success-600: #059669;
+    --color-success-700: #047857;
+    --color-success-800: #065f46;
+    --color-success-900: #064e3b;
+    --color-success-950: #022c22;
+
+    /* z-index 階層 */
+    --z-card-badge:     10;
+    --z-floating-action: 30;
+    --z-overlay-bar:    40;
+    --z-header:         50;
+    --z-toast:          60;
+    --z-dialog:        100;
+    --z-dialog-nested: 200;
+
+    /* アニメーション */
+    --animate-slide-in-right: slide-in-right 0.2s ease-out;
+
+    @keyframes slide-in-right {
+        0%   { transform: translateX(100%); }
+        100% { transform: translateX(0); }
+    }
+}
 
 /* ----------------------------------------------------------------
  * ネイティブフォーム要素のダークモード対応。
@@ -9,9 +63,6 @@
  * ネイティブ UI で描画されるため Tailwind の `dark:` 修飾子だけでは
  * 暗くならない。html.dark に `color-scheme: dark` を当てると Chromium /
  * Firefox 共にネイティブ要素を暗いテーマで描画してくれる。
- *
- * useDarkMode フックは <html> に `dark` クラスを付ける実装なので
- * `html.dark` セレクタで制御する。
  * -------------------------------------------------------------- */
 html.dark {
     color-scheme: dark;
@@ -22,13 +73,6 @@ html:not(.dark) {
 
 /* ----------------------------------------------------------------
  * <option> のドロップダウン背景を明示。
- *
- * `color-scheme` だけでは <select> 自身に当たっている Tailwind の
- * `bg-purple-50 dark:bg-purple-900/30` 等の背景色が <option> にも継承され、
- * 「ライトモード薄ピンク背景 + color-scheme=dark の白文字」で読めなくなる。
- * 各 select に option クラスを足す代わりに、グローバル CSS で統一する。
- *
- * 色は Tailwind の gray-100 / gray-800 / gray-900 と揃える。
  * -------------------------------------------------------------- */
 html.dark select option {
     background-color: rgb(31, 41, 55); /* gray-800 */
