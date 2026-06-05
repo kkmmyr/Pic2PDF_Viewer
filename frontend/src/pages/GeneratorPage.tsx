@@ -25,6 +25,7 @@ export default function GeneratorPage() {
 
     const onCompleted = useCallback((job: GenerateJob) => {
         setResult({ message: job.message, files: job.files, failed_items: job.failed_items ?? [] });
+        // eslint-disable-next-line react-hooks/immutability -- fetchStatus は宣言順が後だが呼び出し時点では定義済み
         fetchStatus();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);

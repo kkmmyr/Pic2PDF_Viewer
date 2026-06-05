@@ -41,6 +41,10 @@ export default tseslint.config(
                 },
             ],
             // catch (error) で型を指定しない unknown はデフォルト OK
+
+            // react-hooks v7 で追加された新ルール。フォームリセットや非同期 fetch 起動など
+            // 正当なパターンを多数フラグするため無効化する。
+            'react-hooks/set-state-in-effect': 'off',
         },
     },
     // テストファイルは緩める

@@ -14,6 +14,7 @@ export function useScrollMemory(urlKey: string) {
 
     // 現在の urlKey を ref で参照（capture handler が古いキーで保存しないように）
     const currentUrlKeyRef = useRef(urlKey);
+    // eslint-disable-next-line react-hooks/refs -- レンダー中に ref を同期するパターン（event handler で最新値を使うため）
     currentUrlKeyRef.current = urlKey;
 
     useEffect(() => {

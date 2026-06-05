@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import GeneratorPage from './pages/GeneratorPage';
@@ -9,7 +10,9 @@ import NovelManagePage from './pages/NovelManagePage';
 import NovelDetailPage from './pages/NovelDetailPage';
 import NovelDiscussionPage from './pages/NovelDiscussionPage';
 import NovelReaderPage from './pages/NovelReaderPage';
-import NovelGraphPage from './pages/NovelGraphPage';
+
+// vis-network を含む重いページは遅延ロード
+const NovelGraphPage = lazy(() => import('./pages/NovelGraphPage'));
 
 function App() {
     return (
@@ -95,7 +98,9 @@ function App() {
                             path="novel/graph"
                             element={
                                 <ErrorBoundary>
-                                    <NovelGraphPage />
+                                    <Suspense fallback={null}>
+                                        <NovelGraphPage />
+                                    </Suspense>
                                 </ErrorBoundary>
                             }
                         />
