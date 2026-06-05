@@ -24,6 +24,11 @@ backend/htmlcov/
 backend/.coverage
 frontend/coverage/
 
+# Playwright E2E テスト出力
+frontend/playwright-output/
+frontend/playwright-results/
+frontend/playwright-report/
+
 # Environment
 .env
 *.env
