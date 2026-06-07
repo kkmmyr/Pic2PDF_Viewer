@@ -42,8 +42,8 @@ NOVEL_DB_LLAMA_SERVER_URL = os.environ.get("NOVEL_DB_LLAMA_SERVER_URL", "http://
 NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gemma4:12b")
 
 # B-9 Contextual Retrieval のチャンクコンテキスト生成モデル。
-# Anthropic の Contextual Retrieval blog では「位置説明は単純なタスクなので
-# 軽量モデルで十分」と推奨されており、gemma4:e4b で代用する。
+# 2026-06-07 比較検証: gemma4:12b は e4b より平均 13% 速く（10.3s vs 11.8s/chunk）、
+# 場面の具体性（固有名詞・状況説明）が高い傾向のため 12b に変更。
 # 品質不足が確認されたら NOVEL_DB_LLM_MODEL（qwen3.6:35b-a3b）にフォールバック。
 #
 # TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) — llama.cpp 公式対応待ち
@@ -65,7 +65,7 @@ NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gem
 #
 #   参考: https://ai.google.dev/gemma/docs/mtp/overview?hl=ja
 #         https://dev.classmethod.jp/articles/dgx-spark-gemma4-mtp-multi-token-prediction-bench/
-NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:e4b")
+NOVEL_DB_CONTEXT_MODEL = os.environ.get("NOVEL_DB_CONTEXT_MODEL", "gemma4:12b")
 
 # §4.5 本構築統合: キャラ抽出 / チャンク文脈生成のバックエンド切替
 # "ollama" (既定): Ollama 経由で gemma4:e4b を使用
@@ -100,12 +100,12 @@ NOVEL_DB_QA_TOP_SUMMARIES  = 11
 # 環境変数 NOVEL_DB_QA_NUM_CTX で上書き可（A=16384 へのロールバックや C=131072 への切替に使う）
 NOVEL_DB_QA_NUM_CTX        = int(os.environ.get("NOVEL_DB_QA_NUM_CTX", "32768"))
 
-# B-11 Query Expansion（2026-05-11 採用）: ユーザーの質問を gemma4:e4b で複数の検索
+# B-11 Query Expansion（2026-05-11 採用）: ユーザーの質問を gemma4:12b で複数の検索
 # クエリに展開して hybrid_search を多角的に実行する。抽象質問の recall 改善が狙い。
-# 応答時間は +3〜5 秒（gemma4:e4b の短答呼び出し）。
+# 2026-06-07 比較検証: gemma4:12b は e4b より平均 22% 速く（8.7s vs 11.1s/query）、品質は同等。
 NOVEL_DB_QA_EXPAND_ENABLED = os.environ.get("NOVEL_DB_QA_EXPAND_ENABLED", "true").lower() in ("1", "true", "yes")
 NOVEL_DB_QA_EXPAND_N       = int(os.environ.get("NOVEL_DB_QA_EXPAND_N", "3"))
-NOVEL_DB_QA_EXPAND_MODEL   = os.environ.get("NOVEL_DB_QA_EXPAND_MODEL", "gemma4:e4b")
+NOVEL_DB_QA_EXPAND_MODEL   = os.environ.get("NOVEL_DB_QA_EXPAND_MODEL", "gemma4:12b")
 
 # B-13 段階 C（2026-05-11 本採用）: scope=book で本文を丸ごと読み込むモード。
 # hybrid_search を bypass し、指定書籍の全 page を page_no 順で LLM に投げる。
