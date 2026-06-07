@@ -27,6 +27,7 @@
   - §2.6 `PATCH /api/meta` — メタデータ更新
   - §2.7 `POST /api/meta/view` — 閲覧記録
   - §2.8 `PATCH /api/meta/novel/{book_key}` — novel 1冊メタ部分更新（4.3）
+  - §2.9 `POST /api/meta/init-genre-original` — genre 未設定書籍への一括初期化（管理操作）
 - [§3. シリーズ管理](#3-シリーズ管理)
   - §3.2 `POST /api/series/assign` — シリーズ割り当て
   - §3.3 `POST /api/series/unassign` — シリーズ解除
@@ -525,6 +526,28 @@ novel ソース 1 冊のメタデータを部分更新する。`{book_key}` は 
 **レスポンス**: `{"message": "Updated"}`
 
 **エラー**: 400 — すべてのフィールドが省略された場合。
+
+---
+
+### §2.9 `POST /api/meta/init-genre-original`
+
+`genre` が未設定の書籍に `"オリジナル"` を一括設定する管理者向け操作。`routers/meta/admin.py` が担当。
+
+**クエリパラメータ**:
+- `source` (オプション) — `doujin`(default) / `comic` / `novel`
+
+**処理内容**:
+- `meta.db` にエントリが存在するが `genre` フィールドが空のもの → `"オリジナル"` に更新
+- `images/` ディレクトリに存在するが `meta.db` に未登録のもの → エントリを新規追加し `genre="オリジナル"` を設定
+
+**レスポンス**:
+```json
+{ "updated": 3, "inserted": 1 }
+```
+- `updated` — 既存エントリへの更新件数
+- `inserted` — 新規追加エントリ件数
+
+**エラー**: 400 — `source` が無効値の場合。
 
 ---
 
