@@ -10,6 +10,7 @@ import os
 # Novel DB の LanceDB ベクトルストアパス（sqlite-vec から移行）
 # data/novel.lancedb/ に保存。環境変数で上書き可。
 import os as _os
+
 NOVEL_DB_LANCE_PATH: str = _os.environ.get(
     "NOVEL_DB_LANCE_PATH",
     _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), "data", "novel.lancedb"),
@@ -35,9 +36,10 @@ NOVEL_DB_LLM_MODEL       = os.environ.get("NOVEL_DB_LLM_MODEL", "qwen3.6-iq4xs")
 # Phase C で `ollama` 分岐撤去。未知の値は LLMError。
 NOVEL_DB_LLM_BACKEND      = os.environ.get("NOVEL_DB_LLM_BACKEND", "llama_server")
 NOVEL_DB_LLAMA_SERVER_URL = os.environ.get("NOVEL_DB_LLAMA_SERVER_URL", "http://127.0.0.1:11435")
-# 主要登場人物抽出用の軽量モデル（短答型タスク。thinking で num_predict を
-# 消費する 26b と異なり、e4b は応答が速く character 抽出に向く）
-NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gemma4:e4b")
+# 主要登場人物抽出用モデル（短答型タスク）。
+# 2026-06-07 比較検証: gemma4:12b は e4b より平均 40% 速く（8.8s vs 14.9s/page）、
+# 一人称視点ページで e4b が返す ['私','猿ども'] 等のノイズを 12b が正しく [] にした。
+NOVEL_DB_CHAR_EXTRACT_MODEL = os.environ.get("NOVEL_DB_CHAR_EXTRACT_MODEL", "gemma4:12b")
 
 # B-9 Contextual Retrieval のチャンクコンテキスト生成モデル。
 # Anthropic の Contextual Retrieval blog では「位置説明は単純なタスクなので
