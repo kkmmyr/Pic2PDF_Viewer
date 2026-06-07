@@ -38,7 +38,7 @@ def test_save_start_creates_row_with_empty_answer(history_db):
             question="Q?",
             prompt="prompt body",
             hits=[_make_hit()],
-            model="gemma4:26b",
+            model="gemma4:12b",
             options={"temperature": 0.2},
         )
     assert history_id > 0
@@ -49,7 +49,7 @@ def test_save_start_creates_row_with_empty_answer(history_db):
     assert detail["answer"] == ""
     assert detail["prompt"] == "prompt body"
     assert detail["scope"] == {"type": "all", "id": None}
-    assert detail["model"] == "gemma4:26b"
+    assert detail["model"] == "gemma4:12b"
     assert detail["options"] == {"temperature": 0.2}
     assert len(detail["context"]) == 1
     assert detail["context"][0]["page_no"] == 1

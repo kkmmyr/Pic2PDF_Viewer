@@ -52,11 +52,6 @@ def extract_main_characters(
     """ページテキストから主要登場人物のリストを返す（同期）。
 
     空文字・極端に短いテキストは [] を返して LLM 呼び出しをスキップする。
-
-    `gemma4:26b` 等の thinking モデルを使うと、thinking ブロックで num_predict を
-    消費して response が空になることがある。デフォルトでは軽量な `gemma4:e4b` を
-    使用し、加えて `think=false`（`OllamaBackend` の既定）を渡して thinking を抑止する。
-
     `model` は呼び出し時に上書き可能（テストや実験で別モデルを試す用途）。
     """
     if not text or len(text.strip()) < 30:

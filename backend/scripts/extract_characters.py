@@ -6,7 +6,7 @@
     uv run python scripts/extract_characters.py --all
     uv run python scripts/extract_characters.py --book "..." --redo  # 既存値を上書き
 
-抽出は LLM (gemma4:26b) で行うため、1 ページあたり数秒〜十秒程度かかる。
+抽出は LLM (gemma4:12b) で行うため、1 ページあたり数秒〜十秒程度かかる。
 1 冊（120 ページ）で 10〜20 分が目安。
 """
 from __future__ import annotations
