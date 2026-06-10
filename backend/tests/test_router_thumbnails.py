@@ -45,7 +45,7 @@ class TestGetPageThumbnail:
         assert res.status_code == 400
 
     def test_kindle_renders_pdf_to_jpeg(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=3)
 
         res = client.get("/api/thumbnails/page?name=book.pdf&page=1&source=comic")
@@ -57,7 +57,7 @@ class TestGetPageThumbnail:
         assert res.status_code == 404
 
     def test_kindle_400_when_page_out_of_range(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=2)
 
         res = client.get("/api/thumbnails/page?name=book.pdf&page=99&source=comic")
@@ -74,8 +74,8 @@ class TestGetPageThumbnail:
 
 class TestRegenerateThumbnail:
     def test_regenerate_from_pdf(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        thumb_dir = tmp_data_dir["KINDLE_THUMBNAIL_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
+        thumb_dir = tmp_data_dir["COMIC_THUMBNAIL_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"))
 
         res = client.post("/api/thumbnails/regenerate", json={
@@ -137,7 +137,7 @@ class TestRegenerateThumbnail:
 
 class TestRegenerateThumbnailBulk:
     def test_partial_success_and_failure(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "ok.pdf"))
 
         res = client.post("/api/thumbnails/regenerate_bulk", json={
@@ -151,7 +151,7 @@ class TestRegenerateThumbnailBulk:
         assert body["failed"] == ["missing.pdf"]
 
     def test_all_success(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
 
@@ -166,7 +166,7 @@ class TestRegenerateThumbnailBulk:
 
     def test_continues_after_failure(self, client, tmp_data_dir, make_pdf):
         """途中で失敗しても全件処理が続行される。"""
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "first.pdf"))
         make_pdf(os.path.join(pdf_dir, "third.pdf"))
 

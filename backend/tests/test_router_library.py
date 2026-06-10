@@ -100,7 +100,7 @@ class TestListPdfsGenerated:
 
 class TestListPdfsKindle:
     def test_lists_books_with_pngs(self, client, tmp_data_dir, make_png):
-        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
+        img_dir = tmp_data_dir["COMIC_IMAGES_DIR"]
         make_png(os.path.join(img_dir, "book1", "001.png"))
         make_png(os.path.join(img_dir, "book2", "001.png"))
 
@@ -110,7 +110,7 @@ class TestListPdfsKindle:
         assert names == {"book1.pdf", "book2.pdf"}
 
     def test_excludes_empty_directories(self, client, tmp_data_dir, make_png):
-        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
+        img_dir = tmp_data_dir["COMIC_IMAGES_DIR"]
         make_png(os.path.join(img_dir, "has_image", "001.png"))
         os.makedirs(os.path.join(img_dir, "empty_dir"))
 
@@ -119,8 +119,8 @@ class TestListPdfsKindle:
         assert names == {"has_image.pdf"}
 
     def test_thumbnail_url_when_thumb_exists(self, client, tmp_data_dir, make_png):
-        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
-        thumb_dir = tmp_data_dir["KINDLE_THUMBNAIL_DIR"]
+        img_dir = tmp_data_dir["COMIC_IMAGES_DIR"]
+        thumb_dir = tmp_data_dir["COMIC_THUMBNAIL_DIR"]
         make_png(os.path.join(img_dir, "book", "001.png"))
         thumb_path = os.path.join(thumb_dir, "book.jpg")
         os.makedirs(thumb_dir, exist_ok=True)
@@ -188,9 +188,9 @@ class TestListBookImages:
 
 class TestRename:
     def test_rename_pdf_updates_three_assets(self, client, tmp_data_dir, make_pdf, make_webp):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        thumb_dir = tmp_data_dir["KINDLE_THUMBNAIL_DIR"]
-        img_dir = tmp_data_dir["KINDLE_IMAGES_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
+        thumb_dir = tmp_data_dir["COMIC_THUMBNAIL_DIR"]
+        img_dir = tmp_data_dir["COMIC_IMAGES_DIR"]
 
         make_pdf(os.path.join(pdf_dir, "old.pdf"))
         os.makedirs(thumb_dir, exist_ok=True)
@@ -213,7 +213,7 @@ class TestRename:
         assert not os.path.exists(os.path.join(pdf_dir, "old.pdf"))
 
     def test_rename_carries_meta_to_new_key(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "old.pdf"))
 
         save_meta("comic", {"old.pdf": {"authors": ["A"], "genre": "テスト"}})
@@ -233,7 +233,7 @@ class TestRename:
         assert meta["new.pdf"]["genre"] == "テスト"
 
     def test_rename_folder_updates_meta_prefix(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         os.makedirs(os.path.join(pdf_dir, "old_folder"))
         make_pdf(os.path.join(pdf_dir, "old_folder", "a.pdf"))
 
@@ -263,7 +263,7 @@ class TestRename:
         assert res.status_code == 404
 
     def test_rename_400_when_dst_exists(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "old.pdf"))
         make_pdf(os.path.join(pdf_dir, "exists.pdf"))
 
@@ -303,7 +303,7 @@ class TestRename:
 
 class TestDeletePdfs:
     def test_delete_multiple_files(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         for n in ["a.pdf", "b.pdf", "c.pdf"]:
             make_pdf(os.path.join(pdf_dir, n))
 
@@ -319,7 +319,7 @@ class TestDeletePdfs:
         assert os.path.exists(os.path.join(pdf_dir, "c.pdf"))
 
     def test_delete_removes_meta_entry(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "doomed.pdf"))
 
         save_meta("comic", {
@@ -338,7 +338,7 @@ class TestDeletePdfs:
         assert "alive.pdf" in meta
 
     def test_partial_failure_returns_errors_with_partial_success(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "exists.pdf"))
 
         res = client.request(

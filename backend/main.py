@@ -10,11 +10,11 @@ from config import (
     CORS_ORIGINS,
     FRONTEND_DIST_DIR,
     IMAGES_DIR,
-    KINDLE_IMAGES_DIR,
+    COMIC_IMAGES_DIR,
     KINDLE_NOVEL_IMAGES_DIR,
     KINDLE_NOVEL_THUMBNAIL_DIR,
-    KINDLE_PDF_DIR,
-    KINDLE_THUMBNAIL_DIR,
+    COMIC_PDF_DIR,
+    COMIC_THUMBNAIL_DIR,
     PROJECT_ROOT,
     THUMBNAIL_DIR,
 )
@@ -96,9 +96,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.mount("/thumbnails",  StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
 app.mount("/images",      StaticFiles(directory=IMAGES_DIR),    name="images")
 
-app.mount("/comic/pdfs",        StaticFiles(directory=KINDLE_PDF_DIR),       name="comic_pdfs")
-app.mount("/comic/thumbnails",  StaticFiles(directory=KINDLE_THUMBNAIL_DIR), name="comic_thumbnails")
-app.mount("/comic/images",      StaticFiles(directory=KINDLE_IMAGES_DIR),    name="comic_images")
+app.mount("/comic/pdfs",        StaticFiles(directory=COMIC_PDF_DIR),       name="comic_pdfs")
+app.mount("/comic/thumbnails",  StaticFiles(directory=COMIC_THUMBNAIL_DIR), name="comic_thumbnails")
+app.mount("/comic/images",      StaticFiles(directory=COMIC_IMAGES_DIR),    name="comic_images")
 
 app.mount("/kindle_novel/thumbnails",  StaticFiles(directory=KINDLE_NOVEL_THUMBNAIL_DIR), name="kindle_novel_thumbnails")
 app.mount("/kindle_novel/images",      StaticFiles(directory=KINDLE_NOVEL_IMAGES_DIR),    name="kindle_novel_images")

@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 class TestDeletePages:
     def test_delete_single_page(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=5)
 
         res = client.post(
@@ -33,7 +33,7 @@ class TestDeletePages:
         assert res.json()["total_pages"] == 4
 
     def test_delete_multiple_pages(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=10)
 
         res = client.post(
@@ -52,7 +52,7 @@ class TestDeletePages:
 
     def test_delete_500_for_out_of_range(self, client, tmp_data_dir, make_pdf):
         """範囲外インデックスは PdfService が ValueError → log_and_raise_500 で 500。"""
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=3)
 
         res = client.post(
@@ -62,8 +62,8 @@ class TestDeletePages:
         assert res.status_code == 500
 
     def test_thumbnail_regenerated_after_delete(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        thumb_dir = tmp_data_dir["KINDLE_THUMBNAIL_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
+        thumb_dir = tmp_data_dir["COMIC_THUMBNAIL_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=5)
         # 古いサムネイルを置く
         os.makedirs(thumb_dir, exist_ok=True)
@@ -149,7 +149,7 @@ class TestDeletePages:
 
 class TestReorderPages:
     def test_reorder_kindle_pdf(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=4)
 
         res = client.post(
@@ -167,7 +167,7 @@ class TestReorderPages:
         assert res.status_code == 404
 
     def test_reorder_kindle_400_for_bad_permutation(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"), page_count=3)
 
         # 重複
@@ -250,7 +250,7 @@ class TestReorderPages:
 
 class TestMergePdfs:
     def test_merge_two_pdfs(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"), page_count=3)
         make_pdf(os.path.join(pdf_dir, "b.pdf"), page_count=2)
 
@@ -271,8 +271,8 @@ class TestMergePdfs:
             assert len(doc) == 5
 
     def test_merge_creates_thumbnail(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
-        thumb_dir = tmp_data_dir["KINDLE_THUMBNAIL_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
+        thumb_dir = tmp_data_dir["COMIC_THUMBNAIL_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
 
@@ -285,7 +285,7 @@ class TestMergePdfs:
         assert os.path.exists(os.path.join(thumb_dir, "merged.jpg"))
 
     def test_merge_400_when_output_exists(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
         make_pdf(os.path.join(pdf_dir, "merged.pdf"))
@@ -299,7 +299,7 @@ class TestMergePdfs:
         assert res.status_code == 400
 
     def test_merge_400_when_too_few_files(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
 
         res = client.post("/api/pdfs/merge", json={
@@ -311,7 +311,7 @@ class TestMergePdfs:
         assert res.status_code == 400
 
     def test_merge_400_when_output_not_pdf(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
 
@@ -324,7 +324,7 @@ class TestMergePdfs:
         assert res.status_code == 400
 
     def test_merge_404_when_input_missing(self, client, tmp_data_dir, make_pdf):
-        pdf_dir = tmp_data_dir["KINDLE_PDF_DIR"]
+        pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
 
         res = client.post("/api/pdfs/merge", json={

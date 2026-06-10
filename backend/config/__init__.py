@@ -38,10 +38,10 @@ COMPLETE_DIR       = os.path.join(MAIN_DATA_DIR, "complete")
 DOUJIN_INPUT_DIR   = os.environ.get("DOUJIN_INPUT_DIR", os.path.join(MAIN_DATA_DIR, "input"))
 
 # Comic
-KINDLE_DIR           = os.path.join(DATA_DIR, "comic")
-KINDLE_PDF_DIR       = os.path.join(KINDLE_DIR, "pdfs")
-KINDLE_THUMBNAIL_DIR = os.path.join(KINDLE_DIR, "thumbnails")
-KINDLE_IMAGES_DIR    = os.path.join(KINDLE_DIR, "images")
+COMIC_DIR           = os.path.join(DATA_DIR, "comic")
+COMIC_PDF_DIR       = os.path.join(COMIC_DIR, "pdfs")
+COMIC_THUMBNAIL_DIR = os.path.join(COMIC_DIR, "thumbnails")
+COMIC_IMAGES_DIR    = os.path.join(COMIC_DIR, "images")
 
 # Kindle Novel
 KINDLE_NOVEL_DIR           = os.path.join(DATA_DIR, "kindle_novel")
@@ -126,9 +126,9 @@ _REQUIRED_DIRS: list[str] = [
     THUMBNAIL_DIR,
     IMAGES_DIR,
     COMPLETE_DIR,
-    KINDLE_PDF_DIR,
-    KINDLE_THUMBNAIL_DIR,
-    KINDLE_IMAGES_DIR,
+    COMIC_PDF_DIR,
+    COMIC_THUMBNAIL_DIR,
+    COMIC_IMAGES_DIR,
     KINDLE_NOVEL_PDF_DIR,
     KINDLE_NOVEL_THUMBNAIL_DIR,
     KINDLE_NOVEL_IMAGES_DIR,
@@ -167,9 +167,9 @@ def get_dirs_by_source(source: str) -> SourceDirs:
     """
     if source == "comic":
         return {
-            "pdf": KINDLE_PDF_DIR,
-            "thumb": KINDLE_THUMBNAIL_DIR,
-            "img": KINDLE_IMAGES_DIR,
+            "pdf": COMIC_PDF_DIR,
+            "thumb": COMIC_THUMBNAIL_DIR,
+            "img": COMIC_IMAGES_DIR,
             "thumb_url_prefix": "/comic/thumbnails",
         }
     if source == "novel":
