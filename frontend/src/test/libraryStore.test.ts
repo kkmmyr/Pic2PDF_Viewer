@@ -11,10 +11,8 @@ const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;
 
 const resetStore = () =>
     useLibraryStore.setState({
-        pdfs: [],
         currentPath: '',
         currentSource: 'doujin',
-        version: 0,
         isSelectionMode: false,
         selectedItems: new Set(),
         renameTarget: null,
@@ -100,11 +98,10 @@ describe('libraryStore', () => {
             expect(useLibraryStore.getState().renameTarget).toBeNull();
         });
 
-        it('handleRename: renameTarget があるとき PATCH /api/rename を呼び renameTarget をクリアし version を increment', async () => {
+        it('handleRename: renameTarget があるとき PATCH /api/rename を呼び renameTarget をクリアする', async () => {
             mockedPatch.mockResolvedValue(undefined);
             useLibraryStore.setState({ currentPath: 'sub', currentSource: 'comic' });
             useLibraryStore.getState().openRenameDialog('old.pdf');
-            const versionBefore = useLibraryStore.getState().version;
 
             await useLibraryStore.getState().handleRename('new.pdf');
 
@@ -116,7 +113,6 @@ describe('libraryStore', () => {
                 is_folder: false,
             });
             expect(useLibraryStore.getState().renameTarget).toBeNull();
-            expect(useLibraryStore.getState().version).toBe(versionBefore + 1);
         });
 
         it('handleRename: renameTarget が null のとき PATCH を呼ばない', async () => {
@@ -132,11 +128,4 @@ describe('libraryStore', () => {
         });
     });
 
-    describe('bumpVersion', () => {
-        it('version を 1 増やす', () => {
-            expect(useLibraryStore.getState().version).toBe(0);
-            useLibraryStore.getState().bumpVersion();
-            expect(useLibraryStore.getState().version).toBe(1);
-        });
-    });
 });

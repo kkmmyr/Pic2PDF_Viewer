@@ -1,22 +1,18 @@
 import { create } from 'zustand';
-import type { PdfFile, LibrarySource } from '../types';
+import type { LibrarySource } from '../types';
 import apiClient from '../config/api_client';
 import { API_ENDPOINTS } from '../config/api';
 
 interface LibraryState {
-    pdfs: PdfFile[];
     currentPath: string;
     currentSource: LibrarySource;
-    version: number;
     isSelectionMode: boolean;
     selectedItems: Set<string>;
     renameTarget: { name: string; isFolder: boolean } | null;
 }
 
 interface LibraryActions {
-    fetchPdfs: () => Promise<void>;
     setContext: (path: string, source: LibrarySource) => void;
-    bumpVersion: () => void;
     toggleSelectionMode: () => void;
     clearSelection: () => void;
     toggleSelectItem: (name: string) => void;
@@ -27,29 +23,13 @@ interface LibraryActions {
 }
 
 export const useLibraryStore = create<LibraryState & LibraryActions>((set, get) => ({
-    pdfs: [],
     currentPath: '',
     currentSource: 'doujin',
-    version: 0,
     isSelectionMode: false,
     selectedItems: new Set(),
     renameTarget: null,
 
-    fetchPdfs: async () => {
-        const { currentPath, currentSource } = get();
-        try {
-            const data = await apiClient.get<unknown, { files: PdfFile[] }>(API_ENDPOINTS.PDFS, {
-                params: { path: currentPath, source: currentSource },
-            });
-            set({ pdfs: data.files });
-        } catch {
-            // ignore fetch errors silently
-        }
-    },
-
     setContext: (path, source) => set({ currentPath: path, currentSource: source }),
-
-    bumpVersion: () => set((s) => ({ version: s.version + 1 })),
 
     toggleSelectionMode: () =>
         set((s) => ({
@@ -92,6 +72,6 @@ export const useLibraryStore = create<LibraryState & LibraryActions>((set, get) 
             is_folder: renameTarget.isFolder,
         });
         set({ renameTarget: null });
-        get().bumpVersion();
+        // リフレッシュは呼び出し元（useLibraryPanel）が invalidateQueries で実施する
     },
 }));

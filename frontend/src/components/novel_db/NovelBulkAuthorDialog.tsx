@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
-import { useDialogSubmit } from '../../hooks/useDialogSubmit';
+import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
 import { useTagsInput } from '../../hooks/useTagsInput';
 import { Dialog, DialogBody, DialogCancelButton, DialogFooter, DialogPrimaryButton } from '../ui/Dialog';
 import { SearchableSelect } from '../ui/SearchableSelect';

@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useSeriesAuthorFilter } from '../hooks/useSeriesAuthorFilter';
+import { useSeriesAuthorFilter } from '../hooks/library/useSeriesAuthorFilter';
 import type { BookMetaMap } from '../types';
 
 const META: BookMetaMap = {

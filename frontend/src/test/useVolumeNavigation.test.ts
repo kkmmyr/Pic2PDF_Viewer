@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useVolumeNavigation } from '../hooks/useVolumeNavigation';
+import { useVolumeNavigation } from '../hooks/reader/useVolumeNavigation';
 
 describe('useVolumeNavigation', () => {
     const mockRecordView = vi.fn();

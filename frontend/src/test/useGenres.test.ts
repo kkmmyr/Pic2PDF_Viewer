@@ -1,4 +1,6 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../config/api_client', () => ({
@@ -11,7 +13,15 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import apiClient from '../config/api_client';
-import { useGenres } from '../hooks/useGenres';
+import { useGenres } from '../hooks/library/useGenres';
+
+const createWrapper = () => {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+};
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;
@@ -28,7 +38,7 @@ describe('useGenres', () => {
 
     it('マウント時に GET /api/genres?source= を実行して genres を初期化する', async () => {
         mockedGet.mockResolvedValue(['アクション', 'ロマンス']);
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(mockedGet).toHaveBeenCalledWith('/api/genres', { params: { source: 'doujin' } });
@@ -37,7 +47,7 @@ describe('useGenres', () => {
 
     it('GET 失敗時は空配列にフォールバック', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.genres).toEqual([]);
@@ -45,7 +55,7 @@ describe('useGenres', () => {
 
     it('GET の戻り値が undefined でも空配列に正規化', async () => {
         mockedGet.mockResolvedValue(undefined);
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.genres).toEqual([]);
@@ -55,7 +65,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A']);
         mockedPost.mockResolvedValue({ genres: ['A', 'B'] });
 
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.genres).toEqual(['A']));
 
         await act(async () => {
@@ -70,7 +80,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A', 'B']);
         mockedDelete.mockResolvedValue({ genres: ['A'] });
 
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.genres).toEqual(['A', 'B']));
 
         await act(async () => {
@@ -87,7 +97,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue([]);
         mockedDelete.mockResolvedValue({ genres: [] });
 
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         await act(async () => {
@@ -102,7 +112,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A', 'B', 'C']);
         mockedPatch.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.genres).toEqual(['A', 'B', 'C']));
 
         await act(async () => {
@@ -120,7 +130,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValue(['A', 'B', 'C']);
         mockedPatch.mockRejectedValue(new Error('network'));
 
-        const { result } = renderHook(() => useGenres('doujin'));
+        const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.genres).toEqual(['A', 'B', 'C']));
 
         await act(async () => {
@@ -135,7 +145,7 @@ describe('useGenres', () => {
         mockedGet.mockResolvedValueOnce(['gen']).mockResolvedValueOnce(['kin']);
         const { result, rerender } = renderHook(
             ({ src }: { src: 'doujin' | 'comic' }) => useGenres(src),
-            { initialProps: { src: 'doujin' } },
+            { initialProps: { src: 'doujin' }, wrapper: createWrapper() },
         );
 
         await waitFor(() => expect(result.current.genres).toEqual(['gen']));

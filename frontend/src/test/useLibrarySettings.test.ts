@@ -11,7 +11,7 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import apiClient from '../config/api_client';
-import { useLibrarySettings } from '../hooks/useLibrarySettings';
+import { useLibrarySettings } from '../hooks/library/useLibrarySettings';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;

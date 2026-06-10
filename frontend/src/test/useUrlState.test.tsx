@@ -1,8 +1,8 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { useUrlState } from '../hooks/useUrlState';
-import { useUrlFilters } from '../hooks/useUrlFilters';
+import { useUrlState } from '../hooks/library/useUrlState';
+import { useUrlFilters } from '../hooks/library/useUrlFilters';
 
 const wrapper =
     (initial: string) =>

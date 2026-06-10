@@ -12,7 +12,7 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import apiClient from '../config/api_client';
-import { useLibraryPins } from '../hooks/useLibraryPins';
+import { useLibraryPins } from '../hooks/library/useLibraryPins';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPut = apiClient.put as ReturnType<typeof vi.fn>;

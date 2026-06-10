@@ -1,9 +1,5 @@
 import { Dialog, DialogBody } from '../ui/Dialog';
-
-interface ShortcutsHelpDialogProps {
-    open: boolean;
-    onClose: () => void;
-}
+import { useReaderContext } from '../../contexts/ReaderContext';
 
 const SHORTCUTS: { key: string; description: string }[] = [
     { key: '←  /  →', description: 'ページ送り（綴じ方向に応じて前後）' },
@@ -19,9 +15,15 @@ const SHORTCUTS: { key: string; description: string }[] = [
  * リーダー画面のキーボードショートカット一覧モーダル。
  * `?` キーまたはヘッダーの「?」ボタンから呼ばれる想定。
  */
-export function ShortcutsHelpDialog({ open, onClose }: ShortcutsHelpDialogProps) {
+export function ShortcutsHelpDialog() {
+    const { isHelpOpen, closeHelp } = useReaderContext();
     return (
-        <Dialog open={open} title="キーボードショートカット" onClose={onClose} maxWidth="md">
+        <Dialog
+            open={isHelpOpen}
+            title="キーボードショートカット"
+            onClose={closeHelp}
+            maxWidth="md"
+        >
             <DialogBody>
                 <ul className="space-y-2">
                     {SHORTCUTS.map(({ key, description }) => (

@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useMetaDerived } from '../hooks/useMetaDerived';
+import { useMetaDerived } from '../hooks/library/useMetaDerived';
 import type { BookMetaMap } from '../types';
 
 describe('useMetaDerived', () => {

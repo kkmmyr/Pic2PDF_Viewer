@@ -1,5 +1,15 @@
+import React from 'react';
 import { renderHook, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+
+const createWrapper = () => {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+};
 
 const mockSetGroupMode = vi.fn();
 const mockSetSeriesFilter = vi.fn();
@@ -16,7 +26,6 @@ const mockMeta: Record<string, { series_id?: string; authors?: string[] }> = {};
 
 vi.mock('../stores/libraryStore', () => ({
     useLibraryStore: () => ({
-        pdfs: [],
         currentPath: '',
         currentSource: 'doujin' as const,
         isSelectionMode: false,
@@ -29,11 +38,15 @@ vi.mock('../stores/libraryStore', () => ({
         openRenameDialog: vi.fn(),
         closeRenameDialog: vi.fn(),
         handleRename: vi.fn(),
-        bumpVersion: mockBumpVersion,
     }),
 }));
 
-vi.mock('../hooks/useUrlState', () => ({
+vi.mock('../hooks/library/useLibraryPdfs', () => ({
+    useLibraryPdfs: () => ({ data: [] }),
+    pdfQueryKey: () => ['pdfs'],
+}));
+
+vi.mock('../hooks/library/useUrlState', () => ({
     useUrlState: () => ({ selectedPdf: null }),
 }));
 
@@ -123,11 +136,11 @@ vi.mock('../hooks', () => ({
     }),
 }));
 
-vi.mock('../hooks/usePinnedBookSets', () => ({
+vi.mock('../hooks/library/usePinnedBookSets', () => ({
     usePinnedBookSets: () => ({ pinnedBooks: new Set(), contextualFavorites: new Set() }),
 }));
 
-vi.mock('../hooks/useSeriesAuthorFilter', () => ({
+vi.mock('../hooks/library/useSeriesAuthorFilter', () => ({
     useSeriesAuthorFilter: () => ({
         isMixedAuthors: false,
         seriesEditFilteredSeries: [],
@@ -135,7 +148,7 @@ vi.mock('../hooks/useSeriesAuthorFilter', () => ({
     }),
 }));
 
-vi.mock('../hooks/useDialogToggles', () => ({
+vi.mock('../hooks/library/useDialogToggles', () => ({
     useDialogToggles: () => ({ isOpen: vi.fn(() => false), open: vi.fn(), close: vi.fn() }),
 }));
 
@@ -147,7 +160,7 @@ vi.mock('../config/api_client', () => ({ default: { post: vi.fn() } }));
 vi.mock('../config/api', () => ({ API_ENDPOINTS: { REGENERATE_THUMBNAIL: '/api/thumb' } }));
 vi.mock('../utils/authors', () => ({ authorsKey: (a: string[]) => a.join('\n') }));
 
-import { useLibraryPanel } from '../hooks/useLibraryPanel';
+import { useLibraryPanel } from '../hooks/library/useLibraryPanel';
 
 describe('useLibraryPanel', () => {
     beforeEach(() => {
@@ -158,13 +171,13 @@ describe('useLibraryPanel', () => {
     });
 
     it('スモークテスト: hook が正常にレンダーされる', () => {
-        const { result } = renderHook(() => useLibraryPanel(vi.fn()));
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), { wrapper: createWrapper() });
         expect(result.current.displayPdfs).toEqual([]);
         expect(result.current.searchText).toBe('');
     });
 
     it('handleGroupModeChange: setGroupMode と seriesFilter クリアを同時に呼ぶ', () => {
-        const { result } = renderHook(() => useLibraryPanel(vi.fn()));
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), { wrapper: createWrapper() });
         act(() => {
             result.current.handleGroupModeChange('series');
         });
@@ -174,7 +187,7 @@ describe('useLibraryPanel', () => {
 
     it('handleToggleSelect: 集約カード（members あり）は bulkSelectItems を呼ぶ', () => {
         mockMembersByRep.set('book-a', [{ name: 'vol1' }, { name: 'vol2' }]);
-        const { result } = renderHook(() => useLibraryPanel(vi.fn()));
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), { wrapper: createWrapper() });
         act(() => {
             result.current.handleToggleSelect('book-a');
         });
@@ -186,7 +199,7 @@ describe('useLibraryPanel', () => {
         mockMembersByRep.set('book-a', [{ name: 'vol1' }, { name: 'vol2' }]);
         mockSelectedItems.add('vol1');
         mockSelectedItems.add('vol2');
-        const { result } = renderHook(() => useLibraryPanel(vi.fn()));
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), { wrapper: createWrapper() });
         act(() => {
             result.current.handleToggleSelect('book-a');
         });
@@ -194,7 +207,7 @@ describe('useLibraryPanel', () => {
     });
 
     it('handleToggleSelect: 非集約アイテムは toggleSelectItem を呼ぶ', () => {
-        const { result } = renderHook(() => useLibraryPanel(vi.fn()));
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), { wrapper: createWrapper() });
         act(() => {
             result.current.handleToggleSelect('single-book');
         });
@@ -204,7 +217,7 @@ describe('useLibraryPanel', () => {
 
     it('handlePdfClick: recordView を呼んだあと onPdfClick を呼ぶ', () => {
         const onPdfClick = vi.fn();
-        const { result } = renderHook(() => useLibraryPanel(onPdfClick));
+        const { result } = renderHook(() => useLibraryPanel(onPdfClick), { wrapper: createWrapper() });
         act(() => {
             result.current.handlePdfClick('test.pdf');
         });

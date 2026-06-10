@@ -1,4 +1,6 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../config/api_client', () => ({
@@ -6,22 +8,30 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import apiClient from '../config/api_client';
-import { useBookMetaCore } from '../hooks/useBookMetaCore';
-import { useBookSeries } from '../hooks/useBookSeries';
+import { useBookMetaCore } from '../hooks/library/useBookMetaCore';
+import { useBookSeries } from '../hooks/library/useBookSeries';
 import type { BookMetaMap } from '../types';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;
 
+const createWrapper = () => {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+};
+
 function useCombined(source: string) {
     const core = useBookMetaCore(source);
-    const series = useBookSeries(source, core.setMeta, core.makeKey);
+    const series = useBookSeries(source);
     return { ...core, ...series };
 }
 
 const renderCombined = (initialMeta: BookMetaMap = {}) => {
     mockedGet.mockResolvedValue(initialMeta);
-    return renderHook(() => useCombined('doujin'));
+    return renderHook(() => useCombined('doujin'), { wrapper: createWrapper() });
 };
 
 describe('useBookSeries', () => {

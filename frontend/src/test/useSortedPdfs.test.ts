@@ -6,7 +6,7 @@
  */
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useSortedPdfs } from '../hooks/useSortedPdfs';
+import { useSortedPdfs } from '../hooks/library/useSortedPdfs';
 import type { PdfFile, SortOrder } from '../types';
 
 const pdf = (name: string, created_at = 0): PdfFile => ({ name, thumbnail: null, created_at });

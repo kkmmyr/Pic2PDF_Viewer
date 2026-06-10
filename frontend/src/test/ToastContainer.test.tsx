@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { ToastContainer } from '../components/reader/ToastContainer';
+import { ToastContainer } from '../components/ui/ToastContainer';
 import type { Toast } from '../hooks/useToast';
 
 const t = (id: number, message: string, type: Toast['type'] = 'info'): Toast => ({

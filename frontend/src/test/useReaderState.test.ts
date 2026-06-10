@@ -44,14 +44,14 @@ vi.mock('../hooks', () => ({
     }),
 }));
 
-vi.mock('../hooks/useNextSeriesVolume', () => ({
+vi.mock('../hooks/reader/useNextSeriesVolume', () => ({
     useNextSeriesVolume: () => null,
     usePrevSeriesVolume: () => null,
 }));
-vi.mock('../hooks/useRelatedBooks', () => ({
+vi.mock('../hooks/reader/useRelatedBooks', () => ({
     useRelatedBooks: () => ({ series: [], authors: [] }),
 }));
-vi.mock('../hooks/usePdfSearch', () => ({
+vi.mock('../hooks/reader/usePdfSearch', () => ({
     usePdfSearch: () => ({
         searchText: '',
         setSearchText: vi.fn(),
@@ -64,7 +64,7 @@ vi.mock('../hooks/usePdfSearch', () => ({
         onDocumentLoaded: vi.fn(),
     }),
 }));
-vi.mock('../hooks/useReaderUIState', () => ({
+vi.mock('../hooks/reader/useReaderUIState', () => ({
     useReaderUIState: () => ({
         showHeader: false,
         showHeaderOn: vi.fn(),
@@ -81,7 +81,7 @@ vi.mock('../hooks/useReaderUIState', () => ({
         closeHelp: vi.fn(),
     }),
 }));
-vi.mock('../hooks/usePdfDocumentState', () => ({
+vi.mock('../hooks/reader/usePdfDocumentState', () => ({
     usePdfDocumentState: () => ({
         numPages: 0,
         setNumPages: vi.fn(),
@@ -91,7 +91,7 @@ vi.mock('../hooks/usePdfDocumentState', () => ({
         handleDocumentLoadSuccess: vi.fn(),
     }),
 }));
-vi.mock('../hooks/useRelatedBooksNavigation', () => ({
+vi.mock('../hooks/reader/useRelatedBooksNavigation', () => ({
     useRelatedBooksNavigation: () => ({
         isOnRelatedPage: false,
         setIsOnRelatedPage: vi.fn(),
@@ -100,20 +100,20 @@ vi.mock('../hooks/useRelatedBooksNavigation', () => ({
         handleSelectRelated: vi.fn(),
     }),
 }));
-vi.mock('../hooks/useReadProgressTracker', () => ({ useReadProgressTracker: vi.fn() }));
-vi.mock('../hooks/useVolumeNavigation', () => ({
+vi.mock('../hooks/reader/useReadProgressTracker', () => ({ useReadProgressTracker: vi.fn() }));
+vi.mock('../hooks/reader/useVolumeNavigation', () => ({
     useVolumeNavigation: () => ({
         handleNavigateNextVolume: vi.fn(),
         handleNavigatePrevVolume: vi.fn(),
     }),
 }));
-vi.mock('../hooks/useReaderInput', () => ({ useReaderInput: vi.fn() }));
+vi.mock('../hooks/reader/useReaderInput', () => ({ useReaderInput: vi.fn() }));
 vi.mock('../config/api', () => ({
     buildStaticUrl: (p: string) => p,
     STATIC_PATHS: { PDF: () => '/test.pdf' },
 }));
 
-import { useReaderState } from '../hooks/useReaderState';
+import { useReaderState } from '../hooks/reader/useReaderState';
 
 const defaultProps = {
     selectedPdf: 'test.pdf',
@@ -124,7 +124,9 @@ const defaultProps = {
 };
 
 describe('useReaderState', () => {
-    beforeEach(() => { vi.clearAllMocks(); });
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
     it('初期状態: direction="rtl", numPages=0, isImageMode=false', () => {
         const { result } = renderHook(() => useReaderState(defaultProps));

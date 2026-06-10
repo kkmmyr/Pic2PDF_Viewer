@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { RelatedBooksPage } from '../components/reader/RelatedBooksPage';
-import type { RelatedBooks } from '../hooks/useRelatedBooks';
+import type { RelatedBooks } from '../hooks/reader/useRelatedBooks';
 
 const empty: RelatedBooks = { series: [], authors: [] };
 

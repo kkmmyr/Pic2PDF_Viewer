@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, waitFor } from '@testing-library/react';
-import { RenameDialog } from '../components/viewer/RenameDialog';
+import { RenameDialog } from '../components/library/RenameDialog';
 
 const renderDialog = (overrides: Partial<Parameters<typeof RenameDialog>[0]> = {}) => {
     const props = {

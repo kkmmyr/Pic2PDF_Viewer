@@ -1,5 +1,0 @@
-export { LibraryPanel } from './LibraryPanel';
-export { ReaderPanel } from './ReaderPanel';
-export { RenameDialog } from './RenameDialog';
-export { BulkAuthorDialog } from './BulkAuthorDialog';
-export { MergeDialog } from './MergeDialog';

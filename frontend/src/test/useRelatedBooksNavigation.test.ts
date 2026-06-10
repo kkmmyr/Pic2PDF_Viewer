@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useRelatedBooksNavigation } from '../hooks/useRelatedBooksNavigation';
+import { useRelatedBooksNavigation } from '../hooks/reader/useRelatedBooksNavigation';
 
 describe('useRelatedBooksNavigation', () => {
     const mockRecordView = vi.fn();

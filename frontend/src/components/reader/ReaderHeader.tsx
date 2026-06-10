@@ -10,29 +10,8 @@ import {
     Minimize2,
     HelpCircle,
 } from 'lucide-react';
-import type { ReadingDirection, SpreadMode } from '../../types';
-
-interface ReaderHeaderProps {
-    selectedPdf: string;
-    direction: ReadingDirection;
-    spreadMode: SpreadMode;
-    pageNumber: number;
-    numPages: number;
-    isEditMode: boolean;
-    showHeader: boolean;
-    isSearchOpen: boolean;
-    isFullscreen: boolean;
-    /** 関連書籍ページ中はページ番号インジケータを非表示にする */
-    hidePageIndicator?: boolean;
-    onClose: () => void;
-    onToggleDirection: () => void;
-    onCycleSpreadMode: () => void;
-    onToggleEditMode: () => void;
-    onMouseLeave: () => void;
-    onToggleSearch: () => void;
-    onToggleFullscreen: () => void;
-    onOpenHelp: () => void;
-}
+import type { SpreadMode } from '../../types';
+import { useReaderContext } from '../../contexts/ReaderContext';
 
 const SPREAD_MODE_CONFIG: Record<
     SpreadMode,
@@ -43,38 +22,40 @@ const SPREAD_MODE_CONFIG: Record<
     single: { label: 'Single', icon: <FileText className="w-4 h-4" />, next: 'auto' },
 };
 
-export function ReaderHeader({
-    selectedPdf,
-    direction,
-    spreadMode,
-    pageNumber,
-    numPages,
-    isEditMode,
-    showHeader,
-    isSearchOpen,
-    isFullscreen,
-    hidePageIndicator = false,
-    onClose,
-    onToggleDirection,
-    onCycleSpreadMode,
-    onToggleEditMode,
-    onMouseLeave,
-    onToggleSearch,
-    onToggleFullscreen,
-    onOpenHelp,
-}: ReaderHeaderProps) {
+export function ReaderHeader() {
+    const {
+        selectedPdf,
+        direction,
+        spreadMode,
+        pageNumber,
+        numPages,
+        isEditMode,
+        showHeader,
+        isSearchOpen,
+        isFullscreen,
+        isOnRelatedPage,
+        handleClose,
+        toggleDirection,
+        cycleSpreadMode,
+        toggleEditMode,
+        showHeaderOff,
+        toggleSearch,
+        toggleFullscreen,
+        openHelp,
+    } = useReaderContext();
+
     return (
         <div
             className={`fixed top-0 left-0 right-0 border-b border-gray-200 dark:border-gray-700 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm shrink-0 z-header transition-transform duration-300 ${
                 !showHeader ? '-translate-y-full' : 'translate-y-0'
             }`}
             style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-            onMouseLeave={onMouseLeave}
+            onMouseLeave={showHeaderOff}
         >
             <div className="h-16 flex items-center px-4 justify-between">
                 <div className="flex items-center gap-4">
                     <button
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
                     >
                         <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />
@@ -86,14 +67,13 @@ export function ReaderHeader({
 
                 <div className="flex items-center gap-2">
                     <button
-                        onClick={onToggleDirection}
+                        onClick={toggleDirection}
                         className="px-3 py-1.5 text-sm font-medium bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors"
                     >
                         {direction === 'rtl' ? 'Right Binding (RTL)' : 'Left Binding (LTR)'}
                     </button>
-                    {/* 見開きモードトグル（Auto / Spread / Single を循環） */}
                     <button
-                        onClick={onCycleSpreadMode}
+                        onClick={cycleSpreadMode}
                         title={`次のモード: ${SPREAD_MODE_CONFIG[spreadMode].next}`}
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-1.5 ${
                             spreadMode === 'auto'
@@ -105,7 +85,7 @@ export function ReaderHeader({
                         {SPREAD_MODE_CONFIG[spreadMode].label}
                     </button>
 
-                    {!hidePageIndicator && (
+                    {!isOnRelatedPage && (
                         <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
                             {pageNumber} / {numPages}
                         </span>
@@ -113,9 +93,8 @@ export function ReaderHeader({
 
                     <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-2" />
 
-                    {/* 検索ボタン */}
                     <button
-                        onClick={onToggleSearch}
+                        onClick={toggleSearch}
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                             isSearchOpen
                                 ? 'bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300'
@@ -127,9 +106,8 @@ export function ReaderHeader({
                         Search
                     </button>
 
-                    {/* フルスクリーン切替ボタン */}
                     <button
-                        onClick={onToggleFullscreen}
+                        onClick={toggleFullscreen}
                         className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                         title={isFullscreen ? 'フルスクリーン解除 (f)' : 'フルスクリーン (f)'}
                     >
@@ -140,9 +118,8 @@ export function ReaderHeader({
                         )}
                     </button>
 
-                    {/* ショートカット一覧ボタン */}
                     <button
-                        onClick={onOpenHelp}
+                        onClick={openHelp}
                         className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                         title="ショートカット一覧 (?)"
                     >
@@ -150,7 +127,7 @@ export function ReaderHeader({
                     </button>
 
                     <button
-                        onClick={onToggleEditMode}
+                        onClick={toggleEditMode}
                         title="編集モード (e) — ページ削除グリッドを開く"
                         className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors flex items-center gap-2 ${
                             isEditMode

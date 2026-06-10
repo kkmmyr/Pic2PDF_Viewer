@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useLibrarySelectionShortcut } from '../hooks/useLibrarySelectionShortcut';
+import { useLibrarySelectionShortcut } from '../hooks/library/useLibrarySelectionShortcut';
 
 const press = (key: string, options: Partial<KeyboardEventInit> = {}) => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key, ...options }));

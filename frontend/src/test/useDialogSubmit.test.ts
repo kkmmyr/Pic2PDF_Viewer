@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useDialogSubmit } from '../hooks/useDialogSubmit';
+import { useDialogSubmit } from '../hooks/library/useDialogSubmit';
 
 describe('useDialogSubmit', () => {
     it('初期状態は saving=false / error=null', () => {

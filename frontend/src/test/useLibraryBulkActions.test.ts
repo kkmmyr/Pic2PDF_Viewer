@@ -8,7 +8,7 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import { useLibraryBulkActions } from '../hooks/useLibraryBulkActions';
+import { useLibraryBulkActions } from '../hooks/library/useLibraryBulkActions';
 
 const makeOptions = (overrides: Record<string, unknown> = {}) => ({
     currentPath: '',

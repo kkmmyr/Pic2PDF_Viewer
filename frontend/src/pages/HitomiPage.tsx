@@ -5,7 +5,7 @@ import { useToast } from '../hooks/useToast';
 import { useAsyncToast } from '../hooks/useAsyncToast';
 import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
 import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
-import { ToastContainer } from '../components/reader/ToastContainer';
+import { ToastContainer } from '../components/ui/ToastContainer';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Alert } from '../components/ui/Alert';
 import { errorMessage } from '../utils/error';

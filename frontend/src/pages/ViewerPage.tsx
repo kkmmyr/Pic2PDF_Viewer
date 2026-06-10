@@ -1,36 +1,34 @@
 import { useEffect, useCallback } from 'react';
-import { LibraryPanel, ReaderPanel } from '../components/viewer';
-import { useUrlState } from '../hooks/useUrlState';
+import { useQueryClient } from '@tanstack/react-query';
+import { LibraryPanel } from '../components/library';
+import { ReaderPanel } from '../components/reader';
+import { useUrlState } from '../hooks/library/useUrlState';
 import { useCurrentSource } from '../hooks/useCurrentSource';
 import { useLibraryStore } from '../stores/libraryStore';
+import { pdfQueryKey } from '../hooks/library/useLibraryPdfs';
 
 function LibraryView() {
     const { currentPath, selectedPdf, navigateUp, selectPdf, clearPdf } = useUrlState();
     const currentSource = useCurrentSource();
-    const { setContext, fetchPdfs, bumpVersion, version } = useLibraryStore();
+    const { setContext } = useLibraryStore();
+    const queryClient = useQueryClient();
 
-    // Sync URL-derived context to store, then fetch pdfs.
-    // setContext is synchronous so fetchPdfs reads the updated path/source immediately.
+    // URL 由来のコンテキストをストアに同期する。
+    // PDF 一覧の取得は useLibraryPanel 内の useLibraryPdfs が担う。
     useEffect(() => {
         setContext(currentPath, currentSource);
-        void fetchPdfs();
-    }, [currentPath, currentSource, setContext, fetchPdfs]);
-
-    // Re-fetch when an operation (rename, thumbnail regen, etc.) bumps the version.
-    // Skip version === 0 to avoid double-fetch on first mount.
-    useEffect(() => {
-        if (version > 0) void fetchPdfs();
-    }, [version, fetchPdfs]);
+    }, [currentPath, currentSource, setContext]);
 
     const handlePdfClick = useCallback(
         (name: string) => selectPdf(name, currentPath),
         [selectPdf, currentPath],
     );
 
-    const handleUpClick = useCallback(
-        () => navigateUp(currentPath),
-        [navigateUp, currentPath],
-    );
+    const handleUpClick = useCallback(() => navigateUp(currentPath), [navigateUp, currentPath]);
+
+    const handlePdfUpdated = useCallback(() => {
+        void queryClient.invalidateQueries({ queryKey: pdfQueryKey(currentPath, currentSource) });
+    }, [queryClient, currentPath, currentSource]);
 
     return (
         <div className="h-full flex flex-col relative">
@@ -43,7 +41,7 @@ function LibraryView() {
                     selectedPdf={selectedPdf}
                     currentPath={currentPath}
                     currentSource={currentSource}
-                    onPdfUpdated={bumpVersion}
+                    onPdfUpdated={handlePdfUpdated}
                     onClose={clearPdf}
                     onSelectPdf={handlePdfClick}
                 />

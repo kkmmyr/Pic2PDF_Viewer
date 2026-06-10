@@ -3,10 +3,10 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, FileText, Maximize2, Minimize2, Wand2 } from 'lucide-react';
 
 import { useWindowSize } from '../hooks';
-import { useFullscreen } from '../hooks/useFullscreen';
-import { useReaderNavigation } from '../hooks/useReaderNavigation';
-import { useReaderUIState } from '../hooks/useReaderUIState';
-import { useSpreadMode } from '../hooks/useSpreadMode';
+import { useFullscreen } from '../hooks/reader/useFullscreen';
+import { useReaderNavigation } from '../hooks/reader/useReaderNavigation';
+import { useReaderUIState } from '../hooks/reader/useReaderUIState';
+import { useSpreadMode } from '../hooks/reader/useSpreadMode';
 import { fetchBooks } from '../features/novel_db/api';
 import type { SpreadMode } from '../types';
 

@@ -1,4 +1,6 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 vi.mock('../config/api_client', () => ({
@@ -6,7 +8,15 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import apiClient from '../config/api_client';
-import { useBookMetaCore } from '../hooks/useBookMetaCore';
+import { useBookMetaCore, makeBookMetaKey } from '../hooks/library/useBookMetaCore';
+
+const createWrapper = () => {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+};
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 
@@ -17,7 +27,7 @@ describe('useBookMetaCore', () => {
 
     it('マウント時に GET /api/meta?source= が呼ばれる', async () => {
         mockedGet.mockResolvedValue({});
-        renderHook(() => useBookMetaCore('doujin'));
+        renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(mockedGet).toHaveBeenCalledWith('/api/meta', { params: { source: 'doujin' } });
     });
@@ -26,38 +36,32 @@ describe('useBookMetaCore', () => {
         mockedGet.mockResolvedValue({
             'a.pdf': { authors: ['作者A'], view_count: 5 },
         });
-        const { result } = renderHook(() => useBookMetaCore('doujin'));
+        const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
         expect(result.current.getAuthors('', 'a.pdf')).toEqual(['作者A']);
     });
 
     it('GET 失敗で meta は空 {} にフォールバック', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => useBookMetaCore('doujin'));
+        const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.meta).toEqual({});
     });
 
     it('GET の戻り値が undefined でも空 {} に正規化', async () => {
         mockedGet.mockResolvedValue(undefined);
-        const { result } = renderHook(() => useBookMetaCore('doujin'));
+        const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(result.current.meta).toEqual({});
     });
 
     describe('makeKey', () => {
-        it('path 空文字なら name のみ', async () => {
-            mockedGet.mockResolvedValue({});
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
-            await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-            expect(result.current.makeKey('', 'a.pdf')).toBe('a.pdf');
+        it('path 空文字なら name のみ', () => {
+            expect(makeBookMetaKey('', 'a.pdf')).toBe('a.pdf');
         });
 
-        it('path 指定で "{path}/{name}" に結合', async () => {
-            mockedGet.mockResolvedValue({});
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
-            await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-            expect(result.current.makeKey('sub', 'a.pdf')).toBe('sub/a.pdf');
+        it('path 指定で "{path}/{name}" に結合', () => {
+            expect(makeBookMetaKey('sub', 'a.pdf')).toBe('sub/a.pdf');
         });
     });
 
@@ -76,7 +80,7 @@ describe('useBookMetaCore', () => {
 
         it('getAuthors: エントリありで配列、不在で空配列', async () => {
             mockedGet.mockResolvedValue(META);
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getAuthors('', 'a.pdf')).toEqual(['作者A']);
             expect(result.current.getAuthors('', 'missing.pdf')).toEqual([]);
@@ -84,7 +88,7 @@ describe('useBookMetaCore', () => {
 
         it('getSeries: series_id ありで {id, title, index}、無しで null', async () => {
             mockedGet.mockResolvedValue(META);
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getSeries('', 'a.pdf')).toEqual({
                 id: 's1',
@@ -96,7 +100,7 @@ describe('useBookMetaCore', () => {
 
         it('getSeries: series_index 欠落で 0 にフォールバック', async () => {
             mockedGet.mockResolvedValue({ 'a.pdf': { series_id: 's1', series_title: 'X' } });
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getSeries('', 'a.pdf')?.index).toBe(0);
         });
@@ -107,7 +111,7 @@ describe('useBookMetaCore', () => {
                 'v.pdf': { hidden: false },
                 'n.pdf': {},
             });
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['h.pdf']).toBeDefined());
             expect(result.current.isHidden('', 'h.pdf')).toBe(true);
             expect(result.current.isHidden('', 'v.pdf')).toBe(false);
@@ -117,7 +121,7 @@ describe('useBookMetaCore', () => {
 
         it('getViewCount: あれば値、無ければ 0', async () => {
             mockedGet.mockResolvedValue(META);
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getViewCount('', 'a.pdf')).toBe(7);
             expect(result.current.getViewCount('', 'missing.pdf')).toBe(0);
@@ -125,7 +129,7 @@ describe('useBookMetaCore', () => {
 
         it('getLastViewedAt: あれば値、無ければ undefined', async () => {
             mockedGet.mockResolvedValue(META);
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getLastViewedAt('', 'a.pdf')).toBe(12345);
             expect(result.current.getLastViewedAt('', 'missing.pdf')).toBeUndefined();
@@ -136,7 +140,7 @@ describe('useBookMetaCore', () => {
                 'done.pdf': { view_count: 0, read_state: 'done' },
                 'unread.pdf': { view_count: 5, read_state: 'unread' },
             });
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['done.pdf']).toBeDefined());
             expect(result.current.getReadState('', 'done.pdf')).toBe('done');
             expect(result.current.getReadState('', 'unread.pdf')).toBe('unread');
@@ -148,7 +152,7 @@ describe('useBookMetaCore', () => {
                 'started.pdf': { view_count: 1 },
                 'often.pdf': { view_count: 10 },
             });
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['fresh.pdf']).toBeDefined());
             expect(result.current.getReadState('', 'fresh.pdf')).toBe('unread');
             expect(result.current.getReadState('', 'started.pdf')).toBe('reading');
@@ -161,7 +165,7 @@ describe('useBookMetaCore', () => {
                 'a.pdf': { authors: ['ルート'] },
                 'sub/a.pdf': { authors: ['サブ'] },
             });
-            const { result } = renderHook(() => useBookMetaCore('doujin'));
+            const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
             await waitFor(() => expect(result.current.meta['a.pdf']).toBeDefined());
             expect(result.current.getAuthors('', 'a.pdf')).toEqual(['ルート']);
             expect(result.current.getAuthors('sub', 'a.pdf')).toEqual(['サブ']);
@@ -170,7 +174,7 @@ describe('useBookMetaCore', () => {
 
     it('fetchMeta を直接呼ぶと再フェッチされる', async () => {
         mockedGet.mockResolvedValueOnce({}).mockResolvedValueOnce({ 'a.pdf': { authors: ['X'] } });
-        const { result } = renderHook(() => useBookMetaCore('doujin'));
+        const { result } = renderHook(() => useBookMetaCore('doujin'), { wrapper: createWrapper() });
         await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(1));
 
         await act(async () => {
@@ -184,6 +188,7 @@ describe('useBookMetaCore', () => {
         mockedGet.mockResolvedValueOnce({}).mockResolvedValueOnce({});
         const { rerender } = renderHook(({ src }: { src: string }) => useBookMetaCore(src), {
             initialProps: { src: 'doujin' },
+            wrapper: createWrapper(),
         });
         await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(1));
 

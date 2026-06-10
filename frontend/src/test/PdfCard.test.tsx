@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { PdfCard, type PdfCardBadge } from '../components/reader/PdfCard';
+import { PdfCard, type PdfCardBadge } from '../components/library/PdfCard';
 import type { PdfFile } from '../types';
 
 const pdf: PdfFile = { name: 'book.pdf', thumbnail: null, created_at: 0 };

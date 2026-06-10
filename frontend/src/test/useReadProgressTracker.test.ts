@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useReadProgressTracker } from '../hooks/useReadProgressTracker';
+import { useReadProgressTracker } from '../hooks/reader/useReadProgressTracker';
 
 describe('useReadProgressTracker', () => {
     const mockGetReadState = vi.fn();

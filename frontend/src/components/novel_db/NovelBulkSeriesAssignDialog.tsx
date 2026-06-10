@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import { useDialogSubmit } from '../../hooks/useDialogSubmit';
+import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
 import type { BookSummary, SeriesSummary } from '../../features/novel_db/types';
 import {
     Dialog,

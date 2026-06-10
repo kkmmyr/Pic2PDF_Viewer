@@ -2,7 +2,7 @@ import { HammerIcon, Layers, Share2, Terminal, Wrench } from 'lucide-react';
 
 import { useToast } from '../hooks';
 import { formatSqliteUtcAsJst } from '../utils/date';
-import { ToastContainer } from '../components/reader/ToastContainer';
+import { ToastContainer } from '../components/ui/ToastContainer';
 
 import {
     AmazonImportButton,

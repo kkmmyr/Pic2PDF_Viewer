@@ -6,7 +6,7 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import apiClient from '../config/api_client';
-import { useSeriesSuggestion } from '../hooks/useSeriesSuggestion';
+import { useSeriesSuggestion } from '../hooks/library/useSeriesSuggestion';
 
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;
 
