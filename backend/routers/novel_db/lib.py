@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from routers._deps import log_and_raise_500
 from services.novel_db import with_db
 from services.novel_db.library import get_book_detail, list_authors, list_books, list_series
-from services.novel_db.vector_search import find_similar_books
+from services.novel_db.search import find_similar_books
 
 router = APIRouter()
 

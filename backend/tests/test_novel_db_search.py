@@ -170,9 +170,9 @@ def search_db(tmp_data_dir, monkeypatch):
         conn.commit()
 
     # クエリの embedding をスタブ（page 1 に近づくよう [0.1, 0, ...] を返す）
-    from services.novel_db import vector_search as vs_mod
+    from services.novel_db import search as search_mod
     monkeypatch.setattr(
-        vs_mod, "embed_batch",
+        search_mod, "embed_batch",
         lambda texts: [[0.1] + [0.0] * 1023 for _ in texts],
     )
 
