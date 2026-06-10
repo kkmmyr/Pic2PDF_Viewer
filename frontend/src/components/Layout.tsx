@@ -1,5 +1,6 @@
 import { Fragment, type ComponentType } from 'react';
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import {
     BookOpen,
     BookText,
@@ -138,6 +139,7 @@ export default function Layout() {
             <main className="flex-1 w-full mx-auto">
                 <Outlet />
             </main>
+            <Toaster position="bottom-right" richColors />
         </div>
     );
 }

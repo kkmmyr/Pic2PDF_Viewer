@@ -13,7 +13,6 @@ vi.mock('../hooks', () => ({
         handlePrev: vi.fn(),
         resetPage: vi.fn(),
     }),
-    useToast: () => ({ toasts: [], showToast: vi.fn(), dismissToast: vi.fn() }),
     useSpreadMode: () => ({
         spreadMode: 'auto' as const,
         isSpread: true,

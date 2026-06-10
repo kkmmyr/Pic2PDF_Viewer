@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { pdfjs } from 'react-pdf';
 import type { LibrarySource, ReadingDirection } from '../../types';
 import { buildStaticUrl, STATIC_PATHS } from '../../config/api';
+import { toast } from 'sonner';
 import {
     useWindowSize,
-    useToast,
     useBookMeta,
     useBookImages,
     useImagePreloader,
@@ -83,7 +83,6 @@ export function useReaderState({
     const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } =
         useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
-    const { toasts, showToast, dismissToast } = useToast();
 
     const { meta, getSeries, recordView, getReadState, setReadState } = useBookMeta(currentSource);
     const nextVolume = useNextSeriesVolume(meta, getSeries, currentPath, selectedPdf);
@@ -146,7 +145,7 @@ export function useReaderState({
         setPageNumber,
         onPdfUpdated,
         bumpPdfVersion,
-        showError: (msg) => showToast(msg, 'error'),
+        showError: (msg) => toast.error(msg),
     });
 
     const {
@@ -260,8 +259,6 @@ export function useReaderState({
         handlePageSize,
         isFullscreen,
         toggleFullscreen,
-        toasts,
-        dismissToast,
         pageNumber,
         setPageNumber,
         handleNext,

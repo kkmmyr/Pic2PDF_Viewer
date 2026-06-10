@@ -1,6 +1,5 @@
 export { useWindowSize } from './useWindowSize';
 export { useDarkMode } from './useDarkMode';
-export { useToast } from './useToast';
 export { useAsyncToast } from './useAsyncToast';
 export { useDebouncedValue } from './useDebouncedValue';
 export { useAutoFocusInput } from './useAutoFocusInput';

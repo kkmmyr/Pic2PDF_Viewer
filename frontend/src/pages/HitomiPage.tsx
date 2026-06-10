@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import { useHitomiArrivals } from '../hooks/useHitomiArrivals';
-import { useToast } from '../hooks/useToast';
 import { useAsyncToast } from '../hooks/useAsyncToast';
 import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
 import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
-import { ToastContainer } from '../components/ui/ToastContainer';
 import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Alert } from '../components/ui/Alert';
 import { errorMessage } from '../utils/error';
@@ -58,8 +57,7 @@ export default function HitomiPage() {
         dismissAll,
         runNow,
     } = useHitomiArrivals();
-    const { toasts, showToast, dismissToast } = useToast();
-    const runAsync = useAsyncToast(showToast);
+    const runAsync = useAsyncToast();
     const [watchlistOpen, setWatchlistOpen] = useState(false);
     const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
 
@@ -75,7 +73,7 @@ export default function HitomiPage() {
             await dismissAll();
             return true;
         }, errMsg('一括既読化に失敗しました'));
-        if (ok) showToast('全件を既読化しました', 'success');
+        if (ok) toast.success('全件を既読化しました');
     };
 
     const handleRunNow = async () => {
@@ -85,9 +83,10 @@ export default function HitomiPage() {
             const parts = [`新着 ${stats.added} 件追加`];
             if (stats.skipped > 0) parts.push(`${stats.skipped} 件スキップ（本日既に取得済み）`);
             if (stats.errors > 0) parts.push(`エラー ${stats.errors} 件`);
-            showToast(parts.join(' / '), stats.errors > 0 ? 'error' : 'success');
+            if (stats.errors > 0) toast.error(parts.join(' / '));
+            else toast.success(parts.join(' / '));
         } else {
-            showToast('新着情報を取得しました', 'success');
+            toast.success('新着情報を取得しました');
         }
     };
 
@@ -183,8 +182,8 @@ export default function HitomiPage() {
                 <HitomiWatchlistDialog
                     open
                     onClose={() => setWatchlistOpen(false)}
-                    onError={(msg) => showToast(msg, 'error')}
-                    onSuccess={(msg) => showToast(msg, 'success')}
+                    onError={toast.error}
+                    onSuccess={toast.success}
                 />
             )}
 
@@ -197,7 +196,6 @@ export default function HitomiPage() {
                 onCancel={() => setConfirmDismissAllOpen(false)}
             />
 
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </div>
     );
 }

@@ -10,7 +10,6 @@ import { ShortcutsHelpDialog } from './ShortcutsHelpDialog';
 import { ReaderHeader } from './ReaderHeader';
 import { ReaderPageView } from './ReaderPageView';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { ToastContainer } from '../ui/ToastContainer';
 
 interface ReaderPanelProps {
     selectedPdf: string;
@@ -81,9 +80,6 @@ function ReaderPanelContent() {
         pendingDeleteCount,
         confirmDeletePages,
         cancelDeletePages,
-        // ToastContainer
-        toasts,
-        dismissToast,
     } = useReaderContext();
 
     const { onTouchStart, onTouchEnd, onTouchCancel } = useTouchSwipe({
@@ -205,8 +201,6 @@ function ReaderPanelContent() {
             />
 
             <ShortcutsHelpDialog />
-
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );
 }

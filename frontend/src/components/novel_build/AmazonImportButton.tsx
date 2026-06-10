@@ -1,18 +1,11 @@
 import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
 
-interface Props {
-    showToast: (message: string, type: 'success' | 'error') => void;
-}
-
-/**
- * Amazon CSV インポートボタン。novel + comic の 2 ソースを同時インポートする。
- * インポート結果は showToast を通じて親コンポーネントのトーストに表示する。
- */
-export function AmazonImportButton({ showToast }: Props) {
+export function AmazonImportButton() {
     const [isImporting, setIsImporting] = useState(false);
 
     const handleImport = async () => {
@@ -40,11 +33,10 @@ export function AmazonImportButton({ showToast }: Props) {
                     novelRes.status === 'rejected'
                         ? (novelRes.reason as Error).message
                         : ((comicRes as PromiseRejectedResult).reason as Error).message;
-                showToast(`インポート失敗: ${msg}`, 'error');
+                toast.error(`インポート失敗: ${msg}`);
             } else {
-                showToast(
+                toast.success(
                     `更新: ${updated} 件 / スキップ: ${skipped} 件 / 未マッチ: ${unmatched} 件`,
-                    'success',
                 );
             }
         } finally {

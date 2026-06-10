@@ -1,6 +1,8 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { toast } from 'sonner';
 
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('../config/api_client', () => ({
     default: {
         post: vi.fn(),
@@ -25,7 +27,6 @@ const makeOptions = (overrides: Record<string, unknown> = {}) => ({
         assignSeries: vi.fn().mockResolvedValue('sid'),
         reorderSeries: vi.fn().mockResolvedValue(undefined),
     },
-    showToast: vi.fn(),
     addGenre: vi.fn().mockResolvedValue(undefined),
     currentGenres: ['既存ジャンル'] as string[],
     ...overrides,
@@ -117,6 +118,8 @@ describe('useLibraryBulkActions', () => {
     });
 
     describe('handleBulkToggleHidden', () => {
+        beforeEach(() => { vi.mocked(toast.error).mockClear(); });
+
         it('PDF が未選択なら何も呼ばない', async () => {
             const opts = makeOptions({ selectedItems: new Set<string>(['folder']) });
             const { result } = renderHook(() => useLibraryBulkActions(opts));
@@ -151,7 +154,7 @@ describe('useLibraryBulkActions', () => {
             expect(opts.bookMeta.setHidden).toHaveBeenCalledWith('', ['a.pdf', 'b.pdf'], false);
         });
 
-        it('setHidden 失敗時は showToast を呼ぶ', async () => {
+        it('setHidden 失敗時は toast.error を呼ぶ', async () => {
             const opts = makeOptions();
             opts.bookMeta.setHidden = vi.fn().mockRejectedValue(new Error('失敗'));
             const { result } = renderHook(() => useLibraryBulkActions(opts));
@@ -160,11 +163,13 @@ describe('useLibraryBulkActions', () => {
                 await result.current.handleBulkToggleHidden();
             });
 
-            expect(opts.showToast).toHaveBeenCalledWith('失敗', 'error');
+            expect(toast.error).toHaveBeenCalledWith('失敗');
         });
     });
 
     describe('handleToggleHiddenOne', () => {
+        beforeEach(() => { vi.mocked(toast.error).mockClear(); });
+
         it('showHidden=false のとき hidden=true で setHidden を呼ぶ', async () => {
             const opts = makeOptions({ showHidden: false });
             const { result } = renderHook(() => useLibraryBulkActions(opts));
@@ -176,7 +181,7 @@ describe('useLibraryBulkActions', () => {
             expect(opts.bookMeta.setHidden).toHaveBeenCalledWith('', ['a.pdf'], true);
         });
 
-        it('setHidden 失敗時は showToast を呼ぶ', async () => {
+        it('setHidden 失敗時は toast.error を呼ぶ', async () => {
             const opts = makeOptions();
             opts.bookMeta.setHidden = vi.fn().mockRejectedValue(new Error('エラー'));
             const { result } = renderHook(() => useLibraryBulkActions(opts));
@@ -185,7 +190,7 @@ describe('useLibraryBulkActions', () => {
                 await result.current.handleToggleHiddenOne('a.pdf');
             });
 
-            expect(opts.showToast).toHaveBeenCalledWith('エラー', 'error');
+            expect(toast.error).toHaveBeenCalledWith('エラー');
         });
     });
 });

@@ -4,7 +4,6 @@ import { LibraryHeader } from './LibraryHeader';
 import { GenreFilterBar } from './GenreFilterBar';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
-import { ToastContainer } from '../ui/ToastContainer';
 
 interface LibraryPanelProps {
     onPdfClick: (name: string) => void;
@@ -74,8 +73,6 @@ function LibraryPdfGrid() {
 }
 
 function LibraryPanelContent() {
-    const { toasts, dismissToast } = useLibraryPanelContext();
-
     return (
         <>
             <LibraryHeader />
@@ -87,7 +84,6 @@ function LibraryPanelContent() {
                 </div>
             </div>
             <SeriesEditDialog />
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </>
     );
 }

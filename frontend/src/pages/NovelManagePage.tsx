@@ -1,8 +1,6 @@
 import { HammerIcon, Layers, Share2, Terminal, Wrench } from 'lucide-react';
 
-import { useToast } from '../hooks';
 import { formatSqliteUtcAsJst } from '../utils/date';
-import { ToastContainer } from '../components/ui/ToastContainer';
 
 import {
     AmazonImportButton,
@@ -56,7 +54,6 @@ export default function NovelManagePage() {
         books,
         unifiedRows,
     } = useNovelManage();
-    const { toasts, showToast, dismissToast } = useToast();
 
     return (
         <div className="max-w-3xl mx-auto px-4 py-8">
@@ -71,7 +68,7 @@ export default function NovelManagePage() {
                         OCR → Full Build の順で実施する統合管理画面
                     </p>
                 </div>
-                <AmazonImportButton showToast={showToast} />
+                <AmazonImportButton />
             </div>
 
             {/* タブ */}
@@ -243,7 +240,6 @@ export default function NovelManagePage() {
                     </div>
                 )}
             </div>
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
         </div>
     );
 }

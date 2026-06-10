@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { toast } from 'sonner';
 import type {
     LibrarySource,
     RegenerateThumbnailBulkResponse,
@@ -6,7 +7,6 @@ import type {
 } from '../../types';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
-import type { ToastType } from '../useToast';
 import { useAsyncToast } from '../useAsyncToast';
 
 /**
@@ -33,7 +33,6 @@ interface UseLibraryBulkActionsOptions {
     onClearSelection: () => void;
     onRefresh: () => void;
     bookMeta: BookMetaActions;
-    showToast: (message: string, type?: ToastType) => void;
     addGenre: (name: string) => Promise<void>;
     currentGenres: string[];
 }
@@ -52,11 +51,10 @@ export function useLibraryBulkActions({
     onClearSelection,
     onRefresh,
     bookMeta,
-    showToast,
     addGenre,
     currentGenres,
 }: UseLibraryBulkActionsOptions) {
-    const runAsync = useAsyncToast(showToast);
+    const runAsync = useAsyncToast();
 
     /** 選択中の PDF 名のみ抽出（`.pdf` 以外は除外） */
     const selectedPdfNames = useMemo(
@@ -119,12 +117,10 @@ export function useLibraryBulkActions({
         if (!data) return;
         onRefresh();
         if (data.failed.length > 0) {
-            showToast(
+            toast.error(
                 `${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`,
-                'error',
             );
         }
-        // 部分失敗があっても、成功した分はあるので選択は解除する（押し直しの意図がない）
         onClearSelection();
     }, [
         selectedPdfNames,
@@ -133,7 +129,6 @@ export function useLibraryBulkActions({
         onRefresh,
         onClearSelection,
         runAsync,
-        showToast,
     ]);
 
     const handleMergePdfs = useCallback(
@@ -177,7 +172,7 @@ export function useLibraryBulkActions({
         if (!ok) return;
         onRefresh();
         onClearSelection();
-        showToast(`${selectedPdfNames.length} 件を削除しました`, 'success');
+        toast.success(`${selectedPdfNames.length} 件を削除しました`);
     }, [
         selectedPdfNames,
         currentPath,
@@ -185,7 +180,6 @@ export function useLibraryBulkActions({
         onRefresh,
         onClearSelection,
         runAsync,
-        showToast,
     ]);
 
     const handleBulkAssignSeries = useCallback(
@@ -204,10 +198,10 @@ export function useLibraryBulkActions({
                 'シリーズ登録に失敗しました。',
                 { rethrow: true },
             );
-            showToast(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`, 'success');
+            toast.success(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`);
             onClearSelection();
         },
-        [bookMeta, currentPath, bulkSeriesNames, runAsync, showToast, onClearSelection],
+        [bookMeta, currentPath, bulkSeriesNames, runAsync, onClearSelection],
     );
 
     return {

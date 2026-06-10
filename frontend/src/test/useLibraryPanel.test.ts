@@ -79,7 +79,6 @@ vi.mock('../hooks', () => ({
         refreshMeta: vi.fn(),
     }),
     useLibraryFilter: () => ({ filteredPdfs: [] }),
-    useToast: () => ({ toasts: [], showToast: vi.fn(), dismissToast: vi.fn() }),
     useUrlFilters: () => ({
         authorFilter: '',
         seriesFilter: '',

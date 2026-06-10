@@ -5,7 +5,6 @@ import {
     useSortedPdfs,
     useBookMeta,
     useLibraryFilter,
-    useToast,
     useUrlFilters,
     useLibrarySettings,
     useLibraryBulkActions,
@@ -122,8 +121,7 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         refreshMeta,
     } = useBookMeta(currentSource);
     const { genres, addGenre, removeGenre, reorderGenres } = useGenres(currentSource);
-    const { toasts, showToast, dismissToast } = useToast();
-    const runAsync = useAsyncToast(showToast);
+    const runAsync = useAsyncToast();
 
     const { pinnedBooks, contextualFavorites } = usePinnedBookSets({
         meta,
@@ -204,7 +202,6 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         seriesFilter,
         onClearSelection: clearSelection,
         onRefresh: invalidatePdfs,
-        showToast,
         bookMeta: {
             updateAuthors,
             updateGenre,
@@ -316,9 +313,6 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         addGenre,
         removeGenre,
         reorderGenres,
-        // toast
-        toasts,
-        dismissToast,
         // display
         grouped,
         displayPdfs,
