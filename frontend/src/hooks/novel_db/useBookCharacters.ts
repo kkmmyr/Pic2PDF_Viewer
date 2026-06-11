@@ -4,7 +4,7 @@
  * BookCard の「登場人物」トグル展開時にのみ fetch する想定。
  * `enabled=false` の間は API を叩かない。
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBookCharacters } from '@/features/novel_db/api';
@@ -20,6 +20,11 @@ export interface UseBookCharacters {
 export function useBookCharacters(bookName: string, enabled: boolean): UseBookCharacters {
     // refetch の失敗を追跡する補助 state（TanStack Query v5 はデータありの場合 error を更新しない）
     const [refetchError, setRefetchError] = useState<string | null>(null);
+
+    // bookName が変わったら前の書籍のエラーをクリア
+    useEffect(() => {
+        setRefetchError(null);
+    }, [bookName]);
 
     const query = useQuery({
         queryKey: ['bookCharacters', bookName],

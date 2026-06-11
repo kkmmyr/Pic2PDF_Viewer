@@ -18,25 +18,30 @@ const mockBulkSelectItems = vi.fn();
 const mockToggleSeriesPin = vi.fn();
 const mockToggleAuthorPin = vi.fn();
 const mockRecordView = vi.fn();
+const mockCloseRenameDialog = vi.fn();
 
 const mockMembersByRep = new Map<string, { name: string }[]>();
 const mockSelectedItems = new Set<string>();
 const mockMeta: Record<string, { series_id?: string; authors?: string[] }> = {};
 
+// handleRename テスト用に変更可能なストア状態
+let mockCurrentPath = '';
+let mockCurrentSource: 'doujin' | 'comic' | 'novel' = 'doujin';
+let mockRenameTarget: { name: string; isFolder: boolean } | null = null;
+
 vi.mock('../stores/libraryStore', () => ({
     useLibraryStore: () => ({
-        currentPath: '',
-        currentSource: 'doujin' as const,
+        currentPath: mockCurrentPath,
+        currentSource: mockCurrentSource,
         isSelectionMode: false,
         selectedItems: mockSelectedItems,
-        renameTarget: null,
+        renameTarget: mockRenameTarget,
         toggleSelectionMode: vi.fn(),
         clearSelection: vi.fn(),
         toggleSelectItem: mockToggleSelectItem,
         bulkSelectItems: mockBulkSelectItems,
         openRenameDialog: vi.fn(),
-        closeRenameDialog: vi.fn(),
-        handleRename: vi.fn(),
+        closeRenameDialog: mockCloseRenameDialog,
     }),
 }));
 
@@ -154,11 +159,16 @@ vi.mock('../hooks/useAsyncToast', () => ({
     useAsyncToast: () => vi.fn(),
 }));
 
-vi.mock('../config/api_client', () => ({ default: { post: vi.fn() } }));
-vi.mock('../config/api', () => ({ API_ENDPOINTS: { REGENERATE_THUMBNAIL: '/api/thumb' } }));
+vi.mock('../config/api_client', () => ({ default: { post: vi.fn(), patch: vi.fn() } }));
+vi.mock('../config/api', () => ({
+    API_ENDPOINTS: { REGENERATE_THUMBNAIL: '/api/thumb', RENAME: '/api/rename' },
+}));
 vi.mock('../utils/authors', () => ({ authorsKey: (a: string[]) => a.join('\n') }));
 
+import apiClient from '@/config/api_client';
 import { useLibraryPanel } from '@/hooks/library/useLibraryPanel';
+
+const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;
 
 describe('useLibraryPanel', () => {
     beforeEach(() => {
@@ -166,6 +176,9 @@ describe('useLibraryPanel', () => {
         mockMembersByRep.clear();
         mockSelectedItems.clear();
         Object.keys(mockMeta).forEach((k) => delete mockMeta[k]);
+        mockCurrentPath = '';
+        mockCurrentSource = 'doujin';
+        mockRenameTarget = null;
     });
 
     it('スモークテスト: hook が正常にレンダーされる', () => {
@@ -223,5 +236,68 @@ describe('useLibraryPanel', () => {
         });
         expect(mockRecordView).toHaveBeenCalledWith('', 'test.pdf');
         expect(onPdfClick).toHaveBeenCalledWith('test.pdf');
+    });
+
+    describe('handleRename', () => {
+        it('renameTarget が null のとき PATCH を呼ばない', async () => {
+            // mockRenameTarget = null (beforeEach でリセット済み)
+            const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+                wrapper: createWrapper(),
+            });
+            await act(async () => {
+                await result.current.handleRename('new.pdf');
+            });
+            expect(mockedPatch).not.toHaveBeenCalled();
+        });
+
+        it('renameTarget があるとき PATCH /api/rename を正しいパラメータで呼ぶ', async () => {
+            mockedPatch.mockResolvedValue(undefined);
+            mockCurrentPath = 'sub';
+            mockCurrentSource = 'comic';
+            mockRenameTarget = { name: 'old.pdf', isFolder: false };
+
+            const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+                wrapper: createWrapper(),
+            });
+            await act(async () => {
+                await result.current.handleRename('new.pdf');
+            });
+
+            expect(mockedPatch).toHaveBeenCalledWith('/api/rename', {
+                path: 'sub',
+                old_name: 'old.pdf',
+                new_name: 'new.pdf',
+                source: 'comic',
+                is_folder: false,
+            });
+        });
+
+        it('フォルダリネームで is_folder=true が body に乗る', async () => {
+            mockedPatch.mockResolvedValue(undefined);
+            mockRenameTarget = { name: 'subfolder', isFolder: true };
+
+            const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+                wrapper: createWrapper(),
+            });
+            await act(async () => {
+                await result.current.handleRename('newfolder');
+            });
+
+            expect(mockedPatch.mock.calls[0][1].is_folder).toBe(true);
+        });
+
+        it('PATCH 成功後に closeRenameDialog が呼ばれる', async () => {
+            mockedPatch.mockResolvedValue(undefined);
+            mockRenameTarget = { name: 'old.pdf', isFolder: false };
+
+            const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+                wrapper: createWrapper(),
+            });
+            await act(async () => {
+                await result.current.handleRename('new.pdf');
+            });
+
+            expect(mockCloseRenameDialog).toHaveBeenCalledTimes(1);
+        });
     });
 });

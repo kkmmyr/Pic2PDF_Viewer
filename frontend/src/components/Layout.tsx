@@ -1,5 +1,6 @@
 import { Fragment, Suspense, type ComponentType } from 'react';
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Toaster } from 'sonner';
 import {
     BookOpen,
@@ -135,9 +136,11 @@ export default function Layout() {
                 </header>
             )}
             <main className="flex-1 w-full mx-auto">
-                <Suspense fallback={null}>
-                    <Outlet />
-                </Suspense>
+                <ErrorBoundary>
+                    <Suspense fallback={null}>
+                        <Outlet />
+                    </Suspense>
+                </ErrorBoundary>
             </main>
             <Toaster position="bottom-right" richColors />
         </div>

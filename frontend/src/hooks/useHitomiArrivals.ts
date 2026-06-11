@@ -112,6 +112,20 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
                 undefined,
                 { timeout: 120_000 },
             );
+            // run 系フィールドをキャッシュに直接書き込む。
+            // invalidateQueries の refetchType:'active' はコンポーネント非アクティブ時に
+            // refetch をスキップするため、戻ってきたときに lastRunAt 等が更新されない。
+            // setQueryData で先に書いておけばアンマウント中でも結果が保持される。
+            queryClient.setQueryData<ArrivalsData>(QUERY_KEY, (old) =>
+                old
+                    ? {
+                          ...old,
+                          lastRunAt: resp.last_run_at,
+                          lastRunStatus: resp.last_run_status as RunStatus,
+                          lastError: resp.last_error,
+                      }
+                    : old,
+            );
             await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
             return resp.last_run_stats;
         } finally {

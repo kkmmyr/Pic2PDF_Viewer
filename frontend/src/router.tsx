@@ -19,6 +19,7 @@ export const router = createBrowserRouter([
     {
         path: '/',
         element: <Layout />,
+        errorElement: <RouteErrorPage />,
         children: [
             { index: true, element: <Navigate to="/doujin" replace /> },
             { path: 'doujin', element: <ViewerPage />, errorElement: err },

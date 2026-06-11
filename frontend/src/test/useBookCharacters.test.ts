@@ -50,12 +50,14 @@ describe('useBookCharacters', () => {
         expect(result.current.error).toBeNull();
     });
 
-    it('fetch 失敗で error がセットされ characters は空', async () => {
-        mockedFetch.mockResolvedValueOnce([]);
+    it('refetch 失敗で error がセットされ直前のデータが保持される', async () => {
+        // TanStack Query v5: refetch 失敗時もキャッシュのデータは保持される
+        const initial = [{ name: 'キャラA' }];
+        mockedFetch.mockResolvedValueOnce(initial);
         const { result } = renderHook(() => useBookCharacters('book.pdf', true), {
             wrapper: createWrapper(),
         });
-        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        await waitFor(() => expect(result.current.characters).toHaveLength(1));
 
         mockedFetch.mockRejectedValueOnce(new Error('API error'));
         await act(async () => {
@@ -63,7 +65,8 @@ describe('useBookCharacters', () => {
         });
 
         expect(result.current.error).toBeTruthy();
-        expect(result.current.characters).toEqual([]);
+        // 失敗後も直前の成功データが残る（空にならない）
+        expect(result.current.characters).toHaveLength(1);
     });
 
     it('refetch() で再フェッチできる', async () => {

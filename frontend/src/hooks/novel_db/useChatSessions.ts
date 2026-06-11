@@ -80,6 +80,8 @@ export function useChatSessionDetail(sessionId: number | null): UseChatSessionDe
         queryFn: () => fetchChatSessionDetail(sessionId!),
         enabled: sessionId !== null,
         staleTime: 0,
+        // SSE ストリーム中に楽観的メッセージが上書きされるのを防ぐ
+        refetchOnWindowFocus: false,
     });
 
     const [streamingAnswer, setStreamingAnswer] = useState('');
