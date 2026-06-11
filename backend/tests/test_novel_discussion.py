@@ -3,11 +3,10 @@
 - discussion_service: トークン推定・メッセージ構築・ターンパース・保存/一覧
 - router: SSE ストリーミング・トークン超過エラー（TestClient + monkeypatch）
 """
+
 from __future__ import annotations
 
 import json
-
-import pytest
 
 from services.novel_db.discussion_service import (
     MAX_INPUT_TOKENS,
@@ -23,6 +22,7 @@ from services.novel_db.search import SearchHit
 # ---------------------------------------------------------------------------
 # ヘルパー
 # ---------------------------------------------------------------------------
+
 
 def _hit(page: int, text: str = "本文テスト") -> SearchHit:
     return SearchHit(
@@ -43,6 +43,7 @@ _PERSONA_B = Persona(name="ファン", style_description="感情的・フラン�
 # estimate_book_tokens
 # ---------------------------------------------------------------------------
 
+
 def test_estimate_book_tokens_basic():
     hits = [_hit(1, "あ" * 1500), _hit(2, "い" * 1500)]
     tokens = estimate_book_tokens(hits)
@@ -57,6 +58,7 @@ def test_estimate_book_tokens_empty():
 # ---------------------------------------------------------------------------
 # build_messages
 # ---------------------------------------------------------------------------
+
 
 def test_build_messages_structure():
     hits = [_hit(1, "本文ページ1"), _hit(2, "本文ページ2")]
@@ -84,6 +86,7 @@ def test_build_messages_num_turns_in_user():
 # ---------------------------------------------------------------------------
 # _parse_turns_from_text（内部ロジック）
 # ---------------------------------------------------------------------------
+
 
 def test_parse_turns_basic():
     text = "[A]: 最初の発言。\n[B]: 応答の発言。\n[A]: 二回目の発言。"
@@ -120,7 +123,7 @@ def test_parse_turns_no_markers():
 # stream_discussion_turns（monkeypatch）
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
+
 async def test_stream_discussion_turns_emits_turns(monkeypatch):
     from services.novel_db import discussion_service
 
@@ -147,7 +150,6 @@ async def test_stream_discussion_turns_emits_turns(monkeypatch):
     assert events[2] == {"type": "turn", "speaker": "A", "text": "続きの発言。"}
 
 
-@pytest.mark.asyncio
 async def test_stream_discussion_turns_single_turn(monkeypatch):
     from services.novel_db import discussion_service
 
@@ -169,6 +171,7 @@ async def test_stream_discussion_turns_single_turn(monkeypatch):
 # ---------------------------------------------------------------------------
 # save_discussion / list_discussions
 # ---------------------------------------------------------------------------
+
 
 def test_save_and_list_discussion(tmp_data_dir, monkeypatch):
     from pathlib import Path
@@ -207,6 +210,7 @@ def test_list_discussions_empty_when_no_dir(tmp_data_dir, monkeypatch):
 # router: トークン超過エラー
 # ---------------------------------------------------------------------------
 
+
 def test_generate_token_overflow_returns_error_sse(client, monkeypatch):
     """本文が MAX_INPUT_TOKENS を超えるときエラー SSE が返る。"""
     # ルーターは `from services.novel_db.search import load_all_pages_of_book` で
@@ -243,6 +247,7 @@ def test_generate_token_overflow_returns_error_sse(client, monkeypatch):
 def test_generate_no_pages_returns_error_sse(client, monkeypatch):
     """インデックスが空のときエラー SSE が返る。"""
     import routers.novel_discussion as disc_router
+
     monkeypatch.setattr(disc_router, "load_all_pages_of_book", lambda *a, **kw: [])
 
     payload = {

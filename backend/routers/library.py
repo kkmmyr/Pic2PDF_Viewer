@@ -1,14 +1,15 @@
 import os
+from collections.abc import Callable
 from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from natsort import natsorted
 from pydantic import BaseModel
 
-from config import get_dirs_by_source
+from config import SourceDirs, get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
 from services.file_manager import FileManager
-from services.meta_store import make_key, update_meta_locked
+from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from utils.file_naming import get_thumbnail_name
 from utils.file_utils import is_image_file
@@ -20,7 +21,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 
-def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) -> dict:
+def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: SourceDirs) -> dict:
     """images/ サブディレクトリを走査して書籍一覧を返す（全ソース共通）。
 
     images/{book}/ ディレクトリを正とし、WebP / PNG / JPG 等任意の画像形式に対応。
@@ -55,7 +56,7 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) 
         thumb_url = None
         if os.path.exists(thumb_path):
             rel = join_path(path, thumb_name) if path else thumb_name
-            encoded = '/'.join(quote(seg, safe='') for seg in rel.replace(os.sep, '/').split('/'))
+            encoded = "/".join(quote(seg, safe="") for seg in rel.replace(os.sep, "/").split("/"))
             thumb_url = f"{url_prefix_thumb}/{encoded}"
         else:
             # fitz は WebP を読めないため PIL 経路で生成（PNG/JPG も同様に対応）
@@ -63,11 +64,13 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: dict) 
             background_tasks.add_task(generate_thumbnail_from_image, first_img, thumb_path)
 
         created_at = int(os.path.getctime(item_path))
-        files.append({
-            "name": pdf_name,
-            "thumbnail": thumb_url,
-            "created_at": created_at,
-        })
+        files.append(
+            {
+                "name": pdf_name,
+                "thumbnail": thumb_url,
+                "created_at": created_at,
+            }
+        )
 
     return {"files": files, "current_path": path}
 
@@ -80,6 +83,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = D
 
     # 全ソース共通: images/ サブディレクトリを走査（WebP / PNG / JPG を含むフォルダを書籍として返す）
     return _list_from_images(background_tasks, path, dirs)
+
 
 @router.get("/books/{path:path}/images")
 @log_and_raise_500("list_book_images")
@@ -102,15 +106,17 @@ def list_book_images(path: str, source: str = Depends(validated_source)):
     images = [f for f in files if is_image_file(f)]
 
     from natsort import natsorted
+
     images = natsorted(images)
 
     image_urls = []
     for img in images:
         rel_path = join_path(path, img)
-        encoded = '/'.join(quote(seg, safe='') for seg in rel_path.replace(os.sep, '/').split('/'))
+        encoded = "/".join(quote(seg, safe="") for seg in rel_path.replace(os.sep, "/").split("/"))
         image_urls.append(f"{url_prefix}/{encoded}")
 
     return {"images": image_urls}
+
 
 class RenameItemRequest(BaseModel):
     path: str
@@ -130,9 +136,7 @@ def rename_item(request: RenameItemRequest):
     dirs = get_dirs_by_source(request.source)
 
     try:
-        FileManager.rename_with_assets(
-            request.path, request.old_name, request.new_name, request.is_folder, dirs
-        )
+        FileManager.rename_with_assets(request.path, request.old_name, request.new_name, request.is_folder, dirs)
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail="Item not found") from e
     except FileExistsError as e:
@@ -150,7 +154,7 @@ def rename_item(request: RenameItemRequest):
             new_prefix = new_key + "/"
             for k in list(data.keys()):
                 if k.startswith(old_prefix):
-                    data[new_prefix + k[len(old_prefix):]] = data.pop(k)
+                    data[new_prefix + k[len(old_prefix) :]] = data.pop(k)
         else:
             if old_key in data:
                 data[new_key] = data.pop(old_key)
@@ -175,11 +179,17 @@ def delete_pdfs(request: DeletePdfsRequest):
     deleted_count = 0
     errors = []
 
+    def _make_dropper(k: str) -> Callable[[MetaDict], None]:
+        def _drop(data: MetaDict) -> None:
+            data.pop(k, None)
+
+        return _drop
+
     for name in request.names:
         try:
             FileManager.delete_with_assets(name, request.path, dirs)
             key = make_key(request.path, name)
-            update_meta_locked(request.source, lambda data, k=key: data.pop(k, None))
+            update_meta_locked(request.source, _make_dropper(key))
             deleted_count += 1
         except FileNotFoundError:
             errors.append(f"Not found: {name}")

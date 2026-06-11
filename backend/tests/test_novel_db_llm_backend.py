@@ -4,9 +4,8 @@ Phase 74 で `_llm_backend.py` を廃止。Backend は各サービスファイ�
 インライン構築されるため、テストは `_astream_ask` / `astream_chat` の
 monkeypatch と `build_prompt` 安定性確認に絞る。
 """
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 
 class TestStreamQaPassthrough:
@@ -16,7 +15,6 @@ class TestStreamQaPassthrough:
     （Backend 実体の動作は common/llm/tests/ で網羅）。
     """
 
-    @pytest.mark.asyncio
     async def test_stream_qa_uses_default_options_and_model(self, monkeypatch):
         from services.novel_db import llm
 
@@ -44,7 +42,6 @@ class TestStreamQaPassthrough:
         assert events[0]["response"] == "ok"
         assert events[-1]["done"] is True
 
-    @pytest.mark.asyncio
     async def test_stream_qa_accepts_custom_options(self, monkeypatch):
         from services.novel_db import llm
 
@@ -72,13 +69,19 @@ class TestBuildPromptStability:
 
         hits = [
             SearchHit(
-                book_name="Book A", page_no=5, snippet="本文",
-                has_highlight=False, image_url=None, rrf_score=1.0,
+                book_name="Book A",
+                page_no=5,
+                snippet="本文",
+                has_highlight=False,
+                image_url=None,
+                rrf_score=1.0,
                 main_characters=["太郎"],
             ),
         ]
         prompt = build_prompt(
-            "Q?", hits, Scope(type="book", id="Book A"),
+            "Q?",
+            hits,
+            Scope(type="book", id="Book A"),
         )
         # book scope なので [page N, 主要登場人物: ...] になり書名は含まれない
         assert "[page 5" in prompt
@@ -90,13 +93,19 @@ class TestBuildPromptStability:
 
         hits = [
             SearchHit(
-                book_name="Book A", page_no=1, snippet="x",
-                has_highlight=False, image_url=None, rrf_score=1.0,
+                book_name="Book A",
+                page_no=1,
+                snippet="x",
+                has_highlight=False,
+                image_url=None,
+                rrf_score=1.0,
                 main_characters=[],
             ),
         ]
         prompt = build_prompt(
-            "Q?", hits, Scope(type="all"),
+            "Q?",
+            hits,
+            Scope(type="all"),
             book_summaries={"Book A": "あらすじ"},
         )
         assert "【書籍俯瞰サマリ】" in prompt
