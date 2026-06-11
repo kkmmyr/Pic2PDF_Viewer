@@ -1,4 +1,5 @@
 """embedder.py のユニットテスト。Ollama への HTTP 呼び出しをモックする。"""
+
 from unittest.mock import MagicMock, patch
 
 import httpx

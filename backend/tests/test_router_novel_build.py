@@ -1,4 +1,5 @@
 """routers/novel_build.py の HTTP レイヤテスト（worker は動かさない）。"""
+
 import pytest
 
 from services.novel_db import with_db
@@ -14,6 +15,7 @@ def db_initialized(tmp_data_dir):
 # ---------------------------------------------------------------------------
 # POST /api/novel/build/enqueue
 # ---------------------------------------------------------------------------
+
 
 def test_enqueue_single_book(client, db_initialized):
     res = client.post("/api/novel/build/enqueue", json={"book_name": "花太郎", "all_books": False})
@@ -53,6 +55,7 @@ def test_enqueue_different_books_allowed(client, db_initialized):
 # GET /api/novel/build/status
 # ---------------------------------------------------------------------------
 
+
 def test_status_empty_queue(client, db_initialized):
     res = client.get("/api/novel/build/status")
     assert res.status_code == 200
@@ -89,10 +92,9 @@ def test_status_queued_position_increments(client, db_initialized):
 # DELETE /api/novel/build/jobs/{job_id}
 # ---------------------------------------------------------------------------
 
+
 def test_cancel_queued_job(client, db_initialized):
-    enqueue_res = client.post(
-        "/api/novel/build/enqueue", json={"book_name": "花太郎", "all_books": False}
-    )
+    enqueue_res = client.post("/api/novel/build/enqueue", json={"book_name": "花太郎", "all_books": False})
     job_id = enqueue_res.json()["job_id"]
 
     res = client.delete(f"/api/novel/build/jobs/{job_id}")
@@ -108,9 +110,7 @@ def test_cancel_nonexistent_job_returns_404(client, db_initialized):
 
 
 def test_cancel_running_job_returns_409(client, db_initialized):
-    enqueue_res = client.post(
-        "/api/novel/build/enqueue", json={"book_name": "花太郎", "all_books": False}
-    )
+    enqueue_res = client.post("/api/novel/build/enqueue", json={"book_name": "花太郎", "all_books": False})
     job_id = enqueue_res.json()["job_id"]
 
     # 手動で running 状態に更新

@@ -1,4 +1,5 @@
 """services/amazon_csv_importer.py のユニットテスト。"""
+
 import csv
 import io
 from pathlib import Path
@@ -20,6 +21,7 @@ from services.amazon_csv_parser import ParsedRow
 # ---------------------------------------------------------------------------
 # _normalize
 # ---------------------------------------------------------------------------
+
 
 class TestNormalize:
     def test_巻番号を除去する(self):
@@ -49,9 +51,16 @@ class TestNormalize:
 # _parse_digital_orders
 # ---------------------------------------------------------------------------
 
+
 def _make_digital_csv(rows: list[dict], encoding: str = "utf-8-sig") -> bytes:
-    fields = ["Order ID", "ASIN", "Digital Order Item ID", "Product Name",
-              "Subscription Order Type", "Seller of Record"]
+    fields = [
+        "Order ID",
+        "ASIN",
+        "Digital Order Item ID",
+        "Product Name",
+        "Subscription Order Type",
+        "Seller of Record",
+    ]
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fields)
     writer.writeheader()
@@ -66,12 +75,16 @@ class TestParseDigitalOrders:
         assert result == {}
 
     def test_正常行からLookupEntryを作成する(self, tmp_path):
-        data = _make_digital_csv([{
-            "Order ID": "D01",
-            "ASIN": "B001234567",
-            "Digital Order Item ID": "doi1",
-            "Product Name": "テスト書籍",
-        }])
+        data = _make_digital_csv(
+            [
+                {
+                    "Order ID": "D01",
+                    "ASIN": "B001234567",
+                    "Digital Order Item ID": "doi1",
+                    "Product Name": "テスト書籍",
+                }
+            ]
+        )
         csv_path = tmp_path / "orders.csv"
         csv_path.write_bytes(data)
         result = _parse_digital_orders(csv_path)
@@ -79,35 +92,45 @@ class TestParseDigitalOrders:
         assert result["B001234567"].title == "テスト書籍"
 
     def test_サブスクタイプは除外される(self, tmp_path):
-        data = _make_digital_csv([{
-            "Order ID": "D02",
-            "ASIN": "B999999999",
-            "Digital Order Item ID": "doi2",
-            "Product Name": "サブスク",
-            "Subscription Order Type": "Subscription_Renewal",
-        }])
+        data = _make_digital_csv(
+            [
+                {
+                    "Order ID": "D02",
+                    "ASIN": "B999999999",
+                    "Digital Order Item ID": "doi2",
+                    "Product Name": "サブスク",
+                    "Subscription Order Type": "Subscription_Renewal",
+                }
+            ]
+        )
         csv_path = tmp_path / "orders.csv"
         csv_path.write_bytes(data)
         result = _parse_digital_orders(csv_path)
         assert "B999999999" not in result
 
     def test_同一ASINの重複行は1件に集約される(self, tmp_path):
-        data = _make_digital_csv([
-            {"Order ID": "D03", "ASIN": "B111111111", "Digital Order Item ID": "doi3a", "Product Name": "本A"},
-            {"Order ID": "D03", "ASIN": "B111111111", "Digital Order Item ID": "doi3b", "Product Name": "本A"},
-        ])
+        data = _make_digital_csv(
+            [
+                {"Order ID": "D03", "ASIN": "B111111111", "Digital Order Item ID": "doi3a", "Product Name": "本A"},
+                {"Order ID": "D03", "ASIN": "B111111111", "Digital Order Item ID": "doi3b", "Product Name": "本A"},
+            ]
+        )
         csv_path = tmp_path / "orders.csv"
         csv_path.write_bytes(data)
         result = _parse_digital_orders(csv_path)
         assert len([k for k in result if k == "B111111111"]) == 1
 
     def test_Product_Nameが空の行はスキップされる(self, tmp_path):
-        data = _make_digital_csv([{
-            "Order ID": "D04",
-            "ASIN": "B222222222",
-            "Digital Order Item ID": "doi4",
-            "Product Name": "",
-        }])
+        data = _make_digital_csv(
+            [
+                {
+                    "Order ID": "D04",
+                    "ASIN": "B222222222",
+                    "Digital Order Item ID": "doi4",
+                    "Product Name": "",
+                }
+            ]
+        )
         csv_path = tmp_path / "orders.csv"
         csv_path.write_bytes(data)
         result = _parse_digital_orders(csv_path)
@@ -117,6 +140,7 @@ class TestParseDigitalOrders:
 # ---------------------------------------------------------------------------
 # _build_lookup
 # ---------------------------------------------------------------------------
+
 
 class TestBuildLookup:
     def _row(self, asin: str, title: str, authors: list[str] | None = None) -> ParsedRow:
@@ -168,6 +192,7 @@ class TestBuildLookup:
 # _match
 # ---------------------------------------------------------------------------
 
+
 class TestMatch:
     def _entry(self, asin: str, title: str) -> _LookupEntry:
         return _LookupEntry(asin=asin, title=title)
@@ -208,6 +233,7 @@ class TestMatch:
 # run_import
 # ---------------------------------------------------------------------------
 
+
 class TestRunImport:
     def test_不正sourceはValueErrorを送出する(self):
         # run_import は source を直接チェックしないがルーターで制御
@@ -223,16 +249,27 @@ class TestRunImport:
         digital_dir.mkdir(parents=True)
         digital_csv = digital_dir / "Digital Content Orders.csv"
 
-        fields = ["Order ID", "ASIN", "Digital Order Item ID", "Product Name",
-                  "Subscription Order Type", "Seller of Record"]
+        fields = [
+            "Order ID",
+            "ASIN",
+            "Digital Order Item ID",
+            "Product Name",
+            "Subscription Order Type",
+            "Seller of Record",
+        ]
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=fields)
         writer.writeheader()
-        writer.writerow({
-            "Order ID": "D01", "ASIN": "B001234567",
-            "Digital Order Item ID": "doi1", "Product Name": "テスト書籍",
-            "Subscription Order Type": "", "Seller of Record": "",
-        })
+        writer.writerow(
+            {
+                "Order ID": "D01",
+                "ASIN": "B001234567",
+                "Digital Order Item ID": "doi1",
+                "Product Name": "テスト書籍",
+                "Subscription Order Type": "",
+                "Seller of Record": "",
+            }
+        )
         digital_csv.write_text(buf.getvalue(), encoding="utf-8-sig")
 
         captured_meta = {}
@@ -254,16 +291,27 @@ class TestRunImport:
         digital_dir.mkdir(parents=True)
         digital_csv = digital_dir / "Digital Content Orders.csv"
 
-        fields = ["Order ID", "ASIN", "Digital Order Item ID", "Product Name",
-                  "Subscription Order Type", "Seller of Record"]
+        fields = [
+            "Order ID",
+            "ASIN",
+            "Digital Order Item ID",
+            "Product Name",
+            "Subscription Order Type",
+            "Seller of Record",
+        ]
         buf = io.StringIO()
         writer = csv.DictWriter(buf, fieldnames=fields)
         writer.writeheader()
-        writer.writerow({
-            "Order ID": "D01", "ASIN": "B001",
-            "Digital Order Item ID": "doi1", "Product Name": "テスト書籍",
-            "Subscription Order Type": "", "Seller of Record": "",
-        })
+        writer.writerow(
+            {
+                "Order ID": "D01",
+                "ASIN": "B001",
+                "Digital Order Item ID": "doi1",
+                "Product Name": "テスト書籍",
+                "Subscription Order Type": "",
+                "Seller of Record": "",
+            }
+        )
         digital_csv.write_text(buf.getvalue(), encoding="utf-8-sig")
 
         def fake_update(source, updater):

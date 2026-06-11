@@ -5,6 +5,7 @@ Usage:
     cd backend
     uv run python scripts/compare_char_extract.py
 """
+
 import sqlite3
 import sys
 import time
@@ -43,9 +44,9 @@ def run_comparison():
         print("ERROR: サンプルが取得できませんでした")
         return
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"サンプル数: {len(samples)} ページ")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     results: dict[str, list] = {m: [] for m in MODELS}
     times: dict[str, float] = {m: 0.0 for m in MODELS}
@@ -66,7 +67,7 @@ def run_comparison():
         print()
 
     # サマリ
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print("【合計時間】")
     for model in MODELS:
         avg = times[model] / len(samples)
@@ -74,10 +75,7 @@ def run_comparison():
 
     print()
     print("【一致率】")
-    match = sum(
-        1 for i in range(len(samples))
-        if set(results[MODELS[0]][i]) == set(results[MODELS[1]][i])
-    )
+    match = sum(1 for i in range(len(samples)) if set(results[MODELS[0]][i]) == set(results[MODELS[1]][i]))
     print(f"  e4b と 12b が完全一致: {match}/{len(samples)} ページ")
 
     print()
@@ -88,7 +86,7 @@ def run_comparison():
         r1 = results[MODELS[1]][i]
         if set(r0) != set(r1):
             any_diff = True
-            print(f"  サンプル {i+1} ({book[:30]})")
+            print(f"  サンプル {i + 1} ({book[:30]})")
             print(f"    e4b  → {r0}")
             print(f"    12b  → {r1}")
     if not any_diff:

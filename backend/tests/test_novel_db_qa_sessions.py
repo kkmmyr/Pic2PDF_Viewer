@@ -2,6 +2,7 @@
 
 DB 入出力のみのテスト。LLM 呼び出しは含まない（router 側で別途モック化）。
 """
+
 import pytest
 
 from services.novel_db import with_db
@@ -43,8 +44,12 @@ def test_append_message_records_role_and_meta(empty_db):
         append_message(conn, sid, role="system", content="sys")
         append_message(conn, sid, role="user", content="Q1")
         append_message(
-            conn, sid, role="assistant", content="A1",
-            eval_count=42, done_reason="stop",
+            conn,
+            sid,
+            role="assistant",
+            content="A1",
+            eval_count=42,
+            done_reason="stop",
         )
 
     with with_db() as conn:
@@ -103,7 +108,8 @@ def test_delete_session_cascades_messages(empty_db):
         assert get_session_meta(conn, sid) is None
         # CASCADE で qa_messages も消える
         row = conn.execute(
-            "SELECT COUNT(*) FROM qa_messages WHERE session_id = ?", (sid,),
+            "SELECT COUNT(*) FROM qa_messages WHERE session_id = ?",
+            (sid,),
         ).fetchone()
         assert row[0] == 0
 

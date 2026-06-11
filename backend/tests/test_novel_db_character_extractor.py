@@ -2,6 +2,7 @@
 
 Ollama 呼び出しはモックする（テストでは _parse_names と短文スキップだけ確認）。
 """
+
 from unittest.mock import patch
 
 from services.novel_db.character_extractor import _parse_names, extract_main_characters
@@ -10,10 +11,9 @@ from services.novel_db.character_extractor import _parse_names, extract_main_cha
 # _parse_names
 # ---------------------------------------------------------------------------
 
+
 def test_parse_names_simple_csv():
-    assert _parse_names("レティ, デューク, アストリッド") == [
-        "レティ", "デューク", "アストリッド"
-    ]
+    assert _parse_names("レティ, デューク, アストリッド") == ["レティ", "デューク", "アストリッド"]
 
 
 def test_parse_names_japanese_comma():
@@ -58,6 +58,7 @@ def test_parse_names_skips_overly_long_fragments():
 # ---------------------------------------------------------------------------
 # extract_main_characters の境界条件
 # ---------------------------------------------------------------------------
+
 
 def test_extract_returns_empty_for_empty_text():
     assert extract_main_characters("") == []

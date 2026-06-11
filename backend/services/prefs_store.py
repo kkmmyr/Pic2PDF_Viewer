@@ -4,6 +4,7 @@
   - ui_filters(source PK, read_state_filter, genre_filter)
   - group_pins(source, pin_type, group_id, book_name; PK=(source,pin_type,group_id))
 """
+
 from services.meta_db import connect
 
 

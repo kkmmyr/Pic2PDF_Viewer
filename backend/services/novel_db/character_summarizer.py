@@ -2,6 +2,7 @@
 
 DB アクセス（book_characters テーブルの CRUD・集計）は character_db.py を参照。
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -35,7 +36,7 @@ _TARGET_CHARS = 400
 _OPTIONS = {
     "temperature": 0.2,
     "repeat_penalty": 1.15,
-    "num_predict": 1024,   # 400 字 + 余裕
+    "num_predict": 1024,  # 400 字 + 余裕
     # 主要キャラの body は 80k 字（_MAX_BODY_CHARS）まで取り得る ≒ ~50k tokens。
     # B-14 の llama-server は num_ctx=131072 起動なので余裕を持って 65536。
     "num_ctx": 65536,
@@ -70,8 +71,7 @@ def summarize_character(
         if total_chars + len(block) > _MAX_BODY_CHARS:
             if progress is not None:
                 progress(
-                    f"    body limit {_MAX_BODY_CHARS:,} chars reached "
-                    f"after page {page_no} (truncated)",
+                    f"    body limit {_MAX_BODY_CHARS:,} chars reached after page {page_no} (truncated)",
                 )
             break
         blocks.append(block)
@@ -79,6 +79,9 @@ def summarize_character(
 
     body = "\n\n".join(blocks)
     prompt = _PROMPT.format(
-        book_name=book_name, char_name=char_name, body=body, target=_TARGET_CHARS,
+        book_name=book_name,
+        char_name=char_name,
+        body=body,
+        target=_TARGET_CHARS,
     )
     return QWEN_BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()

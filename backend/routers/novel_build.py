@@ -5,6 +5,7 @@ GET    /api/novel/build/status          — キュー状態スナップショッ
 DELETE /api/novel/build/jobs/{job_id}   — 待機中ジョブキャンセル
 GET    /api/novel/build/stream          — キュー状態 SSE ストリーム（API §8）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -25,6 +26,7 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 # リクエスト / レスポンスモデル
 # ---------------------------------------------------------------------------
+
 
 class EnqueueRequest(BaseModel):
     book_name: str | None = Field(default=None)
@@ -83,16 +85,12 @@ def _is_already_queued_or_running(book_name: str | None, mode: str) -> bool:
     with with_db() as conn:
         if book_name is None:
             row = conn.execute(
-                "SELECT 1 FROM rebuild_jobs "
-                "WHERE mode=? AND job_type='all' "
-                "AND state IN ('queued','running') LIMIT 1",
+                "SELECT 1 FROM rebuild_jobs WHERE mode=? AND job_type='all' AND state IN ('queued','running') LIMIT 1",
                 (mode,),
             ).fetchone()
         else:
             row = conn.execute(
-                "SELECT 1 FROM rebuild_jobs "
-                "WHERE mode=? AND target_id=? "
-                "AND state IN ('queued','running') LIMIT 1",
+                "SELECT 1 FROM rebuild_jobs WHERE mode=? AND target_id=? AND state IN ('queued','running') LIMIT 1",
                 (mode, book_name),
             ).fetchone()
     return row is not None
@@ -102,6 +100,7 @@ def _is_already_queued_or_running(book_name: str | None, mode: str) -> bool:
 # エンドポイント
 # ---------------------------------------------------------------------------
 
+
 @router.post("/novel/build/enqueue")
 @log_and_raise_500("novel/build/enqueue")
 def post_enqueue(request: EnqueueRequest) -> dict:
@@ -110,16 +109,12 @@ def post_enqueue(request: EnqueueRequest) -> dict:
         raise HTTPException(status_code=422, detail=f"invalid mode: {request.mode}")
 
     if not request.all_books and not request.book_name:
-        raise HTTPException(
-            status_code=422, detail="book_name is required when all_books=false"
-        )
+        raise HTTPException(status_code=422, detail="book_name is required when all_books=false")
 
     target_book = None if request.all_books else request.book_name
 
     if _is_already_queued_or_running(target_book, request.mode):
-        raise HTTPException(
-            status_code=422, detail="already queued or running"
-        )
+        raise HTTPException(status_code=422, detail="already queued or running")
 
     job_type = "all" if request.all_books else "book"
     job_id, queued_position = job_queue.enqueue(job_type, target_book, request.mode)

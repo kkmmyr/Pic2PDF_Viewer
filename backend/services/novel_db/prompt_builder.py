@@ -4,6 +4,7 @@ LLM 呼び出し（stream_qa / stream_chat）とは独立した純関数群。
 プロンプトテンプレートと context 整形ロジックをここに集約し、
 llm.py はストリーミング呼び出しのみを担う。
 """
+
 from __future__ import annotations
 
 from typing import Any

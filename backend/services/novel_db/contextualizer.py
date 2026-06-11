@@ -17,6 +17,7 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 詳細は docs/01_要件定義/機能追加候補.md B-9 / 同設計書 §6.5（書籍サマリベクトル
 検索）と並ぶ「検索品質改善 2 段目」。
 """
+
 from __future__ import annotations
 
 from local_llm import LLMError
@@ -116,7 +117,7 @@ def _clean_response(text: str) -> str:
     # 「位置説明:」「場面:」のような前置きを除去
     for prefix in ("位置説明:", "位置説明：", "場面:", "場面：", "出力:", "出力："):
         if text.startswith(prefix):
-            text = text[len(prefix):].lstrip()
+            text = text[len(prefix) :].lstrip()
     # 1 行目だけ採用（複数行返ってくる場合の保険）
     return text.split("\n", 1)[0].strip()
 

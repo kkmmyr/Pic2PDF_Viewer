@@ -1,4 +1,5 @@
 """書籍メタデータの基本 CRUD・閲覧記録エンドポイント。"""
+
 import json
 import time
 from datetime import datetime
@@ -29,12 +30,14 @@ VIEW_COUNT_DEBOUNCE_SEC = 300
 # リクエスト/レスポンスモデル
 # ---------------------------------------------------------------------------
 
+
 class UpdateMetaRequest(BaseModel):
     """単一書籍または複数書籍へのメタデータ更新リクエスト。
 
     `authors` / `hidden` / `genre` / `read_state` は省略可。省略されたフィールドは変更しない。
     すべて省略するとエラー（更新する内容が無い）。
     """
+
     path: str = ""
     names: list[str]
     authors: list[str] | None = None
@@ -46,6 +49,7 @@ class UpdateMetaRequest(BaseModel):
 
 class RecordViewRequest(BaseModel):
     """閲覧記録リクエスト。"""
+
     path: str = ""
     name: str
     source: str = "doujin"
@@ -54,6 +58,7 @@ class RecordViewRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # エンドポイント
 # ---------------------------------------------------------------------------
+
 
 @router.get("/meta")
 def get_meta(source: str = Depends(validated_source)) -> dict:
@@ -89,21 +94,12 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     すべての list フィールドが空になった場合はエントリ自体を削除する。
     """
     assert_valid_source(request.source)
-    if (
-        request.authors is None
-        and request.hidden is None
-        and request.genre is None
-        and request.read_state is None
-    ):
+    if request.authors is None and request.hidden is None and request.genre is None and request.read_state is None:
         raise HTTPException(
             status_code=400,
             detail="authors, hidden, genre, or read_state must be specified",
         )
-    if (
-        request.read_state is not None
-        and request.read_state != ""
-        and request.read_state not in VALID_READ_STATES
-    ):
+    if request.read_state is not None and request.read_state != "" and request.read_state not in VALID_READ_STATES:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid read_state. Choose from: {', '.join(VALID_READ_STATES)} or '' to clear",
@@ -156,10 +152,7 @@ def record_view(request: RecordViewRequest) -> dict:
         existing = data.get(key, {})
         prev_count = int(existing.get("view_count", 0))
         prev_viewed_at = existing.get("last_viewed_at")
-        should_increment = (
-            prev_viewed_at is None
-            or (now - float(prev_viewed_at)) >= VIEW_COUNT_DEBOUNCE_SEC
-        )
+        should_increment = prev_viewed_at is None or (now - float(prev_viewed_at)) >= VIEW_COUNT_DEBOUNCE_SEC
         new_count = prev_count + 1 if should_increment else prev_count
         merged = {**existing, "view_count": new_count, "last_viewed_at": now}
         # 読書状態の自動遷移: カウント増加時のみ unread/未設定 → reading に書き換える。

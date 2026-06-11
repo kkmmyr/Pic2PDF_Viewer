@@ -10,6 +10,7 @@
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.5 を参照。
 本スクリプトは Phase D3-2（ジョブキュー実装）後は内部で job_queue 経由に置き換える予定。
 """
+
 from __future__ import annotations
 
 import argparse

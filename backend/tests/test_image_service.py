@@ -3,6 +3,7 @@ services.image_service のユニットテスト。
 
 list_book_images / delete_book_image_pages を実際の WebP ファイルで検証する。
 """
+
 import os
 import sys
 
@@ -33,6 +34,7 @@ def _populate_book(book_dir: str, count: int) -> None:
 # ---------------------------------------------------------------------------
 # list_book_images
 # ---------------------------------------------------------------------------
+
 
 class TestListBookImages:
     def test_returns_empty_when_directory_missing(self, tmp_path):
@@ -70,6 +72,7 @@ class TestListBookImages:
 # ---------------------------------------------------------------------------
 # delete_book_image_pages
 # ---------------------------------------------------------------------------
+
 
 class TestDeleteBookImagePages:
     def test_delete_single_page(self, tmp_path):
@@ -121,6 +124,7 @@ class TestDeleteBookImagePages:
 # ---------------------------------------------------------------------------
 # reorder_book_image_pages
 # ---------------------------------------------------------------------------
+
 
 def _populate_with_distinct_colors(book_dir: str, count: int) -> list[tuple[int, int, int]]:
     """N 枚の WebP を異なる色で作って色リストを返す（順序検証用）。"""

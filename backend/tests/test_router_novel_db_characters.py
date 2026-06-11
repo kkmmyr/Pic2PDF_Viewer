@@ -1,4 +1,5 @@
 """routers/novel_db.py のキャラクター API（B-15）テスト。"""
+
 import pytest
 
 from services.novel_db import with_db
@@ -58,12 +59,14 @@ def test_get_characters_returns_registered_characters_sorted(client, book_with_p
     book_id = book_with_pages
     with with_db() as conn:
         upsert_character(
-            conn, book_id,
+            conn,
+            book_id,
             CharacterStat("レティ", first_page=2, page_count=2),
             summary="レティの人物像",
         )
         upsert_character(
-            conn, book_id,
+            conn,
+            book_id,
             CharacterStat("デューク", first_page=3, page_count=2),
             summary=None,
         )
@@ -86,7 +89,8 @@ def test_get_character_detail_returns_summary_and_top_scenes(client, book_with_p
     book_id = book_with_pages
     with with_db() as conn:
         upsert_character(
-            conn, book_id,
+            conn,
+            book_id,
             CharacterStat("レティ", first_page=2, page_count=2),
             summary="レティの人物像です",
         )

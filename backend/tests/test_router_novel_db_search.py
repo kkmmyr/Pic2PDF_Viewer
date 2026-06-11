@@ -2,6 +2,7 @@
 
 LLM (stream_qa) と embedder (embed_batch) はモックする。
 """
+
 import json
 
 import pytest
@@ -43,40 +44,43 @@ def search_setup(tmp_data_dir, monkeypatch):
             else:
                 text = filler
             cur = conn.execute(
-                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
                 (book_id, i, None, text, len(text)),
             )
             page_id = cur.lastrowid
             cur = conn.execute(
-                "INSERT INTO chunks (page_id, chunk_idx, text, char_count) "
-                "VALUES (?, ?, ?, ?)",
+                "INSERT INTO chunks (page_id, chunk_idx, text, char_count) VALUES (?, ?, ?, ?)",
                 (page_id, 0, text, len(text)),
             )
             chunk_id = cur.lastrowid
-            lance_table.add([{
-                "chunk_id": chunk_id,
-                "book_name": "book-1",
-                "page_no": i,
-                "text": text,
-                "char_count": len(text),
-                "page_count": 15,
-                "embedding": [0.1] + [0.0] * 1023,
-            }])
+            lance_table.add(
+                [
+                    {
+                        "chunk_id": chunk_id,
+                        "book_name": "book-1",
+                        "page_no": i,
+                        "text": text,
+                        "char_count": len(text),
+                        "page_count": 15,
+                        "embedding": [0.1] + [0.0] * 1023,
+                    }
+                ]
+            )
         conn.execute(
-            "INSERT INTO pages_fts (rowid, full_text) "
-            "SELECT id, full_text FROM pages WHERE book_id = ?",
+            "INSERT INTO pages_fts (rowid, full_text) SELECT id, full_text FROM pages WHERE book_id = ?",
             (book_id,),
         )
         conn.commit()
 
     from services.novel_db import search as search_mod
+
     monkeypatch.setattr(search_mod, "embed_batch", _stub_embed)
 
 
 # ---------------------------------------------------------------------------
 # 検索
 # ---------------------------------------------------------------------------
+
 
 def test_post_search_returns_hits(client, search_setup):
     res = client.post(
@@ -86,8 +90,9 @@ def test_post_search_returns_hits(client, search_setup):
     assert res.status_code == 200
     body = res.json()
     assert body["total"] >= 1
-    assert any("デューク" in (h["snippet"] or "") for h in body["hits"]) or \
-        any("<mark>" in h["snippet"] for h in body["hits"])
+    assert any("デューク" in (h["snippet"] or "") for h in body["hits"]) or any(
+        "<mark>" in h["snippet"] for h in body["hits"]
+    )
     # 各 hit の構造
     h = body["hits"][0]
     assert {"book_name", "page_no", "snippet", "has_highlight", "image_url", "rrf_score"} <= set(h)
@@ -121,6 +126,7 @@ def test_post_search_validation_oversized_query(client, search_setup):
 
 def test_post_search_returns_503_when_rebuild_running(client, search_setup, monkeypatch):
     from services.novel_db.job_queue import job_queue
+
     monkeypatch.setattr(job_queue._worker, "_is_running", True, raising=False)
     res = client.post(
         "/api/novel_db/search",
@@ -133,6 +139,7 @@ def test_post_search_returns_503_when_rebuild_running(client, search_setup, monk
 # ---------------------------------------------------------------------------
 # QA (SSE)
 # ---------------------------------------------------------------------------
+
 
 async def _stub_stream_qa_ok(prompt, **kwargs):
     """3 token + done のストリームをシミュレート。"""
@@ -150,6 +157,7 @@ async def _stub_stream_qa_raises(prompt, **kwargs):
 
 def test_post_qa_streams_tokens_and_saves_history(client, search_setup, monkeypatch):
     from routers.novel_db import qa as router_mod
+
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
 
     with client.stream(
@@ -197,6 +205,7 @@ def test_post_qa_validation_oversized_question(client, search_setup):
 
 def test_post_qa_returns_503_when_rebuild_running(client, search_setup, monkeypatch):
     from services.novel_db.job_queue import job_queue
+
     monkeypatch.setattr(job_queue._worker, "_is_running", True, raising=False)
     res = client.post(
         "/api/novel_db/qa",
@@ -209,6 +218,7 @@ def test_post_qa_returns_503_when_rebuild_running(client, search_setup, monkeypa
 # 履歴
 # ---------------------------------------------------------------------------
 
+
 def test_get_qa_history_empty_initially(client, search_setup):
     res = client.get("/api/novel_db/qa/history")
     assert res.status_code == 200
@@ -219,6 +229,7 @@ def test_get_qa_history_empty_initially(client, search_setup):
 
 def test_get_qa_history_after_qa_call(client, search_setup, monkeypatch):
     from routers.novel_db import qa as router_mod
+
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
 
     with client.stream(
@@ -245,11 +256,13 @@ def test_get_qa_history_detail_returns_404(client, search_setup):
 
 def test_delete_qa_history_returns_204(client, search_setup, monkeypatch):
     from routers.novel_db import qa as router_mod
+
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
 
     # 1 件作る
     with client.stream(
-        "POST", "/api/novel_db/qa",
+        "POST",
+        "/api/novel_db/qa",
         json={"question": "Q", "scope": {"type": "all"}},
     ) as resp:
         for line in resp.iter_lines():
@@ -274,9 +287,11 @@ def test_delete_qa_history_returns_404_for_missing(client, search_setup):
 # 履歴 book フィルタ (§7.5 book パラメータ)
 # ---------------------------------------------------------------------------
 
+
 def _make_qa(client, monkeypatch, question: str, scope: dict) -> int:
     """QA を 1 件作成して history_id を返すヘルパー。"""
     from routers.novel_db import qa as router_mod
+
     monkeypatch.setattr(router_mod, "stream_qa", _stub_stream_qa_ok)
     history_id = None
     with client.stream("POST", "/api/novel_db/qa", json={"question": question, "scope": scope}) as resp:

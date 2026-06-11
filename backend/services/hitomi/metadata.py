@@ -3,6 +3,7 @@
 `/galleries/<id>.js` は冒頭に `var galleryinfo = {...};` の形式で
 JSON が埋め込まれた JavaScript ファイル。プレフィックスを除いて JSON.parse する。
 """
+
 from __future__ import annotations
 
 import json
@@ -32,7 +33,7 @@ def parse_galleryinfo(js_text: str) -> dict[str, Any]:
     m = _PREFIX_RE.match(js_text)
     if not m:
         raise HitomiMetadataError("'var galleryinfo = ' prefix not found")
-    rest = js_text[m.end():].strip()
+    rest = js_text[m.end() :].strip()
     if rest.endswith(";"):
         rest = rest[:-1].rstrip()
     try:
@@ -67,8 +68,6 @@ def fetch_metadata(
             client.close()
 
     if r.status_code != 200:
-        raise HitomiNetworkError(
-            f"metadata fetch returned {r.status_code} for id={gallery_id}"
-        )
+        raise HitomiNetworkError(f"metadata fetch returned {r.status_code} for id={gallery_id}")
 
     return parse_galleryinfo(r.text)

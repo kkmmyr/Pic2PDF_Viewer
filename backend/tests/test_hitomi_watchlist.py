@@ -3,6 +3,7 @@
 normalize_artist_name は純粋関数。CRUD は tmp_path で隔離。
 NOZOMI 存在確認は monkeypatch で無効化（ネットワーク非依存）。
 """
+
 import json
 import os
 import sys
@@ -23,15 +24,18 @@ from services.hitomi.watchlist import (
 
 
 class TestNormalizeArtistName:
-    @pytest.mark.parametrize("name,expected", [
-        ("aka_shio", "aka_shio"),
-        ("AKA SHIO", "aka_shio"),
-        ("AKA_SHIO", "aka_shio"),
-        ("aka shio", "aka_shio"),
-        ("  aka shio  ", "aka_shio"),  # 前後空白除去
-        ("Some Artist Name", "some_artist_name"),
-        ("artist-name", "artist-name"),  # ハイフンは保持
-    ])
+    @pytest.mark.parametrize(
+        "name,expected",
+        [
+            ("aka_shio", "aka_shio"),
+            ("AKA SHIO", "aka_shio"),
+            ("AKA_SHIO", "aka_shio"),
+            ("aka shio", "aka_shio"),
+            ("  aka shio  ", "aka_shio"),  # 前後空白除去
+            ("Some Artist Name", "some_artist_name"),
+            ("artist-name", "artist-name"),  # ハイフンは保持
+        ],
+    )
     def test_ascii_normalization(self, name, expected):
         assert normalize_artist_name(name) == expected
 
@@ -101,10 +105,13 @@ class TestWatchlistCrud:
         assert entry["normalized"] == "test"
 
     def test_remove_artist_returns_true_on_hit(self, tmp_path):
-        save_watchlist(tmp_path, [
-            {"display_name": "a", "normalized": "a", "language": "japanese", "added_at": "2026-04-29"},
-            {"display_name": "b", "normalized": "b", "language": "japanese", "added_at": "2026-04-29"},
-        ])
+        save_watchlist(
+            tmp_path,
+            [
+                {"display_name": "a", "normalized": "a", "language": "japanese", "added_at": "2026-04-29"},
+                {"display_name": "b", "normalized": "b", "language": "japanese", "added_at": "2026-04-29"},
+            ],
+        )
         assert remove_artist(tmp_path, "a", "japanese") is True
         assert [e["normalized"] for e in load_watchlist(tmp_path)] == ["b"]
 
@@ -113,10 +120,13 @@ class TestWatchlistCrud:
         assert remove_artist(tmp_path, "nonexistent", "japanese") is False
 
     def test_language_distinguishes_entries(self, tmp_path):
-        save_watchlist(tmp_path, [
-            {"display_name": "a", "normalized": "a", "language": "japanese", "added_at": "2026-04-29"},
-            {"display_name": "a", "normalized": "a", "language": "english", "added_at": "2026-04-29"},
-        ])
+        save_watchlist(
+            tmp_path,
+            [
+                {"display_name": "a", "normalized": "a", "language": "japanese", "added_at": "2026-04-29"},
+                {"display_name": "a", "normalized": "a", "language": "english", "added_at": "2026-04-29"},
+            ],
+        )
         # japanese を消しても english は残る
         assert remove_artist(tmp_path, "a", "japanese") is True
         loaded = load_watchlist(tmp_path)

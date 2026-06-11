@@ -2,6 +2,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §4 / API §7.5-7.7。
 """
+
 from __future__ import annotations
 
 import json
@@ -38,6 +39,7 @@ def save_start(
         ),
     )
     conn.commit()
+    assert cur.lastrowid is not None
     return cur.lastrowid
 
 
@@ -66,9 +68,7 @@ def save_error(conn: sqlite3.Connection, history_id: int, error: str) -> None:
     conn.commit()
 
 
-def list_history(
-    conn: sqlite3.Connection, offset: int = 0, limit: int = 20, book: str | None = None
-) -> dict:
+def list_history(conn: sqlite3.Connection, offset: int = 0, limit: int = 20, book: str | None = None) -> dict:
     """[API §7.5] 一覧（要約）。book 指定時はその書籍への質問のみ返す。"""
     if book is not None:
         rows = conn.execute(
@@ -97,15 +97,17 @@ def list_history(
         preview = (answer or "")[:120]
         if len(answer or "") > 120:
             preview += "…"
-        items.append({
-            "id": id_,
-            "asked_at": asked_at,
-            "finished_at": finished_at,
-            "scope": {"type": scope_type, "id": scope_id},
-            "question": question,
-            "answer_preview": preview,
-            "done_reason": done_reason,
-        })
+        items.append(
+            {
+                "id": id_,
+                "asked_at": asked_at,
+                "finished_at": finished_at,
+                "scope": {"type": scope_type, "id": scope_id},
+                "question": question,
+                "answer_preview": preview,
+                "done_reason": done_reason,
+            }
+        )
     return {"items": items, "total": total}
 
 
@@ -119,8 +121,19 @@ def get_history_detail(conn: sqlite3.Connection, history_id: int) -> dict | None
     if row is None:
         return None
     (
-        id_, asked_at, finished_at, scope_type, scope_id, question, answer,
-        prompt, context_json, model, options_json, eval_count, done_reason,
+        id_,
+        asked_at,
+        finished_at,
+        scope_type,
+        scope_id,
+        question,
+        answer,
+        prompt,
+        context_json,
+        model,
+        options_json,
+        eval_count,
+        done_reason,
         error_message,
     ) = row
     return {

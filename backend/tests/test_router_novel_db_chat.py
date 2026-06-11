@@ -2,6 +2,7 @@
 
 LLM 呼び出しは `stream_chat` を monkeypatch して async generator を差し替える。
 """
+
 import pytest
 
 from services.novel_db import with_db
@@ -22,6 +23,7 @@ def db_initialized(tmp_data_dir):
 # ---------------------------------------------------------------------------
 # GET /qa/sessions / detail / DELETE
 # ---------------------------------------------------------------------------
+
 
 def test_get_sessions_returns_empty_when_none(client, db_initialized):
     res = client.get("/api/novel_db/sessions")
@@ -111,11 +113,13 @@ def test_delete_session_404_for_missing(client, db_initialized):
 # title PATCH
 # ---------------------------------------------------------------------------
 
+
 def test_patch_title_updates(client, db_initialized):
     with with_db() as conn:
         sid = create_session(conn, Scope(type="all", id=None), title="old")
     res = client.patch(
-        f"/api/novel_db/sessions/{sid}/title", json={"title": "new"},
+        f"/api/novel_db/sessions/{sid}/title",
+        json={"title": "new"},
     )
     assert res.status_code == 204
     detail = client.get(f"/api/novel_db/sessions/{sid}").json()
@@ -126,7 +130,8 @@ def test_patch_title_rejects_empty(client, db_initialized):
     with with_db() as conn:
         sid = create_session(conn, Scope(type="all", id=None))
     res = client.patch(
-        f"/api/novel_db/sessions/{sid}/title", json={"title": "   "},
+        f"/api/novel_db/sessions/{sid}/title",
+        json={"title": "   "},
     )
     assert res.status_code == 422
 
@@ -136,6 +141,7 @@ def test_patch_title_rejects_empty(client, db_initialized):
 #   - stream_chat を monkeypatch して 2 token + done を吐く async generator に差替
 # ---------------------------------------------------------------------------
 
+
 async def _fake_stream_chat(messages, **kwargs):
     """token + done を吐く最小ストリーム（テスト用）。"""
     yield {"response": "Hello"}
@@ -144,21 +150,27 @@ async def _fake_stream_chat(messages, **kwargs):
 
 
 def test_post_chat_session_start_creates_session_and_appends_assistant(
-    client, db_initialized, monkeypatch,
+    client,
+    db_initialized,
+    monkeypatch,
 ):
     """初手 POST: session + system + user + assistant が DB に積まれる。"""
     # ハイブリッド検索を空ヒットにモック（テストで実検索を走らせない）
     monkeypatch.setattr(
-        "services.novel_db.retrieval.hybrid_search", lambda *a, **kw: [],
+        "services.novel_db.retrieval.hybrid_search",
+        lambda *a, **kw: [],
     )
     monkeypatch.setattr(
-        "services.novel_db.retrieval.expand_query", lambda q: [q],
+        "services.novel_db.retrieval.expand_query",
+        lambda q: [q],
     )
     monkeypatch.setattr(
-        "services.novel_db.retrieval.search_book_summaries", lambda *a, **kw: [],
+        "services.novel_db.retrieval.search_book_summaries",
+        lambda *a, **kw: [],
     )
     monkeypatch.setattr(
-        "services.novel_db.retrieval.load_summaries_for_books", lambda *a, **kw: {},
+        "services.novel_db.retrieval.load_summaries_for_books",
+        lambda *a, **kw: {},
     )
     monkeypatch.setattr("routers.novel_db.chat.stream_chat", _fake_stream_chat)
 
@@ -184,7 +196,9 @@ def test_post_chat_session_start_creates_session_and_appends_assistant(
 
 
 def test_post_chat_session_message_appends_user_and_assistant(
-    client, db_initialized, monkeypatch,
+    client,
+    db_initialized,
+    monkeypatch,
 ):
     """続行 POST: 既存セッションに user + assistant が追記される。"""
     with with_db() as conn:

@@ -1,4 +1,5 @@
 """novel_db ルーター共通 Pydantic スキーマ。"""
+
 from __future__ import annotations
 
 from typing import Literal

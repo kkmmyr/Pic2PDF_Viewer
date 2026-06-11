@@ -6,6 +6,7 @@ Qwen に書籍全文（load_all_pages_of_book 経由）を投入し、2 人の�
 ターン境界は `[A]:` / `[B]:` マーカーを逐次検出することで、1 ターン完結
 ごとにイベントを yield するリアルタイム SSE を実現している。
 """
+
 from __future__ import annotations
 
 import json
@@ -216,13 +217,15 @@ def list_discussions(book_name: str) -> list[dict]:
     for f in sorted(book_dir.glob("*.json"), reverse=True):
         try:
             data = json.loads(f.read_text(encoding="utf-8"))
-            results.append({
-                "filename": f.name,
-                "created_at": data.get("created_at"),
-                "personas": data.get("personas", []),
-                "turn_count": len(data.get("turns", [])),
-                "turns": data.get("turns", []),
-            })
+            results.append(
+                {
+                    "filename": f.name,
+                    "created_at": data.get("created_at"),
+                    "personas": data.get("personas", []),
+                    "turn_count": len(data.get("turns", [])),
+                    "turns": data.get("turns", []),
+                }
+            )
         except Exception:
             pass
     return results

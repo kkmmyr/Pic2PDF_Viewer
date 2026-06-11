@@ -1,4 +1,5 @@
 """JST (Asia/Tokyo) 日時ユーティリティ。"""
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 

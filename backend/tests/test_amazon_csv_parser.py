@@ -14,6 +14,7 @@ from services.amazon_csv_parser import (
 # _extract_publisher
 # ---------------------------------------------------------------------------
 
+
 class TestExtractPublisher:
     def test_末尾の括弧をパブリッシャーとして分離する(self):
         title, pub = _extract_publisher("魔法少女まどか☆マギカ (マジカルバナナ)")
@@ -34,6 +35,7 @@ class TestExtractPublisher:
 # ---------------------------------------------------------------------------
 # _extract_volume
 # ---------------------------------------------------------------------------
+
 
 class TestExtractVolume:
     def test_末尾の半角数字を巻番号として抽出する(self):
@@ -59,6 +61,7 @@ class TestExtractVolume:
 # _parse_authors
 # ---------------------------------------------------------------------------
 
+
 class TestParseAuthors:
     def test_Kindle版プレフィックスを除去して著者リストを返す(self):
         fuzetsu = "[Kindle 版] 石田 リンネ, 起家 一子  販売: Amazon Services International, Inc."
@@ -81,6 +84,7 @@ class TestParseAuthors:
 # ---------------------------------------------------------------------------
 # _decode
 # ---------------------------------------------------------------------------
+
 
 class TestDecode:
     def test_UTF8_BOMを正常にデコードする(self):
@@ -105,9 +109,11 @@ class TestDecode:
 # parse_csv
 # ---------------------------------------------------------------------------
 
+
 def _make_csv_bytes(rows: list[dict], encoding: str = "utf-8-sig") -> bytes:
     import csv
     import io
+
     fieldnames = ["商品名", "商品URL", "付帯情報"]
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames)
@@ -119,11 +125,15 @@ def _make_csv_bytes(rows: list[dict], encoding: str = "utf-8-sig") -> bytes:
 
 class TestParseCsv:
     def test_正常行からParsedRowを返す(self):
-        data = _make_csv_bytes([{
-            "商品名": "ワンピース 1 (ジャンプコミックスDIGITAL)",
-            "商品URL": "https://www.amazon.co.jp/dp/B00AJTFTCG/ref=...",
-            "付帯情報": "[Kindle 版] 尾田 栄一郎  販売: Amazon Services",
-        }])
+        data = _make_csv_bytes(
+            [
+                {
+                    "商品名": "ワンピース 1 (ジャンプコミックスDIGITAL)",
+                    "商品URL": "https://www.amazon.co.jp/dp/B00AJTFTCG/ref=...",
+                    "付帯情報": "[Kindle 版] 尾田 栄一郎  販売: Amazon Services",
+                }
+            ]
+        )
         rows = parse_csv(data)
         assert len(rows) == 1
         r = rows[0]
@@ -136,10 +146,12 @@ class TestParseCsv:
         assert parse_csv(data) == []
 
     def test_商品名が空の行はスキップされる(self):
-        data = _make_csv_bytes([
-            {"商品名": "", "商品URL": "https://example.com/dp/B001/"},
-            {"商品名": "正常タイトル", "商品URL": ""},
-        ])
+        data = _make_csv_bytes(
+            [
+                {"商品名": "", "商品URL": "https://example.com/dp/B001/"},
+                {"商品名": "正常タイトル", "商品URL": ""},
+            ]
+        )
         rows = parse_csv(data)
         assert len(rows) == 1
         assert rows[0].csv_title == "正常タイトル"
@@ -155,17 +167,20 @@ class TestParseCsv:
         assert rows[0].csv_title == "テスト書籍"
 
     def test_複数行を全てパースする(self):
-        data = _make_csv_bytes([
-            {"商品名": "本A", "商品URL": ""},
-            {"商品名": "本B", "商品URL": ""},
-            {"商品名": "本C", "商品URL": ""},
-        ])
+        data = _make_csv_bytes(
+            [
+                {"商品名": "本A", "商品URL": ""},
+                {"商品名": "本B", "商品URL": ""},
+                {"商品名": "本C", "商品URL": ""},
+            ]
+        )
         assert len(parse_csv(data)) == 3
 
 
 # ---------------------------------------------------------------------------
 # match_books
 # ---------------------------------------------------------------------------
+
 
 class TestMatchBooks:
     def _make_row(self, csv_title: str, series_id: str = "", volume: int | None = None) -> ParsedRow:

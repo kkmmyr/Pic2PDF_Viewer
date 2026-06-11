@@ -9,13 +9,14 @@
 pages_fts は FTS5 仮想テーブルのため SQLModel では定義せず、
 Alembic の include_name フィルタで autogenerate 対象外にする。
 """
+
 from __future__ import annotations
 
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
 class Book(SQLModel, table=True):
-    __tablename__ = "books"
+    __tablename__ = "books"  # type: ignore[reportAssignmentType]
 
     id: int | None = Field(default=None, primary_key=True)
     name: str = Field(unique=True)
@@ -30,7 +31,7 @@ class Book(SQLModel, table=True):
 
 
 class Page(SQLModel, table=True):
-    __tablename__ = "pages"
+    __tablename__ = "pages"  # type: ignore[reportAssignmentType]
     __table_args__ = (UniqueConstraint("book_id", "page_no"),)
 
     id: int | None = Field(default=None, primary_key=True)
@@ -43,7 +44,7 @@ class Page(SQLModel, table=True):
 
 
 class Chunk(SQLModel, table=True):
-    __tablename__ = "chunks"
+    __tablename__ = "chunks"  # type: ignore[reportAssignmentType]
 
     id: int | None = Field(default=None, primary_key=True)
     page_id: int = Field(foreign_key="pages.id")
@@ -55,7 +56,7 @@ class Chunk(SQLModel, table=True):
 
 
 class QAHistory(SQLModel, table=True):
-    __tablename__ = "qa_history"
+    __tablename__ = "qa_history"  # type: ignore[reportAssignmentType]
 
     id: int | None = Field(default=None, primary_key=True)
     asked_at: str | None = None
@@ -74,7 +75,7 @@ class QAHistory(SQLModel, table=True):
 
 
 class BookCharacter(SQLModel, table=True):
-    __tablename__ = "book_characters"
+    __tablename__ = "book_characters"  # type: ignore[reportAssignmentType]
     __table_args__ = (UniqueConstraint("book_id", "name"),)
 
     id: int | None = Field(default=None, primary_key=True)
@@ -87,7 +88,7 @@ class BookCharacter(SQLModel, table=True):
 
 
 class QASession(SQLModel, table=True):
-    __tablename__ = "qa_sessions"
+    __tablename__ = "qa_sessions"  # type: ignore[reportAssignmentType]
 
     id: int | None = Field(default=None, primary_key=True)
     scope_type: str
@@ -98,7 +99,7 @@ class QASession(SQLModel, table=True):
 
 
 class QAMessage(SQLModel, table=True):
-    __tablename__ = "qa_messages"
+    __tablename__ = "qa_messages"  # type: ignore[reportAssignmentType]
 
     id: int | None = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="qa_sessions.id")
@@ -110,7 +111,7 @@ class QAMessage(SQLModel, table=True):
 
 
 class RebuildJob(SQLModel, table=True):
-    __tablename__ = "rebuild_jobs"
+    __tablename__ = "rebuild_jobs"  # type: ignore[reportAssignmentType]
 
     id: int | None = Field(default=None, primary_key=True)
     job_type: str

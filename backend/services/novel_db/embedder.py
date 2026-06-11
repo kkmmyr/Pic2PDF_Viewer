@@ -3,6 +3,7 @@
 Ollama の `/api/embed` を httpx で叩くシンプルな実装。バッチサイズは呼び出し側で制御。
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.3。
 """
+
 from __future__ import annotations
 
 import httpx

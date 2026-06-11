@@ -20,6 +20,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.10 / B-15。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,7 +44,9 @@ from services.novel_db.migrations import upgrade_head  # noqa: E402
 
 
 def _list_target_books(
-    *, book_name: str | None, series_id: str | None,
+    *,
+    book_name: str | None,
+    series_id: str | None,
 ) -> list[tuple[int, str]]:
     """対象書籍 (book_id, name) を返す。summary 未生成かどうかは呼び出し側で判定。"""
     with with_db() as conn:
@@ -114,8 +117,7 @@ def _process_book(
         print(f"  no characters extracted for {book_name}", flush=True)
         return (0, 0, 0)
 
-    print(f"  {len(stats)} characters detected (top: "
-          f"{', '.join(s.name for s in stats[:5])})", flush=True)
+    print(f"  {len(stats)} characters detected (top: {', '.join(s.name for s in stats[:5])})", flush=True)
 
     success = 0
     skipped = 0
@@ -126,8 +128,7 @@ def _process_book(
         if stat.name in existing:
             with with_db() as conn:
                 upsert_character(conn, book_id, stat, summary=None)
-            print(f"  [{i}/{len(stats)}] skip (already summarized): {stat.name}",
-                  flush=True)
+            print(f"  [{i}/{len(stats)}] skip (already summarized): {stat.name}", flush=True)
             skipped += 1
             continue
 
@@ -141,9 +142,7 @@ def _process_book(
             continue
 
         body_chars = sum(len(t) for _, t in pages)
-        print(f"  [{i}/{len(stats)}] {stat.name} "
-              f"(pages={len(pages)} body_chars={body_chars:,}) ...",
-              flush=True)
+        print(f"  [{i}/{len(stats)}] {stat.name} (pages={len(pages)} body_chars={body_chars:,}) ...", flush=True)
         try:
             summary = summarize_character(book_name, stat.name, pages)
         except Exception as e:  # noqa: BLE001
@@ -158,8 +157,7 @@ def _process_book(
         elapsed = time.time() - t0
         avg = elapsed / i
         eta = avg * (len(stats) - i)
-        print(f"    ok ({len(summary)} chars) elapsed={elapsed:.0f}s eta={eta:.0f}s",
-              flush=True)
+        print(f"    ok ({len(summary)} chars) elapsed={elapsed:.0f}s eta={eta:.0f}s", flush=True)
         success += 1
 
     return (success, skipped, failure)
@@ -174,11 +172,20 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--series", metavar="ID", help="シリーズ ID")
     group.add_argument("--all", action="store_true", help="全書籍")
     parser.add_argument("--redo", action="store_true", help="既存 summary を上書き")
-    parser.add_argument("--character", metavar="NAME", default=None,
-                        help="このキャラのみ生成（--book と併用、--all 時は全冊から該当キャラを探す）")
-    parser.add_argument("--min-pages", type=int, default=1, metavar="N",
-                        help="page_count >= N のキャラのみ対象（既定 1 = 足切りなし。"
-                             "副キャラを除外したいときに --min-pages 5 等を指定）")
+    parser.add_argument(
+        "--character",
+        metavar="NAME",
+        default=None,
+        help="このキャラのみ生成（--book と併用、--all 時は全冊から該当キャラを探す）",
+    )
+    parser.add_argument(
+        "--min-pages",
+        type=int,
+        default=1,
+        metavar="N",
+        help="page_count >= N のキャラのみ対象（既定 1 = 足切りなし。"
+        "副キャラを除外したいときに --min-pages 5 等を指定）",
+    )
     args = parser.parse_args(argv)
     upgrade_head()
 
@@ -193,21 +200,23 @@ def main(argv: list[str] | None = None) -> int:
     for i, (book_id, name) in enumerate(targets, 1):
         print(f"\n[{i}/{len(targets)}] {name}", flush=True)
         ok, skip, ng = _process_book(
-            book_id, name, redo=args.redo, only_character=args.character,
+            book_id,
+            name,
+            redo=args.redo,
+            only_character=args.character,
             min_pages=args.min_pages,
         )
         total_ok += ok
         total_skip += skip
         total_ng += ng
         elapsed = time.time() - t0
-        print(f"  book done. cumulative ok={total_ok} skip={total_skip} ng={total_ng} "
-              f"(elapsed {elapsed:.0f}s)", flush=True)
+        print(
+            f"  book done. cumulative ok={total_ok} skip={total_skip} ng={total_ng} (elapsed {elapsed:.0f}s)",
+            flush=True,
+        )
 
     elapsed = time.time() - t0
-    print(
-        f"\n完了: {len(targets)} 冊 / characters ok={total_ok} "
-        f"skip={total_skip} ng={total_ng} ({elapsed:.0f}s)"
-    )
+    print(f"\n完了: {len(targets)} 冊 / characters ok={total_ok} skip={total_skip} ng={total_ng} ({elapsed:.0f}s)")
     return 0 if total_ng == 0 else 1
 
 

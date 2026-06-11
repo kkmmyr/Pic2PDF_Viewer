@@ -7,6 +7,7 @@ routers.genres のユニットテスト。
     cd backend
     uv run pytest tests/test_router_genres.py -v
 """
+
 from services.genre_store import save_genres
 
 
@@ -17,6 +18,7 @@ def _seed_genres(source: str, genres: list[str]) -> None:
 # ---------------------------------------------------------------------------
 # GET /api/genres
 # ---------------------------------------------------------------------------
+
 
 class TestGetGenres:
     def test_returns_list(self, client, tmp_data_dir):
@@ -38,6 +40,7 @@ class TestGetGenres:
 # ---------------------------------------------------------------------------
 # POST /api/genres
 # ---------------------------------------------------------------------------
+
 
 class TestAddGenre:
     def test_add_new_genre(self, client, tmp_data_dir):
@@ -73,6 +76,7 @@ class TestAddGenre:
 # DELETE /api/genres/{name}
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteGenre:
     def test_delete_existing(self, client, tmp_data_dir):
         _seed_genres("doujin", ["A", "B", "C"])
@@ -101,36 +105,49 @@ class TestDeleteGenre:
 # PATCH /api/genres/reorder
 # ---------------------------------------------------------------------------
 
+
 class TestReorderGenres:
     def test_reorder_same_set(self, client, tmp_data_dir):
         _seed_genres("doujin", ["A", "B", "C"])
-        res = client.patch("/api/genres/reorder", json={
-            "source": "doujin",
-            "genres": ["C", "A", "B"],
-        })
+        res = client.patch(
+            "/api/genres/reorder",
+            json={
+                "source": "doujin",
+                "genres": ["C", "A", "B"],
+            },
+        )
         assert res.status_code == 200
         assert res.json()["genres"] == ["C", "A", "B"]
 
     def test_400_when_set_mismatch(self, client, tmp_data_dir):
         """既存集合と一致しない（追加・削除がある）場合は 400。"""
         _seed_genres("doujin", ["A", "B", "C"])
-        res = client.patch("/api/genres/reorder", json={
-            "source": "doujin",
-            "genres": ["A", "B"],  # C が欠けている
-        })
+        res = client.patch(
+            "/api/genres/reorder",
+            json={
+                "source": "doujin",
+                "genres": ["A", "B"],  # C が欠けている
+            },
+        )
         assert res.status_code == 400
 
     def test_400_when_extra_item(self, client, tmp_data_dir):
         _seed_genres("doujin", ["A", "B"])
-        res = client.patch("/api/genres/reorder", json={
-            "source": "doujin",
-            "genres": ["A", "B", "C"],  # 余分
-        })
+        res = client.patch(
+            "/api/genres/reorder",
+            json={
+                "source": "doujin",
+                "genres": ["A", "B", "C"],  # 余分
+            },
+        )
         assert res.status_code == 400
 
     def test_invalid_source_400(self, client, tmp_data_dir):
-        res = client.patch("/api/genres/reorder", json={
-            "source": "invalid",
-            "genres": [],
-        })
+        res = client.patch(
+            "/api/genres/reorder",
+            json={
+                "source": "invalid",
+                "genres": [],
+            },
+        )
         assert res.status_code == 400

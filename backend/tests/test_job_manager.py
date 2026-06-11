@@ -5,6 +5,7 @@ services.job_manager のユニットテスト。
     cd backend
     uv run pytest tests/test_job_manager.py -v
 """
+
 import os
 import sys
 import threading
@@ -201,10 +202,9 @@ class TestConcurrency:
         def _set_completed():
             job.update(status=JobStatus.COMPLETED, files=["x.pdf"])
 
-        threads = (
-            [threading.Thread(target=_set_running) for _ in range(20)]
-            + [threading.Thread(target=_set_completed) for _ in range(20)]
-        )
+        threads = [threading.Thread(target=_set_running) for _ in range(20)] + [
+            threading.Thread(target=_set_completed) for _ in range(20)
+        ]
         for t in threads:
             t.start()
         for t in threads:

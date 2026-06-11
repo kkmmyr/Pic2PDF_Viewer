@@ -7,6 +7,7 @@ PDF→サムネイル名の変換ロジックを確認する。
     cd backend
     uv run pytest tests/test_file_naming.py -v
 """
+
 import os
 import sys
 

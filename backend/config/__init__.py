@@ -6,6 +6,7 @@
 
 Novel DB の env 設定（モデル・LLM・検索パラメータ等）は config.novel_db に分離。
 """
+
 from pathlib import Path
 from typing import TypedDict
 
@@ -49,6 +50,7 @@ class _AppSettings(BaseSettings):
 
 
 _s = _AppSettings()
+app_settings = _s  # public singleton
 
 # ---------------------------------------------------------------------------
 # データディレクトリパス定義
@@ -58,26 +60,24 @@ PROJECT_ROOT = str(_BACKEND_DIR.parent)
 DATA_DIR = str(_s.PIC2PDF_DATA_DIR)
 
 # Doujin
-MAIN_DATA_DIR      = str(_s.PIC2PDF_DATA_DIR / "doujin")
+MAIN_DATA_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin")
 PDF_COMPRESSED_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "pdfs_compressed")
-THUMBNAIL_DIR      = str(_s.PIC2PDF_DATA_DIR / "doujin" / "thumbnails")
-IMAGES_DIR         = str(_s.PIC2PDF_DATA_DIR / "doujin" / "images")
-COMPLETE_DIR       = str(_s.PIC2PDF_DATA_DIR / "doujin" / "complete")
-DOUJIN_INPUT_DIR   = str(_s.DOUJIN_INPUT_DIR or _s.PIC2PDF_DATA_DIR / "doujin" / "input")
+THUMBNAIL_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "thumbnails")
+IMAGES_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "images")
+COMPLETE_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "complete")
+DOUJIN_INPUT_DIR = str(_s.DOUJIN_INPUT_DIR or _s.PIC2PDF_DATA_DIR / "doujin" / "input")
 
 # Comic
-COMIC_DIR           = str(_s.PIC2PDF_DATA_DIR / "comic")
-COMIC_PDF_DIR       = str(_s.PIC2PDF_DATA_DIR / "comic" / "pdfs")
+COMIC_DIR = str(_s.PIC2PDF_DATA_DIR / "comic")
+COMIC_PDF_DIR = str(_s.PIC2PDF_DATA_DIR / "comic" / "pdfs")
 COMIC_THUMBNAIL_DIR = str(_s.PIC2PDF_DATA_DIR / "comic" / "thumbnails")
-COMIC_IMAGES_DIR    = str(_s.PIC2PDF_DATA_DIR / "comic" / "images")
+COMIC_IMAGES_DIR = str(_s.PIC2PDF_DATA_DIR / "comic" / "images")
 
 # Kindle Novel
-KINDLE_NOVEL_DIR           = str(_s.PIC2PDF_DATA_DIR / "kindle_novel")
-KINDLE_NOVEL_PDF_DIR       = str(_s.PIC2PDF_DATA_DIR / "kindle_novel" / "pdfs")
+KINDLE_NOVEL_DIR = str(_s.PIC2PDF_DATA_DIR / "kindle_novel")
+KINDLE_NOVEL_PDF_DIR = str(_s.PIC2PDF_DATA_DIR / "kindle_novel" / "pdfs")
 KINDLE_NOVEL_THUMBNAIL_DIR = str(_s.PIC2PDF_DATA_DIR / "kindle_novel" / "thumbnails")
-KINDLE_NOVEL_IMAGES_DIR    = str(
-    _s.KINDLE_NOVEL_IMAGES_DIR or _s.PIC2PDF_DATA_DIR / "kindle_novel" / "images"
-)
+KINDLE_NOVEL_IMAGES_DIR = str(_s.KINDLE_NOVEL_IMAGES_DIR or _s.PIC2PDF_DATA_DIR / "kindle_novel" / "images")
 
 # hitomi.la 新着監視データ
 HITOMI_DATA_DIR = str(_s.PIC2PDF_DATA_DIR / "hitomi")
@@ -86,7 +86,7 @@ HITOMI_DATA_DIR = str(_s.PIC2PDF_DATA_DIR / "hitomi")
 META_DB_DIR = str(_s.META_DB_DIR)
 
 # Novel DB（SQLite + LanceDB）
-NOVEL_DB_DIR  = str(_s.NOVEL_DB_DIR)
+NOVEL_DB_DIR = str(_s.NOVEL_DB_DIR)
 NOVEL_DB_PATH = str(_s.NOVEL_DB_DIR / "novel.db")
 
 # Novel DB の env 設定（モデル・LLM・検索パラメータ等）は novel_db サブモジュールに分離。
@@ -97,8 +97,8 @@ from .novel_db import *  # noqa: E402 F401 F403
 FRONTEND_DIST_DIR = str(_BACKEND_DIR.parent / "frontend" / "dist")
 
 # オプション設定（未設定時は None）
-AMAZON_DATA_DIR:    str | None = str(_s.AMAZON_DATA_DIR) if _s.AMAZON_DATA_DIR else None
-GEMMA_TOOL_DIR:     str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
+AMAZON_DATA_DIR: str | None = str(_s.AMAZON_DATA_DIR) if _s.AMAZON_DATA_DIR else None
+GEMMA_TOOL_DIR: str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
 META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
 
 # ---------------------------------------------------------------------------
@@ -109,9 +109,9 @@ VALID_SOURCES: tuple[str, ...] = ("doujin", "comic", "novel")
 # ---------------------------------------------------------------------------
 # サポートファイル形式
 # ---------------------------------------------------------------------------
-SUPPORTED_IMAGE_FORMATS = ('.webp', '.jpg', '.jpeg', '.png')
-SUPPORTED_WEBP_FORMAT = ('.webp',)
-SUPPORTED_ZIP_FORMAT = ('.zip',)
+SUPPORTED_IMAGE_FORMATS = (".webp", ".jpg", ".jpeg", ".png")
+SUPPORTED_WEBP_FORMAT = (".webp",)
+SUPPORTED_ZIP_FORMAT = (".zip",)
 
 # ---------------------------------------------------------------------------
 # サムネイル設定
@@ -130,8 +130,8 @@ OCR_LOG_MAXLEN = 2000
 # 余裕を持たせた値。これを超える ZIP は generate ジョブで弾く。
 # ---------------------------------------------------------------------------
 ZIP_MAX_ENTRIES: int = 5000
-ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES: int = 2 * 1024**3   # 2 GB
-ZIP_MAX_PER_FILE_BYTES: int = 50 * 1024**2            # 50 MB / 1 枚
+ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES: int = 2 * 1024**3  # 2 GB
+ZIP_MAX_PER_FILE_BYTES: int = 50 * 1024**2  # 50 MB / 1 枚
 
 # ---------------------------------------------------------------------------
 # CORS 設定
@@ -164,6 +164,7 @@ def ensure_directories() -> None:
 
 ensure_directories()
 
+
 # ---------------------------------------------------------------------------
 # ソース別ディレクトリ解決
 # ---------------------------------------------------------------------------
@@ -184,24 +185,26 @@ def get_dirs_by_source(source: str) -> SourceDirs:
     Returns:
         SourceDirs TypedDict
     """
+    data_dir = app_settings.PIC2PDF_DATA_DIR
+    novel_images = str(app_settings.KINDLE_NOVEL_IMAGES_DIR or data_dir / "kindle_novel" / "images")
     if source == "comic":
         return {
-            "pdf": COMIC_PDF_DIR,
-            "thumb": COMIC_THUMBNAIL_DIR,
-            "img": COMIC_IMAGES_DIR,
+            "pdf": str(data_dir / "comic" / "pdfs"),
+            "thumb": str(data_dir / "comic" / "thumbnails"),
+            "img": str(data_dir / "comic" / "images"),
             "thumb_url_prefix": "/comic/thumbnails",
         }
     if source == "novel":
         return {
-            "pdf": KINDLE_NOVEL_PDF_DIR,
-            "thumb": KINDLE_NOVEL_THUMBNAIL_DIR,
-            "img": KINDLE_NOVEL_IMAGES_DIR,
+            "pdf": str(data_dir / "kindle_novel" / "pdfs"),
+            "thumb": str(data_dir / "kindle_novel" / "thumbnails"),
+            "img": novel_images,
             "thumb_url_prefix": "/kindle_novel/thumbnails",
         }
     # doujin (default)
     return {
-        "pdf": PDF_COMPRESSED_DIR,
-        "thumb": THUMBNAIL_DIR,
-        "img": IMAGES_DIR,
+        "pdf": str(data_dir / "doujin" / "pdfs_compressed"),
+        "thumb": str(data_dir / "doujin" / "thumbnails"),
+        "img": str(data_dir / "doujin" / "images"),
         "thumb_url_prefix": "/thumbnails",
     }

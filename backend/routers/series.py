@@ -4,6 +4,7 @@
 `POST /api/series/suggest` で既存シリーズへの紐付け候補を提案（A-1、書き込みなし）。
 シリーズ自動グループ化は撤去済み（2026-05-09、Phase 6）。
 """
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -19,12 +20,14 @@ router = APIRouter()
 # 手動編集 API
 # ---------------------------------------------------------------------------
 
+
 class AssignSeriesRequest(BaseModel):
     """書籍を既存または新規シリーズに割り当てるリクエスト。
 
     `index` は単一の float、または `names` と同じ長さの float 配列（各書籍に
     個別の巻数を割り当てたい一括登録ケース）を受け付ける。
     """
+
     path: str = ""
     names: list[str]
     title: str
@@ -35,6 +38,7 @@ class AssignSeriesRequest(BaseModel):
 
 class UnassignSeriesRequest(BaseModel):
     """書籍をシリーズから外すリクエスト。"""
+
     path: str = ""
     names: list[str]
     source: str = "doujin"
@@ -42,6 +46,7 @@ class UnassignSeriesRequest(BaseModel):
 
 class ReorderSeriesRequest(BaseModel):
     """同じシリーズに属する書籍の `series_index` を `names` の順序で振り直すリクエスト。"""
+
     path: str = ""
     names: list[str]
     series_id: str
@@ -92,7 +97,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
             existing["series_id"] = series_id
             existing["series_title"] = request.title.strip()
             existing["series_index"] = idx
-            data[key] = existing
+            data[key] = existing  # type: ignore[assignment]
 
     update_meta_locked(request.source, _apply)
     return {"message": "Assigned", "id": series_id, "updated_count": len(request.names)}
@@ -152,7 +157,7 @@ def reorder_series(request: ReorderSeriesRequest) -> dict:
             key = make_key(request.path, name)
             existing = dict(data[key])
             existing["series_index"] = float(i + 1)
-            data[key] = existing
+            data[key] = existing  # type: ignore[assignment]
 
     update_meta_locked(request.source, _apply)
     return {"message": "Reordered", "updated_count": len(request.names)}
@@ -162,8 +167,10 @@ def reorder_series(request: ReorderSeriesRequest) -> dict:
 # AI 提案 API（A-1）
 # ---------------------------------------------------------------------------
 
+
 class SuggestSeriesRequest(BaseModel):
     """選択された書籍に対する既存シリーズの紐付け候補を取得するリクエスト。"""
+
     path: str = ""
     names: list[str]
     source: str = "doujin"

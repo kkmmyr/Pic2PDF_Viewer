@@ -1,4 +1,5 @@
 """B-25: meta.db バックアップ API。"""
+
 from fastapi import APIRouter
 
 from services.meta_db_backup import backup_meta_db, get_backup_status

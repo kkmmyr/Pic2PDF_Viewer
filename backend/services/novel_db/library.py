@@ -3,6 +3,7 @@
 novel.db の DB 状態と既存 meta.json（authors / series_id / series_title）を結合する。
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §9。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -12,6 +13,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import config
+from config import app_settings  # noqa: F401 — used via app_settings below
 from services.meta_store import load_meta
 
 
@@ -35,6 +37,7 @@ class BookSummary:
 @dataclass
 class BookDetail:
     """単一書籍の詳細情報（BookSummary + summary / counts）。"""
+
     name: str
     authors: list[str]
     series_id: str | None
@@ -74,9 +77,7 @@ def _thumbnail_url(book_name: str) -> str:
 
 def _fetch_indexed_status(conn: sqlite3.Connection) -> dict[str, dict]:
     """novel.db から書籍の {name: {page_count, indexed_at, ocr_done_at}} を返す。"""
-    rows = conn.execute(
-        "SELECT name, page_count, indexed_at, ocr_done_at FROM books"
-    ).fetchall()
+    rows = conn.execute("SELECT name, page_count, indexed_at, ocr_done_at FROM books").fetchall()
     return {
         name: {
             "page_count": page_count,
@@ -100,16 +101,14 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
     meta_entry = meta.get(_meta_key(book_name), {})
 
     db_row = conn.execute(
-        "SELECT page_count, indexed_at, ocr_done_at, summary, summary_generated_at "
-        "FROM books WHERE name = ?",
+        "SELECT page_count, indexed_at, ocr_done_at, summary, summary_generated_at FROM books WHERE name = ?",
         (book_name,),
     ).fetchone()
 
     if db_row:
         page_count, indexed_at, ocr_done_at, summary, summary_generated_at = db_row
         char_count = conn.execute(
-            "SELECT COUNT(*) FROM book_characters bc "
-            "JOIN books b ON bc.book_id = b.id WHERE b.name = ?",
+            "SELECT COUNT(*) FROM book_characters bc JOIN books b ON bc.book_id = b.id WHERE b.name = ?",
             (book_name,),
         ).fetchone()[0]
     else:
@@ -117,6 +116,7 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
         char_count = 0
 
     from services.novel_db.discussion_service import count_discussions  # noqa: PLC0415
+
     discussion_count = count_discussions(book_name)
 
     return BookDetail(
@@ -198,9 +198,7 @@ def list_series(conn: sqlite3.Connection) -> list[SeriesSummary]:
     for b in books:
         if not b.series_id or not b.series_title:
             continue
-        entry = by_id.setdefault(
-            b.series_id, {"name": b.series_title, "count": 0}
-        )
+        entry = by_id.setdefault(b.series_id, {"name": b.series_title, "count": 0})
         entry["count"] += 1
         # 同一 series_id で title が複数あった場合は最頻値を採用する保険
         # （通常起きないが、meta.json 編集ミスへの耐性）

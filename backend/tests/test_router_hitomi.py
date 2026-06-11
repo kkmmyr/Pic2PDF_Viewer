@@ -8,6 +8,7 @@ HTTP 層のフロー（パラメータ伝達・例外マッピング・ロック
     cd backend
     uv run pytest tests/test_router_hitomi.py -v
 """
+
 import json
 import os
 import sys
@@ -28,33 +29,36 @@ def hitomi_data_dir(tmp_path, monkeypatch):
 
 
 def _seed_state(data_dir: Path, payload: dict) -> None:
-    (data_dir / "state.json").write_text(
-        json.dumps(payload, ensure_ascii=False), encoding="utf-8"
-    )
+    (data_dir / "state.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
 def _seed_arrivals(data_dir: Path, items: list) -> None:
-    (data_dir / "new_arrivals.json").write_text(
-        json.dumps({"items": items}, ensure_ascii=False), encoding="utf-8"
-    )
+    (data_dir / "new_arrivals.json").write_text(json.dumps({"items": items}, ensure_ascii=False), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
 # GET /api/hitomi/new-arrivals
 # ---------------------------------------------------------------------------
 
+
 class TestNewArrivals:
     def test_returns_undismissed_sorted_newest_first(self, client, hitomi_data_dir):
-        _seed_state(hitomi_data_dir, {
-            "last_run_at": "2026-05-06T10:00:00",
-            "last_run_status": "ok",
-            "last_error": None,
-        })
-        _seed_arrivals(hitomi_data_dir, [
-            {"id": 1, "discovered_at": "2026-05-01T10:00:00", "dismissed": False, "title": "old"},
-            {"id": 2, "discovered_at": "2026-05-05T10:00:00", "dismissed": False, "title": "new"},
-            {"id": 3, "discovered_at": "2026-05-06T10:00:00", "dismissed": True, "title": "read"},
-        ])
+        _seed_state(
+            hitomi_data_dir,
+            {
+                "last_run_at": "2026-05-06T10:00:00",
+                "last_run_status": "ok",
+                "last_error": None,
+            },
+        )
+        _seed_arrivals(
+            hitomi_data_dir,
+            [
+                {"id": 1, "discovered_at": "2026-05-01T10:00:00", "dismissed": False, "title": "old"},
+                {"id": 2, "discovered_at": "2026-05-05T10:00:00", "dismissed": False, "title": "new"},
+                {"id": 3, "discovered_at": "2026-05-06T10:00:00", "dismissed": True, "title": "read"},
+            ],
+        )
 
         res = client.get("/api/hitomi/new-arrivals")
         assert res.status_code == 200
@@ -75,11 +79,15 @@ class TestNewArrivals:
 # POST /api/hitomi/dismiss/{id}
 # ---------------------------------------------------------------------------
 
+
 class TestDismiss:
     def test_dismisses_existing(self, client, hitomi_data_dir):
-        _seed_arrivals(hitomi_data_dir, [
-            {"id": 100, "discovered_at": "2026-05-06", "dismissed": False, "title": "x"},
-        ])
+        _seed_arrivals(
+            hitomi_data_dir,
+            [
+                {"id": 100, "discovered_at": "2026-05-06", "dismissed": False, "title": "x"},
+            ],
+        )
         res = client.post("/api/hitomi/dismiss/100")
         assert res.status_code == 200
         # 永続化を確認
@@ -97,13 +105,17 @@ class TestDismiss:
 # POST /api/hitomi/dismiss-all
 # ---------------------------------------------------------------------------
 
+
 class TestDismissAll:
     def test_dismisses_all_undismissed(self, client, hitomi_data_dir):
-        _seed_arrivals(hitomi_data_dir, [
-            {"id": 1, "discovered_at": "2026-05-06", "dismissed": False, "title": "a"},
-            {"id": 2, "discovered_at": "2026-05-06", "dismissed": False, "title": "b"},
-            {"id": 3, "discovered_at": "2026-05-06", "dismissed": True, "title": "c"},
-        ])
+        _seed_arrivals(
+            hitomi_data_dir,
+            [
+                {"id": 1, "discovered_at": "2026-05-06", "dismissed": False, "title": "a"},
+                {"id": 2, "discovered_at": "2026-05-06", "dismissed": False, "title": "b"},
+                {"id": 3, "discovered_at": "2026-05-06", "dismissed": True, "title": "c"},
+            ],
+        )
         res = client.post("/api/hitomi/dismiss-all")
         assert res.status_code == 200
         # 既に dismissed=true だった分は count に含まれない
@@ -114,12 +126,18 @@ class TestDismissAll:
 # GET /api/hitomi/watchlist
 # ---------------------------------------------------------------------------
 
+
 class TestGetWatchlist:
     def test_returns_artists(self, client, hitomi_data_dir):
         (hitomi_data_dir / "watchlist.json").write_text(
-            json.dumps({"artists": [
-                {"normalized": "alice", "display_name": "Alice", "language": "japanese"},
-            ]}, ensure_ascii=False),
+            json.dumps(
+                {
+                    "artists": [
+                        {"normalized": "alice", "display_name": "Alice", "language": "japanese"},
+                    ]
+                },
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         res = client.get("/api/hitomi/watchlist")
@@ -132,6 +150,7 @@ class TestGetWatchlist:
 # ---------------------------------------------------------------------------
 # POST /api/hitomi/watchlist
 # ---------------------------------------------------------------------------
+
 
 class TestPostWatchlist:
     def test_added_when_artist_exists_on_hitomi(self, client, hitomi_data_dir, monkeypatch):
@@ -189,6 +208,7 @@ class TestPostWatchlist:
 # DELETE /api/hitomi/watchlist/{normalized}
 # ---------------------------------------------------------------------------
 
+
 class TestDeleteWatchlist:
     def test_removes_artist(self, client, hitomi_data_dir, monkeypatch):
         monkeypatch.setattr(
@@ -218,6 +238,7 @@ class TestDeleteWatchlist:
 # ---------------------------------------------------------------------------
 # POST /api/hitomi/run-now
 # ---------------------------------------------------------------------------
+
 
 class TestRunNow:
     def test_invokes_monitor_with_threshold_when_not_force(self, client, hitomi_data_dir, monkeypatch):
@@ -252,11 +273,14 @@ class TestRunNow:
 
     def test_returns_state_fields(self, client, hitomi_data_dir, monkeypatch):
         monkeypatch.setattr("routers.hitomi.hitomi_monitor.main", lambda data_dir, threshold=None: 0)
-        _seed_state(hitomi_data_dir, {
-            "last_run_at": "2026-05-06T10:00:00",
-            "last_run_status": "ok",
-            "last_error": None,
-        })
+        _seed_state(
+            hitomi_data_dir,
+            {
+                "last_run_at": "2026-05-06T10:00:00",
+                "last_run_status": "ok",
+                "last_error": None,
+            },
+        )
 
         res = client.post("/api/hitomi/run-now?force=true")
         body = res.json()

@@ -7,6 +7,7 @@ PdfService.delete_pages / get_page_count を実際の PDF ファイルで検証�
     cd backend
     uv run pytest tests/test_pdf_service.py -v
 """
+
 import os
 import sys
 
@@ -32,6 +33,7 @@ def _make_pdf(path: str, page_count: int) -> None:
 # ---------------------------------------------------------------------------
 # delete_pages
 # ---------------------------------------------------------------------------
+
 
 class TestDeletePages:
     def test_delete_single_page(self, tmp_path):
@@ -115,6 +117,7 @@ class TestDeletePages:
 # ---------------------------------------------------------------------------
 # reorder_pages
 # ---------------------------------------------------------------------------
+
 
 def _page_text(pdf_path: str, page_idx: int) -> str:
     """`pdf_path` の `page_idx`（0 始まり）のテキストを返す。順序検証用。"""

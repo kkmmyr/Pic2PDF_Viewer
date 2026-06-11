@@ -35,9 +35,7 @@ class PdfService:
             total_pages = len(doc)
 
             if sorted(page_indices) != list(range(total_pages)):
-                raise ValueError(
-                    f"page_indices must be a permutation of [0..{total_pages - 1}], got: {page_indices}"
-                )
+                raise ValueError(f"page_indices must be a permutation of [0..{total_pages - 1}], got: {page_indices}")
 
             doc.select(page_indices)
             doc.save(temp_path)

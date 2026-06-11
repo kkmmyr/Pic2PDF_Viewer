@@ -1,16 +1,16 @@
 """novel.db の接続ヘルパー（foreign keys 有効化）。"""
+
 from __future__ import annotations
 
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from pathlib import Path
 
-import config
+from config import app_settings
 
 
 def _ensure_dir() -> None:
-    Path(config.NOVEL_DB_DIR).mkdir(parents=True, exist_ok=True)
+    app_settings.NOVEL_DB_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def open_db(db_path: str | None = None) -> sqlite3.Connection:
@@ -21,7 +21,7 @@ def open_db(db_path: str | None = None) -> sqlite3.Connection:
     model_validate(dict(row)) によるモデル変換が使用できる。
     """
     _ensure_dir()
-    conn = sqlite3.connect(db_path or config.NOVEL_DB_PATH, timeout=30)
+    conn = sqlite3.connect(db_path or str(app_settings.NOVEL_DB_DIR / "novel.db"), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")

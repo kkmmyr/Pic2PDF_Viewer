@@ -5,6 +5,7 @@ GET  /generate/job/:id — ジョブ進捗を取得
 GET  /status           — 入力ディレクトリ (config.DOUJIN_INPUT_DIR) の変換状態を一覧
 POST /batch_compress   — 既存 PDF を一括圧縮
 """
+
 import asyncio
 import os
 from enum import StrEnum
@@ -36,6 +37,7 @@ job_store = JobStore()
 
 def _run_generate_job(job: GenerateJob) -> None:
     """同期ワーカー: executor スレッドで PDF 生成ジョブを実行する。"""
+
     def progress_callback(item_name: str):
         job.update(current_item=item_name)
         logger.info("Processing: %s", item_name)
@@ -45,7 +47,7 @@ def _run_generate_job(job: GenerateJob) -> None:
 
         result = scan_and_generate(
             config.DOUJIN_INPUT_DIR,
-            None,           # image-only モード: PDF 生成をスキップ
+            None,  # image-only モード: PDF 生成をスキップ
             config.THUMBNAIL_DIR,
             config.IMAGES_DIR,
             config.COMPLETE_DIR,
@@ -54,10 +56,12 @@ def _run_generate_job(job: GenerateJob) -> None:
 
         # 新規生成ファイルにのみ genre: "オリジナル" を初期書き込み（再生成時は保持）
         if result.generated:
+
             def _init_genre(data):
                 for name in result.generated:
                     if name not in data:
                         data[name] = {"genre": "オリジナル"}
+
             update_meta_locked("doujin", _init_genre)
 
         failed_dicts = [{"name": n, "error": e} for n, e in result.failed_items]
@@ -73,8 +77,7 @@ def _run_generate_job(job: GenerateJob) -> None:
             failed_items=failed_dicts,
             message=message,
         )
-        logger.info("Job %s completed: %d files, %d failed",
-                    job.job_id, len(result.generated), len(failed_dicts))
+        logger.info("Job %s completed: %d files, %d failed", job.job_id, len(result.generated), len(failed_dicts))
 
     except Exception as e:
         logger.exception("Job %s failed", job.job_id)

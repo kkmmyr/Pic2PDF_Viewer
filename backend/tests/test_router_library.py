@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.library のユニットテスト。
 
 書籍一覧（/api/pdfs）・書籍画像一覧（/api/books/{path}/images）・
@@ -8,6 +8,7 @@ routers.library のユニットテスト。
     cd backend
     uv run pytest tests/test_router_library.py -v
 """
+
 import os
 
 from services.meta_store import load_meta, save_meta  # noqa: E402
@@ -15,6 +16,7 @@ from services.meta_store import load_meta, save_meta  # noqa: E402
 # ---------------------------------------------------------------------------
 # GET /api/pdfs (generated: images/ 走査)
 # ---------------------------------------------------------------------------
+
 
 class TestListPdfsGenerated:
     def test_lists_books_with_webps(self, client, tmp_data_dir, make_webp):
@@ -98,6 +100,7 @@ class TestListPdfsGenerated:
 # Kindle キャプチャは PNG として images/{book}/ に保存される。
 # ---------------------------------------------------------------------------
 
+
 class TestListPdfsKindle:
     def test_lists_books_with_pngs(self, client, tmp_data_dir, make_png):
         img_dir = tmp_data_dir["COMIC_IMAGES_DIR"]
@@ -151,6 +154,7 @@ class TestListPdfsKindle:
 # GET /api/books/{path}/images
 # ---------------------------------------------------------------------------
 
+
 class TestListBookImages:
     def test_returns_natsorted_image_urls(self, client, tmp_data_dir, make_webp):
         img_dir = tmp_data_dir["IMAGES_DIR"]
@@ -186,6 +190,7 @@ class TestListBookImages:
 # PATCH /api/rename
 # ---------------------------------------------------------------------------
 
+
 class TestRename:
     def test_rename_pdf_updates_three_assets(self, client, tmp_data_dir, make_pdf, make_webp):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
@@ -198,13 +203,16 @@ class TestRename:
             f.write(b"x")
         make_webp(os.path.join(img_dir, "old", "1.webp"))
 
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "old.pdf",
-            "new_name": "new.pdf",
-            "is_folder": False,
-            "source": "comic",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "old.pdf",
+                "new_name": "new.pdf",
+                "is_folder": False,
+                "source": "comic",
+            },
+        )
         assert res.status_code == 200
 
         assert os.path.exists(os.path.join(pdf_dir, "new.pdf"))
@@ -218,13 +226,16 @@ class TestRename:
 
         save_meta("comic", {"old.pdf": {"authors": ["A"], "genre": "テスト"}})
 
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "old.pdf",
-            "new_name": "new.pdf",
-            "is_folder": False,
-            "source": "comic",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "old.pdf",
+                "new_name": "new.pdf",
+                "is_folder": False,
+                "source": "comic",
+            },
+        )
         assert res.status_code == 200
 
         meta = load_meta("comic")
@@ -239,13 +250,16 @@ class TestRename:
 
         save_meta("comic", {"old_folder/a.pdf": {"authors": ["X"]}})
 
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "old_folder",
-            "new_name": "new_folder",
-            "is_folder": True,
-            "source": "comic",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "old_folder",
+                "new_name": "new_folder",
+                "is_folder": True,
+                "source": "comic",
+            },
+        )
         assert res.status_code == 200
 
         meta = load_meta("comic")
@@ -253,13 +267,16 @@ class TestRename:
         assert meta["new_folder/a.pdf"]["authors"] == ["X"]
 
     def test_rename_404_when_missing(self, client, tmp_data_dir):
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "nope.pdf",
-            "new_name": "new.pdf",
-            "is_folder": False,
-            "source": "comic",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "nope.pdf",
+                "new_name": "new.pdf",
+                "is_folder": False,
+                "source": "comic",
+            },
+        )
         assert res.status_code == 404
 
     def test_rename_400_when_dst_exists(self, client, tmp_data_dir, make_pdf):
@@ -267,39 +284,49 @@ class TestRename:
         make_pdf(os.path.join(pdf_dir, "old.pdf"))
         make_pdf(os.path.join(pdf_dir, "exists.pdf"))
 
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "old.pdf",
-            "new_name": "exists.pdf",
-            "is_folder": False,
-            "source": "comic",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "old.pdf",
+                "new_name": "exists.pdf",
+                "is_folder": False,
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_rename_400_with_traversal(self, client, tmp_data_dir):
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "../etc",
-            "new_name": "new.pdf",
-            "is_folder": False,
-            "source": "comic",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "../etc",
+                "new_name": "new.pdf",
+                "is_folder": False,
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_rename_invalid_source_returns_400(self, client, tmp_data_dir):
-        res = client.patch("/api/rename", json={
-            "path": "",
-            "old_name": "old.pdf",
-            "new_name": "new.pdf",
-            "is_folder": False,
-            "source": "invalid",
-        })
+        res = client.patch(
+            "/api/rename",
+            json={
+                "path": "",
+                "old_name": "old.pdf",
+                "new_name": "new.pdf",
+                "is_folder": False,
+                "source": "invalid",
+            },
+        )
         assert res.status_code == 400
 
 
 # ---------------------------------------------------------------------------
 # DELETE /api/pdfs
 # ---------------------------------------------------------------------------
+
 
 class TestDeletePdfs:
     def test_delete_multiple_files(self, client, tmp_data_dir, make_pdf):
@@ -322,10 +349,13 @@ class TestDeletePdfs:
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "doomed.pdf"))
 
-        save_meta("comic", {
-            "doomed.pdf": {"authors": ["X"]},
-            "alive.pdf": {"authors": ["Y"]},
-        })
+        save_meta(
+            "comic",
+            {
+                "doomed.pdf": {"authors": ["X"]},
+                "alive.pdf": {"authors": ["Y"]},
+            },
+        )
 
         client.request(
             "DELETE",

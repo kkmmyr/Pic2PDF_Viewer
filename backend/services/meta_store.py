@@ -2,6 +2,7 @@
 
 詳細仕様: docs/03_詳細設計/詳細設計書_バックエンド編.md「閲覧回数 / 最近見た順ソート（バックエンド側）」節
 """
+
 import threading
 from collections.abc import Callable
 from typing import Literal, NotRequired, TypedDict
@@ -51,21 +52,14 @@ def _ensure(conn) -> None:
 def load_meta(source: str) -> MetaDict:
     with connect() as conn:
         _ensure(conn)
-        rows = conn.execute(
-            "SELECT * FROM books_meta WHERE source=?", (source,)
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM books_meta WHERE source=?", (source,)).fetchall()
     return {row["book_id"]: row_to_entry(row) for row in rows}  # type: ignore[return-value]
 
 
 def save_meta(source: str, data: MetaDict) -> None:
     with connect() as conn:
         _ensure(conn)
-        existing = {
-            row[0]
-            for row in conn.execute(
-                "SELECT book_id FROM books_meta WHERE source=?", (source,)
-            )
-        }
+        existing = {row[0] for row in conn.execute("SELECT book_id FROM books_meta WHERE source=?", (source,))}
         to_delete = existing - data.keys()
         if to_delete:
             conn.executemany(
@@ -73,7 +67,7 @@ def save_meta(source: str, data: MetaDict) -> None:
                 [(source, bid) for bid in to_delete],
             )
         for book_id, entry in data.items():
-            upsert_entry(conn, source, book_id, entry)
+            upsert_entry(conn, source, book_id, entry)  # type: ignore[arg-type]
 
 
 def update_meta_locked(source: str, updater: Callable[[MetaDict], None]) -> None:

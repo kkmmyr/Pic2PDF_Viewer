@@ -7,6 +7,7 @@ CSV ソース:
   1. Digital Content Orders.csv  — 全期間エクスポート（ASIN + タイトル、著者なし）
   2. amazon-order_digital/*.csv  — 月別デジタル注文（著者情報あり、2021 年〜）
 """
+
 from __future__ import annotations
 
 import csv
@@ -61,6 +62,7 @@ class ImportResult:
 # ---------------------------------------------------------------------------
 # CSV 読み込み
 # ---------------------------------------------------------------------------
+
 
 def _read_text(path: Path) -> str:
     """BOM / SJIS / UTF-8 を順に試みてテキストを返す。"""
@@ -160,6 +162,7 @@ def _build_lookup(
 # マッチング
 # ---------------------------------------------------------------------------
 
+
 def _build_norm_index(
     lookup: dict[str, _LookupEntry],
 ) -> list[tuple[str, _LookupEntry]]:
@@ -198,6 +201,7 @@ def _match(
 # メイン
 # ---------------------------------------------------------------------------
 
+
 def run_import(source: str) -> ImportResult:
     """固定パスの CSV を読み込んで meta.json を著者/ASIN で補完する。
 
@@ -218,8 +222,7 @@ def run_import(source: str) -> ImportResult:
 
     if not digital and not monthly:
         raise ValueError(
-            f"Amazon CSV が見つかりません。"
-            f"パスを確認してください: {_DIGITAL_ORDERS_PATH.parent} / {_MONTHLY_CSV_DIR}"
+            f"Amazon CSV が見つかりません。パスを確認してください: {_DIGITAL_ORDERS_PATH.parent} / {_MONTHLY_CSV_DIR}"
         )
 
     lookup = _build_lookup(digital, monthly)

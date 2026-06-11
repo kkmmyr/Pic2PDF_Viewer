@@ -1,4 +1,5 @@
 """services/novel_db/extractor.py の単体テスト。"""
+
 import os
 
 import fitz

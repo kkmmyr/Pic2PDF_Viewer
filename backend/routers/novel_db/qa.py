@@ -1,4 +1,5 @@
 """novel_db 質問応答（SSE）+ 履歴エンドポイント。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -39,7 +40,10 @@ async def post_qa(
     with with_db() as conn:
         result = retrieve(conn, request.question, scope)
         prompt = build_prompt(
-            request.question, result.hits, scope, book_summaries=result.book_summaries,
+            request.question,
+            result.hits,
+            scope,
+            book_summaries=result.book_summaries,
         )
         history_id = save_start(
             conn,
@@ -81,12 +85,14 @@ async def post_qa(
                             done_reason=done_reason,
                             eval_count=eval_count,
                         )
-                    yield sse_event({
-                        "done": True,
-                        "history_id": history_id,
-                        "eval_count": eval_count,
-                        "done_reason": done_reason,
-                    })
+                    yield sse_event(
+                        {
+                            "done": True,
+                            "history_id": history_id,
+                            "eval_count": eval_count,
+                            "done_reason": done_reason,
+                        }
+                    )
                     return
         except Exception as e:
             logger.exception("post_qa SSE failed")
@@ -100,6 +106,7 @@ async def post_qa(
 # ---------------------------------------------------------------------------
 # 履歴
 # ---------------------------------------------------------------------------
+
 
 @router.get("/qa/history")
 @log_and_raise_500("novel_db/qa/history")

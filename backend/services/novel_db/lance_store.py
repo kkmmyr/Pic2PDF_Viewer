@@ -9,6 +9,7 @@ LanceDB にベクトルを格納する。ANN インデックス（IVF_PQ）を
               char_count: int, page_count: int, embedding: vector[1024])
   summaries: (book_id: int, book_name: str, embedding: vector[1024])
 """
+
 from __future__ import annotations
 
 import threading
@@ -16,7 +17,7 @@ import threading
 import lancedb
 import pyarrow as pa
 
-from config import NOVEL_DB_EMBED_DIM, NOVEL_DB_LANCE_PATH
+from config.novel_db import novel_db_settings as _cfg
 
 _lock = threading.Lock()
 _db: lancedb.DBConnection | None = None
@@ -24,13 +25,16 @@ _db: lancedb.DBConnection | None = None
 # IVF_PQ インデックスを自動構築するチャンク数閾値
 ANN_INDEX_THRESHOLD = 50_000
 
+# bge-m3 の出力次元（固定値）
+_EMBED_DIM = 1024
+
 
 def get_db() -> lancedb.DBConnection:
     global _db
     if _db is None:
         with _lock:
             if _db is None:
-                _db = lancedb.connect(NOVEL_DB_LANCE_PATH)
+                _db = lancedb.connect(_cfg.NOVEL_DB_LANCE_PATH)
     return _db
 
 
@@ -45,15 +49,17 @@ def reset_db() -> None:
 # chunks テーブル
 # ---------------------------------------------------------------------------
 
-_CHUNKS_SCHEMA = pa.schema([
-    pa.field("chunk_id", pa.int64()),
-    pa.field("book_name", pa.utf8()),
-    pa.field("page_no", pa.int32()),
-    pa.field("text", pa.utf8()),
-    pa.field("char_count", pa.int32()),
-    pa.field("page_count", pa.int32()),
-    pa.field("embedding", pa.list_(pa.float32(), NOVEL_DB_EMBED_DIM)),
-])
+_CHUNKS_SCHEMA = pa.schema(
+    [
+        pa.field("chunk_id", pa.int64()),
+        pa.field("book_name", pa.utf8()),
+        pa.field("page_no", pa.int32()),
+        pa.field("text", pa.utf8()),
+        pa.field("char_count", pa.int32()),
+        pa.field("page_count", pa.int32()),
+        pa.field("embedding", pa.list_(pa.float32(), _EMBED_DIM)),
+    ]
+)
 
 
 def get_chunks_table() -> lancedb.table.Table:
@@ -70,11 +76,13 @@ def get_chunks_table() -> lancedb.table.Table:
 # summaries テーブル
 # ---------------------------------------------------------------------------
 
-_SUMMARIES_SCHEMA = pa.schema([
-    pa.field("book_id", pa.int64()),
-    pa.field("book_name", pa.utf8()),
-    pa.field("embedding", pa.list_(pa.float32(), NOVEL_DB_EMBED_DIM)),
-])
+_SUMMARIES_SCHEMA = pa.schema(
+    [
+        pa.field("book_id", pa.int64()),
+        pa.field("book_name", pa.utf8()),
+        pa.field("embedding", pa.list_(pa.float32(), _EMBED_DIM)),
+    ]
+)
 
 
 def get_summaries_table() -> lancedb.table.Table:
@@ -89,6 +97,7 @@ def get_summaries_table() -> lancedb.table.Table:
 # ANN インデックス管理
 # ---------------------------------------------------------------------------
 
+
 def maybe_create_index(table: lancedb.table.Table) -> None:
     """チャンク数が閾値を超えたとき IVF_PQ インデックスを作成する。
 
@@ -98,11 +107,11 @@ def maybe_create_index(table: lancedb.table.Table) -> None:
     if count < ANN_INDEX_THRESHOLD:
         return
     existing = table.list_indices()
-    if any(idx.get("name") == "embedding_idx" for idx in existing):
+    if any(idx.get("name") == "embedding_idx" for idx in existing):  # type: ignore[union-attr]
         return
-    table.create_index(
+    table.create_index(  # type: ignore[call-arg, reportCallIssue]
         "embedding",
-        config=lancedb.index.IvfPq(num_partitions=256, num_sub_vectors=64),
-        index_name="embedding_idx",
+        config=lancedb.index.IvfPq(num_partitions=256, num_sub_vectors=64),  # type: ignore[attr-defined]
+        index_name="embedding_idx",  # type: ignore[reportCallIssue]
         replace=False,
     )

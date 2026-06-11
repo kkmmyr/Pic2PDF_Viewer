@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.pdfs のユニットテスト。
 
 ページ削除（POST /api/pdfs/{filename}/delete_pages）と
@@ -8,6 +8,7 @@ PDF 結合（POST /api/pdfs/merge）を検証する。
     cd backend
     uv run pytest tests/test_router_pdfs.py -v
 """
+
 import os
 import sys
 
@@ -19,6 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # ---------------------------------------------------------------------------
 # POST /api/pdfs/{filename}/delete_pages
 # ---------------------------------------------------------------------------
+
 
 class TestDeletePages:
     def test_delete_single_page(self, client, tmp_data_dir, make_pdf):
@@ -147,6 +149,7 @@ class TestDeletePages:
 # POST /api/pdfs/{filename}/reorder_pages
 # ---------------------------------------------------------------------------
 
+
 class TestReorderPages:
     def test_reorder_kindle_pdf(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
@@ -248,18 +251,22 @@ class TestReorderPages:
 # POST /api/pdfs/merge
 # ---------------------------------------------------------------------------
 
+
 class TestMergePdfs:
     def test_merge_two_pdfs(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"), page_count=3)
         make_pdf(os.path.join(pdf_dir, "b.pdf"), page_count=2)
 
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf", "b.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf", "b.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 200
         body = res.json()
         assert body["total_pages"] == 5
@@ -276,12 +283,15 @@ class TestMergePdfs:
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
 
-        client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf", "b.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "comic",
-        })
+        client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf", "b.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert os.path.exists(os.path.join(thumb_dir, "merged.jpg"))
 
     def test_merge_400_when_output_exists(self, client, tmp_data_dir, make_pdf):
@@ -290,24 +300,30 @@ class TestMergePdfs:
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
         make_pdf(os.path.join(pdf_dir, "merged.pdf"))
 
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf", "b.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf", "b.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_merge_400_when_too_few_files(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
 
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_merge_400_when_output_not_pdf(self, client, tmp_data_dir, make_pdf):
@@ -315,40 +331,52 @@ class TestMergePdfs:
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
 
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf", "b.pdf"],
-            "output_name": "merged.txt",
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf", "b.pdf"],
+                "output_name": "merged.txt",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_merge_404_when_input_missing(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
 
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf", "missing.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf", "missing.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 404
 
     def test_merge_400_with_traversal(self, client, tmp_data_dir):
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["../etc.pdf", "b.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["../etc.pdf", "b.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_merge_invalid_source_returns_400(self, client, tmp_data_dir):
-        res = client.post("/api/pdfs/merge", json={
-            "names": ["a.pdf", "b.pdf"],
-            "output_name": "merged.pdf",
-            "path": "",
-            "source": "invalid",
-        })
+        res = client.post(
+            "/api/pdfs/merge",
+            json={
+                "names": ["a.pdf", "b.pdf"],
+                "output_name": "merged.pdf",
+                "path": "",
+                "source": "invalid",
+            },
+        )
         assert res.status_code == 400

@@ -2,6 +2,7 @@
 
 LLM による人物像サマリ生成ロジックは character_summarizer.py を参照。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -16,6 +17,7 @@ _NAME_MAX_LEN = 30
 @dataclass(frozen=True)
 class CharacterStat:
     """書籍内 1 キャラの登場統計（サマリ生成前の集計値）。"""
+
     name: str
     first_page: int
     page_count: int
@@ -23,6 +25,7 @@ class CharacterStat:
 
 class CharacterRow(SQLModel):
     """`book_characters` テーブルの 1 行（API 応答用）。"""
+
     name: str
     first_page: int
     page_count: int
@@ -76,8 +79,7 @@ def list_book_characters_in_db(
                 entry["first_page"] = page_no
 
     result = [
-        CharacterStat(name=name, first_page=e["first_page"], page_count=e["page_count"])
-        for name, e in stats.items()
+        CharacterStat(name=name, first_page=e["first_page"], page_count=e["page_count"]) for name, e in stats.items()
     ]
     result.sort(key=lambda c: (-c.page_count, c.first_page, c.name))
     return result
@@ -136,9 +138,14 @@ def upsert_character(
             END
         """,
         (
-            book_id, stat.name, summary if has_summary else None,
-            stat.first_page, stat.page_count, has_summary,
-            has_summary, has_summary,
+            book_id,
+            stat.name,
+            summary if has_summary else None,
+            stat.first_page,
+            stat.page_count,
+            has_summary,
+            has_summary,
+            has_summary,
         ),
     )
     conn.commit()

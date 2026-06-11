@@ -4,6 +4,7 @@ watchlist.json への CRUD と、表示名 → NOZOMI URL キーの正規化を�
 NOZOMI ファイル名そのものは `_` 区切り（hitomi.la 内部仕様）のため、
 `urllib.parse.quote` で URL encode しつつ `_` は safe 文字として保持する。
 """
+
 from __future__ import annotations
 
 import json
@@ -76,9 +77,7 @@ def add_artist(
 
     for e in entries:
         if e["normalized"] == normalized and e["language"] == language:
-            raise WatchlistError(
-                f"already in watchlist: {normalized} ({language})"
-            )
+            raise WatchlistError(f"already in watchlist: {normalized} ({language})")
 
     if verify_existence:
         try:
@@ -86,9 +85,7 @@ def add_artist(
         except nozomi.HitomiError as ex:
             raise WatchlistError(f"verification failed: {ex}") from ex
         if not exists:
-            raise WatchlistError(
-                f"artist not found on hitomi.la: {normalized} ({language})"
-            )
+            raise WatchlistError(f"artist not found on hitomi.la: {normalized} ({language})")
 
     entry: WatchlistEntry = {
         "display_name": display_name.strip(),
@@ -108,10 +105,7 @@ def remove_artist(
 ) -> bool:
     """監視対象を削除する。該当があれば True、なければ False を返す。"""
     entries = load_watchlist(data_dir)
-    new_entries = [
-        e for e in entries
-        if not (e["normalized"] == normalized and e["language"] == language)
-    ]
+    new_entries = [e for e in entries if not (e["normalized"] == normalized and e["language"] == language)]
     if len(new_entries) == len(entries):
         return False
     save_watchlist(data_dir, new_entries)

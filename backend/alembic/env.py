@@ -4,6 +4,7 @@ sqlite3 runtime のまま novel.db のみを管理する。
 SQLModel.metadata を target_metadata に設定し autogenerate に対応。
 pages_fts（FTS5 仮想テーブル）は include_name フィルタで除外。
 """
+
 from __future__ import annotations
 
 import sys

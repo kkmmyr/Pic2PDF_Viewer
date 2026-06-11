@@ -7,6 +7,7 @@ services.genre_store のユニットテスト（Phase 64: SQLite バックエン
     cd backend
     uv run pytest tests/test_genre_store.py -v
 """
+
 import threading
 
 import pytest
@@ -18,6 +19,7 @@ from services.meta_store import save_meta
 @pytest.fixture(autouse=True)
 def isolate_db(tmp_path, monkeypatch):
     import config
+
     monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     yield
 
@@ -31,6 +33,7 @@ def _seed_meta(source: str, data: dict) -> None:
 # load_genres
 # ---------------------------------------------------------------------------
 
+
 class TestLoadGenres:
     def test_returns_saved_genres(self):
         save_genres("doujin", ["Voiceloid", "オリジナル"])
@@ -43,22 +46,28 @@ class TestLoadGenres:
 
     def test_derives_from_meta_sorted_by_name(self):
         """books_meta の genre フィールドを名前順にソートした初期 list を返す（migration 用途）。"""
-        _seed_meta("doujin", {
-            "a.pdf": {"authors": [], "genre": "ZZZ"},
-            "b.pdf": {"authors": [], "genre": "AAA"},
-            "c.pdf": {"authors": [], "genre": "MMM"},
-        })
+        _seed_meta(
+            "doujin",
+            {
+                "a.pdf": {"authors": [], "genre": "ZZZ"},
+                "b.pdf": {"authors": [], "genre": "AAA"},
+                "c.pdf": {"authors": [], "genre": "MMM"},
+            },
+        )
 
         genres = load_genres("doujin")
         assert genres == ["AAA", "MMM", "ZZZ"]
 
     def test_dedupes_duplicate_genres_from_meta(self):
         """books_meta で同じ genre が複数書籍に付いていても 1 件にまとめる。"""
-        _seed_meta("doujin", {
-            "a.pdf": {"authors": [], "genre": "X"},
-            "b.pdf": {"authors": [], "genre": "X"},
-            "c.pdf": {"authors": [], "genre": "Y"},
-        })
+        _seed_meta(
+            "doujin",
+            {
+                "a.pdf": {"authors": [], "genre": "X"},
+                "b.pdf": {"authors": [], "genre": "X"},
+                "c.pdf": {"authors": [], "genre": "Y"},
+            },
+        )
 
         assert load_genres("doujin") == ["X", "Y"]
 
@@ -76,6 +85,7 @@ class TestLoadGenres:
 # ---------------------------------------------------------------------------
 # save_genres
 # ---------------------------------------------------------------------------
+
 
 class TestSaveGenres:
     def test_save_then_load_roundtrip(self):
@@ -103,9 +113,11 @@ class TestSaveGenres:
 # 並行性
 # ---------------------------------------------------------------------------
 
+
 class TestConcurrency:
     def test_concurrent_save_no_corruption(self):
         """並行 save で DB が壊れない（最後の書き込みが残ればOK）。"""
+
         def _save(value):
             save_genres("doujin", [value])
 

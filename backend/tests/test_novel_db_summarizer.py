@@ -7,6 +7,7 @@ Qwen 呼び出し（`ask`）はモックする。本テストは:
 - update_book_summary / load_summaries_for_books: DB 入出力
 を確認する。
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -25,6 +26,7 @@ from services.novel_db.summarizer import (
 # ---------------------------------------------------------------------------
 # _chunk_for_map
 # ---------------------------------------------------------------------------
+
 
 def test_chunk_short_text_returns_single_chunk():
     text = "short body"
@@ -53,6 +55,7 @@ def test_chunk_respects_max_chunks_for_huge_text():
 # _load_body_text
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def db_with_book(tmp_data_dir):
     """1 冊（10 ページ）の最小データを入れた novel.db を返す。"""
@@ -67,8 +70,7 @@ def db_with_book(tmp_data_dir):
         for page_no in range(1, 11):
             text = "本文" * (200 if 3 <= page_no <= 8 else 50)
             conn.execute(
-                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
                 (book_id, page_no, None, text, len(text)),
             )
         conn.commit()
@@ -78,8 +80,11 @@ def db_with_book(tmp_data_dir):
 def test_load_body_text_filters_margin_and_min_chars(db_with_book):
     with with_db() as conn:
         text = _load_body_text(
-            conn, db_with_book, page_count=10,
-            min_chars=300, body_page_margin=2,
+            conn,
+            db_with_book,
+            page_count=10,
+            min_chars=300,
+            body_page_margin=2,
         )
     # body_page_margin=2 → page_no 3〜8 を採用
     # min_chars=300 → 「本文」(2 字) × 200 = 400 字なので採用
@@ -90,8 +95,11 @@ def test_load_body_text_filters_margin_and_min_chars(db_with_book):
 def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
     with with_db() as conn:
         text = _load_body_text(
-            conn, db_with_book, page_count=10,
-            min_chars=10000, body_page_margin=0,
+            conn,
+            db_with_book,
+            page_count=10,
+            min_chars=10000,
+            body_page_margin=0,
         )
     assert text == ""
 
@@ -100,14 +108,17 @@ def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
 # summarize_book / update / load
 # ---------------------------------------------------------------------------
 
+
 def test_summarize_book_one_shot_for_short_book(db_with_book):
     """単一チャンクで収まる本では _BACKEND.ask() が 1 回だけ呼ばれる。"""
     with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
         mock_ask.return_value = "  これは要約です。  "
         with with_db() as conn:
             summary = summarize_book(
-                conn, "test-book",
-                min_chars=100, body_page_margin=2,
+                conn,
+                "test-book",
+                min_chars=100,
+                body_page_margin=2,
             )
     assert summary == "これは要約です。"
     assert mock_ask.call_count == 1
@@ -127,8 +138,7 @@ def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
         for page_no in range(1, 61):
             text = "あ" * 5000
             conn.execute(
-                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
                 (book_id, page_no, None, text, len(text)),
             )
         conn.commit()
@@ -137,8 +147,10 @@ def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
         mock_ask.side_effect = [f"map-{i}" for i in range(8)] + ["最終要約"]
         with with_db() as conn:
             summary = summarize_book(
-                conn, "big-book",
-                min_chars=100, body_page_margin=5,
+                conn,
+                "big-book",
+                min_chars=100,
+                body_page_margin=5,
             )
     assert summary == "最終要約"
     # map（最大 8 チャンク）+ reduce（1 回）
@@ -163,8 +175,7 @@ def test_summarize_book_raises_for_empty_body(tmp_data_dir):
         book_id = cur.lastrowid
         for page_no in range(1, 6):
             conn.execute(
-                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
                 (book_id, page_no, None, "", 0),
             )
         conn.commit()
@@ -212,6 +223,7 @@ def test_load_summaries_for_empty_input_returns_empty():
 # B-8: 書籍サマリ embedding と検索インデックス
 # ---------------------------------------------------------------------------
 
+
 def test_update_book_summary_indexes_vector(db_with_book):
     """update_book_summary が summary を保存し、LanceDB summaries にも upsert する。"""
     with patch("services.novel_db.summarizer.embed_batch") as mock_embed:
@@ -221,7 +233,8 @@ def test_update_book_summary_indexes_vector(db_with_book):
             update_book_summary(conn, "test-book", "テストサマリ")
             # books.summary 更新
             row = conn.execute(
-                "SELECT summary FROM books WHERE name = ?", ("test-book",),
+                "SELECT summary FROM books WHERE name = ?",
+                ("test-book",),
             ).fetchone()
             assert row[0] == "テストサマリ"
         # LanceDB summaries に 1 件
@@ -239,7 +252,8 @@ def test_update_book_summary_handles_embed_failure(db_with_book):
             update_book_summary(conn, "test-book", "テスト")
             # 本文は保存されている
             row = conn.execute(
-                "SELECT summary FROM books WHERE name = ?", ("test-book",),
+                "SELECT summary FROM books WHERE name = ?",
+                ("test-book",),
             ).fetchone()
             assert row[0] == "テスト"
         # LanceDB summaries は空のまま

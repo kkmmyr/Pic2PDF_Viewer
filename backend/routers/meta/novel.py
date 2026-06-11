@@ -1,4 +1,5 @@
 """novel ソース専用のメタデータパッチエンドポイント。"""
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -9,6 +10,7 @@ router = APIRouter()
 
 class NovelMetaPatchRequest(BaseModel):
     """novel 1 冊のメタを部分更新するリクエスト（4.3）。省略されたフィールドは変更しない。"""
+
     authors: list[str] | None = None
     series_id: str | None = None
     volume: int | None = None

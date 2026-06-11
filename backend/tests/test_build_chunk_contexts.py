@@ -4,6 +4,7 @@ B-9 改良 (2026-05-12): skip 判定境界を検証する。
 Phase 55-2 (2026-05-14): スクリプトから contextualizer へ移動に伴い、
   importlib 経由の動的ロードを直接 import に置換。
 """
+
 from services.novel_db.contextualizer import should_skip_context
 
 

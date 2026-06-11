@@ -1,4 +1,5 @@
 """novel_db ハイブリッド検索エンドポイント。"""
+
 from __future__ import annotations
 
 from dataclasses import asdict

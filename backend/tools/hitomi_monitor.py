@@ -8,6 +8,7 @@ Windows Task Scheduler から `python -m tools.hitomi_monitor` で単発実行�
   1: 部分失敗（一部作者で例外）
   2: 致命的失敗（state.json 等の I/O エラー）
 """
+
 from __future__ import annotations
 
 import sys
@@ -118,9 +119,7 @@ def main(
             continue
 
         try:
-            ids = nozomi.fetch_nozomi_head(
-                entry["normalized"], entry["language"], count=20
-            )
+            ids = nozomi.fetch_nozomi_head(entry["normalized"], entry["language"], count=20)
         except nozomi.HitomiError as e:
             msg = f"{key}: NOZOMI fetch failed: {e}"
             print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
@@ -174,10 +173,7 @@ def main(
         print(f"[hitomi_monitor] FATAL: state.json 書込失敗: {e}", file=sys.stderr)
         return 2
 
-    print(
-        f"[hitomi_monitor] done: 新着 {added} 件追加, "
-        f"{purged} 件 purge, {skipped} 件 skip, エラー {len(errors)} 件"
-    )
+    print(f"[hitomi_monitor] done: 新着 {added} 件追加, {purged} 件 purge, {skipped} 件 skip, エラー {len(errors)} 件")
     return 1 if errors else 0
 
 

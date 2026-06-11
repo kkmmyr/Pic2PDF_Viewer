@@ -1,4 +1,5 @@
 """ルーター共通 FastAPI 依存関数・ヘルパー。"""
+
 import functools
 import json
 
@@ -60,6 +61,7 @@ def log_and_raise_500(operation: str):
     logger はデコレート対象関数のモジュール名から取得するため、各ルーターの既存ロガー設定を
     そのまま継承する。
     """
+
     def decorator(func):
         logger = get_logger(func.__module__)
 

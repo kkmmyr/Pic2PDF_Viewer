@@ -3,6 +3,7 @@
 POST /api/novel/discussion/generate  → SSE ストリーミング
 GET  /api/novel/discussion/history   → 過去生成一覧（?book_name=<name>）
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator
@@ -65,27 +66,38 @@ async def generate_discussion(
         )
 
     if not hits:
+
         async def _no_pages() -> AsyncGenerator[str, None]:
-            yield sse_event({
-                "type": "error",
-                "message": f"書籍「{request.book_name}」のページデータが見つかりません。インデックスを再構築してください。",
-            })
+            yield sse_event(
+                {
+                    "type": "error",
+                    "message": f"書籍「{request.book_name}」のページデータが見つかりません。インデックスを再構築してください。",
+                }
+            )
+
         return StreamingResponse(_no_pages(), media_type="text/event-stream")
 
     token_count = estimate_book_tokens(hits)
     if token_count > MAX_INPUT_TOKENS:
+
         async def _too_long() -> AsyncGenerator[str, None]:
-            yield sse_event({
-                "type": "error",
-                "message": (
-                    f"本文が長すぎます（推定 {token_count:,} トークン、"
-                    f"上限 {MAX_INPUT_TOKENS:,} トークン）。"
-                ),
-            })
+            yield sse_event(
+                {
+                    "type": "error",
+                    "message": (
+                        f"本文が長すぎます（推定 {token_count:,} トークン、上限 {MAX_INPUT_TOKENS:,} トークン）。"
+                    ),
+                }
+            )
+
         return StreamingResponse(_too_long(), media_type="text/event-stream")
 
     messages = build_messages(
-        request.book_name, persona_a, persona_b, request.num_turns, hits,
+        request.book_name,
+        persona_a,
+        persona_b,
+        request.num_turns,
+        hits,
     )
 
     async def event_stream() -> AsyncGenerator[str, None]:
@@ -94,10 +106,12 @@ async def generate_discussion(
             async for turn_event in stream_discussion_turns(messages):
                 if await http_request.is_disconnected():
                     return
-                accumulated_turns.append({
-                    "speaker": turn_event["speaker"],
-                    "text": turn_event["text"],
-                })
+                accumulated_turns.append(
+                    {
+                        "speaker": turn_event["speaker"],
+                        "text": turn_event["text"],
+                    }
+                )
                 yield sse_event(turn_event)
         except Exception as e:
             logger.exception("generate_discussion SSE failed")
@@ -106,7 +120,10 @@ async def generate_discussion(
 
         if accumulated_turns:
             saved_path = save_discussion(
-                request.book_name, persona_a, persona_b, accumulated_turns,
+                request.book_name,
+                persona_a,
+                persona_b,
+                accumulated_turns,
             )
             yield sse_event({"type": "done", "saved_path": saved_path})
         else:

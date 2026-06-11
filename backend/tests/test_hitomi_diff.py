@@ -1,4 +1,5 @@
 """diff_unseen_ids（前回の top_id より新しい ID を抽出するロジック）のユニットテスト。"""
+
 import os
 import sys
 

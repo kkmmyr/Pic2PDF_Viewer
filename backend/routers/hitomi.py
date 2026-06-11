@@ -3,6 +3,7 @@
 各エンドポイントの詳細は docs/03_詳細設計/hitomi新着監視設計書.md §6 を参照。
 データは backend/data/hitomi/ 配下の JSON ファイル（個別の監視スクリプトが書き出す）。
 """
+
 import logging
 import threading
 from datetime import datetime
@@ -33,6 +34,7 @@ class AddWatchlistRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # 新着一覧・既読化
 # ---------------------------------------------------------------------------
+
 
 @router.get("/hitomi/new-arrivals")
 def get_new_arrivals() -> dict:
@@ -65,6 +67,7 @@ def post_dismiss_all() -> dict:
 # ---------------------------------------------------------------------------
 # 監視対象 CRUD
 # ---------------------------------------------------------------------------
+
 
 @router.get("/hitomi/watchlist")
 def get_watchlist() -> dict:
@@ -112,6 +115,7 @@ def delete_watchlist(normalized: str, language: str = "japanese") -> dict:
 # ---------------------------------------------------------------------------
 # 監視スクリプトの同期実行
 # ---------------------------------------------------------------------------
+
 
 @router.post("/hitomi/run-now")
 def post_run_now(force: bool = False) -> dict:

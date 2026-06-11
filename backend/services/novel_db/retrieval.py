@@ -3,6 +3,7 @@
 両エンドポイントで重複していた retrieval 処理（hybrid_search デデュープ・
 full_book_mode 分岐・書籍サマリ付与）を 1 か所にまとめる。
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -42,16 +43,11 @@ def retrieve(conn, question: str, scope: Scope) -> RetrievalResult:
     full_book_mode（scope=book + NOVEL_DB_QA_FULL_BOOK_MODE 有効）のとき
     全ページ読み。それ以外は hybrid_search + Query Expansion + 書籍サマリ付与。
     """
-    full_book_mode = (
-        NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
-    )
-    qa_options = (
-        {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX}
-        if full_book_mode
-        else LLM_OPTIONS
-    )
+    full_book_mode = NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
+    qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX} if full_book_mode else LLM_OPTIONS
 
     if full_book_mode:
+        assert scope.id is not None  # full_book_mode は scope.id != None を条件に設定される
         hits = load_all_pages_of_book(
             conn,
             scope.id,
@@ -62,9 +58,7 @@ def retrieve(conn, question: str, scope: Scope) -> RetrievalResult:
 
     # 通常 RAG 経路
     # scope=all / series では書籍偏り抑制のため max_per_book を有効化
-    max_per_book = (
-        NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
-    )
+    max_per_book = NOVEL_DB_QA_MAX_PER_BOOK if scope.type in ("all", "series") else None
     # B-11 Query Expansion: 展開無効 / 失敗時は元の質問のみのリストになる
     queries = expand_query(question) if NOVEL_DB_QA_EXPAND_ENABLED else [question]
 
@@ -92,7 +86,10 @@ def retrieve(conn, question: str, scope: Scope) -> RetrievalResult:
     if scope.type in ("all", "series"):
         hit_book_names = {h.book_name for h in hits}
         summary_hits = search_book_summaries(
-            conn, question, scope, top=NOVEL_DB_QA_TOP_SUMMARIES,
+            conn,
+            question,
+            scope,
+            top=NOVEL_DB_QA_TOP_SUMMARIES,
         )
         relevant_book_names = sorted(
             hit_book_names | {name for name, _ in summary_hits},

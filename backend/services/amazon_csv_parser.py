@@ -3,6 +3,7 @@
 対象: amazon-order_digital_*.csv
 エンコード: UTF-8 with BOM / Shift-JIS 両対応
 """
+
 from __future__ import annotations
 
 import csv
@@ -39,9 +40,7 @@ class MatchedRow:
 # ---------------------------------------------------------------------------
 
 _PUBLISHER_RE = re.compile(r"\s*\(([^)]+)\)\s*$")
-_VOLUME_RE = re.compile(
-    r"(?:第?\s*(\d+)\s*巻|[\s　](\d+)(?:\s*$|\s+(?:\(|（)))"
-)
+_VOLUME_RE = re.compile(r"(?:第?\s*(\d+)\s*巻|[\s　](\d+)(?:\s*$|\s+(?:\(|（)))")
 _ASIN_RE = re.compile(r"/dp/([A-Z0-9]{10})/")
 _AUTHOR_PREFIX_RE = re.compile(r"^\[Kindle\s*版\]\s*", re.IGNORECASE)
 _AUTHOR_SELLER_RE = re.compile(r"\s+販売:.*$")
@@ -149,6 +148,7 @@ def parse_csv(file_bytes: bytes) -> list[ParsedRow]:
 # ---------------------------------------------------------------------------
 # 書籍マッチング
 # ---------------------------------------------------------------------------
+
 
 def _similarity(a: str, b: str) -> float:
     return SequenceMatcher(None, a.lower(), b.lower()).ratio()

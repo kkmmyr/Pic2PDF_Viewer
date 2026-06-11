@@ -9,6 +9,7 @@ Qwen 呼び出し（`_BACKEND.ask`）はモックする。本テストは:
 - summarize_character: pages 空・正常系の挙動
 を確認する。
 """
+
 from unittest.mock import patch
 
 import pytest
@@ -31,15 +32,20 @@ from services.novel_db.migrations import upgrade_head
 # _parse_main_characters
 # ---------------------------------------------------------------------------
 
+
 def test_parse_main_characters_comma_separated():
     assert _parse_main_characters("レティ, デューク, アストリッド") == [
-        "レティ", "デューク", "アストリッド",
+        "レティ",
+        "デューク",
+        "アストリッド",
     ]
 
 
 def test_parse_main_characters_handles_japanese_separators():
     assert _parse_main_characters("レティ、デューク・アストリッド") == [
-        "レティ", "デューク", "アストリッド",
+        "レティ",
+        "デューク",
+        "アストリッド",
     ]
 
 
@@ -52,13 +58,15 @@ def test_parse_main_characters_skips_too_long_fragments():
     # 30 字超は誤抽出と判断してスキップ
     long_name = "あ" * 31
     assert _parse_main_characters(f"レティ, {long_name}, デューク") == [
-        "レティ", "デューク",
+        "レティ",
+        "デューク",
     ]
 
 
 # ---------------------------------------------------------------------------
 # DB を使うテスト用フィクスチャ
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def db_with_characters(tmp_data_dir):
@@ -116,6 +124,7 @@ def db_with_characters(tmp_data_dir):
 # list_book_characters_in_db
 # ---------------------------------------------------------------------------
 
+
 def test_list_characters_aggregates_and_sorts(db_with_characters):
     with with_db() as conn:
         stats = list_book_characters_in_db(conn, db_with_characters)
@@ -138,8 +147,7 @@ def test_list_characters_returns_empty_for_book_without_extractions(tmp_data_dir
         bid = cur.lastrowid
         for pn in range(1, 4):
             conn.execute(
-                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
                 (bid, pn, None, "x", 1),
             )
         conn.commit()
@@ -150,6 +158,7 @@ def test_list_characters_returns_empty_for_book_without_extractions(tmp_data_dir
 # ---------------------------------------------------------------------------
 # collect_character_pages
 # ---------------------------------------------------------------------------
+
 
 def test_collect_pages_returns_only_matching_pages(db_with_characters):
     with with_db() as conn:
@@ -168,6 +177,7 @@ def test_collect_pages_exact_name_match(db_with_characters):
 # top_scenes_for_character
 # ---------------------------------------------------------------------------
 
+
 def test_top_scenes_returns_pages_by_char_count_desc(db_with_characters):
     with with_db() as conn:
         scenes = top_scenes_for_character(conn, db_with_characters, "デューク", limit=3)
@@ -179,7 +189,10 @@ def test_top_scenes_returns_pages_by_char_count_desc(db_with_characters):
 def test_top_scenes_respects_limit(db_with_characters):
     with with_db() as conn:
         scenes = top_scenes_for_character(
-            conn, db_with_characters, "デューク", limit=2,
+            conn,
+            db_with_characters,
+            "デューク",
+            limit=2,
         )
     assert len(scenes) == 2
 
@@ -187,6 +200,7 @@ def test_top_scenes_respects_limit(db_with_characters):
 # ---------------------------------------------------------------------------
 # upsert_character + list / get
 # ---------------------------------------------------------------------------
+
 
 def test_upsert_inserts_then_updates(db_with_characters):
     stat = CharacterStat("レティ", first_page=2, page_count=4)
@@ -234,6 +248,7 @@ def test_list_characters_sorts_by_page_count(db_with_characters):
 # ---------------------------------------------------------------------------
 # summarize_character
 # ---------------------------------------------------------------------------
+
 
 def test_summarize_character_calls_backend_with_book_and_name():
     pages = [(3, "本文ページ3"), (4, "本文ページ4")]

@@ -4,6 +4,7 @@
 手動編集 API（POST /api/series/assign 等）で使う `authors_key` /
 `stable_series_id` のみを残置している。
 """
+
 import hashlib
 
 

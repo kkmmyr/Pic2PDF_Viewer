@@ -11,6 +11,7 @@ routers.meta の追補ユニットテスト。
     cd backend
     uv run pytest tests/test_router_meta.py -v
 """
+
 import os
 
 from services.meta_store import load_meta, save_meta
@@ -24,12 +25,16 @@ def _seed_meta(source: str, data: dict) -> None:
 # GET /api/meta
 # ---------------------------------------------------------------------------
 
+
 class TestGetMeta:
     def test_returns_full_meta(self, client, tmp_data_dir):
-        _seed_meta("doujin", {
-            "a.pdf": {"authors": ["A"]},
-            "b.pdf": {"authors": ["B"], "genre": "G"},
-        })
+        _seed_meta(
+            "doujin",
+            {
+                "a.pdf": {"authors": ["A"]},
+                "b.pdf": {"authors": ["B"], "genre": "G"},
+            },
+        )
 
         res = client.get("/api/meta?source=doujin")
         assert res.status_code == 200
@@ -50,6 +55,7 @@ class TestGetMeta:
 # ---------------------------------------------------------------------------
 # GET /api/meta/export
 # ---------------------------------------------------------------------------
+
 
 class TestExportMeta:
     def test_returns_json_with_attachment_header(self, client, tmp_data_dir):
@@ -77,16 +83,20 @@ class TestExportMeta:
 # PATCH /api/meta - genre / 空 list 削除
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateMetaGenre:
     def test_set_genre(self, client, tmp_data_dir):
         _seed_meta("doujin", {"a.pdf": {"authors": ["X"]}})
 
-        res = client.patch("/api/meta", json={
-            "path": "",
-            "names": ["a.pdf"],
-            "genre": "プリンセスコネクト",
-            "source": "doujin",
-        })
+        res = client.patch(
+            "/api/meta",
+            json={
+                "path": "",
+                "names": ["a.pdf"],
+                "genre": "プリンセスコネクト",
+                "source": "doujin",
+            },
+        )
         assert res.status_code == 200
 
         meta = load_meta("doujin")
@@ -96,12 +106,15 @@ class TestUpdateMetaGenre:
     def test_genre_empty_string_removes_field(self, client, tmp_data_dir):
         _seed_meta("doujin", {"a.pdf": {"genre": "X", "authors": ["A"]}})
 
-        client.patch("/api/meta", json={
-            "path": "",
-            "names": ["a.pdf"],
-            "genre": "",
-            "source": "doujin",
-        })
+        client.patch(
+            "/api/meta",
+            json={
+                "path": "",
+                "names": ["a.pdf"],
+                "genre": "",
+                "source": "doujin",
+            },
+        )
 
         meta = load_meta("doujin")
         assert "genre" not in meta["a.pdf"]
@@ -111,17 +124,23 @@ class TestUpdateMetaGenre:
 class TestUpdateMetaEntryDeletion:
     def test_empty_lists_remove_entry(self, client, tmp_data_dir):
         """authors=[] で他に意味のあるフィールドが無ければエントリ自体が消える。"""
-        _seed_meta("doujin", {
-            "victim.pdf": {"authors": ["A"]},
-            "alive.pdf": {"authors": ["B"]},
-        })
+        _seed_meta(
+            "doujin",
+            {
+                "victim.pdf": {"authors": ["A"]},
+                "alive.pdf": {"authors": ["B"]},
+            },
+        )
 
-        client.patch("/api/meta", json={
-            "path": "",
-            "names": ["victim.pdf"],
-            "authors": [],
-            "source": "doujin",
-        })
+        client.patch(
+            "/api/meta",
+            json={
+                "path": "",
+                "names": ["victim.pdf"],
+                "authors": [],
+                "source": "doujin",
+            },
+        )
 
         meta = load_meta("doujin")
         assert "victim.pdf" not in meta
@@ -129,16 +148,22 @@ class TestUpdateMetaEntryDeletion:
 
     def test_empty_lists_keep_entry_with_view_count(self, client, tmp_data_dir):
         """view_count 等 list 以外の意味のあるフィールドが残っていればエントリは保持される。"""
-        _seed_meta("doujin", {
-            "book.pdf": {"authors": ["A"], "view_count": 5, "last_viewed_at": 1700000000.0},
-        })
+        _seed_meta(
+            "doujin",
+            {
+                "book.pdf": {"authors": ["A"], "view_count": 5, "last_viewed_at": 1700000000.0},
+            },
+        )
 
-        client.patch("/api/meta", json={
-            "path": "",
-            "names": ["book.pdf"],
-            "authors": [],
-            "source": "doujin",
-        })
+        client.patch(
+            "/api/meta",
+            json={
+                "path": "",
+                "names": ["book.pdf"],
+                "authors": [],
+                "source": "doujin",
+            },
+        )
 
         meta = load_meta("doujin")
         assert meta["book.pdf"]["view_count"] == 5
@@ -146,17 +171,21 @@ class TestUpdateMetaEntryDeletion:
         assert meta["book.pdf"]["authors"] == []
 
     def test_400_when_no_field_specified(self, client, tmp_data_dir):
-        res = client.patch("/api/meta", json={
-            "path": "",
-            "names": ["a.pdf"],
-            "source": "doujin",
-        })
+        res = client.patch(
+            "/api/meta",
+            json={
+                "path": "",
+                "names": ["a.pdf"],
+                "source": "doujin",
+            },
+        )
         assert res.status_code == 400
 
 
 # ---------------------------------------------------------------------------
 # POST /api/meta/init-genre-original
 # ---------------------------------------------------------------------------
+
 
 def _make_book_in_images(images_dir: str, book_stem: str, subdir: str = "") -> None:
     """images/{subdir}/{book_stem}/ に画像ファイルを置いて書籍ディレクトリを作る。"""
@@ -169,10 +198,13 @@ def _make_book_in_images(images_dir: str, book_stem: str, subdir: str = "") -> N
 class TestInitGenreOriginal:
     def test_updates_entries_without_genre(self, client, tmp_data_dir):
         """genre が未設定のエントリは オリジナル に更新され、設定済みは保持される。"""
-        _seed_meta("doujin", {
-            "no_genre.pdf": {"authors": ["A"]},
-            "has_genre.pdf": {"authors": ["B"], "genre": "魔法少女"},
-        })
+        _seed_meta(
+            "doujin",
+            {
+                "no_genre.pdf": {"authors": ["A"]},
+                "has_genre.pdf": {"authors": ["B"], "genre": "魔法少女"},
+            },
+        )
 
         res = client.post("/api/meta/init-genre-original?source=doujin")
         assert res.status_code == 200

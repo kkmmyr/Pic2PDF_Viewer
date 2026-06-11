@@ -6,6 +6,7 @@ chunk_book()  : 【§4.4 実験用】全ページ連結クロスページチャ�
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.2。
 """
+
 from __future__ import annotations
 
 import bisect

@@ -1,4 +1,5 @@
 """services/novel_db/library.py の単体テスト。"""
+
 from pathlib import Path
 
 import pytest
@@ -30,8 +31,7 @@ def _put_meta(meta_data: dict) -> None:
 def _insert_indexed_book(conn, name: str, page_count: int = 100) -> int:
     """books テーブルに 1 件 INSERT する。"""
     cur = conn.execute(
-        "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
-        "VALUES (?, ?, ?, ?, datetime('now'))",
+        "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) VALUES (?, ?, ?, ?, datetime('now'))",
         (name, f"/dummy/{name}.pdf", f"/dummy/images/{name}", page_count),
     )
     return cur.lastrowid
@@ -69,13 +69,15 @@ def test_list_books_merges_indexed_status(setup_db):
 
 def test_list_books_merges_meta_authors_and_series(setup_db):
     _put_image_dir(setup_db, "book-1")
-    _put_meta({
-        "book-1.pdf": {
-            "authors": ["田中啓子"],
-            "series_id": "oko-kishi",
-            "series_title": "おこぼれ姫",
+    _put_meta(
+        {
+            "book-1.pdf": {
+                "authors": ["田中啓子"],
+                "series_id": "oko-kishi",
+                "series_title": "おこぼれ姫",
+            }
         }
-    })
+    )
 
     with with_db() as conn:
         books = list_books(conn)
@@ -109,17 +111,19 @@ def test_list_series_excludes_unaffiliated_books(setup_db):
     _put_image_dir(setup_db, "book-1")
     _put_image_dir(setup_db, "book-2")
     _put_image_dir(setup_db, "book-orphan")
-    _put_meta({
-        "book-1.pdf": {
-            "series_id": "oko-kishi",
-            "series_title": "おこぼれ姫",
-        },
-        "book-2.pdf": {
-            "series_id": "oko-kishi",
-            "series_title": "おこぼれ姫",
-        },
-        # book-orphan は series_id なし
-    })
+    _put_meta(
+        {
+            "book-1.pdf": {
+                "series_id": "oko-kishi",
+                "series_title": "おこぼれ姫",
+            },
+            "book-2.pdf": {
+                "series_id": "oko-kishi",
+                "series_title": "おこぼれ姫",
+            },
+            # book-orphan は series_id なし
+        }
+    )
 
     with with_db() as conn:
         series = list_series(conn)

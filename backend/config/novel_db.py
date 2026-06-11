@@ -4,6 +4,7 @@ Novel DB（小説 RAG 機能）の設定値。
 `config/__init__.py` から `from .novel_db import *` でインポートされる。
 直接インポートも可能: `from config.novel_db import NOVEL_DB_LLM_MODEL`
 """
+
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -76,29 +77,30 @@ class _NovelDbSettings(BaseSettings):
 
 
 _s = _NovelDbSettings()
+novel_db_settings = _s  # public singleton
 
 # ---------------------------------------------------------------------------
 # モジュールレベル定数として再公開（`from config import NOVEL_DB_*` 互換）
 # ---------------------------------------------------------------------------
-NOVEL_DB_LANCE_PATH           = _s.NOVEL_DB_LANCE_PATH
-NOVEL_DB_OLLAMA_BASE_URL      = _s.NOVEL_DB_OLLAMA_BASE_URL
-NOVEL_DB_EMBED_MODEL          = _s.NOVEL_DB_EMBED_MODEL
-NOVEL_DB_EMBED_DIM            = 1024  # bge-m3 の出力次元（固定値）
-NOVEL_DB_EMBED_NUM_GPU        = _s.NOVEL_DB_EMBED_NUM_GPU
-NOVEL_DB_LLM_MODEL            = _s.NOVEL_DB_LLM_MODEL
-NOVEL_DB_LLM_BACKEND          = _s.NOVEL_DB_LLM_BACKEND
-NOVEL_DB_LLAMA_SERVER_URL     = _s.NOVEL_DB_LLAMA_SERVER_URL
-NOVEL_DB_CHAR_EXTRACT_MODEL   = _s.NOVEL_DB_CHAR_EXTRACT_MODEL
-NOVEL_DB_CONTEXT_MODEL        = _s.NOVEL_DB_CONTEXT_MODEL
-NOVEL_DB_GEMMA_BACKEND        = _s.NOVEL_DB_GEMMA_BACKEND
-NOVEL_DB_MIN_BODY_CHARS       = 300   # 固定値（薄いページ除外閾値）
-NOVEL_DB_QA_TOP_K             = _s.NOVEL_DB_QA_TOP_K
-NOVEL_DB_QA_MAX_PER_BOOK      = 5     # 固定値（書籍ごと取得上限）
-NOVEL_DB_BODY_PAGE_MARGIN     = 5     # 固定値（先頭/末尾の除外ページ数）
-NOVEL_DB_QA_TOP_SUMMARIES     = 11    # 固定値（サマリ上限件数）
-NOVEL_DB_QA_NUM_CTX           = _s.NOVEL_DB_QA_NUM_CTX
-NOVEL_DB_QA_EXPAND_ENABLED    = _s.NOVEL_DB_QA_EXPAND_ENABLED
-NOVEL_DB_QA_EXPAND_N          = _s.NOVEL_DB_QA_EXPAND_N
-NOVEL_DB_QA_EXPAND_MODEL      = _s.NOVEL_DB_QA_EXPAND_MODEL
-NOVEL_DB_QA_FULL_BOOK_MODE    = _s.NOVEL_DB_QA_FULL_BOOK_MODE
+NOVEL_DB_LANCE_PATH = _s.NOVEL_DB_LANCE_PATH
+NOVEL_DB_OLLAMA_BASE_URL = _s.NOVEL_DB_OLLAMA_BASE_URL
+NOVEL_DB_EMBED_MODEL = _s.NOVEL_DB_EMBED_MODEL
+NOVEL_DB_EMBED_DIM = 1024  # bge-m3 の出力次元（固定値）
+NOVEL_DB_EMBED_NUM_GPU = _s.NOVEL_DB_EMBED_NUM_GPU
+NOVEL_DB_LLM_MODEL = _s.NOVEL_DB_LLM_MODEL
+NOVEL_DB_LLM_BACKEND = _s.NOVEL_DB_LLM_BACKEND
+NOVEL_DB_LLAMA_SERVER_URL = _s.NOVEL_DB_LLAMA_SERVER_URL
+NOVEL_DB_CHAR_EXTRACT_MODEL = _s.NOVEL_DB_CHAR_EXTRACT_MODEL
+NOVEL_DB_CONTEXT_MODEL = _s.NOVEL_DB_CONTEXT_MODEL
+NOVEL_DB_GEMMA_BACKEND = _s.NOVEL_DB_GEMMA_BACKEND
+NOVEL_DB_MIN_BODY_CHARS = 300  # 固定値（薄いページ除外閾値）
+NOVEL_DB_QA_TOP_K = _s.NOVEL_DB_QA_TOP_K
+NOVEL_DB_QA_MAX_PER_BOOK = 5  # 固定値（書籍ごと取得上限）
+NOVEL_DB_BODY_PAGE_MARGIN = 5  # 固定値（先頭/末尾の除外ページ数）
+NOVEL_DB_QA_TOP_SUMMARIES = 11  # 固定値（サマリ上限件数）
+NOVEL_DB_QA_NUM_CTX = _s.NOVEL_DB_QA_NUM_CTX
+NOVEL_DB_QA_EXPAND_ENABLED = _s.NOVEL_DB_QA_EXPAND_ENABLED
+NOVEL_DB_QA_EXPAND_N = _s.NOVEL_DB_QA_EXPAND_N
+NOVEL_DB_QA_EXPAND_MODEL = _s.NOVEL_DB_QA_EXPAND_MODEL
+NOVEL_DB_QA_FULL_BOOK_MODE = _s.NOVEL_DB_QA_FULL_BOOK_MODE
 NOVEL_DB_QA_FULL_BOOK_NUM_CTX = _s.NOVEL_DB_QA_FULL_BOOK_NUM_CTX

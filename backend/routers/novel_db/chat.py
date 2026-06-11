@@ -2,6 +2,7 @@
 
 パス: /sessions/* （旧: /qa/sessions/*）
 """
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -61,7 +62,9 @@ async def _chat_event_stream(
             if await http_request.is_disconnected():
                 with with_db() as conn:
                     append_message(
-                        conn, session_id, role="assistant",
+                        conn,
+                        session_id,
+                        role="assistant",
                         content="".join(full_response),
                         done_reason="canceled",
                     )
@@ -75,22 +78,29 @@ async def _chat_event_stream(
                 eval_count = event.get("eval_count")
                 with with_db() as conn:
                     msg_id = append_message(
-                        conn, session_id, role="assistant",
+                        conn,
+                        session_id,
+                        role="assistant",
                         content=answer,
-                        eval_count=eval_count, done_reason=done_reason,
+                        eval_count=eval_count,
+                        done_reason=done_reason,
                     )
-                yield sse_event({
-                    "done": True,
-                    "session_id": session_id,
-                    "message_id": msg_id,
-                    "eval_count": eval_count,
-                    "done_reason": done_reason,
-                })
+                yield sse_event(
+                    {
+                        "done": True,
+                        "session_id": session_id,
+                        "message_id": msg_id,
+                        "eval_count": eval_count,
+                        "done_reason": done_reason,
+                    }
+                )
                 return
     except NotImplementedError as e:
         with with_db() as conn:
             append_message(
-                conn, session_id, role="assistant",
+                conn,
+                session_id,
+                role="assistant",
                 content=f"backend does not support multi-turn chat: {e}",
                 done_reason="error",
             )
@@ -99,8 +109,11 @@ async def _chat_event_stream(
         logger.exception("chat SSE failed")
         with with_db() as conn:
             append_message(
-                conn, session_id, role="assistant",
-                content=str(e), done_reason="error",
+                conn,
+                session_id,
+                role="assistant",
+                content=str(e),
+                done_reason="error",
             )
         yield sse_event({"error": str(e)})
 
@@ -120,9 +133,13 @@ def get_chat_sessions(
         rows = list_sessions(conn, offset=offset, limit=limit, scope_type=scope_type, scope_id=scope_id)
     return [
         ChatSessionSummary(
-            id=r.id, scope_type=r.scope_type, scope_id=r.scope_id,
-            title=r.title, started_at=r.started_at,
-            last_message_at=r.last_message_at, message_count=r.message_count,
+            id=r.id,
+            scope_type=r.scope_type,
+            scope_id=r.scope_id,
+            title=r.title,
+            started_at=r.started_at,
+            last_message_at=r.last_message_at,
+            message_count=r.message_count,
         )
         for r in rows
     ]
@@ -141,16 +158,23 @@ def get_chat_session(session_id: int) -> ChatSessionDetailPayload:
     if detail is None:
         raise HTTPException(status_code=404, detail="session not found")
     return ChatSessionDetailPayload(
-        id=detail.id, scope_type=detail.scope_type, scope_id=detail.scope_id,
-        title=detail.title, started_at=detail.started_at,
+        id=detail.id,
+        scope_type=detail.scope_type,
+        scope_id=detail.scope_id,
+        title=detail.title,
+        started_at=detail.started_at,
         last_message_at=detail.last_message_at,
         messages=[
             ChatMessagePayload(
-                id=m.id, role=m.role, content=m.content,
-                eval_count=m.eval_count, done_reason=m.done_reason,
+                id=m.id,
+                role=m.role,
+                content=m.content,
+                eval_count=m.eval_count,
+                done_reason=m.done_reason,
                 created_at=m.created_at,
             )
-            for m in detail.messages if m.role != "system"
+            for m in detail.messages
+            if m.role != "system"
         ],
     )
 
@@ -183,10 +207,13 @@ async def post_chat_session_start(
     with with_db() as conn:
         result = retrieve(conn, request.question, scope)
         context_block = build_chat_context_block(
-            result.hits, scope, book_summaries=result.book_summaries,
+            result.hits,
+            scope,
+            book_summaries=result.book_summaries,
         )
         system_message = build_chat_system_message(
-            scope, context_block=context_block,
+            scope,
+            context_block=context_block,
         )
         session_id = create_session(conn, scope, title=_auto_title(request.question))
         append_message(conn, session_id, role="system", content=system_message)

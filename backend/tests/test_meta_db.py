@@ -1,4 +1,5 @@
 """services/meta_db.py のユニットテスト。"""
+
 import json
 import sqlite3
 
@@ -15,6 +16,7 @@ from services.meta_db import (
 @pytest.fixture(autouse=True)
 def patch_data_dir(tmp_path, monkeypatch):
     import config
+
     monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
 
 
@@ -22,10 +24,12 @@ def patch_data_dir(tmp_path, monkeypatch):
 # connect / create_tables
 # ---------------------------------------------------------------------------
 
+
 class TestConnect:
     def test_接続でディレクトリが自動作成される(self, tmp_path, monkeypatch):
         sub = tmp_path / "sub"
         import config
+
         monkeypatch.setattr(config, "META_DB_DIR", str(sub))
         conn = connect()
         conn.close()
@@ -34,9 +38,7 @@ class TestConnect:
     def test_接続後にテーブルを作成できる(self):
         conn = connect()
         create_tables(conn)
-        tables = {r[0] for r in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()}
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
         assert "books_meta" in tables
         assert "genres" in tables
         conn.close()
@@ -51,6 +53,7 @@ class TestConnect:
 # ---------------------------------------------------------------------------
 # entry_to_params / row_to_entry
 # ---------------------------------------------------------------------------
+
 
 class TestEntryConversion:
     def _setup_conn(self) -> sqlite3.Connection:
@@ -123,6 +126,7 @@ class TestEntryConversion:
 # upsert_entry（UPSERT = INSERT OR REPLACE）
 # ---------------------------------------------------------------------------
 
+
 class TestUpsertEntry:
     def _setup_conn(self) -> sqlite3.Connection:
         conn = connect()
@@ -145,9 +149,7 @@ class TestUpsertEntry:
         conn.commit()
         upsert_entry(conn, "novel", "book.pdf", {"authors": ["新著者"]})
         conn.commit()
-        row = conn.execute(
-            "SELECT authors FROM books_meta WHERE source='novel' AND book_id='book.pdf'"
-        ).fetchone()
+        row = conn.execute("SELECT authors FROM books_meta WHERE source='novel' AND book_id='book.pdf'").fetchone()
         assert json.loads(row["authors"]) == ["新著者"]
         conn.close()
 

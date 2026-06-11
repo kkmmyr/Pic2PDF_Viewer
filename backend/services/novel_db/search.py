@@ -2,6 +2,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §6。
 """
+
 from __future__ import annotations
 
 import html
@@ -73,9 +74,7 @@ def _resolve_book_names(scope: Scope) -> list[str] | None:
     return []
 
 
-def _fetch_main_characters(
-    conn: sqlite3.Connection, keys: list[tuple[str, int]]
-) -> dict[tuple[str, int], list[str]]:
+def _fetch_main_characters(conn: sqlite3.Connection, keys: list[tuple[str, int]]) -> dict[tuple[str, int], list[str]]:
     """指定された (book_name, page_no) の組に対して main_characters を一括取得する。"""
     if not keys:
         return {}
@@ -184,6 +183,7 @@ def fts_search(
 # LanceDB KNN ベクトル検索
 # ──────────────────────────────────────────────
 
+
 def vec_search(
     conn: sqlite3.Connection,
     query: str,
@@ -205,14 +205,12 @@ def vec_search(
 
     emb = embed_batch([query])[0]
 
-    has_extra_filter = (
-        min_chars > 0 or body_page_margin > 0 or book_names is not None
-    )
+    has_extra_filter = min_chars > 0 or body_page_margin > 0 or book_names is not None
     k = max(top * 5, 50) if has_extra_filter else top
 
     table = get_chunks_table()
-    query_builder = table.search(emb).limit(k).select(
-        ["chunk_id", "book_name", "page_no", "text", "char_count", "page_count"]
+    query_builder = (
+        table.search(emb).limit(k).select(["chunk_id", "book_name", "page_no", "text", "char_count", "page_count"])
     )
 
     filters: list[str] = []
@@ -228,16 +226,13 @@ def vec_search(
 
     if body_page_margin > 0:
         results = [
-            r for r in results
-            if r["page_no"] > body_page_margin
-            and r["page_no"] <= (r["page_count"] - body_page_margin)
+            r
+            for r in results
+            if r["page_no"] > body_page_margin and r["page_no"] <= (r["page_count"] - body_page_margin)
         ]
 
     results.sort(key=lambda r: r["_distance"])
-    rows: list[tuple] = [
-        (r["book_name"], r["page_no"], r["text"], r["_distance"])
-        for r in results[:top]
-    ]
+    rows: list[tuple] = [(r["book_name"], r["page_no"], r["text"], r["_distance"]) for r in results[:top]]
     return rows
 
 
@@ -307,6 +302,7 @@ def find_similar_books(book_name: str, *, top: int = 5) -> list[dict]:
 # Reciprocal Rank Fusion (RRF) ハイブリッド検索
 # ──────────────────────────────────────────────
 
+
 def hybrid_search(
     conn: sqlite3.Connection,
     query: str,
@@ -328,12 +324,20 @@ def hybrid_search(
         body_page_margin: 各書籍の先頭・末尾 N ページを除外。
     """
     fts = fts_search(
-        conn, query, scope, fts_n,
-        min_chars=min_chars, body_page_margin=body_page_margin,
+        conn,
+        query,
+        scope,
+        fts_n,
+        min_chars=min_chars,
+        body_page_margin=body_page_margin,
     )
     vec = vec_search(
-        conn, query, scope, vec_n,
-        min_chars=min_chars, body_page_margin=body_page_margin,
+        conn,
+        query,
+        scope,
+        vec_n,
+        min_chars=min_chars,
+        body_page_margin=body_page_margin,
     )
 
     pages: dict[tuple[str, int], dict] = {}
@@ -415,7 +419,8 @@ def load_all_pages_of_book(
     hybrid_search を bypass する経路。scope=book + 全 page 読み込みモード用。
     """
     book_row = conn.execute(
-        "SELECT id FROM books WHERE name = ?", (book_name,),
+        "SELECT id FROM books WHERE name = ?",
+        (book_name,),
     ).fetchone()
     if book_row is None:
         return []
@@ -427,11 +432,7 @@ def load_all_pages_of_book(
         where_clauses.append("char_count >= ?")
         params.append(min_chars)
 
-    sql = (
-        f"SELECT page_no, full_text "
-        f"FROM pages WHERE {' AND '.join(where_clauses)} "
-        f"ORDER BY page_no ASC"
-    )
+    sql = f"SELECT page_no, full_text FROM pages WHERE {' AND '.join(where_clauses)} ORDER BY page_no ASC"
     rows = conn.execute(sql, params).fetchall()
     if not rows:
         return []

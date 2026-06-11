@@ -1,4 +1,5 @@
 """書籍メタデータ管理ルーターパッケージ。3 サブルーターを /api プレフィックスで結合する。"""
+
 from fastapi import APIRouter
 
 from .admin import router as admin_router

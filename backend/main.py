@@ -71,6 +71,7 @@ app.add_middleware(
 # 例外ハンドラ
 # ---------------------------------------------------------------------------
 
+
 @app.exception_handler(FileOperationError)
 async def file_operation_error_handler(request: Request, exc: FileOperationError):
     logger.exception("FileOperationError at %s: %s", request.url, exc)
@@ -93,32 +94,32 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # 静的ファイルのマウント
 # ---------------------------------------------------------------------------
 
-app.mount("/thumbnails",  StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
-app.mount("/images",      StaticFiles(directory=IMAGES_DIR),    name="images")
+app.mount("/thumbnails", StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
+app.mount("/images", StaticFiles(directory=IMAGES_DIR), name="images")
 
-app.mount("/comic/pdfs",        StaticFiles(directory=COMIC_PDF_DIR),       name="comic_pdfs")
-app.mount("/comic/thumbnails",  StaticFiles(directory=COMIC_THUMBNAIL_DIR), name="comic_thumbnails")
-app.mount("/comic/images",      StaticFiles(directory=COMIC_IMAGES_DIR),    name="comic_images")
+app.mount("/comic/pdfs", StaticFiles(directory=COMIC_PDF_DIR), name="comic_pdfs")
+app.mount("/comic/thumbnails", StaticFiles(directory=COMIC_THUMBNAIL_DIR), name="comic_thumbnails")
+app.mount("/comic/images", StaticFiles(directory=COMIC_IMAGES_DIR), name="comic_images")
 
-app.mount("/kindle_novel/thumbnails",  StaticFiles(directory=KINDLE_NOVEL_THUMBNAIL_DIR), name="kindle_novel_thumbnails")
-app.mount("/kindle_novel/images",      StaticFiles(directory=KINDLE_NOVEL_IMAGES_DIR),    name="kindle_novel_images")
+app.mount("/kindle_novel/thumbnails", StaticFiles(directory=KINDLE_NOVEL_THUMBNAIL_DIR), name="kindle_novel_thumbnails")
+app.mount("/kindle_novel/images", StaticFiles(directory=KINDLE_NOVEL_IMAGES_DIR), name="kindle_novel_images")
 
-app.include_router(library.router,    prefix="/api", tags=["library"])
-app.include_router(pdfs.router,       prefix="/api", tags=["pdfs"])
-app.include_router(generate.router,   prefix="/api", tags=["generate"])
+app.include_router(library.router, prefix="/api", tags=["library"])
+app.include_router(pdfs.router, prefix="/api", tags=["pdfs"])
+app.include_router(generate.router, prefix="/api", tags=["generate"])
 app.include_router(thumbnails.router, prefix="/api", tags=["thumbnails"])
-app.include_router(ocr.router,        prefix="/api", tags=["ocr"])
-app.include_router(meta.router,       prefix="/api", tags=["meta"])
-app.include_router(series.router,     prefix="/api", tags=["series"])
-app.include_router(hitomi.router,     prefix="/api", tags=["hitomi"])
-app.include_router(genres.router,     prefix="/api", tags=["genres"])
-app.include_router(novel_db.router,         prefix="/api", tags=["novel_db"])
+app.include_router(ocr.router, prefix="/api", tags=["ocr"])
+app.include_router(meta.router, prefix="/api", tags=["meta"])
+app.include_router(series.router, prefix="/api", tags=["series"])
+app.include_router(hitomi.router, prefix="/api", tags=["hitomi"])
+app.include_router(genres.router, prefix="/api", tags=["genres"])
+app.include_router(novel_db.router, prefix="/api", tags=["novel_db"])
 app.include_router(novel_discussion.router, prefix="/api", tags=["novel_discussion"])
-app.include_router(novel_build.router,      prefix="/api", tags=["novel_build"])
-app.include_router(amazon_import.router,    prefix="/api", tags=["amazon_import"])
-app.include_router(meta_db_backup.router,  prefix="/api", tags=["meta_db_backup"])
-app.include_router(novel_graph.router,     prefix="/api", tags=["novel_graph"])
-app.include_router(prefs.router,           prefix="/api", tags=["prefs"])
+app.include_router(novel_build.router, prefix="/api", tags=["novel_build"])
+app.include_router(amazon_import.router, prefix="/api", tags=["amazon_import"])
+app.include_router(meta_db_backup.router, prefix="/api", tags=["meta_db_backup"])
+app.include_router(novel_graph.router, prefix="/api", tags=["novel_graph"])
+app.include_router(prefs.router, prefix="/api", tags=["prefs"])
 
 # ---------------------------------------------------------------------------
 # 設計ドキュメント HTML 配信（mkdocs ビルド成果物）

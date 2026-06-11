@@ -7,6 +7,7 @@ main のユニットテスト。
     cd backend
     uv run pytest tests/test_main.py -v
 """
+
 import os
 import sys
 
@@ -18,6 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # ---------------------------------------------------------------------------
 # 例外ハンドラ
 # ---------------------------------------------------------------------------
+
 
 class TestExceptionHandlers:
     """各カスタム例外がハンドラ経由で適切な status / detail に変換されるか。"""
@@ -60,7 +62,6 @@ class TestExceptionHandlers:
         finally:
             app.router.routes = [r for r in app.router.routes if getattr(r, "path", "") != "/api/__test_ocr_error"]
 
-
     def test_unhandled_exception_masked_as_500(self, tmp_data_dir):
         """未捕捉例外は status=500 / detail="Internal server error" にマスクされる。"""
         from fastapi.testclient import TestClient
@@ -90,6 +91,7 @@ class TestExceptionHandlers:
 # CORS
 # ---------------------------------------------------------------------------
 
+
 class TestCors:
     def test_options_returns_cors_headers(self, client):
         """プリフライトリクエストで CORS ヘッダが付く。"""
@@ -109,16 +111,19 @@ class TestCors:
 # 静的マウントの存在
 # ---------------------------------------------------------------------------
 
+
 class TestStaticMounts:
     def test_thumbnails_mount_present(self):
         """/thumbnails と /images が StaticFiles でマウントされている。"""
         from main import app
+
         mount_paths = {r.path for r in app.routes if hasattr(r, "path")}
         assert "/thumbnails" in mount_paths
         assert "/images" in mount_paths
 
     def test_kindle_mounts_present(self):
         from main import app
+
         mount_paths = {r.path for r in app.routes if hasattr(r, "path")}
         assert "/comic/pdfs" in mount_paths
         assert "/comic/thumbnails" in mount_paths
@@ -126,6 +131,7 @@ class TestStaticMounts:
     def test_routers_registered(self):
         """各 router が /api プレフィクスで登録されている。"""
         from main import app
+
         api_paths = [r.path for r in app.routes if hasattr(r, "path") and r.path.startswith("/api/")]
         # 主要エンドポイントが含まれる
         joined = " ".join(api_paths)

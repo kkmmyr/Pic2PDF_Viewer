@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers._deps のユニットテスト。
 
 全ルーターで使われるガード関数とデコレータをカバーする。
@@ -7,6 +7,7 @@ routers._deps のユニットテスト。
     cd backend
     uv run pytest tests/test_router_deps.py -v
 """
+
 import logging
 import os
 import sys
@@ -26,6 +27,7 @@ from routers._deps import (
 # ---------------------------------------------------------------------------
 # validated_source (Depends 用)
 # ---------------------------------------------------------------------------
+
 
 class TestValidatedSource:
     def test_generated_passes(self):
@@ -61,6 +63,7 @@ class TestValidatedSource:
 # assert_valid_source (リクエストボディ検証用)
 # ---------------------------------------------------------------------------
 
+
 class TestAssertValidSource:
     def test_generated_passes(self):
         assert_valid_source("doujin")  # 例外が出ないことを確認
@@ -81,6 +84,7 @@ class TestAssertValidSource:
 # ---------------------------------------------------------------------------
 # validate_request_targets (path + names 一括検証)
 # ---------------------------------------------------------------------------
+
 
 class TestValidateRequestTargets:
     def test_valid_path_and_names(self):
@@ -124,6 +128,7 @@ class TestValidateRequestTargets:
 # log_and_raise_500 デコレータ
 # ---------------------------------------------------------------------------
 
+
 class TestLogAndRaise500:
     def test_normal_return_passes_through(self):
         @log_and_raise_500("test_op")
@@ -141,6 +146,7 @@ class TestLogAndRaise500:
 
     def test_explicit_http_exception_passes_through(self):
         """エンドポイント内で raise した HTTPException は素通し（4xx を残す）。"""
+
         @log_and_raise_500("test_op")
         def func():
             raise HTTPException(status_code=404, detail="Not found")
@@ -152,6 +158,7 @@ class TestLogAndRaise500:
 
     def test_400_passes_through(self):
         """400 もそのまま伝わる（再ラップしない）。"""
+
         @log_and_raise_500("test_op")
         def func():
             raise HTTPException(status_code=400, detail="Bad request")
@@ -182,6 +189,7 @@ class TestLogAndRaise500:
 
     def test_logger_records_operation_name(self, caplog):
         """ログメッセージに operation 名が含まれる。"""
+
         @log_and_raise_500("delete_pages")
         def func():
             raise RuntimeError("boom")
@@ -196,6 +204,7 @@ class TestLogAndRaise500:
 
     def test_runtime_error_handled_inline_passes_400(self):
         """エンドポイント関数内で RuntimeError を 400 に変換する典型パターンが正しく伝わる。"""
+
         @log_and_raise_500("test_op")
         def func():
             try:
@@ -210,6 +219,7 @@ class TestLogAndRaise500:
 
     def test_preserves_function_metadata(self):
         """functools.wraps で __name__ / __doc__ が保たれる。"""
+
         @log_and_raise_500("test_op")
         def my_func():
             """My docstring."""

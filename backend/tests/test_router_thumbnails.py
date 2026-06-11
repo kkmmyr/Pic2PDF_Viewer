@@ -1,4 +1,4 @@
-﻿"""
+"""
 routers.thumbnails のユニットテスト。
 
 ページサムネイルのオンデマンド生成（GET /api/thumbnails/page）と
@@ -8,6 +8,7 @@ routers.thumbnails のユニットテスト。
     cd backend
     uv run pytest tests/test_router_thumbnails.py -v
 """
+
 import os
 import sys
 
@@ -17,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # ---------------------------------------------------------------------------
 # GET /api/thumbnails/page
 # ---------------------------------------------------------------------------
+
 
 class TestGetPageThumbnail:
     def test_generated_returns_webp_directly(self, client, tmp_data_dir, make_webp):
@@ -72,17 +74,21 @@ class TestGetPageThumbnail:
 # POST /api/thumbnails/regenerate
 # ---------------------------------------------------------------------------
 
+
 class TestRegenerateThumbnail:
     def test_regenerate_from_pdf(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         thumb_dir = tmp_data_dir["COMIC_THUMBNAIL_DIR"]
         make_pdf(os.path.join(pdf_dir, "book.pdf"))
 
-        res = client.post("/api/thumbnails/regenerate", json={
-            "path": "",
-            "name": "book.pdf",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate",
+            json={
+                "path": "",
+                "name": "book.pdf",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 200
         assert os.path.exists(os.path.join(thumb_dir, "book.jpg"))
 
@@ -94,11 +100,14 @@ class TestRegenerateThumbnail:
         thumb_dir = tmp_data_dir["THUMBNAIL_DIR"]
         make_webp(os.path.join(img_dir, "book", "1.webp"), color=(255, 0, 0), size=(400, 600))
 
-        res = client.post("/api/thumbnails/regenerate", json={
-            "path": "",
-            "name": "book.pdf",
-            "source": "doujin",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate",
+            json={
+                "path": "",
+                "name": "book.pdf",
+                "source": "doujin",
+            },
+        )
         assert res.status_code == 200
         thumb_path = os.path.join(thumb_dir, "book.jpg")
         assert os.path.exists(thumb_path)
@@ -107,27 +116,36 @@ class TestRegenerateThumbnail:
             assert img.format == "JPEG"
 
     def test_regenerate_404_when_no_source(self, client, tmp_data_dir):
-        res = client.post("/api/thumbnails/regenerate", json={
-            "path": "",
-            "name": "nope.pdf",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate",
+            json={
+                "path": "",
+                "name": "nope.pdf",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 404
 
     def test_regenerate_400_with_traversal(self, client, tmp_data_dir):
-        res = client.post("/api/thumbnails/regenerate", json={
-            "path": "../etc",
-            "name": "book.pdf",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate",
+            json={
+                "path": "../etc",
+                "name": "book.pdf",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_regenerate_invalid_source_returns_400(self, client, tmp_data_dir):
-        res = client.post("/api/thumbnails/regenerate", json={
-            "path": "",
-            "name": "book.pdf",
-            "source": "invalid",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate",
+            json={
+                "path": "",
+                "name": "book.pdf",
+                "source": "invalid",
+            },
+        )
         assert res.status_code == 400
 
 
@@ -135,16 +153,20 @@ class TestRegenerateThumbnail:
 # POST /api/thumbnails/regenerate_bulk
 # ---------------------------------------------------------------------------
 
+
 class TestRegenerateThumbnailBulk:
     def test_partial_success_and_failure(self, client, tmp_data_dir, make_pdf):
         pdf_dir = tmp_data_dir["COMIC_PDF_DIR"]
         make_pdf(os.path.join(pdf_dir, "ok.pdf"))
 
-        res = client.post("/api/thumbnails/regenerate_bulk", json={
-            "names": ["ok.pdf", "missing.pdf"],
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate_bulk",
+            json={
+                "names": ["ok.pdf", "missing.pdf"],
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 200
         body = res.json()
         assert body["succeeded"] == ["ok.pdf"]
@@ -155,11 +177,14 @@ class TestRegenerateThumbnailBulk:
         make_pdf(os.path.join(pdf_dir, "a.pdf"))
         make_pdf(os.path.join(pdf_dir, "b.pdf"))
 
-        res = client.post("/api/thumbnails/regenerate_bulk", json={
-            "names": ["a.pdf", "b.pdf"],
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate_bulk",
+            json={
+                "names": ["a.pdf", "b.pdf"],
+                "path": "",
+                "source": "comic",
+            },
+        )
         body = res.json()
         assert sorted(body["succeeded"]) == ["a.pdf", "b.pdf"]
         assert body["failed"] == []
@@ -170,11 +195,14 @@ class TestRegenerateThumbnailBulk:
         make_pdf(os.path.join(pdf_dir, "first.pdf"))
         make_pdf(os.path.join(pdf_dir, "third.pdf"))
 
-        res = client.post("/api/thumbnails/regenerate_bulk", json={
-            "names": ["first.pdf", "second.pdf", "third.pdf"],
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate_bulk",
+            json={
+                "names": ["first.pdf", "second.pdf", "third.pdf"],
+                "path": "",
+                "source": "comic",
+            },
+        )
         body = res.json()
         # 第2項目で失敗しても third まで処理される
         assert "first.pdf" in body["succeeded"]
@@ -182,17 +210,23 @@ class TestRegenerateThumbnailBulk:
         assert body["failed"] == ["second.pdf"]
 
     def test_400_with_traversal(self, client, tmp_data_dir):
-        res = client.post("/api/thumbnails/regenerate_bulk", json={
-            "names": ["../etc.pdf"],
-            "path": "",
-            "source": "comic",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate_bulk",
+            json={
+                "names": ["../etc.pdf"],
+                "path": "",
+                "source": "comic",
+            },
+        )
         assert res.status_code == 400
 
     def test_invalid_source_returns_400(self, client, tmp_data_dir):
-        res = client.post("/api/thumbnails/regenerate_bulk", json={
-            "names": ["a.pdf"],
-            "path": "",
-            "source": "invalid",
-        })
+        res = client.post(
+            "/api/thumbnails/regenerate_bulk",
+            json={
+                "names": ["a.pdf"],
+                "path": "",
+                "source": "invalid",
+            },
+        )
         assert res.status_code == 400

@@ -13,6 +13,7 @@
 既存の LanceDB テーブルに既にデータがある場合は差分を確認して追記する。
 ロールバック: `data/novel.lancedb/` ディレクトリを削除して再実行。
 """
+
 from __future__ import annotations
 
 import struct
@@ -52,15 +53,17 @@ def migrate_chunks() -> int:
         for chunk_id, book_name, page_no, text, char_count, page_count, emb_blob in conn.execute(sql):
             if chunk_id in existing_ids:
                 continue
-            rows.append({
-                "chunk_id": chunk_id,
-                "book_name": book_name,
-                "page_no": page_no,
-                "text": text or "",
-                "char_count": char_count or 0,
-                "page_count": page_count or 0,
-                "embedding": _unpack_f32(emb_blob),
-            })
+            rows.append(
+                {
+                    "chunk_id": chunk_id,
+                    "book_name": book_name,
+                    "page_no": page_no,
+                    "text": text or "",
+                    "char_count": char_count or 0,
+                    "page_count": page_count or 0,
+                    "embedding": _unpack_f32(emb_blob),
+                }
+            )
 
     if rows:
         table.add(rows)
@@ -97,11 +100,13 @@ def migrate_summaries() -> int:
         for book_id, book_name, emb_blob in conn.execute(sql):
             if book_id in existing_ids:
                 continue
-            rows.append({
-                "book_id": book_id,
-                "book_name": book_name,
-                "embedding": _unpack_f32(emb_blob),
-            })
+            rows.append(
+                {
+                    "book_id": book_id,
+                    "book_name": book_name,
+                    "embedding": _unpack_f32(emb_blob),
+                }
+            )
 
     if rows:
         table.add(rows)

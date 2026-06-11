@@ -9,6 +9,7 @@
 抽出は LLM (gemma4:12b) で行うため、1 ページあたり数秒〜十秒程度かかる。
 1 冊（120 ページ）で 10〜20 分が目安。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -65,10 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     book_name = None if args.all else args.book
     targets = _list_target_pages(book_name, redo=args.redo)
     if not targets:
-        print(
-            "(対象ページなし: 既に抽出済みか、書籍が存在しません。"
-            "再抽出するには --redo を付けてください。)"
-        )
+        print("(対象ページなし: 既に抽出済みか、書籍が存在しません。再抽出するには --redo を付けてください。)")
         return 0
 
     print(f"対象ページ: {len(targets)}")
@@ -82,8 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             avg = elapsed / i
             eta = avg * (len(targets) - i)
             print(
-                f"  [{i}/{len(targets)}] {book_name_} p{page_no:3d}: "
-                f"{names} (avg {avg:.1f}s, eta {eta:.0f}s)",
+                f"  [{i}/{len(targets)}] {book_name_} p{page_no:3d}: {names} (avg {avg:.1f}s, eta {eta:.0f}s)",
                 flush=True,
             )
         except Exception as e:

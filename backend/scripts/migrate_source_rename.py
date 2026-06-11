@@ -11,6 +11,7 @@ kindle  → comic、generated(main) → doujin のデータディレクトリ・
 
 べき等性: すでにリネーム済みのパスは skip する。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -21,11 +22,11 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 _DATA_DIR = _BACKEND_DIR / "data"
 
 RENAMES: list[tuple[Path, Path]] = [
-    (_DATA_DIR / "kindle",              _DATA_DIR / "comic"),
-    (_DATA_DIR / "main",                _DATA_DIR / "doujin"),
-    (_DATA_DIR / "meta" / "kindle",     _DATA_DIR / "meta" / "comic"),
-    (_DATA_DIR / "meta" / "generated",  _DATA_DIR / "meta" / "doujin"),
-    (_DATA_DIR / "genres" / "kindle.json",    _DATA_DIR / "genres" / "comic.json"),
+    (_DATA_DIR / "kindle", _DATA_DIR / "comic"),
+    (_DATA_DIR / "main", _DATA_DIR / "doujin"),
+    (_DATA_DIR / "meta" / "kindle", _DATA_DIR / "meta" / "comic"),
+    (_DATA_DIR / "meta" / "generated", _DATA_DIR / "meta" / "doujin"),
+    (_DATA_DIR / "genres" / "kindle.json", _DATA_DIR / "genres" / "comic.json"),
     (_DATA_DIR / "genres" / "generated.json", _DATA_DIR / "genres" / "doujin.json"),
 ]
 
@@ -37,11 +38,7 @@ def _print_plan() -> None:
     for src, dst in RENAMES:
         exists = src.exists()
         dst_exists = dst.exists()
-        status = (
-            "SKIP (src なし)"  if not exists and not dst_exists
-            else "SKIP (dst 既存)" if dst_exists
-            else "RENAME"
-        )
+        status = "SKIP (src なし)" if not exists and not dst_exists else "SKIP (dst 既存)" if dst_exists else "RENAME"
         print(f"  [{status}] {src.relative_to(_BACKEND_DIR)}  →  {dst.relative_to(_BACKEND_DIR)}")
 
 

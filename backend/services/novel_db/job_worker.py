@@ -3,6 +3,7 @@
 NovelDbJobQueue から生成され、rebuild_jobs テーブルの queued ジョブを
 古い順に取り出して実行する。
 """
+
 from __future__ import annotations
 
 import threading
@@ -25,6 +26,7 @@ logger = get_logger(__name__)
 # 書籍一覧クエリ（job_worker 専用ヘルパー）
 # ---------------------------------------------------------------------------
 
+
 def _list_all_book_names() -> list[str]:
     images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     if not images_dir.exists():
@@ -40,26 +42,21 @@ def _list_books_needing_ocr() -> list[str]:
     if not all_dirs:
         return []
     with with_db() as conn:
-        rows = conn.execute(
-            "SELECT name FROM books WHERE ocr_done_at IS NOT NULL"
-        ).fetchall()
+        rows = conn.execute("SELECT name FROM books WHERE ocr_done_at IS NOT NULL").fetchall()
     done = {r[0] for r in rows}
     return sorted(all_dirs - done)
 
 
 def _list_books_with_ocr_done() -> list[str]:
     with with_db() as conn:
-        rows = conn.execute(
-            "SELECT name FROM books WHERE ocr_done_at IS NOT NULL ORDER BY name"
-        ).fetchall()
+        rows = conn.execute("SELECT name FROM books WHERE ocr_done_at IS NOT NULL ORDER BY name").fetchall()
     return [r[0] for r in rows]
 
 
 def _list_books_needing_full_build() -> list[str]:
     with with_db() as conn:
         rows = conn.execute(
-            "SELECT name FROM books "
-            "WHERE ocr_done_at IS NOT NULL AND indexed_at IS NULL ORDER BY name"
+            "SELECT name FROM books WHERE ocr_done_at IS NOT NULL AND indexed_at IS NULL ORDER BY name"
         ).fetchall()
     return [r[0] for r in rows]
 
@@ -78,6 +75,7 @@ def _list_books_needing_contexts() -> list[str]:
 
 def _get_series_id(book_name: str) -> str | None:
     from services.meta_store import load_meta
+
     meta = load_meta("novel")
     key = f"{book_name}.pdf"
     entry = meta.get(key, {})
@@ -86,6 +84,7 @@ def _get_series_id(book_name: str) -> str | None:
 
 def _list_books_in_series(series_id: str) -> list[str]:
     from services.meta_store import load_meta
+
     images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     meta = load_meta("novel")
     names: list[str] = []
@@ -151,8 +150,7 @@ class NovelDbJobWorker:
                 return None
             job_id, job_type, target_id, mode = row
             conn.execute(
-                "UPDATE rebuild_jobs SET state='running', "
-                "started_at=datetime('now', '+9 hours') WHERE id = ?",
+                "UPDATE rebuild_jobs SET state='running', started_at=datetime('now', '+9 hours') WHERE id = ?",
                 (job_id,),
             )
             conn.commit()
@@ -213,6 +211,7 @@ class NovelDbJobWorker:
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
         elif mode == "full_build":
+
             def _step_cb(msg: str, _jid: int = job_id) -> None:
                 self._update_step(_jid, msg)
 
@@ -226,6 +225,7 @@ class NovelDbJobWorker:
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d full_build progress: %d/%d (%s)", job_id, done, total, book_name)
         elif mode == "generate_contexts":
+
             def _ctx_step_cb(msg: str, _jid: int = job_id) -> None:
                 self._update_step(_jid, msg)
 
@@ -239,6 +239,7 @@ class NovelDbJobWorker:
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d generate_contexts progress: %d/%d (%s)", job_id, done, total, book_name)
         elif mode == "generate_relations":
+
             def _rel_detail_cb(detail: str, _jid: int = job_id) -> None:
                 self._update_detail(_jid, detail)
 

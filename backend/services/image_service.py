@@ -4,6 +4,7 @@ image-only モード（generated ソース）の書籍ページ列を操作す�
 `PdfService` の image-only 版に相当する。書籍は `images/{path}/{book_name}/` 配下の
 WebP ファイル列として表現され、natsort 順がページ順になる。
 """
+
 import os
 
 from natsort import natsorted
@@ -21,11 +22,7 @@ def list_book_images(img_dir: str, book_name: str, path: str = "") -> list[str]:
     target = os.path.join(img_dir, path, book_name) if path else os.path.join(img_dir, book_name)
     if not os.path.isdir(target):
         return []
-    return [
-        os.path.join(target, f)
-        for f in natsorted(os.listdir(target))
-        if f.lower().endswith('.webp')
-    ]
+    return [os.path.join(target, f) for f in natsorted(os.listdir(target)) if f.lower().endswith(".webp")]
 
 
 def delete_book_image_pages(book_dir: str, page_indices: list[int]) -> int:
@@ -45,11 +42,7 @@ def delete_book_image_pages(book_dir: str, page_indices: list[int]) -> int:
     if not os.path.isdir(book_dir):
         raise FileNotFoundError(f"Book images directory not found: {book_dir}")
 
-    webps = [
-        os.path.join(book_dir, f)
-        for f in natsorted(os.listdir(book_dir))
-        if f.lower().endswith('.webp')
-    ]
+    webps = [os.path.join(book_dir, f) for f in natsorted(os.listdir(book_dir)) if f.lower().endswith(".webp")]
     total_pages = len(webps)
 
     indices = sorted(set(page_indices), reverse=True)
@@ -87,17 +80,11 @@ def reorder_book_image_pages(book_dir: str, page_indices: list[int]) -> int:
     if not os.path.isdir(book_dir):
         raise FileNotFoundError(f"Book images directory not found: {book_dir}")
 
-    webps = [
-        os.path.join(book_dir, f)
-        for f in natsorted(os.listdir(book_dir))
-        if f.lower().endswith('.webp')
-    ]
+    webps = [os.path.join(book_dir, f) for f in natsorted(os.listdir(book_dir)) if f.lower().endswith(".webp")]
     total_pages = len(webps)
 
     if sorted(page_indices) != list(range(total_pages)):
-        raise ValueError(
-            f"page_indices must be a permutation of [0..{total_pages - 1}], got: {page_indices}"
-        )
+        raise ValueError(f"page_indices must be a permutation of [0..{total_pages - 1}], got: {page_indices}")
 
     # 段階 1: 旧名 → 一時名（page_indices の順序で並べた一時名を割り当てる）
     temp_paths: list[str] = []

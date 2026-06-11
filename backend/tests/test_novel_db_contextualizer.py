@@ -3,6 +3,7 @@
 LLM 呼び出しはモックする。`_clean_response` の整形ロジックと、空入力での
 スキップ動作、`make_embedding_input` の組立てを確認する。
 """
+
 from unittest.mock import patch
 
 from services.novel_db.contextualizer import (
@@ -14,6 +15,7 @@ from services.novel_db.contextualizer import (
 # ---------------------------------------------------------------------------
 # _clean_response: LLM 応答の整形
 # ---------------------------------------------------------------------------
+
 
 def test_clean_response_strips_whitespace():
     assert _clean_response("  位置説明テキスト  ") == "位置説明テキスト"
@@ -38,6 +40,7 @@ def test_clean_response_returns_empty_for_empty_input():
 # ---------------------------------------------------------------------------
 # generate_chunk_context: 早期スキップ
 # ---------------------------------------------------------------------------
+
 
 def test_generate_returns_empty_for_empty_chunk():
     """空チャンクは LLM を呼ばずに空文字を返す。"""
@@ -84,6 +87,7 @@ def test_generate_calls_backend_with_prompt_and_options():
 # ---------------------------------------------------------------------------
 # make_embedding_input: embedding 入力の組立て
 # ---------------------------------------------------------------------------
+
 
 def test_make_embedding_input_concatenates_when_context_present():
     out = make_embedding_input("page 50 の対話", "デュークが言った『～』")

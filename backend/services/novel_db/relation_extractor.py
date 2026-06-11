@@ -5,6 +5,7 @@
 
 詳細は docs/01_要件定義/C12_キャラクタ関係グラフ_要件.md。
 """
+
 from __future__ import annotations
 
 import json
@@ -66,8 +67,7 @@ def count_cooccurrences(
 ) -> Counter[tuple[str, str]]:
     """同一ページ内の共起回数を返す（ペアはアルファベット順で正規化）。"""
     rows = conn.execute(
-        "SELECT main_characters FROM pages "
-        "WHERE book_id = ? AND main_characters IS NOT NULL AND main_characters <> ''",
+        "SELECT main_characters FROM pages WHERE book_id = ? AND main_characters IS NOT NULL AND main_characters <> ''",
         (book_id,),
     ).fetchall()
     counter: Counter[tuple[str, str]] = Counter()
@@ -96,9 +96,7 @@ def extract_relations_with_qwen(
     if not character_summaries:
         return []
 
-    chars_text = "\n".join(
-        f"【{name}】\n{summary}" for name, summary in character_summaries if summary
-    )
+    chars_text = "\n".join(f"【{name}】\n{summary}" for name, summary in character_summaries if summary)
     if not chars_text.strip():
         return []
 
@@ -208,9 +206,7 @@ def generate_book_relations(
         if detail_callback:
             detail_callback(msg)
 
-    row = conn.execute(
-        "SELECT id FROM books WHERE name = ?", (book_name,)
-    ).fetchone()
+    row = conn.execute("SELECT id FROM books WHERE name = ?", (book_name,)).fetchone()
     if row is None:
         raise ValueError(f"book not found: {book_name}")
     book_id: int = row[0]

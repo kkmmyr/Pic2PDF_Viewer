@@ -70,12 +70,12 @@ class BookInfoDialog(simpledialog.Dialog):
         self.e_title.grid(row=0, column=1, padx=5, pady=5)
 
         tk.Label(master, text="ページめくり:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
-        
+
         self.var_direction = tk.StringVar(value="left") # Default: Left Key (Standard for Vertical)
-        
+
         frame_dir = tk.Frame(master)
         frame_dir.grid(row=1, column=1, sticky="w", padx=5, pady=5)
-        
+
         # Note: In Kindle PC:
         # Vertical Text (Manga/Novel) -> Press Left Arrow to go Next.
         # Horizontal Text (Tech Book) -> Press Right Arrow to go Next.
@@ -102,7 +102,7 @@ class KindleCapturer:
         GetWindowText = windll.user32.GetWindowTextW
         GetWindowTextLength = windll.user32.GetWindowTextLengthW
         WNDENUMPROC = WINFUNCTYPE(c_bool, POINTER(c_int), POINTER(c_int))
-        
+
         found_hwnd = None
 
         def EnumWindowsProc(hwnd, lParam):
@@ -132,7 +132,7 @@ class KindleCapturer:
 
         windll.user32.SetForegroundWindow(self.hwnd)
         self.rect = self._get_window_rect()
-        
+
         # フォーカス確保のためにウィンドウ中央をクリック
         center_x = self.rect.left + (self.rect.right - self.rect.left) // 2
         center_y = self.rect.top + (self.rect.bottom - self.rect.top) // 2
@@ -166,12 +166,12 @@ class KindleCapturer:
         # Use Custom Dialog
         root = tk.Tk()
         root.withdraw() # Hide main window
-        
+
         # Ensure dialog is top most
         root.attributes("-topmost", True)
-        
+
         d = BookInfoDialog(root, "書籍情報入力", default_title)
-        
+
         if d.result_title:
             # Update config with selected direction
             self.config.PAGE_CHANGE_KEY = d.result_direction
@@ -185,7 +185,7 @@ class KindleCapturer:
         """現在の設定範囲でスクリーンショットを取得"""
         # 矩形情報の更新（ウィンドウ移動に対応するため毎回取得が望ましいが、今回は固定クロップなのでrect基準）
         # ただしsetup_windowで取得したrectを使用（ウィンドウが動かない前提）
-        
+
         capture_left = self.rect.left + self.config.CROP_X1
         capture_top = self.rect.top + self.config.CROP_Y1
         capture_right = self.rect.left + self.config.CROP_X2
@@ -219,7 +219,7 @@ class KindleCapturer:
             os.makedirs(save_dir)
 
         print(f"Saving images to: {save_dir}")
-        
+
         # 撮影開始直前の再アクティブ化
         windll.user32.SetForegroundWindow(self.hwnd)
         time.sleep(1.0)
@@ -237,7 +237,7 @@ class KindleCapturer:
 
                 if old_image is None:
                     break
-                
+
                 # 画像比較 (完全一致でなければ変化ありとみなす)
                 if not np.array_equal(old_image, current_image):
                     break
@@ -267,7 +267,7 @@ class KindleCapturer:
                 return None
 
             print(f"Converting {len(image_files)} images to PDF...")
-            
+
             images = []
             for img_file in image_files:
                 img_path = os.path.join(image_dir, img_file)
@@ -280,7 +280,7 @@ class KindleCapturer:
                 images[0].save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images[1:])
                 print(f"PDF saved to: {pdf_path}")
                 return pdf_path
-                
+
         except Exception as e:
             print(f"PDF creation failed: {e}")
             messagebox.showerror("エラー", f"PDF作成中にエラーが発生しました: {e}")
@@ -291,11 +291,11 @@ class AutoConfig(Config):
     # 上下の固定クロップ値 (フルスクリーン時)
     FULLSCREEN_CROP_TOP: int = 0
     FULLSCREEN_CROP_BOTTOM_MARGIN: int = 0
-    
+
     # 黒帯検出の閾値 (0-255)
     # RGBの各値がこの値以下なら黒とみなす
     BLACK_THRESHOLD: int = 20
-    
+
     # コンテンツ検出時のマージン (検出された境界からさらに内側/外側へ)
     DETECTION_MARGIN: int = 0
 
@@ -304,11 +304,11 @@ class AutoConfig(Config):
 
 class AutoKindleCapturer(KindleCapturer):
     """フルスクリーン・動的クロップ版キャプチャクラス"""
-    
+
     def __init__(self):
         super().__init__()
         self.config = AutoConfig() # 設定を上書き
-        
+
     def setup_window(self):
         """ウィンドウをアクティブ化し、フルスクリーンモードに設定"""
         if not self.hwnd:
@@ -317,24 +317,24 @@ class AutoKindleCapturer(KindleCapturer):
         # まずアクティブ化
         windll.user32.SetForegroundWindow(self.hwnd)
         time.sleep(0.5)
-        
+
         # フルスクリーン化 (F11)
         pag.press('f11')
         print("Entering fullscreen mode...")
         time.sleep(3.0) # アニメーション待機
-        
+
         # フルスクリーンになったのでRectを画面全体で更新
         # ただし find_window で取得した hwnd の rect はフルスクリーンになっても更新されない場合があるため
         # 画面サイズ自体を取得して使用する
         screen_w, screen_h = pag.size()
-        
+
         # 動的検出を実行
         print("Detecting content boundaries...")
         full_img = ImageGrab.grab() # 全画面キャプチャ
         img_np = np.array(full_img)
-        
+
         self._detect_boundaries(img_np, screen_w, screen_h)
-        
+
         # ウィンドウ矩形情報も更新しておく (マウス移動の基準などに使うため)
         # ただしフルスクリーンなので (0, 0, w, h)
         class RectShim:
@@ -359,13 +359,13 @@ class AutoKindleCapturer(KindleCapturer):
         # 上下は固定値
         self.config.CROP_Y1 = self.config.FULLSCREEN_CROP_TOP
         self.config.CROP_Y2 = h - self.config.FULLSCREEN_CROP_BOTTOM_MARGIN
-        
+
         # スキャンするY座標のリスト (上部1/4, 中央, 下部3/4)
         scan_y_list = [h // 4, h // 2, (h * 3) // 4]
-        
+
         left_edges = []
         right_edges = []
-        
+
         offset = self.config.SIDE_IGNORE_PX
 
         print(f"Scanning for boundaries at Y={scan_y_list}, Offset={offset}")
@@ -373,7 +373,7 @@ class AutoKindleCapturer(KindleCapturer):
         for y in scan_y_list:
             row = img[y]
             is_black = np.all(row <= self.config.BLACK_THRESHOLD, axis=1)
-            
+
             # 左端検出
             left = offset
             for x in range(offset, w):
@@ -381,7 +381,7 @@ class AutoKindleCapturer(KindleCapturer):
                     left = x
                     break
             left_edges.append(left)
-            
+
             # 右端検出
             right = w - offset
             for x in range(w - 1 - offset, -1, -1):
@@ -389,20 +389,20 @@ class AutoKindleCapturer(KindleCapturer):
                     right = x
                     break
             right_edges.append(right)
-            
+
         # 最も外側の値（コンテンツが一番広くなる値）を採用
         # 左端は最小値、右端は最大値
         final_left = min(left_edges)
         final_right = max(right_edges)
-        
+
         # マージン適用
         self.config.CROP_X1 = final_left + self.config.DETECTION_MARGIN
         self.config.CROP_X2 = final_right - self.config.DETECTION_MARGIN
-        
+
         print(f"Scan results (Left): {left_edges} -> Selected: {final_left}")
         print(f"Scan results (Right): {right_edges} -> Selected: {final_right}")
         print(f"Detected boundaries: Left={self.config.CROP_X1}, Right={self.config.CROP_X2}")
-        
+
         # 異常値チェック
         if self.config.CROP_X1 >= self.config.CROP_X2:
             print("Warning: Detected invalid boundaries. Using full width.")

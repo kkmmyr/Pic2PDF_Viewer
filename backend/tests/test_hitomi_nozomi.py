@@ -2,6 +2,7 @@
 
 実 NOZOMI を取得しないため、ネットワークなしで完結する。
 """
+
 import os
 import sys
 
@@ -15,7 +16,7 @@ from services.hitomi.nozomi import build_nozomi_url, parse_nozomi_bytes
 class TestParseNozomiBytes:
     def test_decodes_3_ids_big_endian(self):
         # big-endian: 0x00FFAABB, 0x12345678, 0xDEADBEEF
-        data = bytes.fromhex("00FFAABB" "12345678" "DEADBEEF")
+        data = bytes.fromhex("00FFAABB12345678DEADBEEF")
         assert parse_nozomi_bytes(data) == [0x00FFAABB, 0x12345678, 0xDEADBEEF]
 
     def test_decodes_single_id(self):
@@ -24,7 +25,7 @@ class TestParseNozomiBytes:
 
     def test_truncates_partial_trailing_bytes(self):
         # 4 bytes (1 ID) + 2 partial bytes → partial は切り捨て
-        data = bytes.fromhex("00112233" "4455")
+        data = bytes.fromhex("001122334455")
         assert parse_nozomi_bytes(data) == [0x00112233]
 
     def test_empty_returns_empty_list(self):
@@ -42,14 +43,18 @@ class TestParseNozomiBytes:
         # 念のため逆向きも検証: big-endian の 1 は 0x00 0x00 0x00 0x01
         assert parse_nozomi_bytes(b"\x00\x00\x00\x01") == [1]
 
-    @pytest.mark.parametrize("ids", [
-        [],
-        [1],
-        [1, 2, 3, 4, 5],
-        [2034567, 2031045, 2027890],
-    ])
+    @pytest.mark.parametrize(
+        "ids",
+        [
+            [],
+            [1],
+            [1, 2, 3, 4, 5],
+            [2034567, 2031045, 2027890],
+        ],
+    )
     def test_roundtrip_via_struct_pack(self, ids):
         import struct
+
         if not ids:
             data = b""
         else:

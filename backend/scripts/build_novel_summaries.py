@@ -12,6 +12,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.7。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,17 +34,17 @@ from services.novel_db.summarizer import (  # noqa: E402
 
 
 def _list_target_books(
-    *, book_name: str | None, series_id: str | None, redo: bool,
+    *,
+    book_name: str | None,
+    series_id: str | None,
+    redo: bool,
 ) -> list[str]:
     """サマリ生成対象の書籍名リストを返す。"""
     with with_db() as conn:
         sql = "SELECT name, summary FROM books"
         rows = conn.execute(sql).fetchall()
 
-    candidates: list[str] = [
-        name for name, summary in rows
-        if (redo or not summary)
-    ]
+    candidates: list[str] = [name for name, summary in rows if (redo or not summary)]
 
     if book_name is not None:
         if book_name not in candidates:
@@ -93,7 +94,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             with with_db() as conn:
                 summary = summarize_book(
-                    conn, name,
+                    conn,
+                    name,
                     progress=lambda msg: print(msg, flush=True),
                 )
                 update_book_summary(conn, name, summary)
@@ -101,8 +103,7 @@ def main(argv: list[str] | None = None) -> int:
             avg = elapsed / i
             eta = avg * (len(targets) - i)
             print(
-                f"  done: {len(summary):,} chars "
-                f"(elapsed {elapsed:.0f}s, avg {avg:.0f}s/book, eta {eta:.0f}s)",
+                f"  done: {len(summary):,} chars (elapsed {elapsed:.0f}s, avg {avg:.0f}s/book, eta {eta:.0f}s)",
                 flush=True,
             )
         except Exception as e:

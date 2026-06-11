@@ -6,6 +6,7 @@ POST /api/genres        - ジャンルを追加する
 DELETE /api/genres/{name} - ジャンルをリストから削除する
 PATCH /api/genres/reorder - 表示順を更新する
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 

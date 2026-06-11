@@ -1,8 +1,12 @@
 import os
 import shutil
+from typing import TYPE_CHECKING
 
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
+
+if TYPE_CHECKING:
+    from config import SourceDirs
 
 logger = get_logger(__name__)
 
@@ -20,7 +24,7 @@ class FileManager:
         old_name: str,
         new_name: str,
         is_folder: bool,
-        dirs: dict,
+        dirs: "SourceDirs",
     ) -> None:
         """PDF（またはフォルダ）とサムネイル・画像ディレクトリをリネームする。
 
@@ -82,7 +86,7 @@ class FileManager:
             raise OSError(f"Rename failed: {e}") from e
 
     @staticmethod
-    def delete_with_assets(item: str, path: str, dirs: dict) -> None:
+    def delete_with_assets(item: str, path: str, dirs: "SourceDirs") -> None:
         """PDF・サムネイル・画像ディレクトリをディスクから完全削除する。
 
         Args:
@@ -96,10 +100,7 @@ class FileManager:
         """
         pdf_path = os.path.join(dirs["pdf"], path, item) if path else os.path.join(dirs["pdf"], item)
         book_name = os.path.splitext(item)[0]
-        img_dir = (
-            os.path.join(dirs["img"], path, book_name) if path
-            else os.path.join(dirs["img"], book_name)
-        )
+        img_dir = os.path.join(dirs["img"], path, book_name) if path else os.path.join(dirs["img"], book_name)
 
         # 存在チェック: PDF または images ディレクトリのどちらか一方が存在すれば OK
         if not os.path.exists(pdf_path) and not os.path.exists(img_dir):
@@ -110,10 +111,7 @@ class FileManager:
             os.remove(pdf_path)
 
         thumb_name = get_thumbnail_name(item)
-        thumb_path = (
-            os.path.join(dirs["thumb"], path, thumb_name) if path
-            else os.path.join(dirs["thumb"], thumb_name)
-        )
+        thumb_path = os.path.join(dirs["thumb"], path, thumb_name) if path else os.path.join(dirs["thumb"], thumb_name)
         if os.path.exists(thumb_path):
             try:
                 os.remove(thumb_path)

@@ -1,4 +1,5 @@
 """novel_db 再構築ジョブエンドポイント（/builds/*）。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Response
@@ -25,9 +26,7 @@ def post_rebuild(request: RebuildRequest) -> dict:
             detail=f"target_id is required for type='{request.type}'",
         )
 
-    job_id, queued_position = job_queue.enqueue(
-        request.type, request.target_id, request.mode
-    )
+    job_id, queued_position = job_queue.enqueue(request.type, request.target_id, request.mode)
     return {"job_id": job_id, "queued_position": queued_position}
 
 

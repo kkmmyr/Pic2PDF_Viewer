@@ -13,6 +13,7 @@ QA 時に検索ヒットページのコンテキストに加えてサマリ群�
 
 プロンプトテンプレート・LLM オプション・パーサは `_prompts.py` に一元管理している。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -49,6 +50,7 @@ from .lance_store import get_summaries_table
 # 公開 API
 # ---------------------------------------------------------------------------
 
+
 def summarize_book(
     conn: sqlite3.Connection,
     book_name: str,
@@ -76,15 +78,19 @@ def summarize_book(
         QwenError: Qwen 呼び出しに失敗
     """
     book_row = conn.execute(
-        "SELECT id, page_count FROM books WHERE name = ?", (book_name,),
+        "SELECT id, page_count FROM books WHERE name = ?",
+        (book_name,),
     ).fetchone()
     if book_row is None:
         raise ValueError(f"book not found: {book_name}")
     book_id, page_count = book_row
 
     body_text = _load_body_text(
-        conn, book_id, page_count,
-        min_chars=min_chars, body_page_margin=body_page_margin,
+        conn,
+        book_id,
+        page_count,
+        min_chars=min_chars,
+        body_page_margin=body_page_margin,
     )
     if not body_text.strip():
         raise ValueError(f"book has no body content: {book_name}")
@@ -95,7 +101,8 @@ def summarize_book(
             f"  body chars={len(body_text):,} → one-shot (num_ctx={ONE_SHOT_OPTIONS['num_ctx']:,})",
         )
         prompt = SINGLE_PROMPT.format(
-            book_name=book_name, text=body_text,
+            book_name=book_name,
+            text=body_text,
             target=FINAL_SUMMARY_TARGET_CHARS,
         )
         return QWEN_BACKEND.ask(prompt, model=model, options=ONE_SHOT_OPTIONS).strip()
@@ -125,15 +132,19 @@ def summarize_book_with_characters(
         LLMError: Qwen 呼び出し失敗
     """
     book_row = conn.execute(
-        "SELECT id, page_count FROM books WHERE name = ?", (book_name,),
+        "SELECT id, page_count FROM books WHERE name = ?",
+        (book_name,),
     ).fetchone()
     if book_row is None:
         raise ValueError(f"book not found: {book_name}")
     book_id, page_count = book_row
 
     body_text = _load_body_text(
-        conn, book_id, page_count,
-        min_chars=min_chars, body_page_margin=body_page_margin,
+        conn,
+        book_id,
+        page_count,
+        min_chars=min_chars,
+        body_page_margin=body_page_margin,
     )
     if not body_text.strip():
         raise ValueError(f"book has no body content: {book_name}")
@@ -186,8 +197,7 @@ def update_book_summary(
     book_id = row[0]
 
     conn.execute(
-        "UPDATE books SET summary = ?, summary_generated_at = datetime('now', '+9 hours') "
-        "WHERE id = ?",
+        "UPDATE books SET summary = ?, summary_generated_at = datetime('now', '+9 hours') WHERE id = ?",
         (summary, book_id),
     )
     _index_summary_vector(conn, book_id, summary)
@@ -213,6 +223,7 @@ def load_summaries_for_books(
 # ---------------------------------------------------------------------------
 # 内部ヘルパー
 # ---------------------------------------------------------------------------
+
 
 def _load_body_text(
     conn: sqlite3.Connection,
@@ -284,11 +295,10 @@ def _run_map_reduce_summary(
         intermediates.append(QWEN_BACKEND.ask(prompt, model=model, options=MAP_OPTIONS).strip())
 
     _log(progress, f"  reduce ({sum(len(s) for s in intermediates):,} chars)...")
-    summaries_block = "\n\n".join(
-        f"[{i}/{len(intermediates)}]\n{s}" for i, s in enumerate(intermediates, 1)
-    )
+    summaries_block = "\n\n".join(f"[{i}/{len(intermediates)}]\n{s}" for i, s in enumerate(intermediates, 1))
     prompt = REDUCE_PROMPT.format(
-        book_name=book_name, summaries=summaries_block,
+        book_name=book_name,
+        summaries=summaries_block,
         target=FINAL_SUMMARY_TARGET_CHARS,
     )
     return QWEN_BACKEND.ask(prompt, model=model, options=REDUCE_OPTIONS).strip()
@@ -304,8 +314,11 @@ def _index_summary_vector(
         emb = embed_batch([summary])[0]
     except Exception as e:  # noqa: BLE001
         import logging  # noqa: PLC0415
+
         logging.getLogger(__name__).warning(
-            "Failed to index summary vector for book_id=%s: %s", book_id, e,
+            "Failed to index summary vector for book_id=%s: %s",
+            book_id,
+            e,
         )
         return
     book_name_row = conn.execute("SELECT name FROM books WHERE id = ?", (book_id,)).fetchone()

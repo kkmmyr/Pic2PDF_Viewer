@@ -7,6 +7,7 @@ PDF / WebP からサムネイル JPG を生成する純関数の挙動を確認�
     cd backend
     uv run pytest tests/test_thumbnail_service.py -v
 """
+
 import os
 import sys
 
@@ -27,11 +28,10 @@ def _make_pdf(path: str, page_count: int = 1, width: int = 400, height: int = 60
     doc.close()
 
 
-
-
 # ---------------------------------------------------------------------------
 # generate_thumbnail
 # ---------------------------------------------------------------------------
+
 
 class TestGenerateThumbnail:
     def test_creates_jpg_from_pdf(self, tmp_path):
@@ -67,8 +67,10 @@ class TestGenerateThumbnail:
         class _FakeDoc:
             def __enter__(self):
                 return self
+
             def __exit__(self, *a):
                 return False
+
             def __len__(self):
                 return 0
 
@@ -86,9 +88,7 @@ class TestGenerateThumbnail:
         """入力 PDF 不在で例外を投げず False を返す。"""
         thumb = tmp_path / "out.jpg"
 
-        result = ThumbnailService.generate_thumbnail(
-            str(tmp_path / "nope.pdf"), str(thumb)
-        )
+        result = ThumbnailService.generate_thumbnail(str(tmp_path / "nope.pdf"), str(thumb))
 
         assert result is False
 

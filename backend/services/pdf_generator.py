@@ -29,6 +29,7 @@ class GenerateResult(NamedTuple):
     - `generated`: 正常生成された書籍ファイル名（".pdf" 付き）のリスト
     - `failed_items`: 失敗した書籍とエラーメッセージの組 `(item_name, error_msg)`
     """
+
     generated: list[str]
     failed_items: list[tuple[str, str]]
 
@@ -67,7 +68,7 @@ def _sanitize_fs_name(name: str) -> str:
     makedirs で作成されるフォルダ名と copy2 で参照するパスが不一致になり
     FileNotFoundError が発生するため、事前に正規化する。
     """
-    return name.rstrip('. ')
+    return name.rstrip(". ")
 
 
 def _collect_images(images_dir: str) -> list[str]:
@@ -84,6 +85,7 @@ def _check_zip_safety(webp_infos: list[zipfile.ZipInfo], zip_filename: str) -> N
     一般的な I/O エラー (`logger.error("Failed to generate PDF for ZIP %s ...")`)
     と区別できるようにする。
     """
+
     def _reject(reason: str) -> None:
         logger.warning("Security: ZIP rejected (%s) — %s", zip_filename, reason)
         raise ValueError(reason)
@@ -99,14 +101,18 @@ def _check_zip_safety(webp_infos: list[zipfile.ZipInfo], zip_filename: str) -> N
             )
         total += info.file_size
         if total > ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES:
-            _reject(
-                f"total uncompressed size exceeds limit {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES}"
-            )
+            _reject(f"total uncompressed size exceeds limit {ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES}")
 
 
 class PdfGenerator:
-    def __init__(self, output_dir: str | None, thumbnail_dir: str, images_dir: str, complete_dir: str,
-                 progress_callback: Callable[[str], None] | None = None):
+    def __init__(
+        self,
+        output_dir: str | None,
+        thumbnail_dir: str,
+        images_dir: str,
+        complete_dir: str,
+        progress_callback: Callable[[str], None] | None = None,
+    ):
         self.output_dir = output_dir  # None = image-only モード（PDF 生成をスキップ）
         self.thumbnail_dir = thumbnail_dir
         self.images_dir = images_dir
@@ -153,7 +159,7 @@ class PdfGenerator:
         os.makedirs(target_images_dir, exist_ok=True)
 
         try:
-            with zipfile.ZipFile(zip_path, 'r') as zf:
+            with zipfile.ZipFile(zip_path, "r") as zf:
                 webp_infos = [info for info in zf.infolist() if is_webp_file(info.filename)]
                 if not webp_infos:
                     return
@@ -201,11 +207,7 @@ class PdfGenerator:
                 self.moves.append((root, os.path.join(self.complete_dir, folder_name), True))
             else:
                 for f in webp_files:
-                    self.moves.append((
-                        os.path.join(root, f),
-                        os.path.join(self.complete_dir, f),
-                        False
-                    ))
+                    self.moves.append((os.path.join(root, f), os.path.join(self.complete_dir, f), False))
 
         except Exception as e:
             logger.error("Failed to generate PDF for folder %s: %s", folder_name, e)
@@ -213,7 +215,7 @@ class PdfGenerator:
 
     def _create_pdf_file(self, image_paths: list[str], output_path: str) -> None:
         with open(output_path, "wb") as f:
-            f.write(img2pdf.convert(image_paths))
+            f.write(img2pdf.convert(image_paths))  # type: ignore[arg-type]
 
     # ------------------------------------------------------------------
     # ファイル移動（バックアップ＋ロールバック）
@@ -288,8 +290,6 @@ def scan_and_generate(
     `output_dir=None` を渡すと PDF 生成をスキップ（image-only モード）。
     例外で失敗した書籍は `result.failed_items` に集約され、ジョブ結果として可視化される。
     """
-    generator = PdfGenerator(
-        output_dir, thumbnail_dir, images_dir, complete_dir, progress_callback
-    )
+    generator = PdfGenerator(output_dir, thumbnail_dir, images_dir, complete_dir, progress_callback)
     generated = generator.run(source_dir)
     return GenerateResult(generated=generated, failed_items=generator.failed_items)

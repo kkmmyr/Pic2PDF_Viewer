@@ -3,6 +3,7 @@
 main() 全体のテストはネットワーク + ファイル I/O が絡むため省略。
 スキップ判定ロジックは pure function として抽出済みなので、ここで網羅する。
 """
+
 import os
 import sys
 from datetime import UTC, datetime, timedelta

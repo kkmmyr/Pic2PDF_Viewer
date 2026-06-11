@@ -2,6 +2,7 @@
 
 書籍俯瞰サマリの埋め込み（B-5）と、scope ごとのヘッダ生成を確認する。
 """
+
 from services.novel_db.prompt_builder import build_prompt
 from services.novel_db.search import Scope, SearchHit
 
@@ -21,6 +22,7 @@ def _hit(book: str, page: int, *, snippet: str = "本文", chars: list[str] | No
 # ---------------------------------------------------------------------------
 # scope ごとの基本構造
 # ---------------------------------------------------------------------------
+
 
 def test_book_scope_omits_book_name_in_page_header():
     hits = [_hit("book-1", 50, snippet="セリフ")]
@@ -46,10 +48,13 @@ def test_main_characters_hint_is_included():
 # 書籍俯瞰サマリ（B-5）
 # ---------------------------------------------------------------------------
 
+
 def test_book_summaries_block_added_for_all_scope():
     hits = [_hit("book-1", 50)]
     prompt = build_prompt(
-        "質問", hits, Scope("all"),
+        "質問",
+        hits,
+        Scope("all"),
         book_summaries={"book-1": "あらすじ A", "book-2": "あらすじ B"},
     )
     assert "【書籍俯瞰サマリ】" in prompt
@@ -63,7 +68,8 @@ def test_book_summaries_block_added_for_all_scope():
 
 def test_book_summaries_block_added_for_series_scope():
     prompt = build_prompt(
-        "質問", [_hit("book-1", 50)],
+        "質問",
+        [_hit("book-1", 50)],
         Scope("series", "シリーズ X"),
         book_summaries={"book-1": "あらすじ"},
     )
@@ -73,7 +79,8 @@ def test_book_summaries_block_added_for_series_scope():
 def test_book_summaries_block_skipped_for_book_scope():
     """単冊スコープではサマリブロックは付与しない（page 抜粋で十分）。"""
     prompt = build_prompt(
-        "質問", [_hit("book-1", 50)],
+        "質問",
+        [_hit("book-1", 50)],
         Scope("book", "book-1"),
         book_summaries={"book-1": "あらすじ"},
     )
@@ -91,7 +98,9 @@ def test_no_summaries_block_when_dict_is_empty_or_none():
 def test_summaries_appear_before_context():
     """プロンプト内でサマリブロックは page 抜粋より前に出る。"""
     prompt = build_prompt(
-        "質問", [_hit("book-1", 50)], Scope("all"),
+        "質問",
+        [_hit("book-1", 50)],
+        Scope("all"),
         book_summaries={"book-1": "あらすじ"},
     )
     summary_pos = prompt.index("【書籍俯瞰サマリ】")

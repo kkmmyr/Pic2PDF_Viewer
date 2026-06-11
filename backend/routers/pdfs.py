@@ -2,6 +2,7 @@
 
 generate/status/batch_compress は routers/generate.py に分離済み。
 """
+
 import os
 
 import fitz
@@ -144,8 +145,8 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
 
 
 class MergePdfsRequest(BaseModel):
-    names: list[str]   # 結合対象の .pdf ファイル名リスト（順序通りに結合）
-    output_name: str   # 出力ファイル名（.pdf 拡張子付き）
+    names: list[str]  # 結合対象の .pdf ファイル名リスト（順序通りに結合）
+    output_name: str  # 出力ファイル名（.pdf 拡張子付き）
     path: str = ""
     source: str = "doujin"
 

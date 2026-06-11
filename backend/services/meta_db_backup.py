@@ -3,6 +3,7 @@
 sqlite3.backup() でホットバックアップを作成し META_DB_BACKUP_DIR に保存する。
 ファイル名: meta_YYYYMMDD_HHMMSS.db（タイムスタンプ付き）
 """
+
 from __future__ import annotations
 
 import sqlite3

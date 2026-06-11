@@ -25,6 +25,7 @@ Qwen 意味セグメンテーション（chunk_qwen, 意味境界→サブ分割
     # 書籍一覧表示
     uv run python scripts/eval_chunk_strategy.py --list
 """
+
 from __future__ import annotations
 
 import argparse
@@ -58,6 +59,7 @@ _EMBED_BATCH = 16
 # DB アクセス
 # ---------------------------------------------------------------------------
 
+
 def _list_books(conn) -> list[str]:
     return [r[0] for r in conn.execute("SELECT name FROM books ORDER BY name").fetchall()]
 
@@ -68,19 +70,16 @@ def _fetch_pages(conn, book_name: str) -> list[dict]:
         raise ValueError(f"書籍が DB に見つかりません: {book_name!r}")
     book_id = row[0]
     rows = conn.execute(
-        "SELECT id, page_no, full_text, char_count "
-        "FROM pages WHERE book_id = ? ORDER BY page_no",
+        "SELECT id, page_no, full_text, char_count FROM pages WHERE book_id = ? ORDER BY page_no",
         (book_id,),
     ).fetchall()
-    return [
-        {"page_id": r[0], "page_no": r[1], "full_text": r[2] or "", "char_count": r[3] or 0}
-        for r in rows
-    ]
+    return [{"page_id": r[0], "page_no": r[1], "full_text": r[2] or "", "char_count": r[3] or 0} for r in rows]
 
 
 # ---------------------------------------------------------------------------
 # チャンク生成
 # ---------------------------------------------------------------------------
+
 
 def _build_page_chunks(pages: list[dict]) -> list[dict]:
     """現状方式: ページ単位 chunk_page (800字)"""
@@ -97,8 +96,12 @@ def _build_book_chunks(pages: list[dict]) -> list[dict]:
     """実験方式: クロスページ chunk_book (1200字)"""
     pid_to_pno = {p["page_id"]: p["page_no"] for p in pages}
     return [
-        {"page_id": c["page_id"], "page_no": pid_to_pno.get(c["page_id"], 0),
-         "chunk_idx": c["chunk_idx"], "text": c["text"]}
+        {
+            "page_id": c["page_id"],
+            "page_no": pid_to_pno.get(c["page_id"], 0),
+            "chunk_idx": c["chunk_idx"],
+            "text": c["text"],
+        }
         for c in chunk_book(pages)
     ]
 
@@ -106,6 +109,7 @@ def _build_book_chunks(pages: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 統計表示
 # ---------------------------------------------------------------------------
+
 
 def _show_stats(label: str, chunks: list[dict]) -> None:
     if not chunks:
@@ -137,6 +141,7 @@ def _show_stats(label: str, chunks: list[dict]) -> None:
 # ---------------------------------------------------------------------------
 # ベクトル類似度検索
 # ---------------------------------------------------------------------------
+
 
 def _cosine(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b, strict=True))
@@ -263,18 +268,21 @@ def _build_qwen_chunks(pages: list[dict], boundaries: list[int]) -> list[dict]:
     all_chunks: list[dict] = []
     for seg in segments:
         for c in chunk_book(seg):
-            all_chunks.append({
-                "page_id": c["page_id"],
-                "page_no": pid_to_pno.get(c["page_id"], 0),
-                "chunk_idx": c["chunk_idx"],
-                "text": c["text"],
-            })
+            all_chunks.append(
+                {
+                    "page_id": c["page_id"],
+                    "page_no": pid_to_pno.get(c["page_id"], 0),
+                    "chunk_idx": c["chunk_idx"],
+                    "text": c["text"],
+                }
+            )
     return all_chunks
 
 
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
@@ -286,14 +294,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--top", type=int, default=5, help="表示件数（デフォルト 5）")
     parser.add_argument("--list", action="store_true", help="DB 登録済み書籍一覧を表示")
     parser.add_argument(
-        "--qwen", action="store_true",
+        "--qwen",
+        action="store_true",
         help="Qwen 意味セグメンテーション方式も含めた 3 方式比較（Qwen サーバ起動必須）",
     )
     args = parser.parse_args(argv)
 
     upgrade_head()
     with with_db() as conn:
-
         if args.list:
             books = _list_books(conn)
             if not books:

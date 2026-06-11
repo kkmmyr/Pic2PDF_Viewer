@@ -1,4 +1,5 @@
 """メタデータ管理者向け一括操作エンドポイント。"""
+
 import os
 
 from fastapi import APIRouter, Depends

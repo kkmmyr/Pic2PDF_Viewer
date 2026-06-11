@@ -2,6 +2,7 @@
 
 テスト時は monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path)) でパスを切り替える。
 """
+
 import json
 import os
 import sqlite3
@@ -84,6 +85,7 @@ def init_db() -> None:
 # Row ↔ MetaEntry 変換ヘルパー
 # ---------------------------------------------------------------------------
 
+
 def row_to_entry(row: sqlite3.Row) -> dict:
     """SQLite の Row を MetaEntry 相当の dict に変換する。
 
@@ -96,8 +98,7 @@ def row_to_entry(row: sqlite3.Row) -> dict:
         entry["last_viewed_at"] = row["last_viewed_at"]
     if row["hidden"]:
         entry["hidden"] = True
-    for key in ("genre", "read_state", "series_id", "series_title",
-                "publisher", "asin", "isbn", "release_date"):
+    for key in ("genre", "read_state", "series_id", "series_title", "publisher", "asin", "isbn", "release_date"):
         val = row[key]
         if val is not None:
             entry[key] = val
@@ -139,5 +140,5 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 """
 
 
-def upsert_entry(conn: sqlite3.Connection, source: str, book_id: str, entry: dict) -> None:
+def upsert_entry(conn: sqlite3.Connection, source: str, book_id: str, entry: dict[str, object]) -> None:
     conn.execute(_UPSERT_SQL, entry_to_params(source, book_id, entry))

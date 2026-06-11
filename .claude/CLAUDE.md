@@ -5,10 +5,11 @@
 
 ## 環境の癖（推測しにくい部分）
 
-- Python は **uv** で管理。`pip install` ではなく `uv add` / `uv sync`、実行は `uv run`。マニフェストは `backend/pyproject.toml` + `backend/uv.lock`
+- Python は **uv** で管理。`pip install` ではなく `uv add` / `uv sync`、実行は `uv run`。マニフェスト: ルート `pyproject.toml`（workspace 定義） + `backend/pyproject.toml`（backend 依存）
+- **uv workspace モノレポ**: `backend` / `kindle-pdf` / `common/llm` の 3 メンバー。**初回セットアップはルートで `uv sync` を 1 回**（`.venv` はルートに作成される）
 - Node は npm。`frontend/package.json`
 - 開発ポートは `:8766` (backend) / `:5176` (frontend)。リリース統合は `:8090`
-- OCR ツール群（`kindle-pdf/`）は別 uv プロジェクト。GPU 依存は `[dependency-groups.gpu]` で分離
+- OCR ツール群（`kindle-pdf/`）は別 uv workspace member。GPU 依存は `[dependency-groups.gpu]` で分離
 
 ## 起動コマンド
 
@@ -50,3 +51,5 @@ mkdocs セットアップ・HTML 配信の詳細は `docs/04_環境構築/` を�
 3. **`memory/` を更新する** — project / feedback / reference のいずれか該当するものを更新・追加
 
 **不要なケース（スキップしてよい）**: typo 修正・コメント整理・テスト追加・フォーマットのみの変更。迷ったら実施する側に倒す。
+
+実装にあたってはトークンを節約するためにOpus/Sonnetを適切にサブエージェントとして切り出して実行し、このメインセッション(Fable 5)は設計と監査、レビューに専念してください。実装難易度が特に高いところはこのセッションでやってよいです

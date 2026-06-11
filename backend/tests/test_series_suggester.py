@@ -1,4 +1,4 @@
-﻿"""
+"""
 services.series_suggester のユニットテスト（A-1）。
 
 ルールベースの紐付け候補スコアリングと、`POST /api/series/suggest`
@@ -8,6 +8,7 @@ services.series_suggester のユニットテスト（A-1）。
     cd backend
     uv run pytest tests/test_series_suggester.py -v
 """
+
 import os
 import sys
 
@@ -27,6 +28,7 @@ from services.series_suggester import (
 # _common_prefix_len
 # ---------------------------------------------------------------------------
 
+
 class TestCommonPrefixLen:
     def test_basic(self):
         assert _common_prefix_len("鬼滅の刃 1", "鬼滅の刃 2") == len("鬼滅の刃 ")
@@ -41,6 +43,7 @@ class TestCommonPrefixLen:
 # ---------------------------------------------------------------------------
 # _strip_volume_suffix
 # ---------------------------------------------------------------------------
+
 
 class TestStripVolumeSuffix:
     def test_strip_int(self):
@@ -66,6 +69,7 @@ class TestStripVolumeSuffix:
 # ---------------------------------------------------------------------------
 # suggest_series
 # ---------------------------------------------------------------------------
+
 
 class TestSuggestSeries:
     def test_empty_meta_returns_empty(self):
@@ -191,36 +195,47 @@ class TestSuggestSeries:
 # POST /api/series/suggest（HTTP 層）
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def suggest_client(tmp_path, monkeypatch):
     """suggest_series_endpoint を検証する TestClient。`config.META_DB_DIR` を tmp_path に。"""
     from fastapi.testclient import TestClient
 
     import config
+
     monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     from main import app
+
     return TestClient(app)
 
 
 def _seed_meta_db(entries: dict, source: str = "doujin") -> None:
     from services.meta_store import save_meta
+
     save_meta(source, entries)
 
 
 class TestSuggestSeriesEndpoint:
     def test_returns_candidates(self, suggest_client):
         client = suggest_client
-        _seed_meta_db({
-            "鬼滅の刃 1.pdf": {
-                "authors": ["A"],
-                "series_id": "s1",
-                "series_title": "鬼滅の刃",
-                "series_index": 1.0,
+        _seed_meta_db(
+            {
+                "鬼滅の刃 1.pdf": {
+                    "authors": ["A"],
+                    "series_id": "s1",
+                    "series_title": "鬼滅の刃",
+                    "series_index": 1.0,
+                },
+            }
+        )
+        res = client.post(
+            "/api/series/suggest",
+            json={
+                "path": "",
+                "names": ["鬼滅の刃 2.pdf"],
+                "source": "doujin",
             },
-        })
-        res = client.post("/api/series/suggest", json={
-            "path": "", "names": ["鬼滅の刃 2.pdf"], "source": "doujin",
-        })
+        )
         assert res.status_code == 200
         body = res.json()
         assert "candidates" in body
@@ -229,23 +244,38 @@ class TestSuggestSeriesEndpoint:
 
     def test_empty_names_returns_400(self, suggest_client):
         client = suggest_client
-        res = client.post("/api/series/suggest", json={
-            "path": "", "names": [], "source": "doujin",
-        })
+        res = client.post(
+            "/api/series/suggest",
+            json={
+                "path": "",
+                "names": [],
+                "source": "doujin",
+            },
+        )
         assert res.status_code == 400
 
     def test_invalid_source_returns_400(self, suggest_client):
         client = suggest_client
-        res = client.post("/api/series/suggest", json={
-            "path": "", "names": ["a.pdf"], "source": "invalid",
-        })
+        res = client.post(
+            "/api/series/suggest",
+            json={
+                "path": "",
+                "names": ["a.pdf"],
+                "source": "invalid",
+            },
+        )
         assert res.status_code == 400
 
     def test_no_existing_series_returns_empty_list(self, suggest_client):
         client = suggest_client
         _seed_meta_db({"book.pdf": {"authors": ["A"]}})
-        res = client.post("/api/series/suggest", json={
-            "path": "", "names": ["other.pdf"], "source": "doujin",
-        })
+        res = client.post(
+            "/api/series/suggest",
+            json={
+                "path": "",
+                "names": ["other.pdf"],
+                "source": "doujin",
+            },
+        )
         assert res.status_code == 200
         assert res.json()["candidates"] == []

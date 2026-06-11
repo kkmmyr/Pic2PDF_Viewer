@@ -3,6 +3,7 @@
 character_relations テーブルから nodes / edges を組み立てる読み取り専用モジュール。
 書き込み（抽出・UPSERT）は relation_extractor.py が担う。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -31,8 +32,7 @@ def get_graph_for_series(
         ).fetchall()
     else:
         rows = conn.execute(
-            "SELECT id, char_a, char_b, relation_type, weight, book_id "
-            "FROM character_relations WHERE series_id = ?",
+            "SELECT id, char_a, char_b, relation_type, weight, book_id FROM character_relations WHERE series_id = ?",
             (series_id,),
         ).fetchall()
 
@@ -52,22 +52,22 @@ def get_graph_for_series(
     for rel_id, char_a, char_b, relation_type, weight, book_id in rows:
         nid_a = _node_id(char_a, book_id)
         nid_b = _node_id(char_b, book_id)
-        edges.append({
-            "id": rel_id,
-            "from": nid_a,
-            "to": nid_b,
-            "label": relation_type or "",
-            "weight": weight,
-        })
+        edges.append(
+            {
+                "id": rel_id,
+                "from": nid_a,
+                "to": nid_b,
+                "label": relation_type or "",
+                "weight": weight,
+            }
+        )
 
     return {"nodes": nodes, "edges": edges}
 
 
 def list_series_with_relations(conn: sqlite3.Connection) -> list[str]:
     """character_relations にデータが存在する series_id 一覧を返す。"""
-    rows = conn.execute(
-        "SELECT DISTINCT series_id FROM character_relations ORDER BY series_id"
-    ).fetchall()
+    rows = conn.execute("SELECT DISTINCT series_id FROM character_relations ORDER BY series_id").fetchall()
     return [r[0] for r in rows]
 
 

@@ -7,6 +7,7 @@ UI 側で「ユーザーが選んだ複数冊」に対する「既存シリー�
 表示し、ユーザーが確定操作した場合のみ既存の `POST /api/series/assign` で
 書き込みが行われる。
 """
+
 import re
 from typing import TypedDict
 

@@ -11,6 +11,7 @@ services.meta_store の純関数ユニットテスト（Phase 64: SQLite バッ�
     cd backend
     uv run pytest tests/test_meta_store.py -v
 """
+
 import threading
 
 import pytest
@@ -27,9 +28,11 @@ from services.meta_store import (
 # フィクスチャ: DATA_DIR を tmp_path に向け、DB を毎テストで分離する
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
 def isolate_db(tmp_path, monkeypatch):
     import config
+
     monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     yield
 
@@ -37,6 +40,7 @@ def isolate_db(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # merge_entry_fields
 # ---------------------------------------------------------------------------
+
 
 class TestMergeEntryFields:
     def test_authors_overwritten(self):
@@ -95,7 +99,9 @@ class TestMergeEntryFields:
     def test_combined_update(self):
         result = merge_entry_fields(
             {"authors": ["old"], "view_count": 3},
-            authors=["new"], hidden=True, genre="G",
+            authors=["new"],
+            hidden=True,
+            genre="G",
         )
         assert result == {
             "authors": ["new"],
@@ -108,6 +114,7 @@ class TestMergeEntryFields:
 # ---------------------------------------------------------------------------
 # has_meaningful_value
 # ---------------------------------------------------------------------------
+
 
 class TestHasMeaningfulValue:
     def test_empty_dict_is_false(self):
@@ -136,6 +143,7 @@ class TestHasMeaningfulValue:
 # update_meta_locked - 並行性
 # ---------------------------------------------------------------------------
 
+
 class TestUpdateMetaLocked:
     def test_basic_update(self):
         update_meta_locked("doujin", lambda d: d.update({"book.pdf": {"authors": ["A"]}}))
@@ -151,6 +159,7 @@ class TestUpdateMetaLocked:
             def _apply(data):
                 entry = data.setdefault("book.pdf", {})
                 entry["view_count"] = entry.get("view_count", 0) + 1
+
             update_meta_locked("doujin", _apply)
 
         threads = [threading.Thread(target=_increment) for _ in range(10)]
@@ -174,6 +183,7 @@ class TestUpdateMetaLocked:
 # ---------------------------------------------------------------------------
 # load_meta / save_meta
 # ---------------------------------------------------------------------------
+
 
 class TestLoadSaveMeta:
     def test_load_missing_returns_empty_dict(self):

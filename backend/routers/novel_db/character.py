@@ -1,4 +1,5 @@
 """novel_db キャラクター辞典エンドポイント（B-15）。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
@@ -64,7 +65,5 @@ def get_book_character_detail(book_name: str, char_name: str) -> CharacterDetail
         page_count=row.page_count,
         summary=row.summary,
         generated_at=row.generated_at,
-        top_scenes=[
-            CharacterScene(page_no=pn, char_count=cc) for pn, cc in scenes
-        ],
+        top_scenes=[CharacterScene(page_no=pn, char_count=cc) for pn, cc in scenes],
     )

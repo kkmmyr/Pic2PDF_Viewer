@@ -8,6 +8,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.14。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -103,6 +104,7 @@ def build_book_contexts(
 # ステップ実装
 # ---------------------------------------------------------------------------
 
+
 def _run_combined_step(
     conn: sqlite3.Connection,
     book_name: str,
@@ -112,18 +114,19 @@ def _run_combined_step(
     detail: StepCallback | None = None,
 ) -> None:
     """書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成して DB に保存する。"""
-    row = conn.execute(
-        "SELECT id, summary FROM books WHERE name = ?", (book_name,)
-    ).fetchone()
+    row = conn.execute("SELECT id, summary FROM books WHERE name = ?", (book_name,)).fetchone()
     if row is None:
         log("  skip: book not found in DB")
         return
     book_id, existing_summary = row
 
-    has_chars = conn.execute(
-        "SELECT COUNT(*) FROM book_characters WHERE book_id = ? AND summary IS NOT NULL",
-        (book_id,),
-    ).fetchone()[0] > 0
+    has_chars = (
+        conn.execute(
+            "SELECT COUNT(*) FROM book_characters WHERE book_id = ? AND summary IS NOT NULL",
+            (book_id,),
+        ).fetchone()[0]
+        > 0
+    )
 
     if existing_summary and has_chars and not redo:
         log("  skip: summary and characters already exist")
@@ -147,8 +150,7 @@ def _run_combined_step(
         for name, char_summary in char_summaries.items():
             # first_page / page_count をテキスト検索で近似
             result = conn.execute(
-                "SELECT MIN(page_no), COUNT(*) FROM pages "
-                "WHERE book_id = ? AND full_text LIKE ?",
+                "SELECT MIN(page_no), COUNT(*) FROM pages WHERE book_id = ? AND full_text LIKE ?",
                 (book_id, f"%{name}%"),
             ).fetchone()
             first_page = result[0] or 1
@@ -172,9 +174,7 @@ def _run_generate_contexts(
     log: StepCallback,
     detail: StepCallback | None = None,
 ) -> None:
-    book_row = conn.execute(
-        "SELECT id, summary FROM books WHERE name = ?", (book_name,)
-    ).fetchone()
+    book_row = conn.execute("SELECT id, summary FROM books WHERE name = ?", (book_name,)).fetchone()
     if book_row is None:
         log("  skip: book not found in DB")
         return
@@ -184,11 +184,7 @@ def _run_generate_contexts(
         log("  skip: book summary missing (run step 2 first)")
         return
 
-    sql = (
-        "SELECT c.id, c.text FROM chunks c "
-        "JOIN pages p ON c.page_id = p.id "
-        "WHERE p.book_id = ?"
-    )
+    sql = "SELECT c.id, c.text FROM chunks c JOIN pages p ON c.page_id = p.id WHERE p.book_id = ?"
     if not redo:
         sql += " AND c.contextual_text IS NULL"
     chunks = conn.execute(sql, (book_id,)).fetchall()
@@ -228,21 +224,27 @@ def _run_generate_contexts(
                 (chunk_id,),
             ).fetchone()
             if meta:
-                lance_table.add([{
-                    "chunk_id": chunk_id,
-                    "book_name": meta[0],
-                    "page_no": meta[1],
-                    "text": chunk_text,
-                    "char_count": meta[2] or 0,
-                    "page_count": meta[3] or 0,
-                    "embedding": emb,
-                }])
+                lance_table.add(
+                    [
+                        {
+                            "chunk_id": chunk_id,
+                            "book_name": meta[0],
+                            "page_no": meta[1],
+                            "text": chunk_text,
+                            "char_count": meta[2] or 0,
+                            "page_count": meta[3] or 0,
+                            "embedding": emb,
+                        }
+                    ]
+                )
             conn.commit()
             done += 1
         except Exception as exc:
             log(f"  chunk {chunk_id} error: {exc}")
             logger.warning(
                 "[full_build:%s] generate_context chunk %s failed: %s",
-                book_name, chunk_id, exc,
+                book_name,
+                chunk_id,
+                exc,
             )
     log(f"  done: {done}/{total_chunks} chunks")

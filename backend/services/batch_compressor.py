@@ -3,6 +3,7 @@
 `PdfGenerator`（生成 + 移動 + ロールバック）と独立した処理として分離した。
 PdfGenerator の private API には依存せず、PIL/img2pdf を直接使う最小実装。
 """
+
 import io
 import os
 from collections.abc import Callable
@@ -28,7 +29,7 @@ def _write_compressed_pdf(image_paths: list[str], output_path: str, quality: int
         img.save(buf, format="JPEG", quality=quality)
         processed.append(buf.getvalue())
     with open(output_path, "wb") as f:
-        f.write(img2pdf.convert(processed))
+        f.write(img2pdf.convert(processed))  # type: ignore[arg-type]
 
 
 def batch_compress(

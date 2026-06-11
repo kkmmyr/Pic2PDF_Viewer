@@ -3,6 +3,7 @@
 LLM 呼び出しはモック。`_parse_expansions` の整形ロジックと、空入力 / LLM 失敗時の
 フォールバック、元の質問が必ず先頭に含まれることを確認する。
 """
+
 from unittest.mock import patch
 
 from services.novel_db.query_expander import _parse_expansions, expand_query
@@ -10,6 +11,7 @@ from services.novel_db.query_expander import _parse_expansions, expand_query
 # ---------------------------------------------------------------------------
 # _parse_expansions: LLM の応答テキスト整形
 # ---------------------------------------------------------------------------
+
 
 def test_parse_basic_lines():
     response = "ベルナード 弁護士 法廷\nソレス王子 裁判編\nレティ 連携 推理"
@@ -73,6 +75,7 @@ def test_parse_empty_response():
 # expand_query: 統合動作
 # ---------------------------------------------------------------------------
 
+
 def test_expand_returns_question_only_for_empty_input():
     """空文字の質問は LLM を呼ばずに元の文字列を返す。"""
     with patch("services.novel_db._llm_backend.QUERY_BACKEND.ask") as mock_ask:
@@ -135,6 +138,6 @@ def test_expand_passes_correct_options_to_backend():
 
     assert mock_ask.call_count == 1
     opts = mock_ask.call_args.kwargs["options"]
-    assert opts["temperature"] == 0.3   # 多様性を上げる
-    assert opts["num_predict"] == 256   # 短答型
+    assert opts["temperature"] == 0.3  # 多様性を上げる
+    assert opts["num_predict"] == 256  # 短答型
     assert opts["num_ctx"] == 4096

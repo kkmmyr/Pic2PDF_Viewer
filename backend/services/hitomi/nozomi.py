@@ -4,6 +4,7 @@ NOZOMI は hitomi.la が事前生成しているバイナリ形式の「条件�
 ギャラリー ID 配列」（big-endian 32bit int の連続）。詳細仕様は
 docs/03_詳細設計/hitomi新着監視設計書.md §8 を参照。
 """
+
 from __future__ import annotations
 
 import struct

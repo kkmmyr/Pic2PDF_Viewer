@@ -24,6 +24,7 @@ B-14 / ADR-0009 採用時に Phase 0〜4b として手動実行したベンチ�
     - ollama backend は VRAM 競合に注意（gemma4:e4b 等が常駐していると OOM の可能性）
     - 採用時の実機ベンチ結果は docs/05_記録/小説RAG_技術知見.md §9 を参照
 """
+
 from __future__ import annotations
 
 import argparse
@@ -51,7 +52,7 @@ from local_llm import (  # noqa: E402
 from config import NOVEL_DB_QA_NUM_CTX  # noqa: E402
 
 DEFAULT_MODEL = "qwen3.6-iq4xs"
-NUM_PREDICT = 256       # tg 計測の安定化のため短めに固定
+NUM_PREDICT = 256  # tg 計測の安定化のため短めに固定
 TEMPERATURE = 0.2
 REPEAT_PENALTY = 1.2
 
@@ -85,7 +86,8 @@ _MID_PAGE_TEMPLATE = """[page {page}, 主要登場人物: 太郎, 花子]
 温かみは消えていた。それでも、彼は花子を探し続けた。喫茶店で聞き込みをし、図書館で名簿を調べ、ようやく彼女が町外れ
 の小さな診療所で働いていることを突き止めた。診療所の扉を押し開けたとき、彼の心臓は十年ぶりの再会を前に高鳴った。"""
 
-PROMPT_MID = """以下は小説『中程度サンプル』からの抜粋です。
+PROMPT_MID = (
+    """以下は小説『中程度サンプル』からの抜粋です。
 これを参考にして質問に答えてください。
 
 【回答ルール】
@@ -93,11 +95,14 @@ PROMPT_MID = """以下は小説『中程度サンプル』からの抜粋です�
 - 引用する際は、誰の発言・行動・心情かを必ず明記してください。
 - 抜粋に直接の記述がなくても、関連する複数の記述から推論して構いません。
 
-""" + "\n\n".join(_MID_PAGE_TEMPLATE.format(page=p) for p in (12, 34, 58, 79, 102, 145, 188, 221)) + """
+"""
+    + "\n\n".join(_MID_PAGE_TEMPLATE.format(page=p) for p in (12, 34, 58, 79, 102, 145, 188, 221))
+    + """
 
 質問: 太郎が町に戻ってきた理由を本文中の記述から推論してください。
 
 回答:"""
+)
 
 _LONG_SUMMARY = """■ サンプル書籍1
 本書はある町を舞台に、主人公太郎が過去の約束を果たすために十年ぶりに帰郷する物語である。
@@ -108,11 +113,14 @@ _LONG_SUMMARY = """■ サンプル書籍1
 読者はここで初めて、太郎が町を離れた本当の理由を知ることになる。
 """
 
-PROMPT_LONG = """以下は小説からの抜粋です。
+PROMPT_LONG = (
+    """以下は小説からの抜粋です。
 これを参考にして質問に答えてください。
 
 【書籍俯瞰サマリ】（各書籍の事前生成あらすじ。背景知識として活用）
-""" + (_LONG_SUMMARY * 6) + """
+"""
+    + (_LONG_SUMMARY * 6)
+    + """
 
 【回答ルール】
 - 根拠としたページ番号を必ず明記してください（例: 「page 50 に記述あり」）。
@@ -120,11 +128,14 @@ PROMPT_LONG = """以下は小説からの抜粋です。
 - 質問が抽象的・概括的な場合は、具体的なシーン・出来事を 3 つ以上挙げて構造的に
   深く分析してください。
 
-""" + "\n\n".join(_MID_PAGE_TEMPLATE.format(page=p) for p in range(10, 410, 13)) + """
+"""
+    + "\n\n".join(_MID_PAGE_TEMPLATE.format(page=p) for p in range(10, 410, 13))
+    + """
 
 質問: この物語群に共通するテーマと、それを象徴する具体的なシーンを 3 つ挙げて分析してください。
 
 回答:"""
+)
 
 
 CASES = [
@@ -137,6 +148,7 @@ CASES = [
 # ---------------------------------------------------------------------------
 # 1 回計測
 # ---------------------------------------------------------------------------
+
 
 def _run_once(label: str, prompt: str, backend: Backend, model: str) -> dict:
     """1 リクエストを投げて Ollama 形式の最終イベントから統計を取り出す。
@@ -212,6 +224,7 @@ def _run_once(label: str, prompt: str, backend: Backend, model: str) -> dict:
 # 1 backend を回す
 # ---------------------------------------------------------------------------
 
+
 def _make_backend(kind: str, *, model: str, llama_url: str) -> Backend:
     """ベンチ対象の Backend を 1 つ作る。
 
@@ -222,9 +235,12 @@ def _make_backend(kind: str, *, model: str, llama_url: str) -> Backend:
     if kind == "llama_server":
         return LlamaServerBackend(BackendConfig(base_url=llama_url, model=cfg_model))
     if kind == "ollama":
-        return OllamaBackend(BackendConfig(
-            base_url="http://localhost:11434", model=cfg_model,
-        ))
+        return OllamaBackend(
+            BackendConfig(
+                base_url="http://localhost:11434",
+                model=cfg_model,
+            )
+        )
     raise ValueError(f"unknown backend kind: {kind}")
 
 
@@ -260,6 +276,7 @@ def _summary_table(results: list[dict]) -> str:
 # 比較モード
 # ---------------------------------------------------------------------------
 
+
 def compare(ollama_path: Path, llama_path: Path) -> None:
     """両 backend の JSON を読み比較表示する。"""
     if not ollama_path.exists() or not llama_path.exists():
@@ -272,8 +289,7 @@ def compare(ollama_path: Path, llama_path: Path) -> None:
 
     print(f"\n=== Compare: {ollama_path.name} vs {llama_path.name} ===")
     print(
-        f"\n{'case':<10} {'ollama tg':>10} {'llama tg':>10} {'tg×':>6} "
-        f"{'ollama s':>10} {'llama s':>10} {'speedup':>8}",
+        f"\n{'case':<10} {'ollama tg':>10} {'llama tg':>10} {'tg×':>6} {'ollama s':>10} {'llama s':>10} {'speedup':>8}",
     )
     for o, l in zip(ollama["results"], llama["results"]):
         tg_ratio = l["tg_t_per_s"] / o["tg_t_per_s"] if o["tg_t_per_s"] else 0
@@ -287,26 +303,33 @@ def compare(ollama_path: Path, llama_path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument(
-        "--backend", choices=["ollama", "llama_server"],
+        "--backend",
+        choices=["ollama", "llama_server"],
         help="ベンチ対象の backend。--compare 時は不要",
     )
     ap.add_argument(
-        "--model", default=DEFAULT_MODEL,
+        "--model",
+        default=DEFAULT_MODEL,
         help=f"モデル名（既定: {DEFAULT_MODEL}）",
     )
     ap.add_argument(
-        "--llama-url", default="http://127.0.0.1:11435",
+        "--llama-url",
+        default="http://127.0.0.1:11435",
         help="llama-server の base URL（backend=llama_server 時）",
     )
     ap.add_argument(
-        "--out", type=Path, default=None,
+        "--out",
+        type=Path,
+        default=None,
         help="JSON 出力先（既定: backend/scripts/results/bench_{backend}.json）",
     )
     ap.add_argument(
-        "--compare", action="store_true",
+        "--compare",
+        action="store_true",
         help="既存 JSON を比較表示。--out で 2 ファイルを指定するか、既定パスを使う",
     )
     ap.add_argument("--ollama-json", type=Path, default=RESULTS_DIR / "bench_ollama.json")

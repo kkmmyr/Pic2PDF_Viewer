@@ -1,4 +1,5 @@
 """services/novel_db/search.py の単体・統合テスト。"""
+
 import pytest
 
 from services.meta_store import save_meta
@@ -17,6 +18,7 @@ from services.novel_db.search import (
 # ---------------------------------------------------------------------------
 # 純関数
 # ---------------------------------------------------------------------------
+
 
 class TestBuildFts5OrQuery:
     def test_extracts_japanese_tokens(self):
@@ -100,24 +102,22 @@ class TestResolveBookNames:
 # hybrid_search 統合テスト
 # ---------------------------------------------------------------------------
 
+
 def _insert_book_with_pages(conn, book_name: str, pages: list[str]) -> int:
     cur = conn.execute(
-        "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
-        "VALUES (?, ?, ?, ?, datetime('now'))",
+        "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) VALUES (?, ?, ?, ?, datetime('now'))",
         (book_name, f"/dummy/{book_name}.pdf", f"/dummy/images/{book_name}", len(pages)),
     )
     book_id = cur.lastrowid
     page_ids = []
     for i, text in enumerate(pages, start=1):
         cur = conn.execute(
-            "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
             (book_id, i, None, text, len(text)),
         )
         page_ids.append(cur.lastrowid)
     conn.execute(
-        "INSERT INTO pages_fts (rowid, full_text) "
-        "SELECT id, full_text FROM pages WHERE book_id = ?",
+        "INSERT INTO pages_fts (rowid, full_text) SELECT id, full_text FROM pages WHERE book_id = ?",
         (book_id,),
     )
     return book_id
@@ -136,15 +136,19 @@ def _insert_chunk(conn, page_id: int, idx: int, text: str, vec: list[float]) -> 
         (page_id,),
     ).fetchone()
     book_name, page_no, char_count, page_count = meta if meta else ("", 0, 0, 0)
-    get_chunks_table().add([{
-        "chunk_id": chunk_id,
-        "book_name": book_name,
-        "page_no": page_no,
-        "text": text,
-        "char_count": char_count or 0,
-        "page_count": page_count or 0,
-        "embedding": vec,
-    }])
+    get_chunks_table().add(
+        [
+            {
+                "chunk_id": chunk_id,
+                "book_name": book_name,
+                "page_no": page_no,
+                "text": text,
+                "char_count": char_count or 0,
+                "page_count": page_count or 0,
+                "embedding": vec,
+            }
+        ]
+    )
     return chunk_id
 
 
@@ -153,11 +157,15 @@ def search_db(tmp_data_dir, monkeypatch):
     """hybrid_search 用に小さな DB を構築する。"""
     upgrade_head()
     with with_db() as conn:
-        book_id = _insert_book_with_pages(conn, "book-1", [
-            "デュークはレティの騎士である。",  # page 1
-            "アストリッドは元暗殺者だった。",  # page 2
-            "薔薇園で重要な戦いが起きた。",    # page 3
-        ])
+        book_id = _insert_book_with_pages(
+            conn,
+            "book-1",
+            [
+                "デュークはレティの騎士である。",  # page 1
+                "アストリッドは元暗殺者だった。",  # page 2
+                "薔薇園で重要な戦いが起きた。",  # page 3
+            ],
+        )
         # 各ページの代表チャンク（1024 次元のダミーベクトル）
         page_rows = conn.execute(
             "SELECT id, page_no FROM pages WHERE book_id = ? ORDER BY page_no",
@@ -171,8 +179,10 @@ def search_db(tmp_data_dir, monkeypatch):
 
     # クエリの embedding をスタブ（page 1 に近づくよう [0.1, 0, ...] を返す）
     from services.novel_db import search as search_mod
+
     monkeypatch.setattr(
-        search_mod, "embed_batch",
+        search_mod,
+        "embed_batch",
         lambda texts: [[0.1] + [0.0] * 1023 for _ in texts],
     )
 
@@ -203,19 +213,13 @@ def test_hybrid_search_image_url_format(search_db):
 def test_hybrid_search_with_book_scope_filters_other_books(search_db):
     """別書籍を追加しても scope=book で対象外になる。"""
     with with_db() as conn:
-        another_book_id = _insert_book_with_pages(
-            conn, "book-2", ["デュークも登場する別の書籍。"]
-        )
-        page_rows = conn.execute(
-            "SELECT id FROM pages WHERE book_id = ?", (another_book_id,)
-        ).fetchall()
+        another_book_id = _insert_book_with_pages(conn, "book-2", ["デュークも登場する別の書籍。"])
+        page_rows = conn.execute("SELECT id FROM pages WHERE book_id = ?", (another_book_id,)).fetchall()
         vec = [0.1] + [0.0] * 1023
         _insert_chunk(conn, page_rows[0][0], 0, "another", vec)
         conn.commit()
 
-        hits = hybrid_search(
-            conn, "デューク", Scope(type="book", id="book-1"), top=10
-        )
+        hits = hybrid_search(conn, "デューク", Scope(type="book", id="book-1"), top=10)
     assert all(h.book_name == "book-1" for h in hits)
 
 
@@ -233,6 +237,7 @@ def test_hybrid_search_returns_empty_for_no_match(search_db):
 # ---------------------------------------------------------------------------
 # load_all_pages_of_book（B-13 段階 C、scope=book 全 page 読み込み）
 # ---------------------------------------------------------------------------
+
 
 def test_load_all_pages_returns_pages_in_page_no_order(search_db):
     """全 page を page_no 昇順で返す（narrative の時系列性を保つ）。"""

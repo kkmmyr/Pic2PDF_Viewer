@@ -1,4 +1,5 @@
 """routers/novel_db.py の HTTP レイヤテスト（worker は動かさない）。"""
+
 from pathlib import Path
 
 import pytest
@@ -137,8 +138,7 @@ def test_delete_rebuild_returns_409_for_running_job(client, db_initialized):
     # 手動で running に
     with with_db() as conn:
         conn.execute(
-            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') "
-            "WHERE id = ?",
+            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') WHERE id = ?",
             (job_id,),
         )
         conn.commit()

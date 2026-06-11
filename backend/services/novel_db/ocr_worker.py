@@ -9,6 +9,7 @@ Usage:
 
 yomitoku は一度だけ初期化して全書籍で再利用する。
 """
+
 import json
 import sys
 from pathlib import Path

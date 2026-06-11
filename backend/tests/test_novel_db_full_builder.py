@@ -3,6 +3,7 @@
 外部依存（LLM / embed_batch / LanceDB）はモック化し、スキップ条件・
 コールバック呼び出し・DB 書き込みロジックのみを検証する。
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -38,8 +39,7 @@ def _insert_book(conn, name: str, summary: str | None = None) -> int:
 
 def _insert_page(conn, book_id: int, page_no: int, text: str) -> int:
     cur = conn.execute(
-        "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
         (book_id, page_no, None, text, len(text)),
     )
     conn.commit()
@@ -48,8 +48,7 @@ def _insert_page(conn, book_id: int, page_no: int, text: str) -> int:
 
 def _insert_chunk(conn, page_id: int, idx: int = 0, ctx_text: str | None = None) -> int:
     cur = conn.execute(
-        "INSERT INTO chunks (page_id, chunk_idx, text, char_count, contextual_text) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO chunks (page_id, chunk_idx, text, char_count, contextual_text) VALUES (?, ?, ?, ?, ?)",
         (page_id, idx, "chunk text", 10, ctx_text),
     )
     conn.commit()
@@ -68,8 +67,7 @@ class TestRunCombinedStep:
         book_id = _insert_book(db_conn, "mybook", summary="既存サマリ")
         # book_characters に summary 付きレコードを追加
         db_conn.execute(
-            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
             (book_id, "キャラA", "説明", 1, 5),
         )
         db_conn.commit()
@@ -85,16 +83,17 @@ class TestRunCombinedStep:
         """redo=True なら既存のサマリ・キャラクタがあっても実行する。"""
         book_id = _insert_book(db_conn, "mybook2", summary="古いサマリ")
         db_conn.execute(
-            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
             (book_id, "キャラ", "説明", 1, 3),
         )
         db_conn.commit()
 
         logs = []
         mock_summarize = MagicMock(return_value=("新サマリ", {}))
-        with patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize), \
-             patch("services.novel_db.full_builder.update_book_summary"):
+        with (
+            patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
+            patch("services.novel_db.full_builder.update_book_summary"),
+        ):
             _run_combined_step(db_conn, "mybook2", redo=True, log=logs.append)
 
         mock_summarize.assert_called_once()
@@ -107,13 +106,13 @@ class TestRunCombinedStep:
         char_summaries = {"アリス": "主人公の少女"}
         mock_summarize = MagicMock(return_value=("本のサマリ", char_summaries))
 
-        with patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize), \
-             patch("services.novel_db.full_builder.update_book_summary"):
+        with (
+            patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
+            patch("services.novel_db.full_builder.update_book_summary"),
+        ):
             _run_combined_step(db_conn, "charbook", redo=False, log=lambda _: None)
 
-        chars = db_conn.execute(
-            "SELECT name FROM book_characters WHERE book_id = ?", (book_id,)
-        ).fetchall()
+        chars = db_conn.execute("SELECT name FROM book_characters WHERE book_id = ?", (book_id,)).fetchall()
         assert [r[0] for r in chars] == ["アリス"]
 
 
@@ -157,10 +156,12 @@ class TestRunGenerateContexts:
         mock_lance.delete = MagicMock()
         mock_lance.add = MagicMock()
 
-        with patch("services.novel_db.full_builder.generate_chunk_context", mock_ctx), \
-             patch("services.novel_db.full_builder.embed_batch", mock_embed), \
-             patch("services.novel_db.full_builder.get_chunks_table", return_value=mock_lance), \
-             patch("services.novel_db.full_builder.make_embedding_input", return_value="input"):
+        with (
+            patch("services.novel_db.full_builder.generate_chunk_context", mock_ctx),
+            patch("services.novel_db.full_builder.embed_batch", mock_embed),
+            patch("services.novel_db.full_builder.get_chunks_table", return_value=mock_lance),
+            patch("services.novel_db.full_builder.make_embedding_input", return_value="input"),
+        ):
             _run_generate_contexts(db_conn, "partial-book", redo=False, log=lambda _: None)
 
         # context なしのチャンク 1 件だけが処理される
@@ -175,8 +176,10 @@ class TestBuildBookFull:
         mock_rebuild = MagicMock()
         mock_combined = MagicMock()
 
-        with patch("services.novel_db.full_builder.rebuild_from_pages", mock_rebuild), \
-             patch("services.novel_db.full_builder._run_combined_step", mock_combined):
+        with (
+            patch("services.novel_db.full_builder.rebuild_from_pages", mock_rebuild),
+            patch("services.novel_db.full_builder._run_combined_step", mock_combined),
+        ):
             build_book_full("test-book")
 
         mock_rebuild.assert_called_once()
@@ -188,8 +191,10 @@ class TestBuildBookFull:
         mock_rebuild = MagicMock()
         mock_combined = MagicMock()
 
-        with patch("services.novel_db.full_builder.rebuild_from_pages", mock_rebuild), \
-             patch("services.novel_db.full_builder._run_combined_step", mock_combined):
+        with (
+            patch("services.novel_db.full_builder.rebuild_from_pages", mock_rebuild),
+            patch("services.novel_db.full_builder._run_combined_step", mock_combined),
+        ):
             build_book_full("test-book", step_callback=steps.append)
 
         # start / step1 / step2 / finished の順で呼ばれる

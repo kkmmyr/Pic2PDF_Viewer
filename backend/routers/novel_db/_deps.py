@@ -1,4 +1,5 @@
 """novel_db ルーター専用 FastAPI 依存関数。"""
+
 from fastapi import HTTPException
 
 from services.novel_db.job_queue import job_queue

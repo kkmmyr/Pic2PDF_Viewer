@@ -8,6 +8,7 @@ PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証�
     cd backend
     uv run pytest tests/test_router_generate.py -v
 """
+
 import os
 import time
 
@@ -18,9 +19,11 @@ from services.pdf_generator import GenerateResult
 # POST /api/generate
 # ---------------------------------------------------------------------------
 
+
 class TestGenerate:
     def test_missing_input_dir_returns_503(self, client, tmp_data_dir, monkeypatch):
         import config
+
         monkeypatch.setattr(config, "DOUJIN_INPUT_DIR", "/nope/does/not/exist/qwerty")
         res = client.post("/api/generate")
         assert res.status_code == 503
@@ -83,6 +86,7 @@ class TestGenerate:
     def test_failed_job_records_error(self, client, tmp_data_dir, monkeypatch):
         def _boom(*a, **kw):
             raise RuntimeError("boom!")
+
         monkeypatch.setattr("routers.generate.scan_and_generate", _boom)
 
         res = client.post("/api/generate")
@@ -119,6 +123,7 @@ class TestGenerate:
 # GET /api/generate/job/{job_id}
 # ---------------------------------------------------------------------------
 
+
 class TestGetGenerateJob:
     def test_404_for_unknown_job(self, client, tmp_data_dir):
         res = client.get("/api/generate/job/nonexistent-uuid")
@@ -129,9 +134,11 @@ class TestGetGenerateJob:
 # GET /api/status
 # ---------------------------------------------------------------------------
 
+
 class TestStatus:
     def test_empty_when_input_dir_missing(self, client, tmp_data_dir, monkeypatch):
         import config
+
         monkeypatch.setattr(config, "DOUJIN_INPUT_DIR", "/nope/qwerty/zzz")
         res = client.get("/api/status")
         assert res.status_code == 200
@@ -173,6 +180,7 @@ class TestStatus:
 # POST /api/batch_compress
 # ---------------------------------------------------------------------------
 
+
 class TestBatchCompress:
     def test_invokes_batch_compress(self, client, tmp_data_dir, monkeypatch):
         called = {}
@@ -193,6 +201,7 @@ class TestBatchCompress:
     def test_404_when_images_dir_missing(self, client, tmp_data_dir, monkeypatch):
         # IMAGES_DIR を消す
         import shutil
+
         shutil.rmtree(tmp_data_dir["IMAGES_DIR"])
 
         res = client.post("/api/batch_compress", json={"quality": 50})

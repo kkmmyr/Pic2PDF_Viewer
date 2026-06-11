@@ -9,6 +9,7 @@ pages テーブルは一切変更しない（chunks/chunks_vec のみ再構築�
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.5。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -43,14 +44,13 @@ def _resolve_images_dir(book_name: str) -> Path:
 # ステップ 1: OCR
 # ---------------------------------------------------------------------------
 
+
 def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
     """OCR 結果を DB に保存する（books/pages テーブル更新 + FTS5 再同期）。"""
     images_dir = _resolve_images_dir(book_name)
     with with_db() as conn:
         with conn:
-            existing = conn.execute(
-                "SELECT id FROM books WHERE name = ?", (book_name,)
-            ).fetchone()
+            existing = conn.execute("SELECT id FROM books WHERE name = ?", (book_name,)).fetchone()
 
             if existing is None:
                 cur = conn.execute(
@@ -63,8 +63,7 @@ def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
             else:
                 book_id = existing[0]
                 conn.execute(
-                    "UPDATE books SET page_count = ?, ocr_done_at = datetime('now', '+9 hours') "
-                    "WHERE id = ?",
+                    "UPDATE books SET page_count = ?, ocr_done_at = datetime('now', '+9 hours') WHERE id = ?",
                     (len(pages), book_id),
                 )
 
@@ -89,13 +88,11 @@ def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
                 )
 
             conn.execute(
-                "DELETE FROM pages_fts WHERE rowid IN "
-                "(SELECT id FROM pages WHERE book_id = ?)",
+                "DELETE FROM pages_fts WHERE rowid IN (SELECT id FROM pages WHERE book_id = ?)",
                 (book_id,),
             )
             conn.execute(
-                "INSERT INTO pages_fts (rowid, full_text) "
-                "SELECT id, full_text FROM pages WHERE book_id = ?",
+                "INSERT INTO pages_fts (rowid, full_text) SELECT id, full_text FROM pages WHERE book_id = ?",
                 (book_id,),
             )
 
@@ -120,6 +117,7 @@ def ocr_book(book_name: str) -> None:
 # ステップ 2: チャンク化 / embedding 再構築
 # ---------------------------------------------------------------------------
 
+
 def rebuild_from_pages(
     conn: sqlite3.Connection,
     book_name: str,
@@ -134,9 +132,7 @@ def rebuild_from_pages(
     Raises:
         ValueError: books レコードが存在しない、または pages が 0 件のとき。
     """
-    book_row = conn.execute(
-        "SELECT id FROM books WHERE name = ?", (book_name,)
-    ).fetchone()
+    book_row = conn.execute("SELECT id FROM books WHERE name = ?", (book_name,)).fetchone()
     if book_row is None:
         raise ValueError(f"book not found (run OCR first): {book_name}")
     book_id = book_row[0]
@@ -157,9 +153,7 @@ def rebuild_from_pages(
         old_chunk_ids = [
             row[0]
             for row in conn.execute(
-                "SELECT c.id FROM chunks c "
-                "JOIN pages p ON c.page_id = p.id "
-                "WHERE p.book_id = ?",
+                "SELECT c.id FROM chunks c JOIN pages p ON c.page_id = p.id WHERE p.book_id = ?",
                 (book_id,),
             )
         ]
@@ -167,17 +161,14 @@ def rebuild_from_pages(
             ids_str = ", ".join(str(cid) for cid in old_chunk_ids)
             lance_table.delete(f"chunk_id IN ({ids_str})")
         conn.execute(
-            "DELETE FROM chunks WHERE page_id IN "
-            "(SELECT id FROM pages WHERE book_id = ?)",
+            "DELETE FROM chunks WHERE page_id IN (SELECT id FROM pages WHERE book_id = ?)",
             (book_id,),
         )
 
         # チャンク分割（ページ単位）
         all_chunks: list[dict] = []
         # book_name と page_count をページIDから引くためのマップ
-        book_row2 = conn.execute(
-            "SELECT name, page_count FROM books WHERE id = ?", (book_id,)
-        ).fetchone()
+        book_row2 = conn.execute("SELECT name, page_count FROM books WHERE id = ?", (book_id,)).fetchone()
         book_name_val = book_row2[0] if book_row2 else ""
         book_page_count = book_row2[1] if book_row2 else 0
 
@@ -185,18 +176,18 @@ def rebuild_from_pages(
         for page_id, full_text, char_count in pages_rows:
             if (char_count or 0) < MIN_CHARS_FOR_CHUNK:
                 continue
-            page_no_row = conn.execute(
-                "SELECT page_no FROM pages WHERE id = ?", (page_id,)
-            ).fetchone()
+            page_no_row = conn.execute("SELECT page_no FROM pages WHERE id = ?", (page_id,)).fetchone()
             page_no = page_no_row[0] if page_no_row else 0
             page_meta[page_id] = (page_no, char_count or 0)
             for idx, c in enumerate(chunk_page(full_text or "")):
-                all_chunks.append({
-                    "page_id": page_id,
-                    "page_no": page_no,
-                    "chunk_idx": idx,
-                    "text": c,
-                })
+                all_chunks.append(
+                    {
+                        "page_id": page_id,
+                        "page_no": page_no,
+                        "chunk_idx": idx,
+                        "text": c,
+                    }
+                )
 
         total_chunks = len(all_chunks)
         if progress_callback:
@@ -209,22 +200,23 @@ def rebuild_from_pages(
             lance_rows: list[dict] = []
             for c, emb in zip(batch, embeddings, strict=True):
                 cur = conn.execute(
-                    "INSERT INTO chunks (page_id, chunk_idx, text, char_count) "
-                    "VALUES (?, ?, ?, ?)",
+                    "INSERT INTO chunks (page_id, chunk_idx, text, char_count) VALUES (?, ?, ?, ?)",
                     (c["page_id"], c["chunk_idx"], c["text"], len(c["text"])),
                 )
                 chunk_id = cur.lastrowid
                 page_no = c["page_no"]
                 page_char_count = page_meta.get(c["page_id"], (0, 0))[1]
-                lance_rows.append({
-                    "chunk_id": chunk_id,
-                    "book_name": book_name_val,
-                    "page_no": page_no,
-                    "text": c["text"],
-                    "char_count": page_char_count,
-                    "page_count": book_page_count,
-                    "embedding": emb,
-                })
+                lance_rows.append(
+                    {
+                        "chunk_id": chunk_id,
+                        "book_name": book_name_val,
+                        "page_no": page_no,
+                        "text": c["text"],
+                        "char_count": page_char_count,
+                        "page_count": book_page_count,
+                        "embedding": emb,
+                    }
+                )
             if lance_rows:
                 lance_table.add(lance_rows)
             done = min(batch_start + EMBED_BATCH_SIZE, total_chunks)
@@ -238,13 +230,16 @@ def rebuild_from_pages(
 
     logger.info(
         "rebuild_from_pages finished: %s (pages=%d, chunks=%d)",
-        book_name, len(pages_rows), total_chunks,
+        book_name,
+        len(pages_rows),
+        total_chunks,
     )
 
 
 # ---------------------------------------------------------------------------
 # 後方互換エイリアス（既存テスト / CLI スクリプト用）
 # ---------------------------------------------------------------------------
+
 
 def rebuild_book(
     conn: sqlite3.Connection,

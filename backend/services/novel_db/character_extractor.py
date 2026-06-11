@@ -10,6 +10,7 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md。
 """
+
 from __future__ import annotations
 
 from local_llm import LLMError
@@ -47,7 +48,9 @@ _OPTIONS = {
 
 
 def extract_main_characters(
-    text: str, *, model: str = NOVEL_DB_CHAR_EXTRACT_MODEL,
+    text: str,
+    *,
+    model: str = NOVEL_DB_CHAR_EXTRACT_MODEL,
 ) -> list[str]:
     """ページテキストから主要登場人物のリストを返す（同期）。
 

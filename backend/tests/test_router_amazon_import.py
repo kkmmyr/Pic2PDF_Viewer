@@ -1,4 +1,5 @@
 """routers/amazon_import.py のテスト。"""
+
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
@@ -10,12 +11,15 @@ client = TestClient(app)
 
 def _mock_run_import(updated=0, skipped=0, unmatched=0):
     from services.amazon_csv_importer import ImportResult
+
     return ImportResult(updated=updated, skipped=skipped, unmatched=unmatched)
 
 
 class TestAmazonCsvImport:
     def test_正常リクエストでupdated件数を返す(self):
-        with patch("routers.amazon_import.run_import", return_value=_mock_run_import(updated=3, skipped=1, unmatched=2)):
+        with patch(
+            "routers.amazon_import.run_import", return_value=_mock_run_import(updated=3, skipped=1, unmatched=2)
+        ):
             resp = client.post("/api/amazon/import?source=novel")
         assert resp.status_code == 200
         body = resp.json()

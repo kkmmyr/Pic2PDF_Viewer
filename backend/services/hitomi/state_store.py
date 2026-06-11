@@ -3,6 +3,7 @@
 - state.json: 各作者の前回 top_id と監視ジョブのヘルス情報
 - new_arrivals.json: 検出済み新着の累積（dismissed フラグで既読管理）
 """
+
 from __future__ import annotations
 
 import json
@@ -20,6 +21,7 @@ class State(TypedDict, total=False):
     last_run_at: str | None
     last_run_status: str  # ok / partial / error / never
     last_error: str | None
+    last_run_stats: dict[str, int]
     artists: dict[str, ArtistState]
 
 
@@ -103,10 +105,11 @@ def merge_new_items(data_dir: Path, new_items: list[ArrivalItem]) -> int:
     existing_ids = {item["id"] for item in arrivals["items"] if "id" in item}
     added = 0
     for item in new_items:
-        if item.get("id") in existing_ids:
+        gid = item.get("id")
+        if gid is None or gid in existing_ids:
             continue
         arrivals["items"].append(item)
-        existing_ids.add(item["id"])
+        existing_ids.add(gid)
         added += 1
     if added > 0:
         save_arrivals(data_dir, arrivals)

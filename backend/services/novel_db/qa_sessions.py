@@ -6,6 +6,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §7.x / B-16。
 """
+
 from __future__ import annotations
 
 import sqlite3
@@ -17,6 +18,7 @@ from .search import Scope
 
 class SessionMeta(SQLModel):
     """セッション一覧用の軽量情報（messages は含まない）。"""
+
     id: int
     scope_type: str
     scope_id: str | None = None
@@ -28,8 +30,9 @@ class SessionMeta(SQLModel):
 
 class ChatMessage(SQLModel):
     """qa_messages の 1 行。assistant のときのみ eval_count / done_reason が入る。"""
+
     id: int
-    role: str        # 'user' / 'assistant' / 'system'
+    role: str  # 'user' / 'assistant' / 'system'
     content: str
     eval_count: int | None = None
     done_reason: str | None = None
@@ -38,6 +41,7 @@ class ChatMessage(SQLModel):
 
 class SessionDetail(SQLModel):
     """セッション詳細（メッセージ全件含む）。"""
+
     id: int
     scope_type: str
     scope_id: str | None = None
@@ -50,6 +54,7 @@ class SessionDetail(SQLModel):
 # ---------------------------------------------------------------------------
 # 書き込み
 # ---------------------------------------------------------------------------
+
 
 def create_session(
     conn: sqlite3.Connection,
@@ -70,6 +75,7 @@ def create_session(
         (scope.type, scope.id, title),
     )
     conn.commit()
+    assert cur.lastrowid is not None
     return cur.lastrowid
 
 
@@ -98,6 +104,7 @@ def append_message(
         (session_id,),
     )
     conn.commit()
+    assert cur.lastrowid is not None
     return cur.lastrowid
 
 
@@ -127,6 +134,7 @@ def delete_session(conn: sqlite3.Connection, session_id: int) -> bool:
 # ---------------------------------------------------------------------------
 # 読み出し
 # ---------------------------------------------------------------------------
+
 
 def list_sessions(
     conn: sqlite3.Connection,
@@ -170,7 +178,8 @@ def list_sessions(
 
 
 def get_session_meta(
-    conn: sqlite3.Connection, session_id: int,
+    conn: sqlite3.Connection,
+    session_id: int,
 ) -> SessionMeta | None:
     row = conn.execute(
         """
@@ -189,7 +198,8 @@ def get_session_meta(
 
 
 def get_session_detail(
-    conn: sqlite3.Connection, session_id: int,
+    conn: sqlite3.Connection,
+    session_id: int,
 ) -> SessionDetail | None:
     """1 セッション + 全メッセージ。未存在なら None。"""
     meta = get_session_meta(conn, session_id)
@@ -206,14 +216,19 @@ def get_session_detail(
     ).fetchall()
     messages = [ChatMessage.model_validate(dict(r)) for r in rows]
     return SessionDetail(
-        id=meta.id, scope_type=meta.scope_type, scope_id=meta.scope_id,
-        title=meta.title, started_at=meta.started_at,
-        last_message_at=meta.last_message_at, messages=messages,
+        id=meta.id,
+        scope_type=meta.scope_type,
+        scope_id=meta.scope_id,
+        title=meta.title,
+        started_at=meta.started_at,
+        last_message_at=meta.last_message_at,
+        messages=messages,
     )
 
 
 def load_chat_messages(
-    conn: sqlite3.Connection, session_id: int,
+    conn: sqlite3.Connection,
+    session_id: int,
 ) -> list[dict[str, str]]:
     """LLM 投入用に OpenAI Chat 形式 `[{role, content}, ...]` を返す。
 

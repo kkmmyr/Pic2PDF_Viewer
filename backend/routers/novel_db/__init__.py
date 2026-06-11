@@ -1,4 +1,5 @@
 """novel_db ルーターパッケージ。6 サブルーターを /novel_db プレフィックスで結合する。"""
+
 from fastapi import APIRouter
 
 from .character import router as character_router

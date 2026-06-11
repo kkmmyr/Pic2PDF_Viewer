@@ -1,4 +1,5 @@
 """novel_db ライブラリ系エンドポイント（書籍一覧 / シリーズ / 著者 / 詳細）。"""
+
 from __future__ import annotations
 
 from dataclasses import asdict

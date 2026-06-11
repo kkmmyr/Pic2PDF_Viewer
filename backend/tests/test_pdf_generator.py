@@ -8,6 +8,7 @@ services.pdf_generator のユニットテスト。
     cd backend
     uv run pytest tests/test_pdf_generator.py -v
 """
+
 import os
 import sys
 import zipfile
@@ -23,6 +24,7 @@ from services.pdf_generator import _check_zip_safety, _collect_images, batch_com
 # ---------------------------------------------------------------------------
 # ヘルパー
 # ---------------------------------------------------------------------------
+
 
 def _make_webp(path: str, color: tuple = (255, 0, 0)) -> None:
     """単色の WebP 画像を作成する。"""
@@ -42,6 +44,7 @@ def _make_zip_of_webps(zip_path: str, names: list[str]) -> None:
 # ---------------------------------------------------------------------------
 # _collect_images
 # ---------------------------------------------------------------------------
+
 
 class TestCollectImages:
     def test_collects_only_webp(self, tmp_path):
@@ -71,6 +74,7 @@ class TestCollectImages:
 # _check_zip_safety — zip bomb 対策
 # ---------------------------------------------------------------------------
 
+
 class TestCheckZipSafety:
     """_check_zip_safety は ZIP 内の WebP エントリ数・サイズが上限を
     超えたら ValueError を投げる。process_zip の except 節に集約され、
@@ -88,6 +92,7 @@ class TestCheckZipSafety:
 
     def test_too_many_entries_raises(self, monkeypatch):
         from services import pdf_generator as pg
+
         monkeypatch.setattr(pg, "ZIP_MAX_ENTRIES", 5)
         infos = [self._make_info(f"{i}.webp", 100) for i in range(6)]
         with pytest.raises(ValueError, match="entry count"):
@@ -95,6 +100,7 @@ class TestCheckZipSafety:
 
     def test_per_file_limit_raises(self, monkeypatch):
         from services import pdf_generator as pg
+
         monkeypatch.setattr(pg, "ZIP_MAX_PER_FILE_BYTES", 1024)
         infos = [self._make_info("big.webp", 2048)]
         with pytest.raises(ValueError, match="per-file limit"):
@@ -102,6 +108,7 @@ class TestCheckZipSafety:
 
     def test_total_size_limit_raises(self, monkeypatch):
         from services import pdf_generator as pg
+
         monkeypatch.setattr(pg, "ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES", 5000)
         # 各 1500 バイト × 4 件 = 6000 バイト > 5000
         infos = [self._make_info(f"{i}.webp", 1500) for i in range(4)]
@@ -113,18 +120,22 @@ class TestCheckZipSafety:
 # scan_and_generate — フォルダ → PDF 変換
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def gen_env(tmp_path):
-    source_dir   = tmp_path / "source"
-    output_dir   = tmp_path / "pdfs"
-    thumb_dir    = tmp_path / "thumbnails"
-    images_dir   = tmp_path / "images"
+    source_dir = tmp_path / "source"
+    output_dir = tmp_path / "pdfs"
+    thumb_dir = tmp_path / "thumbnails"
+    images_dir = tmp_path / "images"
     complete_dir = tmp_path / "complete"
     for d in (source_dir, output_dir, thumb_dir, images_dir, complete_dir):
         d.mkdir()
     return {
-        "source": source_dir, "output": output_dir, "thumb": thumb_dir,
-        "images": images_dir, "complete": complete_dir,
+        "source": source_dir,
+        "output": output_dir,
+        "thumb": thumb_dir,
+        "images": images_dir,
+        "complete": complete_dir,
     }
 
 
@@ -137,8 +148,11 @@ class TestScanAndGenerate:
         _make_webp(str(book_dir / "2.webp"))
 
         result = scan_and_generate(
-            str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
-            str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            str(gen_env["output"]),
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
         )
 
         assert "book1.pdf" in result.generated
@@ -155,8 +169,11 @@ class TestScanAndGenerate:
         _make_zip_of_webps(str(zip_path), ["1.webp", "2.webp"])
 
         result = scan_and_generate(
-            str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
-            str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            str(gen_env["output"]),
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
         )
 
         assert "comic.pdf" in result.generated
@@ -173,8 +190,11 @@ class TestScanAndGenerate:
 
         called = []
         scan_and_generate(
-            str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
-            str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            str(gen_env["output"]),
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
             progress_callback=called.append,
         )
         assert "callback_book" in called
@@ -184,8 +204,11 @@ class TestScanAndGenerate:
         (gen_env["source"] / "ignored.txt").write_text("hi")
 
         result = scan_and_generate(
-            str(gen_env["source"]), str(gen_env["output"]), str(gen_env["thumb"]),
-            str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            str(gen_env["output"]),
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
         )
         assert result.generated == []
         assert result.failed_items == []
@@ -198,8 +221,11 @@ class TestScanAndGenerate:
         _make_zip_of_webps(str(zip_path), ["1.webp", "2.webp"])
 
         result = scan_and_generate(
-            str(gen_env["source"]), None,  # ← image-only モード
-            str(gen_env["thumb"]), str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            None,  # ← image-only モード
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
         )
 
         assert "comic.pdf" in result.generated
@@ -218,8 +244,11 @@ class TestScanAndGenerate:
         _make_webp(str(book_dir / "1.webp"))
 
         result = scan_and_generate(
-            str(gen_env["source"]), None,
-            str(gen_env["thumb"]), str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            None,
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
         )
 
         assert "book1.pdf" in result.generated
@@ -238,8 +267,11 @@ class TestScanAndGenerate:
         _make_zip_of_webps(str(good_zip), ["1.webp"])
 
         result = scan_and_generate(
-            str(gen_env["source"]), None,
-            str(gen_env["thumb"]), str(gen_env["images"]), str(gen_env["complete"]),
+            str(gen_env["source"]),
+            None,
+            str(gen_env["thumb"]),
+            str(gen_env["images"]),
+            str(gen_env["complete"]),
         )
 
         # 正常分は生成、失敗分は failed_items に記録される（黙殺されない）
@@ -256,6 +288,7 @@ class TestScanAndGenerate:
 # batch_compress
 # ---------------------------------------------------------------------------
 
+
 class TestBatchCompress:
     """
     batch_compress は images_dir 配下の **各サブフォルダ** を走査し、
@@ -264,6 +297,7 @@ class TestBatchCompress:
     例: images_dir/alpha/*.webp → output_dir/alpha.pdf
         images_dir/sub1/alpha/*.webp → output_dir/sub1/alpha.pdf
     """
+
     def test_compresses_each_subfolder(self, tmp_path):
         images_dir = tmp_path / "images"
         out_dir = tmp_path / "compressed"

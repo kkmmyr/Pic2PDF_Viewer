@@ -1,4 +1,4 @@
-﻿"""
+"""
 utils.locks.SourceLockManager のユニットテスト。
 
 ストア層共通の遅延生成ロックマネージャの並行性を検証する。
@@ -7,6 +7,7 @@ utils.locks.SourceLockManager のユニットテスト。
     cd backend
     uv run pytest tests/test_locks.py -v
 """
+
 import os
 import sys
 import threading

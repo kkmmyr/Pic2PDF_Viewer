@@ -1,4 +1,5 @@
 """services.hitomi.metadata.parse_galleryinfo のユニットテスト（純粋関数）。"""
+
 import os
 import sys
 

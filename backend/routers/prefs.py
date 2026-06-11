@@ -6,6 +6,7 @@
   PUT    /api/prefs/pins         body: {source, pin_type, group_id, book_name}
   DELETE /api/prefs/pins         ?source=&pin_type=&group_id=
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 

@@ -18,6 +18,7 @@
 
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md / 機能追加候補 B-9。
 """
+
 from __future__ import annotations
 
 import argparse
@@ -44,10 +45,11 @@ from services.novel_db.migrations import upgrade_head  # noqa: E402
 _EMBED_BATCH_SIZE = 16
 
 
-
-
 def _list_target_books(
-    *, book_name: str | None, series_id: str | None, redo: bool,
+    *,
+    book_name: str | None,
+    series_id: str | None,
+    redo: bool,
 ) -> list[tuple[int, str, str | None]]:
     """対象書籍を返す。各要素 (book_id, name, summary)。
 
@@ -97,7 +99,8 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
     """
     with with_db() as conn:
         page_count_row = conn.execute(
-            "SELECT page_count FROM books WHERE id = ?", (book_id,),
+            "SELECT page_count FROM books WHERE id = ?",
+            (book_id,),
         ).fetchone()
         if page_count_row is None:
             print(f"  book not found: {book_name}", file=sys.stderr)
@@ -105,21 +108,27 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
         page_count: int = page_count_row[0]
 
         if redo:
-            chunks = conn.execute("""
+            chunks = conn.execute(
+                """
                 SELECT c.id, c.text, c.char_count, p.page_no
                 FROM chunks c
                 JOIN pages p ON c.page_id = p.id
                 WHERE p.book_id = ?
                 ORDER BY c.id
-            """, (book_id,)).fetchall()
+            """,
+                (book_id,),
+            ).fetchall()
         else:
-            chunks = conn.execute("""
+            chunks = conn.execute(
+                """
                 SELECT c.id, c.text, c.char_count, p.page_no
                 FROM chunks c
                 JOIN pages p ON c.page_id = p.id
                 WHERE p.book_id = ? AND c.contextual_text IS NULL
                 ORDER BY c.id
-            """, (book_id,)).fetchall()
+            """,
+                (book_id,),
+            ).fetchall()
 
     if not chunks:
         print(f"  no pending chunks for {book_name}", flush=True)
@@ -188,15 +197,17 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
                     (chunk_id,),
                 ).fetchone()
                 if meta:
-                    lance_rows.append({
-                        "chunk_id": chunk_id,
-                        "book_name": meta[0],
-                        "page_no": meta[1],
-                        "text": _text,
-                        "char_count": meta[2] or 0,
-                        "page_count": meta[3] or 0,
-                        "embedding": emb,
-                    })
+                    lance_rows.append(
+                        {
+                            "chunk_id": chunk_id,
+                            "book_name": meta[0],
+                            "page_no": meta[1],
+                            "text": _text,
+                            "char_count": meta[2] or 0,
+                            "page_count": meta[3] or 0,
+                            "embedding": emb,
+                        }
+                    )
             if lance_rows:
                 chunk_ids = [r["chunk_id"] for r in lance_rows]
                 ids_str = ", ".join(str(cid) for cid in chunk_ids)
@@ -244,10 +255,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     elapsed = time.time() - t0
-    print(
-        f"\n完了: {len(targets)} 冊 / chunks ok={total_ok} skip={total_skip} "
-        f"ng={total_ng} ({elapsed:.0f}s)"
-    )
+    print(f"\n完了: {len(targets)} 冊 / chunks ok={total_ok} skip={total_skip} ng={total_ng} ({elapsed:.0f}s)")
     return 0 if total_ng == 0 else 1
 
 

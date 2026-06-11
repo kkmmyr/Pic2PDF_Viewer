@@ -2,6 +2,7 @@
 
 SSH 接続はモック化して、パス解決ロジック・有効/無効フラグを検証する。
 """
+
 import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -11,6 +12,7 @@ import services.linux_sync as ls
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_file(path: Path, content: bytes = b"\x00") -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -25,6 +27,7 @@ def _make_dir(path: Path) -> None:
 # sync_after_generate — LINUX_SYNC_ENABLED=false の場合はスキップ
 # ---------------------------------------------------------------------------
 
+
 class TestSyncDisabled:
     def test_no_ssh_when_disabled(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ls, "_SYNC_ENABLED", False)
@@ -38,6 +41,7 @@ class TestSyncDisabled:
 # ---------------------------------------------------------------------------
 # sync_after_generate — パス解決が正しいか
 # ---------------------------------------------------------------------------
+
 
 class TestSyncPathResolution:
     def test_images_dir_uses_stem_not_pdf_name(self, tmp_path, monkeypatch):
@@ -95,7 +99,7 @@ class TestSyncPathResolution:
         """images ディレクトリが存在しない場合は warning のみで例外を投げない。"""
         monkeypatch.setattr(ls, "_SYNC_ENABLED", True)
 
-        images_dir = tmp_path / "images"   # 作らない
+        images_dir = tmp_path / "images"  # 作らない
         thumbs_dir = tmp_path / "thumbnails"
 
         _make_file(thumbs_dir / "book.jpg")
@@ -131,7 +135,8 @@ class TestSyncPathResolution:
 
         ls.sync_after_generate(
             ["alpha.pdf", "beta.pdf"],
-            str(images_dir), str(thumbs_dir),
+            str(images_dir),
+            str(thumbs_dir),
         )
 
         # 各書籍 2 回 (images tar + thumbnail) × 2 冊 + meta init 1 回 = 5 回
@@ -141,6 +146,7 @@ class TestSyncPathResolution:
 # ---------------------------------------------------------------------------
 # _init_meta_on_linux — meta.db 初期化スクリプトの検証
 # ---------------------------------------------------------------------------
+
 
 class TestInitMetaOnLinux:
     def test_sends_python_script_via_stdin(self, monkeypatch):
@@ -177,6 +183,7 @@ class TestInitMetaOnLinux:
         monkeypatch.setattr("subprocess.run", _fake_run)
 
         import pytest
+
         with pytest.raises(RuntimeError):
             ls._init_meta_on_linux(["book.pdf"])
 

@@ -3,55 +3,68 @@
 `series_resolver` から切り出した純粋関数のため、テストは I/O なしで完結する。
 パターン追加・修正時のリグレッション防止が主目的。
 """
+
 import pytest
 
 from services.volume_parser import parse_pair_volume_indexes, parse_volume_index
 
 
 class TestParseVolumeIndex:
-    @pytest.mark.parametrize("suffix,expected", [
-        # 整数
-        ("1", 1.0),
-        ("3", 3.0),
-        ("10", 10.0),
-        ("第3巻", 3.0),
-        ("3巻", 3.0),
-        ("第3", 3.0),
-        ("03", 3.0),
-        # 前後空白許容
-        ("  3  ", 3.0),
-    ])
+    @pytest.mark.parametrize(
+        "suffix,expected",
+        [
+            # 整数
+            ("1", 1.0),
+            ("3", 3.0),
+            ("10", 10.0),
+            ("第3巻", 3.0),
+            ("3巻", 3.0),
+            ("第3", 3.0),
+            ("03", 3.0),
+            # 前後空白許容
+            ("  3  ", 3.0),
+        ],
+    )
     def test_integer_volumes(self, suffix, expected):
         assert parse_volume_index(suffix) == expected
 
-    @pytest.mark.parametrize("suffix,expected", [
-        ("2.5", 2.5),
-        ("4.5", 4.5),
-        ("0.5", 0.5),
-    ])
+    @pytest.mark.parametrize(
+        "suffix,expected",
+        [
+            ("2.5", 2.5),
+            ("4.5", 4.5),
+            ("0.5", 0.5),
+        ],
+    )
     def test_decimal_volumes(self, suffix, expected):
         assert parse_volume_index(suffix) == expected
 
-    @pytest.mark.parametrize("suffix,expected", [
-        ("vol.5", 5.0),
-        ("Vol.5", 5.0),
-        ("VOL.5", 5.0),
-        ("vol5", 5.0),  # ドットなしも許容
-        ("vol.2.5", 2.5),
-        ("VOL.2.5", 2.5),
-    ])
+    @pytest.mark.parametrize(
+        "suffix,expected",
+        [
+            ("vol.5", 5.0),
+            ("Vol.5", 5.0),
+            ("VOL.5", 5.0),
+            ("vol5", 5.0),  # ドットなしも許容
+            ("vol.2.5", 2.5),
+            ("VOL.2.5", 2.5),
+        ],
+    )
     def test_vol_notation(self, suffix, expected):
         assert parse_volume_index(suffix) == expected
 
-    @pytest.mark.parametrize("suffix,expected", [
-        ("(上)", 1.0),
-        ("(中)", 2.0),
-        ("(下)", 3.0),
-        ("(前)", 1.0),
-        ("(後)", 2.0),
-        ("（上）", 1.0),  # 全角括弧
-        ("（下）", 3.0),
-    ])
+    @pytest.mark.parametrize(
+        "suffix,expected",
+        [
+            ("(上)", 1.0),
+            ("(中)", 2.0),
+            ("(下)", 3.0),
+            ("(前)", 1.0),
+            ("(後)", 2.0),
+            ("（上）", 1.0),  # 全角括弧
+            ("（下）", 3.0),
+        ],
+    )
     def test_paren_notation(self, suffix, expected):
         assert parse_volume_index(suffix) == expected
 
@@ -59,14 +72,17 @@ class TestParseVolumeIndex:
         # 「上下」など複数文字並びは曖昧なので非対応
         assert parse_volume_index("(上下)") is None
 
-    @pytest.mark.parametrize("suffix,expected", [
-        ("一", 1.0),
-        ("三", 3.0),
-        ("十", 10.0),
-        ("第三", 3.0),
-        ("第三巻", 3.0),
-        ("三巻", 3.0),
-    ])
+    @pytest.mark.parametrize(
+        "suffix,expected",
+        [
+            ("一", 1.0),
+            ("三", 3.0),
+            ("十", 10.0),
+            ("第三", 3.0),
+            ("第三巻", 3.0),
+            ("三巻", 3.0),
+        ],
+    )
     def test_kanji_single_char(self, suffix, expected):
         assert parse_volume_index(suffix) == expected
 
@@ -75,14 +91,17 @@ class TestParseVolumeIndex:
         assert parse_volume_index("十一") is None
         assert parse_volume_index("第十二巻") is None
 
-    @pytest.mark.parametrize("suffix", [
-        "",
-        "   ",
-        "abc",
-        "外伝",
-        "番外編",
-        "1.2.3",  # 不正なフォーマット
-    ])
+    @pytest.mark.parametrize(
+        "suffix",
+        [
+            "",
+            "   ",
+            "abc",
+            "外伝",
+            "番外編",
+            "1.2.3",  # 不正なフォーマット
+        ],
+    )
     def test_no_match_returns_none(self, suffix):
         assert parse_volume_index(suffix) is None
 

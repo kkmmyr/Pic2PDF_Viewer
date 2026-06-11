@@ -8,6 +8,7 @@ Revision ID: 0001
 Revises:
 Create Date: 2026-05-15
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
@@ -28,37 +29,33 @@ def upgrade() -> None:
     conn = op.get_bind()
 
     # テーブルが存在しない場合は新規 DB — 0003 revision で最新スキーマが生成されるため何もしない
-    tables = {
-        row[0]
-        for row in conn.execute(
-            sa.text("SELECT name FROM sqlite_master WHERE type='table'")
-        ).fetchall()
-    }
+    tables = {row[0] for row in conn.execute(sa.text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()}
     if "books" not in tables:
         return
 
     # books.indexed_at の NOT NULL 制約撤去（最古の既存 DB のみ該当）
-    books_info = {
-        row[1]: row
-        for row in conn.execute(sa.text("PRAGMA table_info(books)")).fetchall()
-    }
+    books_info = {row[1]: row for row in conn.execute(sa.text("PRAGMA table_info(books)")).fetchall()}
     if books_info.get("indexed_at") and books_info["indexed_at"][3] == 1:
         conn.execute(sa.text("PRAGMA foreign_keys = OFF"))
-        conn.execute(sa.text(
-            "CREATE TABLE books_new ("
-            "    id          INTEGER PRIMARY KEY,"
-            "    name        TEXT NOT NULL UNIQUE,"
-            "    pdf_path    TEXT NOT NULL,"
-            "    images_dir  TEXT NOT NULL,"
-            "    page_count  INTEGER NOT NULL,"
-            "    indexed_at  TIMESTAMP,"
-            "    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
-            ")"
-        ))
-        conn.execute(sa.text(
-            "INSERT INTO books_new (id, name, pdf_path, images_dir, page_count, indexed_at, created_at)"
-            " SELECT id, name, pdf_path, images_dir, page_count, indexed_at, created_at FROM books"
-        ))
+        conn.execute(
+            sa.text(
+                "CREATE TABLE books_new ("
+                "    id          INTEGER PRIMARY KEY,"
+                "    name        TEXT NOT NULL UNIQUE,"
+                "    pdf_path    TEXT NOT NULL,"
+                "    images_dir  TEXT NOT NULL,"
+                "    page_count  INTEGER NOT NULL,"
+                "    indexed_at  TIMESTAMP,"
+                "    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+                ")"
+            )
+        )
+        conn.execute(
+            sa.text(
+                "INSERT INTO books_new (id, name, pdf_path, images_dir, page_count, indexed_at, created_at)"
+                " SELECT id, name, pdf_path, images_dir, page_count, indexed_at, created_at FROM books"
+            )
+        )
         conn.execute(sa.text("DROP TABLE books"))
         conn.execute(sa.text("ALTER TABLE books_new RENAME TO books"))
         conn.execute(sa.text("CREATE INDEX IF NOT EXISTS idx_books_name ON books(name)"))

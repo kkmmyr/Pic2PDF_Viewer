@@ -3,6 +3,7 @@
 巻番号・レーベル・ノイズ記号を除去し、書籍シリーズのベースタイトルを返す。
 参照: D:/61.tool/kindle購入履歴/app/backend/src/kindle_viewer/utils/title.py
 """
+
 from __future__ import annotations
 
 import re

@@ -45,12 +45,12 @@ class NovelConfig(AutoConfig):
 
 class NovelKindleCapturer(AutoKindleCapturer):
     """小説用キャプチャクラス (白背景検出 + OCR)"""
-    
+
     def __init__(self):
         super().__init__()
         self.config = NovelConfig()
         self.ocr = None
-        
+
     def initialize(self):
         # No OCR init needed
         pass
@@ -63,15 +63,15 @@ class NovelKindleCapturer(AutoKindleCapturer):
         # 上下は固定値 (フルスクリーン設定に従う)
         self.config.CROP_Y1 = self.config.FULLSCREEN_CROP_TOP
         self.config.CROP_Y2 = h - self.config.FULLSCREEN_CROP_BOTTOM_MARGIN
-        
+
         # --- X-Axis Detection (Left/Right) ---
         # スキャンラインを増やす (10点)
         num_points = 10
         scan_y_list = np.linspace(h * 0.05, h * 0.95, num_points, dtype=int)
-        
+
         left_edges = []
         right_edges = []
-        
+
         offset_x = self.config.SIDE_IGNORE_PX
 
         print(f"Scanning for X-boundaries at Y={scan_y_list}, Offset={offset_x} (White Threshold={self.config.WHITE_THRESHOLD})")
@@ -80,7 +80,7 @@ class NovelKindleCapturer(AutoKindleCapturer):
             row = img[y]
             # 白画素判定: すべてのチャンネルが閾値以上
             is_white = np.all(row >= self.config.WHITE_THRESHOLD, axis=1)
-            
+
             # 左端検出 (左から走査して初めて白でない＝文字が現れる場所)
             left = offset_x
             for x in range(offset_x, w):
@@ -88,7 +88,7 @@ class NovelKindleCapturer(AutoKindleCapturer):
                     left = x
                     break
             left_edges.append(left)
-            
+
             # 右端検出
             right = w - offset_x
             for x in range(w - 1 - offset_x, -1, -1):
@@ -96,22 +96,22 @@ class NovelKindleCapturer(AutoKindleCapturer):
                     right = x
                     break
             right_edges.append(right)
-            
+
         # 最も外側の値を採用 (文字領域の最大包含)
         final_left = min(left_edges)
         final_right = max(right_edges)
-        
+
         # マージン適用 (文字ギリギリだと窮屈なので、少し広げる)
         # DETECTION_MARGIN は正の値だと内側(狭くなる)ので、負にして広げるか、定数を調整する
         # ここでは文字の周りに余白を持たせるため、少し外側へ
         PADDING = 10
         self.config.CROP_X1 = max(0, final_left - PADDING)
         self.config.CROP_X2 = min(w, final_right + PADDING)
-        
+
         print(f"Novel Scan results (Left): {left_edges} -> Selected: {final_left}")
         print(f"Novel Scan results (Right): {right_edges} -> Selected: {final_right}")
         print(f"Detected boundaries: Left={self.config.CROP_X1}, Right={self.config.CROP_X2}")
-        
+
         if self.config.CROP_X1 >= self.config.CROP_X2:
             print("Warning: Detected invalid boundaries. Using full width.")
             self.config.CROP_X1 = 0
@@ -124,9 +124,9 @@ class NovelKindleCapturer(AutoKindleCapturer):
         save_dir = os.path.join(self.config.IMG_OUTPUT_DIR, title)
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
-            
+
         # No OCR/PDF Init
-        
+
         if self.hwnd:
             from ctypes import windll
             windll.user32.SetForegroundWindow(self.hwnd)
@@ -145,7 +145,7 @@ class NovelKindleCapturer(AutoKindleCapturer):
 
                 if old_image is None:
                     break
-                
+
                 if not np.array_equal(old_image, current_image):
                     break
 
@@ -156,10 +156,10 @@ class NovelKindleCapturer(AutoKindleCapturer):
 
             # 画像保存
             self._save_image(current_image, filename)
-            
+
             # OCR Removed
             # PDF Removed
-            
+
             print(f'Page: {page}, {current_image.shape}, {time.perf_counter() - start_time:.2f} sec')
 
             old_image = current_image

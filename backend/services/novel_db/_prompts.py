@@ -3,6 +3,7 @@
 summarizer.py が使うすべてのプロンプト文字列と設定値をここに一元管理する。
 プロンプトを修正する場合はこのファイルだけ変更すればよい。
 """
+
 from __future__ import annotations
 
 import re
@@ -35,21 +36,21 @@ COMBINED_MAX_CHARACTERS = 20
 ONE_SHOT_OPTIONS: dict = {
     "temperature": 0.2,
     "repeat_penalty": 1.15,
-    "num_predict": 2560,   # 1500 字サマリ + 余裕
-    "num_ctx": 131072,     # B-6 検証で 70k tokens 完走を確認（2026-05-10）
+    "num_predict": 2560,  # 1500 字サマリ + 余裕
+    "num_ctx": 131072,  # B-6 検証で 70k tokens 完走を確認（2026-05-10）
 }
 
 MAP_OPTIONS: dict = {
     "temperature": 0.2,
     "repeat_penalty": 1.15,
-    "num_predict": 768,    # 1 チャンクあたり 400 字程度の要約 + 余裕
+    "num_predict": 768,  # 1 チャンクあたり 400 字程度の要約 + 余裕
     "num_ctx": 16384,
 }
 
 REDUCE_OPTIONS: dict = {
     "temperature": 0.2,
     "repeat_penalty": 1.15,
-    "num_predict": 2560,   # 最終 1500 字サマリ + 余裕
+    "num_predict": 2560,  # 最終 1500 字サマリ + 余裕
     "num_ctx": 16384,
 }
 
@@ -147,6 +148,7 @@ COMBINED_PROMPT = """次は小説『{book_name}』の本文（連結ページ）
 # 一括出力パーサ
 # ---------------------------------------------------------------------------
 
+
 def parse_combined_output(text: str) -> tuple[str, dict[str, str]]:
     """COMBINED_PROMPT への Qwen 応答から (書籍サマリ, {キャラ名: サマリ}) を抽出する。"""
     summary = ""
@@ -154,14 +156,16 @@ def parse_combined_output(text: str) -> tuple[str, dict[str, str]]:
 
     m = re.search(
         r"\[SUMMARY\](.*?)(?=\[CHARACTERS\]|\[CHARACTER_DETAIL:|$)",
-        text, re.DOTALL,
+        text,
+        re.DOTALL,
     )
     if m:
         summary = m.group(1).strip()
 
     for m in re.finditer(
         r"\[CHARACTER_DETAIL:([^\]]+)\](.*?)(?=\[CHARACTER_DETAIL:|$)",
-        text, re.DOTALL,
+        text,
+        re.DOTALL,
     ):
         name = m.group(1).strip()
         detail = m.group(2).strip()

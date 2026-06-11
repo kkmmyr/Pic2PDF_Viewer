@@ -14,6 +14,7 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 
 詳細は docs/01_要件定義/機能追加候補.md B-11 / 同設計書 §7.4 を参照。
 """
+
 from __future__ import annotations
 
 from local_llm import LLMError
@@ -47,7 +48,6 @@ _OPTIONS = {
     "num_predict": 256,
     "num_ctx": 4096,
 }
-
 
 
 def expand_query(
@@ -111,7 +111,12 @@ def _parse_expansions(response: str, *, target_n: int) -> list[str]:
             continue
         # 番号付け / 箇条書き記号を除去
         for prefix_pattern in (
-            ".", "．", ":", "：", "、", " ",
+            ".",
+            "．",
+            ":",
+            "：",
+            "、",
+            " ",
         ):
             # "1." / "1．" / "1:" / "1：" / "1、" などを剥がす
             if line and len(line) >= 2 and line[0].isdigit() and line[1] in prefix_pattern:
@@ -131,7 +136,7 @@ def _parse_expansions(response: str, *, target_n: int) -> list[str]:
             for sep in (":", "：", " "):
                 lab_sep = label + sep
                 if line.startswith(lab_sep):
-                    line = line[len(lab_sep):].lstrip()
+                    line = line[len(lab_sep) :].lstrip()
                     break
         # 引用符類を剥がす
         line = line.strip("「」『』\"'")

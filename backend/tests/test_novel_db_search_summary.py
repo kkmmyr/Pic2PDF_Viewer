@@ -3,6 +3,7 @@
 embedder 呼び出しはモック。スキーマ初期化 + book_summaries_vec への手動 INSERT で
 検証する。
 """
+
 from unittest.mock import patch
 
 from services.novel_db import with_db
@@ -39,11 +40,14 @@ def test_search_book_summaries_returns_nearest_first(tmp_data_dir):
     """クエリ ベクトルに最も近い書籍が distance 昇順で先頭に来る。"""
     upgrade_head()
     with with_db() as conn:
-        _setup_books(conn, [
-            ("a", _vec(0)),
-            ("b", _vec(1)),
-            ("c", _vec(2)),
-        ])
+        _setup_books(
+            conn,
+            [
+                ("a", _vec(0)),
+                ("b", _vec(1)),
+                ("c", _vec(2)),
+            ],
+        )
 
         with patch("services.novel_db.search.embed_batch") as mock_embed:
             mock_embed.return_value = [_vec(1)]  # b に近い
@@ -76,7 +80,10 @@ def test_search_book_summaries_returns_empty_for_unknown_scope(tmp_data_dir):
         with patch("services.novel_db.search.embed_batch") as mock_embed:
             mock_embed.return_value = [_vec(0)]
             results = search_book_summaries(
-                conn, "Q", Scope("book", "no-such"), top=5,
+                conn,
+                "Q",
+                Scope("book", "no-such"),
+                top=5,
             )
     assert results == []
 

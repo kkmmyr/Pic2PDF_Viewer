@@ -1,4 +1,5 @@
 """services/novel_db/job_queue.py の単体テスト（worker は起動しない）。"""
+
 import pytest
 
 from services.novel_db import with_db
@@ -60,8 +61,7 @@ def test_cancel_returns_running_for_running_job(queue):
     job_id, _ = queue.enqueue("book", "a")
     with with_db() as conn:
         conn.execute(
-            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') "
-            "WHERE id = ?",
+            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') WHERE id = ?",
             (job_id,),
         )
         conn.commit()
@@ -99,8 +99,7 @@ def test_update_detail_writes_to_db(queue):
     job_id, _ = queue.enqueue("book", "a")
     with with_db() as conn:
         conn.execute(
-            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') "
-            "WHERE id = ?",
+            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') WHERE id = ?",
             (job_id,),
         )
         conn.commit()
@@ -108,9 +107,7 @@ def test_update_detail_writes_to_db(queue):
     queue._worker._update_detail(job_id, "embedding 10/100 チャンク")
 
     with with_db() as conn:
-        row = conn.execute(
-            "SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)
-        ).fetchone()
+        row = conn.execute("SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)).fetchone()
     assert row is not None
     assert row[0] == "embedding 10/100 チャンク"
 
@@ -138,7 +135,5 @@ def test_update_detail_overwrites_previous_value(queue):
     queue._worker._update_detail(job_id, "second")
 
     with with_db() as conn:
-        row = conn.execute(
-            "SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)
-        ).fetchone()
+        row = conn.execute("SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)).fetchone()
     assert row[0] == "second"

@@ -1,4 +1,5 @@
 """ファイル種別判定ユーティリティ。"""
+
 from config import SUPPORTED_IMAGE_FORMATS, SUPPORTED_WEBP_FORMAT, SUPPORTED_ZIP_FORMAT
 
 

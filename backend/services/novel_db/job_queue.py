@@ -5,6 +5,7 @@ worker スレッドが 1 つ走り、rebuild_jobs テーブルから queued ジ�
 検索 / 質問 API は `is_running` フラグを見て 503 を返す。
 詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §8。
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -96,6 +97,7 @@ class NovelDbJobQueue:
                 (job_type, target_id, mode),
             )
             job_id = cur.lastrowid
+            assert job_id is not None
             queued_position = conn.execute(
                 "SELECT COUNT(*) FROM rebuild_jobs WHERE state='queued' AND id <= ?",
                 (job_id,),
@@ -104,15 +106,34 @@ class NovelDbJobQueue:
         self._wakeup.set()
         logger.info(
             "Job enqueued: id=%d type=%s target=%s mode=%s position=%d",
-            job_id, job_type, target_id, mode, queued_position,
+            job_id,
+            job_type,
+            target_id,
+            mode,
+            queued_position,
         )
         return job_id, queued_position
 
+    def cancel_queued_by_mode(self, mode: str) -> list[int]:
+        """指定 mode のキュー中ジョブをすべてキャンセルし、キャンセルした job_id リストを返す。"""
+        with with_db() as conn:
+            rows = conn.execute("SELECT id FROM rebuild_jobs WHERE state='queued' AND mode=?", (mode,)).fetchall()
+            ids = [r[0] for r in rows]
+            if ids:
+                conn.execute(
+                    "UPDATE rebuild_jobs SET state='canceled', "
+                    "finished_at=datetime('now', '+9 hours') "
+                    "WHERE state='queued' AND mode=?",
+                    (mode,),
+                )
+                conn.commit()
+        if ids:
+            logger.info("Canceled %d queued '%s' job(s): %s", len(ids), mode, ids)
+        return ids
+
     def cancel(self, job_id: int) -> Literal["canceled", "running", "not_found"]:
         with with_db() as conn:
-            row = conn.execute(
-                "SELECT state FROM rebuild_jobs WHERE id = ?", (job_id,)
-            ).fetchone()
+            row = conn.execute("SELECT state FROM rebuild_jobs WHERE id = ?", (job_id,)).fetchone()
             if row is None:
                 return "not_found"
             if row[0] != "queued":

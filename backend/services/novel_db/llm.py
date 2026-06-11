@@ -6,6 +6,7 @@ ADR-0009（推論バックエンド切替）。
 プロンプト組み立てロジックは prompt_builder.py に分離した。
 このモジュールは LLM 呼び出しとパラメータ定数のみを担う。
 """
+
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
@@ -41,7 +42,10 @@ async def _astream_ask(
     することで、Backend 実体（HTTP）を介さずにテストできる。
     """
     async for event in QWEN_BACKEND.astream_ask(
-        prompt, model=model, options=options, timeout=timeout,
+        prompt,
+        model=model,
+        options=options,
+        timeout=timeout,
     ):
         yield event
 
@@ -77,7 +81,10 @@ async def astream_chat(
 ) -> AsyncIterator[dict]:
     """共通 Backend.astream_chat への thin wrapper。テストでは monkeypatch で差替可能。"""
     async for event in QWEN_BACKEND.astream_chat(
-        messages, model=model, options=options, timeout=timeout,
+        messages,  # type: ignore[arg-type]
+        model=model,
+        options=options,
+        timeout=timeout,
     ):
         yield event
 

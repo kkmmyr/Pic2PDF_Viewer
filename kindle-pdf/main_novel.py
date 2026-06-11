@@ -15,18 +15,18 @@ def main():
     try:
         capturer.setup_window()
         title = capturer.get_book_title() # Inherited from KindleCapturer (simple dialog)
-        
+
         if not title:
             capturer.cleanup()
             return
-        
+
         total_pages, image_save_dir = capturer.capture_loop(title)
-        
+
         # 終了処理 (フルスクリーン解除)
         capturer.cleanup()
-        
+
         msg = f"撮影が終了しました。\n合計 {total_pages} ページを処理しました。\n\n続いて batch_ocr.py を実行してOCR処理を行ってください。"
-        
+
         messagebox.showinfo("完了", msg)
 
     except Exception as e:

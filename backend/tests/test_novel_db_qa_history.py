@@ -1,4 +1,5 @@
 """services/novel_db/qa_history.py の単体テスト。"""
+
 import pytest
 
 from services.novel_db import with_db
@@ -97,10 +98,8 @@ def test_save_error_records_error_message(history_db):
 
 def test_list_history_returns_descending_order(history_db):
     with with_db() as conn:
-        h1 = save_start(conn, scope=Scope(type="all"), question="Q1",
-                        prompt="P", hits=[], model="m", options={})
-        h2 = save_start(conn, scope=Scope(type="all"), question="Q2",
-                        prompt="P", hits=[], model="m", options={})
+        h1 = save_start(conn, scope=Scope(type="all"), question="Q1", prompt="P", hits=[], model="m", options={})
+        h2 = save_start(conn, scope=Scope(type="all"), question="Q2", prompt="P", hits=[], model="m", options={})
         save_finish(conn, h1, answer="A1", done_reason="stop", eval_count=1)
         save_finish(conn, h2, answer="A2", done_reason="stop", eval_count=2)
 
@@ -116,8 +115,7 @@ def test_list_history_returns_descending_order(history_db):
 def test_list_history_pagination(history_db):
     with with_db() as conn:
         for i in range(5):
-            save_start(conn, scope=Scope(type="all"), question=f"Q{i}",
-                       prompt="P", hits=[], model="m", options={})
+            save_start(conn, scope=Scope(type="all"), question=f"Q{i}", prompt="P", hits=[], model="m", options={})
 
     with with_db() as conn:
         first = list_history(conn, offset=0, limit=2)
@@ -132,10 +130,8 @@ def test_list_history_pagination(history_db):
 def test_list_history_answer_preview_truncates(history_db):
     long_answer = "あ" * 200
     with with_db() as conn:
-        history_id = save_start(conn, scope=Scope(type="all"), question="Q",
-                                prompt="P", hits=[], model="m", options={})
-        save_finish(conn, history_id, answer=long_answer, done_reason="stop",
-                    eval_count=None)
+        history_id = save_start(conn, scope=Scope(type="all"), question="Q", prompt="P", hits=[], model="m", options={})
+        save_finish(conn, history_id, answer=long_answer, done_reason="stop", eval_count=None)
 
     with with_db() as conn:
         result = list_history(conn)
@@ -152,8 +148,7 @@ def test_get_history_detail_returns_none_for_missing(history_db):
 
 def test_delete_history_removes_row(history_db):
     with with_db() as conn:
-        history_id = save_start(conn, scope=Scope(type="all"), question="Q",
-                                prompt="P", hits=[], model="m", options={})
+        history_id = save_start(conn, scope=Scope(type="all"), question="Q", prompt="P", hits=[], model="m", options={})
         assert delete_history(conn, history_id) is True
         assert delete_history(conn, history_id) is False  # 二度目は False
         assert get_history_detail(conn, history_id) is None

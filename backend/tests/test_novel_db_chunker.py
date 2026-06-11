@@ -1,4 +1,5 @@
 """services/novel_db/chunker.py の単体テスト。"""
+
 from services.novel_db.chunker import MAX_CHARS, MAX_CHARS_BOOK, chunk_book, chunk_page
 
 
@@ -48,11 +49,9 @@ def test_no_infinite_loop_on_pathological_input():
 # chunk_book テスト（§4.4 クロスページチャンク）
 # ---------------------------------------------------------------------------
 
+
 def _pages(texts: list[str], start_id: int = 1) -> list[dict]:
-    return [
-        {"page_id": i, "page_no": i, "full_text": t}
-        for i, t in enumerate(texts, start=start_id)
-    ]
+    return [{"page_id": i, "page_no": i, "full_text": t} for i, t in enumerate(texts, start=start_id)]
 
 
 def test_chunk_book_empty_pages_returns_empty():

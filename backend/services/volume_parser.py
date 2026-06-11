@@ -14,21 +14,30 @@
 - 漢数字: ``"一"`` 〜 ``"十"`` (二桁の ``"十一"`` 以降は非対応)
 - 「巻数なし＝1 巻」: ペア判定で片方が空・もう片方が 2 以上の整数なら空側を 1 と扱う
 """
+
 import re
 
 # 漢数字の整数マップ（十一以降は曖昧さ回避のため非対応）
 _KANJI_NUMS = {
-    "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
-    "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+    "一": 1,
+    "二": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+    "十": 10,
 }
 # 整数巻（"3", "第3巻", "03" 等）
-_RE_INT    = re.compile(r"^\s*[第]?\s*(\d+)\s*[巻]?\s*$")
+_RE_INT = re.compile(r"^\s*[第]?\s*(\d+)\s*[巻]?\s*$")
 # 小数巻（"2.5", "4.5" 等）。シリーズの間巻号を表す慣習に対応
-_RE_FLOAT  = re.compile(r"^\s*(\d+\.\d+)\s*$")
+_RE_FLOAT = re.compile(r"^\s*(\d+\.\d+)\s*$")
 # vol.N / vol.N.M
-_RE_VOL    = re.compile(r"^\s*[vV][oO][lL]\.?\s*(\d+(?:\.\d+)?)\s*$")
-_RE_PAREN  = re.compile(r"^\s*[(（]([上中下前後]+)[)）]\s*$")
-_RE_KANJI  = re.compile(r"^\s*第?([一二三四五六七八九十百]+)巻?\s*$")
+_RE_VOL = re.compile(r"^\s*[vV][oO][lL]\.?\s*(\d+(?:\.\d+)?)\s*$")
+_RE_PAREN = re.compile(r"^\s*[(（]([上中下前後]+)[)）]\s*$")
+_RE_KANJI = re.compile(r"^\s*第?([一二三四五六七八九十百]+)巻?\s*$")
 _PAREN_INDEX = {"上": 1, "中": 2, "下": 3, "前": 1, "後": 2}
 
 
@@ -60,7 +69,8 @@ def parse_volume_index(suffix: str) -> float | None:
 
 
 def parse_pair_volume_indexes(
-    suffix_a: str, suffix_b: str,
+    suffix_a: str,
+    suffix_b: str,
 ) -> tuple[float | None, float | None]:
     """ペアのサフィックスを巻数に変換する。
 

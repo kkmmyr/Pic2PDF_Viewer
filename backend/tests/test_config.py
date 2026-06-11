@@ -1,4 +1,4 @@
-﻿"""
+"""
 config モジュールのユニットテスト。
 
 ソース別ディレクトリ解決ヘルパーの挙動を確認する。
@@ -7,6 +7,7 @@ config モジュールのユニットテスト。
     cd backend
     uv run pytest tests/test_config.py -v
 """
+
 import os
 import sys
 

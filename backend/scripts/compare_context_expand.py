@@ -5,6 +5,7 @@ Usage:
     cd backend
     uv run python scripts/compare_context_expand.py
 """
+
 import sqlite3
 import sys
 import time
@@ -23,6 +24,7 @@ TEST_QUERIES = [
     "主人公が初めて魔法を使った場面",
     "仲間との別れのシーン",
 ]
+
 
 # ── コンテキスト生成用サンプル取得 ────────────────────────────────────────
 def get_context_samples(n: int = 3):
@@ -79,7 +81,7 @@ def compare_context():
     print("【合計時間】")
     n = len(samples)
     for model in MODELS:
-        print(f"  {model:20s}: 合計 {times[model]:.1f}s  平均 {times[model]/n:.1f}s/チャンク")
+        print(f"  {model:20s}: 合計 {times[model]:.1f}s  平均 {times[model] / n:.1f}s/チャンク")
 
 
 # ── 2. QA_EXPAND_MODEL 比較 ──────────────────────────────────────────────
@@ -106,7 +108,7 @@ def compare_expand():
     print("【合計時間】")
     n = len(TEST_QUERIES)
     for model in MODELS:
-        print(f"  {model:20s}: 合計 {times[model]:.1f}s  平均 {times[model]/n:.1f}s/クエリ")
+        print(f"  {model:20s}: 合計 {times[model]:.1f}s  平均 {times[model] / n:.1f}s/クエリ")
 
 
 if __name__ == "__main__":
