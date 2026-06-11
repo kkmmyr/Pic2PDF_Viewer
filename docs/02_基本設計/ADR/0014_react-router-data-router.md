@@ -55,3 +55,13 @@
 
 - TanStack Query との役割分担を見直し、`loader` でプリフェッチを行う場合は本 ADR を更新する
 - react-router v8 でブレーキングチェンジがあった場合に本 ADR を Superseded にする
+
+## 修正（2026-06-12）
+
+commit `957ac7c` で `ErrorBoundary.tsx` を class component として再追加し、`Layout.tsx` の `<Outlet>` をラップする形で復活させた。
+
+**理由**: data router の `errorElement` はルートレベルのエラー（ナビゲーション失敗・loader 例外）のみをキャッチする。レンダリング中の予期しない React エラー（`null` デリファレンス等）は `errorElement` ではキャッチされないことが判明し、`ErrorBoundary` が必要になった。
+
+**結果**: 本 ADR の「`ErrorBoundary.tsx` 削除」という記述は撤回。`ErrorBoundary.tsx` と `RouteErrorPage.tsx` は**両方**共存する。
+- `ErrorBoundary.tsx`（class component）: レンダリングエラーをキャッチし fallback UI を表示
+- `RouteErrorPage.tsx`: ルートレベルエラーの共通 UI
