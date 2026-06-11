@@ -9,16 +9,20 @@ import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
 
-import type { BookSummary, SeriesSummary } from '@/features/novel_db/types';
+import type { BookSummary } from '@/features/novel_db/types';
 import { fetchNovelAuthors, fetchSeries, patchNovelBookMeta } from '@/features/novel_db/api';
 import {
     type GroupMode,
     type NovelBookGroup,
     useNovelLibraryGroup,
 } from '@/hooks/useNovelLibraryGroup';
+import type { ExistingSeriesOption } from '@/types';
+import { BulkAuthorDialog } from '@/components/library/BulkAuthorDialog';
+import {
+    BulkSeriesAssignDialog,
+    type BulkSeriesAssignResult,
+} from '@/components/library/BulkSeriesAssignDialog';
 import BookCard from './BookCard';
-import { NovelBulkAuthorDialog } from './NovelBulkAuthorDialog';
-import { NovelBulkSeriesAssignDialog } from './NovelBulkSeriesAssignDialog';
 import SeriesGroupCard from './SeriesGroupCard';
 import { LibraryViewModeSelector } from './LibraryViewModeSelector';
 import { BulkActionsPanel } from './BulkActionsPanel';
@@ -47,7 +51,7 @@ export default function LibrarySection({
     const [showAuthorDialog, setShowAuthorDialog] = useState(false);
     const [showSeriesDialog, setShowSeriesDialog] = useState(false);
     const [allAuthors, setAllAuthors] = useState<string[]>([]);
-    const [allSeriesForDialog, setAllSeriesForDialog] = useState<SeriesSummary[]>([]);
+    const [allSeriesForDialog, setAllSeriesForDialog] = useState<ExistingSeriesOption[]>([]);
 
     const { groups, ungrouped } = useNovelLibraryGroup(books, groupMode);
 
@@ -112,7 +116,14 @@ export default function LibrarySection({
 
     const openSeriesDialog = async () => {
         const series = await fetchSeries().catch(() => []);
-        setAllSeriesForDialog(series);
+        const options: ExistingSeriesOption[] = series.map((s) => {
+            let max = 0;
+            for (const b of books) {
+                if (b.series_id === s.id && b.volume !== null && b.volume > max) max = b.volume;
+            }
+            return { id: s.id, title: s.name, maxIndex: max };
+        });
+        setAllSeriesForDialog(options);
         setShowSeriesDialog(true);
     };
 
@@ -125,12 +136,7 @@ export default function LibrarySection({
         exitSelecting();
     };
 
-    const handleAssignSeries = async (params: {
-        mode: 'existing' | 'new' | 'remove';
-        seriesId?: string;
-        seriesTitle?: string;
-        volumes?: number[];
-    }) => {
+    const handleAssignSeries = async (params: BulkSeriesAssignResult) => {
         const targets = books.filter((b) => selectedNames.has(b.name));
         for (let i = 0; i < targets.length; i++) {
             const book = targets[i];
@@ -139,7 +145,7 @@ export default function LibrarySection({
             } else {
                 await patchNovelBookMeta(`${book.name}.pdf`, {
                     series_id: params.seriesId,
-                    volume: params.volumes?.[i] ?? null,
+                    volume: params.indexes?.[i] ?? null,
                 });
             }
         }
@@ -307,18 +313,19 @@ export default function LibrarySection({
                 </>
             )}
 
-            <NovelBulkAuthorDialog
+            <BulkAuthorDialog
                 open={showAuthorDialog}
                 targetCount={selectedList.length}
                 allAuthors={allAuthors}
                 onClose={() => setShowAuthorDialog(false)}
                 onApply={handleApplyAuthors}
             />
-            <NovelBulkSeriesAssignDialog
+            <BulkSeriesAssignDialog
                 open={showSeriesDialog}
-                selectedBooks={selectedList}
-                allSeries={allSeriesForDialog}
-                allBooks={books}
+                selectedNames={selectedList.map((b) => b.name)}
+                existingSeries={allSeriesForDialog}
+                nested
+                showRemoveMode
                 onClose={() => setShowSeriesDialog(false)}
                 onAssign={handleAssignSeries}
             />
