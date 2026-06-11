@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Tailwind v4 でクラスベースのダークモードを有効化。
+ * デフォルトは @media (prefers-color-scheme: dark) のため、
+ * html.dark によるクラス切り替えが dark: ユーティリティに反映されない。 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* ----------------------------------------------------------------
  * shadcn/ui CSS 変数（Radix UI コンポーネントが参照する設計トークン）。
  * --primary は本プロジェクトの indigo-600 (#4f46e5) に対応。
