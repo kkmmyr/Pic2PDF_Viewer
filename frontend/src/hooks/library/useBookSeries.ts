@@ -1,41 +1,46 @@
 import { useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { BookMetaEntry, BookMetaMap } from '../../types';
 import { API_ENDPOINTS } from '../../config/api';
 import apiClient from '../../config/api_client';
 import { metaQueryKey, makeBookMetaKey } from './useBookMetaCore';
 
+interface AssignSeriesVars {
+    path: string;
+    names: string[];
+    params: { title: string; index: number | number[]; id?: string };
+}
+
+interface UnassignSeriesVars {
+    path: string;
+    names: string[];
+}
+
+interface ReorderSeriesVars {
+    path: string;
+    names: string[];
+    seriesId: string;
+}
+
 /**
  * シリーズ手動編集系フック（割り当て / 解除 / DnD 並べ替え）。
  *
- * `reorderSeries` は楽観的更新 + 失敗時ロールバック実装（StrictMode で
- * updater が 2 度呼ばれてもスナップショットを毎回再構築する）。
+ * - assignSeries  : 悲観的更新（サーバー発行の series_id が必要）
+ * - unassignSeries: 楽観的更新 + エラー時ロールバック
+ * - reorderSeries : 楽観的更新 + エラー時ロールバック
  */
 export function useBookSeries(source: string) {
     const queryClient = useQueryClient();
 
-    /**
-     * 書籍を既存または新規シリーズに割り当てる。
-     * - `id` 省略時はバックエンドで自動生成（同タイトル + 同作者なら同じ id）
-     * - `index` は単一 number または names と同じ長さの number 配列
-     * - 戻り値は確定した `series_id`
-     */
-    const assignSeries = useCallback(
-        async (
-            path: string,
-            names: string[],
-            params: { title: string; index: number | number[]; id?: string },
-        ): Promise<string> => {
-            if (Array.isArray(params.index) && params.index.length !== names.length) {
-                throw new Error('index 配列の長さが names と一致しません');
-            }
-
-            const res = await apiClient.post<unknown, { id: string; updated_count: number }>(
+    // ── assignSeries ────────────────────────────────────────────────────────
+    const { mutateAsync: mutateAssign } = useMutation({
+        mutationFn: ({ path, names, params }: AssignSeriesVars) =>
+            apiClient.post<unknown, { id: string; updated_count: number }>(
                 API_ENDPOINTS.SERIES_ASSIGN,
                 { path, names, ...params, source },
-            );
+            ),
+        onSuccess: (res, { path, names, params }) => {
             const sid = res.id;
-
             const indexFor = (i: number): number =>
                 Array.isArray(params.index) ? params.index[i] : params.index;
 
@@ -53,15 +58,15 @@ export function useBookSeries(source: string) {
                 });
                 return next;
             });
-            return sid;
         },
-        [source, queryClient],
-    );
+    });
 
-    /** 書籍をシリーズから外す（series_* フィールドを削除）。 */
-    const unassignSeries = useCallback(
-        async (path: string, names: string[]): Promise<void> => {
-            await apiClient.post(API_ENDPOINTS.SERIES_UNASSIGN, { path, names, source });
+    // ── unassignSeries ──────────────────────────────────────────────────────
+    const { mutateAsync: mutateUnassign } = useMutation({
+        mutationFn: ({ path, names }: UnassignSeriesVars) =>
+            apiClient.post(API_ENDPOINTS.SERIES_UNASSIGN, { path, names, source }),
+        onMutate: ({ path, names }) => {
+            const previousMeta = queryClient.getQueryData<BookMetaMap>(metaQueryKey(source));
             queryClient.setQueryData<BookMetaMap>(metaQueryKey(source), (prev = {}) => {
                 const next = { ...prev };
                 for (const name of names) {
@@ -78,19 +83,26 @@ export function useBookSeries(source: string) {
                 }
                 return next;
             });
+            return { previousMeta };
         },
-        [source, queryClient],
-    );
+        onError: (_err, _vars, context) => {
+            if (context?.previousMeta !== undefined) {
+                queryClient.setQueryData(metaQueryKey(source), context.previousMeta);
+            }
+        },
+    });
 
-    /**
-     * 同じシリーズに属する書籍の `series_index` を `names` の順序で
-     * 1.0, 2.0, 3.0, ... に振り直す（DnD 並べ替え用）。
-     *
-     * 楽観的更新: ローカル meta を即時に書き換えてから API を投げ、
-     * 失敗時はスナップショットからロールバックする。
-     */
-    const reorderSeries = useCallback(
-        async (path: string, names: string[], seriesId: string): Promise<void> => {
+    // ── reorderSeries ───────────────────────────────────────────────────────
+    const { mutateAsync: mutateReorder } = useMutation({
+        mutationFn: ({ path, names, seriesId }: ReorderSeriesVars) =>
+            apiClient.post(API_ENDPOINTS.SERIES_REORDER, {
+                path,
+                names,
+                series_id: seriesId,
+                source,
+            }),
+        onMutate: ({ path, names }) => {
+            // snapshot を updater 内で構築することで StrictMode の二重呼び出しに対応
             let snapshot: Record<string, number | undefined> = {};
             queryClient.setQueryData<BookMetaMap>(metaQueryKey(source), (prev = {}) => {
                 snapshot = {};
@@ -104,33 +116,60 @@ export function useBookSeries(source: string) {
                 });
                 return next;
             });
-
-            try {
-                await apiClient.post(API_ENDPOINTS.SERIES_REORDER, {
-                    path,
-                    names,
-                    series_id: seriesId,
-                    source,
-                });
-            } catch (e) {
-                queryClient.setQueryData<BookMetaMap>(metaQueryKey(source), (prev = {}) => {
-                    const next = { ...prev };
-                    for (const [key, idx] of Object.entries(snapshot)) {
-                        const existing = next[key];
-                        if (!existing) continue;
-                        if (idx === undefined) {
-                            const { series_index: _si, ...rest } = existing;
-                            next[key] = rest as BookMetaEntry;
-                        } else {
-                            next[key] = { ...existing, series_index: idx };
-                        }
-                    }
-                    return next;
-                });
-                throw e;
-            }
+            return { snapshot };
         },
-        [source, queryClient],
+        onError: (_err, _vars, context) => {
+            if (!context?.snapshot) return;
+            queryClient.setQueryData<BookMetaMap>(metaQueryKey(source), (prev = {}) => {
+                const next = { ...prev };
+                for (const [key, idx] of Object.entries(context.snapshot)) {
+                    const existing = next[key];
+                    if (!existing) continue;
+                    if (idx === undefined) {
+                        const { series_index: _si, ...rest } = existing;
+                        next[key] = rest as BookMetaEntry;
+                    } else {
+                        next[key] = { ...existing, series_index: idx };
+                    }
+                }
+                return next;
+            });
+        },
+    });
+
+    /**
+     * 書籍を既存または新規シリーズに割り当てる。
+     * - `id` 省略時はバックエンドで自動生成（同タイトル + 同作者なら同じ id）
+     * - `index` は単一 number または names と同じ長さの number 配列
+     * - 戻り値は確定した `series_id`
+     */
+    const assignSeries = useCallback(
+        async (
+            path: string,
+            names: string[],
+            params: { title: string; index: number | number[]; id?: string },
+        ): Promise<string> => {
+            if (Array.isArray(params.index) && params.index.length !== names.length) {
+                throw new Error('index 配列の長さが names と一致しません');
+            }
+            const res = await mutateAssign({ path, names, params });
+            return res.id;
+        },
+        [mutateAssign],
+    );
+
+    /** 書籍をシリーズから外す（series_* フィールドを削除）。 */
+    const unassignSeries = useCallback(
+        (path: string, names: string[]): Promise<void> =>
+            mutateUnassign({ path, names }) as Promise<void>,
+        [mutateUnassign],
+    );
+
+    /** シリーズドリルダウン中の DnD ドロップで呼ばれる。楽観的更新 + ロールバック実装済み。 */
+    const reorderSeries = useCallback(
+        (path: string, names: string[], seriesId: string): Promise<void> =>
+            mutateReorder({ path, names, seriesId }) as Promise<void>,
+        [mutateReorder],
     );
 
     return { assignSeries, unassignSeries, reorderSeries };
