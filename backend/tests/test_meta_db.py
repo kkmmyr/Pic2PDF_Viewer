@@ -31,7 +31,7 @@ class TestConnect:
         m.DATA_DIR = str(sub)
         conn = connect()
         conn.close()
-        assert (sub / "meta.db").exists()
+        assert (sub / "meta2.db").exists()
 
     def test_接続後にテーブルを作成できる(self):
         conn = connect()

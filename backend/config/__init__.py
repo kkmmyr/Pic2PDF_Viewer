@@ -6,80 +6,100 @@
 
 Novel DB の env 設定（モデル・LLM・検索パラメータ等）は config.novel_db に分離。
 """
-import os
+from pathlib import Path
 from typing import TypedDict
 
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # プロジェクトルートの .env を読み込む（存在しない場合は無視）
-load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"))
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
+
+_BACKEND_DIR = Path(__file__).parent.parent
+_DEFAULT_DATA_DIR = _BACKEND_DIR / "data"
+
+
+class _AppSettings(BaseSettings):
+    """アプリケーション設定。起動時に環境変数から読み込む。
+
+    .env は上の load_dotenv() で os.environ に読み込み済みのため、
+    env_file は指定せず os.environ のみを参照する。
+    """
+
+    model_config = SettingsConfigDict(env_prefix="", extra="ignore")
+
+    # メインデータディレクトリ（画像・PDF・サムネイル・hitomi JSON）
+    PIC2PDF_DATA_DIR: Path = _DEFAULT_DATA_DIR
+    # Doujin 入力ディレクトリ（None → PIC2PDF_DATA_DIR/doujin/input）
+    DOUJIN_INPUT_DIR: Path | None = None
+    # Kindle Novel 画像ディレクトリ（None → PIC2PDF_DATA_DIR/kindle_novel/images）
+    KINDLE_NOVEL_IMAGES_DIR: Path | None = None
+    # 書誌メタ DB ディレクトリ（OneDrive 非推奨のためローカル固定が基本）
+    META_DB_DIR: Path = _DEFAULT_DATA_DIR
+    # Novel DB ディレクトリ
+    NOVEL_DB_DIR: Path = _DEFAULT_DATA_DIR / "novel_db"
+    # CORS 許可オリジン（カンマ区切り文字列）
+    ALLOWED_ORIGINS: str = "http://localhost:5176,http://127.0.0.1:5176"
+    # Amazon 購入履歴 CSV ルートディレクトリ（未設定時は無効）
+    AMAZON_DATA_DIR: Path | None = None
+    # Gemma 4 ツールディレクトリ（未設定時は Gemma 連携無効）
+    GEMMA_TOOL_DIR: Path | None = None
+    # meta.db バックアップ先（未設定時はバックアップ無効）
+    META_DB_BACKUP_DIR: Path | None = None
+
+
+_s = _AppSettings()
 
 # ---------------------------------------------------------------------------
 # データディレクトリパス定義
 # ---------------------------------------------------------------------------
-# backend/ の親ディレクトリ（プロジェクトルート）
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+PROJECT_ROOT = str(_BACKEND_DIR.parent)
 
-# デフォルトのローカル data/ パス（backend/data/）
-_DEFAULT_DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+DATA_DIR = str(_s.PIC2PDF_DATA_DIR)
 
-# メインデータディレクトリ（画像・PDF・サムネイル・hitomi JSON）
-# env: PIC2PDF_DATA_DIR で OneDrive 等の共有場所に変更可能
-DATA_DIR = os.environ.get("PIC2PDF_DATA_DIR", _DEFAULT_DATA_DIR)
-
-# Doujin (default)
-MAIN_DATA_DIR      = os.path.join(DATA_DIR, "doujin")
-PDF_COMPRESSED_DIR = os.path.join(MAIN_DATA_DIR, "pdfs_compressed")
-THUMBNAIL_DIR      = os.path.join(MAIN_DATA_DIR, "thumbnails")
-IMAGES_DIR         = os.path.join(MAIN_DATA_DIR, "images")
-COMPLETE_DIR       = os.path.join(MAIN_DATA_DIR, "complete")
-# Linux サーバー側でファイルを受け取る入力ディレクトリ（Samba 共有する）
-# env: DOUJIN_INPUT_DIR で上書き可能
-DOUJIN_INPUT_DIR   = os.environ.get("DOUJIN_INPUT_DIR", os.path.join(MAIN_DATA_DIR, "input"))
+# Doujin
+MAIN_DATA_DIR      = str(_s.PIC2PDF_DATA_DIR / "doujin")
+PDF_COMPRESSED_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "pdfs_compressed")
+THUMBNAIL_DIR      = str(_s.PIC2PDF_DATA_DIR / "doujin" / "thumbnails")
+IMAGES_DIR         = str(_s.PIC2PDF_DATA_DIR / "doujin" / "images")
+COMPLETE_DIR       = str(_s.PIC2PDF_DATA_DIR / "doujin" / "complete")
+DOUJIN_INPUT_DIR   = str(_s.DOUJIN_INPUT_DIR or _s.PIC2PDF_DATA_DIR / "doujin" / "input")
 
 # Comic
-COMIC_DIR           = os.path.join(DATA_DIR, "comic")
-COMIC_PDF_DIR       = os.path.join(COMIC_DIR, "pdfs")
-COMIC_THUMBNAIL_DIR = os.path.join(COMIC_DIR, "thumbnails")
-COMIC_IMAGES_DIR    = os.path.join(COMIC_DIR, "images")
+COMIC_DIR           = str(_s.PIC2PDF_DATA_DIR / "comic")
+COMIC_PDF_DIR       = str(_s.PIC2PDF_DATA_DIR / "comic" / "pdfs")
+COMIC_THUMBNAIL_DIR = str(_s.PIC2PDF_DATA_DIR / "comic" / "thumbnails")
+COMIC_IMAGES_DIR    = str(_s.PIC2PDF_DATA_DIR / "comic" / "images")
 
 # Kindle Novel
-KINDLE_NOVEL_DIR           = os.path.join(DATA_DIR, "kindle_novel")
-KINDLE_NOVEL_PDF_DIR       = os.path.join(KINDLE_NOVEL_DIR, "pdfs")
-KINDLE_NOVEL_THUMBNAIL_DIR = os.path.join(KINDLE_NOVEL_DIR, "thumbnails")
-# 画像出力先は env で上書き可能（キャプチャツール kindle-pdf/ と同じ env を共有）
-KINDLE_NOVEL_IMAGES_DIR    = os.environ.get(
-    "KINDLE_NOVEL_IMAGES_DIR",
-    os.path.join(KINDLE_NOVEL_DIR, "images"),
+KINDLE_NOVEL_DIR           = str(_s.PIC2PDF_DATA_DIR / "kindle_novel")
+KINDLE_NOVEL_PDF_DIR       = str(_s.PIC2PDF_DATA_DIR / "kindle_novel" / "pdfs")
+KINDLE_NOVEL_THUMBNAIL_DIR = str(_s.PIC2PDF_DATA_DIR / "kindle_novel" / "thumbnails")
+KINDLE_NOVEL_IMAGES_DIR    = str(
+    _s.KINDLE_NOVEL_IMAGES_DIR or _s.PIC2PDF_DATA_DIR / "kindle_novel" / "images"
 )
 
-# hitomi.la 新着監視データ（JSON ファイル群。DATA_DIR 配下で共有可）
-HITOMI_DATA_DIR = os.path.join(DATA_DIR, "hitomi")
+# hitomi.la 新着監視データ
+HITOMI_DATA_DIR = str(_s.PIC2PDF_DATA_DIR / "hitomi")
 
-# 書誌メタ DB（SQLite。OneDrive 非推奨のためローカルに固定）
-# env: META_DB_DIR で個別パスを上書き可能
-META_DB_DIR = os.environ.get("META_DB_DIR", _DEFAULT_DATA_DIR)
+# 書誌メタ DB（SQLite）
+META_DB_DIR = str(_s.META_DB_DIR)
 
-# Novel DB（SQLite + LanceDB。OneDrive 非推奨のためローカルに固定）
-# env: NOVEL_DB_DIR で個別パスを上書き可能
-NOVEL_DB_DIR  = os.environ.get("NOVEL_DB_DIR", os.path.join(_DEFAULT_DATA_DIR, "novel_db"))
-NOVEL_DB_PATH = os.path.join(NOVEL_DB_DIR, "novel.db")
+# Novel DB（SQLite + LanceDB）
+NOVEL_DB_DIR  = str(_s.NOVEL_DB_DIR)
+NOVEL_DB_PATH = str(_s.NOVEL_DB_DIR / "novel.db")
 
 # Novel DB の env 設定（モデル・LLM・検索パラメータ等）は novel_db サブモジュールに分離。
 # `from config import NOVEL_DB_*` は従来通り動作する。
 from .novel_db import *  # noqa: E402 F401 F403
 
 # フロントエンド配信ディレクトリ（リリースモード用）
-FRONTEND_DIST_DIR = os.path.join(PROJECT_ROOT, "frontend", "dist")
+FRONTEND_DIST_DIR = str(_BACKEND_DIR.parent / "frontend" / "dist")
 
-# Amazon 購入履歴 CSV ルートディレクトリ（環境変数で設定。未設定時は CSV インポート無効）
-AMAZON_DATA_DIR: str | None = os.environ.get("AMAZON_DATA_DIR") or None
-
-# Gemma 4 ツールディレクトリ（web_extract モジュールの場所。未設定時は Gemma 連携無効）
-GEMMA_TOOL_DIR: str | None = os.environ.get("GEMMA_TOOL_DIR") or None
-
-# meta.db バックアップ先（env: META_DB_BACKUP_DIR。未設定時はバックアップ無効）
-META_DB_BACKUP_DIR: str | None = os.environ.get("META_DB_BACKUP_DIR") or None
+# オプション設定（未設定時は None）
+AMAZON_DATA_DIR:    str | None = str(_s.AMAZON_DATA_DIR) if _s.AMAZON_DATA_DIR else None
+GEMMA_TOOL_DIR:     str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
+META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
 
 # ---------------------------------------------------------------------------
 # ソース識別子
@@ -114,10 +134,9 @@ ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES: int = 2 * 1024**3   # 2 GB
 ZIP_MAX_PER_FILE_BYTES: int = 50 * 1024**2            # 50 MB / 1 枚
 
 # ---------------------------------------------------------------------------
-# CORS 設定（環境変数で上書き可能）
+# CORS 設定
 # ---------------------------------------------------------------------------
-_default_origins = "http://localhost:5176,http://127.0.0.1:5176"
-CORS_ORIGINS: list[str] = os.environ.get("ALLOWED_ORIGINS", _default_origins).split(",")
+CORS_ORIGINS: list[str] = _s.ALLOWED_ORIGINS.split(",")
 
 # ---------------------------------------------------------------------------
 # ディレクトリ初期化
@@ -140,7 +159,7 @@ _REQUIRED_DIRS: list[str] = [
 def ensure_directories() -> None:
     """必要なデータディレクトリをすべて作成する。"""
     for directory in _REQUIRED_DIRS:
-        os.makedirs(directory, exist_ok=True)
+        Path(directory).mkdir(parents=True, exist_ok=True)
 
 
 ensure_directories()
