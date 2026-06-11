@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Send } from 'lucide-react';
 
 import { NOVEL_DB_CONFIG } from '@/constants';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface Props {
     onSubmit: (question: string) => void;

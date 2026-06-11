@@ -2,6 +2,7 @@ import * as RadixDialog from '@radix-ui/react-dialog';
 import { type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 type DialogMaxWidth = 'sm' | 'md' | 'xl';
 
@@ -63,10 +64,12 @@ export function Dialog({
             <RadixDialog.Portal>
                 <RadixDialog.Overlay
                     data-testid="dialog-overlay"
+                    data-slot="dialog-overlay"
                     className={cn('fixed inset-0 bg-black/50', zClass)}
                     onClick={() => onClose()}
                 />
                 <RadixDialog.Content
+                    data-slot="dialog-content"
                     className={cn(
                         'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
                         'bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full mx-4',
@@ -77,19 +80,29 @@ export function Dialog({
                     )}
                     onInteractOutside={(e) => e.preventDefault()}
                 >
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div
+                        data-slot="dialog-header"
+                        className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700"
+                    >
                         <div>
-                            <RadixDialog.Title className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                            <RadixDialog.Title
+                                data-slot="dialog-title"
+                                className="text-base font-semibold text-gray-900 dark:text-gray-100"
+                            >
                                 {title}
                             </RadixDialog.Title>
                             {subtitle && (
-                                <RadixDialog.Description className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                <RadixDialog.Description
+                                    data-slot="dialog-description"
+                                    className="text-xs text-gray-500 dark:text-gray-400 mt-0.5"
+                                >
                                     {subtitle}
                                 </RadixDialog.Description>
                             )}
                         </div>
                         <RadixDialog.Close asChild>
                             <button
+                                data-slot="dialog-close"
                                 className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
                                 aria-label="閉じる"
                             >
@@ -112,13 +125,20 @@ export function DialogBody({
     children: ReactNode;
     className?: string;
 }) {
-    return <div className={cn('px-6 py-4', className)}>{children}</div>;
+    return (
+        <div data-slot="dialog-body" className={cn('px-6 py-4', className)}>
+            {children}
+        </div>
+    );
 }
 
 /** ダイアログ下部のボタン領域（ボーダー + 右寄せ flex）。 */
 export function DialogFooter({ children }: { children: ReactNode }) {
     return (
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700">
+        <div
+            data-slot="dialog-footer"
+            className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700"
+        >
             {children}
         </div>
     );
@@ -137,27 +157,27 @@ export function DialogCancelButton({
     children = 'キャンセル',
 }: DialogButtonProps) {
     return (
-        <button
-            type="button"
+        <Button
+            variant="secondary"
             onClick={onClick}
             disabled={disabled}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg"
         >
             {children}
-        </button>
+        </Button>
     );
 }
 
 /** プライマリ確定ボタン（ダイアログ用専用サイズ: px-4 py-2 rounded-lg）。色は primary token。 */
 export function DialogPrimaryButton({ onClick, disabled, children }: DialogButtonProps) {
     return (
-        <button
-            type="button"
+        <Button
+            variant="default"
             onClick={onClick}
             disabled={disabled}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:bg-primary-300 dark:disabled:bg-primary-900 rounded-lg transition-colors"
+            className="px-4 py-2 rounded-lg"
         >
             {children}
-        </button>
+        </Button>
     );
 }

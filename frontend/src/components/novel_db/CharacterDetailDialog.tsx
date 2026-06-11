@@ -6,7 +6,7 @@
 import { useCharacterDetail } from '@/hooks/novel_db';
 import { formatSqliteUtcAsJst } from '@/utils/date';
 
-import { Dialog, DialogBody } from '@/components/ui/Dialog';
+import { Dialog, DialogBody } from '@/components/ui/dialog';
 
 interface Props {
     /** 開く対象。null のとき非表示。 */

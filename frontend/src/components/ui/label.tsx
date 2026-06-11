@@ -10,6 +10,7 @@ export function Label({ ref, className, ...props }: LabelProps) {
     return (
         <LabelPrimitive.Root
             ref={ref}
+            data-slot="label"
             className={cn(
                 'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
                 'text-gray-700 dark:text-gray-300',

@@ -4,7 +4,7 @@ import type { GroupMode } from '@/hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
 import { ToolsMenu } from './ToolsMenu';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 type ReadStateFilter = '' | ReadState;
 

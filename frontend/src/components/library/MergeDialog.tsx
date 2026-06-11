@@ -5,7 +5,7 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '@/components/ui/Dialog';
+} from '@/components/ui/dialog';
 import { validateFilename } from '@/utils/validation';
 import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
 import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';

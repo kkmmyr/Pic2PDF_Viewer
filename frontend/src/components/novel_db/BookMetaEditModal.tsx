@@ -12,7 +12,7 @@ import {
     DialogCancelButton,
     DialogFooter,
     DialogPrimaryButton,
-} from '@/components/ui/Dialog';
+} from '@/components/ui/dialog';
 
 interface Props {
     book: BookSummary | null;

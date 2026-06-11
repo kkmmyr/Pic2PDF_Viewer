@@ -6,7 +6,7 @@
  */
 import { render } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { Alert } from '@/components/ui/Alert';
+import { Alert } from '@/components/ui/alert';
 
 describe('Alert', () => {
     it('variant=error は bg-red-50 と AlertCircle アイコン', () => {

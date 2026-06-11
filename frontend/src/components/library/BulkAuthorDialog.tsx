@@ -5,9 +5,9 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '@/components/ui/Dialog';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { TagsInput } from '@/components/ui/TagsInput';
+} from '@/components/ui/dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { TagsInput } from '@/components/ui/tags-input';
 import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
 import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
 import { useTagsInput } from '@/hooks/useTagsInput';

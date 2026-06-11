@@ -1,19 +1,20 @@
+/* eslint-disable react-refresh/only-export-components */
 import { cva, type VariantProps } from 'class-variance-authority';
 import { type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react';
 import { cn } from '@/lib/utils';
 
-const buttonVariants = cva(
+export const buttonVariants = cva(
     'inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed',
     {
         variants: {
             variant: {
-                primary:
+                default:
                     'bg-primary-600 hover:bg-primary-700 text-white ' +
                     'disabled:bg-primary-300 dark:disabled:bg-primary-900 disabled:hover:bg-primary-300',
                 secondary:
                     'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 ' +
                     'hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-50',
-                danger: 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50',
+                destructive: 'bg-red-600 hover:bg-red-700 text-white disabled:opacity-50',
                 ghost:
                     'bg-transparent text-gray-700 dark:text-gray-300 ' +
                     'hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50',
@@ -38,7 +39,7 @@ const buttonVariants = cva(
             },
         ],
         defaultVariants: {
-            variant: 'primary',
+            variant: 'default',
             size: 'md',
             active: false,
         },
@@ -47,18 +48,15 @@ const buttonVariants = cva(
 
 interface ButtonProps
     extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-    /** React 19: ref を通常 prop として受け取る（forwardRef 不要）。 */
     ref?: Ref<HTMLButtonElement>;
     /** トグル ON 状態（secondary variant 専用）。gray-700 ベースで強調表示。 */
     active?: boolean;
     children?: ReactNode;
 }
 
-export { buttonVariants };
-
 export function Button({
     ref,
-    variant = 'primary',
+    variant = 'default',
     size = 'md',
     active = false,
     className = '',
@@ -70,6 +68,7 @@ export function Button({
         <button
             ref={ref}
             type={type}
+            data-slot="button"
             className={cn(buttonVariants({ variant, size, active }), className)}
             {...rest}
         >

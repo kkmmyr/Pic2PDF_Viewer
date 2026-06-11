@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { createRef } from 'react';
-import { TagsInput } from '@/components/ui/TagsInput';
+import { TagsInput } from '@/components/ui/tags-input';
 
 const noop = () => {};
 

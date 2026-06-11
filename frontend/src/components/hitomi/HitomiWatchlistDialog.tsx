@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '@/components/ui/Dialog';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '@/components/ui/dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useHitomiWatchlist } from '@/hooks/useHitomiWatchlist';
 import { ApiError } from '@/config/api_client';
 import { errorMessage } from '@/utils/error';

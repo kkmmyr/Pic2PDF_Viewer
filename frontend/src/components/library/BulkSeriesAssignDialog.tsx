@@ -5,8 +5,8 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '@/components/ui/Dialog';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+} from '@/components/ui/dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { ExistingSeriesOption, LibrarySource } from '@/types';
 import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
 import { useSeriesSuggestion } from '@/hooks/useSeriesSuggestion';

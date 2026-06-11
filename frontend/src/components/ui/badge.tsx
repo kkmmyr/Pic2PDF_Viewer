@@ -1,8 +1,9 @@
+/* eslint-disable react-refresh/only-export-components */
 import { cva, type VariantProps } from 'class-variance-authority';
 import { type HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 
-const badgeVariants = cva(
+export const badgeVariants = cva(
     'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
     {
         variants: {
@@ -25,7 +26,7 @@ const badgeVariants = cva(
 interface BadgeProps extends HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
-    return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+    return (
+        <div data-slot="badge" className={cn(badgeVariants({ variant }), className)} {...props} />
+    );
 }
-
-export { badgeVariants };

@@ -6,7 +6,7 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '@/components/ui/Dialog';
+} from '@/components/ui/dialog';
 
 describe('Dialog', () => {
     it('open=false で何もレンダリングしない', () => {

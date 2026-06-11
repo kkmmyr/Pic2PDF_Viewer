@@ -1,5 +1,5 @@
 import { User, Library, Layers, Eye, EyeOff, Merge, ImageIcon, Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 interface LibraryBulkActionBarProps {
     selectedCount: number;
@@ -68,7 +68,7 @@ export function LibraryBulkActionBar({
             </Button>
             {showHidden && (
                 <Button
-                    variant="danger"
+                    variant="destructive"
                     onClick={onBulkDelete}
                     disabled={noSelection}
                     title="選択した書籍をディスクから完全に削除する（元に戻せません）"

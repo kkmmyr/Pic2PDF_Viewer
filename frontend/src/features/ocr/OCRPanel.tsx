@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Play, Square, Terminal } from 'lucide-react';
 import { useOcrStatus } from '@/hooks/useOcrStatus';
-import { Alert } from '@/components/ui/Alert';
+import { Alert } from '@/components/ui/alert';
 import { errorMessage } from '@/utils/error';
 
 /**

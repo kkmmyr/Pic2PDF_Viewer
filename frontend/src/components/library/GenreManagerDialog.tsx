@@ -1,6 +1,6 @@
 import { useState, useRef, KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '@/components/ui/Dialog';
+import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '@/components/ui/dialog';
 import { errorMessage } from '@/utils/error';
 
 interface GenreManagerDialogProps {

@@ -9,7 +9,7 @@ import { RelatedBooksPage } from './RelatedBooksPage';
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog';
 import { ReaderHeader } from './ReaderHeader';
 import { ReaderPageView } from './ReaderPageView';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface ReaderPanelProps {
     selectedPdf: string;

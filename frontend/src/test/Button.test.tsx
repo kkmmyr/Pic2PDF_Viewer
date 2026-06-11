@@ -7,10 +7,10 @@
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { createRef } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 describe('Button', () => {
-    it('既定で variant=primary, size=md の class が付く', () => {
+    it('既定で variant=default, size=md の class が付く', () => {
         const { getByRole } = render(<Button>OK</Button>);
         const btn = getByRole('button');
         expect(btn.className).toContain('bg-primary-600');
@@ -19,8 +19,8 @@ describe('Button', () => {
         expect(btn.className).toContain('text-sm');
     });
 
-    it('variant=danger は bg-red-600 が付く', () => {
-        const { getByRole } = render(<Button variant="danger">削除</Button>);
+    it('variant=destructive は bg-red-600 が付く', () => {
+        const { getByRole } = render(<Button variant="destructive">削除</Button>);
         expect(getByRole('button').className).toContain('bg-red-600');
     });
 

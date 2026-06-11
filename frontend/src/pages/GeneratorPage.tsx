@@ -6,7 +6,7 @@ import { usePdfStatus } from '@/hooks/usePdfStatus';
 import { useGenerateJob } from '@/hooks/useGenerateJob';
 import { JobProgress } from '@/components/generator/JobProgress';
 import { StatusTable } from '@/components/generator/StatusTable';
-import { Alert } from '@/components/ui/Alert';
+import { Alert } from '@/components/ui/alert';
 import { errorMessage } from '@/utils/error';
 import type { GenerateJob, GenerateFailedItem } from '@/types';
 

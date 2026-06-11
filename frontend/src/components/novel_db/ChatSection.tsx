@@ -10,7 +10,7 @@ import { MessageSquare } from 'lucide-react';
 import { streamChatSession } from '@/features/novel_db/sse';
 import type { Scope } from '@/features/novel_db/types';
 import { useChatSessionDetail, useChatSessions } from '@/hooks/novel_db';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
 import { SessionSidebar } from './SessionSidebar';

@@ -8,8 +8,8 @@ import {
     DialogCancelButton,
     DialogFooter,
     DialogPrimaryButton,
-} from '@/components/ui/Dialog';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+} from '@/components/ui/dialog';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 interface Props {
     open: boolean;

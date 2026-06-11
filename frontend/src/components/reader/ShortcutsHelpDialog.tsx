@@ -1,4 +1,4 @@
-import { Dialog, DialogBody } from '@/components/ui/Dialog';
+import { Dialog, DialogBody } from '@/components/ui/dialog';
 import { useReaderContext } from '@/contexts/ReaderContext';
 
 const SHORTCUTS: { key: string; description: string }[] = [
