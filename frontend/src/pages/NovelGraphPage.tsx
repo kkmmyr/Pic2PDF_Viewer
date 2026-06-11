@@ -33,8 +33,14 @@ export default function NovelGraphPage() {
 
             {/* シリーズ選択 */}
             <div className="flex items-center gap-3 flex-shrink-0">
-                <label className="text-sm font-medium whitespace-nowrap">シリーズ</label>
+                <label
+                    htmlFor="graph-series-select"
+                    className="text-sm font-medium whitespace-nowrap"
+                >
+                    シリーズ
+                </label>
                 <select
+                    id="graph-series-select"
                     className="border rounded px-2 py-1 text-sm bg-white dark:bg-gray-800 dark:border-gray-600 flex-1 max-w-xs"
                     value={selectedSeries ?? ''}
                     onChange={(e) => {

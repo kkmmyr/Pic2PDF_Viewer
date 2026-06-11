@@ -4,6 +4,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
 
@@ -13,6 +14,7 @@ export default tseslint.config(
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,
+    jsxA11y.flatConfigs.recommended,
     {
         files: ['**/*.{ts,tsx}'],
         languageOptions: {
@@ -45,6 +47,11 @@ export default tseslint.config(
             // react-hooks v7 で追加された新ルール。フォームリセットや非同期 fetch 起動など
             // 正当なパターンを多数フラグするため無効化する。
             'react-hooks/set-state-in-effect': 'off',
+
+            // LAN 個人アプリのため div onClick パターンは warn のみ（error に昇格させない）
+            'jsx-a11y/click-events-have-key-events': 'warn',
+            'jsx-a11y/no-static-element-interactions': 'warn',
+            'jsx-a11y/no-noninteractive-element-interactions': 'warn',
         },
     },
     // テストファイルは緩める

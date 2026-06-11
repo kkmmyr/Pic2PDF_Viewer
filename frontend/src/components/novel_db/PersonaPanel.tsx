@@ -68,8 +68,14 @@ export default function PersonaPanel({ label, persona, onChange, disabled }: Per
                 {label}
             </p>
             <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400">名前</label>
+                <label
+                    htmlFor={`persona-name-${label}`}
+                    className="text-xs text-gray-500 dark:text-gray-400"
+                >
+                    名前
+                </label>
                 <input
+                    id={`persona-name-${label}`}
                     type="text"
                     value={persona.name}
                     onChange={(e) => set({ name: e.target.value })}

@@ -165,7 +165,10 @@ export function SeriesEditDialog() {
                     )}
 
                     {current && (
-                        <label className="flex items-start gap-2 cursor-pointer pt-2 border-t border-gray-200 dark:border-gray-700">
+                        <label
+                            aria-label="シリーズから外す"
+                            className="flex items-start gap-2 cursor-pointer pt-2 border-t border-gray-200 dark:border-gray-700"
+                        >
                             <input
                                 type="radio"
                                 name="mode"

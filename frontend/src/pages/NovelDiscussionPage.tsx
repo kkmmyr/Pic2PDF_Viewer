@@ -49,10 +49,14 @@ export default function NovelDiscussionPage() {
             <div className="space-y-4 border border-gray-200 dark:border-gray-700 rounded-xl p-4">
                 {/* 書籍選択 */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label
+                        htmlFor="discussion-book-select"
+                        className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+                    >
                         書籍を選択
                     </label>
                     <select
+                        id="discussion-book-select"
                         value={selectedBook}
                         onChange={(e) => setSelectedBook(e.target.value)}
                         disabled={isGenerating}

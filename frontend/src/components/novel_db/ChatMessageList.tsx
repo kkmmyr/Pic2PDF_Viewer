@@ -46,13 +46,13 @@ export function ChatMessageList({
                 messages.map((m) => (
                     <MessageBubble
                         key={m.id !== -1 ? m.id : `optimistic-${m.created_at}`}
-                        role={m.role}
+                        senderRole={m.role}
                         content={m.content}
                     />
                 ))
             )}
             {sending && streamingAnswer && (
-                <MessageBubble role="assistant" content={streamingAnswer} streaming />
+                <MessageBubble senderRole="assistant" content={streamingAnswer} streaming />
             )}
         </div>
     );
@@ -61,14 +61,14 @@ export function ChatMessageList({
 // ---------------------------------------------------------------------------
 
 interface MessageBubbleProps {
-    role: 'user' | 'assistant' | 'system';
+    senderRole: 'user' | 'assistant' | 'system';
     content: string;
     streaming?: boolean;
 }
 
-function MessageBubble({ role, content, streaming }: MessageBubbleProps) {
-    if (role === 'system') return null;
-    const isUser = role === 'user';
+function MessageBubble({ senderRole, content, streaming }: MessageBubbleProps) {
+    if (senderRole === 'system') return null;
+    const isUser = senderRole === 'user';
     return (
         <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
             <div

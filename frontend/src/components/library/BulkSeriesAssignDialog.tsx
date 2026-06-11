@@ -250,6 +250,7 @@ export function BulkSeriesAssignDialog({
                                         {candidates.map((c) => (
                                             <label
                                                 key={c.series_id}
+                                                aria-label={c.series_title}
                                                 className="flex items-start gap-2 cursor-pointer text-sm text-gray-700 dark:text-gray-300 px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-800"
                                             >
                                                 <input
