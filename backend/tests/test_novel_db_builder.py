@@ -38,14 +38,17 @@ def _populate_pages(conn: sqlite3.Connection, book_name: str, texts: list[str]) 
 
 @pytest.fixture
 def novel_db_env(tmp_path, monkeypatch):
-    """builder.py の KINDLE_NOVEL_IMAGES_DIR と DB パスを一時パスへ差し替える。"""
+    """config.KINDLE_NOVEL_IMAGES_DIR と DB パスを一時パスへ差し替える。"""
     images_dir = tmp_path / "kindle_novel" / "images"
     db_dir = tmp_path / "novel_db"
     images_dir.mkdir(parents=True)
     db_dir.mkdir(parents=True)
 
+    import config
     db_path = db_dir / "novel.db"
-    monkeypatch.setattr(builder, "KINDLE_NOVEL_IMAGES_DIR", str(images_dir))
+    monkeypatch.setattr(config, "KINDLE_NOVEL_IMAGES_DIR", str(images_dir))
+    monkeypatch.setattr(config, "NOVEL_DB_DIR", str(db_dir))
+    monkeypatch.setattr(config, "NOVEL_DB_PATH", str(db_path))
 
     # LanceDB をテスト用 tmp_path にリダイレクト
     import services.novel_db.lance_store as _lance

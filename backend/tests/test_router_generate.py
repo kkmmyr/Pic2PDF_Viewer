@@ -20,8 +20,8 @@ from services.pdf_generator import GenerateResult
 
 class TestGenerate:
     def test_missing_input_dir_returns_503(self, client, tmp_data_dir, monkeypatch):
-        import routers.generate as rg
-        monkeypatch.setattr(rg, "DOUJIN_INPUT_DIR", "/nope/does/not/exist/qwerty")
+        import config
+        monkeypatch.setattr(config, "DOUJIN_INPUT_DIR", "/nope/does/not/exist/qwerty")
         res = client.post("/api/generate")
         assert res.status_code == 503
 
@@ -131,8 +131,8 @@ class TestGetGenerateJob:
 
 class TestStatus:
     def test_empty_when_input_dir_missing(self, client, tmp_data_dir, monkeypatch):
-        import routers.generate as rg
-        monkeypatch.setattr(rg, "DOUJIN_INPUT_DIR", "/nope/qwerty/zzz")
+        import config
+        monkeypatch.setattr(config, "DOUJIN_INPUT_DIR", "/nope/qwerty/zzz")
         res = client.get("/api/status")
         assert res.status_code == 200
         assert res.json() == {"items": []}

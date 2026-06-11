@@ -193,9 +193,10 @@ class TestSuggestSeries:
 
 @pytest.fixture
 def suggest_client(tmp_path, monkeypatch):
-    """suggest_series_endpoint を検証する TestClient。`meta_db.DATA_DIR` を tmp_path に。"""
+    """suggest_series_endpoint を検証する TestClient。`config.META_DB_DIR` を tmp_path に。"""
+    import config
     from fastapi.testclient import TestClient
-    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     from main import app
     return TestClient(app)
 

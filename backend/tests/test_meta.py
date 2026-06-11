@@ -30,8 +30,9 @@ class TestMakeKey:
 
 @pytest.fixture
 def view_client(tmp_path, monkeypatch):
-    """meta_db の DATA_DIR を tmp_path に差し替えた TestClient を提供する。"""
-    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    """meta_db の META_DB_DIR を tmp_path に差し替えた TestClient を提供する。"""
+    import config
+    monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     from main import app
     return TestClient(app)
 

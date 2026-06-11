@@ -15,7 +15,7 @@ import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 
-from config import KINDLE_NOVEL_IMAGES_DIR
+import config
 from utils.logger import get_logger
 
 from .chunker import chunk_page
@@ -37,7 +37,7 @@ ProgressCallback = Callable[[int, int], None]
 
 
 def _resolve_images_dir(book_name: str) -> Path:
-    return Path(KINDLE_NOVEL_IMAGES_DIR) / book_name
+    return Path(config.KINDLE_NOVEL_IMAGES_DIR) / book_name
 
 
 # ---------------------------------------------------------------------------

@@ -9,7 +9,7 @@ import threading
 import traceback
 from pathlib import Path
 
-from config import KINDLE_NOVEL_IMAGES_DIR
+import config
 from utils.logger import get_logger
 
 from .builder import _resolve_images_dir, _store_ocr_pages, rebuild_from_pages
@@ -26,14 +26,14 @@ logger = get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 def _list_all_book_names() -> list[str]:
-    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     if not images_dir.exists():
         return []
     return sorted(d.name for d in images_dir.iterdir() if d.is_dir())
 
 
 def _list_books_needing_ocr() -> list[str]:
-    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     if not images_dir.exists():
         return []
     all_dirs = {d.name for d in images_dir.iterdir() if d.is_dir()}
@@ -86,7 +86,7 @@ def _get_series_id(book_name: str) -> str | None:
 
 def _list_books_in_series(series_id: str) -> list[str]:
     from services.meta_store import load_meta
-    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     meta = load_meta("novel")
     names: list[str] = []
     for key, entry in meta.items():

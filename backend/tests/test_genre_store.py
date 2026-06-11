@@ -17,7 +17,8 @@ from services.meta_store import save_meta
 
 @pytest.fixture(autouse=True)
 def isolate_db(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    import config
+    monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     yield
 
 

@@ -18,9 +18,10 @@ from services.meta_store import load_meta
 
 @pytest.fixture
 def series_client(tmp_path, monkeypatch):
-    """assign / unassign を検証する TestClient。`meta_db.DATA_DIR` を tmp_path に。"""
+    """assign / unassign を検証する TestClient。`config.META_DB_DIR` を tmp_path に。"""
+    import config
     from fastapi.testclient import TestClient
-    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     from main import app
     return TestClient(app)
 

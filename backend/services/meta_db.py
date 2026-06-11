@@ -1,15 +1,12 @@
 """meta.db の接続・テーブル定義・JSON ファイルからの移行。
 
-DATA_DIR はモジュールレベル変数として保持するので、テスト時は
-  monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
-でパスを切り替えられる。
-実際の値は config.META_DB_DIR（env: META_DB_DIR、デフォルト backend/data/）から来る。
+テスト時は monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path)) でパスを切り替える。
 """
 import json
 import os
 import sqlite3
 
-from config import META_DB_DIR as DATA_DIR  # noqa: F401 – テスト用にモジュール名前空間に公開
+import config
 
 _CREATE_DDL = """
 CREATE TABLE IF NOT EXISTS books_meta (
@@ -57,15 +54,12 @@ CREATE TABLE IF NOT EXISTS group_pins (
 
 
 def _db_path() -> str:
-    """DATA_DIR を呼び出し時に解決する（monkeypatch 対応）。"""
-    import services.meta_db as _self
-    return os.path.join(_self.DATA_DIR, "meta2.db")
+    return os.path.join(config.META_DB_DIR, "meta2.db")
 
 
 def connect() -> sqlite3.Connection:
     """meta.db へ接続して返す。ディレクトリは自動作成。"""
-    import services.meta_db as _self
-    os.makedirs(_self.DATA_DIR, exist_ok=True)
+    os.makedirs(config.META_DB_DIR, exist_ok=True)
     conn = sqlite3.connect(_db_path(), timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")

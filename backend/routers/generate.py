@@ -2,7 +2,7 @@
 
 POST /generate         — バックグラウンドで PDF 生成ジョブを起動
 GET  /generate/job/:id — ジョブ進捗を取得
-GET  /status           — 入力ディレクトリ (DOUJIN_INPUT_DIR) の変換状態を一覧
+GET  /status           — 入力ディレクトリ (config.DOUJIN_INPUT_DIR) の変換状態を一覧
 POST /batch_compress   — 既存 PDF を一括圧縮
 """
 import asyncio
@@ -12,13 +12,7 @@ from enum import StrEnum
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from config import (
-    COMPLETE_DIR,
-    DOUJIN_INPUT_DIR,
-    IMAGES_DIR,
-    PDF_COMPRESSED_DIR,
-    THUMBNAIL_DIR,
-)
+import config
 from routers._deps import log_and_raise_500
 from services.job_manager import GenerateJob, JobStatus, JobStore
 from services.meta_store import update_meta_locked
@@ -50,11 +44,11 @@ def _run_generate_job(job: GenerateJob) -> None:
         job.update(status=JobStatus.RUNNING, current_item="Starting...")
 
         result = scan_and_generate(
-            DOUJIN_INPUT_DIR,
+            config.DOUJIN_INPUT_DIR,
             None,           # image-only モード: PDF 生成をスキップ
-            THUMBNAIL_DIR,
-            IMAGES_DIR,
-            COMPLETE_DIR,
+            config.THUMBNAIL_DIR,
+            config.IMAGES_DIR,
+            config.COMPLETE_DIR,
             progress_callback=progress_callback,
         )
 
@@ -94,8 +88,8 @@ async def _run_generate_job_async(job: GenerateJob) -> None:
 
 @router.post("/generate")
 async def generate_pdfs():
-    if not os.path.isdir(DOUJIN_INPUT_DIR):
-        raise HTTPException(status_code=503, detail=f"Input directory not found: {DOUJIN_INPUT_DIR}")
+    if not os.path.isdir(config.DOUJIN_INPUT_DIR):
+        raise HTTPException(status_code=503, detail=f"Input directory not found: {config.DOUJIN_INPUT_DIR}")
 
     job = job_store.create()
     asyncio.create_task(_run_generate_job_async(job))
@@ -114,20 +108,20 @@ def get_generate_job(job_id: str):
 
 @router.get("/status")
 def get_status():
-    if not os.path.isdir(DOUJIN_INPUT_DIR):
+    if not os.path.isdir(config.DOUJIN_INPUT_DIR):
         return {"items": []}
 
     current_item = job_store.get_active_current_item()
     items_status = []
 
-    for root, _dirs, files in os.walk(DOUJIN_INPUT_DIR):
+    for root, _dirs, files in os.walk(config.DOUJIN_INPUT_DIR):
         webp_files = [f for f in files if is_webp_file(f)]
         if webp_files:
             folder_name = os.path.basename(root)
-            if root == DOUJIN_INPUT_DIR:
-                folder_name = os.path.basename(DOUJIN_INPUT_DIR)
+            if root == config.DOUJIN_INPUT_DIR:
+                folder_name = os.path.basename(config.DOUJIN_INPUT_DIR)
 
-            img_dir = os.path.join(IMAGES_DIR, folder_name)
+            img_dir = os.path.join(config.IMAGES_DIR, folder_name)
 
             if current_item == folder_name:
                 status = GenerateStatus.IN_PROGRESS
@@ -142,7 +136,7 @@ def get_status():
         for zip_file in zip_files:
             item_name = os.path.splitext(zip_file)[0]
 
-            img_dir = os.path.join(IMAGES_DIR, item_name)
+            img_dir = os.path.join(config.IMAGES_DIR, item_name)
 
             if current_item == item_name:
                 status = GenerateStatus.IN_PROGRESS
@@ -163,7 +157,7 @@ class BatchCompressRequest(BaseModel):
 @router.post("/batch_compress")
 @log_and_raise_500("batch_compress")
 def batch_compress_pdfs(request: BatchCompressRequest):
-    if not os.path.exists(IMAGES_DIR):
+    if not os.path.exists(config.IMAGES_DIR):
         raise HTTPException(status_code=404, detail="Images directory not found")
-    generated = batch_compress(IMAGES_DIR, PDF_COMPRESSED_DIR, request.quality)
+    generated = batch_compress(config.IMAGES_DIR, config.PDF_COMPRESSED_DIR, request.quality)
     return {"message": "Batch compression complete", "files": generated}

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import quote
 
-from config import KINDLE_NOVEL_IMAGES_DIR
+import config
 from services.meta_store import load_meta
 
 
@@ -92,7 +92,7 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
 
     書籍ディレクトリが存在しない場合は None。
     """
-    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     if not (images_dir / book_name).is_dir():
         return None
 
@@ -142,7 +142,7 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
 
 def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
     """novel ソースの全書籍を返す（`images/` のサブディレクトリを起点）。"""
-    images_dir = Path(KINDLE_NOVEL_IMAGES_DIR)
+    images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
     if not images_dir.exists():
         return []
 

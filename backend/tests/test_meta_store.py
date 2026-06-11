@@ -5,8 +5,7 @@ services.meta_store の純関数ユニットテスト（Phase 64: SQLite バッ�
 このファイルは `merge_entry_fields` / `has_meaningful_value` /
 `update_meta_locked` を直接テストする。
 
-テスト時は DATA_DIR を tmp_path に向けることで meta.db を分離する。
-services.meta_db.DATA_DIR を monkeypatch することで DB パスが切り替わる。
+テスト時は config.META_DB_DIR を tmp_path に向けることで meta.db を分離する。
 
 実行方法:
     cd backend
@@ -30,7 +29,8 @@ from services.meta_store import (
 
 @pytest.fixture(autouse=True)
 def isolate_db(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    import config
+    monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
     yield
 
 

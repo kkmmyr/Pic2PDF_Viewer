@@ -14,7 +14,8 @@ from services.meta_db import (
 
 @pytest.fixture(autouse=True)
 def patch_data_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr("services.meta_db.DATA_DIR", str(tmp_path))
+    import config
+    monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -22,10 +23,10 @@ def patch_data_dir(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 class TestConnect:
-    def test_接続でディレクトリが自動作成される(self, tmp_path):
+    def test_接続でディレクトリが自動作成される(self, tmp_path, monkeypatch):
         sub = tmp_path / "sub"
-        import services.meta_db as m
-        m.DATA_DIR = str(sub)
+        import config
+        monkeypatch.setattr(config, "META_DB_DIR", str(sub))
         conn = connect()
         conn.close()
         assert (sub / "meta2.db").exists()
