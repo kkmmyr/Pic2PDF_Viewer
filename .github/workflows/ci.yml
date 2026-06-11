@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Backend: ruff lint/format + pytest (with coverage)
+  # ---------------------------------------------------------------------------
+  backend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      # opencv-python (kindle-pdf dependency) requires libGL on Linux
+      - name: System dependencies
+        run: sudo apt-get install -y libgl1
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Lint (ruff check)
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Format check (ruff format)
+        working-directory: backend
+        run: uv run ruff format --check .
+
+      - name: Type check (basedpyright)
+        working-directory: backend
+        run: uv run basedpyright
+
+      - name: Test (pytest + coverage)
+        working-directory: backend
+        run: uv run pytest -q --cov --cov-fail-under=65
+
+  # ---------------------------------------------------------------------------
+  # Frontend: eslint + tsc + vitest
+  # ---------------------------------------------------------------------------
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint (eslint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Test (tsc + vitest)
+        working-directory: frontend
+        run: npm run test:ci

@@ -1,7 +1,7 @@
 repos:
   # --- Python: ruff (linter + formatter) ---
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.13
+    rev: v0.15.16
     hooks:
       - id: ruff
         args: [--fix]
@@ -9,11 +9,15 @@ repos:
       - id: ruff-format
         files: ^backend/
 
-  # --- TypeScript / React: prettier + eslint ---
-  - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
+  # --- TypeScript / React: prettier ---
+  - repo: local
     hooks:
       - id: prettier
+        name: prettier
+        entry: npx prettier --write
+        language: node
+        additional_dependencies:
+          - "prettier@^3.8.3"
         files: ^frontend/src/.*\.(ts|tsx|css|json)$
 
   # --- General ---
@@ -25,6 +29,7 @@ repos:
       - id: end-of-file-fixer
         exclude: ^frontend/src/index\.css$
       - id: check-yaml
+        exclude: ^mkdocs\.yml$
       - id: check-merge-conflict
       - id: check-added-large-files
         args: [--maxkb=2000]

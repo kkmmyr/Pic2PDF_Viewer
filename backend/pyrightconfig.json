@@ -4,10 +4,14 @@
         ".venv",
         "data",
         "__pycache__",
-        "alembic/versions"
+        "alembic",
+        "tests",
+        "scripts",
+        "services/novel_db/ocr_worker.py"
     ],
-    "venvPath": ".",
+    "venvPath": "..",
     "venv": ".venv",
+    "extraPaths": ["../common/llm"],
     "pythonVersion": "3.12",
     "typeCheckingMode": "standard",
     "reportMissingImports": true,
