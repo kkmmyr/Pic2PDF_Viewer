@@ -11,14 +11,13 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from config import HITOMI_DATA_DIR as _hitomi_data_dir
 from services.hitomi import nozomi, state_store, watchlist
 from tools import hitomi_monitor
 
 _log = logging.getLogger(__name__)
 
 router = APIRouter()
-
-from config import HITOMI_DATA_DIR as _hitomi_data_dir
 
 DATA_DIR = Path(_hitomi_data_dir)
 

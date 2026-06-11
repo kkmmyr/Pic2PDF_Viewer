@@ -21,7 +21,7 @@ export interface UseNovelDbBooks {
 export function useNovelDbBooks(): UseNovelDbBooks {
     const queryClient = useQueryClient();
 
-    const { data, isLoading, error, refetch: queryRefetch } = useQuery({
+    const { data, isLoading, error } = useQuery({
         queryKey: novelBooksQueryKey,
         queryFn: async () => {
             const [books, series] = await Promise.all([fetchBooks(), fetchSeries()]);

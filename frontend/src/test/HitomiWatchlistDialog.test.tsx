@@ -150,7 +150,7 @@ describe('HitomiWatchlistDialog', () => {
         mockedGet.mockResolvedValue({ artists: [] });
         mockedPost.mockResolvedValue({ message: 'ok', normalized: 'x' });
 
-        const { getByPlaceholderText, container, getByText } = renderDialog();
+        const { getByPlaceholderText, getByText } = renderDialog();
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         fireEvent.change(getByPlaceholderText(/作者名/), { target: { value: 'x' } });

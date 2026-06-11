@@ -78,13 +78,12 @@ def create_tables(conn: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    """テーブル作成 + JSON ファイルからの自動移行を実行する。
+    """テーブル作成を実行する。
 
     アプリ起動時（lifespan）に 1 回だけ呼ぶ。
     """
     with connect() as conn:
         create_tables(conn)
-        _migrate_from_json(conn)
 
 
 # ---------------------------------------------------------------------------
@@ -148,78 +147,3 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 
 def upsert_entry(conn: sqlite3.Connection, source: str, book_id: str, entry: dict) -> None:
     conn.execute(_UPSERT_SQL, entry_to_params(source, book_id, entry))
-
-
-# ---------------------------------------------------------------------------
-# JSON → SQLite 移行
-# ---------------------------------------------------------------------------
-
-def _migrate_from_json(conn: sqlite3.Connection) -> None:
-    """data/meta/{source}/meta.json と data/genres/{source}.json が残っていれば
-    SQLite へ取り込み、元ファイルを .bak にリネームする。
-
-    既にそのソースのデータが存在する場合はスキップ（二重移行防止）。
-    """
-    import services.meta_db as _self
-    data_dir = _self.DATA_DIR
-    meta_base = os.path.join(data_dir, "meta")
-    genre_dir = os.path.join(data_dir, "genres")
-
-    try:
-        from config import VALID_SOURCES
-        sources = list(VALID_SOURCES)
-    except Exception:
-        sources = ["doujin", "comic", "novel"]
-
-    for source in sources:
-        _migrate_meta_json(conn, source, meta_base)
-        _migrate_genre_json(conn, source, genre_dir)
-
-
-def _migrate_meta_json(conn: sqlite3.Connection, source: str, meta_base: str) -> None:
-    meta_json = os.path.join(meta_base, source, "meta.json")
-    if not os.path.exists(meta_json):
-        return
-    count = conn.execute(
-        "SELECT COUNT(*) FROM books_meta WHERE source=?", (source,)
-    ).fetchone()[0]
-    if count > 0:
-        return
-    try:
-        with open(meta_json, encoding="utf-8") as f:
-            data: dict = json.load(f)
-        for book_id, entry in data.items():
-            upsert_entry(conn, source, book_id, entry)
-        conn.commit()
-    except Exception:
-        return
-    try:
-        os.rename(meta_json, meta_json + ".bak")
-    except OSError:
-        pass
-
-
-def _migrate_genre_json(conn: sqlite3.Connection, source: str, genre_dir: str) -> None:
-    genre_json = os.path.join(genre_dir, f"{source}.json")
-    if not os.path.exists(genre_json):
-        return
-    count = conn.execute(
-        "SELECT COUNT(*) FROM genres WHERE source=?", (source,)
-    ).fetchone()[0]
-    if count > 0:
-        return
-    try:
-        with open(genre_json, encoding="utf-8") as f:
-            genres: list[str] = json.load(f)
-        for i, genre in enumerate(genres):
-            conn.execute(
-                "INSERT OR IGNORE INTO genres (source, genre, sort_order) VALUES (?,?,?)",
-                (source, genre, i),
-            )
-        conn.commit()
-    except Exception:
-        return
-    try:
-        os.rename(genre_json, genre_json + ".bak")
-    except OSError:
-        pass

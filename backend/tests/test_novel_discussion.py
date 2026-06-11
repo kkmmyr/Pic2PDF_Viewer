@@ -20,7 +20,6 @@ from services.novel_db.discussion_service import (
 )
 from services.novel_db.search import SearchHit
 
-
 # ---------------------------------------------------------------------------
 # ヘルパー
 # ---------------------------------------------------------------------------
@@ -172,8 +171,9 @@ async def test_stream_discussion_turns_single_turn(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_save_and_list_discussion(tmp_data_dir, monkeypatch):
-    import services.novel_db.discussion_service as svc
     from pathlib import Path
+
+    import services.novel_db.discussion_service as svc
 
     discussions_dir = Path(tmp_data_dir["KINDLE_NOVEL_DIR"]) / "discussions"
     monkeypatch.setattr(svc, "DISCUSSIONS_DIR", discussions_dir)
@@ -193,8 +193,9 @@ def test_save_and_list_discussion(tmp_data_dir, monkeypatch):
 
 
 def test_list_discussions_empty_when_no_dir(tmp_data_dir, monkeypatch):
-    import services.novel_db.discussion_service as svc
     from pathlib import Path
+
+    import services.novel_db.discussion_service as svc
 
     discussions_dir = Path(tmp_data_dir["KINDLE_NOVEL_DIR"]) / "discussions"
     monkeypatch.setattr(svc, "DISCUSSIONS_DIR", discussions_dir)
@@ -208,11 +209,10 @@ def test_list_discussions_empty_when_no_dir(tmp_data_dir, monkeypatch):
 
 def test_generate_token_overflow_returns_error_sse(client, monkeypatch):
     """本文が MAX_INPUT_TOKENS を超えるときエラー SSE が返る。"""
-    from services.novel_db.search import SearchHit
-
     # ルーターは `from services.novel_db.search import load_all_pages_of_book` で
     # キャプチャしているため、routers.novel_discussion 側を差し替える
     import routers.novel_discussion as disc_router
+    from services.novel_db.search import SearchHit
 
     huge_text = "あ" * int(MAX_INPUT_TOKENS * 1.5 * 1.5 + 100)
     fake_hit = SearchHit(

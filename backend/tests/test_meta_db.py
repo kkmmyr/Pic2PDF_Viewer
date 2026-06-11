@@ -1,15 +1,12 @@
 """services/meta_db.py のユニットテスト。"""
 import json
-import os
 import sqlite3
 
 import pytest
 
-import services.meta_db as meta_db_module
 from services.meta_db import (
     connect,
     create_tables,
-    entry_to_params,
     row_to_entry,
     upsert_entry,
 )
@@ -161,68 +158,3 @@ class TestUpsertEntry:
         count = conn.execute("SELECT COUNT(*) FROM books_meta").fetchone()[0]
         assert count == 2
         conn.close()
-
-
-# ---------------------------------------------------------------------------
-# _migrate_from_json
-# ---------------------------------------------------------------------------
-
-class TestMigrateFromJson:
-    def _make_meta_json(self, tmp_path, source: str, data: dict) -> None:
-        meta_dir = tmp_path / "meta" / source
-        meta_dir.mkdir(parents=True, exist_ok=True)
-        (meta_dir / "meta.json").write_text(json.dumps(data), encoding="utf-8")
-
-    def _make_genre_json(self, tmp_path, source: str, genres: list) -> None:
-        genre_dir = tmp_path / "genres"
-        genre_dir.mkdir(exist_ok=True)
-        (genre_dir / f"{source}.json").write_text(json.dumps(genres), encoding="utf-8")
-
-    def test_meta_jsonからデータが移行される(self, tmp_path):
-        self._make_meta_json(tmp_path, "novel", {
-            "book1.pdf": {"authors": ["著者A"], "view_count": 3},
-        })
-        from services.meta_db import init_db
-        init_db()
-        conn = connect()
-        count = conn.execute(
-            "SELECT COUNT(*) FROM books_meta WHERE source='novel'"
-        ).fetchone()[0]
-        conn.close()
-        assert count == 1
-
-    def test_移行後にbakファイルが作成される(self, tmp_path):
-        self._make_meta_json(tmp_path, "novel", {"book.pdf": {"authors": []}})
-        from services.meta_db import init_db
-        init_db()
-        bak = tmp_path / "meta" / "novel" / "meta.json.bak"
-        assert bak.exists()
-
-    def test_データが既にある場合は移行をスキップする(self, tmp_path):
-        self._make_meta_json(tmp_path, "novel", {"book1.pdf": {"authors": ["著者A"]}})
-        from services.meta_db import init_db
-        init_db()
-        # 2回目（データあり）でも壊れない
-        self._make_meta_json(tmp_path, "novel", {"book2.pdf": {"authors": ["著者B"]}})
-        init_db()
-        conn = connect()
-        count = conn.execute(
-            "SELECT COUNT(*) FROM books_meta WHERE source='novel'"
-        ).fetchone()[0]
-        conn.close()
-        assert count == 1  # 2回目はスキップされるので追加されない
-
-    def test_genre_jsonからジャンルが移行される(self, tmp_path):
-        self._make_genre_json(tmp_path, "novel", ["ファンタジー", "SF"])
-        from services.meta_db import init_db
-        init_db()
-        conn = connect()
-        count = conn.execute(
-            "SELECT COUNT(*) FROM genres WHERE source='novel'"
-        ).fetchone()[0]
-        conn.close()
-        assert count == 2
-
-    def test_jsonが存在しない場合はスキップされる(self):
-        from services.meta_db import init_db
-        init_db()  # meta.json / genres.json なし → エラーなし

@@ -19,7 +19,7 @@ from .builder import rebuild_from_pages
 from .connection import with_db
 from .contextualizer import generate_chunk_context, make_embedding_input
 from .embedder import embed_batch
-from .lance_store import get_chunks_table, get_summaries_table
+from .lance_store import get_chunks_table
 from .schema import init_schema
 from .summarizer import summarize_book_with_characters, update_book_summary
 

@@ -7,14 +7,14 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import (
+    COMIC_IMAGES_DIR,
+    COMIC_PDF_DIR,
+    COMIC_THUMBNAIL_DIR,
     CORS_ORIGINS,
     FRONTEND_DIST_DIR,
     IMAGES_DIR,
-    COMIC_IMAGES_DIR,
     KINDLE_NOVEL_IMAGES_DIR,
     KINDLE_NOVEL_THUMBNAIL_DIR,
-    COMIC_PDF_DIR,
-    COMIC_THUMBNAIL_DIR,
     PROJECT_ROOT,
     THUMBNAIL_DIR,
 )

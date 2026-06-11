@@ -6,8 +6,8 @@ Usage:
     uv run python scripts/compare_char_extract.py
 """
 import sqlite3
-import time
 import sys
+import time
 
 sys.stdout.reconfigure(encoding="utf-8")
 

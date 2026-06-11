@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from services.novel_db.retrieval import RetrievalResult, retrieve
+from services.novel_db.retrieval import retrieve
 from services.novel_db.search import Scope, SearchHit
 
 

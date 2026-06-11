@@ -1,5 +1,4 @@
 """services._title_normalizer のユニットテスト。"""
-import pytest
 
 from services._title_normalizer import is_meaningful, normalize_title
 

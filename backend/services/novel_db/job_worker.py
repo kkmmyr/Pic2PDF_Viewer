@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import threading
 import traceback
-
 from pathlib import Path
 
 from config import KINDLE_NOVEL_IMAGES_DIR

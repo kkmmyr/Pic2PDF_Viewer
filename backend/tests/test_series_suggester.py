@@ -8,7 +8,6 @@ services.series_suggester のユニットテスト（A-1）。
     cd backend
     uv run pytest tests/test_series_suggester.py -v
 """
-import json
 import os
 import sys
 

@@ -18,7 +18,6 @@ const mockBulkSelectItems = vi.fn();
 const mockToggleSeriesPin = vi.fn();
 const mockToggleAuthorPin = vi.fn();
 const mockRecordView = vi.fn();
-const mockBumpVersion = vi.fn();
 
 const mockMembersByRep = new Map<string, { name: string }[]>();
 const mockSelectedItems = new Set<string>();

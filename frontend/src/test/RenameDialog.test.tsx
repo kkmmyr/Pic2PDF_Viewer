@@ -54,7 +54,7 @@ describe('RenameDialog', () => {
     });
 
     it('不正文字を入力するとエラーが表示され、変更ボタンが disabled', () => {
-        const { getByLabelText, getByText, container } = renderDialog();
+        const { getByLabelText, getByText } = renderDialog();
         fireEvent.change(getByLabelText('新しい名前'), { target: { value: 'bad/name' } });
         // バリデーションエラー文言（"使用できない文字" を含む）
         expect(document.body.textContent).toMatch(/使用できない文字/);
@@ -118,7 +118,7 @@ describe('RenameDialog', () => {
 
     it('onRename が throw すると error 表示が出る', async () => {
         const onRename = vi.fn().mockRejectedValue(new Error('既存ファイル'));
-        const { getByText, getByLabelText, container } = renderDialog({ onRename });
+        const { getByText, getByLabelText } = renderDialog({ onRename });
 
         fireEvent.change(getByLabelText('新しい名前'), { target: { value: 'newname' } });
         await act(async () => {

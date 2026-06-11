@@ -1,5 +1,4 @@
 """services/amazon_csv_parser.py のユニットテスト。"""
-import pytest
 
 from services.amazon_csv_parser import (
     ParsedRow,
@@ -10,7 +9,6 @@ from services.amazon_csv_parser import (
     match_books,
     parse_csv,
 )
-
 
 # ---------------------------------------------------------------------------
 # _extract_publisher
@@ -108,7 +106,8 @@ class TestDecode:
 # ---------------------------------------------------------------------------
 
 def _make_csv_bytes(rows: list[dict], encoding: str = "utf-8-sig") -> bytes:
-    import csv, io
+    import csv
+    import io
     fieldnames = ["商品名", "商品URL", "付帯情報"]
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames)

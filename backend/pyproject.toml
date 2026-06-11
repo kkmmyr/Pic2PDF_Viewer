@@ -28,6 +28,7 @@ dev = [
     "httpx",
     "ruff>=0.15.12",
     "pytest-cov>=7.1.0",
+    "basedpyright>=1.39.7",
 ]
 
 [tool.uv]
@@ -44,6 +45,7 @@ qwen-common = { path = "../../common/llm", editable = true }
 # ----------------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
 
 [tool.coverage.run]
 branch = true
@@ -96,3 +98,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # テストではダミー変数や長い fixture 名が出るので一部緩める
 "tests/**" = ["B011"]
+# スタンドアロンスクリプトは sys.path 操作後に import するため E402 を許可
+# ベンチスクリプトは可読性のため変数名ルールを緩める
+"scripts/**" = ["E402", "E741", "B905"]
+"_check_db.py" = ["E402"]

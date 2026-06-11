@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS
 from routers._deps import sse_event
-from utils.logger import get_logger
 from services.novel_db.connection import with_db
 from services.novel_db.discussion_service import (
     MAX_INPUT_TOKENS,
@@ -25,6 +24,7 @@ from services.novel_db.discussion_service import (
     stream_discussion_turns,
 )
 from services.novel_db.search import load_all_pages_of_book
+from utils.logger import get_logger
 
 router = APIRouter()
 logger = get_logger(__name__)

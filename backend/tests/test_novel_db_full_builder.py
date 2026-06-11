@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -101,7 +101,7 @@ class TestRunCombinedStep:
     def test_characters_are_inserted_to_db(self, db_conn):
         """summarize_book_with_characters が返したキャラクターが DB に INSERT される。"""
         book_id = _insert_book(db_conn, "charbook")
-        page_id = _insert_page(db_conn, book_id, 1, "アリスはふしぎの国の住人")
+        _insert_page(db_conn, book_id, 1, "アリスはふしぎの国の住人")
 
         char_summaries = {"アリス": "主人公の少女"}
         mock_summarize = MagicMock(return_value=("本のサマリ", char_summaries))
@@ -146,8 +146,8 @@ class TestRunGenerateContexts:
     def test_processes_chunks_without_context(self, db_conn, monkeypatch):
         """contextual_text が NULL のチャンクのみ処理する。"""
         book_id = _insert_book(db_conn, "partial-book", summary="サマリ")
-        page_id = _insert_page(db_conn, partial_book_id := book_id, 1, "本文")
-        chunk_id_no_ctx = _insert_chunk(db_conn, page_id, 0, ctx_text=None)
+        page_id = _insert_page(db_conn, book_id, 1, "本文")
+        _insert_chunk(db_conn, page_id, 0, ctx_text=None)
         _insert_chunk(db_conn, page_id, 1, ctx_text="既存")
 
         mock_ctx = MagicMock(return_value="生成コンテキスト")
