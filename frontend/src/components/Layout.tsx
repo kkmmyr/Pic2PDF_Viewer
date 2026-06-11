@@ -1,4 +1,4 @@
-import { Fragment, type ComponentType } from 'react';
+import { Fragment, Suspense, type ComponentType } from 'react';
 import { Link, Outlet, useLocation, useSearchParams } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import {
@@ -135,7 +135,9 @@ export default function Layout() {
                 </header>
             )}
             <main className="flex-1 w-full mx-auto">
-                <Outlet />
+                <Suspense fallback={null}>
+                    <Outlet />
+                </Suspense>
             </main>
             <Toaster position="bottom-right" richColors />
         </div>
