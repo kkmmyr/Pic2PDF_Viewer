@@ -3,6 +3,8 @@
  * バックエンド API スキーマと一致させる（docs/03_詳細設計/API仕様書.md §7）。
  */
 
+import type { components } from '../../types/api';
+
 export type ScopeType = 'all' | 'series' | 'book';
 
 export interface Scope {
@@ -35,11 +37,7 @@ export interface BookDetail extends BookSummary {
     discussion_count: number;
 }
 
-export interface SimilarBook {
-    name: string;
-    /** コサイン類似度近似 (0〜1)。高いほど類似 */
-    score: number;
-}
+export type SimilarBook = components['schemas']['SimilarBookOut'];
 
 // ---------------------------------------------------------------------------
 // 書籍メタ編集（4.3）
@@ -56,11 +54,7 @@ export interface NovelMetaPatch {
     release_date?: string;
 }
 
-export interface SeriesSummary {
-    id: string;
-    name: string;
-    book_count: number;
-}
+export type SeriesSummary = components['schemas']['SeriesSummaryOut'];
 
 export interface SearchHit {
     book_name: string;
@@ -134,10 +128,7 @@ export interface RebuildStatus {
     recent_finished: RebuildJob[];
 }
 
-export interface RebuildEnqueueResponse {
-    job_id: number;
-    queued_position: number;
-}
+export type RebuildEnqueueResponse = components['schemas']['RebuildEnqueueResponse'];
 
 // ---------------------------------------------------------------------------
 // マルチターン会話 QA（B-16）
@@ -170,26 +161,9 @@ export interface ChatSessionDetail extends ChatSessionSummary {
 // キャラクター辞典（B-15）
 // ---------------------------------------------------------------------------
 
-export interface CharacterSummary {
-    name: string;
-    first_page: number;
-    page_count: number;
-    has_summary: boolean;
-}
-
-export interface CharacterScene {
-    page_no: number;
-    char_count: number;
-}
-
-export interface CharacterDetail {
-    name: string;
-    first_page: number;
-    page_count: number;
-    summary: string | null;
-    generated_at: string | null;
-    top_scenes: CharacterScene[];
-}
+export type CharacterSummary = components['schemas']['CharacterSummary'];
+export type CharacterScene = components['schemas']['CharacterScene'];
+export type CharacterDetail = components['schemas']['CharacterDetail'];
 
 // ---------------------------------------------------------------------------
 // 読書会ディスカッション（B-20）

@@ -1,5 +1,8 @@
+import type { components } from './api';
+
 /**
  * PDFファイル情報
+ * Note: generated PdfFileOut has `thumbnail?: string | null` (optional), but runtime always includes it.
  */
 export interface PdfFile {
     name: string;
@@ -7,20 +10,11 @@ export interface PdfFile {
     created_at: number;
 }
 
-/**
- * 書籍画像APIレスポンス
- */
-export interface BookImagesResponse {
-    images: string[];
-}
+/** 書籍画像APIレスポンス */
+export type BookImagesResponse = components['schemas']['BookImagesResponse'];
 
-/**
- * ページ削除APIレスポンス
- */
-export interface DeletePagesResponse {
-    message: string;
-    total_pages: number;
-}
+/** ページ削除APIレスポンス */
+export type DeletePagesResponse = components['schemas']['DeletePagesResponse'];
 
 /**
  * ステータスアイテム
@@ -143,23 +137,12 @@ export interface BookMetaEntry {
  */
 export type BookMetaMap = Record<string, BookMetaEntry>;
 
-/**
- * サムネイル一括再生成APIレスポンス
- */
-export interface RegenerateThumbnailBulkResponse {
-    message: string;
-    succeeded: string[];
-    failed: string[];
-}
+/** サムネイル一括再生成APIレスポンス */
+export type RegenerateThumbnailBulkResponse =
+    components['schemas']['RegenerateThumbnailBulkResponse'];
 
-/**
- * PDF結合APIレスポンス
- */
-export interface MergePdfsResponse {
-    message: string;
-    output_name: string;
-    total_pages: number;
-}
+/** PDF結合APIレスポンス */
+export type MergePdfsResponse = components['schemas']['MergePdfsResponse'];
 
 /**
  * シリーズ一括登録ダイアログ用のシリーズ選択肢。
@@ -176,12 +159,4 @@ export interface ExistingSeriesOption {
  * 既存シリーズへの紐付け候補（A-1）。
  * `POST /api/series/suggest` のレスポンスに含まれる各候補。
  */
-export interface SuggestedSeries {
-    series_id: string;
-    series_title: string;
-    series_max_index: number;
-    /** 0.0〜1.0、降順ソートで返却される */
-    score: number;
-    /** マッチ理由のカンマ区切りキー（"title_match" / "title_match,author_match"） */
-    reason: string;
-}
+export type SuggestedSeries = components['schemas']['SuggestedSeriesOut'];
