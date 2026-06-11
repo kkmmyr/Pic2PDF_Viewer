@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 > nul
-cd /d %~dp0\frontend
+cd /d %~dp0\..\frontend
 
 echo === Pic2PDF_Viewer release build ===
 echo.

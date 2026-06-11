@@ -21,6 +21,11 @@
 | [0007](0007_llm-extraction-qwen-adoption.md) | 小説 RAG の LLM を Qwen3.6 に切替 + 共通モジュールに切り出し | Accepted | 2026-05-10 |
 | [0008](0008_design-docs-html-build.md) | 設計ドキュメントを Markdown 編集 + mkdocs-material で HTML 配信 | Accepted | 2026-05-11 |
 | [0009](0009_llm-backend-llama-server.md) | 小説 RAG の Qwen 推論バックエンドを Ollama から llama-server に切替 | Accepted | 2026-05-11 |
+| [0010](0010_uv-workspace-monorepo.md) | uv workspace でモノレポ化（common/llm を repo 内に取り込み） | Accepted | 2026-06-11 |
+| [0011](0011_github-actions-ci.md) | GitHub Actions CI 導入（PR 品質ゲートの自動化） | Accepted | 2026-06-11 |
+| [0012](0012_sqlmodel-orm.md) | novel.db クエリを SQLModel ORM に移行 | Accepted | 2026-06-11 |
+| [0013](0013_openapi-typescript.md) | openapi-typescript で BE/FE 型契約を一本化 | Accepted | 2026-06-11 |
+| [0014](0014_react-router-data-router.md) | react-router v7 data router への移行 | Accepted | 2026-06-11 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順
