@@ -753,20 +753,25 @@ novel ソース 1 冊のメタデータを部分更新する。`{book_key}` は 
 
 ## §5. OCR
 
-> **2026-05-13 更新**: `ocr_service.py` を `start_batch_ocr.bat`（Phase 5 で削除済み）経由のサブプロセス起動からスレッドベース実装に刷新。`run_ocr_subprocess` + `_store_ocr_pages` を直接呼ぶ。`POST /api/ocr/run` は再び動作する。
+> **2026-06-12 更新**: 旧 `OCRService`（Borg singleton + daemon thread）を廃止し、`novel_db` の `job_queue`（`rebuild_jobs` テーブル）で OCR ジョブを一元管理する方式に変更。`POST /api/ocr/run` は `job_queue.enqueue()` を呼ぶだけになった。
 
 ### §5.1 `POST /api/ocr/run`
 
-novel OCR を開始する。`services.ocr_service.OCRService` がスレッドを起動し、`run_ocr_subprocess`（yomitoku）でテキスト抽出 → `_store_ocr_pages` で DB 保存。
+novel OCR ジョブを `job_queue` にエンキューする。`target_dir` 指定時は単冊 OCR (`mode="ocr"`, `target_id=target_dir`)、省略時は全冊 OCR (`mode="ocr"`, 対象全書籍)。
 
 **クエリパラメータ**:
-- `target_dir` (オプション) — 対象書籍ディレクトリ名を指定（省略時は `kindle_novel/images/` 配下の全書籍）
+- `target_dir` (オプション) — 対象書籍ディレクトリ名を指定（省略時は全書籍）
+
+**レスポンス**:
+```json
+{"status": "queued", "job_id": "...", "queue_position": 1}
+```
 
 ---
 
 ### §5.2 `POST /api/ocr/stop`
 
-実行中の OCR を停止要求する（現在処理中の書籍が完了した時点で停止。強制終了ではない）。
+キュー中の OCR ジョブをキャンセルする（`cancel_queued_by_mode("ocr")`）。キャンセル対象がなければ 400 を返す。実行中ジョブは停止できない（キュー待ちのみ対象）。
 
 ---
 
