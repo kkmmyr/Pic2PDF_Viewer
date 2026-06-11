@@ -58,10 +58,10 @@ describe('QuestionInput', () => {
         // ダイアログが表示されている
         expect(screen.getByText('同じ質問を再送しますか?')).toBeInTheDocument();
 
-        // 「送信」ボタンが 2 つ存在（入力欄横 + ダイアログ内）。ダイアログ内（最後）をクリック
+        // ダイアログ表示中は入力欄の「送信」ボタンが aria-hidden。ダイアログ内のみが accessible
         const sendButtons = screen.getAllByRole('button', { name: /送信/ });
-        expect(sendButtons.length).toBe(2);
-        fireEvent.click(sendButtons[sendButtons.length - 1]);
+        expect(sendButtons.length).toBe(1);
+        fireEvent.click(sendButtons[0]);
         expect(onSubmit).toHaveBeenCalledWith('同じ質問');
     });
 

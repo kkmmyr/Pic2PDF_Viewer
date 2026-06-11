@@ -154,7 +154,7 @@ describe('HitomiWatchlistDialog', () => {
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
 
         fireEvent.change(getByPlaceholderText(/作者名/), { target: { value: 'x' } });
-        const select = container.querySelector('select')!;
+        const select = document.body.querySelector('select')!;
         fireEvent.change(select, { target: { value: 'english' } });
 
         await act(async () => {

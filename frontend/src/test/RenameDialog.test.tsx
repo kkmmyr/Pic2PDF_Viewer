@@ -57,7 +57,7 @@ describe('RenameDialog', () => {
         const { getByLabelText, getByText, container } = renderDialog();
         fireEvent.change(getByLabelText('新しい名前'), { target: { value: 'bad/name' } });
         // バリデーションエラー文言（"使用できない文字" を含む）
-        expect(container.textContent).toMatch(/使用できない文字/);
+        expect(document.body.textContent).toMatch(/使用できない文字/);
         expect((getByText('変更') as HTMLButtonElement).disabled).toBe(true);
     });
 
@@ -127,13 +127,13 @@ describe('RenameDialog', () => {
             await Promise.resolve();
         });
 
-        await waitFor(() => expect(container.textContent).toContain('既存ファイル'));
+        await waitFor(() => expect(document.body.textContent).toContain('既存ファイル'));
     });
 
     it('Escape キー（Dialog 経由）で onClose が呼ばれる', () => {
         const onClose = vi.fn();
         renderDialog({ onClose });
-        fireEvent.keyDown(window, { key: 'Escape' });
+        fireEvent.keyDown(document, { key: 'Escape' });
         expect(onClose).toHaveBeenCalled();
     });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen } from '@testing-library/react';
 import {
     Dialog,
     DialogBody,
@@ -10,31 +10,31 @@ import {
 
 describe('Dialog', () => {
     it('open=false で何もレンダリングしない', () => {
-        const { container } = render(
+        render(
             <Dialog open={false} title="t" onClose={() => {}}>
                 <div>body</div>
             </Dialog>,
         );
-        expect(container.firstChild).toBeNull();
+        expect(screen.queryByRole('dialog')).toBeNull();
     });
 
     it('open=true で title と children が表示される', () => {
-        const { getByText } = render(
+        render(
             <Dialog open title="フォルダ作成" onClose={() => {}}>
                 <div>本文</div>
             </Dialog>,
         );
-        expect(getByText('フォルダ作成')).toBeInTheDocument();
-        expect(getByText('本文')).toBeInTheDocument();
+        expect(screen.getByText('フォルダ作成')).toBeInTheDocument();
+        expect(screen.getByText('本文')).toBeInTheDocument();
     });
 
     it('subtitle が指定されると表示される', () => {
-        const { getByText } = render(
+        render(
             <Dialog open title="t" subtitle="3 冊適用" onClose={() => {}}>
                 <div />
             </Dialog>,
         );
-        expect(getByText('3 冊適用')).toBeInTheDocument();
+        expect(screen.getByText('3 冊適用')).toBeInTheDocument();
     });
 
     it('Escape キーで onClose が呼ばれる', () => {
@@ -44,7 +44,7 @@ describe('Dialog', () => {
                 <div />
             </Dialog>,
         );
-        fireEvent.keyDown(window, { key: 'Escape' });
+        fireEvent.keyDown(document, { key: 'Escape' });
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
@@ -55,8 +55,8 @@ describe('Dialog', () => {
                 <div />
             </Dialog>,
         );
-        fireEvent.keyDown(window, { key: 'Enter' });
-        fireEvent.keyDown(window, { key: 'a' });
+        fireEvent.keyDown(document, { key: 'Enter' });
+        fireEvent.keyDown(document, { key: 'a' });
         expect(onClose).not.toHaveBeenCalled();
     });
 
@@ -67,80 +67,80 @@ describe('Dialog', () => {
                 <div />
             </Dialog>,
         );
-        fireEvent.keyDown(window, { key: 'Escape' });
+        fireEvent.keyDown(document, { key: 'Escape' });
         expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('外クリック（オーバーレイ自身）で onClose が呼ばれる', () => {
+    it('外クリック（オーバーレイ）で onClose が呼ばれる', () => {
         const onClose = vi.fn();
-        const { container } = render(
+        render(
             <Dialog open title="t" onClose={onClose}>
                 <div>body</div>
             </Dialog>,
         );
-        const overlay = container.firstChild as HTMLElement;
+        const overlay = screen.getByTestId('dialog-overlay');
         fireEvent.click(overlay);
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('内側クリックでは onClose が呼ばれない（target !== currentTarget）', () => {
+    it('内側クリックでは onClose が呼ばれない', () => {
         const onClose = vi.fn();
-        const { getByText } = render(
+        render(
             <Dialog open title="t" onClose={onClose}>
                 <div>body</div>
             </Dialog>,
         );
-        fireEvent.click(getByText('body'));
+        fireEvent.click(screen.getByText('body'));
         expect(onClose).not.toHaveBeenCalled();
     });
 
     it('×ボタン（aria-label="閉じる"）クリックで onClose', () => {
         const onClose = vi.fn();
-        const { getByLabelText } = render(
+        render(
             <Dialog open title="t" onClose={onClose}>
                 <div />
             </Dialog>,
         );
-        fireEvent.click(getByLabelText('閉じる'));
+        fireEvent.click(screen.getByLabelText('閉じる'));
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('nested=true で z-dialog-nested クラスが付く', () => {
-        const { container } = render(
+    it('nested=true で z-dialog-nested クラスが overlay に付く', () => {
+        render(
             <Dialog open title="t" nested onClose={() => {}}>
                 <div />
             </Dialog>,
         );
-        expect((container.firstChild as HTMLElement).className).toContain('z-dialog-nested');
+        expect(screen.getByTestId('dialog-overlay').className).toContain('z-dialog-nested');
     });
 
     it('nested 既定は z-dialog（z-dialog-nested ではない）', () => {
-        const { container } = render(
+        render(
             <Dialog open title="t" onClose={() => {}}>
                 <div />
             </Dialog>,
         );
-        const cls = (container.firstChild as HTMLElement).className;
+        const cls = screen.getByTestId('dialog-overlay').className;
         expect(cls).toContain('z-dialog');
         expect(cls).not.toContain('z-dialog-nested');
     });
 
-    it('maxWidth=md で max-w-md', () => {
-        const { container } = render(
+    it('maxWidth=md で max-w-md が content に付く', () => {
+        render(
             <Dialog open title="t" maxWidth="md" onClose={() => {}}>
                 <div />
             </Dialog>,
         );
-        expect(container.querySelector('.max-w-md')).not.toBeNull();
+        expect(screen.getByRole('dialog').className).toContain('max-w-md');
     });
 
     it('maxWidth 既定は sm', () => {
-        const { container } = render(
+        render(
             <Dialog open title="t" onClose={() => {}}>
                 <div />
             </Dialog>,
         );
-        expect(container.querySelector('.max-w-sm')).not.toBeNull();
+        expect(screen.getByRole('dialog').className).toContain('max-w-sm');
     });
 });
 

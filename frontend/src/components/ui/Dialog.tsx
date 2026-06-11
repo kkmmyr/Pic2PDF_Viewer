@@ -1,5 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
+import * as RadixDialog from '@radix-ui/react-dialog';
+import { type ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 type DialogMaxWidth = 'sm' | 'md' | 'xl';
 
@@ -25,10 +27,8 @@ const MAX_WIDTH_CLASS: Record<DialogMaxWidth, string> = {
 };
 
 /**
- * ダイアログ共通シェル。
- *
- * - 黒オーバーレイ + 中央配置 + 外クリック閉じ + Esc 閉じを共通化する。
- * - z-index は Tailwind config で定義した `z-dialog` / `z-dialog-nested` を使用。
+ * ダイアログ共通シェル。Radix Dialog を内部で使用し、フォーカストラップ・
+ * スクロールロック・ポータルレンダリングを提供する。
  *
  * 使用例:
  * ```tsx
@@ -51,52 +51,51 @@ export function Dialog({
     onClose,
     children,
 }: DialogProps) {
-    // Esc キーで閉じる
-    useEffect(() => {
-        if (!open) return;
-        const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [open, onClose]);
-
-    if (!open) return null;
-
-    const zIndexClass = nested ? 'z-dialog-nested' : 'z-dialog';
+    const zClass = nested ? 'z-dialog-nested' : 'z-dialog';
 
     return (
-        <div
-            className={`fixed inset-0 bg-black/50 flex items-center justify-center ${zIndexClass}`}
-            onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
-            }}
-        >
-            <div
-                className={`bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full ${MAX_WIDTH_CLASS[maxWidth]} mx-4 border border-gray-200 dark:border-gray-700 ${className}`}
-            >
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <div>
-                        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                            {title}
-                        </h2>
-                        {subtitle && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                {subtitle}
-                            </p>
-                        )}
+        <RadixDialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+            <RadixDialog.Portal>
+                <RadixDialog.Overlay
+                    data-testid="dialog-overlay"
+                    className={cn('fixed inset-0 bg-black/50', zClass)}
+                    onClick={() => onClose()}
+                />
+                <RadixDialog.Content
+                    className={cn(
+                        'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
+                        'bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full mx-4',
+                        'border border-gray-200 dark:border-gray-700',
+                        MAX_WIDTH_CLASS[maxWidth],
+                        zClass,
+                        className,
+                    )}
+                    onInteractOutside={(e) => e.preventDefault()}
+                >
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div>
+                            <RadixDialog.Title className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                                {title}
+                            </RadixDialog.Title>
+                            {subtitle && (
+                                <RadixDialog.Description className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {subtitle}
+                                </RadixDialog.Description>
+                            )}
+                        </div>
+                        <RadixDialog.Close asChild>
+                            <button
+                                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                                aria-label="閉じる"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </RadixDialog.Close>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-                        aria-label="閉じる"
-                    >
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
-                {children}
-            </div>
-        </div>
+                    {children}
+                </RadixDialog.Content>
+            </RadixDialog.Portal>
+        </RadixDialog.Root>
     );
 }
 
@@ -108,7 +107,7 @@ export function DialogBody({
     children: ReactNode;
     className?: string;
 }) {
-    return <div className={`px-6 py-4 ${className}`}>{children}</div>;
+    return <div className={cn('px-6 py-4', className)}>{children}</div>;
 }
 
 /** ダイアログ下部のボタン領域（ボーダー + 右寄せ flex）。 */
