@@ -25,6 +25,7 @@ const makeOptions = (overrides: Record<string, unknown> = {}) => ({
         updateGenre: vi.fn().mockResolvedValue(undefined),
         setHidden: vi.fn().mockResolvedValue(undefined),
         assignSeries: vi.fn().mockResolvedValue('sid'),
+        unassignSeries: vi.fn().mockResolvedValue(undefined),
         reorderSeries: vi.fn().mockResolvedValue(undefined),
     },
     addGenre: vi.fn().mockResolvedValue(undefined),

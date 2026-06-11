@@ -214,6 +214,7 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
             updateGenre,
             setHidden,
             assignSeries,
+            unassignSeries,
             reorderSeries,
         },
         addGenre,

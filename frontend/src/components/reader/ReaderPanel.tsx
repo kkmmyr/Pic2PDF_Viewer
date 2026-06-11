@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { LibrarySource } from '@/types';
 import { ReaderProvider, useReaderContext } from '@/contexts/ReaderContext';
-import { useTouchSwipe } from '@/hooks/useTouchSwipe';
+import { useTouchSwipe } from '@/hooks/reader/useTouchSwipe';
 import { PdfSearchBar } from './PdfSearchBar';
 import { PageSlider } from './PageSlider';
 import { PageGridOverlay } from './PageGridOverlay';

@@ -9,7 +9,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { ExistingSeriesOption, LibrarySource } from '@/types';
 import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
-import { useSeriesSuggestion } from '@/hooks/useSeriesSuggestion';
+import { useSeriesSuggestion } from '@/hooks/library/useSeriesSuggestion';
 
 export interface BulkSeriesAssignResult {
     mode: 'existing' | 'new' | 'remove';

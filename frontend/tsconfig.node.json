@@ -10,7 +10,8 @@
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "isolatedModules": true,
-        "noEmit": true
+        "noEmit": true,
+        "types": ["node", "vite/client"]
     },
     "include": [
         "vite.config.ts"

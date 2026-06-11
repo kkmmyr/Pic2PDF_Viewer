@@ -161,14 +161,14 @@ export function useBookSeries(source: string) {
     /** 書籍をシリーズから外す（series_* フィールドを削除）。 */
     const unassignSeries = useCallback(
         (path: string, names: string[]): Promise<void> =>
-            mutateUnassign({ path, names }) as Promise<void>,
+            mutateUnassign({ path, names }).then(() => undefined),
         [mutateUnassign],
     );
 
     /** シリーズドリルダウン中の DnD ドロップで呼ばれる。楽観的更新 + ロールバック実装済み。 */
     const reorderSeries = useCallback(
         (path: string, names: string[], seriesId: string): Promise<void> =>
-            mutateReorder({ path, names, seriesId }) as Promise<void>,
+            mutateReorder({ path, names, seriesId }).then(() => undefined),
         [mutateReorder],
     );
 

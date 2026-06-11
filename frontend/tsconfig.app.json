@@ -9,6 +9,7 @@
         ],
         "module": "ESNext",
         "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": false,
         /* Bundler mode */
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
@@ -17,6 +18,7 @@
         "noEmit": true,
         "jsx": "react-jsx",
         /* Path aliases */
+        "ignoreDeprecations": "6.0",
         "baseUrl": ".",
         "paths": {
             "@/*": ["src/*"]

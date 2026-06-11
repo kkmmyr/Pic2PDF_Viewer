@@ -17,7 +17,15 @@ interface BookMetaActions {
         names: string[],
         params: { title: string; index: number | number[]; id?: string },
     ) => Promise<string>;
+    unassignSeries: (path: string, names: string[]) => Promise<void>;
     reorderSeries: (path: string, names: string[], seriesId: string) => Promise<void>;
+}
+
+interface SeriesAssignParams {
+    mode: 'existing' | 'new' | 'remove';
+    seriesId?: string;
+    seriesTitle?: string;
+    indexes?: number[];
 }
 
 interface UseLibraryBulkActionsOptions {
@@ -163,22 +171,33 @@ export function useLibraryBulkActions({
     }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, runAsync]);
 
     const handleBulkAssignSeries = useCallback(
-        async (params: { title: string; indexes: number[]; id?: string }) => {
+        async (params: SeriesAssignParams) => {
             if (bulkSeriesNames.length === 0) return;
-            if (params.indexes.length !== bulkSeriesNames.length) {
-                throw new Error('採番リストが選択数と一致しません');
+            if (params.mode === 'remove') {
+                await runAsync(
+                    () => bookMeta.unassignSeries(currentPath, bulkSeriesNames),
+                    'シリーズ解除に失敗しました。',
+                    { rethrow: true },
+                );
+                toast.success(`${bulkSeriesNames.length} 冊をシリーズから外しました`);
+            } else {
+                const title = params.seriesTitle ?? '';
+                const indexes = params.indexes ?? [];
+                if (indexes.length !== bulkSeriesNames.length) {
+                    throw new Error('採番リストが選択数と一致しません');
+                }
+                await runAsync(
+                    () =>
+                        bookMeta.assignSeries(currentPath, bulkSeriesNames, {
+                            title,
+                            index: indexes,
+                            id: params.seriesId,
+                        }),
+                    'シリーズ登録に失敗しました。',
+                    { rethrow: true },
+                );
+                toast.success(`${bulkSeriesNames.length} 冊を「${title}」に登録しました`);
             }
-            await runAsync(
-                () =>
-                    bookMeta.assignSeries(currentPath, bulkSeriesNames, {
-                        title: params.title,
-                        index: params.indexes,
-                        id: params.id,
-                    }),
-                'シリーズ登録に失敗しました。',
-                { rethrow: true },
-            );
-            toast.success(`${bulkSeriesNames.length} 冊を「${params.title}」に登録しました`);
             onClearSelection();
         },
         [bookMeta, currentPath, bulkSeriesNames, runAsync, onClearSelection],
