@@ -118,7 +118,6 @@ backend/
 └── services/
     └── novel_db/                    # 新規パッケージ
         ├── __init__.py
-        ├── schema.py                # SQLite スキーマ DDL（全カラム含む最新定義）
         ├── migrations.py            # Alembic upgrade_head() ヘルパー（起動時呼び出し）
         ├── connection.py            # sqlite3 接続 + sqlite_vec.load()
         ├── extractor.py             # PyMuPDF blocks 抽出 + OCR subprocess インターフェース
@@ -153,7 +152,7 @@ backend/scripts/                     # CLI 用ツール
 
 ## 4. データモデル（SQLite スキーマ）
 
-`services/novel_db/schema.py` に DDL を集約。**Phase 66** で Alembic を導入済み（`backend/alembic/`）。`_ddl()` は常に全カラムを含む最新スキーマを返し、`init_schema(conn)` は `CREATE TABLE IF NOT EXISTS` で冪等に実行する。既存 DB へのカラム追加は Alembic revision が担い、起動時 `upgrade_head()` で自動適用される（失敗で起動中断）。
+スキーマは Alembic が唯一の真実の源。`backend/alembic/versions/` に revision が集約される。新規 DB は `0003_schema_base.py` が完全スキーマを生成し、既存 DB へのカラム追加は各 revision が冪等に実行する。起動時 `upgrade_head()` で自動適用（失敗で起動中断）。`schema.py` による起動時 DDL（`init_schema`）は廃止済み。
 
 ```sql
 -- 書籍メタ（DB 構築時に upsert）
@@ -1241,8 +1240,8 @@ class NovelDbJobQueue:
         return self._worker.is_running
 
     def start(self) -> None:
+        # スキーマ初期化は起動時に upgrade_head() で完了済み（main.py の lifespan）
         with with_db() as conn:
-            init_schema(conn)
             conn.execute("UPDATE rebuild_jobs SET state='failed', error_message='aborted by server restart' WHERE state='running'")
             conn.execute("UPDATE rebuild_jobs SET mode='rebuild' WHERE mode='pdf_text'")
             conn.execute("UPDATE rebuild_jobs SET mode='ocr' WHERE mode='reocr'")
