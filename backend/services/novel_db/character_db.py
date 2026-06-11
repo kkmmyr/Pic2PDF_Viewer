@@ -7,6 +7,8 @@ from __future__ import annotations
 import sqlite3
 from dataclasses import dataclass
 
+from sqlmodel import SQLModel
+
 # キャラ名は通常 5〜15 字、まれに敬称付きで 20 字程度。30 字超は誤抽出と判断。
 _NAME_MAX_LEN = 30
 
@@ -19,14 +21,13 @@ class CharacterStat:
     page_count: int
 
 
-@dataclass(frozen=True)
-class CharacterRow:
+class CharacterRow(SQLModel):
     """`book_characters` テーブルの 1 行（API 応答用）。"""
     name: str
     first_page: int
     page_count: int
-    summary: str | None
-    generated_at: str | None
+    summary: str | None = None
+    generated_at: str | None = None
 
 
 def _parse_main_characters(raw: str | None) -> list[str]:
@@ -160,13 +161,7 @@ def list_characters(
         """,
         (book_id,),
     ).fetchall()
-    return [
-        CharacterRow(
-            name=name, first_page=fp, page_count=pc,
-            summary=summary, generated_at=ga,
-        )
-        for name, fp, pc, summary, ga in rows
-    ]
+    return [CharacterRow.model_validate(dict(row)) for row in rows]
 
 
 def get_character(
@@ -185,10 +180,7 @@ def get_character(
     ).fetchone()
     if row is None:
         return None
-    return CharacterRow(
-        name=row[0], first_page=row[1], page_count=row[2],
-        summary=row[3], generated_at=row[4],
-    )
+    return CharacterRow.model_validate(dict(row))
 
 
 def top_scenes_for_character(

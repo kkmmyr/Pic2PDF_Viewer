@@ -60,7 +60,18 @@ def load_meta(source: str) -> MetaDict:
 def save_meta(source: str, data: MetaDict) -> None:
     with connect() as conn:
         _ensure(conn)
-        conn.execute("DELETE FROM books_meta WHERE source=?", (source,))
+        existing = {
+            row[0]
+            for row in conn.execute(
+                "SELECT book_id FROM books_meta WHERE source=?", (source,)
+            )
+        }
+        to_delete = existing - data.keys()
+        if to_delete:
+            conn.executemany(
+                "DELETE FROM books_meta WHERE source=? AND book_id=?",
+                [(source, bid) for bid in to_delete],
+            )
         for book_id, entry in data.items():
             upsert_entry(conn, source, book_id, entry)
 

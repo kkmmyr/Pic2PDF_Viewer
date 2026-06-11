@@ -9,43 +9,41 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+
+from sqlmodel import SQLModel
 
 from .search import Scope
 
 
-@dataclass(frozen=True)
-class SessionMeta:
+class SessionMeta(SQLModel):
     """セッション一覧用の軽量情報（messages は含まない）。"""
     id: int
     scope_type: str
-    scope_id: str | None
-    title: str | None
+    scope_id: str | None = None
+    title: str | None = None
     started_at: str
-    last_message_at: str | None
-    message_count: int
+    last_message_at: str | None = None
+    message_count: int  # COUNT(*) 集計値
 
 
-@dataclass(frozen=True)
-class ChatMessage:
+class ChatMessage(SQLModel):
     """qa_messages の 1 行。assistant のときのみ eval_count / done_reason が入る。"""
     id: int
     role: str        # 'user' / 'assistant' / 'system'
     content: str
-    eval_count: int | None
-    done_reason: str | None
+    eval_count: int | None = None
+    done_reason: str | None = None
     created_at: str
 
 
-@dataclass(frozen=True)
-class SessionDetail:
+class SessionDetail(SQLModel):
     """セッション詳細（メッセージ全件含む）。"""
     id: int
     scope_type: str
-    scope_id: str | None
-    title: str | None
+    scope_id: str | None = None
+    title: str | None = None
     started_at: str
-    last_message_at: str | None
+    last_message_at: str | None = None
     messages: list[ChatMessage]
 
 
@@ -168,13 +166,7 @@ def list_sessions(
         """,
         params + [limit, offset],
     ).fetchall()
-    return [
-        SessionMeta(
-            id=r[0], scope_type=r[1], scope_id=r[2], title=r[3],
-            started_at=r[4], last_message_at=r[5], message_count=r[6],
-        )
-        for r in rows
-    ]
+    return [SessionMeta.model_validate(dict(r)) for r in rows]
 
 
 def get_session_meta(
@@ -193,10 +185,7 @@ def get_session_meta(
     ).fetchone()
     if row is None:
         return None
-    return SessionMeta(
-        id=row[0], scope_type=row[1], scope_id=row[2], title=row[3],
-        started_at=row[4], last_message_at=row[5], message_count=row[6],
-    )
+    return SessionMeta.model_validate(dict(row))
 
 
 def get_session_detail(
@@ -215,13 +204,7 @@ def get_session_detail(
         """,
         (session_id,),
     ).fetchall()
-    messages = [
-        ChatMessage(
-            id=r[0], role=r[1], content=r[2],
-            eval_count=r[3], done_reason=r[4], created_at=r[5],
-        )
-        for r in rows
-    ]
+    messages = [ChatMessage.model_validate(dict(r)) for r in rows]
     return SessionDetail(
         id=meta.id, scope_type=meta.scope_type, scope_id=meta.scope_id,
         title=meta.title, started_at=meta.started_at,
