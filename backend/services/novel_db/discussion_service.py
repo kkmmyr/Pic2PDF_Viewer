@@ -23,9 +23,12 @@ from config import (
     NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
 )
 from utils.dt import JST
+from utils.logger import get_logger
 
 from .llm import astream_chat as _astream_chat
 from .search import SearchHit
+
+logger = get_logger(__name__)
 
 # ディスカッション JSON 保存先
 DISCUSSIONS_DIR = Path(KINDLE_NOVEL_DIR) / "discussions"
@@ -227,5 +230,5 @@ def list_discussions(book_name: str) -> list[dict]:
                 }
             )
         except Exception:
-            pass
+            logger.warning("discussion JSON parse failed: %s", f.name, exc_info=True)
     return results

@@ -47,6 +47,13 @@ class _AppSettings(BaseSettings):
     GEMMA_TOOL_DIR: Path | None = None
     # meta.db バックアップ先（未設定時はバックアップ無効）
     META_DB_BACKUP_DIR: Path | None = None
+    # OCR venv の Python 実行ファイルパス（未設定時はプラットフォーム既定値）
+    # Windows: D:\61.tool\common\ocr\venv\Scripts\python.exe
+    # Mac/Linux: ~/.venv/ocr/bin/python
+    OCR_PYTHON: str | None = None
+    # OCR パッケージディレクトリ（ocr_engine.py が置かれた common/ocr/ パス）
+    # ocr_worker.py サブプロセスに OCR_PATH 環境変数として渡される
+    OCR_PACKAGE_PATH: str | None = None
 
 
 _s = _AppSettings()

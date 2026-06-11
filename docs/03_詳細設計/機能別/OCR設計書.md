@@ -19,14 +19,21 @@
 ```
 kindle-pdf/main_novel.py  →  kindle_novel/images/{書籍名}/*.png  (キャプチャのみ)
                                           ↓
-POST /api/ocr/run  →  services/ocr_service.py (スレッド起動)
+POST /api/ocr/run  →  job_queue ベース（routers/ocr.py）
   → services/novel_db/extractor.py (run_ocr_subprocess)
-  → D:\61.tool\common\ocr\venv\Scripts\python.exe ocr_worker.py
+  → $OCR_PYTHON ocr_worker.py   # OCR_PYTHON env var（既定: D:\61.tool\common\ocr\venv\Scripts\python.exe）
   → YomitokuEngine.extract_text()
                                           ↓
                               novel.db (books / pages テーブル)
                               ← FTS5 + sqlite-vec でテキスト検索・RAG に利用
 ```
+
+**OCR 環境変数**（`.env` で設定）:
+
+| 変数名 | 既定値 | 説明 |
+|---|---|---|
+| `OCR_PYTHON` | Windows: `D:\61.tool\common\ocr\venv\Scripts\python.exe` / Mac: `~/.venv/ocr/bin/python` | OCR venv の Python 実行ファイルパス |
+| `OCR_PATH` | `D:\61.tool\common\ocr` | ocr_worker.py サブプロセス内で `sys.path` に追加するパッケージディレクトリ |
 
 **旧フロー（Phase 5 で削除済み）**:
 ```

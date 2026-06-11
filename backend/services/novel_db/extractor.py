@@ -21,13 +21,21 @@ import fitz
 
 _NEWLINE_RE = re.compile(r"\n+")
 
-# Windows: Scripts/python.exe、それ以外: bin/python（OCR_PYTHON 環境変数で上書き可能）
-_DEFAULT_OCR_PYTHON = (
-    r"D:\61.tool\common\ocr\venv\Scripts\python.exe"
-    if platform.system() == "Windows"
-    else str(Path.home() / ".venv" / "ocr" / "bin" / "python")
-)
-_OCR_VENV_PYTHON = os.environ.get("OCR_PYTHON", _DEFAULT_OCR_PYTHON)
+
+def _resolve_ocr_python() -> str:
+    """OCR venv の Python 実行ファイルパスを解決する。
+
+    優先順位: app_settings.OCR_PYTHON → プラットフォーム既定値
+    """
+    from config import app_settings
+
+    if app_settings.OCR_PYTHON:
+        return app_settings.OCR_PYTHON
+    if platform.system() == "Windows":
+        return r"D:\61.tool\common\ocr\venv\Scripts\python.exe"
+    return str(Path.home() / ".venv" / "ocr" / "bin" / "python")
+
+
 _OCR_WORKER_SCRIPT = Path(__file__).parent / "ocr_worker.py"
 
 
@@ -43,7 +51,7 @@ def run_ocr_subprocess(images_dirs: list[Path]) -> Iterator[tuple[str, list[Page
     yomitoku は 1 度だけ初期化して全書籍を連続処理する。
     stderr は backend の stdout に流れる（GPU/モデルロードログが見える）。
     """
-    cmd = [_OCR_VENV_PYTHON, str(_OCR_WORKER_SCRIPT)] + [str(d) for d in images_dirs]
+    cmd = [_resolve_ocr_python(), str(_OCR_WORKER_SCRIPT)] + [str(d) for d in images_dirs]
     env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, encoding="utf-8", env=env)
     assert proc.stdout is not None

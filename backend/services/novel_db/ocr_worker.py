@@ -11,10 +11,11 @@ yomitoku は一度だけ初期化して全書籍で再利用する。
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
-_OCR_PATH = r"D:\61.tool\common\ocr"
+_OCR_PATH = os.environ.get("OCR_PATH", r"D:\61.tool\common\ocr")
 if _OCR_PATH not in sys.path:
     sys.path.insert(0, _OCR_PATH)
 
