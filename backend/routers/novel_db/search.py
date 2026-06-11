@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS
 from routers._deps import log_and_raise_500
+from routers.api_schemas import SearchResponse
 from services.novel_db import Scope, hybrid_search, with_db
 
 from ._deps import require_not_locked
@@ -16,7 +17,7 @@ from .schemas import SearchRequest
 router = APIRouter()
 
 
-@router.post("/search")
+@router.post("/search", response_model=SearchResponse)
 @log_and_raise_500("novel_db/search")
 def post_search(
     request: SearchRequest,

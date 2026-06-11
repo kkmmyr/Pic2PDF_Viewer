@@ -13,6 +13,15 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from config import HITOMI_DATA_DIR as _hitomi_data_dir
+from routers.api_schemas import (
+    HitomiAddArtistResponse,
+    HitomiArrivalsResponse,
+    HitomiDismissAllResponse,
+    HitomiDismissResponse,
+    HitomiRemoveArtistResponse,
+    HitomiRunNowResponse,
+    HitomiWatchlistResponse,
+)
 from services.hitomi import nozomi, state_store, watchlist
 from tools import hitomi_monitor
 
@@ -36,7 +45,7 @@ class AddWatchlistRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/hitomi/new-arrivals")
+@router.get("/hitomi/new-arrivals", response_model=HitomiArrivalsResponse)
 def get_new_arrivals() -> dict:
     """dismissed=false のアイテムを新着順で返す + ヘルス情報。"""
     state = state_store.load_state(DATA_DIR)
@@ -51,14 +60,14 @@ def get_new_arrivals() -> dict:
     }
 
 
-@router.post("/hitomi/dismiss/{gallery_id}")
+@router.post("/hitomi/dismiss/{gallery_id}", response_model=HitomiDismissResponse)
 def post_dismiss(gallery_id: int) -> dict:
     if not state_store.dismiss(DATA_DIR, gallery_id):
         raise HTTPException(status_code=404, detail=f"Item not found: {gallery_id}")
     return {"message": "Dismissed", "id": gallery_id}
 
 
-@router.post("/hitomi/dismiss-all")
+@router.post("/hitomi/dismiss-all", response_model=HitomiDismissAllResponse)
 def post_dismiss_all() -> dict:
     count = state_store.dismiss_all(DATA_DIR)
     return {"message": "All dismissed", "dismissed_count": count}
@@ -69,12 +78,12 @@ def post_dismiss_all() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/hitomi/watchlist")
+@router.get("/hitomi/watchlist", response_model=HitomiWatchlistResponse)
 def get_watchlist() -> dict:
     return {"artists": watchlist.load_watchlist(DATA_DIR)}
 
 
-@router.post("/hitomi/watchlist")
+@router.post("/hitomi/watchlist", response_model=HitomiAddArtistResponse)
 def post_watchlist(req: AddWatchlistRequest) -> dict:
     try:
         entry = watchlist.add_artist(DATA_DIR, req.display_name, req.language)
@@ -100,7 +109,7 @@ def post_watchlist(req: AddWatchlistRequest) -> dict:
     return {"message": "Added", "normalized": entry["normalized"]}
 
 
-@router.delete("/hitomi/watchlist/{normalized}")
+@router.delete("/hitomi/watchlist/{normalized}", response_model=HitomiRemoveArtistResponse)
 def delete_watchlist(normalized: str, language: str = "japanese") -> dict:
     if not watchlist.remove_artist(DATA_DIR, normalized, language):
         raise HTTPException(status_code=404, detail=f"Not found: {normalized}")
@@ -117,7 +126,7 @@ def delete_watchlist(normalized: str, language: str = "japanese") -> dict:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/hitomi/run-now")
+@router.post("/hitomi/run-now", response_model=HitomiRunNowResponse)
 def post_run_now(force: bool = False) -> dict:
     """監視スクリプトを同期実行する。完了まで待つ。
 

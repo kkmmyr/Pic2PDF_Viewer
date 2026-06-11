@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Response
 
 from routers._deps import cancel_job_response, log_and_raise_500
+from routers.api_schemas import RebuildEnqueueResponse, RebuildStatusResponse
 from services.novel_db.job_queue import job_queue
 
 from .schemas import RebuildRequest
@@ -12,7 +13,7 @@ from .schemas import RebuildRequest
 router = APIRouter()
 
 
-@router.post("/builds")
+@router.post("/builds", response_model=RebuildEnqueueResponse)
 @log_and_raise_500("novel_db/builds")
 def post_rebuild(request: RebuildRequest) -> dict:
     """再構築 / OCR ジョブをキューに登録する（[API §7.8]）。
@@ -30,7 +31,7 @@ def post_rebuild(request: RebuildRequest) -> dict:
     return {"job_id": job_id, "queued_position": queued_position}
 
 
-@router.get("/builds/status")
+@router.get("/builds/status", response_model=RebuildStatusResponse)
 @log_and_raise_500("novel_db/builds/status")
 def get_rebuild_status() -> dict:
     """現在のキュー状態を返す（[API §7.9]）。"""

@@ -9,6 +9,12 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validate_request_targets
+from routers.api_schemas import (
+    SeriesAssignResponse,
+    SeriesReorderResponse,
+    SeriesSuggestResponse,
+    SeriesUnassignResponse,
+)
 from services.meta_store import MetaDict, load_meta, make_key, update_meta_locked
 from services.series_detector import stable_series_id
 from services.series_suggester import suggest_series
@@ -53,7 +59,7 @@ class ReorderSeriesRequest(BaseModel):
     source: str = "doujin"
 
 
-@router.post("/series/assign")
+@router.post("/series/assign", response_model=SeriesAssignResponse)
 def assign_series(request: AssignSeriesRequest) -> dict:
     """書籍を既存または新規シリーズに割り当てる（手動編集）。
 
@@ -103,7 +109,7 @@ def assign_series(request: AssignSeriesRequest) -> dict:
     return {"message": "Assigned", "id": series_id, "updated_count": len(request.names)}
 
 
-@router.post("/series/unassign")
+@router.post("/series/unassign", response_model=SeriesUnassignResponse)
 def unassign_series(request: UnassignSeriesRequest) -> dict:
     """書籍をシリーズから外す（series_* フィールドを削除）。"""
     assert_valid_source(request.source)
@@ -126,7 +132,7 @@ def unassign_series(request: UnassignSeriesRequest) -> dict:
     return {"message": "Unassigned", "updated_count": len(request.names)}
 
 
-@router.post("/series/reorder")
+@router.post("/series/reorder", response_model=SeriesReorderResponse)
 def reorder_series(request: ReorderSeriesRequest) -> dict:
     """シリーズ内の `series_index` を `names` の順序で 1.0, 2.0, 3.0, ... に振り直す（DnD 並べ替え）。
 
@@ -176,7 +182,7 @@ class SuggestSeriesRequest(BaseModel):
     source: str = "doujin"
 
 
-@router.post("/series/suggest")
+@router.post("/series/suggest", response_model=SeriesSuggestResponse)
 def suggest_series_endpoint(request: SuggestSeriesRequest) -> dict:
     """選択書籍に対する既存シリーズへの紐付け候補を返す（A-1、書き込みなし）。
 

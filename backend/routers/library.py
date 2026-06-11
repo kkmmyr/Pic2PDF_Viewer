@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from config import SourceDirs, get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
+from routers.api_schemas import BookImagesResponse, DeleteResponse, PdfListResponse, RenameResponse
 from services.file_manager import FileManager
 from services.meta_store import MetaDict, make_key, update_meta_locked
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
@@ -75,7 +76,7 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: Source
     return {"files": files, "current_path": path}
 
 
-@router.get("/pdfs")
+@router.get("/pdfs", response_model=PdfListResponse)
 def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = Depends(validated_source)):
     validate_safe_path(path)
 
@@ -85,7 +86,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = D
     return _list_from_images(background_tasks, path, dirs)
 
 
-@router.get("/books/{path:path}/images")
+@router.get("/books/{path:path}/images", response_model=BookImagesResponse)
 @log_and_raise_500("list_book_images")
 def list_book_images(path: str, source: str = Depends(validated_source)):
     validate_safe_path(path)
@@ -126,7 +127,7 @@ class RenameItemRequest(BaseModel):
     is_folder: bool = False
 
 
-@router.patch("/rename")
+@router.patch("/rename", response_model=RenameResponse)
 def rename_item(request: RenameItemRequest):
     assert_valid_source(request.source)
     validate_safe_path(request.path, param_name="path")
@@ -170,7 +171,7 @@ class DeletePdfsRequest(BaseModel):
     source: str = "doujin"
 
 
-@router.delete("/pdfs")
+@router.delete("/pdfs", response_model=DeleteResponse)
 def delete_pdfs(request: DeletePdfsRequest):
     assert_valid_source(request.source)
     validate_request_targets(request.path, request.names)

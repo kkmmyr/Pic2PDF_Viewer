@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS
 from routers._deps import sse_event
+from routers.api_schemas import DiscussionHistoryItemOut
 from services.novel_db.connection import with_db
 from services.novel_db.discussion_service import (
     MAX_INPUT_TOKENS,
@@ -132,7 +133,7 @@ async def generate_discussion(
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
-@router.get("/novel/discussion/history")
+@router.get("/novel/discussion/history", response_model=list[DiscussionHistoryItemOut])
 def get_discussion_history(book_name: str) -> list[dict]:
     """指定書籍のディスカッション履歴一覧を返す（B-20）。"""
     return list_discussions(book_name)

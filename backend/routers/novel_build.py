@@ -15,6 +15,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from routers._deps import cancel_job_response, log_and_raise_500, sse_event
+from routers.api_schemas import BuildEnqueueResponse, BuildStatusResponse
 from services.novel_db.connection import with_db
 from services.novel_db.job_queue import job_queue
 from utils.logger import get_logger
@@ -101,7 +102,7 @@ def _is_already_queued_or_running(book_name: str | None, mode: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-@router.post("/novel/build/enqueue")
+@router.post("/novel/build/enqueue", response_model=BuildEnqueueResponse)
 @log_and_raise_500("novel/build/enqueue")
 def post_enqueue(request: EnqueueRequest) -> dict:
     """Full Build / コンテキスト生成ジョブをキューに登録する（API §8.1）。"""
@@ -121,7 +122,7 @@ def post_enqueue(request: EnqueueRequest) -> dict:
     return {"job_id": job_id, "queued_position": queued_position}
 
 
-@router.get("/novel/build/status")
+@router.get("/novel/build/status", response_model=BuildStatusResponse)
 @log_and_raise_500("novel/build/status")
 def get_status() -> dict:
     """Full Build キュー状態を返す（API §8.2）。"""

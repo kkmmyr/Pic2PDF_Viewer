@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from routers.api_schemas import GraphBookOut, GraphDataResponse
 from services.novel_db.connection import with_db
 from services.novel_db.graph_query import (
     get_graph_for_series,
@@ -21,14 +22,14 @@ def get_series_list() -> list[str]:
         return list_series_with_relations(conn)
 
 
-@router.get("/novel_graph/series/{series_id}/books")
+@router.get("/novel_graph/series/{series_id}/books", response_model=list[GraphBookOut])
 def get_books_in_series(series_id: str) -> list[dict]:
     """シリーズに含まれる書籍一覧を返す（グラフに存在するもの）。"""
     with with_db() as conn:
         return list_books_in_relation_series(conn, series_id)
 
 
-@router.get("/novel_graph/series/{series_id}/graph")
+@router.get("/novel_graph/series/{series_id}/graph", response_model=GraphDataResponse)
 def get_graph(series_id: str, book_ids: str | None = None) -> dict:
     """シリーズのグラフデータ（nodes / edges）を返す。
 

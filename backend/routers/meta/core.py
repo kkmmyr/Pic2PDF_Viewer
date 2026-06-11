@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
+from routers.api_schemas import MetaUpdateResponse, RecordViewResponse
 from services.meta_store import (
     VALID_READ_STATES,
     has_meaningful_value,
@@ -86,7 +87,7 @@ def export_meta(source: str = Depends(validated_source)) -> Response:
     )
 
 
-@router.patch("/meta")
+@router.patch("/meta", response_model=MetaUpdateResponse)
 def update_meta(request: UpdateMetaRequest) -> dict:
     """1冊または複数冊のメタデータ（作者名 / 非表示フラグ / ジャンル / 読書状態）を上書き保存する。
 
@@ -131,7 +132,7 @@ def update_meta(request: UpdateMetaRequest) -> dict:
     return {"message": "Updated", "updated_count": len(request.names)}
 
 
-@router.post("/meta/view")
+@router.post("/meta/view", response_model=RecordViewResponse)
 def record_view(request: RecordViewRequest) -> dict:
     """書籍の閲覧を記録する。
 

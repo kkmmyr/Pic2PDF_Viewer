@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routers.api_schemas import NovelMetaUpdateResponse
 from services.meta_store import update_meta_locked
 
 router = APIRouter()
@@ -21,7 +22,7 @@ class NovelMetaPatchRequest(BaseModel):
     release_date: str | None = None
 
 
-@router.patch("/meta/novel/{book_key:path}")
+@router.patch("/meta/novel/{book_key:path}", response_model=NovelMetaUpdateResponse)
 def patch_novel_meta(book_key: str, request: NovelMetaPatchRequest) -> dict:
     """novel ソースの 1 冊メタを部分更新する（4.3）。
 

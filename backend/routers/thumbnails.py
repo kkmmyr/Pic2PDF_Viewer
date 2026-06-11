@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from config import get_dirs_by_source
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
+from routers.api_schemas import RegenerateThumbnailBulkResponse, RegenerateThumbnailResponse
 from services.image_service import list_book_images
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from services.thumbnail_service import ThumbnailService
@@ -121,7 +122,7 @@ def get_page_thumbnail(
     )
 
 
-@router.post("/thumbnails/regenerate")
+@router.post("/thumbnails/regenerate", response_model=RegenerateThumbnailResponse)
 def regenerate_thumbnail(request: RegenerateThumbnailRequest):
     assert_valid_source(request.source)
     validate_safe_path(request.path, param_name="path")
@@ -134,7 +135,7 @@ def regenerate_thumbnail(request: RegenerateThumbnailRequest):
     return {"message": "Thumbnail regenerated"}
 
 
-@router.post("/thumbnails/regenerate_bulk")
+@router.post("/thumbnails/regenerate_bulk", response_model=RegenerateThumbnailBulkResponse)
 def regenerate_thumbnail_bulk(request: RegenerateThumbnailBulkRequest):
     """複数書籍のサムネイルを一括再生成する。"""
     assert_valid_source(request.source)

@@ -5,12 +5,13 @@ POST /api/amazon/import?source=novel|comic
 
 from fastapi import APIRouter, HTTPException
 
+from routers.api_schemas import AmazonImportResponse
 from services.amazon_csv_importer import ImportResult, run_import
 
 router = APIRouter()
 
 
-@router.post("/amazon/import")
+@router.post("/amazon/import", response_model=AmazonImportResponse)
 def amazon_csv_import(source: str = "novel") -> dict:
     """固定パスの Amazon CSV から meta.json を著者/ASIN で補完する。
 

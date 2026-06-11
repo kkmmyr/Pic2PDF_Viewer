@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from config import get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
+from routers.api_schemas import DeletePagesResponse, MergePdfsResponse, ReorderPagesResponse
 from services.image_service import (
     delete_book_image_pages,
     list_book_images,
@@ -47,7 +48,7 @@ def _validate_permutation(page_indices: list[int], total_pages: int) -> None:
         )
 
 
-@router.post("/pdfs/{filename}/delete_pages")
+@router.post("/pdfs/{filename}/delete_pages", response_model=DeletePagesResponse)
 @log_and_raise_500("delete_pages")
 def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", source: str = Depends(validated_source)):
     validate_safe_path(path)
@@ -93,7 +94,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     return {"message": "Pages deleted successfully", "total_pages": new_total}
 
 
-@router.post("/pdfs/{filename}/reorder_pages")
+@router.post("/pdfs/{filename}/reorder_pages", response_model=ReorderPagesResponse)
 @log_and_raise_500("reorder_pages")
 def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", source: str = Depends(validated_source)):
     validate_safe_path(path)
@@ -151,7 +152,7 @@ class MergePdfsRequest(BaseModel):
     source: str = "doujin"
 
 
-@router.post("/pdfs/merge")
+@router.post("/pdfs/merge", response_model=MergePdfsResponse)
 def merge_pdfs(request: MergePdfsRequest):
     """複数の PDF を順番に結合して新しい PDF を生成する。"""
     assert_valid_source(request.source)

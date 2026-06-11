@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validated_source
+from routers.api_schemas import GenreListResponse
 from services.genre_store import load_genres, save_genres
 from utils.path_utils import validate_safe_name
 
@@ -32,7 +33,7 @@ def get_genres(source: str = Depends(validated_source)) -> list[str]:
     return load_genres(source)
 
 
-@router.post("/genres")
+@router.post("/genres", response_model=GenreListResponse)
 def add_genre(request: AddGenreRequest) -> dict:
     assert_valid_source(request.source)
     name = request.name.strip()
@@ -46,7 +47,7 @@ def add_genre(request: AddGenreRequest) -> dict:
     return {"genres": genres}
 
 
-@router.delete("/genres/{name}")
+@router.delete("/genres/{name}", response_model=GenreListResponse)
 def delete_genre(name: str, source: str = Depends(validated_source)) -> dict:
     validate_safe_name(name, param_name="name")
     genres = load_genres(source)
@@ -57,7 +58,7 @@ def delete_genre(name: str, source: str = Depends(validated_source)) -> dict:
     return {"genres": genres}
 
 
-@router.patch("/genres/reorder")
+@router.patch("/genres/reorder", response_model=GenreListResponse)
 def reorder_genres(request: ReorderGenresRequest) -> dict:
     assert_valid_source(request.source)
     existing = set(load_genres(request.source))

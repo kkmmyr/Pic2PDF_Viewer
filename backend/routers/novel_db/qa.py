@@ -7,6 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from config import NOVEL_DB_LLM_MODEL
 from routers._deps import log_and_raise_500, sse_event
+from routers.api_schemas import QaHistoryResponse
 from services.novel_db import Scope, with_db
 from services.novel_db.llm import stream_qa
 from services.novel_db.prompt_builder import build_prompt
@@ -108,7 +109,7 @@ async def post_qa(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/qa/history")
+@router.get("/qa/history", response_model=QaHistoryResponse)
 @log_and_raise_500("novel_db/qa/history")
 def get_qa_history(offset: int = 0, limit: int = 20, book: str | None = None) -> dict:
     """履歴一覧（[API §7.5]）。book 指定時はその書籍の質問のみ返す。"""

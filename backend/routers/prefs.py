@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validated_source
+from routers.api_schemas import PrefsResponse, PrefsUpdateResponse
 from services.prefs_store import delete_pin, get_prefs, set_pin, update_filters
 
 router = APIRouter()
@@ -31,13 +32,13 @@ class SetPinRequest(BaseModel):
     book_name: str
 
 
-@router.get("/prefs")
+@router.get("/prefs", response_model=PrefsResponse)
 def get_prefs_endpoint(source: str = Depends(validated_source)) -> dict:
     """指定ソースのフィルター設定とピン情報を返す。"""
     return get_prefs(source)
 
 
-@router.patch("/prefs/filters")
+@router.patch("/prefs/filters", response_model=PrefsUpdateResponse)
 def patch_filters(request: UpdateFiltersRequest) -> dict:
     """readStateFilter / genreFilter を部分更新する。"""
     assert_valid_source(request.source)
@@ -54,7 +55,7 @@ def patch_filters(request: UpdateFiltersRequest) -> dict:
     return {"message": "Updated"}
 
 
-@router.put("/prefs/pins")
+@router.put("/prefs/pins", response_model=PrefsUpdateResponse)
 def put_pin(request: SetPinRequest) -> dict:
     """グループピンを登録または上書きする。"""
     assert_valid_source(request.source)
@@ -67,7 +68,7 @@ def put_pin(request: SetPinRequest) -> dict:
     return {"message": "Pinned"}
 
 
-@router.delete("/prefs/pins")
+@router.delete("/prefs/pins", response_model=PrefsUpdateResponse)
 def remove_pin(source: str, pin_type: str, group_id: str) -> dict:
     """グループピンを削除する。"""
     assert_valid_source(source)

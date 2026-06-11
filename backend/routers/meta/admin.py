@@ -6,13 +6,14 @@ from fastapi import APIRouter, Depends
 
 from config import get_dirs_by_source
 from routers._deps import validated_source
+from routers.api_schemas import AdminInitResponse
 from services.meta_store import update_meta_locked
 from utils.file_utils import is_image_file
 
 router = APIRouter()
 
 
-@router.post("/meta/init-genre-original")
+@router.post("/meta/init-genre-original", response_model=AdminInitResponse)
 def init_genre_original(source: str = Depends(validated_source)) -> dict:
     """genre 未設定の書籍に genre=オリジナル を一括設定する。
 

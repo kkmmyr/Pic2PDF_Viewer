@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 import config
 from routers._deps import log_and_raise_500
+from routers.api_schemas import BatchCompressResponse, GenerateJobOut, GenerateStartResponse, GenerateStatusResponse
 from services.job_manager import GenerateJob, JobStatus, JobStore
 from services.meta_store import update_meta_locked
 from services.pdf_generator import batch_compress, scan_and_generate
@@ -89,7 +90,7 @@ async def _run_generate_job_async(job: GenerateJob) -> None:
     await loop.run_in_executor(None, _run_generate_job, job)
 
 
-@router.post("/generate")
+@router.post("/generate", response_model=GenerateStartResponse)
 async def generate_pdfs():
     if not os.path.isdir(config.DOUJIN_INPUT_DIR):
         raise HTTPException(status_code=503, detail=f"Input directory not found: {config.DOUJIN_INPUT_DIR}")
@@ -100,7 +101,7 @@ async def generate_pdfs():
     return {"job_id": job.job_id, "status": "pending"}
 
 
-@router.get("/generate/job/{job_id}")
+@router.get("/generate/job/{job_id}", response_model=GenerateJobOut)
 def get_generate_job(job_id: str):
     """ジョブの進捗・結果を取得する。"""
     job = job_store.get(job_id)
@@ -109,7 +110,7 @@ def get_generate_job(job_id: str):
     return job.to_dict()
 
 
-@router.get("/status")
+@router.get("/status", response_model=GenerateStatusResponse)
 def get_status():
     if not os.path.isdir(config.DOUJIN_INPUT_DIR):
         return {"items": []}
@@ -157,7 +158,7 @@ class BatchCompressRequest(BaseModel):
     quality: int = 50
 
 
-@router.post("/batch_compress")
+@router.post("/batch_compress", response_model=BatchCompressResponse)
 @log_and_raise_500("batch_compress")
 def batch_compress_pdfs(request: BatchCompressRequest):
     if not os.path.exists(config.IMAGES_DIR):
