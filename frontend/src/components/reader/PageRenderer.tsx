@@ -1,5 +1,5 @@
 import { Page } from 'react-pdf';
-import { buildStaticUrl } from '../../config/api';
+import { buildStaticUrl } from '@/config/api';
 
 interface PageRendererProps {
     pageNumber: number;

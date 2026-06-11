@@ -1,5 +1,5 @@
-import { Dialog, DialogBody } from '../ui/Dialog';
-import { useReaderContext } from '../../contexts/ReaderContext';
+import { Dialog, DialogBody } from '@/components/ui/Dialog';
+import { useReaderContext } from '@/contexts/ReaderContext';
 
 const SHORTCUTS: { key: string; description: string }[] = [
     { key: '←  /  →', description: 'ページ送り（綴じ方向に応じて前後）' },

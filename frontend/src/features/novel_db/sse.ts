@@ -4,7 +4,7 @@
  * apiClient (axios) は SSE 非対応のため、本機能のみ fetch を直接利用する。
  * AbortController で停止可能。`onToken` / `onDone` / `onError` でイベント通知。
  */
-import { API_CONFIG as API_URL_CONFIG } from '../../config/api';
+import { API_CONFIG as API_URL_CONFIG } from '@/config/api';
 
 import type { Scope } from './types';
 

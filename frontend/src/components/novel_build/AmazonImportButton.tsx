@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
 
 export function AmazonImportButton() {
     const [isImporting, setIsImporting] = useState(false);

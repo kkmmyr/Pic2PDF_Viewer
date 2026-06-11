@@ -1,16 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import {
-    DndContext,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    type DragEndEvent,
-} from '@dnd-kit/core';
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, arrayMove, rectSortingStrategy } from '@dnd-kit/sortable';
-import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
-import { moveMultipleByIndex } from '../../utils/sort';
-import type { LibrarySource } from '../../types';
+import { API_ENDPOINTS, buildApiUrl } from '@/config/api';
+import { moveMultipleByIndex } from '@/utils/sort';
+import type { LibrarySource } from '@/types';
 import { SortablePageCell } from './SortablePageCell';
 
 interface PageGridOverlayProps {
@@ -37,8 +31,7 @@ interface PageGridOverlayProps {
 
 const THUMB_WIDTH = 180;
 
-const buildIdentity = (n: number): number[] =>
-    Array.from({ length: n }, (_, i) => i + 1);
+const buildIdentity = (n: number): number[] => Array.from({ length: n }, (_, i) => i + 1);
 
 /**
  * 編集モード用の全画面オーバーレイ。

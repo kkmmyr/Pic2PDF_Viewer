@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchBookDetail } from '../../features/novel_db/api';
-import type { BookDetail } from '../../features/novel_db/types';
+import { fetchBookDetail } from '@/features/novel_db/api';
+import type { BookDetail } from '@/features/novel_db/types';
 
 interface UseBookDetail {
     detail: BookDetail | null;

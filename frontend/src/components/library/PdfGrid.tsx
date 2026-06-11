@@ -13,7 +13,7 @@ import {
     arrayMove,
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
-import type { PdfFile, ReadState } from '../../types';
+import type { PdfFile, ReadState } from '@/types';
 import { PdfCard, type PdfCardProps, type PdfCardBadge } from './PdfCard';
 import { SortablePdfCard } from './SortablePdfCard';
 

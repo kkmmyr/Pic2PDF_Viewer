@@ -7,8 +7,8 @@ vi.mock('../config/api_client', () => ({
     default: { get: vi.fn(), post: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useOcrStatus } from '../hooks/useOcrStatus';
+import apiClient from '@/config/api_client';
+import { useOcrStatus } from '@/hooks/useOcrStatus';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;

@@ -2,7 +2,7 @@
  * novel_build REST API クライアント（apiClient ラッパー）。
  * SSE のみ別途 `sse.ts` で EventSource ベースに実装する。
  */
-import apiClient from '../../config/api_client';
+import apiClient from '@/config/api_client';
 
 const PREFIX = '/api/novel/build';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { SeriesDrilldownPanel } from '../components/novel_db/SeriesDrilldownPanel';
-import type { BookSummary } from '../features/novel_db/types';
+import { SeriesDrilldownPanel } from '@/components/novel_db/SeriesDrilldownPanel';
+import type { BookSummary } from '@/features/novel_db/types';
 
 // SeriesDrilldownView は DnD 依存のため stub
 vi.mock('../components/novel_db/SeriesDrilldownView', () => ({
@@ -76,9 +76,7 @@ describe('SeriesDrilldownPanel', () => {
     });
 
     it('選択中はアクションバー（BulkActionsPanel）が表示される', () => {
-        const { getByText } = render(
-            <SeriesDrilldownPanel {...defaultProps} isSelecting={true} />,
-        );
+        const { getByText } = render(<SeriesDrilldownPanel {...defaultProps} isSelecting={true} />);
         expect(getByText('0 冊選択中')).toBeInTheDocument();
     });
 

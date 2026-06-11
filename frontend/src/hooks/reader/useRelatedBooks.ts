@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { BookMetaMap } from '../../types';
+import type { BookMetaMap } from '@/types';
 
 export interface RelatedSeriesBook {
     name: string;

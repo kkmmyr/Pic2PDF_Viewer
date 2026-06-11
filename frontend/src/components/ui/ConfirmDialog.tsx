@@ -1,5 +1,5 @@
 import * as AlertDialog from '@radix-ui/react-alert-dialog';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 interface ConfirmDialogProps {
     open: boolean;
@@ -28,7 +28,12 @@ export function ConfirmDialog({
     onCancel,
 }: ConfirmDialogProps) {
     return (
-        <AlertDialog.Root open={open} onOpenChange={(o) => { if (!o) onCancel(); }}>
+        <AlertDialog.Root
+            open={open}
+            onOpenChange={(o) => {
+                if (!o) onCancel();
+            }}
+        >
             <AlertDialog.Portal>
                 <AlertDialog.Overlay
                     data-testid="confirm-dialog-overlay"

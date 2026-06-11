@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { useLibraryPanel } from '../hooks/library/useLibraryPanel';
+import { useLibraryPanel } from '@/hooks/library/useLibraryPanel';
 
 type LibraryPanelContextValue = ReturnType<typeof useLibraryPanel> & {
     onUpClick: () => void;

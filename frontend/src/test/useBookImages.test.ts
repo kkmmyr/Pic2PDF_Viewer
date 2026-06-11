@@ -5,8 +5,8 @@ vi.mock('../config/api_client', () => ({
     default: { get: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useBookImages } from '../hooks/reader/useBookImages';
+import apiClient from '@/config/api_client';
+import { useBookImages } from '@/hooks/reader/useBookImages';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 
@@ -22,7 +22,6 @@ describe('useBookImages', () => {
         expect(result.current.numPages).toBe(0);
         expect(result.current.isImageMode).toBe(false);
     });
-
 
     it('通常パスで images を取得し imageUrls / numPages が設定される', async () => {
         mockedGet.mockResolvedValue({

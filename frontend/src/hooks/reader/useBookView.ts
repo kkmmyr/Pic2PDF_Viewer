@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { BookMetaMap, ReadState } from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import { metaQueryKey, makeBookMetaKey } from '../library/useBookMetaCore';
+import type { BookMetaMap, ReadState } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
+import { metaQueryKey, makeBookMetaKey } from '@/hooks/library/useBookMetaCore';
 
 interface RecordViewResponse {
     view_count: number;

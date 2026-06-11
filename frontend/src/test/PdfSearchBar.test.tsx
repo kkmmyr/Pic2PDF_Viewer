@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act } from '@testing-library/react';
-import { PdfSearchBar } from '../components/reader/PdfSearchBar';
+import { PdfSearchBar } from '@/components/reader/PdfSearchBar';
 
 type RenderOverrides = {
     searchText?: string;

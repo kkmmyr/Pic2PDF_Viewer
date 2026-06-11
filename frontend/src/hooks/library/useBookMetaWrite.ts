@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import type { BookMetaEntry, BookMetaMap, ReadState } from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
+import type { BookMetaEntry, BookMetaMap, ReadState } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
 import { metaQueryKey, makeBookMetaKey } from './useBookMetaCore';
 
 interface UpdateMetaVars {

@@ -6,7 +6,7 @@
  */
 import { Users } from 'lucide-react';
 
-import { useBookCharacters } from '../../hooks/novel_db';
+import { useBookCharacters } from '@/hooks/novel_db';
 
 interface Props {
     bookName: string;

@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 
-import { useNovelDbScope } from '../hooks/novel_db/useNovelDbScope';
+import { useNovelDbScope } from '@/hooks/novel_db/useNovelDbScope';
 
 function makeWrapper(initialEntries: string[]) {
     return function Wrapper({ children }: { children: ReactNode }) {

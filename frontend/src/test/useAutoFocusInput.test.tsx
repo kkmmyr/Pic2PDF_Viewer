@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useRef } from 'react';
-import { useAutoFocusInput } from '../hooks/useAutoFocusInput';
+import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
 
 describe('useAutoFocusInput', () => {
     let input: HTMLInputElement;

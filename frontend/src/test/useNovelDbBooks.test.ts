@@ -8,8 +8,8 @@ vi.mock('../features/novel_db/api', () => ({
     fetchSeries: vi.fn(),
 }));
 
-import { fetchBooks, fetchSeries } from '../features/novel_db/api';
-import { useNovelDbBooks } from '../hooks/novel_db/useNovelDbBooks';
+import { fetchBooks, fetchSeries } from '@/features/novel_db/api';
+import { useNovelDbBooks } from '@/hooks/novel_db/useNovelDbBooks';
 
 const mockedFetchBooks = fetchBooks as ReturnType<typeof vi.fn>;
 const mockedFetchSeries = fetchSeries as ReturnType<typeof vi.fn>;

@@ -9,13 +9,13 @@ import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
 
-import type { BookSummary, SeriesSummary } from '../../features/novel_db/types';
-import { fetchNovelAuthors, fetchSeries, patchNovelBookMeta } from '../../features/novel_db/api';
+import type { BookSummary, SeriesSummary } from '@/features/novel_db/types';
+import { fetchNovelAuthors, fetchSeries, patchNovelBookMeta } from '@/features/novel_db/api';
 import {
     type GroupMode,
     type NovelBookGroup,
     useNovelLibraryGroup,
-} from '../../hooks/useNovelLibraryGroup';
+} from '@/hooks/useNovelLibraryGroup';
 import BookCard from './BookCard';
 import { NovelBulkAuthorDialog } from './NovelBulkAuthorDialog';
 import { NovelBulkSeriesAssignDialog } from './NovelBulkSeriesAssignDialog';

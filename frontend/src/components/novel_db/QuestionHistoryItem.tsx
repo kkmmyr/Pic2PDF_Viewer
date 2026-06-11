@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 
-import type { QaHistoryEntry } from '../../features/novel_db/types';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
+import type { QaHistoryEntry } from '@/features/novel_db/types';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface Props {
     entry: QaHistoryEntry;

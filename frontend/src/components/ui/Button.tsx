@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 import { type ButtonHTMLAttributes, type ReactNode, type Ref } from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
     'inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:cursor-not-allowed',
@@ -46,8 +46,7 @@ const buttonVariants = cva(
 );
 
 interface ButtonProps
-    extends ButtonHTMLAttributes<HTMLButtonElement>,
-        VariantProps<typeof buttonVariants> {
+    extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
     /** React 19: ref を通常 prop として受け取る（forwardRef 不要）。 */
     ref?: Ref<HTMLButtonElement>;
     /** トグル ON 状態（secondary variant 専用）。gray-700 ベースで強調表示。 */

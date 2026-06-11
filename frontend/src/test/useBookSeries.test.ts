@@ -7,10 +7,10 @@ vi.mock('../config/api_client', () => ({
     default: { get: vi.fn(), post: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useBookMetaCore } from '../hooks/library/useBookMetaCore';
-import { useBookSeries } from '../hooks/library/useBookSeries';
-import type { BookMetaMap } from '../types';
+import apiClient from '@/config/api_client';
+import { useBookMetaCore } from '@/hooks/library/useBookMetaCore';
+import { useBookSeries } from '@/hooks/library/useBookSeries';
+import type { BookMetaMap } from '@/types';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;

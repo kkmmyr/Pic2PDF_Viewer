@@ -14,7 +14,7 @@ import {
     Sun,
     Wrench,
 } from 'lucide-react';
-import { useDarkMode } from '../hooks';
+import { useDarkMode } from '@/hooks';
 
 interface NavItem {
     to: string;
@@ -38,9 +38,7 @@ const NAV_GROUPS: NavGroup[] = [
     },
     {
         label: '漫画',
-        items: [
-            { to: '/comic', icon: Library, label: 'Library' },
-        ],
+        items: [{ to: '/comic', icon: Library, label: 'Library' }],
     },
     {
         label: '小説',

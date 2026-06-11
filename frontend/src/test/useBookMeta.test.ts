@@ -18,8 +18,8 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import apiClient from '../config/api_client';
-import { useBookMeta } from '../hooks/library/useBookMeta';
+import apiClient from '@/config/api_client';
+import { useBookMeta } from '@/hooks/library/useBookMeta';
 
 const createWrapper = () => {
     const queryClient = new QueryClient({
@@ -46,7 +46,9 @@ describe('useBookMeta', () => {
         });
         const { result } = renderHook(() => useBookMeta('doujin'), { wrapper: createWrapper() });
 
-        await waitFor(() => expect(result.current.getAuthors('', 'book.pdf')).toEqual(['サークルA']));
+        await waitFor(() =>
+            expect(result.current.getAuthors('', 'book.pdf')).toEqual(['サークルA']),
+        );
         expect(result.current.getViewCount('', 'book.pdf')).toBe(3);
         expect(result.current.getLastViewedAt('', 'book.pdf')).toBe(1000);
     });

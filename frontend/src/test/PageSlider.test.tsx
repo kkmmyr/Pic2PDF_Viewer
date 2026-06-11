@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { PageSlider } from '../components/reader/PageSlider';
+import { PageSlider } from '@/components/reader/PageSlider';
 
 const renderSlider = (overrides: Partial<Parameters<typeof PageSlider>[0]> = {}) => {
     const props = {

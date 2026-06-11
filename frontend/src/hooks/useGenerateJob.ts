@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ApiError } from '../config/api_client';
-import generateApiClient from '../config/generate_api_client';
-import { API_ENDPOINTS } from '../config/api';
-import { STORAGE_KEYS, API_CONFIG } from '../constants';
-import { getStorageJson, setStorageJson, removeStorage } from '../utils/storage';
-import type { GenerateJob } from '../types';
+import { ApiError } from '@/config/api_client';
+import generateApiClient from '@/config/generate_api_client';
+import { API_ENDPOINTS } from '@/config/api';
+import { STORAGE_KEYS, API_CONFIG } from '@/constants';
+import { getStorageJson, setStorageJson, removeStorage } from '@/utils/storage';
+import type { GenerateJob } from '@/types';
 
 interface StoredJob {
     job_id: string;
@@ -41,8 +41,12 @@ export function useGenerateJob(
 
     const onCompletedRef = useRef(onCompleted);
     const onFailedRef = useRef(onFailed);
-    useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
-    useEffect(() => { onFailedRef.current = onFailed; }, [onFailed]);
+    useEffect(() => {
+        onCompletedRef.current = onCompleted;
+    }, [onCompleted]);
+    useEffect(() => {
+        onFailedRef.current = onFailed;
+    }, [onFailed]);
 
     const { data: fetchedJob, error } = useQuery<GenerateJob>({
         queryKey: ['generateJob', currentJobId],
@@ -63,8 +67,7 @@ export function useGenerateJob(
         currentJobId === null ? null : (fetchedJob ?? pendingJob(currentJobId));
 
     const isGenerating =
-        currentJob !== null &&
-        (currentJob.status === 'pending' || currentJob.status === 'running');
+        currentJob !== null && (currentJob.status === 'pending' || currentJob.status === 'running');
     const isRestoredJob = isGenerating && !!stored;
 
     // Detect terminal status transitions
@@ -77,7 +80,7 @@ export function useGenerateJob(
             removeStorage(STORAGE_KEY);
             onFailedRef.current(fetchedJob);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchedJob?.status]);
 
     // Handle 404 (job disappeared, e.g. server restart)

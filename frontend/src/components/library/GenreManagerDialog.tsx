@@ -1,7 +1,7 @@
 import { useState, useRef, KeyboardEvent } from 'react';
 import { X } from 'lucide-react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '../ui/Dialog';
-import { errorMessage } from '../../utils/error';
+import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '@/components/ui/Dialog';
+import { errorMessage } from '@/utils/error';
 
 interface GenreManagerDialogProps {
     open: boolean;

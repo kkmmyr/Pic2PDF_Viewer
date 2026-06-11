@@ -8,7 +8,7 @@ vi.mock('react-pdf', () => ({
     Document: () => null,
 }));
 
-import { usePdfDocumentState } from '../hooks/reader/usePdfDocumentState';
+import { usePdfDocumentState } from '@/hooks/reader/usePdfDocumentState';
 
 describe('usePdfDocumentState', () => {
     it('初期 numPages=0 / pdfVersion=0', () => {

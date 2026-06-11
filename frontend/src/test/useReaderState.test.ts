@@ -112,7 +112,7 @@ vi.mock('../config/api', () => ({
     STATIC_PATHS: { PDF: () => '/test.pdf' },
 }));
 
-import { useReaderState } from '../hooks/reader/useReaderState';
+import { useReaderState } from '@/hooks/reader/useReaderState';
 
 const defaultProps = {
     selectedPdf: 'test.pdf',

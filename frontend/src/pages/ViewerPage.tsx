@@ -1,11 +1,11 @@
 import { useEffect, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { LibraryPanel } from '../components/library';
-import { ReaderPanel } from '../components/reader';
-import { useUrlState } from '../hooks/library/useUrlState';
-import { useCurrentSource } from '../hooks/useCurrentSource';
-import { useLibraryStore } from '../stores/libraryStore';
-import { pdfQueryKey } from '../hooks/library/useLibraryPdfs';
+import { LibraryPanel } from '@/components/library';
+import { ReaderPanel } from '@/components/reader';
+import { useUrlState } from '@/hooks/library/useUrlState';
+import { useCurrentSource } from '@/hooks/useCurrentSource';
+import { useLibraryStore } from '@/stores/libraryStore';
+import { pdfQueryKey } from '@/hooks/library/useLibraryPdfs';
 
 function LibraryView() {
     const { currentPath, selectedPdf, navigateUp, selectPdf, clearPdf } = useUrlState();

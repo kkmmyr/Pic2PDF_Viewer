@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { STORAGE_KEYS } from '../constants';
+import { STORAGE_KEYS } from '@/constants';
 
 const STORAGE_KEY = STORAGE_KEYS.DARK_MODE;
 

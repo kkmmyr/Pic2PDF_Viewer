@@ -1,8 +1,8 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { useUrlState } from '../hooks/library/useUrlState';
-import { useUrlFilters } from '../hooks/library/useUrlFilters';
+import { useUrlState } from '@/hooks/library/useUrlState';
+import { useUrlFilters } from '@/hooks/library/useUrlFilters';
 
 const wrapper =
     (initial: string) =>
@@ -63,10 +63,9 @@ describe('useUrlState', () => {
     });
 
     it('selectPdf で author / series フィルターが保持される', () => {
-        const { result } = renderHook(
-            () => ({ url: useUrlState(), filters: useUrlFilters() }),
-            { wrapper: wrapper('/?path=sub&author=foo&series=bar') },
-        );
+        const { result } = renderHook(() => ({ url: useUrlState(), filters: useUrlFilters() }), {
+            wrapper: wrapper('/?path=sub&author=foo&series=bar'),
+        });
         act(() => result.current.url.selectPdf('book.pdf', 'sub'));
         expect(result.current.url.selectedPdf).toBe('book.pdf');
         expect(result.current.filters.authorFilter).toBe('foo');

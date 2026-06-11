@@ -5,10 +5,10 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '../ui/Dialog';
-import { validateFilename } from '../../utils/validation';
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
-import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
+} from '@/components/ui/Dialog';
+import { validateFilename } from '@/utils/validation';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
 
 interface MergeDialogProps {
     open: boolean;

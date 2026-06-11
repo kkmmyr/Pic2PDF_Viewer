@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useReaderUIState } from '../hooks/reader/useReaderUIState';
+import { useReaderUIState } from '@/hooks/reader/useReaderUIState';
 
 describe('useReaderUIState', () => {
     it('初期状態は全部 false', () => {

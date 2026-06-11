@@ -7,9 +7,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { searchHits } from '../../features/novel_db/api';
-import type { Scope, SearchHit } from '../../features/novel_db/types';
-import { NOVEL_DB_CONFIG } from '../../constants';
+import { searchHits } from '@/features/novel_db/api';
+import type { Scope, SearchHit } from '@/features/novel_db/types';
+import { NOVEL_DB_CONFIG } from '@/constants';
 
 export interface UseNovelDbSearch {
     query: string;

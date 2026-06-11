@@ -1,14 +1,14 @@
 import { useState, useCallback } from 'react';
 import { FolderSearch, Loader2, Zap } from 'lucide-react';
-import { API_ENDPOINTS } from '../config/api';
-import generateApiClient from '../config/generate_api_client';
-import { usePdfStatus } from '../hooks/usePdfStatus';
-import { useGenerateJob } from '../hooks/useGenerateJob';
-import { JobProgress } from '../components/generator/JobProgress';
-import { StatusTable } from '../components/generator/StatusTable';
-import { Alert } from '../components/ui/Alert';
-import { errorMessage } from '../utils/error';
-import type { GenerateJob, GenerateFailedItem } from '../types';
+import { API_ENDPOINTS } from '@/config/api';
+import generateApiClient from '@/config/generate_api_client';
+import { usePdfStatus } from '@/hooks/usePdfStatus';
+import { useGenerateJob } from '@/hooks/useGenerateJob';
+import { JobProgress } from '@/components/generator/JobProgress';
+import { StatusTable } from '@/components/generator/StatusTable';
+import { Alert } from '@/components/ui/Alert';
+import { errorMessage } from '@/utils/error';
+import type { GenerateJob, GenerateFailedItem } from '@/types';
 
 const DEFAULT_QUALITY = 50;
 
@@ -61,10 +61,10 @@ export default function GeneratorPage() {
         setError(null);
         setResult(null);
         try {
-            const data = await generateApiClient.post<unknown, { message: string; files: string[] }>(
-                API_ENDPOINTS.BATCH_COMPRESS,
-                { quality },
-            );
+            const data = await generateApiClient.post<
+                unknown,
+                { message: string; files: string[] }
+            >(API_ENDPOINTS.BATCH_COMPRESS, { quality });
             setResult({ ...data, failed_items: [] });
         } catch (err: unknown) {
             setError(errorMessage(err, '一括圧縮に失敗しました。'));
@@ -95,7 +95,8 @@ export default function GeneratorPage() {
                     {/* 入力ディレクトリ説明 */}
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
                         <p className="text-sm text-blue-800 dark:text-blue-200">
-                            サーバーの入力フォルダ（Samba 共有）に WebP 画像または ZIP を配置してから生成してください。
+                            サーバーの入力フォルダ（Samba 共有）に WebP 画像または ZIP
+                            を配置してから生成してください。
                         </p>
                     </div>
 

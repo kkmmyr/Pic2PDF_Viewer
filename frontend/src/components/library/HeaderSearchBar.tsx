@@ -1,5 +1,5 @@
 import { Search, User } from 'lucide-react';
-import { SearchableSelect } from '../ui/SearchableSelect';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 interface HeaderSearchBarProps {
     searchText: string;

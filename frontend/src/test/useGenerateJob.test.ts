@@ -7,10 +7,10 @@ vi.mock('../config/generate_api_client', () => ({
     default: { get: vi.fn() },
 }));
 
-import generateApiClient from '../config/generate_api_client';
-import { ApiError } from '../config/api_client';
-import { useGenerateJob } from '../hooks/useGenerateJob';
-import type { GenerateJob } from '../types';
+import generateApiClient from '@/config/generate_api_client';
+import { ApiError } from '@/config/api_client';
+import { useGenerateJob } from '@/hooks/useGenerateJob';
+import type { GenerateJob } from '@/types';
 
 const mockedGet = generateApiClient.get as ReturnType<typeof vi.fn>;
 
@@ -66,10 +66,7 @@ describe('useGenerateJob', () => {
     });
 
     it('localStorage に既存ジョブがあるとマウント時に復元される（isRestoredJob=true）', () => {
-        localStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify({ job_id: 'restored' }),
-        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ job_id: 'restored' }));
         const { result } = renderHook(() => useGenerateJob(vi.fn(), vi.fn()), {
             wrapper: createWrapper(),
         });

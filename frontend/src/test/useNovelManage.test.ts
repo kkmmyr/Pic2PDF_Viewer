@@ -17,12 +17,12 @@ vi.mock('../features/novel_db/api', () => ({
     fetchBooks: vi.fn(),
 }));
 
-import { useNovelBuildQueue } from '../hooks/novel_build/useNovelBuildQueue';
-import { useOcrStatus } from '../hooks/useOcrStatus';
-import { fetchBooks } from '../features/novel_db/api';
-import { useNovelManage } from '../hooks/useNovelManage';
-import type { BuildQueueStatus } from '../features/novel_build/types';
-import type { BookSummary } from '../features/novel_db/types';
+import { useNovelBuildQueue } from '@/hooks/novel_build/useNovelBuildQueue';
+import { useOcrStatus } from '@/hooks/useOcrStatus';
+import { fetchBooks } from '@/features/novel_db/api';
+import { useNovelManage } from '@/hooks/useNovelManage';
+import type { BuildQueueStatus } from '@/features/novel_build/types';
+import type { BookSummary } from '@/features/novel_db/types';
 
 const mockedUseBuildQueue = useNovelBuildQueue as ReturnType<typeof vi.fn>;
 const mockedUseOcrStatus = useOcrStatus as ReturnType<typeof vi.fn>;
@@ -57,10 +57,7 @@ function makeBook(overrides: Partial<BookSummary> = {}): BookSummary {
     };
 }
 
-function setupMocks(
-    ocrStatus: string = 'idle',
-    buildStatus: Partial<BuildQueueStatus> = {},
-) {
+function setupMocks(ocrStatus: string = 'idle', buildStatus: Partial<BuildQueueStatus> = {}) {
     mockedUseOcrStatus.mockReturnValue({ status: ocrStatus, logs: [] });
     mockedUseBuildQueue.mockReturnValue({
         status: { ...EMPTY_STATUS, ...buildStatus },
@@ -273,12 +270,16 @@ describe('useNovelManage', () => {
         await waitFor(() => expect(result.current.selectedBook).toBe('本A'));
 
         act(() => {
-            result.current.setAllBooks(true);          // Full Build は全冊
-            result.current.setAllBooksCtx(false);       // コンテキストは個別
+            result.current.setAllBooks(true); // Full Build は全冊
+            result.current.setAllBooksCtx(false); // コンテキストは個別
         });
 
-        act(() => { result.current.handleEnqueueBuild(); });
-        act(() => { result.current.handleEnqueueCtx(); });
+        act(() => {
+            result.current.handleEnqueueBuild();
+        });
+        act(() => {
+            result.current.handleEnqueueCtx();
+        });
 
         expect(mockEnqueue).toHaveBeenNthCalledWith(1, null, true, 'full_build');
         expect(mockEnqueue).toHaveBeenNthCalledWith(2, '本A', false, 'generate_contexts');
@@ -307,7 +308,13 @@ describe('useNovelManage', () => {
 
     it('current_job があるとき build 実行中行が含まれる', () => {
         setupMocks('idle', {
-            current_job: { id: 1, target_id: '海辺のカフカ', mode: 'full_build', progress_done: 0, progress_total: 1 },
+            current_job: {
+                id: 1,
+                target_id: '海辺のカフカ',
+                mode: 'full_build',
+                progress_done: 0,
+                progress_total: 1,
+            },
         });
         const { result } = renderHook(() => useNovelManage());
 
@@ -321,9 +328,30 @@ describe('useNovelManage', () => {
     it('recent_finished の completed/failed/canceled が正しくラベル付けされる', () => {
         setupMocks('idle', {
             recent_finished: [
-                { id: 10, target_id: 'A', mode: 'full_build', state: 'completed', finished_at: '2024-01-01T00:00:00', error_message: null },
-                { id: 11, target_id: 'B', mode: 'full_build', state: 'failed', finished_at: '2024-01-02T00:00:00', error_message: null },
-                { id: 12, target_id: 'C', mode: 'generate_contexts', state: 'canceled', finished_at: '2024-01-03T00:00:00', error_message: null },
+                {
+                    id: 10,
+                    target_id: 'A',
+                    mode: 'full_build',
+                    state: 'completed',
+                    finished_at: '2024-01-01T00:00:00',
+                    error_message: null,
+                },
+                {
+                    id: 11,
+                    target_id: 'B',
+                    mode: 'full_build',
+                    state: 'failed',
+                    finished_at: '2024-01-02T00:00:00',
+                    error_message: null,
+                },
+                {
+                    id: 12,
+                    target_id: 'C',
+                    mode: 'generate_contexts',
+                    state: 'canceled',
+                    finished_at: '2024-01-03T00:00:00',
+                    error_message: null,
+                },
             ],
         });
         const { result } = renderHook(() => useNovelManage());

@@ -9,8 +9,8 @@
  */
 import { useCallback, useRef, useState } from 'react';
 
-import { streamQa } from '../../features/novel_db/sse';
-import type { Scope } from '../../features/novel_db/types';
+import { streamQa } from '@/features/novel_db/sse';
+import type { Scope } from '@/features/novel_db/types';
 
 export interface UseNovelDbQuestion {
     submit: (question: string) => Promise<void>;

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { PdfFile, BookMetaMap } from '../../types';
+import type { PdfFile, BookMetaMap } from '@/types';
 import { useLibraryGrouping, type GroupMode, type GroupedLibrary } from './useLibraryGrouping';
 import type { PinsMap } from './useLibraryPins';
 

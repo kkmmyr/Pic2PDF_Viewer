@@ -4,15 +4,15 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useNovelDbHistory } from '../hooks/novel_db/useNovelDbHistory';
-import type { QaHistoryListResponse } from '../features/novel_db/types';
+import { useNovelDbHistory } from '@/hooks/novel_db/useNovelDbHistory';
+import type { QaHistoryListResponse } from '@/features/novel_db/types';
 
 vi.mock('../features/novel_db/api', () => ({
     fetchQaHistory: vi.fn(),
     deleteQaHistory: vi.fn(),
 }));
 
-import { deleteQaHistory, fetchQaHistory } from '../features/novel_db/api';
+import { deleteQaHistory, fetchQaHistory } from '@/features/novel_db/api';
 
 function makeList(ids: number[], total: number): QaHistoryListResponse {
     return {

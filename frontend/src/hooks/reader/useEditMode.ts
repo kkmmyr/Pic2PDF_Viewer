@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
-import type { LibrarySource, DeletePagesResponse } from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import { errorMessage } from '../../utils/error';
+import type { LibrarySource, DeletePagesResponse } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
+import { errorMessage } from '@/utils/error';
 
 interface UseEditModeProps {
     selectedPdf: string;

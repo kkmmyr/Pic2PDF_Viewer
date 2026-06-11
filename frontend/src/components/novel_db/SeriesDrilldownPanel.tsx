@@ -1,6 +1,6 @@
 import { CheckSquare, ChevronRight, Square } from 'lucide-react';
 
-import type { BookSummary } from '../../features/novel_db/types';
+import type { BookSummary } from '@/features/novel_db/types';
 import { BulkActionsPanel } from './BulkActionsPanel';
 import SeriesDrilldownView from './SeriesDrilldownView';
 

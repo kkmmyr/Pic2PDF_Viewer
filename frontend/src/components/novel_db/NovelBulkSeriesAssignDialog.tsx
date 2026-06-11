@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
-import type { BookSummary, SeriesSummary } from '../../features/novel_db/types';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import type { BookSummary, SeriesSummary } from '@/features/novel_db/types';
 import {
     Dialog,
     DialogBody,
     DialogCancelButton,
     DialogFooter,
     DialogPrimaryButton,
-} from '../ui/Dialog';
-import { SearchableSelect } from '../ui/SearchableSelect';
+} from '@/components/ui/Dialog';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 interface Props {
     open: boolean;

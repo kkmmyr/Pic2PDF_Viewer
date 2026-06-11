@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { SpreadMode } from '../../types';
+import type { SpreadMode } from '@/types';
 
 interface UseSpreadModeReturn {
     spreadMode: SpreadMode;

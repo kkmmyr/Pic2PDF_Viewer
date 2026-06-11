@@ -5,11 +5,11 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '../ui/Dialog';
-import { SearchableSelect } from '../ui/SearchableSelect';
-import type { ExistingSeriesOption, LibrarySource } from '../../types';
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
-import { useSeriesSuggestion } from '../../hooks/useSeriesSuggestion';
+} from '@/components/ui/Dialog';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import type { ExistingSeriesOption, LibrarySource } from '@/types';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import { useSeriesSuggestion } from '@/hooks/useSeriesSuggestion';
 import { useState } from 'react';
 
 interface BulkSeriesAssignDialogProps {

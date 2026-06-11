@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { fetchBooks } from '../features/novel_db/api';
-import type { BookSummary } from '../features/novel_db/types';
-import type { BuildMode } from '../features/novel_build/types';
+import { fetchBooks } from '@/features/novel_db/api';
+import type { BookSummary } from '@/features/novel_db/types';
+import type { BuildMode } from '@/features/novel_build/types';
 import { useNovelBuildQueue } from './novel_build';
 import { useOcrStatus } from './useOcrStatus';
 import { useBuildTarget } from './useBuildTarget';

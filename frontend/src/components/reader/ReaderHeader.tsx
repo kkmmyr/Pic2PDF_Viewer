@@ -10,8 +10,8 @@ import {
     Minimize2,
     HelpCircle,
 } from 'lucide-react';
-import type { SpreadMode } from '../../types';
-import { useReaderContext } from '../../contexts/ReaderContext';
+import type { SpreadMode } from '@/types';
+import { useReaderContext } from '@/contexts/ReaderContext';
 
 const SPREAD_MODE_CONFIG: Record<
     SpreadMode,

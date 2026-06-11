@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { pdfjs } from 'react-pdf';
-import type { LibrarySource, ReadingDirection } from '../../types';
-import { buildStaticUrl, STATIC_PATHS } from '../../config/api';
+import type { LibrarySource, ReadingDirection } from '@/types';
+import { buildStaticUrl, STATIC_PATHS } from '@/config/api';
 import { toast } from 'sonner';
 import {
     useWindowSize,

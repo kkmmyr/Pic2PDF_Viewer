@@ -4,8 +4,8 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
-import { useNovelDbPageImageModal } from '../hooks/novel_db/useNovelDbPageImageModal';
-import type { BookSummary } from '../features/novel_db/types';
+import { useNovelDbPageImageModal } from '@/hooks/novel_db/useNovelDbPageImageModal';
+import type { BookSummary } from '@/features/novel_db/types';
 
 const BOOKS: BookSummary[] = [
     {

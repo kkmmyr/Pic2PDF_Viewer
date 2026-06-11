@@ -1,8 +1,8 @@
 import { type ReactNode } from 'react';
-import type { PdfFile, ReadState } from '../../types';
+import type { PdfFile, ReadState } from '@/types';
 import { PdfCardThumbnail } from './PdfCardThumbnail';
 import { PdfCardActionButtons } from './PdfCardActionButtons';
-import { formatTimestampJa } from '../../utils/date';
+import { formatTimestampJa } from '@/utils/date';
 
 /** 集約カードのバッジ情報（PdfGrid から PdfFile.name で引く想定） */
 export interface PdfCardBadge {

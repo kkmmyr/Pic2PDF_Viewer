@@ -13,10 +13,10 @@ vi.mock('../features/novel_build/sse', () => ({
     connectBuildStream: vi.fn(),
 }));
 
-import apiClient from '../config/api_client';
-import { connectBuildStream } from '../features/novel_build/sse';
-import type { BuildQueueStatus } from '../features/novel_build/sse';
-import { useNovelBuildQueue } from '../hooks/novel_build/useNovelBuildQueue';
+import apiClient from '@/config/api_client';
+import { connectBuildStream } from '@/features/novel_build/sse';
+import type { BuildQueueStatus } from '@/features/novel_build/sse';
+import { useNovelBuildQueue } from '@/hooks/novel_build/useNovelBuildQueue';
 
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;
 const mockedDelete = apiClient.delete as ReturnType<typeof vi.fn>;
@@ -38,10 +38,12 @@ describe('useNovelBuildQueue', () => {
         mockClose.mockReset();
         mockedPost.mockReset();
         mockedDelete.mockReset();
-        mockedConnect.mockImplementation((handlers: { onStatus: (s: BuildQueueStatus) => void }) => {
-            capturedOnStatus = handlers.onStatus;
-            return mockClose;
-        });
+        mockedConnect.mockImplementation(
+            (handlers: { onStatus: (s: BuildQueueStatus) => void }) => {
+                capturedOnStatus = handlers.onStatus;
+                return mockClose;
+            },
+        );
     });
 
     it('マウント時に connectBuildStream が呼ばれる', () => {

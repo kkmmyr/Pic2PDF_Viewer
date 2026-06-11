@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { PageGridOverlay } from '../components/reader/PageGridOverlay';
+import { PageGridOverlay } from '@/components/reader/PageGridOverlay';
 
 const renderOverlay = (overrides: Partial<React.ComponentProps<typeof PageGridOverlay>> = {}) => {
     const props = {

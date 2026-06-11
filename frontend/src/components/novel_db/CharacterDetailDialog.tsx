@@ -3,10 +3,10 @@
  * 書籍名 × キャラ名で fetch し、サマリ + 主要シーン top 5 を表示する。
  * シーンの page_no クリックで親が `PageImageModal` を開くよう onOpenScene を呼ぶ。
  */
-import { useCharacterDetail } from '../../hooks/novel_db';
-import { formatSqliteUtcAsJst } from '../../utils/date';
+import { useCharacterDetail } from '@/hooks/novel_db';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
-import { Dialog, DialogBody } from '../ui/Dialog';
+import { Dialog, DialogBody } from '@/components/ui/Dialog';
 
 interface Props {
     /** 開く対象。null のとき非表示。 */

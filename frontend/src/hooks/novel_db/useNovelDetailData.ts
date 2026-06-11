@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import type { DiscussionHistoryItem } from '../../features/novel_db/api';
-import { fetchDiscussionHistory, fetchSimilarBooks } from '../../features/novel_db/api';
-import type { SimilarBook } from '../../features/novel_db/types';
+import type { DiscussionHistoryItem } from '@/features/novel_db/api';
+import { fetchDiscussionHistory, fetchSimilarBooks } from '@/features/novel_db/api';
+import type { SimilarBook } from '@/features/novel_db/types';
 
 interface UseNovelDetailDataReturn {
     discussions: DiscussionHistoryItem[];

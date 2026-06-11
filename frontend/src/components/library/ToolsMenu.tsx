@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings, ChevronDown, Download } from 'lucide-react';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import type { LibrarySource } from '../../types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
+import type { LibrarySource } from '@/types';
 
 interface ToolsMenuProps {
     source: LibrarySource;

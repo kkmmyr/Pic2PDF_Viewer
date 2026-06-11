@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 
-import type { ReadState } from '../../types';
+import type { ReadState } from '@/types';
 
 interface UseReadProgressTrackerProps {
     selectedPdf: string;

@@ -1,13 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
-import type {
-    LibrarySource,
-    RegenerateThumbnailBulkResponse,
-    MergePdfsResponse,
-} from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import { useAsyncToast } from '../useAsyncToast';
+import type { LibrarySource, RegenerateThumbnailBulkResponse, MergePdfsResponse } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
+import { useAsyncToast } from '@/hooks/useAsyncToast';
 
 /**
  * `useBookMeta` から渡すアクション関数群（必要分のみ）。
@@ -117,19 +113,10 @@ export function useLibraryBulkActions({
         if (!data) return;
         onRefresh();
         if (data.failed.length > 0) {
-            toast.error(
-                `${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`,
-            );
+            toast.error(`${data.succeeded.length} 件再生成完了。失敗: ${data.failed.join(', ')}`);
         }
         onClearSelection();
-    }, [
-        selectedPdfNames,
-        currentPath,
-        currentSource,
-        onRefresh,
-        onClearSelection,
-        runAsync,
-    ]);
+    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, runAsync]);
 
     const handleMergePdfs = useCallback(
         async (outputName: string) => {
@@ -173,14 +160,7 @@ export function useLibraryBulkActions({
         onRefresh();
         onClearSelection();
         toast.success(`${selectedPdfNames.length} 件を削除しました`);
-    }, [
-        selectedPdfNames,
-        currentPath,
-        currentSource,
-        onRefresh,
-        onClearSelection,
-        runAsync,
-    ]);
+    }, [selectedPdfNames, currentPath, currentSource, onRefresh, onClearSelection, runAsync]);
 
     const handleBulkAssignSeries = useCallback(
         async (params: { title: string; indexes: number[]; id?: string }) => {

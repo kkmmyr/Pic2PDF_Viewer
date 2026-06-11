@@ -7,7 +7,7 @@
 import { render, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { createRef } from 'react';
-import { Button } from '../components/ui/Button';
+import { Button } from '@/components/ui/Button';
 
 describe('Button', () => {
     it('既定で variant=primary, size=md の class が付く', () => {

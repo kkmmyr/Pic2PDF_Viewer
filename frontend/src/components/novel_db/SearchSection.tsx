@@ -4,8 +4,8 @@
 import { useEffect, useRef } from 'react';
 import { Search } from 'lucide-react';
 
-import type { BookSummary, Scope, SeriesSummary } from '../../features/novel_db/types';
-import { useNovelDbSearch } from '../../hooks/novel_db';
+import type { BookSummary, Scope, SeriesSummary } from '@/features/novel_db/types';
+import { useNovelDbSearch } from '@/hooks/novel_db';
 
 import SearchHitItem from './SearchHitItem';
 

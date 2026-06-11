@@ -1,5 +1,5 @@
 import { ArrowUpDown } from 'lucide-react';
-import type { SortOrder } from '../../types';
+import type { SortOrder } from '@/types';
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
     { value: 'name_asc', label: '名前 (A→Z)' },

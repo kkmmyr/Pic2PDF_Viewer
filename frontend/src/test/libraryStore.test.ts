@@ -4,8 +4,8 @@ vi.mock('../config/api_client', () => ({
     default: { patch: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useLibraryStore } from '../stores/libraryStore';
+import apiClient from '@/config/api_client';
+import { useLibraryStore } from '@/stores/libraryStore';
 
 const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;
 
@@ -127,5 +127,4 @@ describe('libraryStore', () => {
             expect(mockedPatch.mock.calls[0][1].is_folder).toBe(true);
         });
     });
-
 });

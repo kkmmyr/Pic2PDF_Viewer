@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { JobProgress } from '../components/generator/JobProgress';
-import type { GenerateJob } from '../types';
+import { JobProgress } from '@/components/generator/JobProgress';
+import type { GenerateJob } from '@/types';
 
 const buildJob = (overrides: Partial<GenerateJob>): GenerateJob => ({
     job_id: 'jid',

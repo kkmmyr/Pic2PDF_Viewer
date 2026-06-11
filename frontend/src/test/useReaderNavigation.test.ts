@@ -3,7 +3,7 @@
  */
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import { useReaderNavigation } from '../hooks/reader/useReaderNavigation';
+import { useReaderNavigation } from '@/hooks/reader/useReaderNavigation';
 
 const defaults = { numPages: 10, isSpread: false, direction: 'ltr' as const, isActive: false };
 

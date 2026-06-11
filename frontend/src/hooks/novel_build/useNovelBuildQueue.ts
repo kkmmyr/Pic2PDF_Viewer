@@ -4,9 +4,9 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { cancelBuildJob, enqueueBuild } from '../../features/novel_build/api';
-import type { BuildQueueStatus } from '../../features/novel_build/types';
-import { connectBuildStream } from '../../features/novel_build/sse';
+import { cancelBuildJob, enqueueBuild } from '@/features/novel_build/api';
+import type { BuildQueueStatus } from '@/features/novel_build/types';
+import { connectBuildStream } from '@/features/novel_build/sse';
 
 const INITIAL_STATUS: BuildQueueStatus = {
     is_running: false,

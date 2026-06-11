@@ -4,15 +4,15 @@
  */
 import { useEffect, useState } from 'react';
 
-import { patchNovelBookMeta } from '../../features/novel_db/api';
-import type { BookSummary } from '../../features/novel_db/types';
+import { patchNovelBookMeta } from '@/features/novel_db/api';
+import type { BookSummary } from '@/features/novel_db/types';
 import {
     Dialog,
     DialogBody,
     DialogCancelButton,
     DialogFooter,
     DialogPrimaryButton,
-} from '../ui/Dialog';
+} from '@/components/ui/Dialog';
 
 interface Props {
     book: BookSummary | null;

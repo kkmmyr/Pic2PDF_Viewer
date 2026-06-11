@@ -1,10 +1,10 @@
 import { Library, BookOpen, Eye, EyeOff } from 'lucide-react';
-import type { LibrarySource, ReadState, SortOrder } from '../../types';
-import type { GroupMode } from '../../hooks/useLibraryGrouping';
+import type { LibrarySource, ReadState, SortOrder } from '@/types';
+import type { GroupMode } from '@/hooks/useLibraryGrouping';
 import { HeaderSearchBar } from './HeaderSearchBar';
 import { HeaderSortSelect } from './HeaderSortSelect';
 import { ToolsMenu } from './ToolsMenu';
-import { Button } from '../ui/Button';
+import { Button } from '@/components/ui/Button';
 
 type ReadStateFilter = '' | ReadState;
 

@@ -4,14 +4,14 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useNovelDbQuestion } from '../hooks/novel_db/useNovelDbQuestion';
-import type { Scope } from '../features/novel_db/types';
+import { useNovelDbQuestion } from '@/hooks/novel_db/useNovelDbQuestion';
+import type { Scope } from '@/features/novel_db/types';
 
 vi.mock('../features/novel_db/sse', () => ({
     streamQa: vi.fn(),
 }));
 
-import { streamQa } from '../features/novel_db/sse';
+import { streamQa } from '@/features/novel_db/sse';
 
 const SCOPE: Scope = { type: 'all' };
 

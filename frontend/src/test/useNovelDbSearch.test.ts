@@ -4,14 +4,14 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-import { useNovelDbSearch } from '../hooks/novel_db/useNovelDbSearch';
-import type { Scope, SearchResponse } from '../features/novel_db/types';
+import { useNovelDbSearch } from '@/hooks/novel_db/useNovelDbSearch';
+import type { Scope, SearchResponse } from '@/features/novel_db/types';
 
 vi.mock('../features/novel_db/api', () => ({
     searchHits: vi.fn(),
 }));
 
-import { searchHits } from '../features/novel_db/api';
+import { searchHits } from '@/features/novel_db/api';
 
 const SCOPE: Scope = { type: 'all' };
 

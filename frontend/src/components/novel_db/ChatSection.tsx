@@ -7,10 +7,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 
-import { streamChatSession } from '../../features/novel_db/sse';
-import type { Scope } from '../../features/novel_db/types';
-import { useChatSessionDetail, useChatSessions } from '../../hooks/novel_db';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { streamChatSession } from '@/features/novel_db/sse';
+import type { Scope } from '@/features/novel_db/types';
+import { useChatSessionDetail, useChatSessions } from '@/hooks/novel_db';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ChatInput } from './ChatInput';
 import { ChatMessageList } from './ChatMessageList';
 import { SessionSidebar } from './SessionSidebar';

@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { ReadState, SortOrder } from '../../types';
-import type { LibrarySource } from '../../types';
+import type { ReadState, SortOrder } from '@/types';
+import type { LibrarySource } from '@/types';
 import type { GroupMode } from './useLibraryGrouping';
-import { STORAGE_KEYS } from '../../constants';
-import { getStorageJson, setStorageJson } from '../../utils/storage';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
+import { STORAGE_KEYS } from '@/constants';
+import { getStorageJson, setStorageJson } from '@/utils/storage';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
 
 const SORT_STORAGE_KEY = STORAGE_KEYS.LIBRARY_SORT;
 const GROUP_MODE_KEY = 'library_group_mode';

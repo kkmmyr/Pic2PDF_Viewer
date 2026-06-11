@@ -3,12 +3,7 @@
  */
 import { RefreshCw } from 'lucide-react';
 
-import type {
-    BookSummary,
-    RebuildStatus,
-    Scope,
-    SeriesSummary,
-} from '../../features/novel_db/types';
+import type { BookSummary, RebuildStatus, Scope, SeriesSummary } from '@/features/novel_db/types';
 
 import ScopeSelector from './ScopeSelector';
 

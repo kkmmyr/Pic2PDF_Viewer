@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import type { LibrarySource } from '../types';
-import apiClient from '../config/api_client';
-import { API_ENDPOINTS } from '../config/api';
+import type { LibrarySource } from '@/types';
+import apiClient from '@/config/api_client';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface LibraryState {
     currentPath: string;

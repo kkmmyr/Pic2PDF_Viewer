@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
-import type { LibrarySource, SuggestedSeries } from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import { errorMessage } from '../../utils/error';
+import type { LibrarySource, SuggestedSeries } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
+import { errorMessage } from '@/utils/error';
 
 /**
  * 既存シリーズへの紐付け候補を取得するフック（A-1）。

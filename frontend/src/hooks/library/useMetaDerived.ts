@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { BookMetaMap } from '../../types';
-import { cmpJa } from '../../utils/sort';
+import type { BookMetaMap } from '@/types';
+import { cmpJa } from '@/utils/sort';
 
 interface UseMetaDerivedResult {
     /** 全作者名（重複排除・ソート済み）

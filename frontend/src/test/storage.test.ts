@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getStorageJson, setStorageJson, removeStorage } from '../utils/storage';
+import { getStorageJson, setStorageJson, removeStorage } from '@/utils/storage';
 
 describe('storage utils', () => {
     beforeEach(() => {

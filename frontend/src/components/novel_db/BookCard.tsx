@@ -3,8 +3,8 @@
  */
 import { CheckCircle2, Circle, Pencil } from 'lucide-react';
 
-import type { BookSummary } from '../../features/novel_db/types';
-import { formatSqliteUtcAsJst } from '../../utils/date';
+import type { BookSummary } from '@/features/novel_db/types';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 import BookMetaList from './BookMetaList';
 
 interface Props {

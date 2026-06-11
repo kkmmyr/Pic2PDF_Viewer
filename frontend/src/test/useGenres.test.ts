@@ -12,8 +12,8 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import apiClient from '../config/api_client';
-import { useGenres } from '../hooks/library/useGenres';
+import apiClient from '@/config/api_client';
+import { useGenres } from '@/hooks/library/useGenres';
 
 const createWrapper = () => {
     const queryClient = new QueryClient({

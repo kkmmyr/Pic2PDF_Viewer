@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import type { PdfFile, SortOrder } from '../../types';
-import { cmpJa } from '../../utils/sort';
+import type { PdfFile, SortOrder } from '@/types';
+import { cmpJa } from '@/utils/sort';
 
 /**
  * PDF一覧をお気に入りと並び替え順序に基づいてソートするフック。

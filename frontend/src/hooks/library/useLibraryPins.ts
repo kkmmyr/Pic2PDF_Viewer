@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { LibrarySource } from '../../types';
-import { STORAGE_KEYS } from '../../constants';
-import { getStorageJson } from '../../utils/storage';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
+import type { LibrarySource } from '@/types';
+import { STORAGE_KEYS } from '@/constants';
+import { getStorageJson } from '@/utils/storage';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
 
 /** groupId → ピン留めされた book_name。1グループにつき1冊のみ */
 export type PinsMap = Record<string, string>;

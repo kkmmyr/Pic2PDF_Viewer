@@ -14,16 +14,16 @@ import {
     useLibrarySelectionShortcut,
     useSeriesEditDialog,
 } from '..';
-import { useAsyncToast } from '../useAsyncToast';
+import { useAsyncToast } from '@/hooks/useAsyncToast';
 import { useUrlState } from './useUrlState';
 import { useLibraryPdfs, pdfQueryKey } from './useLibraryPdfs';
 import { usePinnedBookSets } from './usePinnedBookSets';
 import { useSeriesAuthorFilter } from './useSeriesAuthorFilter';
 import { useDialogToggles } from './useDialogToggles';
-import { useLibraryStore } from '../../stores/libraryStore';
-import { API_ENDPOINTS } from '../../config/api';
-import { authorsKey } from '../../utils/authors';
-import apiClient from '../../config/api_client';
+import { useLibraryStore } from '@/stores/libraryStore';
+import { API_ENDPOINTS } from '@/config/api';
+import { authorsKey } from '@/utils/authors';
+import apiClient from '@/config/api_client';
 
 type BulkDialogKey = 'bulkAuthor' | 'merge' | 'bulkSeries' | 'bulkGenre';
 

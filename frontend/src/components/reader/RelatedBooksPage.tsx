@@ -1,8 +1,8 @@
 import { BookCopy, User } from 'lucide-react';
-import type { RelatedBooks } from '../../hooks/useRelatedBooks';
-import type { LibrarySource } from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import { LazyThumbnail } from '../library/LazyThumbnail';
+import type { RelatedBooks } from '@/hooks/useRelatedBooks';
+import type { LibrarySource } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import { LazyThumbnail } from '@/components/library/LazyThumbnail';
 
 interface RelatedBooksPageProps {
     related: RelatedBooks;

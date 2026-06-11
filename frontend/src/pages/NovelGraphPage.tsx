@@ -6,8 +6,8 @@
  */
 import { useState } from 'react';
 import { Share2 } from 'lucide-react';
-import CharacterGraph from '../components/novel_graph/CharacterGraph';
-import { useCharacterGraph } from '../hooks/novel_graph/useCharacterGraph';
+import CharacterGraph from '@/components/novel_graph/CharacterGraph';
+import { useCharacterGraph } from '@/hooks/novel_graph/useCharacterGraph';
 
 export default function NovelGraphPage() {
     const {
@@ -60,7 +60,10 @@ export default function NovelGraphPage() {
                 <div className="flex flex-wrap gap-2 flex-shrink-0">
                     <span className="text-sm font-medium self-center">冊フィルタ:</span>
                     {books.map((b) => (
-                        <label key={b.id} className="flex items-center gap-1 text-sm cursor-pointer">
+                        <label
+                            key={b.id}
+                            className="flex items-center gap-1 text-sm cursor-pointer"
+                        >
                             <input
                                 type="checkbox"
                                 checked={selectedBookIds.includes(b.id)}
@@ -90,14 +93,13 @@ export default function NovelGraphPage() {
                     )}
                     {!selectedSeries && !loading && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-sm text-gray-400">シリーズを選択してください</span>
+                            <span className="text-sm text-gray-400">
+                                シリーズを選択してください
+                            </span>
                         </div>
                     )}
                     {graphData && graphData.nodes.length > 0 && (
-                        <CharacterGraph
-                            data={graphData}
-                            onNodeClick={setClickedChar}
-                        />
+                        <CharacterGraph data={graphData} onNodeClick={setClickedChar} />
                     )}
                     {graphData && graphData.nodes.length === 0 && !loading && (
                         <div className="absolute inset-0 flex items-center justify-center">

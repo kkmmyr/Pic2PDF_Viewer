@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 
-import type { BuildJob } from '../../features/novel_build/types';
+import type { BuildJob } from '@/features/novel_build/types';
 
 export default function QueuedJobCard({
     job,

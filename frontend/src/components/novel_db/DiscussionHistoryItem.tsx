@@ -5,8 +5,8 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Users } from 'lucide-react';
 
-import type { DiscussionHistoryItem } from '../../features/novel_db/api';
-import { formatSqliteUtcAsJst } from '../../utils/date';
+import type { DiscussionHistoryItem } from '@/features/novel_db/api';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
 interface TurnCardProps {
     speaker: 'A' | 'B';

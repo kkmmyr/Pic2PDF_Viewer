@@ -5,8 +5,8 @@ vi.mock('../features/novel_db/api', () => ({
     fetchBookCharacters: vi.fn(),
 }));
 
-import { fetchBookCharacters } from '../features/novel_db/api';
-import { useBookCharacters } from '../hooks/novel_db/useBookCharacters';
+import { fetchBookCharacters } from '@/features/novel_db/api';
+import { useBookCharacters } from '@/hooks/novel_db/useBookCharacters';
 
 const mockedFetch = fetchBookCharacters as ReturnType<typeof vi.fn>;
 
@@ -42,7 +42,9 @@ describe('useBookCharacters', () => {
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetch.mockRejectedValueOnce(new Error('API error'));
-        await act(async () => { await result.current.refetch(); });
+        await act(async () => {
+            await result.current.refetch();
+        });
 
         expect(result.current.error).toBeTruthy();
         expect(result.current.characters).toEqual([]);
@@ -54,7 +56,9 @@ describe('useBookCharacters', () => {
         const { result } = renderHook(() => useBookCharacters('book.pdf', true));
 
         await waitFor(() => expect(mockedFetch).toHaveBeenCalledTimes(1));
-        await act(async () => { await result.current.refetch(); });
+        await act(async () => {
+            await result.current.refetch();
+        });
         expect(result.current.characters).toHaveLength(1);
     });
 

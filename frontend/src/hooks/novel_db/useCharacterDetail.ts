@@ -6,8 +6,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchCharacterDetail } from '../../features/novel_db/api';
-import type { CharacterDetail } from '../../features/novel_db/types';
+import { fetchCharacterDetail } from '@/features/novel_db/api';
+import type { CharacterDetail } from '@/features/novel_db/types';
 
 export interface UseCharacterDetail {
     detail: CharacterDetail | null;

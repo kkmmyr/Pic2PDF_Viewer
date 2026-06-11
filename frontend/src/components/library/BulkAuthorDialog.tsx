@@ -5,12 +5,12 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '../ui/Dialog';
-import { SearchableSelect } from '../ui/SearchableSelect';
-import { TagsInput } from '../ui/TagsInput';
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
-import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
-import { useTagsInput } from '../../hooks/useTagsInput';
+} from '@/components/ui/Dialog';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { TagsInput } from '@/components/ui/TagsInput';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
+import { useTagsInput } from '@/hooks/useTagsInput';
 
 interface BulkAuthorDialogProps {
     open: boolean;

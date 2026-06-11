@@ -1,6 +1,6 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { usePdfSearch } from '../hooks/reader/usePdfSearch';
+import { usePdfSearch } from '@/hooks/reader/usePdfSearch';
 
 interface FakePage {
     getTextContent: () => Promise<{ items: Array<{ str: string }> }>;

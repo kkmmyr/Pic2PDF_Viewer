@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useNextSeriesVolume, usePrevSeriesVolume } from '../hooks/reader/useNextSeriesVolume';
-import type { BookMetaMap } from '../types';
+import { useNextSeriesVolume, usePrevSeriesVolume } from '@/hooks/reader/useNextSeriesVolume';
+import type { BookMetaMap } from '@/types';
 
 type SeriesRef = { id: string; title: string; index: number } | null;
 

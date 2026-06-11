@@ -5,9 +5,9 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '../ui/Dialog';
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
-import { useLibraryPanelContext } from '../../contexts/LibraryPanelContext';
+} from '@/components/ui/Dialog';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import { useLibraryPanelContext } from '@/contexts/LibraryPanelContext';
 
 type Mode = 'existing' | 'new' | 'unassign';
 

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { SearchableSelect } from '../components/ui/SearchableSelect';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 beforeAll(() => {
     Element.prototype.scrollIntoView = vi.fn();

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
-import { PdfGrid } from '../components/library/PdfGrid';
-import type { PdfFile } from '../types';
+import { PdfGrid } from '@/components/library/PdfGrid';
+import type { PdfFile } from '@/types';
 
 const pdf = (name: string): PdfFile => ({ name, thumbnail: null, created_at: 0 });
 

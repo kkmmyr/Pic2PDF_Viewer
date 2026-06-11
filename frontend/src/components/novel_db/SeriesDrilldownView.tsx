@@ -11,8 +11,8 @@ import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from '@d
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
 
-import type { BookSummary } from '../../features/novel_db/types';
-import { reorderNovelSeries } from '../../features/novel_db/api';
+import type { BookSummary } from '@/features/novel_db/types';
+import { reorderNovelSeries } from '@/features/novel_db/api';
 import BookCard from './BookCard';
 
 interface Props {

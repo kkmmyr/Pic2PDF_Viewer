@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { useScrollMemory } from '../hooks/library/useScrollMemory';
+import { useScrollMemory } from '@/hooks/library/useScrollMemory';
 
 describe('useScrollMemory', () => {
     let scrollToSpy: ReturnType<typeof vi.fn>;

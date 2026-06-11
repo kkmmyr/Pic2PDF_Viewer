@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import type { LibrarySource } from '../../types';
-import { ReaderProvider, useReaderContext } from '../../contexts/ReaderContext';
-import { useTouchSwipe } from '../../hooks/useTouchSwipe';
+import type { LibrarySource } from '@/types';
+import { ReaderProvider, useReaderContext } from '@/contexts/ReaderContext';
+import { useTouchSwipe } from '@/hooks/useTouchSwipe';
 import { PdfSearchBar } from './PdfSearchBar';
 import { PageSlider } from './PageSlider';
 import { PageGridOverlay } from './PageGridOverlay';
@@ -9,7 +9,7 @@ import { RelatedBooksPage } from './RelatedBooksPage';
 import { ShortcutsHelpDialog } from './ShortcutsHelpDialog';
 import { ReaderHeader } from './ReaderHeader';
 import { ReaderPageView } from './ReaderPageView';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 interface ReaderPanelProps {
     selectedPdf: string;

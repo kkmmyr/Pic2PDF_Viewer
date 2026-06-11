@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
-import type { QaHistoryEntry, Scope } from '../../features/novel_db/types';
-import { useNovelDbQuestion } from '../../hooks/novel_db';
+import type { QaHistoryEntry, Scope } from '@/features/novel_db/types';
+import { useNovelDbQuestion } from '@/hooks/novel_db';
 
 import QuestionHistoryDetail from './QuestionHistoryDetail';
 import QuestionHistoryList from './QuestionHistoryList';

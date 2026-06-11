@@ -1,8 +1,8 @@
 import { Loader2 } from 'lucide-react';
 
-import { formatSqliteUtcAsJst } from '../../utils/date';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
-import type { BuildJob } from '../../features/novel_build/types';
+import type { BuildJob } from '@/features/novel_build/types';
 
 function ProgressBar({ done, total }: { done: number; total: number }) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;

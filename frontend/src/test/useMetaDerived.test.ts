@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useMetaDerived } from '../hooks/library/useMetaDerived';
-import type { BookMetaMap } from '../types';
+import { useMetaDerived } from '@/hooks/library/useMetaDerived';
+import type { BookMetaMap } from '@/types';
 
 describe('useMetaDerived', () => {
     it('空 meta なら全派生値が空', () => {

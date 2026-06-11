@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useReadProgressTracker } from '../hooks/reader/useReadProgressTracker';
+import { useReadProgressTracker } from '@/hooks/reader/useReadProgressTracker';
 
 describe('useReadProgressTracker', () => {
     const mockGetReadState = vi.fn();
@@ -29,10 +29,9 @@ describe('useReadProgressTracker', () => {
     it('isAtLastSpread=true かつ未読で setReadState が呼ばれる', async () => {
         mockGetReadState.mockReturnValue(undefined);
         mockSetReadState.mockResolvedValue(undefined);
-        const { rerender } = renderHook(
-            (props) => useReadProgressTracker(props),
-            { initialProps: { ...defaultProps, isAtLastSpread: false } },
-        );
+        const { rerender } = renderHook((props) => useReadProgressTracker(props), {
+            initialProps: { ...defaultProps, isAtLastSpread: false },
+        });
         await act(async () => {
             rerender({ ...defaultProps, isAtLastSpread: true });
         });
@@ -41,10 +40,9 @@ describe('useReadProgressTracker', () => {
 
     it('既に read_state=done の場合は setReadState を呼ばない', async () => {
         mockGetReadState.mockReturnValue('done');
-        const { rerender } = renderHook(
-            (props) => useReadProgressTracker(props),
-            { initialProps: { ...defaultProps, isAtLastSpread: false } },
-        );
+        const { rerender } = renderHook((props) => useReadProgressTracker(props), {
+            initialProps: { ...defaultProps, isAtLastSpread: false },
+        });
         await act(async () => {
             rerender({ ...defaultProps, isAtLastSpread: true });
         });
@@ -53,10 +51,9 @@ describe('useReadProgressTracker', () => {
 
     it('同じ書籍で連続して isAtLastSpread=true になっても 2 回目は呼ばれない', async () => {
         mockGetReadState.mockReturnValue(undefined);
-        const { rerender } = renderHook(
-            (props) => useReadProgressTracker(props),
-            { initialProps: { ...defaultProps, isAtLastSpread: false } },
-        );
+        const { rerender } = renderHook((props) => useReadProgressTracker(props), {
+            initialProps: { ...defaultProps, isAtLastSpread: false },
+        });
         await act(async () => {
             rerender({ ...defaultProps, isAtLastSpread: true });
         });
@@ -69,10 +66,9 @@ describe('useReadProgressTracker', () => {
 
     it('selectedPdf が変わるとガードがリセットされ次の書籍で再び呼ばれる', async () => {
         mockGetReadState.mockReturnValue(undefined);
-        const { rerender } = renderHook(
-            (props) => useReadProgressTracker(props),
-            { initialProps: { ...defaultProps, isAtLastSpread: false } },
-        );
+        const { rerender } = renderHook((props) => useReadProgressTracker(props), {
+            initialProps: { ...defaultProps, isAtLastSpread: false },
+        });
         // 1冊目
         await act(async () => {
             rerender({ ...defaultProps, isAtLastSpread: true });
@@ -93,10 +89,9 @@ describe('useReadProgressTracker', () => {
         mockSetReadState.mockRejectedValueOnce(new Error('network error'));
         mockSetReadState.mockResolvedValue(undefined);
 
-        const { rerender } = renderHook(
-            (props) => useReadProgressTracker(props),
-            { initialProps: { ...defaultProps, isAtLastSpread: false } },
-        );
+        const { rerender } = renderHook((props) => useReadProgressTracker(props), {
+            initialProps: { ...defaultProps, isAtLastSpread: false },
+        });
         // 1回目: 失敗（.catch() が doneSentForRef を null に戻す）
         await act(async () => {
             rerender({ ...defaultProps, isAtLastSpread: true });

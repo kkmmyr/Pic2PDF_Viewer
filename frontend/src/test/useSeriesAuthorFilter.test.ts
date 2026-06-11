@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useSeriesAuthorFilter } from '../hooks/library/useSeriesAuthorFilter';
-import type { BookMetaMap } from '../types';
+import { useSeriesAuthorFilter } from '@/hooks/library/useSeriesAuthorFilter';
+import type { BookMetaMap } from '@/types';
 
 const META: BookMetaMap = {
     'a.pdf': { series_id: 's1', authors: ['作者A'] },

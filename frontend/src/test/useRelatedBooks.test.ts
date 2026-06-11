@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useRelatedBooks } from '../hooks/reader/useRelatedBooks';
-import type { BookMetaMap } from '../types';
+import { useRelatedBooks } from '@/hooks/reader/useRelatedBooks';
+import type { BookMetaMap } from '@/types';
 
 describe('useRelatedBooks', () => {
     it('全 input が空なら 2 セクションすべて空', () => {

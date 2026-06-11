@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import type { PdfFile, BookMetaMap } from '../../types';
+import type { PdfFile, BookMetaMap } from '@/types';
 import type { PinsMap } from './useLibraryPins';
-import { authorsKey } from '../../utils/authors';
+import { authorsKey } from '@/utils/authors';
 
 /**
  * ライブラリの集約モード:

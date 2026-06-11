@@ -1,5 +1,5 @@
 import { User, Library, Layers, Eye, EyeOff, Merge, ImageIcon, Trash2 } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { Button } from '@/components/ui/Button';
 
 interface LibraryBulkActionBarProps {
     selectedCount: number;

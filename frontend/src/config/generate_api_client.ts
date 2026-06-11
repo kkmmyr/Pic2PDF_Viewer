@@ -2,7 +2,7 @@
  * Generator 専用 API クライアント。同一オリジンの backend へ送信する。
  */
 import axios, { AxiosError } from 'axios';
-import { API_CONFIG as API_TIMEOUT } from '../constants';
+import { API_CONFIG as API_TIMEOUT } from '@/constants';
 import { ApiError } from './api_client';
 
 const GENERATE_BASE_URL: string = '';

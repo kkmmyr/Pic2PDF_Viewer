@@ -5,8 +5,8 @@ vi.mock('../features/novel_db/api', () => ({
     fetchCharacterDetail: vi.fn(),
 }));
 
-import { fetchCharacterDetail } from '../features/novel_db/api';
-import { useCharacterDetail } from '../hooks/novel_db/useCharacterDetail';
+import { fetchCharacterDetail } from '@/features/novel_db/api';
+import { useCharacterDetail } from '@/hooks/novel_db/useCharacterDetail';
 
 const mockedFetch = fetchCharacterDetail as ReturnType<typeof vi.fn>;
 

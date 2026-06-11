@@ -1,7 +1,7 @@
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { PageRenderer } from './PageRenderer';
-import { useReaderContext } from '../../contexts/ReaderContext';
+import { useReaderContext } from '@/contexts/ReaderContext';
 
 // <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(

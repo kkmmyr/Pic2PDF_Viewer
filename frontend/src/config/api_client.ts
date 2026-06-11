@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { API_CONFIG as API_URL_CONFIG } from './api';
-import { API_CONFIG } from '../constants';
+import { API_CONFIG } from '@/constants';
 
 /** API エラーの種別 */
 type ApiErrorKind = 'network' | 'timeout' | 'server' | 'client' | 'unknown';

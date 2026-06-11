@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 
-import { useAutoFocusInput } from '../../hooks/useAutoFocusInput';
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
-import { useTagsInput } from '../../hooks/useTagsInput';
-import { Dialog, DialogBody, DialogCancelButton, DialogFooter, DialogPrimaryButton } from '../ui/Dialog';
-import { SearchableSelect } from '../ui/SearchableSelect';
-import { TagsInput } from '../ui/TagsInput';
+import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import { useTagsInput } from '@/hooks/useTagsInput';
+import {
+    Dialog,
+    DialogBody,
+    DialogCancelButton,
+    DialogFooter,
+    DialogPrimaryButton,
+} from '@/components/ui/Dialog';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { TagsInput } from '@/components/ui/TagsInput';
 
 interface Props {
     open: boolean;
@@ -80,7 +86,9 @@ export function NovelBulkAuthorDialog({ open, targetCount, allAuthors, onClose, 
                             <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
                                 既存の作者から選択
                                 {noExisting && (
-                                    <span className="ml-2 text-xs text-gray-400">（既存作者なし）</span>
+                                    <span className="ml-2 text-xs text-gray-400">
+                                        （既存作者なし）
+                                    </span>
                                 )}
                             </div>
                             {mode === 'existing' && !noExisting && (

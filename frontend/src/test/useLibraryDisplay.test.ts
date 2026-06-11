@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useLibraryDisplay } from '../hooks/library/useLibraryDisplay';
-import type { PdfFile, BookMetaMap } from '../types';
+import { useLibraryDisplay } from '@/hooks/library/useLibraryDisplay';
+import type { PdfFile, BookMetaMap } from '@/types';
 
 const pdf = (name: string): PdfFile => ({ name, thumbnail: null, created_at: 0 });
 

@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import { useHitomiArrivals } from '../hooks/useHitomiArrivals';
-import { useAsyncToast } from '../hooks/useAsyncToast';
-import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
-import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
-import { ConfirmDialog } from '../components/ui/ConfirmDialog';
-import { Alert } from '../components/ui/Alert';
-import { errorMessage } from '../utils/error';
-import { formatDateTimeJa } from '../utils/date';
-import type { RunStatus } from '../types/hitomi';
+import { useHitomiArrivals } from '@/hooks/useHitomiArrivals';
+import { useAsyncToast } from '@/hooks/useAsyncToast';
+import { HitomiArrivalCard } from '@/components/hitomi/HitomiArrivalCard';
+import { HitomiWatchlistDialog } from '@/components/hitomi/HitomiWatchlistDialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Alert } from '@/components/ui/Alert';
+import { errorMessage } from '@/utils/error';
+import { formatDateTimeJa } from '@/utils/date';
+import type { RunStatus } from '@/types/hitomi';
 
 function StatusBadge({ status }: { status: RunStatus }) {
     if (status === 'ok') {
@@ -195,7 +195,6 @@ export default function HitomiPage() {
                 onConfirm={handleDismissAllConfirmed}
                 onCancel={() => setConfirmDismissAllOpen(false)}
             />
-
         </div>
     );
 }

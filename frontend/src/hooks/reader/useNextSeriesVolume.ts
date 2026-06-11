@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { BookMetaMap } from '../../types';
+import type { BookMetaMap } from '@/types';
 
 type SeriesRef = { id: string; title: string; index: number } | null;
 type VolumeRef = { name: string; index: number; title: string } | null;

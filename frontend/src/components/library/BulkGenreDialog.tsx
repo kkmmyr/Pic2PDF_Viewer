@@ -5,8 +5,8 @@ import {
     DialogFooter,
     DialogCancelButton,
     DialogPrimaryButton,
-} from '../ui/Dialog';
-import { useDialogSubmit } from '../../hooks/library/useDialogSubmit';
+} from '@/components/ui/Dialog';
+import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
 
 interface BulkGenreDialogProps {
     open: boolean;

@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useSeriesEditDialog } from '../hooks/library/useSeriesEditDialog';
+import { useSeriesEditDialog } from '@/hooks/library/useSeriesEditDialog';
 
 const setup = () => {
     const assignSeries = vi.fn().mockResolvedValue('sid');

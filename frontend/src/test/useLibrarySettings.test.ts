@@ -10,8 +10,8 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import apiClient from '../config/api_client';
-import { useLibrarySettings } from '../hooks/library/useLibrarySettings';
+import apiClient from '@/config/api_client';
+import { useLibrarySettings } from '@/hooks/library/useLibrarySettings';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;
@@ -113,8 +113,12 @@ describe('useLibrarySettings', () => {
             const { result } = renderHook(() => useLibrarySettings('doujin'), {
                 wrapper: createWrapper(),
             });
-            act(() => { result.current.toggleShowHidden(); });
-            act(() => { result.current.toggleShowHidden(); });
+            act(() => {
+                result.current.toggleShowHidden();
+            });
+            act(() => {
+                result.current.toggleShowHidden();
+            });
             expect(result.current.showHidden).toBe(false);
         });
     });

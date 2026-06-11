@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { HitomiArrivalCard } from '../components/hitomi/HitomiArrivalCard';
-import type { ArrivalItem } from '../types/hitomi';
+import { HitomiArrivalCard } from '@/components/hitomi/HitomiArrivalCard';
+import type { ArrivalItem } from '@/types/hitomi';
 
 const item: ArrivalItem = {
     id: 42,

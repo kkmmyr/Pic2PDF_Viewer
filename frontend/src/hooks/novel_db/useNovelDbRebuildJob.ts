@@ -7,10 +7,10 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { cancelRebuild, fetchRebuildStatus, postRebuild } from '../../features/novel_db/api';
-import type { RebuildEnqueueRequest } from '../../features/novel_db/api';
-import type { RebuildEnqueueResponse, RebuildStatus } from '../../features/novel_db/types';
-import { NOVEL_DB_CONFIG } from '../../constants';
+import { cancelRebuild, fetchRebuildStatus, postRebuild } from '@/features/novel_db/api';
+import type { RebuildEnqueueRequest } from '@/features/novel_db/api';
+import type { RebuildEnqueueResponse, RebuildStatus } from '@/features/novel_db/types';
+import { NOVEL_DB_CONFIG } from '@/constants';
 
 export interface UseNovelDbRebuildJob {
     status: RebuildStatus | null;
@@ -27,9 +27,15 @@ export function useNovelDbRebuildJob(onJobCompleted?: () => void): UseNovelDbReb
     const queryClient = useQueryClient();
     const lastIsRunningRef = useRef(false);
     const onCompletedRef = useRef(onJobCompleted);
-    useEffect(() => { onCompletedRef.current = onJobCompleted; }, [onJobCompleted]);
+    useEffect(() => {
+        onCompletedRef.current = onJobCompleted;
+    }, [onJobCompleted]);
 
-    const { data: status, isLoading, error: queryError } = useQuery<RebuildStatus>({
+    const {
+        data: status,
+        isLoading,
+        error: queryError,
+    } = useQuery<RebuildStatus>({
         queryKey: QUERY_KEY,
         queryFn: fetchRebuildStatus,
         refetchInterval: NOVEL_DB_CONFIG.REBUILD_POLL_INTERVAL_MS,

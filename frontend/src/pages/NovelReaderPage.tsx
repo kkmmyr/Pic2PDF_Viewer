@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, FileText, Maximize2, Minimize2, Wand2 } from 'lucide-react';
 
-import { useWindowSize } from '../hooks';
-import { useFullscreen } from '../hooks/reader/useFullscreen';
-import { useReaderNavigation } from '../hooks/reader/useReaderNavigation';
-import { useReaderUIState } from '../hooks/reader/useReaderUIState';
-import { useSpreadMode } from '../hooks/reader/useSpreadMode';
-import { fetchBooks } from '../features/novel_db/api';
-import type { SpreadMode } from '../types';
+import { useWindowSize } from '@/hooks';
+import { useFullscreen } from '@/hooks/reader/useFullscreen';
+import { useReaderNavigation } from '@/hooks/reader/useReaderNavigation';
+import { useReaderUIState } from '@/hooks/reader/useReaderUIState';
+import { useSpreadMode } from '@/hooks/reader/useSpreadMode';
+import { fetchBooks } from '@/features/novel_db/api';
+import type { SpreadMode } from '@/types';
 
 function novelImageUrl(bookName: string, pageNo: number): string {
     return `/kindle_novel/images/${encodeURIComponent(bookName)}/${String(pageNo).padStart(3, '0')}.png`;
@@ -33,7 +33,11 @@ const SPREAD_ICON: Record<SpreadMode, React.ReactNode> = {
     spread: <BookOpen className="w-4 h-4" />,
     single: <FileText className="w-4 h-4" />,
 };
-const SPREAD_LABEL: Record<SpreadMode, string> = { auto: 'Auto', spread: 'Spread', single: 'Single' };
+const SPREAD_LABEL: Record<SpreadMode, string> = {
+    auto: 'Auto',
+    spread: 'Spread',
+    single: 'Single',
+};
 
 const HEADER_H = 56;
 
@@ -48,7 +52,8 @@ export default function NovelReaderPage() {
     const initialPageSet = useRef(false);
 
     const { height: windowHeight } = useWindowSize();
-    const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } = useSpreadMode();
+    const { spreadMode, isSpread, cycleSpreadMode, handlePageSize, resetAutoSpread } =
+        useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
     const { showHeader, showHeaderOff, showSlider, showSliderOff } = useReaderUIState();
 
@@ -268,7 +273,6 @@ export default function NovelReaderPage() {
                     </span>
                 </div>
             )}
-
         </div>
     );
 }

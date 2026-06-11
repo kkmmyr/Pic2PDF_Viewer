@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import type { ReadingDirection, LibrarySource } from '../../types';
-import { API_ENDPOINTS, buildApiUrl } from '../../config/api';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import type { ReadingDirection, LibrarySource } from '@/types';
+import { API_ENDPOINTS, buildApiUrl } from '@/config/api';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 interface PageSliderProps {
     pageNumber: number;

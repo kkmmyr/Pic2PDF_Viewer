@@ -3,7 +3,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { Network, type Options } from 'vis-network';
-import type { GraphData } from '../../features/novel_graph/api';
+import type { GraphData } from '@/features/novel_graph/api';
 
 interface Props {
     data: GraphData;
@@ -17,7 +17,11 @@ const NETWORK_OPTIONS: Options = {
         size: 16,
         font: { size: 14 },
         borderWidth: 2,
-        color: { background: '#6366f1', border: '#4f46e5', highlight: { background: '#818cf8', border: '#6366f1' } },
+        color: {
+            background: '#6366f1',
+            border: '#4f46e5',
+            highlight: { background: '#818cf8', border: '#6366f1' },
+        },
     },
     edges: {
         font: { size: 11, align: 'middle' },
@@ -50,11 +54,7 @@ export default function CharacterGraph({ data, onNodeClick }: Props) {
             width: Math.min(Math.max(e.weight, 1), 10),
         }));
 
-        networkRef.current = new Network(
-            containerRef.current,
-            { nodes, edges },
-            NETWORK_OPTIONS,
-        );
+        networkRef.current = new Network(containerRef.current, { nodes, edges }, NETWORK_OPTIONS);
 
         if (onNodeClick) {
             networkRef.current.on('click', (params) => {

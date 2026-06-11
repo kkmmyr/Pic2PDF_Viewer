@@ -4,8 +4,8 @@
  * - `card` variant: ライブラリカード用（コンパクト・ラベルなし・line-clamp）
  * - `detail` variant: 詳細ページ用（<dl> 形式・ラベルあり・フル表示）
  */
-import type { BookDetail, BookSummary } from '../../features/novel_db/types';
-import { formatSqliteUtcAsJst } from '../../utils/date';
+import type { BookDetail, BookSummary } from '@/features/novel_db/types';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
 interface BookMetaListProps {
     book: BookSummary | BookDetail;
@@ -14,9 +14,8 @@ interface BookMetaListProps {
 
 export default function BookMetaList({ book, variant = 'detail' }: BookMetaListProps) {
     const detail = book as BookDetail;
-    const seriesName = variant === 'detail'
-        ? (detail.series_title ?? book.series_id)
-        : book.series_id;
+    const seriesName =
+        variant === 'detail' ? (detail.series_title ?? book.series_id) : book.series_id;
 
     if (variant === 'card') {
         return (

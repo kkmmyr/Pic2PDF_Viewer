@@ -7,10 +7,10 @@ vi.mock('../config/api_client', () => ({
     default: { get: vi.fn(), patch: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useBookMetaCore } from '../hooks/library/useBookMetaCore';
-import { useBookMetaWrite } from '../hooks/library/useBookMetaWrite';
-import type { BookMetaMap } from '../types';
+import apiClient from '@/config/api_client';
+import { useBookMetaCore } from '@/hooks/library/useBookMetaCore';
+import { useBookMetaWrite } from '@/hooks/library/useBookMetaWrite';
+import type { BookMetaMap } from '@/types';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;

@@ -1,4 +1,4 @@
-import type { StatusItem } from '../../types';
+import type { StatusItem } from '@/types';
 
 interface StatusTableProps {
     items: StatusItem[];

@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useDarkMode } from '../hooks/useDarkMode';
+import { useDarkMode } from '@/hooks/useDarkMode';
 
 const STORAGE_KEY = 'darkMode';
 

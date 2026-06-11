@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { useVolumeNavigation } from '../hooks/reader/useVolumeNavigation';
+import { useVolumeNavigation } from '@/hooks/reader/useVolumeNavigation';
 
 describe('useVolumeNavigation', () => {
     const mockRecordView = vi.fn();
@@ -17,11 +17,15 @@ describe('useVolumeNavigation', () => {
         currentPath: '/path/vol1.pdf',
     };
 
-    beforeEach(() => { vi.clearAllMocks(); });
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
     it('handleNavigateNextVolume: nextVolume + onSelectPdf あり → recordView/onSelectPdf が呼ばれる', () => {
         const { result } = renderHook(() => useVolumeNavigation(defaultProps));
-        act(() => { result.current.handleNavigateNextVolume(); });
+        act(() => {
+            result.current.handleNavigateNextVolume();
+        });
         expect(mockRecordView).toHaveBeenCalledWith('/path/vol1.pdf', 'vol2.pdf');
         expect(mockOnSelectPdf).toHaveBeenCalledWith('vol2.pdf');
     });
@@ -30,7 +34,9 @@ describe('useVolumeNavigation', () => {
         const { result } = renderHook(() =>
             useVolumeNavigation({ ...defaultProps, nextVolume: null }),
         );
-        act(() => { result.current.handleNavigateNextVolume(); });
+        act(() => {
+            result.current.handleNavigateNextVolume();
+        });
         expect(mockRecordView).not.toHaveBeenCalled();
         expect(mockOnSelectPdf).not.toHaveBeenCalled();
     });
@@ -39,13 +45,17 @@ describe('useVolumeNavigation', () => {
         const { result } = renderHook(() =>
             useVolumeNavigation({ ...defaultProps, onSelectPdf: undefined }),
         );
-        act(() => { result.current.handleNavigateNextVolume(); });
+        act(() => {
+            result.current.handleNavigateNextVolume();
+        });
         expect(mockRecordView).not.toHaveBeenCalled();
     });
 
     it('handleNavigatePrevVolume: prevVolume + onSelectPdf あり → recordView/onSelectPdf が呼ばれる', () => {
         const { result } = renderHook(() => useVolumeNavigation(defaultProps));
-        act(() => { result.current.handleNavigatePrevVolume(); });
+        act(() => {
+            result.current.handleNavigatePrevVolume();
+        });
         expect(mockRecordView).toHaveBeenCalledWith('/path/vol1.pdf', 'vol0.pdf');
         expect(mockOnSelectPdf).toHaveBeenCalledWith('vol0.pdf');
     });
@@ -54,7 +64,9 @@ describe('useVolumeNavigation', () => {
         const { result } = renderHook(() =>
             useVolumeNavigation({ ...defaultProps, prevVolume: null }),
         );
-        act(() => { result.current.handleNavigatePrevVolume(); });
+        act(() => {
+            result.current.handleNavigatePrevVolume();
+        });
         expect(mockRecordView).not.toHaveBeenCalled();
         expect(mockOnSelectPdf).not.toHaveBeenCalled();
     });
@@ -63,7 +75,9 @@ describe('useVolumeNavigation', () => {
         const { result } = renderHook(() =>
             useVolumeNavigation({ ...defaultProps, onSelectPdf: undefined }),
         );
-        act(() => { result.current.handleNavigatePrevVolume(); });
+        act(() => {
+            result.current.handleNavigatePrevVolume();
+        });
         expect(mockRecordView).not.toHaveBeenCalled();
     });
 });

@@ -9,7 +9,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import type { Scope } from '../../features/novel_db/types';
+import type { Scope } from '@/features/novel_db/types';
 
 export interface UseNovelDbScope {
     scope: Scope;

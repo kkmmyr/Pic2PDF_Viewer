@@ -1,4 +1,4 @@
-import type { Scope } from '../../features/novel_db/types';
+import type { Scope } from '@/features/novel_db/types';
 
 interface ChatInputProps {
     question: string;

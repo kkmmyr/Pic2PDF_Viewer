@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { toast } from 'sonner';
-import { useAsyncToast } from '../hooks/useAsyncToast';
+import { useAsyncToast } from '@/hooks/useAsyncToast';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 

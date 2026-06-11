@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useSpreadMode } from '../hooks/reader/useSpreadMode';
+import { useSpreadMode } from '@/hooks/reader/useSpreadMode';
 
 describe('useSpreadMode', () => {
     it('初期: spreadMode=auto / isSpread=true（autoIsSpread の初期値）', () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { StatusTable } from '../components/generator/StatusTable';
-import type { StatusItem } from '../types';
+import { StatusTable } from '@/components/generator/StatusTable';
+import type { StatusItem } from '@/types';
 
 const item = (name: string, type: string, status: StatusItem['status']): StatusItem => ({
     name,

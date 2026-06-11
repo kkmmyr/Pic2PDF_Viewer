@@ -1,8 +1,8 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 
-import { useNovelLibraryGroup } from '../hooks/useNovelLibraryGroup';
-import type { BookSummary } from '../features/novel_db/types';
+import { useNovelLibraryGroup } from '@/hooks/useNovelLibraryGroup';
+import type { BookSummary } from '@/features/novel_db/types';
 
 const book = (
     name: string,

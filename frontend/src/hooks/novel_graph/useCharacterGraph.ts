@@ -8,7 +8,7 @@ import {
     fetchGraph,
     type BookEntry,
     type GraphData,
-} from '../../features/novel_graph/api';
+} from '@/features/novel_graph/api';
 
 export function useCharacterGraph() {
     const [seriesList, setSeriesList] = useState<string[]>([]);

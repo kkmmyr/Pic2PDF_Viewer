@@ -12,7 +12,7 @@ vi.mock('react-pdf', () => ({
     Document: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-import { PageRenderer } from '../components/reader/PageRenderer';
+import { PageRenderer } from '@/components/reader/PageRenderer';
 
 const renderPR = (overrides: Partial<Parameters<typeof PageRenderer>[0]> = {}) => {
     const props = {

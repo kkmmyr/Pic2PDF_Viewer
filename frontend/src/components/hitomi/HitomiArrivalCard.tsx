@@ -1,6 +1,6 @@
 import { ExternalLink, EyeOff, FileText } from 'lucide-react';
-import type { ArrivalItem } from '../../types/hitomi';
-import { formatDateJa } from '../../utils/date';
+import type { ArrivalItem } from '@/types/hitomi';
+import { formatDateJa } from '@/utils/date';
 
 interface HitomiArrivalCardProps {
     item: ArrivalItem;

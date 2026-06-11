@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import type { LibrarySource, PdfFile } from '../../types';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
+import type { LibrarySource, PdfFile } from '@/types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
 
 export const pdfQueryKey = (path: string, source: LibrarySource) => ['pdfs', path, source] as const;
 

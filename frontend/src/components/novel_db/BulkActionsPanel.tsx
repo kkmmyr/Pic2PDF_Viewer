@@ -1,4 +1,4 @@
-import type { BookSummary } from '../../features/novel_db/types';
+import type { BookSummary } from '@/features/novel_db/types';
 
 interface Props {
     targetBooks: BookSummary[];

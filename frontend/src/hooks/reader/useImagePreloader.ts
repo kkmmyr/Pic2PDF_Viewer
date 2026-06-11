@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { buildStaticUrl } from '../../config/api';
+import { buildStaticUrl } from '@/config/api';
 
 /**
  * 画像をプリロードするカスタムフック

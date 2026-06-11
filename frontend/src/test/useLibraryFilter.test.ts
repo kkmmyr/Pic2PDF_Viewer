@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useLibraryFilter } from '../hooks/library/useLibraryFilter';
-import type { PdfFile, BookMetaMap } from '../types';
+import { useLibraryFilter } from '@/hooks/library/useLibraryFilter';
+import type { PdfFile, BookMetaMap } from '@/types';
 
 const makePdf = (name: string): PdfFile => ({
     name,

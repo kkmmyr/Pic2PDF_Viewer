@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import apiClient from '../config/api_client';
-import { API_ENDPOINTS } from '../config/api';
-import { errorMessage } from '../utils/error';
-import type { WatchlistEntry, WatchlistResponse } from '../types/hitomi';
+import apiClient from '@/config/api_client';
+import { API_ENDPOINTS } from '@/config/api';
+import { errorMessage } from '@/utils/error';
+import type { WatchlistEntry, WatchlistResponse } from '@/types/hitomi';
 
 interface UseHitomiWatchlistResult {
     artists: WatchlistEntry[];

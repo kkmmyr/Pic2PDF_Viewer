@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-import type { Scope } from '../../features/novel_db/types';
-import type { useChatSessionDetail } from '../../hooks/novel_db';
+import type { Scope } from '@/features/novel_db/types';
+import type { useChatSessionDetail } from '@/hooks/novel_db';
 
 interface ChatMessageListProps {
     detail: ReturnType<typeof useChatSessionDetail>['detail'];

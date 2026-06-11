@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* ----------------------------------------------------------------
  * shadcn/ui CSS 変数（Radix UI コンポーネントが参照する設計トークン）。
@@ -77,7 +77,7 @@
 
 @theme {
     /* セマンティック色トークン */
-    --color-primary-50:  #eef2ff;
+    --color-primary-50: #eef2ff;
     --color-primary-100: #e0e7ff;
     --color-primary-200: #c7d2fe;
     --color-primary-300: #a5b4fc;
@@ -89,7 +89,7 @@
     --color-primary-900: #312e81;
     --color-primary-950: #1e1b4b;
 
-    --color-accent-50:  #faf5ff;
+    --color-accent-50: #faf5ff;
     --color-accent-100: #f3e8ff;
     --color-accent-200: #e9d5ff;
     --color-accent-300: #d8b4fe;
@@ -101,7 +101,7 @@
     --color-accent-900: #581c87;
     --color-accent-950: #3b0764;
 
-    --color-success-50:  #ecfdf5;
+    --color-success-50: #ecfdf5;
     --color-success-100: #d1fae5;
     --color-success-200: #a7f3d0;
     --color-success-300: #6ee7b7;
@@ -114,20 +114,24 @@
     --color-success-950: #022c22;
 
     /* z-index 階層 */
-    --z-card-badge:     10;
+    --z-card-badge: 10;
     --z-floating-action: 30;
-    --z-overlay-bar:    40;
-    --z-header:         50;
-    --z-toast:          60;
-    --z-dialog:        100;
+    --z-overlay-bar: 40;
+    --z-header: 50;
+    --z-toast: 60;
+    --z-dialog: 100;
     --z-dialog-nested: 200;
 
     /* アニメーション */
     --animate-slide-in-right: slide-in-right 0.2s ease-out;
 
     @keyframes slide-in-right {
-        0%   { transform: translateX(100%); }
-        100% { transform: translateX(0); }
+        0% {
+            transform: translateX(100%);
+        }
+        100% {
+            transform: translateX(0);
+        }
     }
 }
 

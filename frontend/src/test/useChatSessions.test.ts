@@ -7,11 +7,8 @@ vi.mock('../features/novel_db/api', () => ({
     fetchChatSessionDetail: vi.fn(),
 }));
 
-import {
-    fetchChatSessions,
-    deleteChatSession,
-} from '../features/novel_db/api';
-import { useChatSessions } from '../hooks/novel_db/useChatSessions';
+import { fetchChatSessions, deleteChatSession } from '@/features/novel_db/api';
+import { useChatSessions } from '@/hooks/novel_db/useChatSessions';
 
 const mockedFetchSessions = fetchChatSessions as ReturnType<typeof vi.fn>;
 const mockedDelete = deleteChatSession as ReturnType<typeof vi.fn>;
@@ -51,7 +48,9 @@ describe('useChatSessions', () => {
         const { result } = renderHook(() => useChatSessions());
         await waitFor(() => expect(result.current.sessions).toHaveLength(2));
 
-        await act(async () => { await result.current.remove(1); });
+        await act(async () => {
+            await result.current.remove(1);
+        });
 
         expect(mockedDelete).toHaveBeenCalledWith(1);
         expect(result.current.sessions).toHaveLength(1);
@@ -63,7 +62,9 @@ describe('useChatSessions', () => {
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetchSessions.mockResolvedValueOnce([{ id: 1 }]);
-        await act(async () => { await result.current.refetch(); });
+        await act(async () => {
+            await result.current.refetch();
+        });
 
         expect(result.current.sessions).toHaveLength(1);
     });

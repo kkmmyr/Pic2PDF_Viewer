@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { BulkActionsPanel } from '../components/novel_db/BulkActionsPanel';
-import type { BookSummary } from '../features/novel_db/types';
+import { BulkActionsPanel } from '@/components/novel_db/BulkActionsPanel';
+import type { BookSummary } from '@/features/novel_db/types';
 
 const makeBook = (name: string): BookSummary => ({
     name,
@@ -32,10 +32,7 @@ const defaultProps = {
 describe('BulkActionsPanel', () => {
     it('選択数を表示する', () => {
         const { getByText } = render(
-            <BulkActionsPanel
-                {...defaultProps}
-                selectedNames={new Set(['book-a', 'book-b'])}
-            />,
+            <BulkActionsPanel {...defaultProps} selectedNames={new Set(['book-a', 'book-b'])} />,
         );
         expect(getByText('2 冊選択中')).toBeInTheDocument();
     });
@@ -76,10 +73,7 @@ describe('BulkActionsPanel', () => {
 
     it('選択ありのとき「作者を設定」「シリーズに登録」が有効', () => {
         const { getByText } = render(
-            <BulkActionsPanel
-                {...defaultProps}
-                selectedNames={new Set(['book-a'])}
-            />,
+            <BulkActionsPanel {...defaultProps} selectedNames={new Set(['book-a'])} />,
         );
         expect((getByText('作者を設定') as HTMLButtonElement).disabled).toBe(false);
         expect((getByText('シリーズに登録') as HTMLButtonElement).disabled).toBe(false);

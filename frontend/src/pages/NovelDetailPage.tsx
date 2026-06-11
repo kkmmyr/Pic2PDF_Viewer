@@ -28,12 +28,17 @@ import {
     QuestionSection,
     RebuildJobBanner,
     SearchSection,
-} from '../components/novel_db';
-import BookMetaList from '../components/novel_db/BookMetaList';
-import DiscussionHistoryItemCard from '../components/novel_db/DiscussionHistoryItem';
-import type { BookDetail } from '../features/novel_db/types';
-import { useBookDetail, useNovelDbHistory, useNovelDbRebuildJob, useNovelDetailData } from '../hooks/novel_db';
-import { formatSqliteUtcAsJst } from '../utils/date';
+} from '@/components/novel_db';
+import BookMetaList from '@/components/novel_db/BookMetaList';
+import DiscussionHistoryItemCard from '@/components/novel_db/DiscussionHistoryItem';
+import type { BookDetail } from '@/features/novel_db/types';
+import {
+    useBookDetail,
+    useNovelDbHistory,
+    useNovelDbRebuildJob,
+    useNovelDetailData,
+} from '@/hooks/novel_db';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
 export default function NovelDetailPage() {
     const { bookName } = useParams<{ bookName: string }>();

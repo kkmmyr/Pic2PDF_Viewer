@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { AxiosError } from 'axios';
-import { ApiError } from '../config/api_client';
+import { ApiError } from '@/config/api_client';
 
 // interceptor を直接テストするのは難しいため、interceptor の reject ハンドラを
 // 同じロジックで再現する形でカバーする（実装を写経する形のテスト）。

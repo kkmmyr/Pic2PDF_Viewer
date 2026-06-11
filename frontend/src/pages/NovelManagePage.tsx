@@ -1,6 +1,6 @@
 import { HammerIcon, Layers, Share2, Terminal, Wrench } from 'lucide-react';
 
-import { formatSqliteUtcAsJst } from '../utils/date';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
 import {
     AmazonImportButton,
@@ -9,9 +9,9 @@ import {
     QueuedJobCard,
     RunningJobCard,
     SectionHeader,
-} from '../components/novel_build';
-import { OCRPanel } from '../features/ocr/OCRPanel';
-import { useNovelManage } from '../hooks/useNovelManage';
+} from '@/components/novel_build';
+import { OCRPanel } from '@/features/ocr/OCRPanel';
+import { useNovelManage } from '@/hooks/useNovelManage';
 
 const TAB_BASE =
     'flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors';

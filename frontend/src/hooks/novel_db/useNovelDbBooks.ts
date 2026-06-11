@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { BookSummary, SeriesSummary } from '../../features/novel_db/types';
-import { fetchBooks, fetchSeries } from '../../features/novel_db/api';
+import type { BookSummary, SeriesSummary } from '@/features/novel_db/types';
+import { fetchBooks, fetchSeries } from '@/features/novel_db/api';
 
 export const novelBooksQueryKey = ['novelBooks'] as const;
 

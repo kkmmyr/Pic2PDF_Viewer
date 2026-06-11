@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import type { BookSummary } from '../../features/novel_db/types';
+import type { BookSummary } from '@/features/novel_db/types';
 
 export interface ImageModalState {
     book: string;

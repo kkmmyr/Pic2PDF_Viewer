@@ -1,6 +1,6 @@
 import { Plus, Trash2 } from 'lucide-react';
 
-import type { useChatSessions } from '../../hooks/novel_db';
+import type { useChatSessions } from '@/hooks/novel_db';
 
 interface SessionSidebarProps {
     sessions: ReturnType<typeof useChatSessions>['sessions'];

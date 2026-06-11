@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenreManagerDialog } from './GenreManagerDialog';
-import { useLibraryPanelContext } from '../../contexts/LibraryPanelContext';
+import { useLibraryPanelContext } from '@/contexts/LibraryPanelContext';
 
 interface SortableGenrePillProps {
     genre: string;

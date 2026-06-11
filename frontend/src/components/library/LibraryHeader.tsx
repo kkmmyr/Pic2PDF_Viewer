@@ -1,4 +1,4 @@
-import { useLibraryPanelContext } from '../../contexts/LibraryPanelContext';
+import { useLibraryPanelContext } from '@/contexts/LibraryPanelContext';
 import { LibraryNavBar } from './LibraryNavBar';
 import { LibraryFilterBar } from './LibraryFilterBar';
 import { LibraryBulkActionBar } from './LibraryBulkActionBar';

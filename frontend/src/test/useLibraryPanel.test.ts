@@ -158,7 +158,7 @@ vi.mock('../config/api_client', () => ({ default: { post: vi.fn() } }));
 vi.mock('../config/api', () => ({ API_ENDPOINTS: { REGENERATE_THUMBNAIL: '/api/thumb' } }));
 vi.mock('../utils/authors', () => ({ authorsKey: (a: string[]) => a.join('\n') }));
 
-import { useLibraryPanel } from '../hooks/library/useLibraryPanel';
+import { useLibraryPanel } from '@/hooks/library/useLibraryPanel';
 
 describe('useLibraryPanel', () => {
     beforeEach(() => {
@@ -215,7 +215,9 @@ describe('useLibraryPanel', () => {
 
     it('handlePdfClick: recordView を呼んだあと onPdfClick を呼ぶ', () => {
         const onPdfClick = vi.fn();
-        const { result } = renderHook(() => useLibraryPanel(onPdfClick), { wrapper: createWrapper() });
+        const { result } = renderHook(() => useLibraryPanel(onPdfClick), {
+            wrapper: createWrapper(),
+        });
         act(() => {
             result.current.handlePdfClick('test.pdf');
         });

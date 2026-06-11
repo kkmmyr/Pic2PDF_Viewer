@@ -1,6 +1,6 @@
 import * as LabelPrimitive from '@radix-ui/react-label';
 import { type ComponentPropsWithoutRef, type Ref } from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 interface LabelProps extends ComponentPropsWithoutRef<typeof LabelPrimitive.Root> {
     ref?: Ref<HTMLLabelElement>;

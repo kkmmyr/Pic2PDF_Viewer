@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { errorMessage } from '../../utils/error';
+import { errorMessage } from '@/utils/error';
 
 /**
  * ダイアログの saving / error 状態と非同期送信ハンドラを共通化するフック。

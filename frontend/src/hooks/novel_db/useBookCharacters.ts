@@ -6,8 +6,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { fetchBookCharacters } from '../../features/novel_db/api';
-import type { CharacterSummary } from '../../features/novel_db/types';
+import { fetchBookCharacters } from '@/features/novel_db/api';
+import type { CharacterSummary } from '@/features/novel_db/types';
 
 export interface UseBookCharacters {
     characters: CharacterSummary[];

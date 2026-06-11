@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
-import type { BookMetaMap } from '../../types';
-import { authorsKey } from '../../utils/authors';
+import type { BookMetaMap } from '@/types';
+import { authorsKey } from '@/utils/authors';
 
 interface UseSeriesAuthorFilterParams {
     meta: BookMetaMap;

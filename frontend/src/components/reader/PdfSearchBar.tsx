@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Search, X, ChevronUp, ChevronDown } from 'lucide-react';
-import { UI_CONFIG } from '../../constants';
-import { useDebouncedValue } from '../../hooks/useDebouncedValue';
+import { UI_CONFIG } from '@/constants';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 interface PdfSearchBarProps {
     /** 検索テキスト */

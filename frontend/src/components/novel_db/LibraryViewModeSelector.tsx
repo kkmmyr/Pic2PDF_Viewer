@@ -1,5 +1,5 @@
 import { LayoutGrid, Users, BookOpen, CheckSquare, Square } from 'lucide-react';
-import type { GroupMode } from '../../hooks/useNovelLibraryGroup';
+import type { GroupMode } from '@/hooks/useNovelLibraryGroup';
 
 const GROUP_MODES: { value: GroupMode; label: string; icon: React.ReactNode }[] = [
     { value: 'flat', label: 'フラット', icon: <LayoutGrid className="w-3.5 h-3.5" /> },

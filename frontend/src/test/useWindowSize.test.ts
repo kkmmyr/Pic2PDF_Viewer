@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useWindowSize } from '../hooks/useWindowSize';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 describe('useWindowSize', () => {
     it('初期値は window.innerWidth / innerHeight', () => {

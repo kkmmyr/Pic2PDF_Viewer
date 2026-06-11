@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { errorMessage } from '../utils/error';
+import { errorMessage } from '@/utils/error';
 
 describe('errorMessage', () => {
     it('Error インスタンスは message を返す', () => {

@@ -1,7 +1,7 @@
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
 import { type ComponentPropsWithoutRef, type HTMLAttributes, type Ref } from 'react';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
@@ -10,8 +10,9 @@ export const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
 
-interface DropdownMenuSubTriggerProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger> {
+interface DropdownMenuSubTriggerProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.SubTrigger
+> {
     ref?: Ref<HTMLDivElement>;
     inset?: boolean;
 }
@@ -40,16 +41,13 @@ export function DropdownMenuSubTrigger({
     );
 }
 
-interface DropdownMenuSubContentProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent> {
+interface DropdownMenuSubContentProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.SubContent
+> {
     ref?: Ref<HTMLDivElement>;
 }
 
-export function DropdownMenuSubContent({
-    ref,
-    className,
-    ...props
-}: DropdownMenuSubContentProps) {
+export function DropdownMenuSubContent({ ref, className, ...props }: DropdownMenuSubContentProps) {
     return (
         <DropdownMenuPrimitive.SubContent
             ref={ref}
@@ -69,8 +67,9 @@ export function DropdownMenuSubContent({
     );
 }
 
-interface DropdownMenuContentProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> {
+interface DropdownMenuContentProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.Content
+> {
     ref?: Ref<HTMLDivElement>;
 }
 
@@ -102,18 +101,14 @@ export function DropdownMenuContent({
     );
 }
 
-interface DropdownMenuItemProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> {
+interface DropdownMenuItemProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.Item
+> {
     ref?: Ref<HTMLDivElement>;
     inset?: boolean;
 }
 
-export function DropdownMenuItem({
-    ref,
-    className,
-    inset,
-    ...props
-}: DropdownMenuItemProps) {
+export function DropdownMenuItem({ ref, className, inset, ...props }: DropdownMenuItemProps) {
     return (
         <DropdownMenuPrimitive.Item
             ref={ref}
@@ -129,8 +124,9 @@ export function DropdownMenuItem({
     );
 }
 
-interface DropdownMenuCheckboxItemProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.CheckboxItem> {
+interface DropdownMenuCheckboxItemProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.CheckboxItem
+> {
     ref?: Ref<HTMLDivElement>;
 }
 
@@ -163,8 +159,9 @@ export function DropdownMenuCheckboxItem({
     );
 }
 
-interface DropdownMenuRadioItemProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.RadioItem> {
+interface DropdownMenuRadioItemProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.RadioItem
+> {
     ref?: Ref<HTMLDivElement>;
 }
 
@@ -195,18 +192,14 @@ export function DropdownMenuRadioItem({
     );
 }
 
-interface DropdownMenuLabelProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Label> {
+interface DropdownMenuLabelProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.Label
+> {
     ref?: Ref<HTMLDivElement>;
     inset?: boolean;
 }
 
-export function DropdownMenuLabel({
-    ref,
-    className,
-    inset,
-    ...props
-}: DropdownMenuLabelProps) {
+export function DropdownMenuLabel({ ref, className, inset, ...props }: DropdownMenuLabelProps) {
     return (
         <DropdownMenuPrimitive.Label
             ref={ref}
@@ -220,16 +213,13 @@ export function DropdownMenuLabel({
     );
 }
 
-interface DropdownMenuSeparatorProps
-    extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Separator> {
+interface DropdownMenuSeparatorProps extends ComponentPropsWithoutRef<
+    typeof DropdownMenuPrimitive.Separator
+> {
     ref?: Ref<HTMLDivElement>;
 }
 
-export function DropdownMenuSeparator({
-    ref,
-    className,
-    ...props
-}: DropdownMenuSeparatorProps) {
+export function DropdownMenuSeparator({ ref, className, ...props }: DropdownMenuSeparatorProps) {
     return (
         <DropdownMenuPrimitive.Separator
             ref={ref}
@@ -239,13 +229,13 @@ export function DropdownMenuSeparator({
     );
 }
 
-export function DropdownMenuShortcut({
-    className,
-    ...props
-}: HTMLAttributes<HTMLSpanElement>) {
+export function DropdownMenuShortcut({ className, ...props }: HTMLAttributes<HTMLSpanElement>) {
     return (
         <span
-            className={cn('ml-auto text-xs tracking-widest text-gray-400 dark:text-gray-500', className)}
+            className={cn(
+                'ml-auto text-xs tracking-widest text-gray-400 dark:text-gray-500',
+                className,
+            )}
             {...props}
         />
     );

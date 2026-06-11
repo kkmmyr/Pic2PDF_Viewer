@@ -16,8 +16,8 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import apiClient from '../config/api_client';
-import { useBookMeta } from '../hooks/library/useBookMeta';
+import apiClient from '@/config/api_client';
+import { useBookMeta } from '@/hooks/library/useBookMeta';
 
 const createWrapper = () => {
     const queryClient = new QueryClient({

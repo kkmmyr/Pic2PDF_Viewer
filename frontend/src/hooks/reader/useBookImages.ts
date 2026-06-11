@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { API_ENDPOINTS } from '../../config/api';
-import apiClient from '../../config/api_client';
-import { LibrarySource, BookImagesResponse } from '../../types';
+import { API_ENDPOINTS } from '@/config/api';
+import apiClient from '@/config/api_client';
+import { LibrarySource, BookImagesResponse } from '@/types';
 
 interface UseBookImagesReturn {
     imageUrls: string[] | null;

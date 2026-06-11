@@ -10,8 +10,8 @@ vi.mock('../config/api_client', async () => {
     };
 });
 
-import apiClient, { ApiError } from '../config/api_client';
-import { HitomiWatchlistDialog } from '../components/hitomi/HitomiWatchlistDialog';
+import apiClient, { ApiError } from '@/config/api_client';
+import { HitomiWatchlistDialog } from '@/components/hitomi/HitomiWatchlistDialog';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;

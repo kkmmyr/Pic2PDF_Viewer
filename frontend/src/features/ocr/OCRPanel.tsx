@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Play, Square, Terminal } from 'lucide-react';
-import { useOcrStatus } from '../../hooks/useOcrStatus';
-import { Alert } from '../../components/ui/Alert';
-import { errorMessage } from '../../utils/error';
+import { useOcrStatus } from '@/hooks/useOcrStatus';
+import { Alert } from '@/components/ui/Alert';
+import { errorMessage } from '@/utils/error';
 
 /**
  * Novel OCR 実行パネル (Tailwind実装)。

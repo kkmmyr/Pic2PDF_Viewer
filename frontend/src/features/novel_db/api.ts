@@ -6,7 +6,7 @@
  * `apiClient.get<unknown, T>(...)` の第 2 ジェネリクスが解決値の型になる
  * （既存パターン: hooks/useGenres.ts 等を参照）。
  */
-import apiClient from '../../config/api_client';
+import apiClient from '@/config/api_client';
 
 import type {
     BookDetail,

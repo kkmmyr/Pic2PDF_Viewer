@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText } from 'lucide-react';
-import { buildStaticUrl } from '../../config/api';
-import { UI_CONFIG } from '../../constants';
+import { buildStaticUrl } from '@/config/api';
+import { UI_CONFIG } from '@/constants';
 
 interface LazyThumbnailProps {
     src: string | null;

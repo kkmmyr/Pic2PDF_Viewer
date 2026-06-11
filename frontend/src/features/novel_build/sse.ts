@@ -3,7 +3,7 @@
  * GET /api/novel/build/stream から Full Build キュー状態を受信する。
  * EventSource（ネイティブ）を使用。停止は返却した close 関数で行う。
  */
-import { API_CONFIG } from '../../config/api';
+import { API_CONFIG } from '@/config/api';
 
 import type { BuildQueueStatus, BuildStreamHandlers } from './types';
 

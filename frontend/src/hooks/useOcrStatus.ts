@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '../config/api_client';
-import { API_ENDPOINTS } from '../config/api';
-import type { OcrStatusResponse } from '../types';
+import apiClient from '@/config/api_client';
+import { API_ENDPOINTS } from '@/config/api';
+import type { OcrStatusResponse } from '@/types';
 
 /**
  * OCR ステータスをポーリングで取得するフック。

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { authorsKey } from '../utils/authors';
+import { authorsKey } from '@/utils/authors';
 
 describe('authorsKey', () => {
     it('単一作者でその文字列を返す', () => {

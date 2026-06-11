@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cmpJa, moveMultipleByIndex } from '../utils/sort';
+import { cmpJa, moveMultipleByIndex } from '@/utils/sort';
 
 describe('cmpJa', () => {
     it('a < b で負の値を返す', () => {

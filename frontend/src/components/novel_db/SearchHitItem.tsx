@@ -2,7 +2,7 @@
  * 検索結果 1 件分のカード。サムネイル + 書名 + page 番号 + ハイライト snippet。
  * snippet はバックエンドで `<mark>` のみ許可済みなので dangerouslySetInnerHTML で安全。
  */
-import type { SearchHit } from '../../features/novel_db/types';
+import type { SearchHit } from '@/features/novel_db/types';
 
 interface Props {
     hit: SearchHit;

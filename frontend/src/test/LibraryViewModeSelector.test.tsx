@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
-import { LibraryViewModeSelector } from '../components/novel_db/LibraryViewModeSelector';
+import { LibraryViewModeSelector } from '@/components/novel_db/LibraryViewModeSelector';
 
 const defaultProps = {
     groupMode: 'series' as const,

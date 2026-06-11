@@ -1,4 +1,4 @@
-import { LibraryPanelProvider, useLibraryPanelContext } from '../../contexts/LibraryPanelContext';
+import { LibraryPanelProvider, useLibraryPanelContext } from '@/contexts/LibraryPanelContext';
 import { PdfGrid } from './PdfGrid';
 import { LibraryHeader } from './LibraryHeader';
 import { GenreFilterBar } from './GenreFilterBar';

@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { Plus, Trash2, Loader2 } from 'lucide-react';
-import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '../ui/Dialog';
-import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { useHitomiWatchlist } from '../../hooks/useHitomiWatchlist';
-import { ApiError } from '../../config/api_client';
-import { errorMessage } from '../../utils/error';
-import type { WatchlistEntry } from '../../types/hitomi';
+import { Dialog, DialogBody, DialogFooter, DialogCancelButton } from '@/components/ui/Dialog';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useHitomiWatchlist } from '@/hooks/useHitomiWatchlist';
+import { ApiError } from '@/config/api_client';
+import { errorMessage } from '@/utils/error';
+import type { WatchlistEntry } from '@/types/hitomi';
 
 interface HitomiWatchlistDialogProps {
     open: boolean;

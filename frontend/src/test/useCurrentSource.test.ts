@@ -6,12 +6,14 @@ vi.mock('react-router-dom', () => ({
 }));
 
 import { useLocation } from 'react-router-dom';
-import { useCurrentSource } from '../hooks/useCurrentSource';
+import { useCurrentSource } from '@/hooks/useCurrentSource';
 
 const mockedUseLocation = useLocation as ReturnType<typeof vi.fn>;
 
 describe('useCurrentSource', () => {
-    beforeEach(() => { vi.clearAllMocks(); });
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
     it('/comic で始まるパスは "comic" を返す', () => {
         mockedUseLocation.mockReturnValue({ pathname: '/comic/book.pdf' });

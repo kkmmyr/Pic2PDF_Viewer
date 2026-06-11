@@ -4,7 +4,7 @@
  */
 import { Loader2 } from 'lucide-react';
 
-import type { RebuildStatus } from '../../features/novel_db/types';
+import type { RebuildStatus } from '@/features/novel_db/types';
 
 interface Props {
     status: RebuildStatus | null;

@@ -6,8 +6,8 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { deleteQaHistory, fetchQaHistory } from '../../features/novel_db/api';
-import type { QaHistoryEntry } from '../../features/novel_db/types';
+import { deleteQaHistory, fetchQaHistory } from '@/features/novel_db/api';
+import type { QaHistoryEntry } from '@/features/novel_db/types';
 
 const FETCH_LIMIT = 100;
 

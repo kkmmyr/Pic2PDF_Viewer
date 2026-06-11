@@ -6,7 +6,7 @@ import {
     formatSqliteUtcAsJst,
     formatTimestampJa,
     parseSqliteUtc,
-} from '../utils/date';
+} from '@/utils/date';
 
 describe('formatTimestampJa', () => {
     it('null で空文字', () => {

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { PdfFile, BookMetaMap, ReadState } from '../../types';
+import type { PdfFile, BookMetaMap, ReadState } from '@/types';
 
 interface UseLibraryFilterParams {
     pdfs: PdfFile[];

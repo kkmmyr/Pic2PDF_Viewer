@@ -10,7 +10,7 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import { useLibraryBulkActions } from '../hooks/library/useLibraryBulkActions';
+import { useLibraryBulkActions } from '@/hooks/library/useLibraryBulkActions';
 
 const makeOptions = (overrides: Record<string, unknown> = {}) => ({
     currentPath: '',
@@ -118,7 +118,9 @@ describe('useLibraryBulkActions', () => {
     });
 
     describe('handleBulkToggleHidden', () => {
-        beforeEach(() => { vi.mocked(toast.error).mockClear(); });
+        beforeEach(() => {
+            vi.mocked(toast.error).mockClear();
+        });
 
         it('PDF が未選択なら何も呼ばない', async () => {
             const opts = makeOptions({ selectedItems: new Set<string>(['folder']) });
@@ -168,7 +170,9 @@ describe('useLibraryBulkActions', () => {
     });
 
     describe('handleToggleHiddenOne', () => {
-        beforeEach(() => { vi.mocked(toast.error).mockClear(); });
+        beforeEach(() => {
+            vi.mocked(toast.error).mockClear();
+        });
 
         it('showHidden=false のとき hidden=true で setHidden を呼ぶ', async () => {
             const opts = makeOptions({ showHidden: false });

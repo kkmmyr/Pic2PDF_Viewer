@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom';
-import type { LibrarySource } from '../types';
+import type { LibrarySource } from '@/types';
 
 export const useCurrentSource = (): LibrarySource => {
     const { pathname } = useLocation();

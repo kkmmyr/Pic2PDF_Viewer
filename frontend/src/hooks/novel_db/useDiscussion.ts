@@ -7,9 +7,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { type PersonaState, buildStyleDesc } from '../../components/novel_db/PersonaPanel';
-import { type DiscussionHistoryItem, fetchDiscussionHistory } from '../../features/novel_db/api';
-import { type DiscussionTurnEvent, streamDiscussion } from '../../features/novel_db/sse';
+import { type PersonaState, buildStyleDesc } from '@/components/novel_db/PersonaPanel';
+import { type DiscussionHistoryItem, fetchDiscussionHistory } from '@/features/novel_db/api';
+import { type DiscussionTurnEvent, streamDiscussion } from '@/features/novel_db/sse';
 
 // ---------------------------------------------------------------------------
 // ペルソナデフォルト値

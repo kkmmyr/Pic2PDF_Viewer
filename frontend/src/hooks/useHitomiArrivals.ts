@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import apiClient from '../config/api_client';
-import { API_ENDPOINTS } from '../config/api';
-import { errorMessage } from '../utils/error';
+import apiClient from '@/config/api_client';
+import { API_ENDPOINTS } from '@/config/api';
+import { errorMessage } from '@/utils/error';
 import type {
     ArrivalItem,
     NewArrivalsResponse,
     RunNowResponse,
     RunStats,
     RunStatus,
-} from '../types/hitomi';
+} from '@/types/hitomi';
 
 interface UseHitomiArrivalsResult {
     items: ArrivalItem[];

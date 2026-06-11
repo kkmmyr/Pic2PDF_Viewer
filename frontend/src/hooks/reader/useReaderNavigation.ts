@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { ReadingDirection } from '../../types';
+import type { ReadingDirection } from '@/types';
 
 interface UseReaderNavigationProps {
     numPages: number;

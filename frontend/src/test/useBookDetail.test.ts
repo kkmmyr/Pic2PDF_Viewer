@@ -5,8 +5,8 @@ vi.mock('../features/novel_db/api', () => ({
     fetchBookDetail: vi.fn(),
 }));
 
-import { fetchBookDetail } from '../features/novel_db/api';
-import { useBookDetail } from '../hooks/novel_db/useBookDetail';
+import { fetchBookDetail } from '@/features/novel_db/api';
+import { useBookDetail } from '@/hooks/novel_db/useBookDetail';
 
 const mockedFetch = fetchBookDetail as ReturnType<typeof vi.fn>;
 
@@ -41,7 +41,9 @@ describe('useBookDetail', () => {
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetch.mockRejectedValueOnce(new Error('not found'));
-        await act(async () => { await result.current.refetch(); });
+        await act(async () => {
+            await result.current.refetch();
+        });
 
         expect(result.current.error).toBeTruthy();
         expect(result.current.detail).toBeNull();
@@ -54,7 +56,9 @@ describe('useBookDetail', () => {
         await waitFor(() => expect(result.current.detail).not.toBeNull());
 
         mockedFetch.mockResolvedValueOnce({ summary: '更新後' });
-        await act(async () => { await result.current.refetch(); });
+        await act(async () => {
+            await result.current.refetch();
+        });
         await waitFor(() => expect(result.current.detail?.summary).toBe('更新後'));
     });
 });

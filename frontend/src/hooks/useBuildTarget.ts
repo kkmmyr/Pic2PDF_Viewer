@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 
-import type { BuildMode } from '../features/novel_build/types';
-import type { BookSummary } from '../features/novel_db/types';
+import type { BuildMode } from '@/features/novel_build/types';
+import type { BookSummary } from '@/features/novel_db/types';
 
 export interface BuildTargetState {
     all: boolean;

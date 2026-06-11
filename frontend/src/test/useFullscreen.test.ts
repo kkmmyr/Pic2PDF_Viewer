@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { useFullscreen } from '../hooks/reader/useFullscreen';
+import { useFullscreen } from '@/hooks/reader/useFullscreen';
 
 describe('useFullscreen', () => {
     let requestSpy: ReturnType<typeof vi.fn>;

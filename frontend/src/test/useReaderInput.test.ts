@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useReaderInput } from '../hooks/reader/useReaderInput';
+import { useReaderInput } from '@/hooks/reader/useReaderInput';
 
 const setup = (overrides: Partial<Parameters<typeof useReaderInput>[0]> = {}) => {
     const props = {

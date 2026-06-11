@@ -1,7 +1,7 @@
 import { Check, Minus, BookOpen, Users } from 'lucide-react';
 
-import type { NovelBookGroup } from '../../hooks/useNovelLibraryGroup';
-import type { GroupMode } from '../../hooks/useNovelLibraryGroup';
+import type { NovelBookGroup } from '@/hooks/useNovelLibraryGroup';
+import type { GroupMode } from '@/hooks/useNovelLibraryGroup';
 
 interface Props {
     group: NovelBookGroup;

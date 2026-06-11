@@ -5,9 +5,9 @@ vi.mock('../config/api_client', () => ({
     default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useHitomiWatchlist } from '../hooks/useHitomiWatchlist';
-import type { WatchlistEntry, WatchlistResponse } from '../types/hitomi';
+import apiClient from '@/config/api_client';
+import { useHitomiWatchlist } from '@/hooks/useHitomiWatchlist';
+import type { WatchlistEntry, WatchlistResponse } from '@/types/hitomi';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;

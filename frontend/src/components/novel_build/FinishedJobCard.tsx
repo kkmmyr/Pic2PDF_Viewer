@@ -1,7 +1,7 @@
 import { CheckCircle, XCircle } from 'lucide-react';
 
-import type { FinishedJob } from '../../features/novel_build/types';
-import { formatSqliteUtcAsJst } from '../../utils/date';
+import type { FinishedJob } from '@/features/novel_build/types';
+import { formatSqliteUtcAsJst } from '@/utils/date';
 
 export default function FinishedJobCard({ job }: { job: FinishedJob }) {
     const isOk = job.state === 'completed';

@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useDialogToggles } from '../hooks/library/useDialogToggles';
+import { useDialogToggles } from '@/hooks/library/useDialogToggles';
 
 type Key = 'rename' | 'delete' | 'merge';
 

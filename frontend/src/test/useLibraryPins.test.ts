@@ -11,8 +11,8 @@ vi.mock('../config/api_client', () => ({
     },
 }));
 
-import apiClient from '../config/api_client';
-import { useLibraryPins } from '../hooks/library/useLibraryPins';
+import apiClient from '@/config/api_client';
+import { useLibraryPins } from '@/hooks/library/useLibraryPins';
 
 const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPut = apiClient.put as ReturnType<typeof vi.fn>;
@@ -108,9 +108,7 @@ describe('useLibraryPins', () => {
                 result.current.toggleSeriesPin('sid-1', 'vol1.pdf');
             });
             await waitFor(() => expect(result.current.seriesPins['sid-1']).toBeUndefined());
-            expect(mockedDelete).toHaveBeenCalledWith(
-                expect.stringContaining('pin_type=series'),
-            );
+            expect(mockedDelete).toHaveBeenCalledWith(expect.stringContaining('pin_type=series'));
         });
 
         it('別の書籍をトグルすると代表が切り替わる', async () => {
@@ -176,9 +174,7 @@ describe('useLibraryPins', () => {
                 result.current.toggleAuthorPin('Author A', 'bookA.pdf');
             });
             await waitFor(() => expect(result.current.authorPins['Author A']).toBeUndefined());
-            expect(mockedDelete).toHaveBeenCalledWith(
-                expect.stringContaining('pin_type=author'),
-            );
+            expect(mockedDelete).toHaveBeenCalledWith(expect.stringContaining('pin_type=author'));
         });
 
         it('作者ピンはシリーズピンに影響しない', async () => {
@@ -208,9 +204,7 @@ describe('useLibraryPins', () => {
                 wrapper: createWrapper(),
             });
 
-            await waitFor(() =>
-                expect(doujin.current.seriesPins['sid-1']).toBe('vol1.pdf'),
-            );
+            await waitFor(() => expect(doujin.current.seriesPins['sid-1']).toBe('vol1.pdf'));
             await waitFor(() => expect(mockedGet).toHaveBeenCalledTimes(2));
             expect(comic.current.seriesPins).toEqual({});
         });

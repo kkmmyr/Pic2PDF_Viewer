@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import type { BookSummary } from '../features/novel_db/types';
+import type { BookSummary } from '@/features/novel_db/types';
 
 export type GroupMode = 'flat' | 'author' | 'series';
 

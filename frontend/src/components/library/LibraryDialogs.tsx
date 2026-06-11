@@ -1,4 +1,4 @@
-import { useLibraryPanelContext } from '../../contexts/LibraryPanelContext';
+import { useLibraryPanelContext } from '@/contexts/LibraryPanelContext';
 import { RenameDialog, BulkAuthorDialog, MergeDialog } from './';
 import { BulkSeriesAssignDialog } from './BulkSeriesAssignDialog';
 import { BulkGenreDialog } from './BulkGenreDialog';

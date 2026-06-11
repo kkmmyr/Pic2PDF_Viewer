@@ -6,10 +6,10 @@
  */
 import { Loader2, MessageSquare, Square } from 'lucide-react';
 
-import DiscussionHistoryItemCard, { TurnCard } from '../components/novel_db/DiscussionHistoryItem';
-import PersonaPanel from '../components/novel_db/PersonaPanel';
-import { useDiscussion } from '../hooks/novel_db/useDiscussion';
-import { useNovelDbBooks } from '../hooks/novel_db';
+import DiscussionHistoryItemCard, { TurnCard } from '@/components/novel_db/DiscussionHistoryItem';
+import PersonaPanel from '@/components/novel_db/PersonaPanel';
+import { useDiscussion } from '@/hooks/novel_db/useDiscussion';
+import { useNovelDbBooks } from '@/hooks/novel_db';
 
 export default function NovelDiscussionPage() {
     const { books } = useNovelDbBooks();

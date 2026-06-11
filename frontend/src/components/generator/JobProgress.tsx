@@ -1,5 +1,5 @@
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
-import type { GenerateJob } from '../../types';
+import type { GenerateJob } from '@/types';
 
 interface JobProgressProps {
     job: GenerateJob;

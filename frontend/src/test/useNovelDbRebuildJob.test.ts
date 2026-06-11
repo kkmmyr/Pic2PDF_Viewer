@@ -11,9 +11,9 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import * as api from '../features/novel_db/api';
-import { useNovelDbRebuildJob } from '../hooks/novel_db/useNovelDbRebuildJob';
-import type { RebuildStatus } from '../features/novel_db/types';
+import * as api from '@/features/novel_db/api';
+import { useNovelDbRebuildJob } from '@/hooks/novel_db/useNovelDbRebuildJob';
+import type { RebuildStatus } from '@/features/novel_db/types';
 
 const IDLE_STATUS: RebuildStatus = {
     is_running: false,

@@ -5,8 +5,8 @@ vi.mock('../config/api_client', () => ({
     default: { post: vi.fn() },
 }));
 
-import apiClient from '../config/api_client';
-import { useEditMode } from '../hooks/reader/useEditMode';
+import apiClient from '@/config/api_client';
+import { useEditMode } from '@/hooks/reader/useEditMode';
 
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;
 

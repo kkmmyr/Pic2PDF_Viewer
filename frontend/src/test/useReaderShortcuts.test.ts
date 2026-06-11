@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { useReaderShortcuts } from '../hooks/reader/useReaderShortcuts';
+import { useReaderShortcuts } from '@/hooks/reader/useReaderShortcuts';
 
 const setup = (overrides: Partial<Parameters<typeof useReaderShortcuts>[0]> = {}) => {
     const props = {

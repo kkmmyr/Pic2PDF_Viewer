@@ -1,9 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { BookMetaEditModal, LibrarySection, SearchSection } from '../components/novel_db';
-import type { BookSummary } from '../features/novel_db/types';
-import { useNovelDbBooks } from '../hooks/novel_db';
+import { BookMetaEditModal, LibrarySection, SearchSection } from '@/components/novel_db';
+import type { BookSummary } from '@/features/novel_db/types';
+import { useNovelDbBooks } from '@/hooks/novel_db';
 
 export default function NovelDbPage() {
     const navigate = useNavigate();

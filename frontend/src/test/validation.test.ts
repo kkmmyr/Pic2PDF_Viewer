@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateFilename } from '../utils/validation';
+import { validateFilename } from '@/utils/validation';
 
 describe('validateFilename', () => {
     describe('空入力', () => {

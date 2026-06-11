@@ -1,7 +1,7 @@
 import { useBookMetaCore } from './useBookMetaCore';
 import { useBookMetaWrite } from './useBookMetaWrite';
 import { useBookSeries } from './useBookSeries';
-import { useBookView } from '../reader/useBookView';
+import { useBookView } from '@/hooks/reader/useBookView';
 import { useMetaDerived } from './useMetaDerived';
 
 /**

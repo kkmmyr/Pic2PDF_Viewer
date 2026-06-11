@@ -1,6 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { useTagsInput } from '../hooks/useTagsInput';
+import { useTagsInput } from '@/hooks/useTagsInput';
 
 const makeKey = (key: string): React.KeyboardEvent<HTMLInputElement> => {
     const e = {

@@ -1,7 +1,7 @@
 /**
  * C-12: キャラクタ関係グラフ API クライアント。
  */
-import apiClient from '../../config/api_client';
+import apiClient from '@/config/api_client';
 
 const PREFIX = '/api/novel_graph';
 

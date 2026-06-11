@@ -3,7 +3,7 @@
  * 全件 / シリーズ / 単冊 を選択できる。
  * シリーズ未所属書籍は「シリーズ」グループには含めない（要件 TBD-7）。
  */
-import type { BookSummary, Scope, SeriesSummary } from '../../features/novel_db/types';
+import type { BookSummary, Scope, SeriesSummary } from '@/features/novel_db/types';
 
 interface Props {
     scope: Scope;

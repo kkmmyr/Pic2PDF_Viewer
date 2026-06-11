@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import { fetchQaHistoryDetail } from '../../features/novel_db/api';
-import type { QaHistoryDetail, QaHistoryEntry } from '../../features/novel_db/types';
-import { formatElapsedSeconds, formatSqliteUtcAsJst } from '../../utils/date';
+import { fetchQaHistoryDetail } from '@/features/novel_db/api';
+import type { QaHistoryDetail, QaHistoryEntry } from '@/features/novel_db/types';
+import { formatElapsedSeconds, formatSqliteUtcAsJst } from '@/utils/date';
 
 interface Props {
     selectedId: number | null;

@@ -1,7 +1,7 @@
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { type ReactNode } from 'react';
 import { X } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn } from '@/lib/utils';
 
 type DialogMaxWidth = 'sm' | 'md' | 'xl';
 
@@ -54,7 +54,12 @@ export function Dialog({
     const zClass = nested ? 'z-dialog-nested' : 'z-dialog';
 
     return (
-        <RadixDialog.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+        <RadixDialog.Root
+            open={open}
+            onOpenChange={(o) => {
+                if (!o) onClose();
+            }}
+        >
             <RadixDialog.Portal>
                 <RadixDialog.Overlay
                     data-testid="dialog-overlay"

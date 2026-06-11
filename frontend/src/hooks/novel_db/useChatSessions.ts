@@ -11,13 +11,13 @@ import {
     deleteChatSession,
     fetchChatSessionDetail,
     fetchChatSessions,
-} from '../../features/novel_db/api';
+} from '@/features/novel_db/api';
 import type {
     ChatMessage,
     ChatSessionDetail,
     ChatSessionSummary,
     Scope,
-} from '../../features/novel_db/types';
+} from '@/features/novel_db/types';
 
 export interface UseChatSessions {
     sessions: ChatSessionSummary[];

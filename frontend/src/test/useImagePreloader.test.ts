@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { useImagePreloader } from '../hooks/reader/useImagePreloader';
+import { useImagePreloader } from '@/hooks/reader/useImagePreloader';
 
 describe('useImagePreloader', () => {
     let originalImage: typeof window.Image;

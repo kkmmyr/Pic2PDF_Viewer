@@ -1,4 +1,4 @@
-import type { QaHistoryEntry } from '../../features/novel_db/types';
+import type { QaHistoryEntry } from '@/features/novel_db/types';
 
 import QuestionHistoryItem from './QuestionHistoryItem';
 

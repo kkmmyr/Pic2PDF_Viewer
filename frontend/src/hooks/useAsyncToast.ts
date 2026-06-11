@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { errorMessage } from '../utils/error';
+import { errorMessage } from '@/utils/error';
 
 /**
  * 非同期処理の例外を catch して sonner エラートーストに流すヘルパーフック。

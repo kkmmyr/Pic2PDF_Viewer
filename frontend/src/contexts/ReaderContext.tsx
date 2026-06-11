@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
-import { useReaderState } from '../hooks/reader/useReaderState';
-import type { LibrarySource } from '../types';
+import { useReaderState } from '@/hooks/reader/useReaderState';
+import type { LibrarySource } from '@/types';
 
 type ReaderContextValue = ReturnType<typeof useReaderState> & {
     selectedPdf: string;

@@ -7,8 +7,8 @@ vi.mock('../config/generate_api_client', () => ({
     default: { get: vi.fn() },
 }));
 
-import generateApiClient from '../config/generate_api_client';
-import { usePdfStatus } from '../hooks/usePdfStatus';
+import generateApiClient from '@/config/generate_api_client';
+import { usePdfStatus } from '@/hooks/usePdfStatus';
 
 const mockedGet = generateApiClient.get as ReturnType<typeof vi.fn>;
 
