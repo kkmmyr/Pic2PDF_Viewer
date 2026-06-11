@@ -20,7 +20,6 @@ from .connection import with_db
 from .contextualizer import generate_chunk_context, make_embedding_input
 from .embedder import embed_batch
 from .lance_store import get_chunks_table
-from .schema import init_schema
 from .summarizer import summarize_book_with_characters, update_book_summary
 
 logger = get_logger(__name__)
@@ -62,7 +61,6 @@ def build_book_full(
         _detail(f"embedding {done}/{total} チャンク")
 
     with with_db() as conn:
-        init_schema(conn)
         rebuild_from_pages(conn, book_name, progress_callback=_rebuild_progress)
 
     # ステップ 2: 書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成

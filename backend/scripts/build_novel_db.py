@@ -22,7 +22,8 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from config import KINDLE_NOVEL_PDF_DIR  # noqa: E402
-from services.novel_db import init_schema, rebuild_book, with_db  # noqa: E402
+from services.novel_db import rebuild_book, with_db  # noqa: E402
+from services.novel_db.migrations import upgrade_head  # noqa: E402
 
 
 def _list_books() -> list[str]:
@@ -42,7 +43,6 @@ def _rebuild_one(book_name: str) -> bool:
     print(f"[rebuild] {book_name}", flush=True)
     try:
         with with_db() as conn:
-            init_schema(conn)
             rebuild_book(conn, book_name, progress_callback=_print_progress)
     except Exception as e:
         print(f"  FAILED: {e}", file=sys.stderr, flush=True)
@@ -58,6 +58,8 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--book", metavar="NAME", help="指定書籍 1 冊を再構築する（PDF stem）")
     group.add_argument("--list", action="store_true", help="再構築可能な書籍一覧を表示する")
     args = parser.parse_args(argv)
+
+    upgrade_head()
 
     if args.list:
         books = _list_books()

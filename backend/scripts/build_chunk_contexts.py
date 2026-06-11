@@ -30,7 +30,7 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from services.meta_store import load_meta  # noqa: E402
-from services.novel_db import init_schema, with_db  # noqa: E402
+from services.novel_db import with_db  # noqa: E402
 from services.novel_db.contextualizer import (  # noqa: E402
     generate_chunk_context,
     make_embedding_input,
@@ -38,6 +38,7 @@ from services.novel_db.contextualizer import (  # noqa: E402
 )
 from services.novel_db.embedder import embed_batch  # noqa: E402
 from services.novel_db.lance_store import get_chunks_table  # noqa: E402
+from services.novel_db.migrations import upgrade_head  # noqa: E402
 
 # bge-m3 のバッチサイズ
 _EMBED_BATCH_SIZE = 16
@@ -54,7 +55,6 @@ def _list_target_books(
     redo=False の場合、全チャンクが contextual_text 済みの書籍はスキップ。
     """
     with with_db() as conn:
-        init_schema(conn)
         rows = conn.execute("""
             SELECT b.id, b.name, b.summary,
                    SUM(CASE WHEN c.contextual_text IS NULL THEN 1 ELSE 0 END) AS pending,
@@ -214,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--all", action="store_true", help="全書籍")
     parser.add_argument("--redo", action="store_true", help="既存 contextual_text を上書き")
     args = parser.parse_args(argv)
+    upgrade_head()
 
     targets = _list_target_books(
         book_name=args.book,

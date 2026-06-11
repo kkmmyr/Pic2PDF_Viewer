@@ -1,15 +1,15 @@
 """services/novel_db/job_queue.py の単体テスト（worker は起動しない）。"""
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.job_queue import NovelDbJobQueue
+from services.novel_db.migrations import upgrade_head
 
 
 @pytest.fixture
 def queue(tmp_data_dir):
     """schema を初期化した後、worker を起動しない単独 NovelDbJobQueue を返す。"""
-    with with_db() as conn:
-        init_schema(conn)
+    upgrade_head()
     # 新規インスタンスで状態をクリーンに保つ
     return NovelDbJobQueue()
 

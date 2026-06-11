@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.character_db import (
     CharacterStat,
     _parse_main_characters,
@@ -25,6 +25,7 @@ from services.novel_db.character_db import (
     upsert_character,
 )
 from services.novel_db.character_summarizer import summarize_character
+from services.novel_db.migrations import upgrade_head
 
 # ---------------------------------------------------------------------------
 # _parse_main_characters
@@ -92,8 +93,8 @@ def db_with_characters(tmp_data_dir):
         9: (None, 100),
         10: (None, 100),
     }
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",
@@ -127,8 +128,8 @@ def test_list_characters_aggregates_and_sorts(db_with_characters):
 
 
 def test_list_characters_returns_empty_for_book_without_extractions(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",

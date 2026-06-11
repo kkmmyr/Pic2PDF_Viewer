@@ -23,7 +23,6 @@ from .connection import with_db
 from .embedder import embed_batch
 from .extractor import PageText, run_ocr_subprocess
 from .lance_store import get_chunks_table
-from .schema import init_schema
 
 logger = get_logger(__name__)
 
@@ -48,7 +47,6 @@ def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
     """OCR 結果を DB に保存する（books/pages テーブル更新 + FTS5 再同期）。"""
     images_dir = _resolve_images_dir(book_name)
     with with_db() as conn:
-        init_schema(conn)
         with conn:
             existing = conn.execute(
                 "SELECT id FROM books WHERE name = ?", (book_name,)

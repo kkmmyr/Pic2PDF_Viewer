@@ -1,7 +1,8 @@
 """services/novel_db/qa_history.py の単体テスト。"""
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
+from services.novel_db.migrations import upgrade_head
 from services.novel_db.qa_history import (
     delete_history,
     get_history_detail,
@@ -15,8 +16,7 @@ from services.novel_db.search import Scope, SearchHit
 
 @pytest.fixture
 def history_db(tmp_data_dir):
-    with with_db() as conn:
-        init_schema(conn)
+    upgrade_head()
 
 
 def _make_hit(book="book-1", page=1) -> SearchHit:

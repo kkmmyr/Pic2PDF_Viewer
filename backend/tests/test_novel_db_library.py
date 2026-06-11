@@ -4,15 +4,15 @@ from pathlib import Path
 import pytest
 
 from services.meta_store import save_meta
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.library import list_books, list_series
+from services.novel_db.migrations import upgrade_head
 
 
 @pytest.fixture
 def setup_db(tmp_data_dir):
     """novel.db のスキーマを初期化する。"""
-    with with_db() as conn:
-        init_schema(conn)
+    upgrade_head()
     return tmp_data_dir
 
 

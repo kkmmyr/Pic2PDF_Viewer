@@ -24,7 +24,8 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from services.meta_store import load_meta  # noqa: E402
-from services.novel_db import init_schema, with_db  # noqa: E402
+from services.novel_db import with_db  # noqa: E402
+from services.novel_db.migrations import upgrade_head  # noqa: E402
 from services.novel_db.summarizer import (  # noqa: E402
     summarize_book,
     update_book_summary,
@@ -36,7 +37,6 @@ def _list_target_books(
 ) -> list[str]:
     """サマリ生成対象の書籍名リストを返す。"""
     with with_db() as conn:
-        init_schema(conn)
         sql = "SELECT name, summary FROM books"
         rows = conn.execute(sql).fetchall()
 
@@ -71,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--all", action="store_true", help="全書籍")
     parser.add_argument("--redo", action="store_true", help="既存値を上書き")
     args = parser.parse_args(argv)
+    upgrade_head()
 
     targets = _list_target_books(
         book_name=args.book,
@@ -91,7 +92,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\n[{i}/{len(targets)}] {name}", flush=True)
         try:
             with with_db() as conn:
-                init_schema(conn)
                 summary = summarize_book(
                     conn, name,
                     progress=lambda msg: print(msg, flush=True),

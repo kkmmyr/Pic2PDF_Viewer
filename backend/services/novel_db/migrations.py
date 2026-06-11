@@ -9,14 +9,14 @@ from pathlib import Path
 
 from alembic.config import Config
 
+import config
 from alembic import command
-from config import NOVEL_DB_DIR
 
 _ALEMBIC_INI = Path(__file__).parent.parent.parent / "alembic.ini"
 
 
 def upgrade_head() -> None:
     """alembic upgrade head を実行する。失敗時は例外を送出し起動を中断する。"""
-    Path(NOVEL_DB_DIR).mkdir(parents=True, exist_ok=True)
+    Path(config.NOVEL_DB_DIR).mkdir(parents=True, exist_ok=True)
     cfg = Config(str(_ALEMBIC_INI))
     command.upgrade(cfg, "head")

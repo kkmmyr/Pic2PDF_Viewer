@@ -8,9 +8,10 @@ import sqlite3
 
 import pytest
 
-from services.novel_db import builder, init_schema, with_db
+from services.novel_db import builder, with_db
 from services.novel_db.embedder import EmbeddingError
 from services.novel_db.lance_store import get_chunks_table
+from services.novel_db.migrations import upgrade_head
 
 
 def _populate_pages(conn: sqlite3.Connection, book_name: str, texts: list[str]) -> int:
@@ -56,6 +57,7 @@ def novel_db_env(tmp_path, monkeypatch):
     monkeypatch.setattr(_lance, "NOVEL_DB_LANCE_PATH", lance_path)
     _lance.reset_db()
 
+    upgrade_head()
     return {"images_dir": images_dir, "db_path": db_path}
 
 
@@ -73,7 +75,6 @@ def test_rebuild_from_pages_creates_chunks(novel_db_env, monkeypatch):
 
     conn = sqlite3.connect(str(novel_db_env["db_path"]))
     try:
-        init_schema(conn)
         _populate_pages(conn, book_name, ["Page one content. Hello world."] * 3)
 
         builder.rebuild_from_pages(conn, book_name)
@@ -99,7 +100,6 @@ def test_rebuild_from_pages_replaces_existing_chunks(novel_db_env, monkeypatch):
     monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
 
     with with_db(str(novel_db_env["db_path"])) as conn:
-        init_schema(conn)
         _populate_pages(conn, book_name, ["First version content here, enough text."])
         builder.rebuild_from_pages(conn, book_name)
         first_chunks = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
@@ -131,7 +131,6 @@ def test_rebuild_from_pages_rolls_back_chunks_on_embedding_failure(novel_db_env,
     monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch_failing)
 
     with with_db(str(novel_db_env["db_path"])) as conn:
-        init_schema(conn)
         _populate_pages(
             conn, book_name, ["Some content for failing embedding test." * 3]
         )
@@ -148,7 +147,6 @@ def test_rebuild_from_pages_rolls_back_chunks_on_embedding_failure(novel_db_env,
 
 def test_rebuild_from_pages_raises_when_book_not_in_db(novel_db_env):
     with with_db(str(novel_db_env["db_path"])) as conn:
-        init_schema(conn)
         with pytest.raises(ValueError, match="run OCR first"):
             builder.rebuild_from_pages(conn, "nonexistent-book")
 
@@ -159,7 +157,6 @@ def test_rebuild_book_alias_works(novel_db_env, monkeypatch):
     monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
 
     with with_db(str(novel_db_env["db_path"])) as conn:
-        init_schema(conn)
         _populate_pages(conn, book_name, ["Alias test content here, enough chars."])
         builder.rebuild_book(conn, book_name)
 

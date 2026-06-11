@@ -1,13 +1,13 @@
 """routers/novel_build.py の HTTP レイヤテスト（worker は動かさない）。"""
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
+from services.novel_db.migrations import upgrade_head
 
 
 @pytest.fixture
 def db_initialized(tmp_data_dir):
-    with with_db() as conn:
-        init_schema(conn)
+    upgrade_head()
     return tmp_data_dir
 
 

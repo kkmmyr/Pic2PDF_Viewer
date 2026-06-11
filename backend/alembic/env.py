@@ -15,7 +15,7 @@ from alembic import context
 
 # backend/ をパスに追加して config モジュールを import できるようにする
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import NOVEL_DB_DIR, NOVEL_DB_PATH  # noqa: E402
+import config  # noqa: E402
 
 alembic_config = context.config
 
@@ -26,7 +26,7 @@ target_metadata = None  # autogenerate 不使用
 
 
 def _db_url() -> str:
-    return "sqlite:///" + NOVEL_DB_PATH.replace("\\", "/")
+    return "sqlite:///" + config.NOVEL_DB_PATH.replace("\\", "/")
 
 
 def run_migrations_offline() -> None:
@@ -36,7 +36,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    Path(NOVEL_DB_DIR).mkdir(parents=True, exist_ok=True)
+    Path(config.NOVEL_DB_DIR).mkdir(parents=True, exist_ok=True)
     engine = create_engine(_db_url(), poolclass=pool.NullPool)
     with engine.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)

@@ -44,10 +44,11 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from services.novel_db import init_schema, with_db  # noqa: E402
+from services.novel_db import with_db  # noqa: E402
 from services.novel_db._llm_backend import build_qwen_backend  # noqa: E402
 from services.novel_db.chunker import chunk_book, chunk_page  # noqa: E402
 from services.novel_db.embedder import embed_batch  # noqa: E402
+from services.novel_db.migrations import upgrade_head  # noqa: E402
 
 _MIN_PAGE_CHARS = 30
 _EMBED_BATCH = 16
@@ -290,8 +291,8 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
 
         if args.list:
             books = _list_books(conn)

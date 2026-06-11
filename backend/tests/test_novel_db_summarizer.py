@@ -11,8 +11,9 @@ from unittest.mock import patch
 
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.lance_store import get_summaries_table
+from services.novel_db.migrations import upgrade_head
 from services.novel_db.summarizer import (
     _chunk_for_map,
     _load_body_text,
@@ -55,8 +56,8 @@ def test_chunk_respects_max_chunks_for_huge_text():
 @pytest.fixture
 def db_with_book(tmp_data_dir):
     """1 冊（10 ページ）の最小データを入れた novel.db を返す。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",
@@ -114,8 +115,8 @@ def test_summarize_book_one_shot_for_short_book(db_with_book):
 
 def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
     """長い本では map（チャンク数）+ reduce（1 回）が呼ばれる。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",
@@ -145,15 +146,15 @@ def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
 
 
 def test_summarize_book_raises_for_missing_book(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         with pytest.raises(ValueError, match="book not found"):
             summarize_book(conn, "no-such-book")
 
 
 def test_summarize_book_raises_for_empty_body(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",
@@ -182,8 +183,8 @@ def test_update_and_load_summary_roundtrip(db_with_book):
 
 def test_load_summaries_skips_null_and_empty(tmp_data_dir):
     """summary が NULL / 空文字の書籍は load 結果に含まれない。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         for name, summary in [("a", "ok"), ("b", None), ("c", "")]:
             cur = conn.execute(
                 "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
@@ -259,7 +260,7 @@ def test_update_book_summary_replaces_existing_vector(db_with_book):
 
 
 def test_update_book_summary_raises_for_missing_book(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         with pytest.raises(ValueError, match="book not found"):
             update_book_summary(conn, "no-such-book", "サマリ")

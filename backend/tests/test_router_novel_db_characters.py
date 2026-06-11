@@ -1,15 +1,16 @@
 """routers/novel_db.py のキャラクター API（B-15）テスト。"""
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.character_db import CharacterStat, upsert_character
+from services.novel_db.migrations import upgrade_head
 
 
 @pytest.fixture
 def book_with_pages(tmp_data_dir):
     """1 冊 + 数ページ（main_characters 入り）を入れた DB を返す。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",
@@ -35,9 +36,8 @@ def book_with_pages(tmp_data_dir):
 
 @pytest.fixture
 def db_initialized(tmp_data_dir):
-    """空の novel.db を init_schema 済みで返す。"""
-    with with_db() as conn:
-        init_schema(conn)
+    """空の novel.db を Alembic マイグレーション済みで返す。"""
+    upgrade_head()
     return tmp_data_dir
 
 

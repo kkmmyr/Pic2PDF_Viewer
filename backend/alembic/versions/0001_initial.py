@@ -1,7 +1,7 @@
 """initial schema migrations
 
 既存の schema.py._migrate() を Alembic 管理に移行した最初の revision。
-新規 DB（テーブルなし）は no-op — init_schema()._ddl() が最新スキーマを生成する。
+新規 DB（テーブルなし）は no-op — 0003 revision で完全なスキーマが生成される。
 既存 DB はカラム有無を確認してから ALTER TABLE を実行する（冪等）。
 
 Revision ID: 0001
@@ -27,7 +27,7 @@ def _cols(conn: sa.engine.Connection, table: str) -> set[str]:
 def upgrade() -> None:
     conn = op.get_bind()
 
-    # テーブルが存在しない場合は新規 DB — init_schema()._ddl() で最新スキーマが生成されるため何もしない
+    # テーブルが存在しない場合は新規 DB — 0003 revision で最新スキーマが生成されるため何もしない
     tables = {
         row[0]
         for row in conn.execute(

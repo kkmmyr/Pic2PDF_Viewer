@@ -4,7 +4,8 @@ DB 入出力のみのテスト。LLM 呼び出しは含まない（router 側で
 """
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
+from services.novel_db.migrations import upgrade_head
 from services.novel_db.qa_sessions import (
     append_message,
     create_session,
@@ -20,8 +21,7 @@ from services.novel_db.search import Scope
 
 @pytest.fixture
 def empty_db(tmp_data_dir):
-    with with_db() as conn:
-        init_schema(conn)
+    upgrade_head()
     return tmp_data_dir
 
 

@@ -25,9 +25,10 @@ def _make_hit(book_name: str, page_no: int, score: float = 1.0) -> SearchHit:
 
 @pytest.fixture
 def db_conn(tmp_data_dir):
-    from services.novel_db import init_schema, with_db
+    from services.novel_db import with_db
+    from services.novel_db.migrations import upgrade_head
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         yield conn
 
 

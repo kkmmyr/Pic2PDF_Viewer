@@ -10,7 +10,6 @@ from .chunker import chunk_page
 from .connection import open_db, with_db
 from .embedder import embed_batch
 from .extractor import extract_pages, run_ocr_subprocess
-from .schema import init_schema
 from .search import Scope, SearchHit, hybrid_search
 
 __all__ = [
@@ -20,7 +19,6 @@ __all__ = [
     "embed_batch",
     "extract_pages",
     "hybrid_search",
-    "init_schema",
     "ocr_book",
     "open_db",
     "rebuild_book",

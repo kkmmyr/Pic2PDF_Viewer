@@ -4,7 +4,8 @@ LLM 呼び出しは `stream_chat` を monkeypatch して async generator を差�
 """
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
+from services.novel_db.migrations import upgrade_head
 from services.novel_db.qa_sessions import (
     append_message,
     create_session,
@@ -14,8 +15,7 @@ from services.novel_db.search import Scope
 
 @pytest.fixture
 def db_initialized(tmp_data_dir):
-    with with_db() as conn:
-        init_schema(conn)
+    upgrade_head()
     return tmp_data_dir
 
 

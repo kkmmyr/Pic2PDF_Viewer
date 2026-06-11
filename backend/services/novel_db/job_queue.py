@@ -15,7 +15,6 @@ from utils.logger import get_logger
 
 from .connection import with_db
 from .job_worker import NovelDbJobWorker
-from .schema import init_schema
 
 logger = get_logger(__name__)
 
@@ -46,9 +45,8 @@ class NovelDbJobQueue:
     # ----- ライフサイクル -----
 
     async def start(self) -> None:
-        """schema 初期化 + 旧 JobMode migration + worker タスク起動。"""
+        """旧 JobMode migration + worker タスク起動。"""
         with with_db() as conn:
-            init_schema(conn)
             conn.execute(
                 "UPDATE rebuild_jobs SET state='failed', "
                 "error_message='aborted by server restart' "

@@ -6,8 +6,9 @@ import json
 
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.lance_store import get_chunks_table
+from services.novel_db.migrations import upgrade_head
 
 
 def _stub_embed(texts):
@@ -21,8 +22,8 @@ def search_setup(tmp_data_dir, monkeypatch):
     NOVEL_DB_BODY_PAGE_MARGIN=5 でフィルタされても本文ページが残るよう、
     page_count=15 で先頭 5 / 末尾 5 を除いた中央 5 ページに本文を配置する。
     """
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         cur = conn.execute(
             "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
             "VALUES (?, ?, ?, ?, datetime('now'))",

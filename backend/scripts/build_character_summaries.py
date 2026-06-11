@@ -32,13 +32,14 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from services.meta_store import load_meta  # noqa: E402
-from services.novel_db import init_schema, with_db  # noqa: E402
+from services.novel_db import with_db  # noqa: E402
 from services.novel_db.character_db import (  # noqa: E402
     collect_character_pages,
     list_book_characters_in_db,
     upsert_character,
 )
 from services.novel_db.character_summarizer import summarize_character  # noqa: E402
+from services.novel_db.migrations import upgrade_head  # noqa: E402
 
 
 def _list_target_books(
@@ -46,7 +47,6 @@ def _list_target_books(
 ) -> list[tuple[int, str]]:
     """対象書籍 (book_id, name) を返す。summary 未生成かどうかは呼び出し側で判定。"""
     with with_db() as conn:
-        init_schema(conn)
         rows = conn.execute(
             "SELECT id, name FROM books ORDER BY id",
         ).fetchall()
@@ -180,6 +180,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="page_count >= N のキャラのみ対象（既定 1 = 足切りなし。"
                              "副キャラを除外したいときに --min-pages 5 等を指定）")
     args = parser.parse_args(argv)
+    upgrade_head()
 
     targets = _list_target_books(book_name=args.book, series_id=args.series)
     if not targets:

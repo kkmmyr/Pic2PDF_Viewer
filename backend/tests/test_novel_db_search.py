@@ -2,8 +2,9 @@
 import pytest
 
 from services.meta_store import save_meta
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.lance_store import get_chunks_table
+from services.novel_db.migrations import upgrade_head
 from services.novel_db.search import (
     Scope,
     _resolve_book_names,
@@ -150,8 +151,8 @@ def _insert_chunk(conn, page_id: int, idx: int, text: str, vec: list[float]) -> 
 @pytest.fixture
 def search_db(tmp_data_dir, monkeypatch):
     """hybrid_search 用に小さな DB を構築する。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         book_id = _insert_book_with_pages(conn, "book-1", [
             "デュークはレティの騎士である。",  # page 1
             "アストリッドは元暗殺者だった。",  # page 2

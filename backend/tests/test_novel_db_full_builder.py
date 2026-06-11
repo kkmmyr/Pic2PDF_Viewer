@@ -9,19 +9,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.full_builder import (
     _run_combined_step,
     _run_generate_contexts,
     build_book_contexts,
     build_book_full,
 )
+from services.novel_db.migrations import upgrade_head
 
 
 @pytest.fixture
 def db_conn(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         yield conn
 
 

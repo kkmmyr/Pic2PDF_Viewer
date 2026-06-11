@@ -5,8 +5,9 @@ embedder 呼び出しはモック。スキーマ初期化 + book_summaries_vec �
 """
 from unittest.mock import patch
 
-from services.novel_db import init_schema, with_db
+from services.novel_db import with_db
 from services.novel_db.lance_store import get_summaries_table
+from services.novel_db.migrations import upgrade_head
 from services.novel_db.search import Scope, search_book_summaries
 
 
@@ -36,8 +37,8 @@ def _vec(ones_at: int, dim: int = 1024) -> list[float]:
 
 def test_search_book_summaries_returns_nearest_first(tmp_data_dir):
     """クエリ ベクトルに最も近い書籍が distance 昇順で先頭に来る。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         _setup_books(conn, [
             ("a", _vec(0)),
             ("b", _vec(1)),
@@ -56,8 +57,8 @@ def test_search_book_summaries_returns_nearest_first(tmp_data_dir):
 
 def test_search_book_summaries_respects_scope_book(tmp_data_dir):
     """scope=book なら指定書籍だけ返る。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         _setup_books(conn, [("a", _vec(0)), ("b", _vec(1))])
 
         with patch("services.novel_db.search.embed_batch") as mock_embed:
@@ -68,8 +69,8 @@ def test_search_book_summaries_respects_scope_book(tmp_data_dir):
 
 
 def test_search_book_summaries_returns_empty_for_unknown_scope(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         _setup_books(conn, [("a", _vec(0))])
 
         with patch("services.novel_db.search.embed_batch") as mock_embed:
@@ -82,8 +83,8 @@ def test_search_book_summaries_returns_empty_for_unknown_scope(tmp_data_dir):
 
 def test_search_book_summaries_handles_empty_table(tmp_data_dir):
     """LanceDB summaries テーブルが空のときは空リストを返す。"""
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         # テーブルは作成されるがデータなし
         results = search_book_summaries(conn, "Q", Scope("all"), top=5)
 
@@ -91,8 +92,8 @@ def test_search_book_summaries_handles_empty_table(tmp_data_dir):
 
 
 def test_search_book_summaries_top_limits_count(tmp_data_dir):
+    upgrade_head()
     with with_db() as conn:
-        init_schema(conn)
         _setup_books(conn, [(f"b{i}", _vec(i)) for i in range(5)])
 
         with patch("services.novel_db.search.embed_batch") as mock_embed:
