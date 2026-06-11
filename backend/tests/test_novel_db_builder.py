@@ -4,6 +4,7 @@
 OCR ステップ（ocr_book）は GPU 依存のため本テストでは対象外。
 embed_batch はモックで置き換える。
 """
+
 import sqlite3
 
 import pytest
@@ -17,20 +18,17 @@ from services.novel_db.migrations import upgrade_head
 def _populate_pages(conn: sqlite3.Connection, book_name: str, texts: list[str]) -> int:
     """テスト用に books + pages を直接 INSERT し、book_id を返す。"""
     cur = conn.execute(
-        "INSERT INTO books (name, pdf_path, images_dir, page_count) "
-        "VALUES (?, ?, ?, ?)",
+        "INSERT INTO books (name, pdf_path, images_dir, page_count) VALUES (?, ?, ?, ?)",
         (book_name, "", f"/images/{book_name}", len(texts)),
     )
     book_id = cur.lastrowid
     for i, text in enumerate(texts, start=1):
         conn.execute(
-            "INSERT INTO pages (book_id, page_no, full_text, char_count) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO pages (book_id, page_no, full_text, char_count) VALUES (?, ?, ?, ?)",
             (book_id, i, text, len(text)),
         )
     conn.execute(
-        "INSERT INTO pages_fts (rowid, full_text) "
-        "SELECT id, full_text FROM pages WHERE book_id = ?",
+        "INSERT INTO pages_fts (rowid, full_text) SELECT id, full_text FROM pages WHERE book_id = ?",
         (book_id,),
     )
     conn.commit()
@@ -46,15 +44,23 @@ def novel_db_env(tmp_path, monkeypatch):
     db_dir.mkdir(parents=True)
 
     import config
+
     db_path = db_dir / "novel.db"
     monkeypatch.setattr(config, "KINDLE_NOVEL_IMAGES_DIR", str(images_dir))
     monkeypatch.setattr(config, "NOVEL_DB_DIR", str(db_dir))
     monkeypatch.setattr(config, "NOVEL_DB_PATH", str(db_path))
 
-    # LanceDB をテスト用 tmp_path にリダイレクト
-    import services.novel_db.lance_store as _lance
+    # settings オブジェクトを差し替え（app_settings.NOVEL_DB_DIR / novel_db_settings.NOVEL_DB_LANCE_PATH）
+    from config import app_settings
+    from config.novel_db import novel_db_settings
+
+    monkeypatch.setattr(app_settings, "NOVEL_DB_DIR", db_dir)
     lance_path = str(tmp_path / "novel.lancedb")
-    monkeypatch.setattr(_lance, "NOVEL_DB_LANCE_PATH", lance_path)
+    monkeypatch.setattr(novel_db_settings, "NOVEL_DB_LANCE_PATH", lance_path)
+
+    # LanceDB グローバル接続をリセット（テスト用 tmp_path に再接続させる）
+    import services.novel_db.lance_store as _lance
+
     _lance.reset_db()
 
     upgrade_head()
@@ -79,9 +85,7 @@ def test_rebuild_from_pages_creates_chunks(novel_db_env, monkeypatch):
 
         builder.rebuild_from_pages(conn, book_name)
 
-        row = conn.execute(
-            "SELECT page_count FROM books WHERE name = ?", (book_name,)
-        ).fetchone()
+        row = conn.execute("SELECT page_count FROM books WHERE name = ?", (book_name,)).fetchone()
         assert row is not None
         assert row[0] == 3
 
@@ -108,17 +112,14 @@ def test_rebuild_from_pages_replaces_existing_chunks(novel_db_env, monkeypatch):
     # pages の full_text を直接 UPDATE して再構築
     with with_db(str(novel_db_env["db_path"])) as conn:
         conn.execute(
-            "UPDATE pages SET full_text = ?, char_count = ? "
-            "WHERE book_id = (SELECT id FROM books WHERE name = ?)",
+            "UPDATE pages SET full_text = ?, char_count = ? WHERE book_id = (SELECT id FROM books WHERE name = ?)",
             ("Second version content with different text.", 44, book_name),
         )
         conn.commit()
         builder.rebuild_from_pages(conn, book_name)
 
         # books 行は 1 件のみ（重複なし）
-        rows = conn.execute(
-            "SELECT COUNT(*) FROM books WHERE name = ?", (book_name,)
-        ).fetchall()
+        rows = conn.execute("SELECT COUNT(*) FROM books WHERE name = ?", (book_name,)).fetchall()
         assert rows[0][0] == 1
 
         # chunks は前回分が消えて再構築されている
@@ -131,16 +132,12 @@ def test_rebuild_from_pages_rolls_back_chunks_on_embedding_failure(novel_db_env,
     monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch_failing)
 
     with with_db(str(novel_db_env["db_path"])) as conn:
-        _populate_pages(
-            conn, book_name, ["Some content for failing embedding test." * 3]
-        )
+        _populate_pages(conn, book_name, ["Some content for failing embedding test." * 3])
         with pytest.raises(EmbeddingError):
             builder.rebuild_from_pages(conn, book_name)
 
         # books/pages は残る（OCR 済みデータは保持）
-        assert conn.execute(
-            "SELECT COUNT(*) FROM books WHERE name = ?", (book_name,)
-        ).fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM books WHERE name = ?", (book_name,)).fetchone()[0] == 1
         # chunks はロールバックされて 0 件
         assert conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] == 0
 

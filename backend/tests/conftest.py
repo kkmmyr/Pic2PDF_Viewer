@@ -4,6 +4,7 @@
 router テスト・統合テストで使う `tmp_data_dir` / `client` / `make_pdf` 等を集約する。
 詳細は docs/06_リファクタリング/テスト整備計画書.md §4.1 を参照。
 """
+
 import os
 import sys
 
@@ -17,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 # ---------------------------------------------------------------------------
 # データディレクトリの差し替え
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_data_dir(tmp_path, monkeypatch):
@@ -59,15 +61,24 @@ def tmp_data_dir(tmp_path, monkeypatch):
             os.makedirs(p, exist_ok=True)
     os.makedirs(meta_dir, exist_ok=True)
 
-    # config 本体を差し替え（全モジュールが config.X で参照するためこれだけで十分）
+    # config モジュールレベル定数を差し替え（from config import X を使うコード用）
     import config
+
     for key, p in paths.items():
         monkeypatch.setattr(config, key, p, raising=True)
+
+    # settings オブジェクトを差し替え（app_settings.X / novel_db_settings.X を call-time で参照するコード用）
+    from config import app_settings
+    from config.novel_db import novel_db_settings
+
+    monkeypatch.setattr(app_settings, "PIC2PDF_DATA_DIR", tmp_path)
+    monkeypatch.setattr(app_settings, "NOVEL_DB_DIR", tmp_path / "novel_db")
+    monkeypatch.setattr(novel_db_settings, "NOVEL_DB_LANCE_PATH", lance_path)
 
     # LanceDB グローバル接続をリセット（テスト用 tmp_path に再接続させる）
     try:
         import services.novel_db.lance_store as _lance
-        monkeypatch.setattr(_lance, "NOVEL_DB_LANCE_PATH", lance_path)
+
         _lance.reset_db()
     except ImportError:
         pass
@@ -82,10 +93,10 @@ def tmp_data_dir(tmp_path, monkeypatch):
     }
 
 
-
 # ---------------------------------------------------------------------------
 # TestClient
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def client(tmp_data_dir):
@@ -101,9 +112,11 @@ def client(tmp_data_dir):
 # PDF / WebP 生成ヘルパー
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def make_pdf():
     """指定パスに page_count ページの PDF を生成する関数。"""
+
     def _make(path: str, page_count: int = 1, width: int = 400, height: int = 600) -> None:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         doc = fitz.open()
@@ -119,6 +132,7 @@ def make_pdf():
 @pytest.fixture
 def make_webp():
     """指定パスに WebP 画像を生成する関数。"""
+
     def _make(path: str, color: tuple = (255, 0, 0), size: tuple = (100, 100)) -> None:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         img = Image.new("RGB", size, color)
@@ -130,6 +144,7 @@ def make_webp():
 @pytest.fixture
 def make_png():
     """指定パスに PNG 画像を生成する関数（Kindle キャプチャのテスト用）。"""
+
     def _make(path: str, color: tuple = (0, 128, 255), size: tuple = (100, 100)) -> None:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         img = Image.new("RGB", size, color)
