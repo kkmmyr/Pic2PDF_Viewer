@@ -1,6 +1,6 @@
 ---
 name: backend-conventions
-description: backend/ 配下の Python/FastAPI コードを編集する際に発動。routers/services 分離、async/await、get_dirs_by_source、is_pdf_file/is_webp_file ユーティリティ、update_meta_locked パターン（既存フィールド保持）、validate_safe_path のセキュリティ規約を含む。
+description: backend/ 配下の Python/FastAPI コードを編集する際に発動。routers/services 分離、async/await、get_dirs_by_source、is_pdf_file/is_webp_file ユーティリティ、update_meta_locked パターン（既存フィールド保持）、validate_safe_path のセキュリティ規約、config パッケージ (pydantic-settings BaseSettings)、SQLModel + Alembic、response_model 必須を含む。
 ---
 
 # バックエンド (Python / FastAPI) 規約
@@ -9,8 +9,26 @@ description: backend/ 配下の Python/FastAPI コードを編集する際に発
 
 - ルーターは `backend/routers/` に配置、ビジネスロジックは `backend/services/` に分離
 - 非同期処理は `async/await` を使用
-- データディレクトリの参照は `backend/config.py` の `get_dirs_by_source()` を経由する。`source` パラメータの値は `doujin` / `comic` / `novel`
+- データディレクトリの参照は `config.get_dirs_by_source()` を経由する。`source` パラメータの値は `doujin` / `comic` / `novel`
 - 型ヒントを必ず付ける
+
+## 設定 (config パッケージ)
+
+- 設定は `config/` パッケージ（**pydantic-settings BaseSettings**）で管理する
+    - アプリ設定（データパス・CORS 等）: `config/__init__.py`
+    - Novel DB 設定（モデル・LLM・検索パラメータ等）: `config/novel_db.py`
+- 設定値はライブ参照が必要なため `import config; config.X` を基本とする。ヘルパー関数・型（`get_dirs_by_source`, `SourceDirs`）は `from config import` 直 import 可
+- 旧 `backend/config.py` 単一ファイル構成は廃止済み
+
+## novel_db スキーマ
+
+- モデル定義は **SQLModel**（`services/novel_db/models.py`）を使用する
+- スキーマ変更は **Alembic が唯一の真実の源**（マイグレーションファイル追加）。手書き DDL 禁止
+
+## API レスポンス
+
+- 全エンドポイントに **`response_model` を付ける**。スキーマ定義は `routers/api_schemas.py`（フロントの openapi-typescript 型生成元）
+- 新規エンドポイント追加後は frontend 側で `npm run generate:types` を実行して型を再生成する
 
 ## ユーティリティ強制
 

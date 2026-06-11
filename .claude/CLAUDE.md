@@ -10,6 +10,8 @@
 - Node は npm。`frontend/package.json`
 - 開発ポートは `:8766` (backend) / `:5176` (frontend)。リリース統合は `:8090`
 - OCR ツール群（`kindle-pdf/`）は別 uv workspace member。GPU 依存は `[dependency-groups.gpu]` で分離
+- `.bat` / `.sh` スクリプトは **`scripts/` 配下に集約済**（ルート直下には存在しない）
+- **pre-commit hooks**（`.pre-commit-config.yaml`）が設定済み — commit 時に ruff --fix（Python）/ prettier（TS/TSX/CSS）が自動整形される
 
 ## 起動コマンド
 
@@ -35,6 +37,9 @@ cd frontend && npm run lint && npm run format
 
 # 型チェック
 cd frontend && npx tsc --noEmit
+
+# OpenAPI から TypeScript 型を再生成（backend :8766 起動中に実行）
+cd frontend && npm run generate:types
 ```
 
 ## 設計書
@@ -51,5 +56,17 @@ mkdocs セットアップ・HTML 配信の詳細は `docs/04_環境構築/` を�
 3. **`memory/` を更新する** — project / feedback / reference のいずれか該当するものを更新・追加
 
 **不要なケース（スキップしてよい）**: typo 修正・コメント整理・テスト追加・フォーマットのみの変更。迷ったら実施する側に倒す。
+
+## 計画候補の振り分け
+
+新しい改善候補を起票する前に1問だけ判定する: **「ユーザーから見た振る舞いが新しく増える/変わるか？」**
+
+| 判定 | 行き先 |
+|---|---|
+| Yes（新機能・新体験） | `docs/01_要件定義/バックログ.md`（A/B/C 階層） |
+| No・外部挙動を変えない内部構造改善 | `docs/06_リファクタリング/リファクタリング計画書.md` **§ 未着手候補 — リファクタリング** |
+| No だが依存/インフラ/性能が変わる | `docs/06_リファクタリング/リファクタリング計画書.md` **§ 未着手候補 — 技術メンテナンス** |
+
+**新機能をリファクタリング計画書に Phase として起票しない**。
 
 実装にあたってはトークンを節約するためにOpus/Sonnetを適切にサブエージェントとして切り出して実行し、このメインセッション(Fable 5)は設計と監査、レビューに専念してください。実装難易度が特に高いところはこのセッションでやってよいです
