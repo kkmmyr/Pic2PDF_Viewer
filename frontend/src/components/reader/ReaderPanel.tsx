@@ -53,7 +53,6 @@ function ReaderPanelContent() {
         currentPath,
         currentSource,
         setPageNumber,
-        showSliderOff,
         pauseSliderTimer,
         resumeSliderTimer,
         // PdfSearchBar
@@ -127,7 +126,6 @@ function ReaderPanelContent() {
                 currentPath={currentPath}
                 currentSource={currentSource}
                 onPageJump={setPageNumber}
-                onMouseLeave={showSliderOff}
                 onDragStart={pauseSliderTimer}
                 onDragEnd={resumeSliderTimer}
             />

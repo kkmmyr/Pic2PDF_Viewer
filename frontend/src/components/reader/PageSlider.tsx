@@ -13,7 +13,6 @@ interface PageSliderProps {
     currentPath: string;
     currentSource: LibrarySource;
     onPageJump: (page: number) => void;
-    onMouseLeave?: () => void;
     onDragStart?: () => void;
     onDragEnd?: () => void;
 }
@@ -53,7 +52,6 @@ export function PageSlider({
     currentPath,
     currentSource,
     onPageJump,
-    onMouseLeave,
     onDragStart,
     onDragEnd,
 }: PageSliderProps) {
@@ -89,7 +87,6 @@ export function PageSlider({
                 !show ? 'translate-y-full' : 'translate-y-0'
             } bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700`}
             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-            onMouseLeave={onMouseLeave}
         >
             <div className="h-14 flex items-center px-6 gap-3">
                 <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400 shrink-0 w-14 text-right">

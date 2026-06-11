@@ -38,7 +38,6 @@ export function ReaderHeader() {
         toggleDirection,
         cycleSpreadMode,
         toggleEditMode,
-        showHeaderOff,
         toggleSearch,
         toggleFullscreen,
         openHelp,
@@ -50,7 +49,6 @@ export function ReaderHeader() {
                 !showHeader ? '-translate-y-full' : 'translate-y-0'
             }`}
             style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
-            onMouseLeave={showHeaderOff}
         >
             <div className="h-16 flex items-center px-4 justify-between">
                 <div className="flex items-center gap-4">
