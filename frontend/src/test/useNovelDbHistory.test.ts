@@ -3,6 +3,8 @@
  */
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 import { useNovelDbHistory } from '@/hooks/novel_db/useNovelDbHistory';
 import type { QaHistoryListResponse } from '@/features/novel_db/types';
@@ -13,6 +15,14 @@ vi.mock('../features/novel_db/api', () => ({
 }));
 
 import { deleteQaHistory, fetchQaHistory } from '@/features/novel_db/api';
+
+function createWrapper() {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
 
 function makeList(ids: number[], total: number): QaHistoryListResponse {
     return {
@@ -36,7 +46,7 @@ describe('useNovelDbHistory', () => {
 
     it('マウント時に一覧を取得', async () => {
         vi.mocked(fetchQaHistory).mockResolvedValue(makeList([1, 2, 3], 3));
-        const { result } = renderHook(() => useNovelDbHistory());
+        const { result } = renderHook(() => useNovelDbHistory(), { wrapper: createWrapper() });
 
         await waitFor(() => {
             expect(result.current.items).toHaveLength(3);
@@ -49,7 +59,7 @@ describe('useNovelDbHistory', () => {
         vi.mocked(fetchQaHistory).mockResolvedValue(makeList([1, 2], 2));
         vi.mocked(deleteQaHistory).mockResolvedValue();
 
-        const { result } = renderHook(() => useNovelDbHistory());
+        const { result } = renderHook(() => useNovelDbHistory(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.items).toHaveLength(2));
 
         await act(async () => {
@@ -66,7 +76,7 @@ describe('useNovelDbHistory', () => {
             .mockResolvedValueOnce(makeList([1], 1))
             .mockResolvedValueOnce(makeList([1, 2], 2));
 
-        const { result } = renderHook(() => useNovelDbHistory());
+        const { result } = renderHook(() => useNovelDbHistory(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.items).toHaveLength(1));
 
         await act(async () => {
@@ -78,7 +88,7 @@ describe('useNovelDbHistory', () => {
 
     it('取得エラーは error に格納される', async () => {
         vi.mocked(fetchQaHistory).mockRejectedValue(new Error('boom'));
-        const { result } = renderHook(() => useNovelDbHistory());
+        const { result } = renderHook(() => useNovelDbHistory(), { wrapper: createWrapper() });
 
         await waitFor(() => {
             expect(result.current.error).toBe('boom');

@@ -1,5 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 vi.mock('../config/api_client', () => ({
     default: { get: vi.fn(), post: vi.fn(), delete: vi.fn() },
@@ -22,6 +24,14 @@ const makeEntry = (display: string, normalized = display.toLowerCase()): Watchli
 
 const buildResp = (artists: WatchlistEntry[]): WatchlistResponse => ({ artists });
 
+function createWrapper() {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
 describe('useHitomiWatchlist', () => {
     beforeEach(() => {
         mockedGet.mockReset();
@@ -31,7 +41,7 @@ describe('useHitomiWatchlist', () => {
 
     it('マウント時に GET /api/hitomi/watchlist を呼び artists を初期化', async () => {
         mockedGet.mockResolvedValue(buildResp([makeEntry('A'), makeEntry('B')]));
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
         expect(mockedGet).toHaveBeenCalledWith('/api/hitomi/watchlist');
@@ -42,7 +52,7 @@ describe('useHitomiWatchlist', () => {
 
     it('GET 失敗で error が設定され、loading は false に戻る', async () => {
         mockedGet.mockRejectedValue(new Error('network'));
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
 
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.error).toBe('network');
@@ -53,7 +63,7 @@ describe('useHitomiWatchlist', () => {
         mockedPost.mockResolvedValue({ message: 'ok', normalized: 'foo' });
         mockedGet.mockResolvedValueOnce(buildResp([makeEntry('Foo', 'foo')]));
 
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         let returned: WatchlistEntry | undefined;
@@ -77,7 +87,7 @@ describe('useHitomiWatchlist', () => {
         );
         mockedDelete.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.artists).toHaveLength(3));
 
         await act(async () => {
@@ -97,7 +107,7 @@ describe('useHitomiWatchlist', () => {
         );
         mockedDelete.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.artists).toHaveLength(2));
 
         await act(async () => {
@@ -112,7 +122,7 @@ describe('useHitomiWatchlist', () => {
         mockedGet.mockResolvedValue(buildResp([makeEntry('A', 'a'), makeEntry('B', 'b')]));
         mockedDelete.mockRejectedValue(new Error('boom'));
 
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.artists).toHaveLength(2));
 
         let thrown: unknown;
@@ -130,7 +140,7 @@ describe('useHitomiWatchlist', () => {
 
     it('refresh を直接呼べる', async () => {
         mockedGet.mockResolvedValueOnce(buildResp([makeEntry('A')]));
-        const { result } = renderHook(() => useHitomiWatchlist());
+        const { result } = renderHook(() => useHitomiWatchlist(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.artists).toHaveLength(1));
 
         mockedGet.mockResolvedValueOnce(buildResp([makeEntry('A'), makeEntry('B')]));

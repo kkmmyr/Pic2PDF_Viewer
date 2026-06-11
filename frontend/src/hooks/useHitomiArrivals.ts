@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/config/api_client';
 import { API_ENDPOINTS } from '@/config/api';
 import { errorMessage } from '@/utils/error';
@@ -9,6 +10,15 @@ import type {
     RunStats,
     RunStatus,
 } from '@/types/hitomi';
+
+interface ArrivalsData {
+    items: ArrivalItem[];
+    lastRunAt: string | null;
+    lastRunStatus: RunStatus;
+    lastError: string | null;
+}
+
+const QUERY_KEY = ['hitomiArrivals'] as const;
 
 interface UseHitomiArrivalsResult {
     items: ArrivalItem[];
@@ -32,86 +42,96 @@ interface UseHitomiArrivalsResult {
  * - dismiss / dismissAll は楽観的更新 + サーバ反映、失敗時はロールバック
  */
 export function useHitomiArrivals(): UseHitomiArrivalsResult {
-    const [items, setItems] = useState<ArrivalItem[]>([]);
-    const [lastRunAt, setLastRunAt] = useState<string | null>(null);
-    const [lastRunStatus, setLastRunStatus] = useState<RunStatus>('never');
-    const [lastError, setLastError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const queryClient = useQueryClient();
     const [running, setRunning] = useState(false);
-    const [error, setError] = useState<string | null>(null);
 
-    const refresh = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
+    const query = useQuery({
+        queryKey: QUERY_KEY,
+        queryFn: async (): Promise<ArrivalsData> => {
             const resp = await apiClient.get<unknown, NewArrivalsResponse>(
                 API_ENDPOINTS.HITOMI_NEW_ARRIVALS,
             );
-            setItems(resp.items);
-            setLastRunAt(resp.last_run_at);
-            setLastRunStatus(resp.last_run_status);
-            setLastError(resp.last_error);
-        } catch (e) {
-            setError(errorMessage(e, '不明なエラー'));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+            return {
+                items: resp.items,
+                lastRunAt: resp.last_run_at,
+                lastRunStatus: resp.last_run_status,
+                lastError: resp.last_error,
+            };
+        },
+        staleTime: Infinity,
+    });
+
+    const dismissMutation = useMutation({
+        mutationFn: (id: number) => apiClient.post(API_ENDPOINTS.HITOMI_DISMISS(id)),
+        onMutate: (id: number) => {
+            const prev = queryClient.getQueryData<ArrivalsData>(QUERY_KEY);
+            queryClient.setQueryData<ArrivalsData>(QUERY_KEY, (old) =>
+                old ? { ...old, items: old.items.filter((it) => it.id !== id) } : old,
+            );
+            return { prev };
+        },
+        onError: (_err, _id, context) => {
+            if (context?.prev !== undefined) {
+                queryClient.setQueryData(QUERY_KEY, context.prev);
+            }
+        },
+    });
+
+    const dismissAllMutation = useMutation({
+        mutationFn: () => apiClient.post(API_ENDPOINTS.HITOMI_DISMISS_ALL),
+        onMutate: () => {
+            const prev = queryClient.getQueryData<ArrivalsData>(QUERY_KEY);
+            queryClient.setQueryData<ArrivalsData>(QUERY_KEY, (old) =>
+                old ? { ...old, items: [] } : old,
+            );
+            return { prev };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.prev !== undefined) {
+                queryClient.setQueryData(QUERY_KEY, context.prev);
+            }
+        },
+    });
 
     const dismiss = useCallback(
         async (id: number) => {
-            const prev = items;
-            setItems(items.filter((it) => it.id !== id));
-            try {
-                await apiClient.post(API_ENDPOINTS.HITOMI_DISMISS(id));
-            } catch (e) {
-                setItems(prev);
-                throw e;
-            }
+            await dismissMutation.mutateAsync(id);
         },
-        [items],
+        [dismissMutation],
     );
 
     const dismissAll = useCallback(async () => {
-        const prev = items;
-        setItems([]);
-        try {
-            await apiClient.post(API_ENDPOINTS.HITOMI_DISMISS_ALL);
-        } catch (e) {
-            setItems(prev);
-            throw e;
-        }
-    }, [items]);
+        await dismissAllMutation.mutateAsync();
+    }, [dismissAllMutation]);
 
-    const runNow = useCallback(async () => {
+    const runNow = useCallback(async (): Promise<RunStats | null> => {
         setRunning(true);
         try {
-            // 監視は数秒〜数十秒かかる可能性があるためタイムアウトを延長
             const resp = await apiClient.post<unknown, RunNowResponse>(
                 API_ENDPOINTS.HITOMI_RUN_NOW,
                 undefined,
                 { timeout: 120_000 },
             );
-            await refresh();
+            await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
             return resp.last_run_stats;
         } finally {
             setRunning(false);
         }
-    }, [refresh]);
+    }, [queryClient]);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    const data = query.data;
 
     return {
-        items,
-        lastRunAt,
-        lastRunStatus,
-        lastError,
-        loading,
+        items: data?.items ?? [],
+        lastRunAt: data?.lastRunAt ?? null,
+        lastRunStatus: data?.lastRunStatus ?? 'never',
+        lastError: data?.lastError ?? null,
+        loading: query.isLoading,
         running,
-        error,
-        refresh,
+        error: query.error instanceof Error ? errorMessage(query.error, '不明なエラー') : null,
+        refresh: async () => {
+            await query.refetch();
+        },
         dismiss,
         dismissAll,
         runNow,

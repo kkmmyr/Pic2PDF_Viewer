@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 vi.mock('../config/api_client', async () => {
     const actual =
@@ -17,6 +19,14 @@ const mockedGet = apiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = apiClient.post as ReturnType<typeof vi.fn>;
 const mockedDelete = apiClient.delete as ReturnType<typeof vi.fn>;
 
+function createWrapper() {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
 const renderDialog = (overrides: Partial<Parameters<typeof HitomiWatchlistDialog>[0]> = {}) => {
     const props = {
         open: true,
@@ -25,7 +35,8 @@ const renderDialog = (overrides: Partial<Parameters<typeof HitomiWatchlistDialog
         onSuccess: vi.fn(),
         ...overrides,
     };
-    return { props, ...render(<HitomiWatchlistDialog {...props} />) };
+    const Wrapper = createWrapper();
+    return { props, ...render(<HitomiWatchlistDialog {...props} />, { wrapper: Wrapper }) };
 };
 
 describe('HitomiWatchlistDialog', () => {

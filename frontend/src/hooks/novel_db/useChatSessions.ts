@@ -5,7 +5,8 @@
  * - 詳細: useChatSessionDetail（API: GET /qa/sessions/{id}）
  * - 送信: streamChatSession（SSE）
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import {
     deleteChatSession,
@@ -28,40 +29,33 @@ export interface UseChatSessions {
 }
 
 export function useChatSessions(scope?: Scope): UseChatSessions {
-    const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
+    const queryClient = useQueryClient();
     const scopeType = scope?.type;
     const scopeId = scope?.id ?? null;
+    const queryKey = ['chatSessions', scopeType, scopeId] as const;
 
-    const refetch = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const filterScope = scopeType ? { type: scopeType, id: scopeId } : undefined;
-            const list = await fetchChatSessions(0, 50, filterScope);
-            setSessions(Array.isArray(list) ? list : []);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-        } finally {
-            setIsLoading(false);
-        }
-    }, [scopeType, scopeId]);
+    const query = useQuery({
+        queryKey,
+        queryFn: () =>
+            fetchChatSessions(0, 50, scopeType ? { type: scopeType, id: scopeId } : undefined),
+        staleTime: Infinity,
+    });
 
-    const remove = useCallback(
-        async (id: number) => {
-            await deleteChatSession(id);
-            await refetch();
+    const removeMutation = useMutation({
+        mutationFn: (id: number) => deleteChatSession(id),
+        onSuccess: () =>
+            queryClient.invalidateQueries({ queryKey: ['chatSessions'], refetchType: 'active' }),
+    });
+
+    return {
+        sessions: Array.isArray(query.data) ? query.data : [],
+        isLoading: query.isLoading,
+        error: query.error instanceof Error ? query.error.message : null,
+        refetch: async () => {
+            await queryClient.refetchQueries({ queryKey });
         },
-        [refetch],
-    );
-
-    useEffect(() => {
-        void refetch();
-    }, [refetch]);
-
-    return { sessions, isLoading, error, refetch, remove };
+        remove: (id: number) => removeMutation.mutateAsync(id),
+    };
 }
 
 export interface UseChatSessionDetail {
@@ -78,53 +72,50 @@ export interface UseChatSessionDetail {
 }
 
 export function useChatSessionDetail(sessionId: number | null): UseChatSessionDetail {
-    const [detail, setDetail] = useState<ChatSessionDetail | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
+    const queryKey = useMemo(() => ['chatSessionDetail', sessionId] as const, [sessionId]);
+
+    const query = useQuery({
+        queryKey,
+        queryFn: () => fetchChatSessionDetail(sessionId!),
+        enabled: sessionId !== null,
+        staleTime: 0,
+    });
+
     const [streamingAnswer, setStreamingAnswer] = useState('');
 
-    const reload = useCallback(async () => {
-        if (sessionId === null) {
-            setDetail(null);
-            return;
-        }
-        setIsLoading(true);
-        setError(null);
-        try {
-            const d = await fetchChatSessionDetail(sessionId);
-            setDetail(d);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-            setDetail(null);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [sessionId]);
-
-    const appendOptimisticUserMessage = useCallback((content: string) => {
-        setDetail((cur) => {
-            if (!cur) return cur;
-            const optimistic: ChatMessage = {
-                id: -1,
-                role: 'user',
-                content,
-                eval_count: null,
-                done_reason: null,
-                created_at: new Date().toISOString(),
-            };
-            return { ...cur, messages: [...cur.messages, optimistic] };
-        });
-    }, []);
-
+    // sessionId 変更時に streamingAnswer をリセット
     useEffect(() => {
         setStreamingAnswer('');
-        void reload();
-    }, [reload]);
+    }, [sessionId]);
+
+    const appendOptimisticUserMessage = useCallback(
+        (content: string) => {
+            queryClient.setQueryData(queryKey, (old: ChatSessionDetail | undefined) => {
+                if (!old) return old;
+                const optimistic: ChatMessage = {
+                    id: -1,
+                    role: 'user',
+                    content,
+                    eval_count: null,
+                    done_reason: null,
+                    created_at: new Date().toISOString(),
+                };
+                return { ...old, messages: [...old.messages, optimistic] };
+            });
+        },
+        [queryClient, queryKey],
+    );
+
+    const reload = useCallback(async () => {
+        if (sessionId === null) return;
+        await queryClient.invalidateQueries({ queryKey });
+    }, [queryClient, queryKey, sessionId]);
 
     return {
-        detail,
-        isLoading,
-        error,
+        detail: query.data ?? null,
+        isLoading: query.isLoading,
+        error: query.error instanceof Error ? query.error.message : null,
         streamingAnswer,
         setStreamingAnswer,
         reload,

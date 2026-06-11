@@ -1,13 +1,6 @@
-import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 
-vi.mock('../config/api_client', () => ({
-    default: { patch: vi.fn() },
-}));
-
-import apiClient from '@/config/api_client';
 import { useLibraryStore } from '@/stores/libraryStore';
-
-const mockedPatch = apiClient.patch as ReturnType<typeof vi.fn>;
 
 const resetStore = () =>
     useLibraryStore.setState({
@@ -21,7 +14,6 @@ const resetStore = () =>
 describe('libraryStore', () => {
     beforeEach(() => {
         resetStore();
-        mockedPatch.mockReset();
     });
 
     describe('selection mode', () => {
@@ -96,35 +88,6 @@ describe('libraryStore', () => {
             useLibraryStore.getState().openRenameDialog('book.pdf');
             useLibraryStore.getState().closeRenameDialog();
             expect(useLibraryStore.getState().renameTarget).toBeNull();
-        });
-
-        it('handleRename: renameTarget があるとき PATCH /api/rename を呼び renameTarget をクリアする', async () => {
-            mockedPatch.mockResolvedValue(undefined);
-            useLibraryStore.setState({ currentPath: 'sub', currentSource: 'comic' });
-            useLibraryStore.getState().openRenameDialog('old.pdf');
-
-            await useLibraryStore.getState().handleRename('new.pdf');
-
-            expect(mockedPatch).toHaveBeenCalledWith('/api/rename', {
-                path: 'sub',
-                old_name: 'old.pdf',
-                new_name: 'new.pdf',
-                source: 'comic',
-                is_folder: false,
-            });
-            expect(useLibraryStore.getState().renameTarget).toBeNull();
-        });
-
-        it('handleRename: renameTarget が null のとき PATCH を呼ばない', async () => {
-            await useLibraryStore.getState().handleRename('whatever');
-            expect(mockedPatch).not.toHaveBeenCalled();
-        });
-
-        it('handleRename: フォルダリネームで is_folder=true が body に乗る', async () => {
-            mockedPatch.mockResolvedValue(undefined);
-            useLibraryStore.getState().openRenameDialog('subfolder', true);
-            await useLibraryStore.getState().handleRename('newfolder');
-            expect(mockedPatch.mock.calls[0][1].is_folder).toBe(true);
         });
     });
 });

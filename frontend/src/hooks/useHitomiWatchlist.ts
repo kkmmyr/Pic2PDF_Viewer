@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/config/api_client';
 import { API_ENDPOINTS } from '@/config/api';
 import { errorMessage } from '@/utils/error';
 import type { WatchlistEntry, WatchlistResponse } from '@/types/hitomi';
+
+const WATCHLIST_QUERY_KEY = ['hitomiWatchlist'] as const;
 
 interface UseHitomiWatchlistResult {
     artists: WatchlistEntry[];
@@ -20,33 +23,48 @@ interface UseHitomiWatchlistResult {
  * 新着一覧フックとは独立。ダイアログ内で使う想定。
  */
 export function useHitomiWatchlist(): UseHitomiWatchlistResult {
-    const [artists, setArtists] = useState<WatchlistEntry[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const queryClient = useQueryClient();
 
-    const refresh = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
+    const query = useQuery({
+        queryKey: WATCHLIST_QUERY_KEY,
+        queryFn: async () => {
             const resp = await apiClient.get<unknown, WatchlistResponse>(
                 API_ENDPOINTS.HITOMI_WATCHLIST,
             );
-            setArtists(resp.artists);
-        } catch (e) {
-            setError(errorMessage(e, '不明なエラー'));
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+            return resp.artists;
+        },
+        staleTime: Infinity,
+    });
 
-    const addArtist = useCallback(
-        async (displayName: string, language: string) => {
-            const resp = await apiClient.post<unknown, { message: string; normalized: string }>(
+    const addMutation = useMutation({
+        mutationFn: ({ displayName, language }: { displayName: string; language: string }) =>
+            apiClient.post<unknown, { message: string; normalized: string }>(
                 API_ENDPOINTS.HITOMI_WATCHLIST,
                 { display_name: displayName, language },
+            ),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: WATCHLIST_QUERY_KEY }),
+    });
+
+    const removeMutation = useMutation({
+        mutationFn: ({ normalized, language }: { normalized: string; language: string }) =>
+            apiClient.delete(API_ENDPOINTS.HITOMI_WATCHLIST_DELETE(normalized, language)),
+        onMutate: ({ normalized, language }) => {
+            const prev = queryClient.getQueryData<WatchlistEntry[]>(WATCHLIST_QUERY_KEY);
+            queryClient.setQueryData<WatchlistEntry[]>(WATCHLIST_QUERY_KEY, (old) =>
+                old?.filter((e) => !(e.normalized === normalized && e.language === language)),
             );
-            // サーバ正規化後の値を含む新エントリを再取得
-            await refresh();
+            return { prev };
+        },
+        onError: (_err, _vars, context) => {
+            if (context?.prev !== undefined) {
+                queryClient.setQueryData(WATCHLIST_QUERY_KEY, context.prev);
+            }
+        },
+    });
+
+    const addArtist = useCallback(
+        async (displayName: string, language: string): Promise<WatchlistEntry> => {
+            const resp = await addMutation.mutateAsync({ displayName, language });
             return {
                 display_name: displayName.trim(),
                 normalized: resp.normalized,
@@ -54,29 +72,26 @@ export function useHitomiWatchlist(): UseHitomiWatchlistResult {
                 added_at: new Date().toISOString().slice(0, 10),
             };
         },
-        [refresh],
+        [addMutation],
     );
 
     const removeArtist = useCallback(
-        async (normalized: string, language: string) => {
-            // 楽観的更新
-            const prev = artists;
-            setArtists(
-                artists.filter((e) => !(e.normalized === normalized && e.language === language)),
-            );
-            try {
-                await apiClient.delete(API_ENDPOINTS.HITOMI_WATCHLIST_DELETE(normalized, language));
-            } catch (e) {
-                setArtists(prev);
-                throw e;
-            }
+        async (normalized: string, language: string): Promise<void> => {
+            await removeMutation.mutateAsync({ normalized, language });
         },
-        [artists],
+        [removeMutation],
     );
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    const refresh = useCallback(async () => {
+        await queryClient.refetchQueries({ queryKey: WATCHLIST_QUERY_KEY });
+    }, [queryClient]);
 
-    return { artists, loading, error, refresh, addArtist, removeArtist };
+    return {
+        artists: query.data ?? [],
+        loading: query.isLoading,
+        error: query.error instanceof Error ? errorMessage(query.error, '不明なエラー') : null,
+        refresh,
+        addArtist,
+        removeArtist,
+    };
 }

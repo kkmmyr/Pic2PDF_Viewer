@@ -4,7 +4,8 @@
  * BookCard の「登場人物」トグル展開時にのみ fetch する想定。
  * `enabled=false` の間は API を叩かない。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { fetchBookCharacters } from '@/features/novel_db/api';
 import type { CharacterSummary } from '@/features/novel_db/types';
@@ -17,27 +18,31 @@ export interface UseBookCharacters {
 }
 
 export function useBookCharacters(bookName: string, enabled: boolean): UseBookCharacters {
-    const [characters, setCharacters] = useState<CharacterSummary[]>([]);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    // refetch の失敗を追跡する補助 state（TanStack Query v5 はデータありの場合 error を更新しない）
+    const [refetchError, setRefetchError] = useState<string | null>(null);
 
-    const refetch = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const list = await fetchBookCharacters(bookName);
-            setCharacters(Array.isArray(list) ? list : []);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-        } finally {
-            setIsLoading(false);
+    const query = useQuery({
+        queryKey: ['bookCharacters', bookName],
+        queryFn: () => fetchBookCharacters(bookName),
+        enabled,
+        staleTime: Infinity,
+    });
+
+    const refetch = async () => {
+        setRefetchError(null);
+        const result = await query.refetch();
+        if (result.error) {
+            const msg = result.error instanceof Error ? result.error.message : String(result.error);
+            setRefetchError(msg);
         }
-    }, [bookName]);
+    };
 
-    useEffect(() => {
-        if (!enabled) return;
-        void refetch();
-    }, [enabled, refetch]);
+    const error = refetchError ?? (query.error instanceof Error ? query.error.message : null);
 
-    return { characters, isLoading, error, refetch };
+    return {
+        characters: Array.isArray(query.data) ? query.data : [],
+        isLoading: query.isLoading,
+        error,
+        refetch,
+    };
 }

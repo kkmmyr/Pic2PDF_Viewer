@@ -1,5 +1,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import React from 'react';
 
 vi.mock('../features/novel_db/api', () => ({
     fetchChatSessions: vi.fn(),
@@ -13,6 +15,14 @@ import { useChatSessions } from '@/hooks/novel_db/useChatSessions';
 const mockedFetchSessions = fetchChatSessions as ReturnType<typeof vi.fn>;
 const mockedDelete = deleteChatSession as ReturnType<typeof vi.fn>;
 
+function createWrapper() {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false } },
+    });
+    return ({ children }: { children: React.ReactNode }) =>
+        React.createElement(QueryClientProvider, { client: queryClient }, children);
+}
+
 describe('useChatSessions', () => {
     beforeEach(() => {
         mockedFetchSessions.mockReset();
@@ -23,7 +33,7 @@ describe('useChatSessions', () => {
         const sessions = [{ id: 1, title: 'セッション1' }];
         mockedFetchSessions.mockResolvedValue(sessions);
 
-        const { result } = renderHook(() => useChatSessions());
+        const { result } = renderHook(() => useChatSessions(), { wrapper: createWrapper() });
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(mockedFetchSessions).toHaveBeenCalled();
@@ -33,7 +43,7 @@ describe('useChatSessions', () => {
     it('fetch 失敗で error がセットされる', async () => {
         mockedFetchSessions.mockRejectedValue(new Error('API error'));
 
-        const { result } = renderHook(() => useChatSessions());
+        const { result } = renderHook(() => useChatSessions(), { wrapper: createWrapper() });
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(result.current.error).toBeTruthy();
@@ -45,7 +55,7 @@ describe('useChatSessions', () => {
         mockedDelete.mockResolvedValue(undefined);
         mockedFetchSessions.mockResolvedValueOnce([{ id: 2 }]);
 
-        const { result } = renderHook(() => useChatSessions());
+        const { result } = renderHook(() => useChatSessions(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.sessions).toHaveLength(2));
 
         await act(async () => {
@@ -53,12 +63,12 @@ describe('useChatSessions', () => {
         });
 
         expect(mockedDelete).toHaveBeenCalledWith(1);
-        expect(result.current.sessions).toHaveLength(1);
+        await waitFor(() => expect(result.current.sessions).toHaveLength(1));
     });
 
     it('refetch() で再フェッチできる', async () => {
         mockedFetchSessions.mockResolvedValueOnce([]);
-        const { result } = renderHook(() => useChatSessions());
+        const { result } = renderHook(() => useChatSessions(), { wrapper: createWrapper() });
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetchSessions.mockResolvedValueOnce([{ id: 1 }]);
@@ -66,12 +76,12 @@ describe('useChatSessions', () => {
             await result.current.refetch();
         });
 
-        expect(result.current.sessions).toHaveLength(1);
+        await waitFor(() => expect(result.current.sessions).toHaveLength(1));
     });
 
     it('API が配列以外を返した場合は空配列にフォールバック', async () => {
         mockedFetchSessions.mockResolvedValue(null);
-        const { result } = renderHook(() => useChatSessions());
+        const { result } = renderHook(() => useChatSessions(), { wrapper: createWrapper() });
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(result.current.sessions).toEqual([]);

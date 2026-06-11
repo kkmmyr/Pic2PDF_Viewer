@@ -42,7 +42,6 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         bulkSelectItems,
         openRenameDialog,
         closeRenameDialog,
-        handleRename: storeHandleRename,
     } = useLibraryStore();
 
     const { data: pdfs = [] } = useLibraryPdfs(currentPath, currentSource);
@@ -53,10 +52,18 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
 
     const handleRename = useCallback(
         async (newName: string) => {
-            await storeHandleRename(newName);
+            if (!renameTarget) return;
+            await apiClient.patch(API_ENDPOINTS.RENAME, {
+                path: currentPath,
+                old_name: renameTarget.name,
+                new_name: newName,
+                source: currentSource,
+                is_folder: renameTarget.isFolder,
+            });
+            closeRenameDialog();
             invalidatePdfs();
         },
-        [storeHandleRename, invalidatePdfs],
+        [renameTarget, currentPath, currentSource, closeRenameDialog, invalidatePdfs],
     );
 
     const { selectedPdf } = useUrlState();

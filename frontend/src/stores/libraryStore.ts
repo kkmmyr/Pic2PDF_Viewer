@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import type { LibrarySource } from '@/types';
-import apiClient from '@/config/api_client';
-import { API_ENDPOINTS } from '@/config/api';
 
 interface LibraryState {
     currentPath: string;
@@ -19,10 +17,9 @@ interface LibraryActions {
     bulkSelectItems: (names: string[], select: boolean) => void;
     openRenameDialog: (name: string, isFolder?: boolean) => void;
     closeRenameDialog: () => void;
-    handleRename: (newName: string) => Promise<void>;
 }
 
-export const useLibraryStore = create<LibraryState & LibraryActions>((set, get) => ({
+export const useLibraryStore = create<LibraryState & LibraryActions>((set) => ({
     currentPath: '',
     currentSource: 'doujin',
     isSelectionMode: false,
@@ -60,18 +57,4 @@ export const useLibraryStore = create<LibraryState & LibraryActions>((set, get) 
     openRenameDialog: (name, isFolder = false) => set({ renameTarget: { name, isFolder } }),
 
     closeRenameDialog: () => set({ renameTarget: null }),
-
-    handleRename: async (newName) => {
-        const { renameTarget, currentPath, currentSource } = get();
-        if (!renameTarget) return;
-        await apiClient.patch(API_ENDPOINTS.RENAME, {
-            path: currentPath,
-            old_name: renameTarget.name,
-            new_name: newName,
-            source: currentSource,
-            is_folder: renameTarget.isFolder,
-        });
-        set({ renameTarget: null });
-        // リフレッシュは呼び出し元（useLibraryPanel）が invalidateQueries で実施する
-    },
 }));
