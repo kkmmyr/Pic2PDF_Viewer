@@ -45,7 +45,7 @@ Pydantic v2 が既に導入済みで、SQLModel（Pydantic v2 + SQLAlchemy ベ�
 - 既存の生 SQL テストを SQLModel ベースに書き直すコスト（pytest 914 件を通すまでの修正作業）
 
 ### 影響範囲
-- `backend/services/novel_db/schema.py`（SQLModel テーブル定義に全面移行）
+- `backend/services/novel_db/models.py`（SQLModel テーブル定義に全面移行）
 - `backend/services/novel_db/` 配下の全クエリファイル
 - `backend/alembic/env.py`（target_metadata を SQLModel.metadata に変更）
 
