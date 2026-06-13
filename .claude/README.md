@@ -16,6 +16,9 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | [hooks/remind_docs_update.sh](hooks/remind_docs_update.sh) | PreToolUse: 実装変更前に docs/ の更新を**提案**する（advisory・ブロックしない） | ❌ (実行のみ) | 判定ロジック改善時 |
 | [hooks/remind_tests.sh](hooks/remind_tests.sh) | PostToolUse: 大きめの実装変更時にテスト実行を促す | ❌ (実行のみ) | 対象ファイル拡張時 |
 | [hooks/remind_deps_install.sh](hooks/remind_deps_install.sh) | PostToolUse: `pyproject.toml` / `package.json` 等の編集時に `uv sync` / `npm install` を促す | ❌ (実行のみ) | 言語追加時 |
+| [hooks/lint_check.sh](hooks/lint_check.sh) | PostToolUse: backend .py → ruff check / frontend .ts/tsx → eslint + prettier --check を実行して違反通知 | ❌ (実行のみ) | 対象パス変更時 |
+| [hooks/mkdocs_build.sh](hooks/mkdocs_build.sh) | PostToolUse: `docs/*.md` 編集後に mkdocs build --dirty を実行 | ❌ (実行のみ) | mkdocs 設定変更時 |
+| [hooks/remind_memory_sync.sh](hooks/remind_memory_sync.sh) | PostToolUse (git commit): commit 後に `memory/pending_tasks.md` の更新を促す | ❌ (実行のみ) | 運用変更時 |
 | [settings.json](settings.json) | hooks 登録 + 共有 permissions | ❌ | hooks 追加・共有 permission 追加時 |
 | `settings.local.json` | 個人別 permissions（`.gitignore` 対象） | ❌ | 個別 PC で許可を増やす時 |
 
@@ -46,6 +49,7 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 - `settings.json` の `hooks` 配列で登録
 - 副作用は最小に。ブロックする場合は明確な指示メッセージを返す
 - スキルと違い**強制力がある**（モデルの判断ではなく機械的に実行される）
+- セルフテスト: `hooks/tests/run_hook_tests.sh` で hook の挙動を「実際に走らせて assert」できる（`/check-hooks` コマンドから実行可能）
 
 ---
 
@@ -75,6 +79,9 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `/audit` | npm audit + uv audit でセキュリティ脆弱性を確認 |
 | `/changelog` | 直近コミットから 変更履歴.md 追記の草稿を生成 |
 | `/sync-memory` | 永続メモリと git log・計画書のズレを検出して更新 |
+| `/check-hooks` | hooks セルフテストを実行して PASS/FAIL を報告 |
+| `/cleanup` | 月次点検: 未使用 skill / 古い docs / 肥大化 / .claude ドリフトを可視化 |
+| `/feature-status` | 機能バックログ（A/B/C 階層）の未着手・保留・完了状況をサマリ |
 
 通常のテスト実行・型チェックは Bash で直接呼ぶ（`cd backend && uv run pytest` 等）。コマンド化していたが、project-specific な情報量が少ないため削除済み。実行コマンド一覧は `test-writing` skill を参照。
 
