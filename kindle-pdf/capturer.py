@@ -36,7 +36,7 @@ def _resolve_comic_dir(subdir: str) -> str:
 @dataclass
 class Config:
     """アプリケーション設定"""
-    KINDLE_WINDOW_TITLE: str = 'Kindle for PC'
+    KINDLE_WINDOW_TITLE: str = 'Kindle'
     PAGE_CHANGE_KEY: str = 'left'  # ページめくりキー (デフォルト)
     WAIT_SEC: float = 0.15         # キー入力後の微小待機
     PAGE_TURN_WAIT: float = 0.5    # ページめくり完了待ち
@@ -54,7 +54,8 @@ class Config:
     PDF_OUTPUT_DIR: str = _resolve_comic_dir("pdfs")
 
     # タイトルクリーニング用 (正規表現で PC 後のバージョン番号に対応)
-    TITLE_PATTERN: str = r'Kindle for PC\d*\s*-\s*(.+)'
+    # 旧: 'Kindle for PC - Title' / 新: 'Kindle - Title'（タイトルが出ない場合は空→ダイアログで手入力）
+    TITLE_PATTERN: str = r'(?:Kindle for PC\d*|Kindle)\s*-\s*(.+)'
 
 class BookInfoDialog(simpledialog.Dialog):
     def __init__(self, parent, title, initialvalue):
@@ -110,7 +111,7 @@ class KindleCapturer:
             length = GetWindowTextLength(hwnd)
             buff = create_unicode_buffer(length + 1)
             GetWindowText(hwnd, buff, length + 1)
-            if self.config.KINDLE_WINDOW_TITLE in buff.value:
+            if buff.value.startswith(self.config.KINDLE_WINDOW_TITLE):
                 found_hwnd = hwnd
                 return False
             return True
