@@ -1,14 +1,21 @@
 #!/bin/bash
-# Windows → Linux サーバーへアプリコードをデプロイするスクリプト
-# 使い方: bash deploy_to_linux.sh
+# Mac / Windows → Linux サーバーへアプリコードをデプロイするスクリプト
+# 使い方: bash scripts/deploy_to_linux.sh
 # 前提: Tailscale が起動していること、SSH 鍵認証が設定済みであること
+#       サーバー側 amashio に NOPASSWD sudo (systemctl restart/status pic2pdf-viewer) 設定済み
 set -e
+
+# Homebrew の npm/node を PATH に通す（Mac、未ログインシェル対策。Windows では no-op）
+if [ -x /opt/homebrew/bin/brew ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+fi
 
 LINUX_USER=amashio
 LINUX_HOST=medaroserver
 LINUX="${LINUX_USER}@${LINUX_HOST}"
 APP_ROOT=/opt/pic2pdf-viewer
-SRC="/d/61.tool/Pic2PDF_Viewer"
+# リポジトリルートをスクリプト位置から自動解決（Mac / Windows Git Bash 両対応）
+SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # ---- 1. フロントエンドをローカルでビルド ----
 echo "=== [1/3] Frontend build ==="
