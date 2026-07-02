@@ -57,7 +57,16 @@ async def lifespan(app: FastAPI):
         await job_queue.stop()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    title="Pic2PDF Viewer API",
+    description=(
+        "WebP / ZIP 画像を PDF 化してブラウザ閲覧するマルチソース（doujin / comic / novel）ライブラリの"
+        "バックエンド API。Kindle キャプチャ連携、yomitoku による OCR 検索可能 PDF 生成、"
+        "novel 向けの bge-m3 + Qwen によるフルテキスト検索・RAG 質問応答を含む。"
+    ),
+    version="0.1.0",
+)
 
 app.add_middleware(
     CORSMiddleware,

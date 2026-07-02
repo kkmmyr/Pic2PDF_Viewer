@@ -9,7 +9,7 @@ model: sonnet
 
 ## 担当範囲
 
-- 設計書: `docs/01_要件定義/`, `docs/02_基本設計/`, `docs/03_詳細設計/`, `docs/API仕様書/`, `docs/04_環境構築/`
+- 設計書: `docs/design/要件定義/`, `docs/design/基本設計/`, `docs/design/詳細設計/`, `docs/design/詳細設計/API.md`, `docs/design/環境構築/`
 - 実装: `backend/` (Python/FastAPI), `frontend/src/` (React/TypeScript)
 
 ## チェックの観点
@@ -48,4 +48,4 @@ model: sonnet
 
 - コードは書かない（差分検出のみ）
 - 大量に差分が見つかった場合、まず重要度 Top 10 を返し、続きが必要か呼び出し元に確認する
-- ADR（`docs/02_基本設計/ADR/`）に経緯が書かれている可能性があるため、`[実装が設計外]` を報告する前に ADR で言及されていないか確認する
+- ADR（`docs/design/基本設計/ADR/`）に経緯が書かれている可能性があるため、`[実装が設計外]` を報告する前に ADR で言及されていないか確認する

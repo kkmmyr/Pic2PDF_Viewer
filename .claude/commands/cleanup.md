@@ -22,7 +22,7 @@ description: 月次のリポジトリ新陳代謝チェック。未使用 skill 
 
 1. `docs/` 配下と memory の md ファイル一覧を取得
 2. 各ファイルの最終 `git log` 日付（memory は mtime）を取得
-3. 6 ヶ月以上経過しているものを列挙。ストック系（`01_要件定義` 〜 `04_環境構築`）は **現実とズレている可能性が高い** 警告対象。フロー系（`06_リファクタリング` の完了済み Phase 詳細）は古くて当然なので除外
+3. 6 ヶ月以上経過しているものを列挙。ストック系（`docs/design/` 配下の要件定義・基本設計・詳細設計・環境構築）は **現実とズレている可能性が高い** 警告対象。フロー系（`docs/archive/リファクタリング履歴.md` の完了済み Phase 詳細）は古くて当然なので除外
 
 ### 問い 3: Claude の応答が重くなりそうな肥大箇所はないか？
 
@@ -52,7 +52,7 @@ cd backend && uv run python ../scripts/maintenance/check_claude_drift.py
 - `.claude/commands/<name>.md` — 同上
 
 ### 2. 鮮度切れ候補の docs / memory（半年以上未更新）
-- `docs/03_詳細設計/<file>.md` — 最終更新 YYYY-MM-DD
+- `docs/design/詳細設計/<file>.md` — 最終更新 YYYY-MM-DD
 - `memory/<file>.md` — 最終更新 YYYY-MM-DD
 
 ### 3. 肥大化候補

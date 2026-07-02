@@ -20,7 +20,7 @@ description: memory/ の内容を git log・リファクタリング計画書・
     - `git log --all --oneline -5 --grep="Phase"` で Phase 系コミットの最新
 
 3. **計画書と突き合わせ**
-    - `docs/06_リファクタリング/リファクタリング計画書.md` を Read
+    - `docs/log/計画/リファクタリング計画書.md` を Read
     - 計画書の「Phase N まで完了」とメモリの記述が一致するか確認
 
 4. **pending_tasks を突き合わせ**

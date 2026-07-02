@@ -1,6 +1,6 @@
 ---
 name: refactor-planner
-description: 既存のリファクタリング計画書（docs/06_リファクタリング/リファクタリング計画書.md）と現状コードを照合し、次のリファクタ対象の段階的計画を提案する際に使用。複数ファイルにまたがる大規模リファクタの前に呼んで、影響範囲とフェーズ分割を整理させる。
+description: 既存のリファクタリング計画書（docs/log/計画/リファクタリング計画書.md）と現状コードを照合し、次のリファクタ対象の段階的計画を提案する際に使用。複数ファイルにまたがる大規模リファクタの前に呼んで、影響範囲とフェーズ分割を整理させる。
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -9,8 +9,8 @@ model: sonnet
 
 ## 入力
 
-- 既存のリファクタリング計画書: `docs/06_リファクタリング/リファクタリング計画書.md`
-- 既存のリファクタリング履歴書: `docs/99_アーカイブ/リファクタリング履歴.md`
+- 既存のリファクタリング計画書: `docs/log/計画/リファクタリング計画書.md`
+- 既存のリファクタリング履歴書: `docs/archive/リファクタリング履歴.md`
 - 現状コード: `backend/`, `frontend/src/`
 - 大ファイル一覧: `/big-files` スラッシュコマンドの出力（必要なら）
 
@@ -26,7 +26,7 @@ model: sonnet
 - **コードは書かない**（計画立案のみ）
 - **機能追加は提案しない** — 「ユーザー向けの新機能・新体験」に相当する候補が出た場合は「バックログ.md 行き」と注記するに留める。提案する Phase は §未着手候補 — リファクタリング / §未着手候補 — 技術メンテナンス のどちらに入るかを明示する
 - 100 行以上の変更を要する Phase は単独に分離する
-- ADR（`docs/02_基本設計/ADR/`）に類似の意思決定が記録済みなら参照する
+- ADR（`docs/design/基本設計/ADR/`）に類似の意思決定が記録済みなら参照する
 - バックエンド・フロントエンドの設計規約（`backend-conventions` / `frontend-conventions` スキル参照）を尊重する：
   - backend: routers/services 分離、`get_dirs_by_source`, `update_meta_locked`, `validate_safe_path`
   - frontend: components 階層分離、`apiClient` 必須、共通 Dialog/ConfirmDialog シェル、`any` 型禁止
