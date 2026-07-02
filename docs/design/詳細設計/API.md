@@ -1,5 +1,7 @@
 # API 仕様
 
+> status: living | last-verified: 2026-07-03
+
 バックエンド (FastAPI) が提供する API のリファレンス方針と、OpenAPI では表現できない設計意図をまとめる。
 
 ## この文書の位置づけ

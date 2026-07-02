@@ -1,5 +1,7 @@
 # Windows サービス化セットアップ
 
+> status: living | last-verified: 2026-07-03
+
 Pic2PDF Viewer のリリースサーバー（uvicorn on :8090）を **NSSM (Non-Sucking Service Manager)** で Windows サービスとして登録する手順。
 他環境への移植時はこの手順を上から順に実施。
 

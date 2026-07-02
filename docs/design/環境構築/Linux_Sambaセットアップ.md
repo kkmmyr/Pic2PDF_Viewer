@@ -1,5 +1,7 @@
 # Linux サーバー Samba セットアップ
 
+> status: living | last-verified: 2026-07-03
+
 同人誌の画像ファイル（WebP / ZIP）を Windows からネットワークドライブ経由でサーバーに置けるようにする。
 配置後、ブラウザの「PDF 生成」ページからワンクリックで変換できる。
 

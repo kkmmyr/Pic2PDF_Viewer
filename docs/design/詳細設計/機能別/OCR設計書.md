@@ -1,8 +1,10 @@
 # OCR設計・改善記録
 
+> status: absorption-pending | last-verified: 2026-05-09
+<!-- 吸収予定（設計書ガバナンス再編 G4）。それまで本書が当該機能の正本。 -->
+
 縦書き小説OCR（yomitoku）を用いたSearchable PDF生成の設計と改善記録。
 
-- 最終更新: 2026-05-09（novel ソースの新機能（テキスト DB 化）への移行方針を追記）
 - 関連: [ADR-0003: image-only モード](../../基本設計/ADR/0003_generated-image-only-mode.md)（`generated` ソースは OCR 対象外）、[GPU環境セットアップ.md](../../環境構築/GPU環境セットアップ.md)（`uv` ベースに更新済み）
 
 > **2026-05-09 注記**: novel ソース（`backend/data/kindle_novel/`）については、Searchable PDF を中間成果物として持つ運用から、**OCR テキストを SQLite に取り込み検索・質問応答する新機能** に移行する方針が確定。novel タブの新ビューア仕様は [小説テキスト検索・RAG機能.md](小説テキスト検索・RAG機能_バックエンド設計.md) / [バックエンド設計](小説テキスト検索・RAG機能_バックエンド設計.md) / [フロントエンド設計](小説テキスト検索・RAG機能_フロントエンド設計.md) を参照。

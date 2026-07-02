@@ -1,8 +1,9 @@
 # 小説テキスト検索・RAG 機能 バックエンド設計書
 
-novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は 要件定義: 小説テキスト検索・RAG機能.md を参照。
+> status: absorption-pending | last-verified: 2026-05-11
+<!-- 吸収予定（設計書ガバナンス再編 G4）。それまで本書が当該機能の正本。 -->
 
-最終更新: 2026-05-11（B-9 Contextual Retrieval 追記 / summarizer の 1-shot 経路 / builder の道連れ削除コメント追加 / B-12 で LLM を IQ4_XS 量子化に切替 / B-13 段階 A→B→C で QA num_ctx を 段階拡大、scope=book は全 page 読み（`-c 131072 -ncmoe 28` canonical）/ B-14 で llama-server に切替 / 質問履歴を JST 表示 + 応答時間併記）
+novel タブの OCR テキストを SQLite + FTS5 + ベクトルで検索し、ローカル LLM（Qwen3.6:35b-a3b）で質問応答する機能の **バックエンド側** 設計書。本ファイルに集約し、要件は 要件定義: 小説テキスト検索・RAG機能.md を参照。
 
 ---
 

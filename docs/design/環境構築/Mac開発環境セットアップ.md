@@ -1,5 +1,7 @@
 # Mac 開発環境セットアップ
 
+> status: living | last-verified: 2026-07-03
+
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
 > **前提**: アプリの本番運用（NSSM サービス・Linux デプロイ）は Windows / Linux で行う。Mac は開発専用。

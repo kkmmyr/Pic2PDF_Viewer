@@ -1,5 +1,7 @@
 # Claude Code Remote Control + Discord通知 設定書
 
+> status: living | last-verified: 2026-07-03
+
 ## 概要
 
 Claude Code の Remote Control セッションを起動した際に、接続URLをDiscordへ自動通知するスクリプトの設定。  

@@ -1,6 +1,6 @@
 # OCR GPU環境セットアップガイド
 
-最終更新: 2026-05-07
+> status: living | last-verified: 2026-05-07
 
 Novel機能のOCR処理 (`yomitoku`) を高速化するために、NVIDIA GPU (CUDA) を利用可能な環境を構築する手順。
 

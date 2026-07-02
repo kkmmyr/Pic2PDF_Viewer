@@ -1,11 +1,13 @@
 """`docs/**/*.md` の整合性を検査する（pre-commit フックからコミットをブロックする）。
 
 check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツール）とは異なり、
-本スクリプトは違反があれば **exit 1** する。以下 3 ルールを検査する。
+本スクリプトは違反があれば **exit 1** する。以下 5 ルールを検査する。
 
   Rule 1: docs 間の相対 Markdown リンク切れ
   Rule 2: メインの変更履歴.md の行数肥大化（週次ローテーション漏れ）
   Rule 3: mkdocs.yml の nav ツリーとの同期（dead entry / orphan ファイル）
+  Rule 4: design/ 各 spec 文書のサイズ超過（warn・非ブロック）
+  Rule 5: design/ 各 spec 文書の status ヘッダ欠落（ブロッキング）
 
 usage:
     uv run python scripts/maintenance/check_docs.py
@@ -34,8 +36,20 @@ MKDOCS_YML = PROJECT_ROOT / "mkdocs.yml"
 # 変更履歴/YYYY-Www.md にローテーションするよう促す
 CHANGELOG_LINE_LIMIT = 800
 
+# Rule 4: design/ の spec 文書がこの行数を超えたら warn（非ブロック）。
+# 超過はまず「設計過程・歴史が本文に混ざっていないか」を疑う（分割・凍結は次善）。
+DESIGN_DOC_LINE_LIMIT = 800
+
 MD_LINK_RE = re.compile(r"\[(?:[^\]]*)\]\(([^)#\s][^)]*)\)")
 WEEKLY_CHANGELOG_RE = re.compile(r"^\d{4}-W\d{2}\.md$")
+
+# Rule 5: design/ の spec 文書は冒頭 10 行以内にこの status ヘッダを持つ。
+# 例: `> status: living | last-verified: 2026-07-03`
+STATUS_HEADER_RE = re.compile(
+    r"^>\s*status:\s*(?:living|absorption-pending)\s*\|\s*"
+    r"last-verified:\s*\d{4}-\d{2}-\d{2}\s*$"
+)
+DESIGN_DIR = DOCS_DIR / "design"
 
 
 # ---------------------------------------------------------------------------
@@ -211,6 +225,55 @@ def check_nav_sync() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Rule 4 / 5: design/ spec 文書のサイズ番犬（warn）と status ヘッダ（fail）
+# ---------------------------------------------------------------------------
+
+
+def _iter_design_docs():
+    """design/ 配下の spec 文書を yield する。
+
+    ADR（Architecture Decision Records）は「一度 accepted になれば凍結」という
+    独自ライフサイクルを持つ記録文書なので、status ヘッダ・サイズ番犬の対象外。
+    """
+    if not DESIGN_DIR.exists():
+        return
+    for md_file in sorted(DESIGN_DIR.rglob("*.md")):
+        if "ADR" in md_file.relative_to(DESIGN_DIR).parts:
+            continue
+        yield md_file
+
+
+def check_design_doc_size() -> list[str]:
+    """Rule 4（warn・非ブロック）: design/ の spec 文書が上限行数を超えていないか。"""
+    warnings: list[str] = []
+    for md_file in _iter_design_docs():
+        rel = md_file.relative_to(PROJECT_ROOT)
+        line_count = len(md_file.read_text(encoding="utf-8", errors="replace").splitlines())
+        if line_count > DESIGN_DOC_LINE_LIMIT:
+            warnings.append(
+                f"{rel}: {line_count} 行（目安 {DESIGN_DOC_LINE_LIMIT} 行超）"
+                f" -> まず設計過程・歴史の混在を疑い、必要なら分割/凍結を検討"
+            )
+    return warnings
+
+
+def check_design_headers() -> list[str]:
+    """Rule 5（fail・ブロッキング）: design/ の spec 文書が冒頭 10 行以内に
+    status ヘッダ（`> status: living|absorption-pending | last-verified: YYYY-MM-DD`）
+    を持つか検査する。"""
+    violations: list[str] = []
+    for md_file in _iter_design_docs():
+        rel = md_file.relative_to(PROJECT_ROOT)
+        head = md_file.read_text(encoding="utf-8", errors="replace").splitlines()[:10]
+        if not any(STATUS_HEADER_RE.match(line.strip()) for line in head):
+            violations.append(
+                f"{rel}: 冒頭 10 行に status ヘッダがありません"
+                f" -> `> status: living|absorption-pending | last-verified: YYYY-MM-DD` を追加してください"
+            )
+    return violations
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -219,6 +282,8 @@ def main() -> None:
     broken_links = check_broken_links()
     changelog_over = check_changelog_size()
     nav_violations = check_nav_sync()
+    size_warnings = check_design_doc_size()
+    header_missing = check_design_headers()
 
     print("=== check_docs: docs/ 整合性チェック ===\n")
 
@@ -237,11 +302,28 @@ def main() -> None:
         print(f"  {line}")
     print()
 
-    total = len(broken_links) + len(changelog_over) + len(nav_violations)
+    print(
+        f"[Rule 4] design/ 文書サイズ (> {DESIGN_DOC_LINE_LIMIT} 行): "
+        f"{len(size_warnings)} 件 [warn・非ブロック]"
+    )
+    for line in size_warnings:
+        print(f"  {line}")
+    print()
+
+    print(f"[Rule 5] design/ status ヘッダ欠落: {len(header_missing)} 件")
+    for line in header_missing:
+        print(f"  {line}")
+    print()
+
+    # Rule 4 は warn のため合計には数えない（Rule 1/2/3/5 のみブロッキング）。
+    total = len(broken_links) + len(changelog_over) + len(nav_violations) + len(header_missing)
     if total == 0:
-        print("違反なし。")
+        if size_warnings:
+            print(f"ブロッキング違反なし（Rule 4 の warn が {len(size_warnings)} 件あります）。")
+        else:
+            print("違反なし。")
         sys.exit(0)
-    print(f"合計 {total} 件の違反を検出しました。")
+    print(f"合計 {total} 件のブロッキング違反を検出しました（Rule 4 warn は除く）。")
     sys.exit(1)
 
 

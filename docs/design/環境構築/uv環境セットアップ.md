@@ -1,5 +1,7 @@
 # uv 環境セットアップ
 
+> status: living | last-verified: 2026-07-03
+
 本プロジェクトの Python 環境は [uv](https://docs.astral.sh/uv/) で管理しています。
 
 ## uv のインストール
