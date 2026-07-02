@@ -1,6 +1,6 @@
 """hitomi.la 新着監視 API。
 
-各エンドポイントの詳細は docs/03_詳細設計/hitomi新着監視設計書.md §6 を参照。
+各エンドポイントの詳細は docs/design/詳細設計/機能別/hitomi新着監視設計書.md §6 を参照。
 データは backend/data/hitomi/ 配下の JSON ファイル（個別の監視スクリプトが書き出す）。
 """
 

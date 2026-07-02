@@ -1,7 +1,7 @@
 """hitomi.la NOZOMI 監視 CLI。
 
 Windows Task Scheduler から `python -m tools.hitomi_monitor` で単発実行する。
-詳細は docs/03_詳細設計/hitomi新着監視設計書.md §10 を参照。
+詳細は docs/design/詳細設計/機能別/hitomi新着監視設計書.md §10 を参照。
 
 終了コード:
   0: 全成功

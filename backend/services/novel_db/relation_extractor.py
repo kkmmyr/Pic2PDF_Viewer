@@ -3,7 +3,7 @@
 共起カウントでエッジ重みを算出し、Qwen で関係タイプラベルを抽出する。
 抽出結果は character_relations テーブルに UPSERT する。
 
-詳細は docs/01_要件定義/C12_キャラクタ関係グラフ_要件.md。
+詳細は docs/archive/要件/C12_キャラクタ関係グラフ_要件.md。
 """
 
 from __future__ import annotations

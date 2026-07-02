@@ -228,4 +228,4 @@ CLI からの呼び出しも `logs/YYYY-MM-DD.log` に `cli` / `cli_session` ソ
 - **A-0〜A-7**（完了、2026-05-11）: Qwen 専用設計から Backend 抽象に再設計。
   ディレクトリリネーム (`Qwen/` → `llm/`)、Backend ABC + 2 つの具象 + ファクトリに
   分離、env 経由設定渡しを廃止し `BackendConfig` 引数渡しに統一。詳細は
-  Pic2PDF_Viewer の `docs/06_リファクタリング/LLM層リファクタリング計画.md`
+  Pic2PDF_Viewer の `docs/archive/LLM層リファクタリング_完了記録.md`

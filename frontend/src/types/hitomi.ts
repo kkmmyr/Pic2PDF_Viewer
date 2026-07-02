@@ -1,6 +1,6 @@
 /**
  * hitomi.la 新着監視機能の型定義。
- * 詳細は docs/03_詳細設計/hitomi新着監視設計書.md §4 を参照。
+ * 詳細は docs/design/詳細設計/機能別/hitomi新着監視設計書.md §4 を参照。
  */
 
 export type RunStatus = 'ok' | 'partial' | 'error' | 'never';

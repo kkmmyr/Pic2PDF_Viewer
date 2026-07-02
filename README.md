@@ -2,7 +2,7 @@
 
 WebP 画像・ZIP を PDF 化してブラウザで閲覧する個人向け Web アプリケーション。Kindle キャプチャ連携と OCR (yomitoku) による Searchable PDF 生成機能あり。
 
-> **想定ユーザー**: ローカル LAN・シングルユーザー。認証は実装していない。LAN 外公開を想定する場合は別途設計が必要（[セキュリティ設計書 §1](docs/03_詳細設計/セキュリティ設計書.md)）
+> **想定ユーザー**: ローカル LAN・シングルユーザー。認証は実装していない。LAN 外公開を想定する場合は別途設計が必要（[セキュリティ設計書 §1](docs/design/詳細設計/セキュリティ設計書.md)）
 
 ## 起動方法
 
@@ -45,10 +45,10 @@ cd kindle-pdf
 uv sync --group gpu
 ```
 
-詳細は [docs/04_環境構築/](docs/04_環境構築/) 配下:
-- [uv環境セットアップ.md](docs/04_環境構築/uv環境セットアップ.md)
-- [GPU環境セットアップ.md](docs/04_環境構築/GPU環境セットアップ.md)
-- [運用ガイド.md](docs/04_環境構築/運用ガイド.md) — バックアップ・定期メンテナンス・トラブルシュート・性能指標
+詳細は [docs/design/環境構築/](docs/design/環境構築/) 配下:
+- [uv環境セットアップ.md](docs/design/環境構築/uv環境セットアップ.md)
+- [GPU環境セットアップ.md](docs/design/環境構築/GPU環境セットアップ.md)
+- [運用ガイド.md](docs/design/環境構築/運用ガイド.md) — バックアップ・定期メンテナンス・トラブルシュート・性能指標
 
 ## 主要ディレクトリ
 
@@ -65,15 +65,15 @@ uv sync --group gpu
 
 | 領域 | 入口 |
 |---|---|
-| 全体像 | [docs/02_基本設計/基本設計書.md](docs/02_基本設計/基本設計書.md) |
-| 機能追加候補（バックログ） | [docs/01_要件定義/機能追加候補.md](docs/01_要件定義/機能追加候補.md) |
-| 設計判断の理由 (ADR) | [docs/02_基本設計/ADR/](docs/02_基本設計/ADR/) |
-| 詳細設計（バックエンド） | [docs/02_基本設計/アーキテクチャ詳細_バックエンド編.md](docs/02_基本設計/アーキテクチャ詳細_バックエンド編.md) → [詳細設計書_バックエンド編.md](docs/03_詳細設計/詳細設計書_バックエンド編.md) |
-| 詳細設計（フロントエンド） | [docs/02_基本設計/アーキテクチャ詳細_フロントエンド編.md](docs/02_基本設計/アーキテクチャ詳細_フロントエンド編.md) → [詳細設計書_フロントエンド編.md](docs/03_詳細設計/詳細設計書_フロントエンド編.md) |
-| API 仕様 | [docs/03_詳細設計/API仕様書.md](docs/03_詳細設計/API仕様書.md) |
-| セキュリティ | [docs/03_詳細設計/セキュリティ設計書.md](docs/03_詳細設計/セキュリティ設計書.md) |
-| ライセンス・コンプライアンス | [docs/03_詳細設計/ライセンス・コンプライアンス.md](docs/03_詳細設計/ライセンス・コンプライアンス.md) |
-| 変更履歴 | [docs/05_記録/変更履歴.md](docs/05_記録/変更履歴.md) |
+| 全体像 | [docs/design/基本設計/基本設計書.md](docs/design/基本設計/基本設計書.md) |
+| バックログ | [docs/log/計画/バックログ.md](docs/log/計画/バックログ.md) |
+| 設計判断の理由 (ADR) | [docs/design/基本設計/ADR/](docs/design/基本設計/ADR/) |
+| 詳細設計（バックエンド） | [詳細設計書_バックエンド編.md](docs/design/詳細設計/詳細設計書_バックエンド編.md) |
+| 詳細設計（フロントエンド） | [詳細設計書_フロントエンド編.md](docs/design/詳細設計/詳細設計書_フロントエンド編.md) |
+| API 仕様 | [docs/design/詳細設計/API.md](docs/design/詳細設計/API.md)（一覧は /openapi.json） |
+| セキュリティ | [docs/design/詳細設計/セキュリティ設計書.md](docs/design/詳細設計/セキュリティ設計書.md) |
+| ライセンス・コンプライアンス | [docs/design/環境構築/ライセンス・コンプライアンス.md](docs/design/環境構築/ライセンス・コンプライアンス.md) |
+| 変更履歴 | [docs/log/変更履歴.md](docs/log/変更履歴.md) |
 
 ## 開発支援
 
@@ -94,7 +94,7 @@ Claude Code 用の設定は [.claude/](.claude/) を参照。スラッシュコ�
 設計の意図に関わる変更は以下の順序で進める（[.claude/skills/docs-workflow/SKILL.md](.claude/skills/docs-workflow/SKILL.md) で Claude にも自動案内される）:
 
 1. **設計書を更新** — `docs/<該当領域>/...md`（要件定義 / 基本設計 / 詳細設計 / アーキテクチャ詳細 / API 仕様 / セキュリティ / OCR 等）
-2. **変更履歴に追記** — [docs/05_記録/変更履歴.md](docs/05_記録/変更履歴.md) の「直近の追記」先頭に `## YYYY-MM-DD: type — タイトル` を追加（`/changelog` で草稿生成可）
+2. **変更履歴に追記** — [docs/log/変更履歴.md](docs/log/変更履歴.md) の「直近の追記」先頭に `## YYYY-MM-DD: type — タイトル` を追加（`/changelog` で草稿生成可）
 3. **ソースを修正** — backend / frontend / kindle-pdf
 4. **テスト・リント** — `uv run pytest` / `npm run test` / `uv run ruff check` / `npm run lint`
 5. **コミット** — Conventional Commits（`feat:` / `fix:` / `refactor:` / `docs:` / `test:` / `chore:`）+ HEREDOC で Co-Authored-By trailer 付与
@@ -103,4 +103,4 @@ Claude Code 用の設定は [.claude/](.claude/) を参照。スラッシュコ�
 
 ## ライセンス
 
-未指定（個人プロジェクト）。配布する場合は依存ライブラリのライセンス（特に PyMuPDF AGPL-3.0）に準拠した LICENSE ファイル明記が必要。詳細は [docs/03_詳細設計/ライセンス・コンプライアンス.md](docs/03_詳細設計/ライセンス・コンプライアンス.md)。
+未指定（個人プロジェクト）。配布する場合は依存ライブラリのライセンス（特に PyMuPDF AGPL-3.0）に準拠した LICENSE ファイル明記が必要。詳細は [docs/design/環境構築/ライセンス・コンプライアンス.md](docs/design/環境構築/ライセンス・コンプライアンス.md)。

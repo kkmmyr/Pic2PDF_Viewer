@@ -65,7 +65,7 @@ class TestParseNozomiBytes:
 class TestBuildNozomiUrl:
     """NOZOMI ファイル名は実際には空白を含むため、内部 key の `_` を `%20` に変換する。
 
-    URL 仕様の詳細は docs/03_詳細設計/hitomi新着監視設計書.md §8.1 を参照。
+    URL 仕様の詳細は docs/design/詳細設計/機能別/hitomi新着監視設計書.md §8.1 を参照。
     """
 
     def test_underscore_becomes_percent20(self):

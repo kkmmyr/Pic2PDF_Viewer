@@ -1,6 +1,6 @@
 /**
  * 小説テキスト検索・RAG 機能の共通型定義。
- * バックエンド API スキーマと一致させる（docs/03_詳細設計/API仕様書.md §7）。
+ * バックエンド API スキーマと一致させる（docs/design/詳細設計/API.md、一覧は /openapi.json）。
  */
 
 import type { components } from '../../types/api';

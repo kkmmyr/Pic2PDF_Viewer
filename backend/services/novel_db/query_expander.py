@@ -12,7 +12,7 @@ LLM 選定:
 LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local_llm` の
 `OllamaBackend` 経由に集約。
 
-詳細は docs/01_要件定義/機能追加候補.md B-11 / 同設計書 §7.4 を参照。
+詳細は docs/log/計画/バックログ.md B-11 / 同設計書 §7.4 を参照。
 """
 
 from __future__ import annotations

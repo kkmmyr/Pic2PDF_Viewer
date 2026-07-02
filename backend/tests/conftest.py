@@ -2,7 +2,7 @@
 共通テストフィクスチャ。
 
 router テスト・統合テストで使う `tmp_data_dir` / `client` / `make_pdf` 等を集約する。
-詳細は docs/06_リファクタリング/テスト整備計画書.md §4.1 を参照。
+詳細は docs/archive/テスト整備計画書.md §4.1 を参照。
 """
 
 import os

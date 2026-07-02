@@ -22,7 +22,7 @@ B-14 / ADR-0009 採用時に Phase 0〜4b として手動実行したベンチ�
     - llama_server backend は事前に llama-server が `--port 11435` で稼働している必要
       （Windows タスクスケジューラ `llama-server-qwen` で自動起動）
     - ollama backend は VRAM 競合に注意（gemma4:e4b 等が常駐していると OOM の可能性）
-    - 採用時の実機ベンチ結果は docs/05_記録/小説RAG_技術知見.md §9 を参照
+    - 採用時の実機ベンチ結果は docs/log/技術知見/小説RAG_技術知見.md §9 を参照
 """
 
 from __future__ import annotations
