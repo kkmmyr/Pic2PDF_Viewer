@@ -31,6 +31,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "basedpyright>=1.39.7",
     "pre-commit>=4.6.0",
+    # scripts/maintenance/check_docs.py (mkdocs.yml nav の YAML パース) が直接 import する。
+    # pre-commit の推移依存で偶然入っていたが、明示依存として固定する。
+    "pyyaml>=6.0.3",
 ]
 
 [tool.uv]

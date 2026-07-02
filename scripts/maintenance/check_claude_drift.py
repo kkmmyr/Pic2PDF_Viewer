@@ -1,8 +1,18 @@
-"""`.claude/**/*.md` 内のローカルパス参照が実在するか検査する。
+"""`.claude/**/*.md` と グローバル `memory/**/*.md` 内のローカルパス参照が
+実在するか検査する。あわせて `mkdocs.yml` の nav ツリーの dead entry も検査する。
 
 markdown リンク `[..](target)` のローカルターゲットと、バックティック内の
 パス様トークン（`/` を含み既知ルート配下または拡張子付き）を抽出し、
 リポジトリルート基準（リンクは記載ファイル相対も試す）で実在検証する。
+
+`memory/` はプロジェクトルート外（`C:\\Users\\...\\memory\\`）にあるため、
+`.claude/` とは別ディレクトリとして走査する。解決ロジック自体
+（`_resolve()`）は共通で、リポジトリルート基準の解決と記載ファイル相対の
+解決の両方を試すため、memory ファイル内の `docs/...` バックティック参照
+（リポジトリルート基準）と memory ファイル同士の相対リンク（記載ファイル
+基準）の両方をそのまま拾える。
+
+report-only（人間の判断に委ねるツール）のため、常に exit 0。
 
 usage:
     cd backend && uv run python ../scripts/maintenance/check_claude_drift.py
@@ -14,12 +24,17 @@ import re
 import sys
 from pathlib import Path
 
+import yaml
+
 # Windows 環境で日本語ファイルパスが文字化けしないよう UTF-8 出力を強制
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_DIR = PROJECT_ROOT / ".claude"
+# グローバルメモリはプロジェクト外に存在する（リポジトリには含まれない）
+MEMORY_DIR = Path(r"C:\Users\amashio\.claude\projects\d--61-tool-Pic2PDF-Viewer\memory")
+MKDOCS_YML = PROJECT_ROOT / "mkdocs.yml"
 
 KNOWN_ROOTS = (
     "backend/",
@@ -67,7 +82,7 @@ EXTERNAL_PREFIXES = (
     "https://",
     "~/",
     "~\\",
-    "@/",       # TypeScript パスエイリアス（実ファイルパスではない）
+    "@/",  # TypeScript パスエイリアス（実ファイルパスではない）
     "memory/",  # グローバルメモリはプロジェクト外（C:\Users\...\memory\）
     "Z:",
     "C:",
@@ -95,8 +110,7 @@ def _is_path_like(token: str) -> bool:
     if any(t.startswith(ext) or t.lower().startswith(ext.lower()) for ext in EXTERNAL_PREFIXES):
         return False
     has_known_root = any(
-        t.startswith(root) or f"/{root}" in t or t.lstrip("./").startswith(root)
-        for root in KNOWN_ROOTS
+        t.startswith(root) or f"/{root}" in t or t.lstrip("./").startswith(root) for root in KNOWN_ROOTS
     )
     has_extension = bool(re.search(r"\.[a-zA-Z]{2,6}$", t.split("/")[-1]))
     return has_known_root or has_extension
@@ -153,10 +167,24 @@ def _resolve(target: str, source_file: Path) -> Path | None:
     return None
 
 
-def check_drift() -> list[tuple[str, int, str]]:
+def check_drift(scan_dir: Path, display_root: Path, display_prefix: str = "") -> list[tuple[str, int, str]]:
+    """scan_dir 配下の `*.md` を走査し、存在しないローカルパス参照を集める。
+
+    表示用の相対パスは display_root 基準（+ display_prefix）で組み立てる。
+    `.claude/` 呼び出しでは display_root=PROJECT_ROOT, display_prefix="" とし、
+    従来と完全に同じ表示（`.claude/xxx.md:N -> ...`）になる。
+    解決ロジック（_resolve）自体は scan_dir に関わらず PROJECT_ROOT 基準 /
+    記載ファイル相対の両方を試すため、memory/ 配下のファイルでも
+    「docs/ 始まりのバックティック参照（リポジトリルート基準）」と
+    「memory ファイル同士の相対リンク（記載ファイル基準）」の両方を正しく拾う。
+    """
     broken: list[tuple[str, int, str]] = []
-    for md_file in sorted(CLAUDE_DIR.rglob("*.md")):
-        rel_file = md_file.relative_to(PROJECT_ROOT)
+    for md_file in sorted(scan_dir.rglob("*.md")):
+        try:
+            rel_file = md_file.relative_to(display_root)
+        except ValueError:
+            rel_file = md_file
+        rel_label = f"{display_prefix}{rel_file}"
         lines = md_file.read_text(encoding="utf-8", errors="replace").splitlines()
         in_code_fence = False
         for lineno, line in enumerate(lines, start=1):
@@ -173,7 +201,7 @@ def check_drift() -> list[tuple[str, int, str]]:
                 if not target:
                     continue
                 if _resolve(target, md_file) is None:
-                    broken.append((str(rel_file), lineno, target))
+                    broken.append((rel_label, lineno, target))
             for m in BACKTICK_TOKEN_RE.finditer(line):
                 token = m.group(1)
                 if not _is_path_like(token):
@@ -188,18 +216,79 @@ def check_drift() -> list[tuple[str, int, str]]:
                     if _should_skip_target(cand):
                         continue
                     if _resolve(cand, md_file) is None:
-                        broken.append((str(rel_file), lineno, cand))
+                        broken.append((rel_label, lineno, cand))
     return broken
 
 
+# ---------------------------------------------------------------------------
+# mkdocs.yml nav の dead entry 検査（check_docs.py Rule 3 の簡易版・重複実装）
+# ---------------------------------------------------------------------------
+
+
+class _LenientYamlLoader(yaml.SafeLoader):
+    """mkdocs.yml の markdown_extensions 内で使われる `!!python/name:...`
+    タグを無視して読み飛ばすための Loader（nav: の解析にしか興味がないため）。"""
+
+
+def _ignore_python_tag(loader: yaml.Loader, suffix: str, node: yaml.Node) -> None:
+    return None
+
+
+_LenientYamlLoader.add_multi_constructor("tag:yaml.org,2002:python/name:", _ignore_python_tag)
+
+
+def _collect_nav_paths(node) -> list[str]:
+    paths: list[str] = []
+    if isinstance(node, str):
+        paths.append(node)
+    elif isinstance(node, dict):
+        for v in node.values():
+            paths.extend(_collect_nav_paths(v))
+    elif isinstance(node, list):
+        for item in node:
+            paths.extend(_collect_nav_paths(item))
+    return paths
+
+
+def check_nav_dead_entries() -> list[str]:
+    """mkdocs.yml の nav ツリーが存在しないファイルを指していないか検査する。"""
+    if not MKDOCS_YML.exists():
+        return []
+    data = yaml.load(MKDOCS_YML.read_text(encoding="utf-8"), Loader=_LenientYamlLoader)
+    nav = data.get("nav", []) if isinstance(data, dict) else []
+    docs_dir = PROJECT_ROOT / "docs"
+    violations: list[str] = []
+    for p in _collect_nav_paths(nav):
+        if not (docs_dir / p).exists():
+            violations.append(f"mkdocs.yml nav -> {p} (ファイルが存在しません)")
+    return violations
+
+
 def main() -> None:
-    broken = check_drift()
-    if not broken:
-        print("ドリフトなし（存在しないローカルパス参照: 0件）")
-        sys.exit(0)
-    print(f"存在しないローカルパス参照: {len(broken)} 件\n")
-    for file_path, lineno, ref in broken:
+    claude_broken = check_drift(CLAUDE_DIR, PROJECT_ROOT)
+    memory_broken = check_drift(MEMORY_DIR, MEMORY_DIR, display_prefix="memory/")
+    nav_broken = check_nav_dead_entries()
+
+    print(f"[.claude/] 存在しないローカルパス参照: {len(claude_broken)} 件")
+    for file_path, lineno, ref in claude_broken:
         print(f"  {file_path}:{lineno} -> {ref}")
+    print()
+
+    print(f"[memory/] 存在しないローカルパス参照: {len(memory_broken)} 件")
+    for file_path, lineno, ref in memory_broken:
+        print(f"  {file_path}:{lineno} -> {ref}")
+    print()
+
+    print(f"[mkdocs.yml nav] 存在しない参照先: {len(nav_broken)} 件")
+    for line in nav_broken:
+        print(f"  {line}")
+    print()
+
+    total = len(claude_broken) + len(memory_broken) + len(nav_broken)
+    if total == 0:
+        print("ドリフトなし（存在しないローカルパス参照: 0件）")
+    else:
+        print(f"合計 {total} 件（列挙のみ、判断は人間に委ねる）")
     sys.exit(0)  # 列挙のみ、判断は人間に委ねる
 
 
