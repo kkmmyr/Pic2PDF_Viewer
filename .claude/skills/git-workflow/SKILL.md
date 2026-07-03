@@ -26,11 +26,11 @@ description: git の commit / PR 作成 / branch 操作 / mv / rm を行う際�
 
     詳細...
 
-    Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+    Co-Authored-By: Claude <現在のセッションのモデル名> <noreply@anthropic.com>
     EOF
     )"
     ```
-- 末尾には常に `Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>` を入れる。
+- 末尾には常に `Co-Authored-By: Claude <現在のセッションのモデル名> <noreply@anthropic.com>` を入れる。モデル名は**そのコミットを作成している現在のセッションのもの**を使う（特定バージョンを固定で書かない — 固定すると陳腐化する）。
 - タイトルは 70 文字以内。詳細は本文で書く。
 
 ## ファイル操作
