@@ -154,6 +154,12 @@ class TestGetWatchlist:
 
 class TestPostWatchlist:
     def test_added_when_artist_exists_on_hitomi(self, client, hitomi_data_dir, monkeypatch):
+        # watchlist.add_artist 内部の実在確認（hitomi.la への実ネットワークアクセス）をモックし、
+        # フレーキーテスト化（外部サイトの状態・可用性に依存）を防ぐ
+        monkeypatch.setattr(
+            "services.hitomi.watchlist.nozomi.check_nozomi_exists",
+            lambda normalized, language: True,
+        )
         # nozomi.fetch_nozomi_head を成功させる
         monkeypatch.setattr(
             "routers.hitomi.nozomi.fetch_nozomi_head",
