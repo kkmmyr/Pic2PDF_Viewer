@@ -1,5 +1,7 @@
 """`.claude/**/*.md` と グローバル `memory/**/*.md` 内のローカルパス参照が
-実在するか検査する。あわせて `mkdocs.yml` の nav ツリーの dead entry も検査する。
+実在するか検査する。あわせて `mkdocs.yml` の nav ツリーの dead entry と、
+`.claude/README.md` のスキル/コマンド一覧表と実体（`.claude/skills/` /
+`.claude/commands/`）とのドリフトも検査する。
 
 markdown リンク `[..](target)` のローカルターゲットと、バックティック内の
 パス様トークン（`/` を含み既知ルート配下または拡張子付き）を抽出し、
@@ -11,6 +13,14 @@ markdown リンク `[..](target)` のローカルターゲットと、バック�
 解決の両方を試すため、memory ファイル内の `docs/...` バックティック参照
 （リポジトリルート基準）と memory ファイル同士の相対リンク（記載ファイル
 基準）の両方をそのまま拾える。
+
+`.claude/README.md` のスキル一覧・コマンド一覧は手動転記のテーブルのため、
+`.claude/skills/*/SKILL.md` / `.claude/commands/*.md` の実体が増減しても
+追随されず古くなりがち。`check_readme_registry_drift()` は実体（ディレクトリ /
+ファイル）と README のテーブル記載を突き合わせ、両方向の差分（未掲載 / 実体なし）
+を報告する。あわせて `.claude/hooks/README.md`（一覧表）と実体（`.claude/hooks/*.sh`、
+`hooks/tests/` は除く）、および `.claude/README.md` のエージェント一覧表と実体
+（`.claude/agents/*.md`）とのドリフトも同じ関数内で検査する。
 
 report-only（人間の判断に委ねるツール）のため、常に exit 0。
 
@@ -35,6 +45,12 @@ CLAUDE_DIR = PROJECT_ROOT / ".claude"
 # グローバルメモリはプロジェクト外に存在する（リポジトリには含まれない）
 MEMORY_DIR = Path(r"C:\Users\amashio\.claude\projects\d--61-tool-Pic2PDF-Viewer\memory")
 MKDOCS_YML = PROJECT_ROOT / "mkdocs.yml"
+CLAUDE_README = CLAUDE_DIR / "README.md"
+SKILLS_DIR = CLAUDE_DIR / "skills"
+COMMANDS_DIR = CLAUDE_DIR / "commands"
+AGENTS_DIR = CLAUDE_DIR / "agents"
+HOOKS_DIR = CLAUDE_DIR / "hooks"
+HOOKS_README = HOOKS_DIR / "README.md"
 
 KNOWN_ROOTS = (
     "backend/",
@@ -264,10 +280,126 @@ def check_nav_dead_entries() -> list[str]:
     return violations
 
 
+# ---------------------------------------------------------------------------
+# .claude/README.md のスキル/コマンド一覧表と実体とのドリフト検査
+# ---------------------------------------------------------------------------
+
+TABLE_ROW_RE = re.compile(r"^\|\s*`([/A-Za-z0-9_.-]+)`")
+
+
+def _discover_skills() -> set[str]:
+    if not SKILLS_DIR.is_dir():
+        return set()
+    return {p.name for p in SKILLS_DIR.iterdir() if p.is_dir() and (p / "SKILL.md").exists()}
+
+
+def _discover_commands() -> set[str]:
+    if not COMMANDS_DIR.is_dir():
+        return set()
+    return {p.stem for p in COMMANDS_DIR.glob("*.md")}
+
+
+def _discover_agents() -> set[str]:
+    if not AGENTS_DIR.is_dir():
+        return set()
+    return {p.stem for p in AGENTS_DIR.glob("*.md")}
+
+
+def _discover_hooks() -> set[str]:
+    """`.claude/hooks/` 直下（`hooks/tests/` は含まない）の `*.sh` を列挙する。
+
+    hook 名はテーブル側が拡張子込み（例: `remind_docs_update.sh`）で記載されるため、
+    skills/commands と異なり拡張子を残したファイル名で返す。
+    """
+    if not HOOKS_DIR.is_dir():
+        return set()
+    return {p.name for p in HOOKS_DIR.glob("*.sh")}
+
+
+def _extract_table_names_under_heading(lines: list[str], heading: str) -> set[str]:
+    """README.md の指定見出しセクション内のテーブルから `name` トークンを抽出する。
+
+    行頭が `` |`name` `` 形式（バックティック直後の英数字/ハイフン/アンダースコア/
+    スラッシュ）のもののみをデータ行とみなし、ヘッダ行・区切り行（`|---|---|` 等）は
+    自然に除外される。次の `## ` 見出しに到達したら走査を止める。
+    """
+    names: set[str] = set()
+    in_section = False
+    for raw_line in lines:
+        line = raw_line.rstrip("\n")
+        if line.strip() == heading:
+            in_section = True
+            continue
+        if in_section:
+            if line.startswith("## "):
+                break
+            m = TABLE_ROW_RE.match(line.strip())
+            if m:
+                names.add(m.group(1).lstrip("/"))
+    return names
+
+
+def check_readme_registry_drift() -> list[str]:
+    """`.claude/README.md` のスキル/コマンド/エージェント一覧表と実体（skills/ commands/ agents/）を突き合わせる。"""
+    if not CLAUDE_README.exists():
+        return []
+    lines = CLAUDE_README.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+
+    readme_skills = _extract_table_names_under_heading(lines, "## スキル一覧（現状）")
+    readme_commands = _extract_table_names_under_heading(lines, "## スラッシュコマンド一覧（現状）")
+    readme_agents = _extract_table_names_under_heading(lines, "## エージェント一覧（現状）")
+
+    actual_skills = _discover_skills()
+    actual_commands = _discover_commands()
+    actual_agents = _discover_agents()
+
+    issues: list[str] = []
+
+    for name in sorted(actual_skills - readme_skills):
+        issues.append(f"skill '{name}' が実体にあるが .claude/README.md のスキル一覧表に未掲載")
+    for name in sorted(readme_skills - actual_skills):
+        issues.append(
+            f"skill '{name}' が .claude/README.md のスキル一覧表に記載されているが "
+            f".claude/skills/{name}/SKILL.md が存在しない"
+        )
+
+    for name in sorted(actual_commands - readme_commands):
+        issues.append(f"command '{name}' が実体にあるが .claude/README.md のコマンド一覧表に未掲載")
+    for name in sorted(readme_commands - actual_commands):
+        issues.append(
+            f"command '{name}' が .claude/README.md のコマンド一覧表に記載されているが "
+            f".claude/commands/{name}.md が存在しない"
+        )
+
+    for name in sorted(actual_agents - readme_agents):
+        issues.append(f"agent '{name}' が実体にあるが .claude/README.md のエージェント一覧表に未掲載")
+    for name in sorted(readme_agents - actual_agents):
+        issues.append(
+            f"agent '{name}' が .claude/README.md のエージェント一覧表に記載されているが "
+            f".claude/agents/{name}.md が存在しない"
+        )
+
+    if HOOKS_README.exists():
+        hooks_lines = HOOKS_README.read_text(encoding="utf-8", errors="replace").splitlines(keepends=True)
+        readme_hooks = _extract_table_names_under_heading(hooks_lines, "## 一覧")
+        actual_hooks = _discover_hooks()
+
+        for name in sorted(actual_hooks - readme_hooks):
+            issues.append(f"hook '{name}' が実体にあるが .claude/hooks/README.md の一覧表に未掲載")
+        for name in sorted(readme_hooks - actual_hooks):
+            issues.append(
+                f"hook '{name}' が .claude/hooks/README.md の一覧表に記載されているが "
+                f".claude/hooks/{name} が存在しない"
+            )
+
+    return issues
+
+
 def main() -> None:
     claude_broken = check_drift(CLAUDE_DIR, PROJECT_ROOT)
     memory_broken = check_drift(MEMORY_DIR, MEMORY_DIR, display_prefix="memory/")
     nav_broken = check_nav_dead_entries()
+    registry_broken = check_readme_registry_drift()
 
     print(f"[.claude/] 存在しないローカルパス参照: {len(claude_broken)} 件")
     for file_path, lineno, ref in claude_broken:
@@ -284,7 +416,12 @@ def main() -> None:
         print(f"  {line}")
     print()
 
-    total = len(claude_broken) + len(memory_broken) + len(nav_broken)
+    print(f"[.claude/README.md registry] スキル/コマンド/エージェント/hooks 一覧との差分: {len(registry_broken)} 件")
+    for line in registry_broken:
+        print(f"  {line}")
+    print()
+
+    total = len(claude_broken) + len(memory_broken) + len(nav_broken) + len(registry_broken)
     if total == 0:
         print("ドリフトなし（存在しないローカルパス参照: 0件）")
     else:

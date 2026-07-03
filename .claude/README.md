@@ -2,7 +2,7 @@
 
 Claude Code（このプロジェクトでアシスタントとして動く CLI）の設定一式。
 
-セッション開始時に **自動ロードされるもの**（`CLAUDE.md`）と、**description ベースで必要時にだけ自動発動するもの**（`skills/`）、**手動で `/` 呼び出しするもの**（`commands/`）、**ツール実行に連動するもの**（`hooks/`）に分けて配置している。
+セッション開始時に **自動ロードされるもの**（`CLAUDE.md`）と、**description ベースで必要時にだけ自動発動するもの**（`skills/`）、**手動で `/` 呼び出しするもの**（`commands/`）、**ツール実行に連動するもの**（`hooks/`）、**メイン session が明示的にサブエージェントとして切り出すもの**（`agents/`）に分けて配置している。
 
 ---
 
@@ -13,12 +13,8 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | [CLAUDE.md](CLAUDE.md) | プロジェクト概要 + 環境の癖（uv 必須）+ 起動コマンド | ✅ | 起動方法・環境変更時 |
 | [skills/](skills/) | description ベースで自動発動する規約・ノウハウ集 | △ (description のみ) | 新しい共通パターンが確立したら追加 |
 | [commands/](commands/) | スラッシュコマンド定義（`/<filename>` で呼べる） | ❌ | 頻用作業を発見したら新規作成 |
-| [hooks/remind_docs_update.sh](hooks/remind_docs_update.sh) | PreToolUse: 実装変更前に docs/ の更新を**提案**する（advisory・ブロックしない） | ❌ (実行のみ) | 判定ロジック改善時 |
-| [hooks/remind_tests.sh](hooks/remind_tests.sh) | PostToolUse: 大きめの実装変更時にテスト実行を促す | ❌ (実行のみ) | 対象ファイル拡張時 |
-| [hooks/remind_deps_install.sh](hooks/remind_deps_install.sh) | PostToolUse: `pyproject.toml` / `package.json` 等の編集時に `uv sync` / `npm install` を促す | ❌ (実行のみ) | 言語追加時 |
-| [hooks/lint_check.sh](hooks/lint_check.sh) | PostToolUse: backend .py → ruff check / frontend .ts/tsx → eslint + prettier --check を実行して違反通知 | ❌ (実行のみ) | 対象パス変更時 |
-| [hooks/mkdocs_build.sh](hooks/mkdocs_build.sh) | PostToolUse: `docs/*.md` 編集後に mkdocs build --dirty を実行 | ❌ (実行のみ) | mkdocs 設定変更時 |
-| [hooks/remind_memory_sync.sh](hooks/remind_memory_sync.sh) | PostToolUse (git commit): commit 後に `memory/pending_tasks.md` の更新を促す | ❌ (実行のみ) | 運用変更時 |
+| [hooks/](hooks/) | ツール実行の前後に走る advisory reminder script 群（個別一覧は [hooks/README.md](hooks/README.md) が正） | ❌ (実行のみ) | 新しい hook を追加・変更したら |
+| [agents/](agents/) | メイン session が Agent ツールで明示的に呼ぶサブエージェント定義（長文コンテキストをメイン session から隔離する用途） | ❌ | 新しい定型監査・分析タスクを切り出したら |
 | [settings.json](settings.json) | hooks 登録 + 共有 permissions | ❌ | hooks 追加・共有 permission 追加時 |
 | `settings.local.json` | 個人別 permissions（`.gitignore` 対象） | ❌ | 個別 PC で許可を増やす時 |
 
@@ -51,6 +47,13 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 - スキルと違い**強制力がある**（モデルの判断ではなく機械的に実行される）
 - セルフテスト: `hooks/tests/run_hook_tests.sh` で hook の挙動を「実際に走らせて assert」できる（`/check-hooks` コマンドから実行可能）
 
+### `agents/` に置くもの
+
+- **長文の設計書・コードを読み込む定型監査/分析タスク**をメイン session の context から隔離するために切り出す
+- 1 エージェント = 1 ファイル（`<name>.md`）。frontmatter で `description`（いつ使うか）・`tools`（許可ツール）・`model` を明示
+- コードは書かない・提案に留める設計が多い（実装はメイン session か別の一般エージェントに委ねる）
+- `commands/` から Agent ツール経由で呼ぶ（例: `/check-docs` → `docs-cross-checker`）か、ユーザー/メイン session が直接 Agent ツールで呼ぶ
+
 ---
 
 ## スキル一覧（現状）
@@ -64,8 +67,10 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 | `frontend-conventions` | `frontend/src/` 配下の React/TypeScript コード編集時 |
 | `backend-conventions` | `backend/` 配下の Python/FastAPI コード編集時 |
 | `worktree-workflow` | git worktree を使った並列作業（大型リファクタ・機能開発）を始める際 |
+| `grill-me` | `/grill-me <機能名>` で明示的に呼び出した時。要件が曖昧な新機能・リファクタの要件を対話で固める |
 
 定義は [skills/](skills/) を参照。詳細は各 SKILL.md および `references/` 配下に記載。
+本表は手動転記のため実体とズレることがある —鮮度は `check_claude_drift.py`（`/cleanup` 問い4）が機械チェックする。
 
 ---
 
@@ -86,6 +91,17 @@ Claude Code（このプロジェクトでアシスタントとして動く CLI�
 通常のテスト実行・型チェックは Bash で直接呼ぶ（`cd backend && uv run pytest` 等）。コマンド化していたが、project-specific な情報量が少ないため削除済み。実行コマンド一覧は `test-writing` skill を参照。
 
 定義は [commands/](commands/) を参照。
+
+---
+
+## エージェント一覧（現状）
+
+| エージェント | いつ使うか | 呼び出し元 |
+|---|---|---|
+| `docs-cross-checker` | 設計書 ↔ 実装の整合性チェック。長文の設計書をメイン context に乗せず分析したい時 | `/check-docs` |
+| `refactor-planner` | 既存のリファクタリング計画書と現状コードを照合し、次のリファクタ対象の段階的計画を提案する時 | 大規模リファクタ着手前にメイン session が直接呼ぶ（専用コマンドなし） |
+
+定義は [agents/](agents/) を参照。
 
 ---
 

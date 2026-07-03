@@ -41,6 +41,7 @@ cd backend && uv run python ../scripts/maintenance/check_claude_drift.py
 
 - 検出 0 件なら「ドリフトなし」と記録する
 - 検出があれば「ファイル:行 → 参照先」の一覧を記録する（**削除・書き換えはしない。判断はユーザー**）
+- パス参照の他に、`.claude/README.md` のスキル一覧表・コマンド一覧表と実体（`.claude/skills/` / `.claude/commands/`）とのドリフト（未掲載 / 記載だが実体なし）も同スクリプトが `[.claude/README.md registry]` セクションで報告する
 
 ## 報告フォーマット
 
