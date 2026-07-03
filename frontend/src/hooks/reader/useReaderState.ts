@@ -3,16 +3,14 @@ import { pdfjs } from 'react-pdf';
 import type { LibrarySource, ReadingDirection } from '@/types';
 import { buildStaticUrl, STATIC_PATHS } from '@/config/api';
 import { toast } from 'sonner';
-import {
-    useWindowSize,
-    useBookMeta,
-    useBookImages,
-    useImagePreloader,
-    useReaderNavigation,
-    useSpreadMode,
-    useEditMode,
-    useFullscreen,
-} from '..';
+import { useWindowSize } from '@/hooks/useWindowSize';
+import { useBookMeta } from '@/hooks/library/useBookMeta';
+import { useBookImages } from '@/hooks/reader/useBookImages';
+import { useImagePreloader } from '@/hooks/reader/useImagePreloader';
+import { useReaderNavigation } from '@/hooks/reader/useReaderNavigation';
+import { useSpreadMode } from '@/hooks/reader/useSpreadMode';
+import { useEditMode } from '@/hooks/reader/useEditMode';
+import { useFullscreen } from '@/hooks/reader/useFullscreen';
 import { useNextSeriesVolume, usePrevSeriesVolume } from './useNextSeriesVolume';
 import { useRelatedBooks } from './useRelatedBooks';
 import { usePdfSearch } from './usePdfSearch';

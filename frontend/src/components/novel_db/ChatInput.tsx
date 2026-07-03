@@ -1,4 +1,5 @@
 import type { Scope } from '@/features/novel_db/types';
+import { formatScopeLabel } from '@/features/novel_db/scopeLabel';
 
 interface ChatInputProps {
     question: string;
@@ -23,12 +24,7 @@ export function ChatInput({
     activeId,
     scope,
 }: ChatInputProps) {
-    const placeholderScope =
-        scope.type === 'book'
-            ? `本: ${scope.id ?? ''}`
-            : scope.type === 'series'
-              ? `シリーズ: ${scope.id ?? ''}`
-              : '全件';
+    const placeholderScope = formatScopeLabel(scope.type, scope.id);
 
     return (
         <>

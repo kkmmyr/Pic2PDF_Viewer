@@ -108,6 +108,7 @@ export function ReaderHeader() {
                         onClick={toggleFullscreen}
                         className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                         title={isFullscreen ? 'フルスクリーン解除 (f)' : 'フルスクリーン (f)'}
+                        aria-label={isFullscreen ? 'フルスクリーン解除' : 'フルスクリーン'}
                     >
                         {isFullscreen ? (
                             <Minimize2 className="w-4 h-4" />
@@ -120,6 +121,7 @@ export function ReaderHeader() {
                         onClick={openHelp}
                         className="px-2 py-1.5 text-sm font-medium rounded-md transition-colors bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                         title="ショートカット一覧 (?)"
+                        aria-label="ショートカット一覧"
                     >
                         <HelpCircle className="w-4 h-4" />
                     </button>

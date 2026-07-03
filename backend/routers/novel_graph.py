@@ -15,7 +15,7 @@ from services.novel_db.graph_query import (
 router = APIRouter()
 
 
-@router.get("/novel_graph/series")
+@router.get("/novel_graph/series", response_model=list[str])
 def get_series_list() -> list[str]:
     """character_relations データが存在するシリーズ一覧を返す。"""
     with with_db() as conn:

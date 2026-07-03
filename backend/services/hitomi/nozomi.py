@@ -101,7 +101,9 @@ def fetch_nozomi_head(
     if r.status_code not in (200, 206):
         raise HitomiNetworkError(f"NOZOMI fetch returned {r.status_code} for {url}")
 
-    return parse_nozomi_bytes(r.content)
+    # サーバーが Range を無視して 200 (フルコンテンツ) を返すことがあるため、
+    # 常に要求した count*4 バイトへスライスしてから渡す。
+    return parse_nozomi_bytes(r.content[: count * 4])
 
 
 def check_nozomi_exists(

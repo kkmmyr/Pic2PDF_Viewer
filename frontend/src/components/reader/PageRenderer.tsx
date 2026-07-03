@@ -75,6 +75,9 @@ export function PageRenderer({
                         const img = e.currentTarget;
                         onPageSize?.(img.naturalWidth, img.naturalHeight);
                     }}
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                 />
             </div>
         );

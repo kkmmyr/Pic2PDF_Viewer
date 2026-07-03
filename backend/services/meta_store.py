@@ -3,6 +3,7 @@
 詳細仕様: docs/design/詳細設計/詳細設計書_バックエンド編.md「閲覧回数 / 最近見た順ソート（バックエンド側）」節
 """
 
+import sqlite3
 import threading
 from collections.abc import Callable
 from typing import Literal, NotRequired, TypedDict
@@ -44,7 +45,7 @@ def make_key(path: str, name: str) -> str:
     return f"{path}/{name}" if path else name
 
 
-def _ensure(conn) -> None:
+def _ensure(conn: sqlite3.Connection) -> None:
     """テーブルが存在しない場合（テスト等）に自動作成する。"""
     create_tables(conn)
 

@@ -9,13 +9,15 @@
 ロック: `SourceLockManager` で source 単位に直列化。
 """
 
+import sqlite3
+
 from services.meta_db import connect, create_tables
 from utils.locks import SourceLockManager
 
 _lock_manager = SourceLockManager()
 
 
-def _ensure(conn) -> None:
+def _ensure(conn: sqlite3.Connection) -> None:
     create_tables(conn)
 
 
@@ -46,7 +48,7 @@ def save_genres(source: str, genres: list[str]) -> None:
             _write_genres_unlocked(conn, source, genres)
 
 
-def _derive_from_meta(conn, source: str) -> list[str]:
+def _derive_from_meta(conn: sqlite3.Connection, source: str) -> list[str]:
     """books_meta.genre を収集して名前順ソートした初期リストを返す。"""
     rows = conn.execute(
         "SELECT DISTINCT genre FROM books_meta WHERE source=? AND genre IS NOT NULL",
@@ -55,7 +57,7 @@ def _derive_from_meta(conn, source: str) -> list[str]:
     return sorted(r["genre"] for r in rows)
 
 
-def _write_genres_unlocked(conn, source: str, genres: list[str]) -> None:
+def _write_genres_unlocked(conn: sqlite3.Connection, source: str, genres: list[str]) -> None:
     """ロック取得済み前提でジャンルリストを上書きする。"""
     conn.execute("DELETE FROM genres WHERE source=?", (source,))
     conn.executemany(

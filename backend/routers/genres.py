@@ -28,7 +28,7 @@ class ReorderGenresRequest(BaseModel):
     genres: list[str]
 
 
-@router.get("/genres")
+@router.get("/genres", response_model=list[str])
 def get_genres(source: str = Depends(validated_source)) -> list[str]:
     return load_genres(source)
 

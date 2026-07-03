@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 
 import type { QaHistoryEntry } from '@/features/novel_db/types';
+import { scopeLabel } from '@/features/novel_db/scopeLabel';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 interface Props {
@@ -9,12 +10,6 @@ interface Props {
     isActive: boolean;
     onSelect: (id: number) => void;
     onDelete: (id: number) => void;
-}
-
-function scopeLabel(entry: QaHistoryEntry): string {
-    if (entry.scope.type === 'all') return '全件';
-    if (entry.scope.type === 'series') return `シリーズ: ${entry.scope.id ?? ''}`;
-    return `単冊: ${entry.scope.id ?? ''}`;
 }
 
 export default function QuestionHistoryItem({ entry, isActive, onSelect, onDelete }: Props) {
@@ -36,7 +31,7 @@ export default function QuestionHistoryItem({ entry, isActive, onSelect, onDelet
                     {entry.question}
                 </div>
                 <div className="text-[10px] text-gray-500 dark:text-gray-400 truncate">
-                    {scopeLabel(entry)}
+                    {scopeLabel(entry.scope)}
                 </div>
             </button>
             <button

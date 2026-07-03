@@ -3,7 +3,7 @@
  * バックエンド API スキーマと一致させる（docs/design/詳細設計/API.md、一覧は /openapi.json）。
  */
 
-import type { components } from '../../types/api';
+import type { components } from '@/types/api';
 
 export type ScopeType = 'all' | 'series' | 'book';
 

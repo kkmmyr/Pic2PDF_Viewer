@@ -87,7 +87,7 @@ export function HitomiWatchlistDialog({
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 e.preventDefault();
-                                handleAdd();
+                                void handleAdd();
                             }
                         }}
                         placeholder="作者名（例: aka shio）"
@@ -107,7 +107,7 @@ export function HitomiWatchlistDialog({
                         ))}
                     </select>
                     <button
-                        onClick={handleAdd}
+                        onClick={() => void handleAdd()}
                         disabled={submitting || !name.trim()}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >

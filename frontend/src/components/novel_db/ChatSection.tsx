@@ -4,7 +4,7 @@
  * ChatGPT 風 UI: 左にセッション一覧、右に現セッションのメッセージスレッド + 入力欄。
  * 新規セッションは現在の scope（NovelDbHeader のスコープセレクタ）で開始。
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 
 import { streamChatSession } from '@/features/novel_db/sse';
@@ -35,6 +35,12 @@ export default function ChatSection({ scope, disabled }: Props) {
     const [error, setError] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
     const abortRef = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        return () => {
+            abortRef.current?.abort();
+        };
+    }, []);
 
     const handleSend = useCallback(async () => {
         const q = question.trim();

@@ -22,12 +22,12 @@ def _write_compressed_pdf(image_paths: list[str], output_path: str, quality: int
     """画像を指定品質で JPEG 変換し img2pdf で 1 PDF に書き出す。"""
     processed: list[bytes] = []
     for item in image_paths:
-        img = Image.open(item)
-        if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=quality)
-        processed.append(buf.getvalue())
+        with Image.open(item) as img:
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=quality)
+            processed.append(buf.getvalue())
     with open(output_path, "wb") as f:
         f.write(img2pdf.convert(processed))  # type: ignore[arg-type]
 

@@ -2,18 +2,13 @@ import { useEffect, useState } from 'react';
 
 import { fetchQaHistoryDetail } from '@/features/novel_db/api';
 import type { QaHistoryDetail, QaHistoryEntry } from '@/features/novel_db/types';
+import { scopeLabel } from '@/features/novel_db/scopeLabel';
 import { formatElapsedSeconds, formatSqliteUtcAsJst } from '@/utils/date';
 
 interface Props {
     selectedId: number | null;
     entry: QaHistoryEntry | null;
     onOpenImage: (book: string, pageNo: number) => void;
-}
-
-function scopeLabel(entry: QaHistoryEntry): string {
-    if (entry.scope.type === 'all') return '全件';
-    if (entry.scope.type === 'series') return `シリーズ: ${entry.scope.id ?? ''}`;
-    return `単冊: ${entry.scope.id ?? ''}`;
 }
 
 export default function QuestionHistoryDetail({ selectedId, entry, onOpenImage }: Props) {
@@ -70,7 +65,7 @@ export default function QuestionHistoryDetail({ selectedId, entry, onOpenImage }
                         </>
                     )}
                     <span>·</span>
-                    <span>{scopeLabel(entry)}</span>
+                    <span>{scopeLabel(entry.scope)}</span>
                 </div>
             </div>
 

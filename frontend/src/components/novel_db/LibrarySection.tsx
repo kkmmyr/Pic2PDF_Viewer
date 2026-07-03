@@ -8,6 +8,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
+import { toast } from 'sonner';
 
 import type { BookSummary } from '@/features/novel_db/types';
 import { fetchNovelAuthors, fetchSeries, patchNovelBookMeta } from '@/features/novel_db/api';
@@ -109,13 +110,19 @@ export default function LibrarySection({
     }, [isSelecting, exitSelecting]);
 
     const openAuthorDialog = async () => {
-        const authors = await fetchNovelAuthors().catch(() => []);
+        const authors = await fetchNovelAuthors().catch(() => {
+            toast.error('作者一覧の取得に失敗しました');
+            return [];
+        });
         setAllAuthors(authors);
         setShowAuthorDialog(true);
     };
 
     const openSeriesDialog = async () => {
-        const series = await fetchSeries().catch(() => []);
+        const series = await fetchSeries().catch(() => {
+            toast.error('シリーズ一覧の取得に失敗しました');
+            return [];
+        });
         const options: ExistingSeriesOption[] = series.map((s) => {
             let max = 0;
             for (const b of books) {
@@ -166,7 +173,7 @@ export default function LibrarySection({
                 </div>
                 {isSelecting && (
                     <button
-                        className="absolute inset-0 z-10 rounded-lg"
+                        className="absolute inset-0 z-card-badge rounded-lg"
                         onClick={() => toggleSelect(book.name)}
                         aria-label={selected ? `${book.name} の選択を解除` : `${book.name} を選択`}
                     >

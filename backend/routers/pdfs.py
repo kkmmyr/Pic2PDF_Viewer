@@ -23,7 +23,7 @@ from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
 from utils.file_utils import is_pdf_file
 from utils.logger import get_logger
-from utils.path_utils import validate_safe_name, validate_safe_path
+from utils.path_utils import join_path, validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 
@@ -57,13 +57,13 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     dirs = get_dirs_by_source(source)
     base_thumb_dir = dirs["thumb"]
     thumb_name = get_thumbnail_name(filename)
-    thumb_path = os.path.join(base_thumb_dir, path, thumb_name) if path else os.path.join(base_thumb_dir, thumb_name)
+    thumb_path = join_path(base_thumb_dir, path, thumb_name)
 
     # generated は image-only モード: images/{book_name}/ から WebP を削除する
     if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
-        book_img_dir = os.path.join(base_img_dir, path, book_name) if path else os.path.join(base_img_dir, book_name)
+        book_img_dir = join_path(base_img_dir, path, book_name)
         if not os.path.isdir(book_img_dir):
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -80,7 +80,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
 
     # kindle / novel: 従来通り PDF から fitz でページ削除
     base_pdf_dir = dirs["pdf"]
-    pdf_path = os.path.join(base_pdf_dir, path, filename) if path else os.path.join(base_pdf_dir, filename)
+    pdf_path = join_path(base_pdf_dir, path, filename)
 
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -103,13 +103,13 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
     dirs = get_dirs_by_source(source)
     base_thumb_dir = dirs["thumb"]
     thumb_name = get_thumbnail_name(filename)
-    thumb_path = os.path.join(base_thumb_dir, path, thumb_name) if path else os.path.join(base_thumb_dir, thumb_name)
+    thumb_path = join_path(base_thumb_dir, path, thumb_name)
 
     # generated は image-only モード: images/{book_name}/ の WebP を再採番リネーム
     if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
-        book_img_dir = os.path.join(base_img_dir, path, book_name) if path else os.path.join(base_img_dir, book_name)
+        book_img_dir = join_path(base_img_dir, path, book_name)
         if not os.path.isdir(book_img_dir):
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -129,7 +129,7 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
 
     # kindle / novel: PDF を fitz で再構築
     base_pdf_dir = dirs["pdf"]
-    pdf_path = os.path.join(base_pdf_dir, path, filename) if path else os.path.join(base_pdf_dir, filename)
+    pdf_path = join_path(base_pdf_dir, path, filename)
 
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -153,6 +153,7 @@ class MergePdfsRequest(BaseModel):
 
 
 @router.post("/pdfs/merge", response_model=MergePdfsResponse)
+@log_and_raise_500("merge_pdfs")
 def merge_pdfs(request: MergePdfsRequest):
     """複数の PDF を順番に結合して新しい PDF を生成する。"""
     assert_valid_source(request.source)

@@ -2,6 +2,7 @@
  * C-12: キャラクタ関係グラフ API クライアント。
  */
 import apiClient from '@/config/api_client';
+import type { components } from '@/types/api';
 
 const PREFIX = '/api/novel_graph';
 
@@ -24,10 +25,7 @@ export interface GraphData {
     edges: GraphEdge[];
 }
 
-export interface BookEntry {
-    id: number;
-    name: string;
-}
+export type BookEntry = components['schemas']['GraphBookOut'];
 
 export function fetchSeriesList(): Promise<string[]> {
     return apiClient.get<unknown, string[]>(`${PREFIX}/series`);

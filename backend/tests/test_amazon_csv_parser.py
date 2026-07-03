@@ -1,12 +1,10 @@
 """services/amazon_csv_parser.py のユニットテスト。"""
 
 from services.amazon_csv_parser import (
-    ParsedRow,
     _decode,
     _extract_publisher,
     _extract_volume,
     _parse_authors,
-    match_books,
     parse_csv,
 )
 
@@ -175,47 +173,3 @@ class TestParseCsv:
             ]
         )
         assert len(parse_csv(data)) == 3
-
-
-# ---------------------------------------------------------------------------
-# match_books
-# ---------------------------------------------------------------------------
-
-
-class TestMatchBooks:
-    def _make_row(self, csv_title: str, series_id: str = "", volume: int | None = None) -> ParsedRow:
-        return ParsedRow(
-            csv_title=csv_title,
-            series_id=series_id or csv_title,
-            volume=volume,
-            publisher="",
-            authors=[],
-            asin="",
-        )
-
-    def test_完全一致でスコアが高い(self):
-        row = self._make_row("ワンピース", "ワンピース")
-        results = match_books([row], ["ワンピース.pdf"])
-        assert results[0].matched_book == "ワンピース.pdf"
-        assert results[0].match_score > 0.7
-
-    def test_スコア閾値未満はmatchedBookがNone(self):
-        row = self._make_row("全く関係ないタイトル")
-        results = match_books([row], ["ABCDEFGHIJK.pdf"])
-        assert results[0].matched_book is None
-
-    def test_空の書籍リストは全てNone(self):
-        row = self._make_row("ワンピース")
-        results = match_books([row], [])
-        assert results[0].matched_book is None
-
-    def test_複数書籍の中から最良マッチを選ぶ(self):
-        row = self._make_row("鬼滅の刃")
-        book_names = ["鬼滅の刃.pdf", "全く違う本.pdf", "別の漫画.pdf"]
-        results = match_books([row], book_names)
-        assert results[0].matched_book == "鬼滅の刃.pdf"
-
-    def test_複数ParsedRowを全てマッチングする(self):
-        rows = [self._make_row("本A"), self._make_row("本B")]
-        results = match_books(rows, ["本A.pdf", "本B.pdf"])
-        assert len(results) == 2

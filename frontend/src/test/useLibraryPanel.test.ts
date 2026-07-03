@@ -54,14 +54,20 @@ vi.mock('../hooks/library/useUrlState', () => ({
     useUrlState: () => ({ selectedPdf: null }),
 }));
 
-vi.mock('../hooks', () => ({
+vi.mock('../hooks/library/useLibraryPins', () => ({
     useLibraryPins: () => ({
         seriesPins: {},
         authorPins: {},
         toggleSeriesPin: mockToggleSeriesPin,
         toggleAuthorPin: mockToggleAuthorPin,
     }),
+}));
+
+vi.mock('../hooks/library/useSortedPdfs', () => ({
     useSortedPdfs: () => [],
+}));
+
+vi.mock('../hooks/library/useBookMeta', () => ({
     useBookMeta: () => ({
         meta: mockMeta,
         getAuthors: vi.fn(() => []),
@@ -82,7 +88,13 @@ vi.mock('../hooks', () => ({
         allSeriesWithStats: [],
         refreshMeta: vi.fn(),
     }),
+}));
+
+vi.mock('../hooks/library/useLibraryFilter', () => ({
     useLibraryFilter: () => ({ filteredPdfs: [] }),
+}));
+
+vi.mock('../hooks/library/useUrlFilters', () => ({
     useUrlFilters: () => ({
         authorFilter: '',
         seriesFilter: '',
@@ -90,6 +102,9 @@ vi.mock('../hooks', () => ({
         setSeriesFilter: mockSetSeriesFilter,
         clearAllDrilldown: vi.fn(),
     }),
+}));
+
+vi.mock('../hooks/library/useLibrarySettings', () => ({
     useLibrarySettings: () => ({
         sortOrder: 'name' as const,
         setSortOrder: vi.fn(),
@@ -102,6 +117,9 @@ vi.mock('../hooks', () => ({
         genreFilter: '',
         setGenreFilter: vi.fn(),
     }),
+}));
+
+vi.mock('../hooks/library/useLibraryBulkActions', () => ({
     useLibraryBulkActions: () => ({
         handleBulkToggleHidden: vi.fn(),
         handleBulkDelete: vi.fn(),
@@ -114,6 +132,9 @@ vi.mock('../hooks', () => ({
         handleSeriesReorder: vi.fn(),
         bulkSeriesNames: [],
     }),
+}));
+
+vi.mock('../hooks/library/useLibraryDisplay', () => ({
     useLibraryDisplay: () => ({
         grouped: {
             membersByRepresentativeName: mockMembersByRep,
@@ -122,14 +143,26 @@ vi.mock('../hooks', () => ({
         displayPdfs: [],
         breadcrumbs: [],
     }),
+}));
+
+vi.mock('../hooks/library/useGenres', () => ({
     useGenres: () => ({
         genres: [],
         addGenre: vi.fn(),
         removeGenre: vi.fn(),
         reorderGenres: vi.fn(),
     }),
+}));
+
+vi.mock('../hooks/library/useScrollMemory', () => ({
     useScrollMemory: vi.fn(),
+}));
+
+vi.mock('../hooks/library/useLibrarySelectionShortcut', () => ({
     useLibrarySelectionShortcut: vi.fn(),
+}));
+
+vi.mock('../hooks/library/useSeriesEditDialog', () => ({
     useSeriesEditDialog: () => ({
         target: null,
         open: vi.fn(),

@@ -2,10 +2,16 @@ import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // 複数の API フェッチ hook をモックしてスモークテストを実現する
-vi.mock('../hooks', () => ({
+vi.mock('../hooks/useWindowSize', () => ({
     useWindowSize: () => ({ height: 900 }),
+}));
+vi.mock('../hooks/reader/useBookImages', () => ({
     useBookImages: () => ({ imageUrls: null, numPages: 0, isImageMode: false }),
+}));
+vi.mock('../hooks/reader/useImagePreloader', () => ({
     useImagePreloader: vi.fn(),
+}));
+vi.mock('../hooks/reader/useReaderNavigation', () => ({
     useReaderNavigation: () => ({
         pageNumber: 1,
         setPageNumber: vi.fn(),
@@ -13,6 +19,8 @@ vi.mock('../hooks', () => ({
         handlePrev: vi.fn(),
         resetPage: vi.fn(),
     }),
+}));
+vi.mock('../hooks/reader/useSpreadMode', () => ({
     useSpreadMode: () => ({
         spreadMode: 'auto' as const,
         isSpread: true,
@@ -20,6 +28,8 @@ vi.mock('../hooks', () => ({
         handlePageSize: vi.fn(),
         resetAutoSpread: vi.fn(),
     }),
+}));
+vi.mock('../hooks/reader/useEditMode', () => ({
     useEditMode: () => ({
         isEditMode: false,
         selectedPages: new Set<number>(),
@@ -33,7 +43,11 @@ vi.mock('../hooks', () => ({
         pendingDeleteCount: 0,
         applyReorder: vi.fn(),
     }),
+}));
+vi.mock('../hooks/reader/useFullscreen', () => ({
     useFullscreen: () => ({ isFullscreen: false, toggleFullscreen: vi.fn() }),
+}));
+vi.mock('../hooks/library/useBookMeta', () => ({
     useBookMeta: () => ({
         meta: {},
         getSeries: vi.fn(),

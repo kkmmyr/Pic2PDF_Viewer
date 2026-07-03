@@ -1,9 +1,5 @@
 import { useState, useCallback } from 'react';
-
-interface RelatedBooks {
-    series: unknown[];
-    authors: unknown[];
-}
+import type { RelatedBooks } from '@/hooks/reader/useRelatedBooks';
 
 interface UseRelatedBooksNavigationProps {
     relatedBooks: RelatedBooks;

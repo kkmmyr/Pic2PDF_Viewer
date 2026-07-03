@@ -142,7 +142,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
     t0 = time.time()
     # コンテキスト生成 → DB 更新（embedding は最後にバッチで）
     # ctx は str | None。skip 対象は None を保ち、make_embedding_input が text のみで embed する。
-    pending_for_embed: list[tuple[int, str | None, str]] = []
+    pending_for_embed: list[tuple[int, str | None, str, int, int]] = []
     for i, (chunk_id, text, char_count, page_no) in enumerate(chunks, 1):
         if should_skip_context(char_count, page_no, page_count):
             ctx: str | None = None
@@ -162,7 +162,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
                 (ctx, chunk_id),
             )
             conn.commit()
-        pending_for_embed.append((chunk_id, ctx, text))
+        pending_for_embed.append((chunk_id, ctx, text, page_no, char_count or 0))
         if i % 10 == 0 or i == len(chunks):
             elapsed = time.time() - t0
             avg = elapsed / i
@@ -179,40 +179,31 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
     lance_table = get_chunks_table()
     for batch_start in range(0, len(pending_for_embed), _EMBED_BATCH_SIZE):
         batch = pending_for_embed[batch_start : batch_start + _EMBED_BATCH_SIZE]
-        inputs = [make_embedding_input(ctx, text) for _, ctx, text in batch]
+        inputs = [make_embedding_input(ctx, text) for _, ctx, text, _page_no, _char_count in batch]
         try:
             embeds = embed_batch(inputs)
         except Exception as e:
             print(f"  embedding failed at batch {batch_start}: {e}", file=sys.stderr)
             continue
-        with with_db() as conn:
-            lance_rows = []
-            for (chunk_id, _ctx, _text), emb in zip(batch, embeds, strict=True):
-                meta = conn.execute(
-                    "SELECT b.name, p.page_no, p.char_count, b.page_count "
-                    "FROM chunks c "
-                    "JOIN pages p ON c.page_id = p.id "
-                    "JOIN books b ON p.book_id = b.id "
-                    "WHERE c.id = ?",
-                    (chunk_id,),
-                ).fetchone()
-                if meta:
-                    lance_rows.append(
-                        {
-                            "chunk_id": chunk_id,
-                            "book_name": meta[0],
-                            "page_no": meta[1],
-                            "text": _text,
-                            "char_count": meta[2] or 0,
-                            "page_count": meta[3] or 0,
-                            "embedding": emb,
-                        }
-                    )
-            if lance_rows:
-                chunk_ids = [r["chunk_id"] for r in lance_rows]
-                ids_str = ", ".join(str(cid) for cid in chunk_ids)
-                lance_table.delete(f"chunk_id IN ({ids_str})")
-                lance_table.add(lance_rows)
+        # book_name / page_count は関数冒頭で取得済み、page_no / char_count は上の
+        # ctx 生成ループで取得済みのため、chunk_id ごとの再 JOIN クエリ (N+1) は不要。
+        lance_rows = [
+            {
+                "chunk_id": chunk_id,
+                "book_name": book_name,
+                "page_no": page_no,
+                "text": _text,
+                "char_count": char_count,
+                "page_count": page_count or 0,
+                "embedding": emb,
+            }
+            for (chunk_id, _ctx, _text, page_no, char_count), emb in zip(batch, embeds, strict=True)
+        ]
+        if lance_rows:
+            chunk_ids = [r["chunk_id"] for r in lance_rows]
+            ids_str = ", ".join(str(cid) for cid in chunk_ids)
+            lance_table.delete(f"chunk_id IN ({ids_str})")
+            lance_table.add(lance_rows)
     print(f"  embedding done ({time.time() - t1:.0f}s)", flush=True)
     return (success, skipped, failure)
 

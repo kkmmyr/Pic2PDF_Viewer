@@ -138,7 +138,7 @@ def rebuild_from_pages(
     book_id = book_row[0]
 
     pages_rows = conn.execute(
-        "SELECT id, full_text, char_count FROM pages WHERE book_id = ? ORDER BY page_no",
+        "SELECT id, full_text, char_count, page_no FROM pages WHERE book_id = ? ORDER BY page_no",
         (book_id,),
     ).fetchall()
     if not pages_rows:
@@ -173,11 +173,9 @@ def rebuild_from_pages(
         book_page_count = book_row2[1] if book_row2 else 0
 
         page_meta: dict[int, tuple[int, int]] = {}  # page_id → (page_no, char_count_per_page)
-        for page_id, full_text, char_count in pages_rows:
+        for page_id, full_text, char_count, page_no in pages_rows:
             if (char_count or 0) < MIN_CHARS_FOR_CHUNK:
                 continue
-            page_no_row = conn.execute("SELECT page_no FROM pages WHERE id = ?", (page_id,)).fetchone()
-            page_no = page_no_row[0] if page_no_row else 0
             page_meta[page_id] = (page_no, char_count or 0)
             for idx, c in enumerate(chunk_page(full_text or "")):
                 all_chunks.append(

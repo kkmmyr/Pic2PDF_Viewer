@@ -9,6 +9,7 @@ import os
 
 from natsort import natsorted
 
+from utils.file_utils import is_webp_file
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -22,7 +23,18 @@ def list_book_images(img_dir: str, book_name: str, path: str = "") -> list[str]:
     target = os.path.join(img_dir, path, book_name) if path else os.path.join(img_dir, book_name)
     if not os.path.isdir(target):
         return []
-    return [os.path.join(target, f) for f in natsorted(os.listdir(target)) if f.lower().endswith(".webp")]
+    return [os.path.join(target, f) for f in natsorted(os.listdir(target)) if is_webp_file(f)]
+
+
+def _list_webps_sorted(book_dir: str) -> list[str]:
+    """`book_dir` 配下の WebP を natsort 順で絶対パスのリストとして返す。
+
+    Raises:
+        FileNotFoundError: ディレクトリが存在しない場合
+    """
+    if not os.path.isdir(book_dir):
+        raise FileNotFoundError(f"Book images directory not found: {book_dir}")
+    return [os.path.join(book_dir, f) for f in natsorted(os.listdir(book_dir)) if is_webp_file(f)]
 
 
 def delete_book_image_pages(book_dir: str, page_indices: list[int]) -> int:
@@ -39,10 +51,7 @@ def delete_book_image_pages(book_dir: str, page_indices: list[int]) -> int:
         FileNotFoundError: ディレクトリが存在しない場合
         ValueError: ページインデックスが範囲外の場合
     """
-    if not os.path.isdir(book_dir):
-        raise FileNotFoundError(f"Book images directory not found: {book_dir}")
-
-    webps = [os.path.join(book_dir, f) for f in natsorted(os.listdir(book_dir)) if f.lower().endswith(".webp")]
+    webps = _list_webps_sorted(book_dir)
     total_pages = len(webps)
 
     indices = sorted(set(page_indices), reverse=True)
@@ -77,10 +86,7 @@ def reorder_book_image_pages(book_dir: str, page_indices: list[int]) -> int:
         を経由する 2 段階リネーム（旧名→一時名→新名）で安全に並び替える。
         新しいファイル名は `page_0001.webp / page_0002.webp / ...` の 0 詰め採番。
     """
-    if not os.path.isdir(book_dir):
-        raise FileNotFoundError(f"Book images directory not found: {book_dir}")
-
-    webps = [os.path.join(book_dir, f) for f in natsorted(os.listdir(book_dir)) if f.lower().endswith(".webp")]
+    webps = _list_webps_sorted(book_dir)
     total_pages = len(webps)
 
     if sorted(page_indices) != list(range(total_pages)):

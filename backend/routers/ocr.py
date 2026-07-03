@@ -11,14 +11,15 @@ GET  /ocr/status  — OCR ジョブの状態（フロントエンド互換形式
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from routers.api_schemas import OcrRunResponse, OcrStopResponse
 from services.novel_db.connection import with_db
 from services.novel_db.job_queue import job_queue
 
 router = APIRouter()
 
 
-@router.post("/ocr/run")
-def run_ocr(target_dir: str | None = None):
+@router.post("/ocr/run", response_model=OcrRunResponse)
+def run_ocr(target_dir: str | None = None) -> dict:
     if target_dir:
         job_id, position = job_queue.enqueue("book", target_id=target_dir, mode="ocr")
     else:
@@ -26,8 +27,8 @@ def run_ocr(target_dir: str | None = None):
     return {"status": "queued", "job_id": job_id, "queue_position": position}
 
 
-@router.post("/ocr/stop")
-def stop_ocr():
+@router.post("/ocr/stop", response_model=OcrStopResponse)
+def stop_ocr() -> dict:
     canceled = job_queue.cancel_queued_by_mode("ocr")
     if not canceled:
         raise HTTPException(status_code=400, detail="No queued OCR jobs to cancel")

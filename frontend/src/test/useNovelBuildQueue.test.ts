@@ -76,6 +76,43 @@ describe('useNovelBuildQueue', () => {
         expect(mockClose).toHaveBeenCalledTimes(1);
     });
 
+    it('SSE エラー時に旧接続を close してから再接続する（接続リーク防止）', () => {
+        // React の内部スケジューラは setTimeout/MessageChannel に依存するため、
+        // 対象を setTimeout/clearTimeout のみに絞ってフェイクする（全体フェイクだと mount 自体が壊れる）。
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+        try {
+            let capturedOnError: (() => void) | null = null;
+            const closeFns = [vi.fn(), vi.fn()];
+            let callCount = 0;
+            mockedConnect.mockImplementation(
+                (handlers: { onStatus: (s: BuildQueueStatus) => void; onError: () => void }) => {
+                    capturedOnStatus = handlers.onStatus;
+                    capturedOnError = handlers.onError;
+                    return closeFns[callCount++];
+                },
+            );
+            mockedConnect.mockClear(); // 前のテストの呼び出し回数を引き継がないようリセット
+
+            renderHook(() => useNovelBuildQueue());
+            expect(mockedConnect).toHaveBeenCalledTimes(1);
+
+            // 1 回目の接続でエラー発生 → 旧接続が即座に close され、3 秒後に再接続される
+            act(() => {
+                capturedOnError?.();
+            });
+            expect(closeFns[0]).toHaveBeenCalledTimes(1);
+            expect(mockedConnect).toHaveBeenCalledTimes(1); // まだ再接続していない
+
+            act(() => {
+                vi.advanceTimersByTime(3000);
+            });
+            expect(mockedConnect).toHaveBeenCalledTimes(2);
+            expect(closeFns[1]).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('enqueue — 成功時に POST が呼ばれ isEnqueuing が戻る', async () => {
         mockedPost.mockResolvedValue({ job_id: 10, queued_position: 1 });
         const { result } = renderHook(() => useNovelBuildQueue());

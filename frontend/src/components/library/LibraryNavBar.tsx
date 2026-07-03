@@ -19,6 +19,7 @@ export function LibraryNavBar({ currentPath, breadcrumbs, onUpClick }: LibraryNa
                 {currentPath && (
                     <button
                         onClick={onUpClick}
+                        aria-label="上の階層に戻る"
                         className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5 text-gray-700 dark:text-gray-300" />

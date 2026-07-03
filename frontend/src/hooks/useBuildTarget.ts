@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { BuildMode } from '@/features/novel_build/types';
 import type { BookSummary } from '@/features/novel_db/types';
@@ -29,8 +29,9 @@ export function useBuildTarget(
     const [selected, setSelected] = useState('');
     const [showBuilt, setShowBuilt] = useState(false);
 
-    const filtered = books.filter((b) =>
-        showBuilt ? b.indexed_at !== null : b.indexed_at === null,
+    const filtered = useMemo(
+        () => books.filter((b) => (showBuilt ? b.indexed_at !== null : b.indexed_at === null)),
+        [books, showBuilt],
     );
 
     const handleShowBuiltChange = useCallback(

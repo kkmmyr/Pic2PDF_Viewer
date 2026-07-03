@@ -39,8 +39,6 @@ _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意
 
 検索クエリ（{n} 行）:"""
 
-_TIMEOUT_SEC = 60
-
 # 短答型（150 字程度）。temperature は多様性を少し上げる
 _OPTIONS = {
     "temperature": 0.3,

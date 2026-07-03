@@ -10,7 +10,6 @@ from collections.abc import Callable
 from config import NOVEL_DB_LLM_MODEL
 
 from ._llm_backend import QWEN_BACKEND
-from .character_db import CharacterRow, CharacterStat  # noqa: F401 (re-export)
 
 _PROMPT = """次は小説『{book_name}』から「{char_name}」が登場するページを page_no 順に集めた本文です。
 この本（1 冊）における「{char_name}」の人物像を、1 段落（{target} 字程度）でまとめてください。

@@ -105,9 +105,6 @@ def list_book_images(path: str, source: str = Depends(validated_source)):
 
     files = os.listdir(target_dir)
     images = [f for f in files if is_image_file(f)]
-
-    from natsort import natsorted
-
     images = natsorted(images)
 
     image_urls = []

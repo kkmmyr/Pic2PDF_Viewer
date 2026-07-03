@@ -1,6 +1,7 @@
 import threading
 import uuid
 from enum import StrEnum
+from typing import Any
 
 from config import JOB_MAX_JOBS
 
@@ -15,7 +16,7 @@ class JobStatus(StrEnum):
 class GenerateJob:
     """1回のPDF生成ジョブを表すデータクラス。"""
 
-    def __init__(self, job_id: str):
+    def __init__(self, job_id: str) -> None:
         self.job_id = job_id
         self.status: JobStatus = JobStatus.PENDING
         self.current_item: str | None = None
@@ -38,7 +39,7 @@ class GenerateJob:
                 "error": self.error,
             }
 
-    def update(self, **kwargs) -> None:
+    def update(self, **kwargs: Any) -> None:
         with self._lock:
             for k, v in kwargs.items():
                 setattr(self, k, v)
@@ -49,7 +50,7 @@ class JobStore:
 
     _MAX_JOBS = JOB_MAX_JOBS
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = threading.Lock()
         self._jobs: dict[str, GenerateJob] = {}
         self._order: list[str] = []

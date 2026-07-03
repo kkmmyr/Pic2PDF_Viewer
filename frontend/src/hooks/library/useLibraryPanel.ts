@@ -1,19 +1,17 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-    useLibraryPins,
-    useSortedPdfs,
-    useBookMeta,
-    useLibraryFilter,
-    useUrlFilters,
-    useLibrarySettings,
-    useLibraryBulkActions,
-    useLibraryDisplay,
-    useGenres,
-    useScrollMemory,
-    useLibrarySelectionShortcut,
-    useSeriesEditDialog,
-} from '..';
+import { useLibraryPins } from '@/hooks/library/useLibraryPins';
+import { useSortedPdfs } from '@/hooks/library/useSortedPdfs';
+import { useBookMeta } from '@/hooks/library/useBookMeta';
+import { useLibraryFilter } from '@/hooks/library/useLibraryFilter';
+import { useUrlFilters } from '@/hooks/library/useUrlFilters';
+import { useLibrarySettings } from '@/hooks/library/useLibrarySettings';
+import { useLibraryBulkActions } from '@/hooks/library/useLibraryBulkActions';
+import { useLibraryDisplay } from '@/hooks/library/useLibraryDisplay';
+import { useGenres } from '@/hooks/library/useGenres';
+import { useScrollMemory } from '@/hooks/library/useScrollMemory';
+import { useLibrarySelectionShortcut } from '@/hooks/library/useLibrarySelectionShortcut';
+import { useSeriesEditDialog } from '@/hooks/library/useSeriesEditDialog';
 import { useAsyncToast } from '@/hooks/useAsyncToast';
 import { useUrlState } from './useUrlState';
 import { useLibraryPdfs, pdfQueryKey } from './useLibraryPdfs';

@@ -10,7 +10,7 @@ import { validateFilename } from '@/utils/validation';
 import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
 import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
 
-interface Props {
+interface RenameDialogProps {
     open: boolean;
     currentName: string; // PDF の場合は .pdf 拡張子あり、フォルダの場合は拡張子なし
     isFolder?: boolean;
@@ -22,7 +22,13 @@ interface Props {
  * PDF/フォルダ共用リネームダイアログ。
  * PDF の場合は拡張子 .pdf を表示から省き、確定時に自動付加する。
  */
-export function RenameDialog({ open, currentName, isFolder = false, onClose, onRename }: Props) {
+export function RenameDialog({
+    open,
+    currentName,
+    isFolder = false,
+    onClose,
+    onRename,
+}: RenameDialogProps) {
     const stem = isFolder ? currentName : currentName.replace(/\.pdf$/i, '');
     const [name, setName] = useState(stem);
     const inputRef = useRef<HTMLInputElement>(null);

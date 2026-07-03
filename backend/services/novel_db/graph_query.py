@@ -7,13 +7,14 @@ character_relations テーブルから nodes / edges を組み立てる読み取
 from __future__ import annotations
 
 import sqlite3
+from typing import Any
 
 
 def get_graph_for_series(
     conn: sqlite3.Connection,
     series_id: str,
     book_ids: list[int] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """series_id のグラフデータを返す。
 
     Args:
@@ -74,7 +75,7 @@ def list_series_with_relations(conn: sqlite3.Connection) -> list[str]:
 def list_books_in_relation_series(
     conn: sqlite3.Connection,
     series_id: str,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """series_id に属する書籍の id・name 一覧（グラフ内に存在するもの）。"""
     rows = conn.execute(
         "SELECT DISTINCT cr.book_id, b.name "

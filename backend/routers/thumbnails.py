@@ -18,7 +18,7 @@ from services.pdf_generator import generate_thumbnail as generate_thumbnail_from
 from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
-from utils.path_utils import validate_safe_name, validate_safe_path
+from utils.path_utils import join_path, validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 
@@ -45,9 +45,9 @@ def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir:
     fitz は WebP を読めないため、画像→JPG は PIL 経路を使う必要がある。
     """
     thumb_name = get_thumbnail_name(name)
-    thumb_path = os.path.join(thumb_dir, path, thumb_name) if path else os.path.join(thumb_dir, thumb_name)
+    thumb_path = join_path(thumb_dir, path, thumb_name)
 
-    pdf_path = os.path.join(pdf_dir, path, name) if path else os.path.join(pdf_dir, name)
+    pdf_path = join_path(pdf_dir, path, name)
     if os.path.exists(pdf_path):
         return ThumbnailService.generate_thumbnail(pdf_path, thumb_path)
 
@@ -97,7 +97,7 @@ def get_page_thumbnail(
         )
 
     # kindle / novel: PDF を fitz でレンダリング
-    pdf_path = os.path.join(dirs["pdf"], path, name) if path else os.path.join(dirs["pdf"], name)
+    pdf_path = join_path(dirs["pdf"], path, name)
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="PDF not found")
 

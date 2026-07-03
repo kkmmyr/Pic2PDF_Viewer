@@ -38,13 +38,17 @@ export function useNovelBuildQueue(enabled = true): UseNovelBuildQueue {
         if (!enabled) return;
 
         function connect() {
-            closeRef.current = connectBuildStream({
+            const close = connectBuildStream({
                 onStatus: setStatus,
                 onError: () => {
-                    // SSE 切断時は 3 秒後に再接続（unmount 時は clearTimeout で停止）
+                    // 旧接続を明示的に close してから 3 秒後に再接続する（close し忘れると
+                    // ブラウザ側の自動再試行と重複して接続がリークする恐れがある）。
+                    // unmount 時は clearTimeout で再接続自体を停止する。
+                    close();
                     reconnectTimerRef.current = setTimeout(connect, 3000);
                 },
             });
+            closeRef.current = close;
         }
         connect();
         return () => {

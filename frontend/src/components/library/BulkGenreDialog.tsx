@@ -7,6 +7,7 @@ import {
     DialogPrimaryButton,
 } from '@/components/ui/dialog';
 import { useDialogSubmit } from '@/hooks/library/useDialogSubmit';
+import { useAutoFocusInput } from '@/hooks/useAutoFocusInput';
 
 interface BulkGenreDialogProps {
     open: boolean;
@@ -35,6 +36,8 @@ export function BulkGenreDialog({
         setIsNew(false);
         setNewGenre('');
     }, [open, allGenres]);
+
+    useAutoFocusInput(inputRef, open && isNew, { delay: 50 });
 
     const handleApply = () => {
         const genre = isNew ? newGenre.trim() : selected;
@@ -80,7 +83,6 @@ export function BulkGenreDialog({
                             checked={isNew}
                             onChange={() => {
                                 setIsNew(true);
-                                setTimeout(() => inputRef.current?.focus(), 50);
                             }}
                             className="mt-0.5 accent-primary-600"
                         />

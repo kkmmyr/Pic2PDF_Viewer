@@ -108,9 +108,9 @@ export function PdfCard({
                         const authors = getAuthors(pdf.name);
                         return authors.length > 0 ? (
                             <div className="mt-1 flex flex-wrap gap-1">
-                                {authors.map((a, i) => (
+                                {authors.map((a) => (
                                     <span
-                                        key={i}
+                                        key={a}
                                         className={`text-xs px-1.5 py-0.5 rounded bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-800/50' : ''}`}
                                         onClick={
                                             onAuthorClick

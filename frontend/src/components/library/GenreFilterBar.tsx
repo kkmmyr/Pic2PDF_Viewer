@@ -4,6 +4,7 @@ import {
     DndContext,
     closestCenter,
     PointerSensor,
+    KeyboardSensor,
     useSensor,
     useSensors,
     type DragEndEvent,
@@ -13,6 +14,7 @@ import {
     horizontalListSortingStrategy,
     useSortable,
     arrayMove,
+    sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GenreManagerDialog } from './GenreManagerDialog';
@@ -59,13 +61,12 @@ function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps)
 export function GenreFilterBar() {
     const { genres, genreFilter, setGenreFilter, reorderGenres, addGenre, removeGenre } =
         useLibraryPanelContext();
-    const onGenreFilterChange = setGenreFilter;
-    const onReorder = reorderGenres;
-    const onAdd = addGenre;
-    const onRemove = removeGenre;
     const [isManagerOpen, setIsManagerOpen] = useState(false);
 
-    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    );
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
@@ -73,7 +74,7 @@ export function GenreFilterBar() {
         const oldIndex = genres.indexOf(active.id as string);
         const newIndex = genres.indexOf(over.id as string);
         if (oldIndex !== -1 && newIndex !== -1) {
-            onReorder(arrayMove(genres, oldIndex, newIndex));
+            reorderGenres(arrayMove(genres, oldIndex, newIndex));
         }
     };
 
@@ -91,8 +92,8 @@ export function GenreFilterBar() {
                     open={isManagerOpen}
                     genres={genres}
                     onClose={() => setIsManagerOpen(false)}
-                    onAdd={onAdd}
-                    onRemove={onRemove}
+                    onAdd={addGenre}
+                    onRemove={removeGenre}
                 />
             </div>
         );
@@ -110,7 +111,7 @@ export function GenreFilterBar() {
 
             {/* すべて */}
             <button
-                onClick={() => onGenreFilterChange('')}
+                onClick={() => setGenreFilter('')}
                 className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border shrink-0 ${
                     !genreFilter
                         ? 'bg-indigo-600 text-white border-indigo-600'
@@ -132,9 +133,7 @@ export function GenreFilterBar() {
                                 key={genre}
                                 genre={genre}
                                 isActive={genreFilter === genre}
-                                onClick={() =>
-                                    onGenreFilterChange(genreFilter === genre ? '' : genre)
-                                }
+                                onClick={() => setGenreFilter(genreFilter === genre ? '' : genre)}
                             />
                         ))}
                     </div>
@@ -145,8 +144,8 @@ export function GenreFilterBar() {
                 open={isManagerOpen}
                 genres={genres}
                 onClose={() => setIsManagerOpen(false)}
-                onAdd={onAdd}
-                onRemove={onRemove}
+                onAdd={addGenre}
+                onRemove={removeGenre}
             />
         </div>
     );

@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 
 import type { useChatSessions } from '@/hooks/novel_db';
+import { formatScopeLabel } from '@/features/novel_db/scopeLabel';
 
 interface SessionSidebarProps {
     sessions: ReturnType<typeof useChatSessions>['sessions'];
@@ -37,12 +38,7 @@ export function SessionSidebar({
                 <ul>
                     {sessions.map((s) => {
                         const isActive = s.id === activeId;
-                        const scopeLabel =
-                            s.scope_type === 'book'
-                                ? `本: ${s.scope_id ?? ''}`
-                                : s.scope_type === 'series'
-                                  ? `シリーズ: ${s.scope_id ?? ''}`
-                                  : '全件';
+                        const scopeLabel = formatScopeLabel(s.scope_type, s.scope_id);
                         return (
                             <li
                                 key={s.id}

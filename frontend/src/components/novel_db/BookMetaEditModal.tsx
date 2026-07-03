@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 
 import { patchNovelBookMeta } from '@/features/novel_db/api';
+import { buildNovelMetaPatch } from '@/features/novel_db/bookMetaPatch';
 import type { BookSummary } from '@/features/novel_db/types';
 import {
     Dialog,
@@ -20,13 +21,6 @@ interface Props {
     onSaved: () => void;
 }
 
-function splitAuthors(raw: string): string[] {
-    return raw
-        .split(/[,、]/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-}
-
 export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
     const [authors, setAuthors] = useState('');
     const [seriesId, setSeriesId] = useState('');
@@ -34,7 +28,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
     const [publisher, setPublisher] = useState('');
     const [asin, setAsin] = useState('');
     const [isbn, setIsbn] = useState('');
+    const [isbnTouched, setIsbnTouched] = useState(false);
     const [releaseDate, setReleaseDate] = useState('');
+    const [releaseDateTouched, setReleaseDateTouched] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -45,8 +41,13 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
         setVolume(book.volume != null ? String(book.volume) : '');
         setPublisher(book.publisher ?? '');
         setAsin(book.asin ?? '');
+        // BookSummary は isbn/release_date を持たないため、未編集時は PATCH payload から
+        // 除外する（バックエンドは空文字を「既存値のクリア」として扱うため、空文字で
+        // 送ると既存の ISBN・発売日が意図せず消える）。
         setIsbn('');
+        setIsbnTouched(false);
         setReleaseDate('');
+        setReleaseDateTouched(false);
         setError(null);
     }, [book]);
 
@@ -55,15 +56,20 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
         setError(null);
         try {
             const volNum = volume.trim() ? parseInt(volume.trim(), 10) : null;
-            await patchNovelBookMeta(`${book!.name}.pdf`, {
-                authors: splitAuthors(authors),
-                series_id: seriesId.trim(),
-                ...(volNum != null ? { volume: volNum } : { volume_clear: true }),
-                publisher: publisher.trim(),
-                asin: asin.trim(),
-                isbn: isbn.trim(),
-                release_date: releaseDate.trim(),
-            });
+            await patchNovelBookMeta(
+                `${book!.name}.pdf`,
+                buildNovelMetaPatch({
+                    authors,
+                    seriesId,
+                    volNum,
+                    publisher,
+                    asin,
+                    isbn,
+                    isbnTouched,
+                    releaseDate,
+                    releaseDateTouched,
+                }),
+            );
             onSaved();
             onClose();
         } catch {
@@ -77,8 +83,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
         <Dialog open={Boolean(book)} title={book?.name ?? ''} maxWidth="md" onClose={onClose}>
             <DialogBody>
                 <div className="space-y-3">
-                    <Field label="著者（カンマ区切り）">
+                    <Field label="著者（カンマ区切り）" htmlFor="book-meta-authors">
                         <input
+                            id="book-meta-authors"
                             type="text"
                             value={authors}
                             onChange={(e) => setAuthors(e.target.value)}
@@ -86,8 +93,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
                             placeholder="石田 リンネ, 起家 一子"
                         />
                     </Field>
-                    <Field label="シリーズ名">
+                    <Field label="シリーズ名" htmlFor="book-meta-series">
                         <input
+                            id="book-meta-series"
                             type="text"
                             value={seriesId}
                             onChange={(e) => setSeriesId(e.target.value)}
@@ -95,8 +103,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
                             placeholder="おこぼれ姫と円卓の騎士"
                         />
                     </Field>
-                    <Field label="巻番号">
+                    <Field label="巻番号" htmlFor="book-meta-volume">
                         <input
+                            id="book-meta-volume"
                             type="number"
                             min={1}
                             value={volume}
@@ -105,8 +114,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
                             placeholder="1"
                         />
                     </Field>
-                    <Field label="出版社・レーベル">
+                    <Field label="出版社・レーベル" htmlFor="book-meta-publisher">
                         <input
+                            id="book-meta-publisher"
                             type="text"
                             value={publisher}
                             onChange={(e) => setPublisher(e.target.value)}
@@ -114,8 +124,9 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
                             placeholder="ビーズログ文庫"
                         />
                     </Field>
-                    <Field label="ASIN">
+                    <Field label="ASIN" htmlFor="book-meta-asin">
                         <input
+                            id="book-meta-asin"
                             type="text"
                             value={asin}
                             onChange={(e) => setAsin(e.target.value)}
@@ -123,20 +134,28 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
                             placeholder="B009IMAVXC"
                         />
                     </Field>
-                    <Field label="ISBN">
+                    <Field label="ISBN" htmlFor="book-meta-isbn">
                         <input
+                            id="book-meta-isbn"
                             type="text"
                             value={isbn}
-                            onChange={(e) => setIsbn(e.target.value)}
+                            onChange={(e) => {
+                                setIsbn(e.target.value);
+                                setIsbnTouched(true);
+                            }}
                             className={inputClass}
                             placeholder="9784047264298"
                         />
                     </Field>
-                    <Field label="発売日">
+                    <Field label="発売日" htmlFor="book-meta-release-date">
                         <input
+                            id="book-meta-release-date"
                             type="date"
                             value={releaseDate}
-                            onChange={(e) => setReleaseDate(e.target.value)}
+                            onChange={(e) => {
+                                setReleaseDate(e.target.value);
+                                setReleaseDateTouched(true);
+                            }}
                             className={inputClass}
                         />
                     </Field>
@@ -156,10 +175,23 @@ export default function BookMetaEditModal({ book, onClose, onSaved }: Props) {
 const inputClass =
     'w-full px-2.5 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500';
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+    label,
+    htmlFor,
+    children,
+}: {
+    label: string;
+    htmlFor: string;
+    children: React.ReactNode;
+}) {
     return (
         <div>
-            <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{label}</label>
+            <label
+                htmlFor={htmlFor}
+                className="block text-xs text-gray-600 dark:text-gray-400 mb-1"
+            >
+                {label}
+            </label>
             {children}
         </div>
     );

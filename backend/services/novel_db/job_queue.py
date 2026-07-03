@@ -21,7 +21,6 @@ logger = get_logger(__name__)
 
 JobType = Literal["book", "series", "all"]
 JobMode = Literal["rebuild", "ocr", "full_build", "generate_contexts", "generate_relations"]
-JobState = Literal["queued", "running", "completed", "failed", "canceled"]
 
 
 class NovelDbJobQueue:

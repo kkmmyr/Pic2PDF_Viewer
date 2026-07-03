@@ -119,7 +119,7 @@ export default function GeneratorPage() {
                             max="95"
                             step="5"
                             value={quality}
-                            onChange={(e) => setQuality(parseInt(e.target.value))}
+                            onChange={(e) => setQuality(parseInt(e.target.value, 10))}
                             className="w-full h-2 bg-primary-200 dark:bg-primary-800 rounded-lg appearance-none cursor-pointer accent-primary-600"
                         />
                     </div>

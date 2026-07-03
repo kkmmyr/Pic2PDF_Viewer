@@ -59,7 +59,6 @@ export function useBookImages(
             })
             .catch(() => {
                 // Fallback to PDF mode (do nothing, imageUrls stays null)
-                console.log('Images not found, falling back to PDF');
             })
             .finally(() => {
                 setIsLoading(false);

@@ -6,6 +6,7 @@ full_book_mode 分岐・書籍サマリ付与）を 1 か所にまとめる。
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 
 from config import (
@@ -37,7 +38,7 @@ class RetrievalResult:
     qa_options: dict
 
 
-def retrieve(conn, question: str, scope: Scope) -> RetrievalResult:
+def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> RetrievalResult:
     """scope・question に応じた hits / book_summaries / qa_options を返す。
 
     full_book_mode（scope=book + NOVEL_DB_QA_FULL_BOOK_MODE 有効）のとき

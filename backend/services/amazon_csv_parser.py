@@ -10,7 +10,6 @@ import csv
 import io
 import re
 from dataclasses import dataclass
-from difflib import SequenceMatcher
 
 
 @dataclass
@@ -21,18 +20,6 @@ class ParsedRow:
     publisher: str
     authors: list[str]
     asin: str
-
-
-@dataclass
-class MatchedRow:
-    csv_title: str
-    series_id: str
-    volume: int | None
-    publisher: str
-    authors: list[str]
-    asin: str
-    matched_book: str | None
-    match_score: float
 
 
 # ---------------------------------------------------------------------------
@@ -143,47 +130,3 @@ def parse_csv(file_bytes: bytes) -> list[ParsedRow]:
         if parsed is not None:
             rows.append(parsed)
     return rows
-
-
-# ---------------------------------------------------------------------------
-# 書籍マッチング
-# ---------------------------------------------------------------------------
-
-
-def _similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, a.lower(), b.lower()).ratio()
-
-
-def match_books(parsed: list[ParsedRow], book_names: list[str]) -> list[MatchedRow]:
-    """ParsedRow ごとに最もスコアの高い書籍 stem を対応させる。
-
-    マッチングは csv_title と book_name の部分一致（SequenceMatcher）で行う。
-    score < 0.4 は未マッチ扱い（matched_book = None）。
-    """
-    results: list[MatchedRow] = []
-    for row in parsed:
-        best_name: str | None = None
-        best_score = 0.0
-        for name in book_names:
-            score = max(
-                _similarity(row.csv_title, name),
-                _similarity(row.series_id, name),
-            )
-            if score > best_score:
-                best_score = score
-                best_name = name
-        if best_score < 0.4:
-            best_name = None
-        results.append(
-            MatchedRow(
-                csv_title=row.csv_title,
-                series_id=row.series_id,
-                volume=row.volume,
-                publisher=row.publisher,
-                authors=row.authors,
-                asin=row.asin,
-                matched_book=best_name,
-                match_score=round(best_score, 3),
-            )
-        )
-    return results

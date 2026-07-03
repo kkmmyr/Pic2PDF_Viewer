@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import type { Scope } from '@/features/novel_db/types';
+import { formatScopeLabel } from '@/features/novel_db/scopeLabel';
 import type { useChatSessionDetail } from '@/hooks/novel_db';
 
 interface ChatMessageListProps {
@@ -26,12 +27,7 @@ export function ChatMessageList({
     }, [detail?.messages.length, streamingAnswer]);
 
     const messages = detail?.messages ?? [];
-    const placeholderScope =
-        scope.type === 'book'
-            ? `本: ${scope.id ?? ''}`
-            : scope.type === 'series'
-              ? `シリーズ: ${scope.id ?? ''}`
-              : '全件';
+    const placeholderScope = formatScopeLabel(scope.type, scope.id);
 
     return (
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">

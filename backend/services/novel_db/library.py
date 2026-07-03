@@ -13,7 +13,6 @@ from pathlib import Path
 from urllib.parse import quote
 
 import config
-from config import app_settings  # noqa: F401 — used via app_settings below
 from services.meta_store import load_meta
 
 

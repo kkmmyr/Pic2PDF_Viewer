@@ -63,6 +63,7 @@ export default function BookSelectorPanel({
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="radio"
+                            name="all-books-filter"
                             checked={!allBooks}
                             onChange={() => setAllBooks(false)}
                             className="text-primary-500"
@@ -72,6 +73,7 @@ export default function BookSelectorPanel({
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="radio"
+                            name="all-books-filter"
                             checked={allBooks}
                             onChange={() => setAllBooks(true)}
                             className="text-primary-500"
@@ -88,6 +90,7 @@ export default function BookSelectorPanel({
                                 <label className="flex items-center gap-1.5 cursor-pointer">
                                     <input
                                         type="radio"
+                                        name="show-built-filter"
                                         checked={!showBuilt}
                                         onChange={() => onShowBuiltChange!(false)}
                                         className="text-primary-500"
@@ -97,6 +100,7 @@ export default function BookSelectorPanel({
                                 <label className="flex items-center gap-1.5 cursor-pointer">
                                     <input
                                         type="radio"
+                                        name="show-built-filter"
                                         checked={showBuilt}
                                         onChange={() => onShowBuiltChange!(true)}
                                         className="text-primary-500"

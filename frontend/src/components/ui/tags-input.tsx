@@ -41,6 +41,7 @@ export function TagsInput({
                         {tag}
                         <button
                             type="button"
+                            aria-label="タグを削除"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 onRemove(i);

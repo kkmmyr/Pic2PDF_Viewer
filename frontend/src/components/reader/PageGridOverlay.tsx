@@ -158,6 +158,7 @@ export function PageGridOverlay({
                     onClick={onClose}
                     className="p-2 hover:bg-gray-700 rounded-full"
                     title="閉じる (Esc)"
+                    aria-label="閉じる"
                 >
                     <X className="w-5 h-5" />
                 </button>

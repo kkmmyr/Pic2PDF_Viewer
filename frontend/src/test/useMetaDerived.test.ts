@@ -7,7 +7,6 @@ describe('useMetaDerived', () => {
     it('空 meta なら全派生値が空', () => {
         const { result } = renderHook(() => useMetaDerived({}));
         expect(result.current.allAuthors).toEqual([]);
-        expect(result.current.allGenres).toEqual([]);
         expect(result.current.allSeries).toEqual([]);
         expect(result.current.allSeriesWithStats).toEqual([]);
     });
@@ -29,17 +28,6 @@ describe('useMetaDerived', () => {
         };
         const { result } = renderHook(() => useMetaDerived(meta));
         expect(result.current.allAuthors).toEqual(['A', 'B']);
-    });
-
-    it('allGenres は falsy 値（undefined / 空文字）を除外', () => {
-        const meta: BookMetaMap = {
-            'a.pdf': { genre: 'アクション' },
-            'b.pdf': { genre: '' }, // 空文字 → 除外
-            'c.pdf': {}, // 不在 → 除外
-            'd.pdf': { genre: 'コメディ' },
-        };
-        const { result } = renderHook(() => useMetaDerived(meta));
-        expect(result.current.allGenres).toEqual(['アクション', 'コメディ']);
     });
 
     it('allSeries は同 series_id を 1 つに集約してタイトル順', () => {

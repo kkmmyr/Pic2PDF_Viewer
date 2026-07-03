@@ -43,14 +43,19 @@ export function SortablePageCell({
         transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0.4 : 1,
-        zIndex: isDragging ? 10 : 'auto',
     };
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes} className="relative">
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...attributes}
+            className={`relative ${isDragging ? 'z-card-badge' : ''}`}
+        >
             <button
                 type="button"
                 onClick={onClick}
+                aria-pressed={isSelected}
                 className={`relative w-full bg-gray-700 rounded overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary-500 transition-shadow ${
                     isSelected
                         ? 'ring-4 ring-red-500 shadow-xl'
