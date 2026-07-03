@@ -28,7 +28,13 @@ use_directory_urls: false
 # 独立かつ正確に検知しているため、mkdocs 側の links.not_found は info に格下げする。
 # nav の同期（omitted_files / not_found）は check_docs.py Rule 3 と独立した二重チェックとして
 # デフォルト（warn＝strict で失敗）のまま維持する。
-# anchors（見出しアンカーの不一致）は本リストラとは無関係な既存の軽微な乖離のため info 化。
+# anchors（見出しアンカーの不一致）: mkdocs のデフォルト slugifier は日本語見出しの
+# 非 ASCII 文字を anchor id から全て落とす仕様のため、日本語テキストをそのまま anchor
+# フラグメントに書いた古いリンクは高確率で壊れる。design/ 配下の実リンクは 2026-07-03 に
+# 全て実際の生成 id へ修正済み（17件 → 1件）。残る1件は docs/log/変更履歴/ 配下の凍結済み
+# 週次アーカイブへの自己リンクで、アーカイブは編集しない方針のため意図的に未修正。
+# 新しい週次アーカイブが切り出されるたびに同種の乖離が発生しうるため、anchors は
+# 恒久的に info のままとする（1件だけのために strict を有効化する価値は無い）。
 validation:
   links:
     not_found: info
