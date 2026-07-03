@@ -27,7 +27,7 @@ export default function GeneratorPage() {
         setResult({ message: job.message, files: job.files, failed_items: job.failed_items ?? [] });
         // eslint-disable-next-line react-hooks/immutability -- fetchStatus は宣言順が後だが呼び出し時点では定義済み
         fetchStatus();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchStatus (usePdfStatus の refetch) はクエリキー固定で参照が安定するため依存に含めない
     }, []);
 
     const onFailed = useCallback((job: GenerateJob) => {

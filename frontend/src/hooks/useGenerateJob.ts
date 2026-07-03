@@ -80,7 +80,7 @@ export function useGenerateJob(
             removeStorage(STORAGE_KEY);
             onFailedRef.current(fetchedJob);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- status 変化時のみ発火させる（ポーリングで fetchedJob が丸ごと更新される他のフィールド変化では再実行しない）。onCompleted/onFailed は ref 経由で最新を参照
     }, [fetchedJob?.status]);
 
     // Handle 404 (job disappeared, e.g. server restart)

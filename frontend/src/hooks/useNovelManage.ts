@@ -175,7 +175,7 @@ export function useNovelManage(): UseNovelManage {
 
     useEffect(() => {
         refreshBooks(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshBooks は setState セッターのみに依存し参照が安定するため、マウント時に一度だけ実行
     }, []);
 
     // ジョブ完了時（running → 非 running）に書籍一覧を再取得

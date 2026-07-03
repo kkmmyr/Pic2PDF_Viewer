@@ -49,7 +49,7 @@ export function BulkAuthorDialog({
         setMode(fallbackMode);
         setSelectedExisting(allAuthors[0] ?? '');
         t.reset();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- t.reset は useTagsInput 内で useCallback([]) 化され参照が安定（t オブジェクト自体を依存に含めると毎レンダーで再実行されてしまう）
     }, [open, noExistingAuthors, allAuthors]);
 
     const handleApply = () => {
