@@ -216,13 +216,12 @@ else
 fi
 
 # ─────────────────────────────────────────
-# Case 7: bash -n 構文OK（6 hook 全部）
+# Case 7: bash -n 構文OK（5 hook 全部）
 # ─────────────────────────────────────────
-echo "--- Case 7: 6 hook の bash -n 構文チェック ---"
+echo "--- Case 7: 5 hook の bash -n 構文チェック ---"
 
 hook_files=(
   "$HOOKS/lint_check.sh"
-  "$HOOKS/mkdocs_build.sh"
   "$HOOKS/remind_deps_install.sh"
   "$HOOKS/remind_docs_update.sh"
   "$HOOKS/remind_memory_sync.sh"
@@ -238,7 +237,7 @@ for hf in "${hook_files[@]}"; do
     case7_ok=false
   fi
 done
-$case7_ok && pass "Case 7: 6 hook 全て bash -n OK"
+$case7_ok && pass "Case 7: 5 hook 全て bash -n OK"
 
 # ─────────────────────────────────────────
 # サマリ
