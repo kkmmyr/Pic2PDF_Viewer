@@ -98,7 +98,7 @@ NOVEL_DB_PATH = str(_s.NOVEL_DB_DIR / "novel.db")
 
 # Novel DB の env 設定（モデル・LLM・検索パラメータ等）は novel_db サブモジュールに分離。
 # `from config import NOVEL_DB_*` は従来通り動作する。
-from .novel_db import *  # noqa: E402 F401 F403
+from .novel_db import *  # noqa: E402, F403
 
 # フロントエンド配信ディレクトリ（リリースモード用）
 FRONTEND_DIST_DIR = str(_BACKEND_DIR.parent / "frontend" / "dist")

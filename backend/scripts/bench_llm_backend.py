@@ -42,14 +42,14 @@ _LLM_PKG_DIR = r"D:\61.tool\common\llm"
 if _LLM_PKG_DIR not in sys.path:
     sys.path.insert(0, _LLM_PKG_DIR)
 
-from local_llm import (  # noqa: E402
+from local_llm import (
     Backend,
     BackendConfig,
     LlamaServerBackend,
     OllamaBackend,
 )
 
-from config import NOVEL_DB_QA_NUM_CTX  # noqa: E402
+from config import NOVEL_DB_QA_NUM_CTX
 
 DEFAULT_MODEL = "qwen3.6-iq4xs"
 NUM_PREDICT = 256  # tg 計測の安定化のため短めに固定

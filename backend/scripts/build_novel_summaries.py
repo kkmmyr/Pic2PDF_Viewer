@@ -24,10 +24,10 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from services.meta_store import load_meta  # noqa: E402
-from services.novel_db import with_db  # noqa: E402
-from services.novel_db.migrations import upgrade_head  # noqa: E402
-from services.novel_db.summarizer import (  # noqa: E402
+from services.meta_store import load_meta
+from services.novel_db import with_db
+from services.novel_db.migrations import upgrade_head
+from services.novel_db.summarizer import (
     summarize_book,
     update_book_summary,
 )

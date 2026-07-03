@@ -115,7 +115,7 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
         page_count = indexed_at = ocr_done_at = summary = summary_generated_at = None
         char_count = 0
 
-    from services.novel_db.discussion_service import count_discussions  # noqa: PLC0415
+    from services.novel_db.discussion_service import count_discussions
 
     discussion_count = count_discussions(book_name)
 
@@ -174,7 +174,7 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
     return summaries
 
 
-def list_authors(conn: sqlite3.Connection) -> list[str]:  # noqa: ARG001
+def list_authors(conn: sqlite3.Connection) -> list[str]:
     """novel ソースの全書籍から重複なし作者一覧を返す（作者未設定は除く）。"""
     books = list_books(conn)
     seen: set[str] = set()

@@ -22,9 +22,9 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from config import KINDLE_NOVEL_PDF_DIR  # noqa: E402
-from services.novel_db import rebuild_book, with_db  # noqa: E402
-from services.novel_db.migrations import upgrade_head  # noqa: E402
+from config import KINDLE_NOVEL_PDF_DIR
+from services.novel_db import rebuild_book, with_db
+from services.novel_db.migrations import upgrade_head
 
 
 def _list_books() -> list[str]:

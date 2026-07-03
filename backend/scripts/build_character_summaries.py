@@ -32,15 +32,15 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from services.meta_store import load_meta  # noqa: E402
-from services.novel_db import with_db  # noqa: E402
-from services.novel_db.character_db import (  # noqa: E402
+from services.meta_store import load_meta
+from services.novel_db import with_db
+from services.novel_db.character_db import (
     collect_character_pages,
     list_book_characters_in_db,
     upsert_character,
 )
-from services.novel_db.character_summarizer import summarize_character  # noqa: E402
-from services.novel_db.migrations import upgrade_head  # noqa: E402
+from services.novel_db.character_summarizer import summarize_character
+from services.novel_db.migrations import upgrade_head
 
 
 def _list_target_books(
@@ -145,7 +145,7 @@ def _process_book(
         print(f"  [{i}/{len(stats)}] {stat.name} (pages={len(pages)} body_chars={body_chars:,}) ...", flush=True)
         try:
             summary = summarize_character(book_name, stat.name, pages)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"    ng: {e}", file=sys.stderr)
             failure += 1
             with with_db() as conn:

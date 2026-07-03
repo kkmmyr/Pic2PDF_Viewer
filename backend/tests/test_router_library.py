@@ -11,7 +11,7 @@ routers.library のユニットテスト。
 
 import os
 
-from services.meta_store import load_meta, save_meta  # noqa: E402
+from services.meta_store import load_meta, save_meta
 
 # ---------------------------------------------------------------------------
 # GET /api/pdfs (generated: images/ 走査)

@@ -45,11 +45,11 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from services.novel_db import with_db  # noqa: E402
-from services.novel_db._llm_backend import build_qwen_backend  # noqa: E402
-from services.novel_db.chunker import chunk_book, chunk_page  # noqa: E402
-from services.novel_db.embedder import embed_batch  # noqa: E402
-from services.novel_db.migrations import upgrade_head  # noqa: E402
+from services.novel_db import with_db
+from services.novel_db._llm_backend import build_qwen_backend
+from services.novel_db.chunker import chunk_book, chunk_page
+from services.novel_db.embedder import embed_batch
+from services.novel_db.migrations import upgrade_head
 
 _MIN_PAGE_CHARS = 30
 _EMBED_BATCH = 16

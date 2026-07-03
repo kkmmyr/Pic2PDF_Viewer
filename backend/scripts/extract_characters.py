@@ -21,9 +21,9 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from services.novel_db import with_db  # noqa: E402
-from services.novel_db.character_extractor import extract_main_characters  # noqa: E402
-from services.novel_db.migrations import upgrade_head  # noqa: E402
+from services.novel_db import with_db
+from services.novel_db.character_extractor import extract_main_characters
+from services.novel_db.migrations import upgrade_head
 
 
 def _list_target_pages(book_name: str | None, redo: bool) -> list[tuple[int, str, int, str]]:

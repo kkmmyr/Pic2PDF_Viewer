@@ -18,8 +18,8 @@ from pathlib import Path
 # backend/ をパス追加してパッケージ参照を解決
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from config import HITOMI_DATA_DIR as _hitomi_data_dir  # noqa: E402
-from services.hitomi import metadata, nozomi, state_store, watchlist  # noqa: E402
+from config import HITOMI_DATA_DIR as _hitomi_data_dir
+from services.hitomi import metadata, nozomi, state_store, watchlist
 
 DATA_DIR = Path(_hitomi_data_dir)
 GALLERY_URL_TEMPLATE = "https://hitomi.la/galleries/{id}.html"

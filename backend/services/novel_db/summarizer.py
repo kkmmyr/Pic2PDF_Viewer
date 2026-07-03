@@ -213,8 +213,7 @@ def load_summaries_for_books(
         return {}
     placeholders = ",".join("?" * len(book_names))
     rows = conn.execute(
-        f"SELECT name, summary FROM books "  # noqa: S608
-        f"WHERE name IN ({placeholders}) AND summary IS NOT NULL AND summary <> ''",
+        f"SELECT name, summary FROM books WHERE name IN ({placeholders}) AND summary IS NOT NULL AND summary <> ''",
         book_names,
     ).fetchall()
     return {name: summary for name, summary in rows}
@@ -312,8 +311,8 @@ def _index_summary_vector(
     """書籍サマリを bge-m3 で embedding し、LanceDB summaries テーブルに upsert する。"""
     try:
         emb = embed_batch([summary])[0]
-    except Exception as e:  # noqa: BLE001
-        import logging  # noqa: PLC0415
+    except Exception as e:
+        import logging
 
         logging.getLogger(__name__).warning(
             "Failed to index summary vector for book_id=%s: %s",

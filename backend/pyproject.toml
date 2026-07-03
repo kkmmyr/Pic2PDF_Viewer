@@ -94,7 +94,9 @@ exclude = [
 # I: isort (import 順序)
 # B: flake8-bugbear (mutable default など意図せぬバグ)
 # UP: pyupgrade (古い構文の自動更新)
-select = ["F", "E", "W", "I", "B", "UP"]
+# RUF100: 何も抑制していない # noqa コメントを検知（select に無いルール向けの noqa や、
+#   実際には違反しない行への noqa が気づかれずに残り続けるのを防ぐ）
+select = ["F", "E", "W", "I", "B", "UP", "RUF100"]
 ignore = [
     "E501",  # 行長は line-length で別管理（formatter 任せにしたいので警告は抑止）
     "B008",  # FastAPI の Depends(...) を引数デフォルトに置くため

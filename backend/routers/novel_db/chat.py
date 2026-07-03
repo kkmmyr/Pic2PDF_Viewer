@@ -105,7 +105,7 @@ async def _chat_event_stream(
                 done_reason="error",
             )
         yield sse_event({"error": f"backend not supported: {e}"})
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         logger.exception("chat SSE failed")
         with with_db() as conn:
             append_message(

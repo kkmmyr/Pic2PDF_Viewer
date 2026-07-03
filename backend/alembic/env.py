@@ -17,8 +17,8 @@ from alembic import context
 
 # backend/ をパスに追加して config モジュールを import できるようにする
 sys.path.insert(0, str(Path(__file__).parent.parent))
-import config  # noqa: E402
-from services.novel_db.models import SQLModel  # noqa: E402
+import config
+from services.novel_db.models import SQLModel
 
 alembic_config = context.config
 

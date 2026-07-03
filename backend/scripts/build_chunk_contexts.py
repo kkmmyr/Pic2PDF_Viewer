@@ -30,16 +30,16 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from services.meta_store import load_meta  # noqa: E402
-from services.novel_db import with_db  # noqa: E402
-from services.novel_db.contextualizer import (  # noqa: E402
+from services.meta_store import load_meta
+from services.novel_db import with_db
+from services.novel_db.contextualizer import (
     generate_chunk_context,
     make_embedding_input,
     should_skip_context,
 )
-from services.novel_db.embedder import embed_batch  # noqa: E402
-from services.novel_db.lance_store import get_chunks_table  # noqa: E402
-from services.novel_db.migrations import upgrade_head  # noqa: E402
+from services.novel_db.embedder import embed_batch
+from services.novel_db.lance_store import get_chunks_table
+from services.novel_db.migrations import upgrade_head
 
 # bge-m3 のバッチサイズ
 _EMBED_BATCH_SIZE = 16
@@ -182,7 +182,7 @@ def _process_book(book_id: int, book_name: str, book_summary: str, *, redo: bool
         inputs = [make_embedding_input(ctx, text) for _, ctx, text in batch]
         try:
             embeds = embed_batch(inputs)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             print(f"  embedding failed at batch {batch_start}: {e}", file=sys.stderr)
             continue
         with with_db() as conn:
