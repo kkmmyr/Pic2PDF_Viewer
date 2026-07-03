@@ -4,7 +4,7 @@ chunk_page()  : 【本番】1 ページの文字列 → チャンクリスト（
 chunk_book()  : 【§4.4 実験用】全ページ連結クロスページチャンク（1200 字 / overlap 120 字）
                 eval_chunk_strategy.py での比較検証後に本番採否を決定する。
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.2。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §3。
 """
 
 from __future__ import annotations

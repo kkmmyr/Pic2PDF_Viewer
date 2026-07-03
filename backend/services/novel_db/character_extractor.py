@@ -8,7 +8,7 @@ LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local
 `OllamaBackend` 経由に集約。urllib 直叩きを廃止して thinking 抑制と SSE 解析を
 共通モジュールに任せる。
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §6。
 """
 
 from __future__ import annotations

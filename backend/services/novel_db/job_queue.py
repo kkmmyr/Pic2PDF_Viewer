@@ -3,7 +3,7 @@
 worker スレッドが 1 つ走り、rebuild_jobs テーブルから queued ジョブを古い順に
 取り出して実行する。実行ロジックは job_worker.NovelDbJobWorker に委譲。
 検索 / 質問 API は `is_running` フラグを見て 503 を返す。
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §8。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §7。
 """
 
 from __future__ import annotations

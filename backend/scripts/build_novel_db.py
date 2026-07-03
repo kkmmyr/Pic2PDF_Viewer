@@ -7,7 +7,7 @@
     uv run python scripts/build_novel_db.py --all
     uv run python scripts/build_novel_db.py --list
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.5 を参照。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §3 を参照。
 本スクリプトは Phase D3-2（ジョブキュー実装）後は内部で job_queue 経由に置き換える予定。
 """
 

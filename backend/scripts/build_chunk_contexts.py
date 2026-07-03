@@ -16,7 +16,7 @@
 - 5 秒/chunk × 2,230 = 約 3 時間
 - バッチサイズ 16 で embedding を流すので bge-m3 部分は無視できる
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md / 機能追加候補 B-9。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §5 / 機能追加候補 B-9。
 """
 
 from __future__ import annotations

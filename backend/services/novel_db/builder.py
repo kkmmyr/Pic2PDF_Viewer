@@ -7,7 +7,7 @@
 各ステップは独立して実行可能。rebuild_from_pages は OCR 済みの full_text を前提とし、
 pages テーブルは一切変更しない（chunks/chunks_vec のみ再構築）。
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.5。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §3・§7。
 """
 
 from __future__ import annotations

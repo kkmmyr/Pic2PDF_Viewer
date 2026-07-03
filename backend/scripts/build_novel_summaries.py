@@ -10,7 +10,7 @@
 サマリは LLM (qwen3.6:35b-a3b) で map-reduce 方式で生成するため、1 冊あたり 5〜15 分
 程度かかる。11 冊で 1.5〜2 時間が目安。
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.7。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §4。
 """
 
 from __future__ import annotations

@@ -6,7 +6,7 @@
                                 （redo=False かつ summary・book_characters 両方存在でスキップ）
   3. generate_contexts   — チャンク位置説明生成 + 再 embedding（redo=False かつ contextual_text 存在でスキップ）
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.14。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §4・§7。
 """
 
 from __future__ import annotations

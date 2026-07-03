@@ -2,7 +2,7 @@
 
 DB スキーマ定義・接続・PDF テキスト抽出・チャンク分割・embedding 計算・
 DB 構築フローを提供する。詳細は
-docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md を参照。
+docs/design/詳細設計/機能別/小説RAG_データ.md を参照。
 """
 
 from .builder import ocr_book, rebuild_book, rebuild_from_pages

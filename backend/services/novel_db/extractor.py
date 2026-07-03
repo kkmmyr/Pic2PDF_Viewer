@@ -3,7 +3,7 @@
 - PDF モード: PyMuPDF で縦書きブロックを連結（既存書籍との後方互換用）
 - 画像モード: ocr_worker.py を common/ocr/venv の Python でサブプロセス実行（§5.1.1）
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.1。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §2。
 """
 
 from __future__ import annotations

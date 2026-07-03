@@ -1,7 +1,7 @@
 """novel タブ向けの書籍一覧 / シリーズ一覧の取得。
 
 novel.db の DB 状態と既存 meta.json（authors / series_id / series_title）を結合する。
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §9。
+詳細は docs/design/詳細設計/機能別/小説RAG_検索QA設計.md §1。
 """
 
 from __future__ import annotations

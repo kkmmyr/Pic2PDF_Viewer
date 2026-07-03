@@ -4,7 +4,7 @@
 固定（途中変更不可）。LLM 呼び出しは別レイヤ（`llm.stream_chat_session`）が
 本ファイルの読み書きを介して履歴を構築する。
 
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §7.x / B-16。
+詳細は docs/design/詳細設計/機能別/小説RAG_検索QA設計.md §7 / B-16。
 """
 
 from __future__ import annotations

@@ -1,7 +1,7 @@
 """Ollama 経由で embedding を取得する（bge-m3, 1024 次元）。
 
 Ollama の `/api/embed` を httpx で叩くシンプルな実装。バッチサイズは呼び出し側で制御。
-詳細は docs/03_詳細設計/小説テキスト検索・RAG機能_バックエンド設計.md §5.3。
+詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §3。
 """
 
 from __future__ import annotations
