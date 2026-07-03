@@ -121,6 +121,7 @@ nav:
           - API: design/詳細設計/API.md
           - OCR 設計書: design/詳細設計/機能別/OCR設計書.md
           - hitomi 新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
+          - 小説 RAG データ設計: design/詳細設計/機能別/小説RAG_データ.md
           - 小説 RAG バックエンド設計: design/詳細設計/機能別/小説テキスト検索・RAG機能_バックエンド設計.md
           - 小説 RAG フロントエンド設計: design/詳細設計/機能別/小説テキスト検索・RAG機能_フロントエンド設計.md
           - セキュリティ設計書: design/詳細設計/セキュリティ設計書.md
@@ -151,3 +152,4 @@ nav:
       - 実装ログ_2026-04-14: archive/実装ログ_2026-04-14.md
       - LLM 層リファクタリング_完了記録: archive/LLM層リファクタリング_完了記録.md
       - 漫画 AI 検証: archive/検証/漫画AI検証.md
+      - OCR 旧 SearchablePDF 設計: archive/OCR_旧SearchablePDF設計.md
