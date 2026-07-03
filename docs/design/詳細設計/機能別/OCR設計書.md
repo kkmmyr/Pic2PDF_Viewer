@@ -5,7 +5,7 @@
 縦書き小説OCR（yomitoku）を用いたテキスト抽出（`YomitokuEngine`）の設計。
 
 - 関連: [ADR-0003: image-only モード](../../基本設計/ADR/0003_generated-image-only-mode.md)（`generated` ソースは OCR 対象外）、[GPU環境セットアップ.md](../../環境構築/GPU環境セットアップ.md)（`uv` ベースに更新済み）
-- OCR結果の取り込み先（novel.db・検索・RAG）は [小説テキスト検索・RAG機能_バックエンド設計.md](小説テキスト検索・RAG機能_バックエンド設計.md) / [フロントエンド設計](小説テキスト検索・RAG機能_フロントエンド設計.md) を参照。
+- OCR結果の取り込み先（novel.db・検索・RAG）は [小説RAG パイプライン設計](小説RAG_パイプライン設計.md) / [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
 ---
 

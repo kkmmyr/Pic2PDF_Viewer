@@ -122,8 +122,8 @@ nav:
           - OCR 設計書: design/詳細設計/機能別/OCR設計書.md
           - hitomi 新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
           - 小説 RAG データ設計: design/詳細設計/機能別/小説RAG_データ.md
-          - 小説 RAG バックエンド設計: design/詳細設計/機能別/小説テキスト検索・RAG機能_バックエンド設計.md
-          - 小説 RAG フロントエンド設計: design/詳細設計/機能別/小説テキスト検索・RAG機能_フロントエンド設計.md
+          - 小説 RAG パイプライン設計: design/詳細設計/機能別/小説RAG_パイプライン設計.md
+          - 小説 RAG 検索QA設計: design/詳細設計/機能別/小説RAG_検索QA設計.md
           - セキュリティ設計書: design/詳細設計/セキュリティ設計書.md
       - 環境構築:
           - GPU 環境セットアップ: design/環境構築/GPU環境セットアップ.md
@@ -153,3 +153,6 @@ nav:
       - LLM 層リファクタリング_完了記録: archive/LLM層リファクタリング_完了記録.md
       - 漫画 AI 検証: archive/検証/漫画AI検証.md
       - OCR 旧 SearchablePDF 設計: archive/OCR_旧SearchablePDF設計.md
+      - hitomi 監視 実装計画と設計判断: archive/hitomi監視_実装計画と設計判断.md
+      - 小説RAG 設計過程: archive/小説RAG_設計過程.md
+      - 小説RAG FE 設計過程: archive/小説RAG_FE設計過程.md

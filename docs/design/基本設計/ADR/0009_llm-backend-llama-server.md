@@ -3,7 +3,7 @@
 - **Status**: Accepted（実装完了 2026-05-11、commit `a1eee28`）
 - **Date**: 2026-05-11
 - **決定者**: プロジェクトオーナー
-- **関連**: [ADR-0007](0007_llm-extraction-qwen-adoption.md) / [小説テキスト検索・RAG機能_バックエンド設計.md](../../詳細設計/機能別/小説テキスト検索・RAG機能_バックエンド設計.md) / [小説RAG_技術知見.md](../../../log/技術知見/小説RAG_技術知見.md) / [バックログ B-14](../../../log/計画/バックログ.md) / [LLM 層リファクタリング_完了記録](../../../archive/LLM層リファクタリング_完了記録.md)（A-0〜A-7、共通モジュールを `Qwen/` → `llm/` にリネーム + Backend 抽象化）
+- **関連**: [ADR-0007](0007_llm-extraction-qwen-adoption.md) / [小説RAG 検索QA設計](../../詳細設計/機能別/小説RAG_検索QA設計.md)（LLM 呼び出し層 §5） / [小説RAG_技術知見.md](../../../log/技術知見/小説RAG_技術知見.md) / [バックログ B-14](../../../log/計画/バックログ.md) / [LLM 層リファクタリング_完了記録](../../../archive/LLM層リファクタリング_完了記録.md)（A-0〜A-7、共通モジュールを `Qwen/` → `llm/` にリネーム + Backend 抽象化）
 - **パス更新注記**: 2026-05-11 の A-0 で共通モジュールを `D:\61.tool\common\Qwen\lib\qwen_client.py` → `D:\61.tool\common\llm\local_llm\` に再構成。本 ADR 内のパス・API 名（`qwen_client` / `QwenError` 等）は決定時の歴史的記録としてそのまま残置（現行は `local_llm` パッケージ / `LLMError`）
 
 ## コンテキスト

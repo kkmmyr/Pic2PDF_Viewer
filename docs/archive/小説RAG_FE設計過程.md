@@ -1,9 +1,8 @@
-# 小説テキスト検索・RAG 機能 フロントエンド設計書
+# 小説 RAG フロントエンド 設計過程（凍結: 2026-07-03）
 
-> status: absorption-pending | last-verified: 2026-05-09
-<!-- 吸収予定（設計書ガバナンス再編 G4）。それまで本書が当該機能の正本。 -->
+> 📦 本書は 小説テキスト検索・RAG機能_フロントエンド設計書（2026-05-09 初版ドラフト）から切り出した設計判断・完了済み移行計画・初版の計画形記述。歴史記録として凍結。現行の FE 設計は [フロントエンド編](../design/詳細設計/詳細設計書_フロントエンド編.md) と [フロントエンド_ファイルマップ](../design/詳細設計/詳細設計書_フロントエンド_ファイルマップ.md)。以後編集しない。
 
-novel タブの「テキスト DB ビューア」を実現するフロントエンド側の詳細設計書。要件は 小説テキスト検索・RAG機能.md、API は [小説テキスト検索・RAG機能_バックエンド設計.md](小説テキスト検索・RAG機能_バックエンド設計.md) を参照。
+<!-- 初版当時の関連文書（当時の相対パス／現存を保証しない）: 要件 = `小説テキスト検索・RAG機能.md` / バックエンド = `小説テキスト検索・RAG機能_バックエンド設計.md`。本書内の旧ドキュメント相対リンクは凍結時に平テキスト化した。 -->
 
 ---
 
@@ -20,16 +19,16 @@ novel タブを **OCR テキスト DB を主軸とした検索・質問応答ビ
 
 ### 1.2. 設計原則
 
-- **既存規約踏襲**: components/reader (presentation) + components/viewer (state container) 分離 / apiClient 必須 / Dialog 共通シェル / z-index Tailwind 階層 / `any` 禁止（[frontend-conventions skill](../../../../.claude/skills/frontend-conventions/SKILL.md)）
+- **既存規約踏襲**: components/reader (presentation) + components/viewer (state container) 分離 / apiClient 必須 / Dialog 共通シェル / z-index Tailwind 階層 / `any` 禁止（`.claude/skills/frontend-conventions/SKILL.md`）
 - **別ルート並行運用**: 新画面は `/novel/db` で稼働（初期設計では `/novel-db`、移行後に `/novel/db` に変更）。既存 `/viewer?source=novel` は撤去済み
 - **専用ディレクトリ**: `components/novel_db/` `hooks/novel_db/` `features/novel_db/` のように本機能専用の名前空間を切る（hitomi 機能と同等のスタイル）
 
 ### 1.3. 関連ドキュメント
 
 - 要件定義: docs/01_要件定義/小説テキスト検索・RAG機能.md
-- バックエンド設計: [小説テキスト検索・RAG機能_バックエンド設計.md](小説テキスト検索・RAG機能_バックエンド設計.md)
-- 既存フロント全体: [詳細設計書_フロントエンド編.md](../詳細設計書_フロントエンド編.md)
-- API 仕様: [API仕様書.md](../API.md) §X（後続追加予定）
+- バックエンド設計: `小説テキスト検索・RAG機能_バックエンド設計.md`
+- 既存フロント全体: `詳細設計書_フロントエンド編.md`（現行: ../design/詳細設計/）
+- API 仕様: `API仕様書.md`（廃止・Swagger UI / openapi.json に一本化） §X（後続追加予定）
 
 ---
 
@@ -367,7 +366,7 @@ const { items: history, ... } = useNovelDbHistory(decodedName);
 
 **セクション間の順序の意図:**
 
-「会話 QA（ChatSection）が先、質問＋履歴（QuestionSection）が後」は、一問一答の記録よりマルチターン対話を優先する UX 上の判断（[要件定義](../../../archive/要件/NovelPage_QA_UI_リデザイン_要件.md)）。
+「会話 QA（ChatSection）が先、質問＋履歴（QuestionSection）が後」は、一問一答の記録よりマルチターン対話を優先する UX 上の判断（要件定義: `archive/要件/NovelPage_QA_UI_リデザイン_要件.md`）。
 
 ---
 
@@ -696,15 +695,15 @@ streamDiscussion(body, {
 - **画像プリロード**: PageImageModal で前後ページを開いたときの読み込み待ち時間は許容。気になれば将来 `useImagePreloader` 流用
 - **オフライン対応**: 想定しない（LAN 内利用前提）
 - **モバイル対応**: PC 利用前提。スマホで開けはするが、モーダル UI 等の最適化は別途
-- **キーボードショートカット**: 検索 (`/`)、質問 (`?`) などのトップレベルショートカットは [バックログ.md](../../../log/計画/バックログ.md) と相談しつつ後付け
+- **キーボードショートカット**: 検索 (`/`)、質問 (`?`) などのトップレベルショートカットは `バックログ.md`（log/計画/）と相談しつつ後付け
 
 ---
 
 ## 13. 関連ドキュメント
 
 - 要件: docs/01_要件定義/小説テキスト検索・RAG機能.md
-- バックエンド設計: [小説テキスト検索・RAG機能_バックエンド設計.md](小説テキスト検索・RAG機能_バックエンド設計.md)
-- 既存フロント全体: [詳細設計書_フロントエンド編.md](../詳細設計書_フロントエンド編.md)
-- フロント規約: [.claude/skills/frontend-conventions/SKILL.md](../../../../.claude/skills/frontend-conventions/SKILL.md)
-- API 仕様: [API仕様書.md](../API.md)（後続で novel_db セクション追加）
+- バックエンド設計: `小説テキスト検索・RAG機能_バックエンド設計.md`
+- 既存フロント全体: `詳細設計書_フロントエンド編.md`（現行: ../design/詳細設計/）
+- フロント規約: `.claude/skills/frontend-conventions/SKILL.md`
+- API 仕様: `API仕様書.md`（廃止・Swagger UI / openapi.json に一本化）（後続で novel_db セクション追加）
 - PoC 実装の参考: 旧 `tmp_poc/`（実装完了後に削除済み）

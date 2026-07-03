@@ -71,15 +71,36 @@ def _iter_non_fenced_lines(md_file: Path):
         yield lineno, line
 
 
-def check_broken_links() -> list[str]:
+def _is_frozen_record(md_file: Path) -> bool:
+    """凍結記録（追記専用・原則編集しない）か判定する。
+
+    これらの文書が「その後に分割・削除された doc / コード」を指すのは歴史記録として
+    正常なので、リンク切れをブロッキング違反にせず情報表示に留める（doc の正当な
+    再編のたびに過去の変更履歴を書き換えさせないため。方法論の罠カタログ §8-3）。
+    - archive/ 配下すべて
+    - 週次アーカイブ 変更履歴/YYYY-Www.md（メインの log/変更履歴.md は living なので対象外）
+    """
+    parts = md_file.relative_to(DOCS_DIR).parts
+    if "archive" in parts:
+        return True
+    if "変更履歴" in parts and WEEKLY_CHANGELOG_RE.match(md_file.name):
+        return True
+    return False
+
+
+def check_broken_links() -> tuple[list[str], list[str]]:
     """docs/**/*.md 内の相対 Markdown リンク（*.md 宛て）の切れを検出する。
 
     リンクはリンク元ファイル自身のディレクトリ基準で解決する（このリポジトリの
-    docs 内リンクは実際にそう書かれているため。例: `../05_記録/変更履歴.md`）。
+    docs 内リンクは実際にそう書かれているため。例: `../log/変更履歴.md`）。
+
+    返り値は (living 文書のブロッキング違反, 凍結記録内の情報のみリンク切れ)。
     """
     violations: list[str] = []
+    frozen_info: list[str] = []
     for md_file in sorted(DOCS_DIR.rglob("*.md")):
         rel_file = md_file.relative_to(PROJECT_ROOT)
+        frozen = _is_frozen_record(md_file)
         for lineno, line in _iter_non_fenced_lines(md_file):
             for m in MD_LINK_RE.finditer(line):
                 raw = m.group(1).strip()
@@ -94,8 +115,9 @@ def check_broken_links() -> list[str]:
                     continue
                 resolved = (md_file.parent / target).resolve()
                 if not resolved.exists():
-                    violations.append(f"{rel_file}:{lineno} -> {raw}")
-    return violations
+                    entry = f"{rel_file}:{lineno} -> {raw}"
+                    (frozen_info if frozen else violations).append(entry)
+    return violations, frozen_info
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +301,7 @@ def check_design_headers() -> list[str]:
 
 
 def main() -> None:
-    broken_links = check_broken_links()
+    broken_links, frozen_link_info = check_broken_links()
     changelog_over = check_changelog_size()
     nav_violations = check_nav_sync()
     size_warnings = check_design_doc_size()
@@ -287,9 +309,15 @@ def main() -> None:
 
     print("=== check_docs: docs/ 整合性チェック ===\n")
 
-    print(f"[Rule 1] docs 間リンク切れ: {len(broken_links)} 件")
+    print(f"[Rule 1] docs 間リンク切れ（living）: {len(broken_links)} 件")
     for line in broken_links:
         print(f"  {line}")
+    if frozen_link_info:
+        print(
+            f"  （凍結記録内のリンク切れ {len(frozen_link_info)} 件 = 歴史記録につき非ブロック・情報のみ）"
+        )
+        for line in frozen_link_info:
+            print(f"  [info] {line}")
     print()
 
     print(f"[Rule 2] 変更履歴.md 行数超過 (> {CHANGELOG_LINE_LIMIT} 行): {len(changelog_over)} 件")
