@@ -91,6 +91,9 @@ jobs:
       - name: Check docs (リンク切れ・変更履歴肥大化・nav 孤児)
         run: uv run python scripts/maintenance/check_docs.py
 
+      - name: Check file-map freshness
+        run: uv run python scripts/maintenance/generate_file_map.py --check
+
       - name: Install mkdocs
         run: pip install mkdocs mkdocs-material mkdocs-mermaid2-plugin
 

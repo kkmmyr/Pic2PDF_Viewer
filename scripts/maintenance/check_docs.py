@@ -1,13 +1,14 @@
 """`docs/**/*.md` の整合性を検査する（pre-commit フックからコミットをブロックする）。
 
 check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツール）とは異なり、
-本スクリプトは違反があれば **exit 1** する。以下 5 ルールを検査する。
+本スクリプトは違反があれば **exit 1** する。以下 6 ルールを検査する。
 
   Rule 1: docs 間の相対 Markdown リンク切れ
   Rule 2: メインの変更履歴.md の行数肥大化（週次ローテーション漏れ）
   Rule 3: mkdocs.yml の nav ツリーとの同期（dead entry / orphan ファイル）
   Rule 4: design/ 各 spec 文書のサイズ超過（warn・非ブロック）
   Rule 5: design/ 各 spec 文書の status ヘッダ欠落（ブロッキング）
+  Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ（ブロッキング）
 
 usage:
     uv run python scripts/maintenance/check_docs.py
@@ -296,6 +297,67 @@ def check_design_headers() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ
+# ---------------------------------------------------------------------------
+
+# generate_file_map.py（scripts/maintenance/generate_file_map.py）が
+# ディレクトリツリーを自動生成する 2 文書。手書きの「## 2. 主要ファイル補足」
+# 表はスクリプト管理外のため、ここで実在チェックする。config ファイルなし・
+# パス直書きの慣習は DESIGN_DIR / MKDOCS_YML と同様。
+FILE_MAP_DOCS = [
+    DESIGN_DIR / "詳細設計" / "詳細設計書_フロントエンド_ファイルマップ.md",
+    DESIGN_DIR / "詳細設計" / "詳細設計書_バックエンド_ファイルマップ.md",
+]
+
+FILE_MAP_SECTION_HEADING = "## 2. 主要ファイル補足"
+
+
+def check_file_map_annotations() -> list[str]:
+    """Rule 6（fail・ブロッキング）: FILE_MAP_DOCS の「主要ファイル補足」表の
+    第一列（Markdown リンク）が実在するファイルを指しているか検査する。
+
+    セクション自体（`## 2. 主要ファイル補足`）が見つからない場合も違反とする。
+    """
+    violations: list[str] = []
+    for md_file in FILE_MAP_DOCS:
+        rel_file = md_file.relative_to(PROJECT_ROOT)
+        if not md_file.exists():
+            violations.append(f"{rel_file}: ファイルが存在しません")
+            continue
+
+        lines = md_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        section_start = next(
+            (i for i, line in enumerate(lines) if line.strip() == FILE_MAP_SECTION_HEADING),
+            None,
+        )
+        if section_start is None:
+            violations.append(f"{rel_file}: 「{FILE_MAP_SECTION_HEADING}」セクションが見つかりません")
+            continue
+
+        # 次の `## ` 見出し（なければ末尾）までがセクション範囲
+        section_end = len(lines)
+        for i in range(section_start + 1, len(lines)):
+            if lines[i].startswith("## "):
+                section_end = i
+                break
+
+        for offset, line in enumerate(lines[section_start:section_end]):
+            if not line.strip().startswith("|"):
+                continue
+            m = MD_LINK_RE.search(line)
+            if not m:
+                continue
+            lineno = section_start + offset + 1
+            target = m.group(1).strip()
+            if target.lower().startswith(("http://", "https://")):
+                continue
+            resolved = (md_file.parent / target).resolve()
+            if not resolved.exists():
+                violations.append(f"{rel_file}:{lineno} -> {target}（実在しません）")
+    return violations
+
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -306,6 +368,7 @@ def main() -> None:
     nav_violations = check_nav_sync()
     size_warnings = check_design_doc_size()
     header_missing = check_design_headers()
+    file_map_violations = check_file_map_annotations()
 
     print("=== check_docs: docs/ 整合性チェック ===\n")
 
@@ -343,8 +406,19 @@ def main() -> None:
         print(f"  {line}")
     print()
 
-    # Rule 4 は warn のため合計には数えない（Rule 1/2/3/5 のみブロッキング）。
-    total = len(broken_links) + len(changelog_over) + len(nav_violations) + len(header_missing)
+    print(f"[Rule 6] ファイルマップ注釈の参照切れ: {len(file_map_violations)} 件")
+    for line in file_map_violations:
+        print(f"  {line}")
+    print()
+
+    # Rule 4 は warn のため合計には数えない（Rule 1/2/3/5/6 のみブロッキング）。
+    total = (
+        len(broken_links)
+        + len(changelog_over)
+        + len(nav_violations)
+        + len(header_missing)
+        + len(file_map_violations)
+    )
     if total == 0:
         if size_warnings:
             print(f"ブロッキング違反なし（Rule 4 の warn が {len(size_warnings)} 件あります）。")

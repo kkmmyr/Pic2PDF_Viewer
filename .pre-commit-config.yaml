@@ -30,6 +30,13 @@ repos:
         files: ^(docs/.*\.md|mkdocs\.yml)$
         pass_filenames: false
 
+      - id: file-map
+        name: file-map (ファイルマップを生成し鮮度を保証)
+        entry: uv run python scripts/maintenance/generate_file_map.py
+        language: system
+        files: ^(backend/.*|kindle-pdf/.*|frontend/src/.*|docs/design/詳細設計/詳細設計書_(バックエンド|フロントエンド)_ファイルマップ\.md)$
+        pass_filenames: false
+
   # --- General ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
