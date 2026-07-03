@@ -18,6 +18,6 @@ case "$cmd" in
 esac
 
 cat <<'EOF'
-{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "git commit が完了しました。memory/pending_tasks.md の「作業中（未コミット）」欄と完了タスクを更新してください（/sync-memory で一括チェックできます）。"}}
+{"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "git commit が完了しました。CLAUDE.md「タスク完了後の必須アクション」③に従い memory/ を更新してください（project/feedback/reference のいずれか該当するもの。ズレの棚卸しは /sync-memory）。"}}
 EOF
 exit 0

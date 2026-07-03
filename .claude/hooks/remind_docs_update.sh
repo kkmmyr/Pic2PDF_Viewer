@@ -45,6 +45,6 @@ touch "$marker_file"
 
 # Step 3: ソース変更で docs/ 未更新 → advisory として additionalContext を追加
 cat <<'EOF'
-{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "実装変更前に docs/ 配下の関連設計書を更新するのが推奨です（typo修正・小規模リファクタ等の軽微な変更は無視して構いません）。設計の意図を変える変更の場合は、設計書と docs/log/変更履歴.md の更新をこの編集に先行させてください。"}}
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": "設計の意図に関わる変更なら、この編集の前に docs/ 更新 → 変更履歴.md の順序を先行させてください（手順・スキップ条件: CLAUDE.md「タスク完了後の必須アクション」/ docs-workflow skill）。"}}
 EOF
 exit 0

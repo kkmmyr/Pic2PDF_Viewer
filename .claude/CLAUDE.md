@@ -58,6 +58,8 @@ mkdocs セットアップ・HTML 配信の詳細は `docs/design/環境構築/` 
 
 **不要なケース（スキップしてよい）**: typo 修正・コメント整理・テスト追加・フォーマットのみの変更。迷ったら実施する側に倒す。
 
+本節が正本。編集直前 (①) は `hooks/remind_docs_update.sh`、commit 後 (③) は `hooks/remind_memory_sync.sh` が advisory で短く再通知する。①の設計書振り分けの詳細は `docs-workflow` skill を参照。
+
 ## 計画候補の振り分け
 
 新しい改善候補を起票する前に1問だけ判定する: **「ユーザーから見た振る舞いが新しく増える/変わるか？」**
