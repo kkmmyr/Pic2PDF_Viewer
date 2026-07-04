@@ -7,7 +7,10 @@ describe('useRelatedBooksNavigation', () => {
     const mockOnSelectPdf = vi.fn();
 
     const defaultProps = {
-        relatedBooks: { series: [{ name: 'vol2.pdf' }], authors: [] },
+        relatedBooks: {
+            series: [{ name: 'vol2.pdf', seriesIndex: 2, seriesTitle: 'サンプルシリーズ' }],
+            authors: [],
+        },
         onSelectPdf: mockOnSelectPdf,
         recordView: mockRecordView,
         currentPath: '/path/to/book.pdf',
