@@ -22,7 +22,8 @@ description: frontend/src/ 配下の React/TypeScript コードを編集する�
 
 ## ダイアログ・UI 共通プリミティブ
 
-- UI プリミティブは `components/ui/` に置く。ファイル名は **kebab-case**（shadcn/ui CLI 規約: `dialog.tsx`, `confirm-dialog.tsx`, `button.tsx` 等）。import は `@/components/ui` バレル（`index.ts`）経由
+- UI プリミティブは `components/ui/` に置き、**個別ファイルを直接 import** する（`import { Dialog } from '@/components/ui/dialog'`。バレル index.ts は存在しない）
+- 新規ファイル名は **kebab-case**（shadcn/ui CLI 規約: `confirm-dialog.tsx` 等）。⚠既存 7 ファイル（`Dialog.tsx` `Button.tsx` `Alert.tsx` 等）は PascalCase のまま残っており、import 側は小文字（`ui/dialog`）で書かれている — **Windows の大文字小文字非区別で偶然解決している潜在バグ**。case-sensitive 環境（Linux CI 等）ではビルドが壊れるため、これらへの import を書くときは既存記法（小文字）に合わせ、根本解消（kebab-case への git mv）は別作業として起票する
 - ダイアログは `@/components/ui` の `<Dialog>` / `DialogBody` / `DialogFooter` / `DialogCancelButton` / `DialogPrimaryButton` を使用する。手書きの `fixed inset-0 bg-black/50 ...` 禁止
 - ユーザー確認は `ConfirmDialog` を使用する。`confirm()` / `alert()` 禁止
 - エラー通知は **sonner** の `toast()`（`import { toast } from 'sonner'`）を使用する。旧 `useToast` は廃止済み
