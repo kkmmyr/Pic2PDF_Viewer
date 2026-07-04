@@ -36,8 +36,8 @@ cd frontend && npm run test:coverage
 cd backend && uv run ruff check . && uv run ruff format .
 cd frontend && npm run lint && npm run format
 
-# 型チェック
-cd frontend && npx tsc --noEmit
+# 型チェック（tsc --noEmit は solution tsconfig のため 0 ファイル検査の no-op — 使わない）
+cd frontend && npx tsc -b
 
 # OpenAPI から TypeScript 型を再生成（backend :8766 起動中に実行）
 cd frontend && npm run generate:types
