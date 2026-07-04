@@ -38,7 +38,7 @@ description: pytest（バックエンド）/ vitest（フロントエンド）�
 
 - 全件: backend `cd backend && uv run pytest` / frontend `cd frontend && npm run test -- --run`（`--run` で vitest watch を抑止）
 - 個別: backend `cd backend && uv run pytest tests/test_xxx.py -v` / frontend `cd frontend && npx vitest run src/test/xxx.test.ts`
-- 型チェック: `cd frontend && npx tsc --noEmit`
+- 型チェック: `cd frontend && npx tsc -b`（build と同じ検査）。**`tsc --noEmit` は使わない** — tsconfig.json が solution 形式（`files:[]` + references のみ）のため 0 ファイル検査の no-op になる（実測確認済み）
 - バグ修正コミットには **必ず再現テストを含める**（Phase 15-4 が好例）
 
 ## 詳細なテストパターン
