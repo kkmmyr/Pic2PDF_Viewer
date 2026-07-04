@@ -87,6 +87,36 @@ export interface GenerateJob {
     error: string | null;
 }
 
+// TODO: backend マージ後に `npm run generate:types` を実行し、生成型 (api.d.ts) に置き換える
+export type DoujinWatcherState =
+    | 'idle'
+    | 'waiting_stable'
+    | 'running'
+    | 'input_missing'
+    | 'disabled';
+
+export interface DoujinWatcherPendingItem {
+    name: string;
+    kind: 'zip' | 'folder';
+}
+
+export interface DoujinWatcherLastAutoJob {
+    job_id: string;
+    status: string;
+    finished_at: string;
+}
+
+export interface DoujinWatcherStatus {
+    enabled: boolean;
+    state: DoujinWatcherState;
+    interval_sec: number;
+    last_scan_at: string | null;
+    pending_items: DoujinWatcherPendingItem[];
+    active_job_id: string | null;
+    last_auto_job: DoujinWatcherLastAutoJob | null;
+    retry_blocked: boolean;
+}
+
 /**
  * 並び替え順序
  */

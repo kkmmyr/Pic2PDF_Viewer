@@ -20,12 +20,13 @@ function rejectHandler(error: AxiosError): ApiError {
         return new ApiError(message, undefined, kind);
     }
     const status = error.response.status;
-    const detail =
-        (error.response.data as { detail?: string } | undefined)?.detail ??
-        error.message ??
-        '予期しないエラーが発生しました。';
+    const rawDetail = (error.response.data as { detail?: unknown } | undefined)?.detail;
+    const message =
+        typeof rawDetail === 'string'
+            ? rawDetail
+            : (error.message ?? '予期しないエラーが発生しました。');
     const kind: ErrorKind['kind'] = status >= 500 ? 'server' : 'client';
-    return new ApiError(detail, status, kind);
+    return new ApiError(message, status, kind, rawDetail);
 }
 
 const buildError = (overrides: Partial<AxiosError>): AxiosError =>

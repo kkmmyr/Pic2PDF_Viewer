@@ -40,6 +40,8 @@ export const API_ENDPOINTS = {
     BATCH_COMPRESS: '/api/batch_compress',
     /** Generate ジョブ進捗取得 */
     GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
+    /** 同人誌フォルダ自動監視の状態取得 */
+    GENERATE_WATCHER: '/api/generate/watcher',
     /** 書籍メタデータ取得・更新 */
     META: '/api/meta',
     /** メタデータ一括エクスポート（JSON ダウンロード） */

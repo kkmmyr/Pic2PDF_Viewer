@@ -1,12 +1,15 @@
 """PDF 生成・変換ジョブルーター。
 
-POST /generate         — バックグラウンドで PDF 生成ジョブを起動
-GET  /generate/job/:id — ジョブ進捗を取得
-GET  /status           — 入力ディレクトリ (config.DOUJIN_INPUT_DIR) の変換状態を一覧
-POST /batch_compress   — 既存 PDF を一括圧縮
+POST /generate          — バックグラウンドで PDF 生成ジョブを起動
+GET  /generate/job/:id  — ジョブ進捗を取得
+GET  /generate/watcher  — 同人誌フォルダ自動監視の状態を取得
+GET  /status            — 入力ディレクトリ (config.DOUJIN_INPUT_DIR) の変換状態を一覧
+POST /batch_compress    — 既存 PDF を一括圧縮
+
+PDF 生成ジョブの実行ロジック・排他ロックは services.generate_service に集約し、
+本ルーターの手動起動と services.doujin_watcher の自動起動が同一のコードパスを通る。
 """
 
-import asyncio
 import os
 from enum import StrEnum
 
@@ -15,10 +18,16 @@ from pydantic import BaseModel
 
 import config
 from routers._deps import log_and_raise_500
-from routers.api_schemas import BatchCompressResponse, GenerateJobOut, GenerateStartResponse, GenerateStatusResponse
-from services.job_manager import GenerateJob, JobStatus, JobStore
-from services.meta_store import update_meta_locked
-from services.pdf_generator import batch_compress, scan_and_generate
+from routers.api_schemas import (
+    BatchCompressResponse,
+    GenerateJobOut,
+    GenerateStartResponse,
+    GenerateStatusResponse,
+    GenerateWatcherResponse,
+)
+from services.doujin_watcher import doujin_watcher
+from services.generate_service import get_active_job_id, job_store, start_generate_job
+from services.pdf_generator import batch_compress
 from utils.file_utils import is_webp_file, is_zip_file
 from utils.logger import get_logger
 
@@ -33,72 +42,35 @@ class GenerateStatus(StrEnum):
     COMPLETED = "completed"
 
 
-job_store = JobStore()
-
-
-def _run_generate_job(job: GenerateJob) -> None:
-    """同期ワーカー: executor スレッドで PDF 生成ジョブを実行する。"""
-
-    def progress_callback(item_name: str):
-        job.update(current_item=item_name)
-        logger.info("Processing: %s", item_name)
-
-    try:
-        job.update(status=JobStatus.RUNNING, current_item="Starting...")
-
-        result = scan_and_generate(
-            config.DOUJIN_INPUT_DIR,
-            None,  # image-only モード: PDF 生成をスキップ
-            config.THUMBNAIL_DIR,
-            config.IMAGES_DIR,
-            config.COMPLETE_DIR,
-            progress_callback=progress_callback,
-        )
-
-        # 新規生成ファイルにのみ genre: "オリジナル" を初期書き込み（再生成時は保持）
-        if result.generated:
-
-            def _init_genre(data):
-                for name in result.generated:
-                    if name not in data:
-                        data[name] = {"genre": "オリジナル"}
-
-            update_meta_locked("doujin", _init_genre)
-
-        failed_dicts = [{"name": n, "error": e} for n, e in result.failed_items]
-        if failed_dicts:
-            message = f"Generation complete: {len(result.generated)} succeeded, {len(failed_dicts)} failed"
-        else:
-            message = "Generation complete"
-
-        job.update(
-            status=JobStatus.COMPLETED,
-            current_item=None,
-            files=result.generated,
-            failed_items=failed_dicts,
-            message=message,
-        )
-        logger.info("Job %s completed: %d files, %d failed", job.job_id, len(result.generated), len(failed_dicts))
-
-    except Exception as e:
-        logger.exception("Job %s failed", job.job_id)
-        job.update(status=JobStatus.FAILED, current_item=None, error=str(e))
-
-
-async def _run_generate_job_async(job: GenerateJob) -> None:
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _run_generate_job, job)
-
-
 @router.post("/generate", response_model=GenerateStartResponse)
 async def generate_pdfs():
     if not os.path.isdir(config.DOUJIN_INPUT_DIR):
         raise HTTPException(status_code=503, detail=f"Input directory not found: {config.DOUJIN_INPUT_DIR}")
 
-    job = job_store.create()
-    asyncio.create_task(_run_generate_job_async(job))
+    job = await start_generate_job(trigger="manual")
+    if job is None:
+        active_job_id = get_active_job_id()
+        raise HTTPException(status_code=409, detail=f"Generation already running (job_id={active_job_id})")
+
+    # 手動実行 = 再試行の意思表示。同一残骸に対する自動再試行のブロックを解除する。
+    doujin_watcher.clear_last_attempted()
 
     return {"job_id": job.job_id, "status": "pending"}
+
+
+@router.get("/generate/watcher", response_model=GenerateWatcherResponse)
+def get_generate_watcher():
+    """同人誌フォルダ自動監視の現在状態を返す。"""
+    return {
+        "enabled": config.DOUJIN_WATCH_ENABLED,
+        "state": doujin_watcher.state,
+        "interval_sec": config.DOUJIN_WATCH_INTERVAL_SEC,
+        "last_scan_at": doujin_watcher.last_scan_at,
+        "pending_items": [{"name": p.name, "kind": p.kind} for p in doujin_watcher.pending_items],
+        "active_job_id": get_active_job_id(),
+        "last_auto_job": doujin_watcher.last_auto_job,
+        "retry_blocked": doujin_watcher.retry_blocked,
+    }
 
 
 @router.get("/generate/job/{job_id}", response_model=GenerateJobOut)

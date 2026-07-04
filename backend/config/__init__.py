@@ -54,6 +54,10 @@ class _AppSettings(BaseSettings):
     # OCR パッケージディレクトリ（ocr_engine.py が置かれた common/ocr/ パス）
     # ocr_worker.py サブプロセスに OCR_PATH 環境変数として渡される
     OCR_PACKAGE_PATH: str | None = None
+    # 同人誌入力フォルダの自動監視を有効にするか
+    DOUJIN_WATCH_ENABLED: bool = True
+    # 監視間隔（秒）
+    DOUJIN_WATCH_INTERVAL_SEC: int = 15
 
 
 _s = _AppSettings()
@@ -130,6 +134,12 @@ THUMBNAIL_HEIGHT = 500
 # ---------------------------------------------------------------------------
 JOB_MAX_JOBS = 20
 OCR_LOG_MAXLEN = 2000
+
+# ---------------------------------------------------------------------------
+# 同人誌フォルダ監視設定
+# ---------------------------------------------------------------------------
+DOUJIN_WATCH_ENABLED: bool = _s.DOUJIN_WATCH_ENABLED
+DOUJIN_WATCH_INTERVAL_SEC: int = _s.DOUJIN_WATCH_INTERVAL_SEC
 
 # ---------------------------------------------------------------------------
 # ZIP 解凍上限（zip bomb 対策）

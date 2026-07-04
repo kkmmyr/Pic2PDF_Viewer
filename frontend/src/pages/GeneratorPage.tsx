@@ -1,14 +1,21 @@
-import { useState, useCallback } from 'react';
-import { FolderSearch, Loader2, Zap } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
+import { FolderSearch, Loader2, RefreshCw, Zap } from 'lucide-react';
 import { API_ENDPOINTS } from '@/config/api';
 import generateApiClient from '@/config/generate_api_client';
+import { ApiError } from '@/config/api_client';
 import { usePdfStatus } from '@/hooks/usePdfStatus';
 import { useGenerateJob } from '@/hooks/useGenerateJob';
+import { useDoujinWatcher } from '@/hooks/useDoujinWatcher';
 import { JobProgress } from '@/components/generator/JobProgress';
 import { StatusTable } from '@/components/generator/StatusTable';
+import { WatcherStatusCard } from '@/components/generator/WatcherStatusCard';
 import { Alert } from '@/components/ui/alert';
 import { errorMessage } from '@/utils/error';
 import type { GenerateJob, GenerateFailedItem } from '@/types';
+
+/** 409 の ApiError.message から `job_id=<uuid>` を抜き出す */
+const JOB_ID_FROM_MESSAGE_RE = /job_id=([^)]+)\)/;
 
 const DEFAULT_QUALITY = 50;
 
@@ -39,9 +46,18 @@ export default function GeneratorPage() {
         onFailed,
     );
 
+    const { watcher } = useDoujinWatcher();
+
     const isLoading = isGenerating || isCompressing;
 
     const { statusItems, refetch: fetchStatus } = usePdfStatus(isLoading);
+
+    // watcher がバックグラウンドでジョブを自動起動した場合、同じ JobProgress UI に反映する
+    useEffect(() => {
+        if (watcher?.active_job_id && watcher.active_job_id !== currentJob?.job_id) {
+            startJob(watcher.active_job_id);
+        }
+    }, [watcher?.active_job_id, currentJob?.job_id, startJob]);
 
     const handleGenerate = async () => {
         setError(null);
@@ -52,6 +68,14 @@ export default function GeneratorPage() {
             );
             startJob(data.job_id);
         } catch (err: unknown) {
+            if (err instanceof ApiError && err.status === 409) {
+                toast.error('取り込みは既に実行中です');
+                const match = JOB_ID_FROM_MESSAGE_RE.exec(err.message);
+                if (match) {
+                    startJob(match[1]);
+                }
+                return;
+            }
             setError(errorMessage(err, '生成に失敗しました。'));
         }
     };
@@ -92,11 +116,14 @@ export default function GeneratorPage() {
                         </Alert>
                     )}
 
+                    {/* 自動監視ステータス */}
+                    <WatcherStatusCard watcher={watcher} />
+
                     {/* 入力ディレクトリ説明 */}
                     <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
                         <p className="text-sm text-blue-800 dark:text-blue-200">
                             サーバーの入力フォルダ（Samba 共有）に WebP 画像または ZIP
-                            を配置してから生成してください。
+                            を配置してから生成してください。新着は自動監視により自動的に取り込まれます。
                         </p>
                     </div>
 
@@ -139,8 +166,8 @@ export default function GeneratorPage() {
                                 </>
                             ) : (
                                 <>
-                                    <FolderSearch className="w-5 h-5" />
-                                    スキャン &amp; 生成
+                                    <RefreshCw className="w-5 h-5" />
+                                    今すぐスキャン
                                 </>
                             )}
                         </button>

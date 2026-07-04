@@ -16,7 +16,7 @@ class JobStatus(StrEnum):
 class GenerateJob:
     """1回のPDF生成ジョブを表すデータクラス。"""
 
-    def __init__(self, job_id: str) -> None:
+    def __init__(self, job_id: str, trigger: str = "manual") -> None:
         self.job_id = job_id
         self.status: JobStatus = JobStatus.PENDING
         self.current_item: str | None = None
@@ -25,6 +25,8 @@ class GenerateJob:
         self.failed_items: list[dict[str, str]] = []
         self.message: str = ""
         self.error: str | None = None
+        # "manual"（手動 API 起動）| "auto"（フォルダ監視による自動起動）
+        self.trigger: str = trigger
         self._lock = threading.Lock()
 
     def to_dict(self) -> dict[str, object]:
@@ -37,6 +39,7 @@ class GenerateJob:
                 "failed_items": list(self.failed_items),
                 "message": self.message,
                 "error": self.error,
+                "trigger": self.trigger,
             }
 
     def update(self, **kwargs: Any) -> None:
@@ -55,8 +58,8 @@ class JobStore:
         self._jobs: dict[str, GenerateJob] = {}
         self._order: list[str] = []
 
-    def create(self) -> GenerateJob:
-        job = GenerateJob(str(uuid.uuid4()))
+    def create(self, trigger: str = "manual") -> GenerateJob:
+        job = GenerateJob(str(uuid.uuid4()), trigger=trigger)
         with self._lock:
             self._jobs[job.job_id] = job
             self._order.append(job.job_id)

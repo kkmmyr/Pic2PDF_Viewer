@@ -37,6 +37,7 @@ from routers import (
     series,
     thumbnails,
 )
+from services.doujin_watcher import doujin_watcher
 from services.meta_db import init_db
 from services.novel_db.job_queue import job_queue
 from services.novel_db.migrations import upgrade_head
@@ -47,13 +48,15 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """起動時に meta_db / novel_db の初期化・マイグレーションと job_queue worker を起動する。"""
+    """起動時に meta_db / novel_db の初期化・マイグレーションと job_queue / doujin_watcher を起動する。"""
     init_db()
     upgrade_head()
     await job_queue.start()
+    await doujin_watcher.start()
     try:
         yield
     finally:
+        await doujin_watcher.stop()
         await job_queue.stop()
 
 

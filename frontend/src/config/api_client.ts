@@ -14,6 +14,7 @@ export class ApiError extends Error {
         message: string,
         public readonly status: number | undefined,
         public readonly kind: ApiErrorKind,
+        public readonly detail?: unknown,
     ) {
         super(message);
         this.name = 'ApiError';
@@ -38,14 +39,15 @@ export function createResponseInterceptor(client: AxiosInstance): void {
             }
 
             const status = error.response.status;
-            const detail =
-                (error.response.data as { detail?: string } | undefined)?.detail ??
-                error.message ??
-                '予期しないエラーが発生しました。';
+            const rawDetail = (error.response.data as { detail?: unknown } | undefined)?.detail;
+            const message =
+                typeof rawDetail === 'string'
+                    ? rawDetail
+                    : (error.message ?? '予期しないエラーが発生しました。');
             const kind: ApiErrorKind = status >= 500 ? 'server' : 'client';
 
-            console.error(`API Error [${status}]:`, detail);
-            return Promise.reject(new ApiError(detail, status, kind));
+            console.error(`API Error [${status}]:`, message);
+            return Promise.reject(new ApiError(message, status, kind, rawDetail));
         },
     );
 }

@@ -54,6 +54,7 @@ class GenerateJobOut(BaseModel):
     failed_items: list[dict]
     message: str
     error: str | None = None
+    trigger: str = "manual"
 
 
 class GenerateStartResponse(BaseModel):
@@ -78,6 +79,35 @@ class GenerateStatusResponse(BaseModel):
 class BatchCompressResponse(BaseModel):
     message: str
     files: list[str]
+
+
+# ---------------------------------------------------------------------------
+# generate.py 用 — 同人誌フォルダ自動監視ステータス
+# ---------------------------------------------------------------------------
+
+
+class GenerateWatcherPendingItemOut(BaseModel):
+    name: str
+    kind: str
+
+
+class GenerateWatcherLastAutoJobOut(BaseModel):
+    job_id: str
+    status: str
+    finished_at: str
+
+
+class GenerateWatcherResponse(BaseModel):
+    """GET /generate/watcher の返却値。"""
+
+    enabled: bool
+    state: str
+    interval_sec: int
+    last_scan_at: str | None = None
+    pending_items: list[GenerateWatcherPendingItemOut]
+    active_job_id: str | None = None
+    last_auto_job: GenerateWatcherLastAutoJobOut | None = None
+    retry_blocked: bool
 
 
 # ---------------------------------------------------------------------------
