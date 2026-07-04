@@ -1,6 +1,6 @@
 """PDF 操作ルーター（ページ削除・結合）。
 
-generate/status/batch_compress は routers/generate.py に分離済み。
+generate は routers/generate.py に分離済み。
 """
 
 import os

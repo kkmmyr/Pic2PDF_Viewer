@@ -17,22 +17,6 @@ export type BookImagesResponse = components['schemas']['BookImagesResponse'];
 export type DeletePagesResponse = components['schemas']['DeletePagesResponse'];
 
 /**
- * ステータスアイテム
- */
-export interface StatusItem {
-    name: string;
-    type: string;
-    status: 'not_started' | 'in_progress' | 'completed';
-}
-
-/**
- * ステータスAPIレスポンス
- */
-export interface StatusResponse {
-    items: StatusItem[];
-}
-
-/**
  * OCR ステータスAPIレスポンス
  */
 export interface OcrStatusResponse {

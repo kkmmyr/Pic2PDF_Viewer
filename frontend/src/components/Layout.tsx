@@ -33,7 +33,7 @@ const NAV_GROUPS: NavGroup[] = [
         label: '同人誌',
         items: [
             { to: '/doujin', icon: Library, label: 'Library' },
-            { to: '/doujin/generator', icon: Settings, label: 'Generator' },
+            { to: '/doujin/generator', icon: Settings, label: '取り込み' },
             { to: '/doujin/hitomi', icon: Sparkles, label: '新着' },
         ],
     },

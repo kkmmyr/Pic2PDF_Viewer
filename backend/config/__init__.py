@@ -72,7 +72,6 @@ DATA_DIR = str(_s.PIC2PDF_DATA_DIR)
 
 # Doujin
 MAIN_DATA_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin")
-PDF_COMPRESSED_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "pdfs_compressed")
 THUMBNAIL_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "thumbnails")
 IMAGES_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "images")
 COMPLETE_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin" / "complete")

@@ -1,7 +1,7 @@
 """
 routers.generate のユニットテスト。
 
-PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証する。
+PDF 生成ジョブ起動・進捗取得を検証する。
 `scan_and_generate` は重い処理なのでモック化してジョブのライフサイクルだけ追う。
 
 実行方法:
@@ -10,7 +10,6 @@ PDF 生成ジョブ起動・進捗取得・状態一覧・一括圧縮を検証�
 """
 
 import asyncio
-import os
 import time
 
 from services.doujin_watcher import PendingItem, doujin_watcher
@@ -162,84 +161,6 @@ class TestGenerate:
 class TestGetGenerateJob:
     def test_404_for_unknown_job(self, client, tmp_data_dir):
         res = client.get("/api/generate/job/nonexistent-uuid")
-        assert res.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# GET /api/status
-# ---------------------------------------------------------------------------
-
-
-class TestStatus:
-    def test_empty_when_input_dir_missing(self, client, tmp_data_dir, monkeypatch):
-        import config
-
-        monkeypatch.setattr(config, "DOUJIN_INPUT_DIR", "/nope/qwerty/zzz")
-        res = client.get("/api/status")
-        assert res.status_code == 200
-        assert res.json() == {"items": []}
-
-    def test_lists_folders_with_webp(self, client, tmp_data_dir, make_webp):
-        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
-        make_webp(os.path.join(input_dir, "alpha", "1.webp"))
-        make_webp(os.path.join(input_dir, "beta", "1.webp"))
-
-        res = client.get("/api/status")
-        items = res.json()["items"]
-        names = {(it["name"], it["type"]) for it in items}
-        assert ("alpha", "folder") in names
-        assert ("beta", "folder") in names
-
-    def test_status_completed_when_images_exist(self, client, tmp_data_dir, make_webp):
-        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
-        make_webp(os.path.join(input_dir, "alpha", "1.webp"))
-        # IMAGES_DIR/alpha/ にファイルがあれば completed
-        make_webp(os.path.join(tmp_data_dir["IMAGES_DIR"], "alpha", "1.webp"))
-
-        res = client.get("/api/status")
-        items = res.json()["items"]
-        alpha = next(it for it in items if it["name"] == "alpha")
-        assert alpha["status"] == "completed"
-
-    def test_status_not_started_when_no_images(self, client, tmp_data_dir, make_webp):
-        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
-        make_webp(os.path.join(input_dir, "newone", "1.webp"))
-
-        res = client.get("/api/status")
-        items = res.json()["items"]
-        item = next(it for it in items if it["name"] == "newone")
-        assert item["status"] == "not_started"
-
-
-# ---------------------------------------------------------------------------
-# POST /api/batch_compress
-# ---------------------------------------------------------------------------
-
-
-class TestBatchCompress:
-    def test_invokes_batch_compress(self, client, tmp_data_dir, monkeypatch):
-        called = {}
-
-        def _fake(images_dir, out_dir, quality, **kw):
-            called["images_dir"] = images_dir
-            called["out_dir"] = out_dir
-            called["quality"] = quality
-            return ["alpha/alpha.pdf"]
-
-        monkeypatch.setattr("routers.generate.batch_compress", _fake)
-
-        res = client.post("/api/batch_compress", json={"quality": 70})
-        assert res.status_code == 200
-        assert res.json()["files"] == ["alpha/alpha.pdf"]
-        assert called["quality"] == 70
-
-    def test_404_when_images_dir_missing(self, client, tmp_data_dir, monkeypatch):
-        # IMAGES_DIR を消す
-        import shutil
-
-        shutil.rmtree(tmp_data_dir["IMAGES_DIR"])
-
-        res = client.post("/api/batch_compress", json={"quality": 50})
         assert res.status_code == 404
 
 

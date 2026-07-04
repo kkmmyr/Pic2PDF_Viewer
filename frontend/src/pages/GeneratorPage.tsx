@@ -1,14 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { toast } from 'sonner';
-import { FolderSearch, Loader2, RefreshCw, Zap } from 'lucide-react';
+import { FolderSearch, Loader2, RefreshCw } from 'lucide-react';
 import { API_ENDPOINTS } from '@/config/api';
 import generateApiClient from '@/config/generate_api_client';
 import { ApiError } from '@/config/api_client';
-import { usePdfStatus } from '@/hooks/usePdfStatus';
 import { useGenerateJob } from '@/hooks/useGenerateJob';
 import { useDoujinWatcher } from '@/hooks/useDoujinWatcher';
 import { JobProgress } from '@/components/generator/JobProgress';
-import { StatusTable } from '@/components/generator/StatusTable';
 import { WatcherStatusCard } from '@/components/generator/WatcherStatusCard';
 import { Alert } from '@/components/ui/alert';
 import { errorMessage } from '@/utils/error';
@@ -17,10 +15,7 @@ import type { GenerateJob, GenerateFailedItem } from '@/types';
 /** 409 の ApiError.message から `job_id=<uuid>` を抜き出す */
 const JOB_ID_FROM_MESSAGE_RE = /job_id=([^)]+)\)/;
 
-const DEFAULT_QUALITY = 50;
-
 export default function GeneratorPage() {
-    const [isCompressing, setIsCompressing] = useState(false);
     const [result, setResult] = useState<{
         message: string;
         files: string[];
@@ -28,13 +23,8 @@ export default function GeneratorPage() {
     } | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const [quality, setQuality] = useState(DEFAULT_QUALITY);
-
     const onCompleted = useCallback((job: GenerateJob) => {
         setResult({ message: job.message, files: job.files, failed_items: job.failed_items ?? [] });
-        // eslint-disable-next-line react-hooks/immutability -- fetchStatus は宣言順が後だが呼び出し時点では定義済み
-        fetchStatus();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchStatus (usePdfStatus の refetch) はクエリキー固定で参照が安定するため依存に含めない
     }, []);
 
     const onFailed = useCallback((job: GenerateJob) => {
@@ -48,9 +38,7 @@ export default function GeneratorPage() {
 
     const { watcher } = useDoujinWatcher();
 
-    const isLoading = isGenerating || isCompressing;
-
-    const { statusItems, refetch: fetchStatus } = usePdfStatus(isLoading);
+    const isLoading = isGenerating;
 
     // watcher がバックグラウンドでジョブを自動起動した場合、同じ JobProgress UI に反映する
     useEffect(() => {
@@ -80,29 +68,12 @@ export default function GeneratorPage() {
         }
     };
 
-    const handleBatchCompress = async () => {
-        setIsCompressing(true);
-        setError(null);
-        setResult(null);
-        try {
-            const data = await generateApiClient.post<
-                unknown,
-                { message: string; files: string[] }
-            >(API_ENDPOINTS.BATCH_COMPRESS, { quality });
-            setResult({ ...data, failed_items: [] });
-        } catch (err: unknown) {
-            setError(errorMessage(err, '一括圧縮に失敗しました。'));
-        } finally {
-            setIsCompressing(false);
-        }
-    };
-
     return (
         <div className="max-w-4xl mx-auto p-6">
             <div className="bg-white dark:bg-gray-900 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
                 <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 flex items-center gap-2">
                     <FolderSearch className="text-blue-600 dark:text-blue-400" />
-                    PDF 生成
+                    取り込み
                 </h2>
 
                 <div className="space-y-6">
@@ -127,30 +98,6 @@ export default function GeneratorPage() {
                         </p>
                     </div>
 
-                    {/* Batch Compress 用の品質スライダー（生成 API では未使用） */}
-                    <div className="p-4 bg-primary-50 dark:bg-primary-900/20 rounded-lg border border-primary-100 dark:border-primary-800 space-y-2">
-                        <label
-                            htmlFor="quality"
-                            className="text-sm font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-2"
-                        >
-                            <Zap size={16} className="text-amber-500 fill-amber-500" />
-                            一括圧縮 品質: {quality}
-                            <span className="ml-auto text-xs font-normal text-gray-500 dark:text-gray-400">
-                                小さいほどファイルサイズ小
-                            </span>
-                        </label>
-                        <input
-                            id="quality"
-                            type="range"
-                            min="10"
-                            max="95"
-                            step="5"
-                            value={quality}
-                            onChange={(e) => setQuality(parseInt(e.target.value, 10))}
-                            className="w-full h-2 bg-primary-200 dark:bg-primary-800 rounded-lg appearance-none cursor-pointer accent-primary-600"
-                        />
-                    </div>
-
                     {/* Buttons */}
                     <div className="flex flex-col gap-4">
                         <button
@@ -171,39 +118,6 @@ export default function GeneratorPage() {
                                 </>
                             )}
                         </button>
-
-                        <button
-                            type="button"
-                            onClick={fetchStatus}
-                            disabled={isLoading}
-                            className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 border border-gray-300 dark:border-gray-600 transition-colors"
-                        >
-                            状態確認
-                        </button>
-
-                        <div className="relative">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-gray-200 dark:border-gray-700" />
-                            </div>
-                            <div className="relative flex justify-center text-xs uppercase">
-                                <span className="bg-white dark:bg-gray-900 px-2 text-gray-500 dark:text-gray-400">
-                                    または既存 PDF を管理
-                                </span>
-                            </div>
-                        </div>
-
-                        <button
-                            onClick={handleBatchCompress}
-                            disabled={isLoading}
-                            className="w-full flex items-center justify-center gap-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:bg-gray-50 dark:disabled:bg-gray-800/50 text-gray-700 dark:text-gray-300 font-semibold py-3 rounded-xl border border-gray-300 dark:border-gray-600 transition-all"
-                        >
-                            {isCompressing ? (
-                                <Loader2 className="animate-spin" size={18} />
-                            ) : (
-                                <Zap size={18} className="text-amber-500" />
-                            )}
-                            {isCompressing ? '圧縮中...' : '既存 PDF を一括圧縮'}
-                        </button>
                     </div>
 
                     {currentJob && <JobProgress job={currentJob} />}
@@ -217,8 +131,6 @@ export default function GeneratorPage() {
                             エラー: {error}
                         </Alert>
                     )}
-
-                    <StatusTable items={statusItems} />
 
                     {/* Result Message */}
                     {result && (

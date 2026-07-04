@@ -71,17 +71,3 @@ class JobStore:
     def get(self, job_id: str) -> GenerateJob | None:
         with self._lock:
             return self._jobs.get(job_id)
-
-    def get_active_current_item(self) -> str | None:
-        """最新の RUNNING ジョブの current_item を返す。
-
-        `/api/status` で「現在処理中のアイテム名」を取得するために使う。
-        RUNNING のジョブがなければ None。
-        """
-        with self._lock:
-            # 新しい順に走査して RUNNING ジョブを探す
-            for job_id in reversed(self._order):
-                job = self._jobs.get(job_id)
-                if job is not None and job.status == JobStatus.RUNNING:
-                    return job.current_item
-        return None

@@ -16,7 +16,7 @@ import { ApiError } from '@/config/api_client';
 import { toast } from 'sonner';
 import { API_ENDPOINTS } from '@/config/api';
 import GeneratorPage from '@/pages/GeneratorPage';
-import type { DoujinWatcherStatus, GenerateJob, StatusResponse } from '@/types';
+import type { DoujinWatcherStatus, GenerateJob } from '@/types';
 
 const mockedGet = generateApiClient.get as ReturnType<typeof vi.fn>;
 const mockedPost = generateApiClient.post as ReturnType<typeof vi.fn>;
@@ -44,15 +44,12 @@ const buildJob = (overrides: Partial<GenerateJob> = {}): GenerateJob => ({
     ...overrides,
 });
 
-const emptyStatus: StatusResponse = { items: [] };
-
 /** watcher / job のスタブを URL 引数で切り替える generateApiClient.get モックを構築する */
 function mockGetByUrl(opts: { watcher?: DoujinWatcherStatus; jobs?: Record<string, GenerateJob> }) {
     const watcher = opts.watcher ?? buildWatcher();
     const jobs = opts.jobs ?? {};
     mockedGet.mockImplementation((url: string) => {
         if (url === API_ENDPOINTS.GENERATE_WATCHER) return Promise.resolve(watcher);
-        if (url === API_ENDPOINTS.STATUS) return Promise.resolve(emptyStatus);
         for (const [jobId, job] of Object.entries(jobs)) {
             if (url === API_ENDPOINTS.GENERATE_JOB(jobId)) return Promise.resolve(job);
         }

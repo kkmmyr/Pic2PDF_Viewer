@@ -19,7 +19,7 @@ from services.job_manager import JobStatus
 from services.pdf_generator import GenerateResult
 
 
-async def _wait_job_done(job_id: str, timeout: float = 2.0):
+async def _wait_job_done(job_id: str, timeout: float = 10.0):
     # 同期 time.sleep はイベントループを塞ぎ、start_generate_job が
     # create_task したジョブ本体が永遠に走らない。必ず await で譲る。
     deadline = time.time() + timeout

@@ -64,23 +64,6 @@ class GenerateStartResponse(BaseModel):
     status: str
 
 
-class GenerateStatusItemOut(BaseModel):
-    name: str
-    type: str
-    status: str
-
-
-class GenerateStatusResponse(BaseModel):
-    """GET /status の返却値 (items リスト)。"""
-
-    items: list[GenerateStatusItemOut]
-
-
-class BatchCompressResponse(BaseModel):
-    message: str
-    files: list[str]
-
-
 # ---------------------------------------------------------------------------
 # generate.py 用 — 同人誌フォルダ自動監視ステータス
 # ---------------------------------------------------------------------------

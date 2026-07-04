@@ -15,69 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from services.job_manager import GenerateJob, JobStatus, JobStore
 
 
-class TestJobStoreGetActiveCurrentItem:
-    def test_empty_store_returns_none(self):
-        store = JobStore()
-        assert store.get_active_current_item() is None
-
-    def test_pending_job_returns_none(self):
-        store = JobStore()
-        job = store.create()
-        assert job.status == JobStatus.PENDING
-        assert store.get_active_current_item() is None
-
-    def test_completed_job_returns_none(self):
-        store = JobStore()
-        job = store.create()
-        job.update(status=JobStatus.COMPLETED)
-        assert store.get_active_current_item() is None
-
-    def test_failed_job_returns_none(self):
-        store = JobStore()
-        job = store.create()
-        job.update(status=JobStatus.FAILED, error="something went wrong")
-        assert store.get_active_current_item() is None
-
-    def test_running_job_returns_current_item(self):
-        store = JobStore()
-        job = store.create()
-        job.update(status=JobStatus.RUNNING, current_item="vol01.pdf")
-        assert store.get_active_current_item() == "vol01.pdf"
-
-    def test_running_job_with_none_current_item(self):
-        store = JobStore()
-        job = store.create()
-        job.update(status=JobStatus.RUNNING)
-        assert store.get_active_current_item() is None
-
-    def test_newest_running_job_wins(self):
-        """複数の RUNNING ジョブがある場合、最新（_order 末尾）のものが返る。"""
-        store = JobStore()
-        job1 = store.create()
-        job1.update(status=JobStatus.RUNNING, current_item="old.pdf")
-        job2 = store.create()
-        job2.update(status=JobStatus.RUNNING, current_item="new.pdf")
-        assert store.get_active_current_item() == "new.pdf"
-
-    def test_running_then_completed_returns_none(self):
-        store = JobStore()
-        job = store.create()
-        job.update(status=JobStatus.RUNNING, current_item="vol01.pdf")
-        assert store.get_active_current_item() == "vol01.pdf"
-        job.update(status=JobStatus.COMPLETED, current_item=None)
-        assert store.get_active_current_item() is None
-
-    def test_mixed_states_returns_running(self):
-        """COMPLETED / RUNNING / PENDING が混在しても RUNNING のものを返す。"""
-        store = JobStore()
-        j_completed = store.create()
-        j_completed.update(status=JobStatus.COMPLETED)
-        j_running = store.create()
-        j_running.update(status=JobStatus.RUNNING, current_item="target.pdf")
-        _j_pending = store.create()  # PENDING のまま
-        assert store.get_active_current_item() == "target.pdf"
-
-
 class TestJobStoreCreate:
     def test_create_returns_job_with_uuid(self):
         store = JobStore()
@@ -112,16 +49,6 @@ class TestJobStoreCreate:
         assert store.get(j1.job_id) is None
         assert store.get(j2.job_id) is j2
         assert store.get(j4.job_id) is j4
-
-    def test_evicted_job_not_returned_by_get_active(self):
-        """RUNNING 中に押し出されたジョブは get_active_current_item の対象外になる。"""
-        store = JobStore()
-        store._MAX_JOBS = 2
-        j1 = store.create()
-        j1.update(status=JobStatus.RUNNING, current_item="old.pdf")
-        store.create()
-        store.create()  # j1 が押し出される
-        assert store.get_active_current_item() is None
 
 
 class TestGenerateJobUpdate:

@@ -19,7 +19,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from services.pdf_generator import _check_zip_safety, _collect_images, batch_compress, scan_and_generate
+from services.pdf_generator import _check_zip_safety, _collect_images, scan_and_generate
 
 # ---------------------------------------------------------------------------
 # ヘルパー
@@ -282,72 +282,3 @@ class TestScanAndGenerate:
         # 失敗した ZIP は complete/ には移動しない（元のまま）
         assert bad_zip.exists()
         assert (gen_env["complete"] / "good.zip").exists()
-
-
-# ---------------------------------------------------------------------------
-# batch_compress
-# ---------------------------------------------------------------------------
-
-
-class TestBatchCompress:
-    """
-    batch_compress は images_dir 配下の **各サブフォルダ** を走査し、
-    そのフォルダ名で PDF を生成して **親ディレクトリ相当** に出力する。
-
-    例: images_dir/alpha/*.webp → output_dir/alpha.pdf
-        images_dir/sub1/alpha/*.webp → output_dir/sub1/alpha.pdf
-    """
-
-    def test_compresses_each_subfolder(self, tmp_path):
-        images_dir = tmp_path / "images"
-        out_dir = tmp_path / "compressed"
-        images_dir.mkdir()
-        out_dir.mkdir()
-
-        for name in ("alpha", "beta"):
-            sub = images_dir / name
-            sub.mkdir()
-            _make_webp(str(sub / "1.webp"))
-
-        generated = batch_compress(str(images_dir), str(out_dir), quality=50)
-
-        # フォルダは images_dir 直下なので出力は out_dir 直下
-        assert sorted(generated) == [
-            os.path.join("alpha", "alpha.pdf"),
-            os.path.join("beta", "beta.pdf"),
-        ]
-        assert (out_dir / "alpha.pdf").exists()
-        assert (out_dir / "beta.pdf").exists()
-
-    def test_skips_already_compressed(self, tmp_path):
-        images_dir = tmp_path / "images"
-        out_dir = tmp_path / "compressed"
-        images_dir.mkdir()
-        out_dir.mkdir()
-
-        sub = images_dir / "alpha"
-        sub.mkdir()
-        _make_webp(str(sub / "1.webp"))
-
-        # 既に出力先に PDF が存在する状態にする（出力は out_dir 直下）
-        (out_dir / "alpha.pdf").write_bytes(b"existing")
-
-        generated = batch_compress(str(images_dir), str(out_dir), quality=50)
-        assert generated == []
-        # 既存ファイルは上書きされない
-        assert (out_dir / "alpha.pdf").read_bytes() == b"existing"
-
-    def test_progress_callback_receives_relative_path(self, tmp_path):
-        images_dir = tmp_path / "images"
-        out_dir = tmp_path / "compressed"
-        images_dir.mkdir()
-        out_dir.mkdir()
-
-        sub = images_dir / "alpha"
-        sub.mkdir()
-        _make_webp(str(sub / "1.webp"))
-
-        called: list[str] = []
-        batch_compress(str(images_dir), str(out_dir), quality=50, progress_callback=called.append)
-
-        assert any("alpha" in c for c in called)

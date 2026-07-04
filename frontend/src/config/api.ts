@@ -17,8 +17,6 @@ export const API_ENDPOINTS = {
     PDFS: '/api/pdfs',
     /** PDF生成 */
     GENERATE: '/api/generate',
-    /** ステータス取得 */
-    STATUS: '/api/status',
     /** 書籍画像取得 */
     BOOK_IMAGES: (path: string, source: LibrarySource = 'doujin') =>
         `/api/books/${encodeURIComponent(path)}/images?source=${source}`,
@@ -36,8 +34,6 @@ export const API_ENDPOINTS = {
     OCR_RUN: '/api/ocr/run',
     OCR_STOP: '/api/ocr/stop',
     OCR_STATUS: '/api/ocr/status',
-    /** 既存PDFの一括圧縮 */
-    BATCH_COMPRESS: '/api/batch_compress',
     /** Generate ジョブ進捗取得 */
     GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
     /** 同人誌フォルダ自動監視の状態取得 */

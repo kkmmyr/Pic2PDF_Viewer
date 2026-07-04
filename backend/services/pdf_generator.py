@@ -14,13 +14,12 @@ from config import (
     ZIP_MAX_PER_FILE_BYTES,
     ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES,
 )
-from services.batch_compressor import batch_compress  # 後方互換 re-export
 from utils.file_utils import is_webp_file, is_zip_file
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-__all__ = ["generate_thumbnail", "PdfGenerator", "scan_and_generate", "batch_compress", "GenerateResult"]
+__all__ = ["generate_thumbnail", "PdfGenerator", "scan_and_generate", "GenerateResult"]
 
 
 class GenerateResult(NamedTuple):

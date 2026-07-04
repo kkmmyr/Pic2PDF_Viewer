@@ -37,7 +37,6 @@ def tmp_data_dir(tmp_path, monkeypatch):
         "DATA_DIR": str(tmp_path),
         "META_DB_DIR": str(tmp_path),
         "MAIN_DATA_DIR": str(main),
-        "PDF_COMPRESSED_DIR": str(main / "pdfs_compressed"),
         "THUMBNAIL_DIR": str(main / "thumbnails"),
         "IMAGES_DIR": str(main / "images"),
         "COMPLETE_DIR": str(main / "complete"),
