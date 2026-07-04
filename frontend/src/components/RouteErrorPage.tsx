@@ -1,5 +1,5 @@
 import { useRouteError, isRouteErrorResponse, Link } from 'react-router-dom';
-import { ErrorFallbackCard } from '@/components/ui/ErrorFallbackCard';
+import { ErrorFallbackCard } from '@/components/ui/error-fallback-card';
 
 export default function RouteErrorPage() {
     const error = useRouteError();
