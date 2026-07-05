@@ -58,6 +58,8 @@ class _AppSettings(BaseSettings):
     DOUJIN_WATCH_ENABLED: bool = True
     # 監視間隔（秒）
     DOUJIN_WATCH_INTERVAL_SEC: int = 15
+    # hitomi 新着監視の実行結果を通知する Discord Webhook URL（未設定時は通知無効）
+    HITOMI_DISCORD_WEBHOOK_URL: str | None = None
 
 
 _s = _AppSettings()
@@ -110,6 +112,7 @@ FRONTEND_DIST_DIR = str(_BACKEND_DIR.parent / "frontend" / "dist")
 AMAZON_DATA_DIR: str | None = str(_s.AMAZON_DATA_DIR) if _s.AMAZON_DATA_DIR else None
 GEMMA_TOOL_DIR: str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
 META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
+HITOMI_DISCORD_WEBHOOK_URL: str | None = _s.HITOMI_DISCORD_WEBHOOK_URL or None
 
 # ---------------------------------------------------------------------------
 # ソース識別子

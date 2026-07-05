@@ -530,6 +530,27 @@ tail -50 /opt/pic2pdf-viewer/logs/hitomi-monitor.log
 - バックエンドの新着画面に「最終実行: YYYY-MM-DD HH:MM / ステータス: ok」と表示される
 - `last_run_status: error` が続く場合は NOZOMI URL の仕様変更を疑う（§8 を参照して再検証）
 
+## 11. Discord 通知（実行結果）
+
+監視 1 回ごとに新着件数を Discord に通知するオプション機能。**新着 0 件でも送信**する（正常稼働の生存確認を兼ねる）。
+
+### 11.1. 有効化
+
+環境変数 `HITOMI_DISCORD_WEBHOOK_URL` に Discord チャンネルの Webhook URL を設定する（`.env`）。未設定なら通知は完全に no-op。
+
+- Windows / Mac: プロジェクトルート `.env`
+- Linux systemd: `EnvironmentFile=/opt/pic2pdf-viewer/.env`（`deploy/hitomi-monitor.service`）経由で同じ `.env` を参照
+
+### 11.2. 対象トリガーと差し込み位置
+
+`tools/hitomi_monitor.py` の `main()` 末尾（`last_run_stats` 確定後）で `services/hitomi/notify.notify_run_result()` を呼ぶ。手動 API（`POST /hitomi/run-now`）・systemd 定期・Task Scheduler は全て `main()` を通るため、この 1 箇所で全経路をカバーする。watchlist が空の早期 return 経路でも同様に送信する。
+
+### 11.3. 送信内容と失敗時の挙動
+
+- 本文: `📥 hitomi 新着監視: 新着 N 件（skip M / エラー K）`（件数のみ）
+- 送信は `httpx.post` で Webhook に `{"content": ...}` を POST
+- **通知失敗は監視処理を止めない**。`httpx.HTTPError` は握りつぶし stderr に warning を出すのみ（`last_run_status` には影響しない）
+
 ---
 
 ## 11. リスク・注意事項

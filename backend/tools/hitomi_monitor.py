@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import HITOMI_DATA_DIR as _hitomi_data_dir
-from services.hitomi import metadata, nozomi, state_store, watchlist
+from services.hitomi import metadata, notify, nozomi, state_store, watchlist
 
 DATA_DIR = Path(_hitomi_data_dir)
 GALLERY_URL_TEMPLATE = "https://hitomi.la/galleries/{id}.html"
@@ -102,6 +102,7 @@ def main(
         except Exception as e:
             print(f"[hitomi_monitor] FATAL: state.json 書込失敗: {e}", file=sys.stderr)
             return 2
+        notify.notify_run_result(added=0, skipped=0, errors=0)
         return 0
 
     errors: list[str] = []
@@ -174,6 +175,7 @@ def main(
         return 2
 
     print(f"[hitomi_monitor] done: 新着 {added} 件追加, {purged} 件 purge, {skipped} 件 skip, エラー {len(errors)} 件")
+    notify.notify_run_result(added=added, skipped=skipped, errors=len(errors))
     return 1 if errors else 0
 
 
