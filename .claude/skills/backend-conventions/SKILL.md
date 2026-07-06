@@ -17,7 +17,10 @@ description: backend/ 配下の Python/FastAPI コードを編集する際に発
 - 設定は `config/` パッケージ（**pydantic-settings BaseSettings**）で管理する
     - アプリ設定（データパス・CORS 等）: `config/__init__.py`
     - Novel DB 設定（モデル・LLM・検索パラメータ等）: `config/novel_db.py`
-- 設定値はライブ参照が必要なため `import config; config.X` を基本とする。ヘルパー関数・型（`get_dirs_by_source`, `SourceDirs`）は `from config import` 直 import 可
+- import の使い分けは「**テストで差し替わる値か**」で決める（2026-07-06 裁定、直 import 26+ 箇所の実態を追認）:
+    - **差し替わる値**（パス系定数 = `tests/conftest.py` の `paths` 一覧にある名前、および settings オブジェクトの属性）→ call-time 参照（`import config; config.X` / `app_settings.X` / `get_dirs_by_source()` 等の helper）。**新規コードでこれらを `from config import X` 直 import しない**（import 時にバインドされ monkeypatch が効かなくなる）
+    - **静的値**（モデル名・閾値・`VALID_SOURCES` / `SUPPORTED_*` 等、テストで差し替えない値）→ `from config import X` 直 import 可。ヘルパー関数・型（`get_dirs_by_source`, `SourceDirs`）も直 import 可
+    - 既存の例外: `main.py` の StaticFiles mount と `discussion_service.py` の `DISCUSSIONS_DIR` はパス定数を import 時にバインドするが、conftest が「patch → その後に main を import」の順序で成立させている（アプリ構築は本質的に import 時 1 回のため、記法変更では改善しない）。触らない
 - 旧 `backend/config.py` 単一ファイル構成は廃止済み
 
 ## novel_db スキーマ
