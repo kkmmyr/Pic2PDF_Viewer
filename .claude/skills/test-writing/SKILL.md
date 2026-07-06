@@ -11,11 +11,11 @@ description: pytest（バックエンド）/ vitest（フロントエンド）�
 
 | 領域 | 対象 | テスト済み箇所 |
 |---|---|---|
-| meta.json 更新 | `update_meta_locked` の lambda、view_count / authors のマージ規則 | `tests/test_meta.py` |
-| ファイル操作 | `FileManager.move_with_assets` / `rename_with_assets` のロールバック | `tests/test_file_manager.py` |
+| meta.db 更新 | `update_meta_locked` の lambda、view_count / authors のマージ規則 | `tests/test_meta.py` |
+| ファイル操作 | `FileManager.rename_with_assets` のロールバック / `delete_with_assets` | `tests/test_file_manager.py` |
 | パスバリデーション | `validate_safe_path` / `validate_safe_name`（セキュリティ）| `tests/test_path_utils.py` |
 | PDF 生成フロー | `_collect_images` の natsort、`scan_and_generate` の ZIP/Folder 分岐、`batch_compress` のスキップ判定 | `tests/test_pdf_generator.py` |
-| ジョブ管理 | `JobStore.get_active_current_item()` の状態遷移・eviction・to_dict | `tests/test_job_manager.py` |
+| ジョブ管理 | `JobStore` の create/get・eviction・並行更新、`GenerateJob.update` / `to_dict` | `tests/test_job_manager.py` |
 | auto-fill | mode 別ターゲット選別、view_count 保持 | `tests/test_meta.py` |
 | ライブラリフィルタ | searchText / authorFilter / currentPath の組み合わせ | `test/useLibraryFilter.test.ts` |
 | ソート | `useSortedPdfs` の各ソート種別 | `test/useSortedPdfs.test.ts` |
@@ -30,7 +30,7 @@ description: pytest（バックエンド）/ vitest（フロントエンド）�
 ## 副作用のあるロジック追加時のチェックリスト
 
 新しいロジックを追加するときは以下を考慮:
-1. 副作用があるか？（ファイル I/O・meta.json 更新・ジョブ起動）→ あればテスト必須
+1. 副作用があるか？（ファイル I/O・meta.db 更新・ジョブ起動）→ あればテスト必須
 2. 既存の副作用ロジックを変更したか？→ 既存テストが通るか確認 + 新パスのテスト追加
 3. 失敗時のロールバックがあるか？→ ロールバックパスもテスト
 
@@ -48,4 +48,4 @@ description: pytest（バックエンド）/ vitest（フロントエンド）�
 - **バックエンド (pytest)** → `references/backend-patterns.md`
   TestClient + tmp_path + monkeypatch のフィクスチャパターン、モック方針、命名規則
 - **フロントエンド (vitest)** → `references/frontend-patterns.md`
-  renderHook によるフック単体テスト、コンポーネントテストを書かない方針
+  renderHook によるフック単体テスト、render + fireEvent によるコンポーネントテスト

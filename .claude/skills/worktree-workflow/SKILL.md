@@ -23,8 +23,10 @@ worktree パス: .claude/worktrees/<作業識別子>/
 # 1. ブランチ + worktree を同時に作成
 git worktree add .claude/worktrees/<作業識別子> -b worktree-<作業識別子>
 
-# 2. worktree 内で依存をインストール（backend を使う場合）
-Set-Location .claude/worktrees/<作業識別子>/backend
+# 2. worktree の「ルート」で依存をインストール（Python を使う場合）
+#    uv workspace 構成（ADR-0010）のため、ルートで uv sync すると
+#    backend / kindle-pdf / common/llm がまとめて単一の .venv に入る
+Set-Location .claude/worktrees/<作業識別子>
 uv sync
 ```
 
@@ -36,14 +38,14 @@ git worktree remove .claude/worktrees/<作業識別子>
 git branch -d worktree-<作業識別子>
 ```
 
-## 注意: backend/.venv の残存
+## 注意: .venv の残存
 
-worktree 内で `uv sync` を実行すると `backend/.venv/` が作られる。  
+worktree 内で `uv sync` を実行すると worktree ルートに `.venv/` が作られる（uv workspace 構成のため、ADR-0010）。  
 `git worktree remove` は追跡外ファイルを削除しないため、`.venv/` が残り続ける。  
 不要になったら手動で削除する:
 
 ```powershell
-Remove-Item -Recurse -Force .claude/worktrees/<作業識別子>/backend/.venv
+Remove-Item -Recurse -Force .claude/worktrees/<作業識別子>/.venv
 git worktree remove .claude/worktrees/<作業識別子>
 ```
 

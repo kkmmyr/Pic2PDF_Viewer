@@ -35,9 +35,9 @@ description: backend/ 配下の Python/FastAPI コードを編集する際に発
 - ファイル拡張子チェックは `backend/utils/file_utils.py` の `is_pdf_file` / `is_webp_file` / `is_zip_file` / `is_image_file` を使用する。`name.lower().endswith('.xxx')` を直書きしない
 - パスバリデーションは `utils/path_utils.py` の `validate_safe_path` / `validate_safe_name` を使用
 
-## meta.json 更新の作法
+## meta.db 更新の作法
 
-- meta.json の更新は `services/meta_store.py` の `update_meta_locked(source, updater)` を使用し、`updater` 内で **既存フィールド（view_count / last_viewed_at 等）を保持** する形（`{**existing, "authors": [...]}`）で書く。エントリ全体を `{"authors": [a]}` で上書きしない
+- 書籍メタデータの実体は **meta.db（SQLite、`services/meta_db.py`）**。更新は `services/meta_store.py`（meta.db の facade）の `update_meta_locked(source, updater)` を使用し、`updater` 内で **既存フィールド（view_count / last_viewed_at 等）を保持** する形（`{**existing, "authors": [...]}`）で書く。エントリ全体を `{"authors": [a]}` で上書きしない
 
 ## 共通ルール（フロント・バック共通）
 

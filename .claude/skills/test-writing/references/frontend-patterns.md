@@ -14,8 +14,17 @@ expect(result.current.filteredPdfs).toEqual([...]);
 - フックは `renderHook` で単体テスト
 - API 呼び出しは `apiClient` を `vi.fn()` でモック（`useBookMeta.test.ts` 参照）
 
-## コンポーネントのテストは原則書かない
+## コンポーネントのテスト: `render` + `fireEvent`
 
-- React コンポーネントの DOM 検証は工数対効果が悪い
-- ロジックはフックに切り出してテストする方針（既存 `useEditMode` / `useSpreadMode` 等）
-- ダイアログ等のインタラクションはユーザーが手動確認
+コンポーネントテストは多数存在する（`src/test/*.test.tsx` 約 28 本: `PdfCard` / `Dialog` / `GeneratorPage` 等）。
+
+```tsx
+import { render, fireEvent } from '@testing-library/react';
+
+const { getByText } = render(<PdfCard {...baseProps} />);
+expect(getByText('book')).toBeInTheDocument();
+```
+
+- 表示分岐・コールバック発火など**壊れやすい挙動**を `@testing-library/react` の `render` / `fireEvent` で検証（`PdfCard.test.tsx` 参照）
+- ロジックはフックに切り出し、フック側は `renderHook` でテスト
+- スナップショットテストは書かない（メンテコスト過大）

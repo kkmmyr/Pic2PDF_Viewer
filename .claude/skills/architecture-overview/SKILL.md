@@ -48,7 +48,7 @@ docs/
 ## レイヤ構成
 
 - **バックエンド** (`backend/`): FastAPI + Python（uv 管理）。ルーター/サービス分離。詳細規約は `backend-conventions` skill が発動
-- **フロントエンド** (`frontend/`): React + TypeScript + Vite。`viewer/`（状態管理）と `reader/`（プレゼンテーション）の階層分離。詳細規約は `frontend-conventions` skill が発動
+- **フロントエンド** (`frontend/`): React + TypeScript + Vite。`library/`（状態管理、旧 `viewer/` からリネーム済）と `reader/`（プレゼンテーション）の階層分離（`components/` / `hooks/` 配下）。詳細規約は `frontend-conventions` skill が発動
 
 ## 関連 skill
 
