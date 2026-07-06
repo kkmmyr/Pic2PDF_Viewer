@@ -127,6 +127,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/generate/watcher': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Generate Watcher
+         * @description 同人誌フォルダ自動監視の現在状態を返す。
+         */
+        get: operations['get_generate_watcher_api_generate_watcher_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/generate/job/{job_id}': {
         parameters: {
             query?: never;
@@ -141,40 +161,6 @@ export interface paths {
         get: operations['get_generate_job_api_generate_job__job_id__get'];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    '/api/status': {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Status */
-        get: operations['get_status_api_status_get'];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    '/api/batch_compress': {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Batch Compress Pdfs */
-        post: operations['batch_compress_pdfs_api_batch_compress_post'];
         delete?: never;
         options?: never;
         head?: never;
@@ -1075,7 +1061,10 @@ export interface paths {
         put?: never;
         /**
          * Generate Discussion
-         * @description 読書会ディスカッションを SSE でストリーミング生成する（B-20）。
+         * @description 読書会番組台本を SSE でストリーミング生成する（B-28）。
+         *
+         *     構成ステップ（planning）→ 台本ステップ（scripting）の 2 段 LLM 呼び出し。
+         *     完了時に DoD 機械チェック（M1〜M5）を実行し done イベントに含める。
          */
         post: operations['generate_discussion_api_novel_discussion_generate_post'];
         delete?: never;
@@ -1093,12 +1082,32 @@ export interface paths {
         };
         /**
          * Get Discussion History
-         * @description 指定書籍のディスカッション履歴一覧を返す（B-20）。
+         * @description 指定書籍のディスカッション履歴一覧を返す（B-20/B-28 両形式対応）。
          */
         get: operations['get_discussion_history_api_novel_discussion_history_get'];
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/novel/discussion/history/{filename}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Discussion History
+         * @description 指定ディスカッション履歴を削除する（B-28）。
+         */
+        delete: operations['delete_discussion_history_api_novel_discussion_history__filename__delete'];
         options?: never;
         head?: never;
         patch?: never;
@@ -1498,21 +1507,6 @@ export interface components {
             /** Backed Up At */
             backed_up_at: string;
         };
-        /** BatchCompressRequest */
-        BatchCompressRequest: {
-            /**
-             * Quality
-             * @default 50
-             */
-            quality: number;
-        };
-        /** BatchCompressResponse */
-        BatchCompressResponse: {
-            /** Message */
-            message: string;
-            /** Files */
-            files: string[];
-        };
         /** BookDetailOut */
         BookDetailOut: {
             /** Name */
@@ -1737,6 +1731,11 @@ export interface components {
             /** Errors */
             errors: string[];
         };
+        /** DiscussionDeleteOut */
+        DiscussionDeleteOut: {
+            /** Status */
+            status: string;
+        };
         /** DiscussionHistoryItemOut */
         DiscussionHistoryItemOut: {
             /** Filename */
@@ -1753,6 +1752,21 @@ export interface components {
             turns: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Format Version
+             * @default 1
+             */
+            format_version: number;
+            /** Segments */
+            segments?:
+                | {
+                      [key: string]: unknown;
+                  }[]
+                | null;
+            /** Checks */
+            checks?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** EnqueueRequest */
         EnqueueRequest: {
@@ -1790,18 +1804,16 @@ export interface components {
             message: string;
             /** Error */
             error?: string | null;
+            /**
+             * Trigger
+             * @default manual
+             */
+            trigger: string;
         };
         /** GenerateRequest */
         GenerateRequest: {
             /** Book Name */
             book_name: string;
-            /** Personas */
-            personas: components['schemas']['PersonaRequest'][];
-            /**
-             * Num Turns
-             * @default 6
-             */
-            num_turns: number;
         };
         /**
          * GenerateStartResponse
@@ -1813,22 +1825,42 @@ export interface components {
             /** Status */
             status: string;
         };
-        /** GenerateStatusItemOut */
-        GenerateStatusItemOut: {
-            /** Name */
-            name: string;
-            /** Type */
-            type: string;
+        /** GenerateWatcherLastAutoJobOut */
+        GenerateWatcherLastAutoJobOut: {
+            /** Job Id */
+            job_id: string;
             /** Status */
             status: string;
+            /** Finished At */
+            finished_at: string;
+        };
+        /** GenerateWatcherPendingItemOut */
+        GenerateWatcherPendingItemOut: {
+            /** Name */
+            name: string;
+            /** Kind */
+            kind: string;
         };
         /**
-         * GenerateStatusResponse
-         * @description GET /status の返却値 (items リスト)。
+         * GenerateWatcherResponse
+         * @description GET /generate/watcher の返却値。
          */
-        GenerateStatusResponse: {
-            /** Items */
-            items: components['schemas']['GenerateStatusItemOut'][];
+        GenerateWatcherResponse: {
+            /** Enabled */
+            enabled: boolean;
+            /** State */
+            state: string;
+            /** Interval Sec */
+            interval_sec: number;
+            /** Last Scan At */
+            last_scan_at?: string | null;
+            /** Pending Items */
+            pending_items: components['schemas']['GenerateWatcherPendingItemOut'][];
+            /** Active Job Id */
+            active_job_id?: string | null;
+            last_auto_job?: components['schemas']['GenerateWatcherLastAutoJobOut'] | null;
+            /** Retry Blocked */
+            retry_blocked: boolean;
         };
         /** GenreListResponse */
         GenreListResponse: {
@@ -1982,6 +2014,22 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** OcrRunResponse */
+        OcrRunResponse: {
+            /** Status */
+            status: string;
+            /** Job Id */
+            job_id: number;
+            /** Queue Position */
+            queue_position: number;
+        };
+        /** OcrStopResponse */
+        OcrStopResponse: {
+            /** Status */
+            status: string;
+            /** Canceled Jobs */
+            canceled_jobs: number[];
+        };
         /** PdfFileOut */
         PdfFileOut: {
             /** Name */
@@ -1997,13 +2045,6 @@ export interface components {
             files: components['schemas']['PdfFileOut'][];
             /** Current Path */
             current_path: string;
-        };
-        /** PersonaRequest */
-        PersonaRequest: {
-            /** Name */
-            name: string;
-            /** Style Description */
-            style_description: string;
         };
         /** PrefsResponse */
         PrefsResponse: {
@@ -2693,6 +2734,26 @@ export interface operations {
             };
         };
     };
+    get_generate_watcher_api_generate_watcher_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['GenerateWatcherResponse'];
+                };
+            };
+        };
+    };
     get_generate_job_api_generate_job__job_id__get: {
         parameters: {
             query?: never;
@@ -2711,59 +2772,6 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['GenerateJobOut'];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
-                };
-            };
-        };
-    };
-    get_status_api_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': components['schemas']['GenerateStatusResponse'];
-                };
-            };
-        };
-    };
-    batch_compress_pdfs_api_batch_compress_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                'application/json': components['schemas']['BatchCompressRequest'];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    'application/json': components['schemas']['BatchCompressResponse'];
                 };
             };
             /** @description Validation Error */
@@ -2895,7 +2903,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    'application/json': components['schemas']['OcrRunResponse'];
                 };
             };
             /** @description Validation Error */
@@ -2924,7 +2932,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    'application/json': components['schemas']['OcrStopResponse'];
                 };
             };
         };
@@ -4275,6 +4283,39 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['DiscussionHistoryItemOut'][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    delete_discussion_history_api_novel_discussion_history__filename__delete: {
+        parameters: {
+            query: {
+                book_name: string;
+            };
+            header?: never;
+            path: {
+                filename: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['DiscussionDeleteOut'];
                 };
             };
             /** @description Validation Error */

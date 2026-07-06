@@ -2,11 +2,11 @@
 
 > status: living | last-verified: 2026-07-03
 
-novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会ディスカッションの現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
+novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会番組台本生成の現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
 
 **環境変数・スキーマ・LLM backend / port・API 一覧は [データ設計](小説RAG_データ.md) が正本**。本書は重複記載せず、検索・QA の処理フローに集中する。段階拡大（num_ctx PoC→A→B→C・top_k）や俯瞰質問三段改善（B-5/B-8/B-9）の経緯は [設計過程（凍結）](../../../archive/小説RAG_設計過程.md)、実機ベンチ・モデル選定は [技術知見](../../../log/技術知見/小説RAG_技術知見.md)。
 
-検索/QA のコアは `backend/services/novel_db/` の `search.py` / `retrieval.py` / `prompt_builder.py` / `query_expander.py` / `llm.py` / `qa_history.py` / `qa_sessions.py` / `discussion_service.py`、ルーターは `backend/routers/novel_db/{search,qa,chat}.py`。
+検索/QA のコアは `backend/services/novel_db/` の `search.py` / `retrieval.py` / `prompt_builder.py` / `query_expander.py` / `llm.py` / `qa_history.py` / `qa_sessions.py` / `discussion_service.py`（+ `discussion_cast.py` / `discussion_prompts.py` / `discussion_checks.py`）、ルーターは `backend/routers/novel_db/{search,qa,chat}.py`。
 
 ---
 
@@ -81,13 +81,20 @@ LLM 呼び出しとは独立した純関数群。
 - **KV cache**: 続行ターンは同じ system prefix を再送するため llama-server の KV cache がヒットし、2 ターン目以降が高速化する。
 - **backend 制約**: Ollama backend は `stream_chat` 非対応 → `NotImplementedError` を error SSE で 1 度返して終了。詳細（一覧 / タイトル変更 API 等）は [データ設計 §4](小説RAG_データ.md)。UI は system メッセージを応答から除外する。
 
-## 8. 読書会ディスカッション（`discussion_service.py`）B-20
+## 8. 読書会 番組台本生成（`discussion_service.py` ほか）B-28
 
-書籍全文を Qwen 131k コンテキストに投入し、2 ペルソナが交互に語り合う対話を SSE 生成する。
+書籍全文を Qwen 131k コンテキストに投入し、固定ホストキャラ 2 人（レイ＆ミオ）による番組台本を 2 段の LLM 呼び出しで SSE 生成する。B-20（自由ペルソナ 2 人の読書会対話）を置き換えた（要件と設計判断の経緯は [読書会ロングフォーム拡張_要件.md](../../要件定義/読書会ロングフォーム拡張_要件.md)）。
 
-- **フロー**: `load_all_pages_of_book` で全ページ取得 → `estimate_book_tokens`（1 token ≒ 1.5 日本語字）が `MAX_INPUT_TOKENS`(112,000) 超なら error SSE で即終了 → `build_messages`（2 ペルソナの system + user）→ `stream_discussion_turns`。
-- **ターン分割**: LLM 出力を逐次バッファし `[A]:` / `[B]:` マーカー検出で 1 ターン完結ごとに `{"type":"turn", "speaker", "text"}` を yield。終端で最後のターンをフラッシュ。
-- **保存**: 全ターン完了で `save_discussion` が `data/kindle_novel/discussions/{書籍名}/{UTCタイムスタンプ}.json`（personas / turns / created_at）へ保存。クライアント切断時は保存スキップ。`list_discussions` / `count_discussions` で一覧。LLM オプションは `temperature=0.7 / num_predict=8192 / num_ctx=131072`。
+- **モジュール構成**: `discussion_cast.py`（ホスト人格核の定数。レイ=分析派/丁寧語、ミオ=感情派/くだけた口調）/ `discussion_prompts.py`（構成・台本プロンプトビルダー + `SEGMENTS` / `SEGMENT_TURNS` 定数）/ `discussion_checks.py`（DoD 機械チェック M1〜M5）/ `discussion_service.py`（パーサ・生成・保存・削除）。
+- **2 段パイプライン**:
+    1. **構成ステップ** (`generate_plan`): 書籍を読ませて構成メモ JSON（対立する 2 つの推し解釈 `stances`・テーマ 2 件・脱線ネタカード 2〜3 枚 [facts=正確な固有情報 / keywords=言及判定用]）を生成。`temperature=0.4 / num_predict=2048`。
+    2. **台本ステップ** (`stream_discussion_turns`): 番組構成（OPフック→テーマ1→テーマ2→脱線→締め、セグメント別ターン数指定）で台本を SSE ストリーミング。`temperature=0.7 / num_predict=8192`。
+    - **KV cache 最適化**: 両呼び出しの system プロンプト先頭（課題本 + 小説本文の `_COMMON_PREFIX`）を完全一致させ、llama-server の prefix cache により 2 段目の prompt processing をほぼゼロにする。
+- **パーサ**: ターンマーカーは表記揺れ許容（`[A]:` / `[A>:` / `[A]：` 等）。セグメント境界は `[S:segment_id]` 行を逐次検出し `segment` イベント化（チャンク分断による ID 誤検出のガードあり）。
+- **機械チェック（DoD 層1）**: 生成完了時に `run_checks` で M1 字数 3,000〜4,500 / M2 5 セグメント出現 / M3 話者分割成功 / M4 言語リーク 0（簡体字 64 字セット + 4 字以上英字）/ M5 ネタカード言及 を判定し、done イベントと保存 JSON に含める。不合格時は UI から再生成する運用（全保存 + 削除ボタン）。
+- **SSE イベント**: `status(stage=planning|scripting)` → `segment(id,title)` / `turn(speaker,text,segment)` → `done(saved_path, checks)`。エラーは `error(message)`。
+- **保存（format_version 2）**: `data/kindle_novel/discussions/{書籍名}/{JSTタイムスタンプ+0900}.json` に cast スナップショット（人格核 + 当回の stance）/ segments / cards / turns（segment 付き）/ checks を保存。旧 v1 JSON（personas/turns のみ）も `list_discussions` が互換で読める。クライアント切断時は保存スキップ。
+- **API**: `POST /api/novel/discussion/generate`（body は `{book_name}` のみ）/ `GET /history` / `DELETE /history/{filename}?book_name=`（filename 正規表現 + resolve/is_relative_to のパストラバーサル対策）。
 
 ---
 

@@ -1,0 +1,161 @@
+"""B-28 読書会ロングフォーム: プロンプトテンプレートとビルダー。
+
+2 段の LLM 呼び出し（構成ステップ → 台本ステップ）の system プロンプトは、
+KV cache を効かせるため先頭部分（_COMMON_PREFIX = 課題本 + 小説本文）を
+完全一致させている。プレフィックス以降にのみ呼び出し固有の指示を続けること。
+"""
+
+from __future__ import annotations
+
+from .discussion_cast import CAST_RELATIONSHIP, HOST_A, HOST_B
+
+# ---------------------------------------------------------------------------
+# セグメント定義
+# ---------------------------------------------------------------------------
+
+# (segment_id, title)。title=None は構成メモの themes[].title から解決する
+SEGMENTS: list[tuple[str, str | None]] = [
+    ("op_hook", "OPフック"),
+    ("theme1", None),
+    ("theme2", None),
+    ("tangent", "脱線コーナー"),
+    ("closing", "締め"),
+]
+
+# セグメント別ターン数の目安（プロンプトに埋め込む。チューニング用に定数化）
+SEGMENT_TURNS: dict[str, int] = {
+    "op_hook": 3,
+    "theme1": 8,
+    "theme2": 8,
+    "tangent": 6,
+    "closing": 3,
+}
+
+# ---------------------------------------------------------------------------
+# 共通プレフィックス（2 呼び出しで完全一致させる — KV cache 最適化）
+# ---------------------------------------------------------------------------
+
+_COMMON_PREFIX = """あなたは本好き向けトーク番組の制作AIです。以下の小説を素材に作業します。
+
+## 課題本
+{book_name}
+
+## 小説本文（全ページ）
+{book_text}
+
+"""
+
+# ---------------------------------------------------------------------------
+# 構成ステップ（Call 1）
+# ---------------------------------------------------------------------------
+
+# JSON 例にリテラルの {} を含むため .format は使わず文字列連結で組み立てる
+_PLAN_JSON_EXAMPLE = """{
+  "themes": [
+    {"title": "テーマ1の短いタイトル", "question": "2人の解釈が割れる具体的な問い"},
+    {"title": "テーマ2の短いタイトル", "question": "この作品の設定・構造の巧さを視聴者にプレゼンする問い"}
+  ],
+  "stances": {
+    "a": "レイの今回の主張（ミオと対立する解釈。1〜2文）",
+    "b": "ミオの今回の主張（レイと対立する解釈。1〜2文）"
+  },
+  "cards": [
+    {"title": "脱線ネタの見出し", "content": "ネタの中身（この本と接続する類似作品・ジャンルの流行史・設定の系譜・教養小話など。2〜3文）", "facts": ["ネタに登場する作品・人物の正確な固有情報（例: 『薬屋のひとりごと』の主人公は猫猫）"], "keywords": ["台本中でこのネタに言及したか判定するためのキーワード2〜4個"]}
+  ]
+}"""
+
+_PLAN_SYSTEM_SUFFIX = f"""## あなたの役割
+上の小説を読み込み、トーク番組の「構成メモ」をJSONで作成する構成作家です。
+
+## パーソナリティ（この2人が番組で語り合う）
+- {HOST_A.name} [{HOST_A.marker}]: {HOST_A.profile}
+- {HOST_B.name} [{HOST_B.marker}]: {HOST_B.profile}
+
+## 作成する構成メモ
+以下のJSONオブジェクトだけを出力してください。コードフェンスや前置き・後書きは不要です。
+{_PLAN_JSON_EXAMPLE}
+
+## 構成メモのルール
+- themes は必ず2件、cards は2〜3件
+- stances は必ず対立させる。レイは構造・テーマ・歴史的文脈寄り、ミオはキャラクター・感情・関係性寄りの解釈にする
+- cards の facts には確信のある固有情報だけを書く。うろ覚えの情報は書かない
+- cards のうち1枚は、レイの得意分野（日本史・英語・少年漫画）またはミオの得意分野（世界史・数学・少女漫画・懐かし作品）に接続する教養ネタにする
+- 実在の人物・企業への評価・批判につながるネタは避ける"""
+
+PLAN_USER_MESSAGE = "構成メモのJSONをお願いします。"
+
+
+def build_plan_messages(book_name: str, book_text: str) -> list[dict]:
+    """構成ステップ（Call 1）の messages を組み立てる。"""
+    system = _COMMON_PREFIX.format(book_name=book_name, book_text=book_text) + _PLAN_SYSTEM_SUFFIX
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": PLAN_USER_MESSAGE},
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 台本ステップ（Call 2）
+# ---------------------------------------------------------------------------
+
+SCRIPT_USER_MESSAGE = (
+    "番組台本をお願いします。構成の順番と各セグメントのターン数目安を守り、"
+    "締めセグメントに入るまで総括しないでください。"
+)
+
+
+def _format_cards(cards: list[dict]) -> str:
+    lines = []
+    for card in cards:
+        facts = "、".join(card.get("facts", []))
+        lines.append(f"- {card['title']}: {card['content']}（事実メモ: {facts}）")
+    return "\n".join(lines)
+
+
+def build_script_messages(book_name: str, book_text: str, plan: dict) -> list[dict]:
+    """台本ステップ（Call 2）の messages を組み立てる。
+
+    plan は generate_plan がバリデーション済みの構成メモ
+    （themes 2件 / stances a,b / cards 1件以上）。
+    """
+    themes = plan["themes"]
+    stances = plan["stances"]
+    suffix = f"""## あなたの役割
+あなたは本好き向けトーク番組の放送作家兼出演者AIです。上の課題本について2人のパーソナリティが語り合う動画番組の「台本」を書いてください。画面の向こうには視聴者がいます。視聴者はこの本をまだ読んでいないかもしれません。
+
+## パーソナリティ（スタンスの対立が番組の生命線）
+- **{HOST_A.name} [{HOST_A.marker}]**: {HOST_A.profile} 今回の主張:「{stances["a"]}」
+- **{HOST_B.name} [{HOST_B.marker}]**: {HOST_B.profile} 今回の主張:「{stances["b"]}」
+- {CAST_RELATIONSHIP}
+
+## 番組構成（この順番で進行する）
+各セグメントの開始時に、単独の行として `[S:セグメントID]` というマーカーを出力してから会話を始めること。セグメント見出しやその他の区切り記号は出力しない。
+1. `[S:op_hook]` **OPフック（{SEGMENT_TURNS["op_hook"]}ターン）**: 視聴者を掴む。あらすじ紹介から入るのは禁止。「〇〇だと思って敬遠してる人、損してます」のような引きで始める。
+2. `[S:theme1]` **テーマ1「{themes[0]["title"]}」（{SEGMENT_TURNS["theme1"]}ターン前後）**: {themes[0]["question"]} — 2人の解釈がはっきり割れること。決着はつけなくてよい。
+3. `[S:theme2]` **テーマ2「{themes[1]["title"]}」（{SEGMENT_TURNS["theme2"]}ターン前後）**: {themes[1]["question"]} — 設定・構造の面白さを視聴者にプレゼンする。
+4. `[S:tangent]` **脱線コーナー（{SEGMENT_TURNS["tangent"]}ターン前後）**: 下の「脱線ネタ」から1〜2個を使って本作からいったん離れ、また自然に本作へ戻ってくる。脱線こそ番組の華。
+5. `[S:closing]` **締め（{SEGMENT_TURNS["closing"]}ターン）**: それぞれ「どんな人に刺さる本か」を一言 + 例えや点数など印象に残る評価で終える。このセグメントに入るまで、総括・まとめの空気を出すことを禁止する。
+
+## 脱線ネタ（この材料から選んで使う。カードに書かれた事実の範囲で話し、書かれていない詳細をでっち上げない）
+{_format_cards(plan["cards"])}
+
+## 会話のルール
+- **安易な同意の禁止**: 「ええ、本当に！」「そうですよね！」のような全肯定で発言を始めない。各テーマで最低1回は反論・別解釈・茶々を入れる
+- **あらすじの再演禁止**: シーンの引用は「自分の主張の証拠」として出すときだけ。物語を頭から順になぞらない
+- ターンの長さは20〜300字で可変。基本は100〜250字とし、短いツッコミや疑問形を混ぜて会話にリズムを作る。台本全体で3,500〜4,200字を目安にする
+- 登場人物名は初出時に一言説明を添える
+- 実在の人物・企業への評価・批判はしない
+- 出力は日本語のみ。中国語の語彙・簡体字・不要な英単語を混ぜない
+- {HOST_A.name}の発言は `[A]:`、{HOST_B.name}の発言は `[B]:` で始める。`[A]:` `[B]:` `[S:...]` 以外のヘッダー・前置き・後書きは一切出力しない"""
+    system = _COMMON_PREFIX.format(book_name=book_name, book_text=book_text) + suffix
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": SCRIPT_USER_MESSAGE},
+    ]
+
+
+def resolve_segment_titles(plan: dict) -> list[dict]:
+    """SEGMENTS 定数の title=None を構成メモの themes[].title で解決して返す。"""
+    themes = plan["themes"]
+    theme_titles = {"theme1": themes[0]["title"], "theme2": themes[1]["title"]}
+    return [{"id": seg_id, "title": title if title is not None else theme_titles[seg_id]} for seg_id, title in SEGMENTS]

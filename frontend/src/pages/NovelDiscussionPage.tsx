@@ -1,48 +1,56 @@
 /**
- * B-20 読書会ディスカッション生成ページ（/novel/discussion）。
+ * B-28 読書会 番組台本生成ページ（/novel/discussion）。
  *
+ * ホストキャラはレイ＆ミオ固定（サーバー側管理）のため、設定は書籍選択のみ。
  * ロジックは useDiscussion フックに委譲し、このページは JSX の
  * オーケストレーターのみとなっている。
  */
-import { Loader2, MessageSquare, Square } from 'lucide-react';
+import { Loader2, RadioTower, RefreshCw, Square } from 'lucide-react';
 
-import DiscussionHistoryItemCard, { TurnCard } from '@/components/novel_db/DiscussionHistoryItem';
-import PersonaPanel from '@/components/novel_db/PersonaPanel';
+import DiscussionHistoryItemCard from '@/components/novel_db/DiscussionHistoryItem';
+import ScriptView, { ChecksBadge, ScriptExportButtons } from '@/components/novel_db/script-view';
 import { useDiscussion } from '@/hooks/novel_db/useDiscussion';
 import { useNovelDbBooks } from '@/hooks/novel_db';
+
+const STAGE_LABELS = {
+    planning: '構成を考え中…（数分かかります）',
+    scripting: '台本を執筆中…',
+} as const;
 
 export default function NovelDiscussionPage() {
     const { books } = useNovelDbBooks();
     const {
         selectedBook,
         setSelectedBook,
-        personaA,
-        setPersonaA,
-        personaB,
-        setPersonaB,
-        numTurns,
-        setNumTurns,
         turns,
+        segments,
+        stage,
+        checks,
         isGenerating,
         error,
-        nameA,
-        nameB,
         canGenerate,
         history,
         historyLoading,
         handleGenerate,
+        handleRegenerate,
         handleCancel,
+        handleDelete,
         bottomRef,
     } = useDiscussion();
+
+    const failedChecks = checks?.results.filter((r) => !r.passed) ?? [];
 
     return (
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
             {/* ヘッダー */}
             <div className="flex items-center gap-2">
-                <MessageSquare className="w-5 h-5 text-indigo-500" />
+                <RadioTower className="w-5 h-5 text-indigo-500" />
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-                    読書会ディスカッション
+                    読書会 番組台本
                 </h1>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                    ホスト: レイ ＆ ミオ
+                </span>
             </div>
 
             {/* 設定パネル */}
@@ -74,45 +82,6 @@ export default function NovelDiscussionPage() {
                     </select>
                 </div>
 
-                {/* ペルソナ設定 */}
-                <div className="flex gap-3">
-                    <PersonaPanel
-                        label="キャラクター A"
-                        persona={personaA}
-                        onChange={setPersonaA}
-                        disabled={isGenerating}
-                    />
-                    <PersonaPanel
-                        label="キャラクター B"
-                        persona={personaB}
-                        onChange={setPersonaB}
-                        disabled={isGenerating}
-                    />
-                </div>
-
-                {/* 発話数スライダー */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        往復数:{' '}
-                        <span className="text-indigo-600 dark:text-indigo-400">{numTurns}</span>{' '}
-                        往復 （合計 {numTurns * 2} 発言）
-                    </label>
-                    <input
-                        type="range"
-                        min={2}
-                        max={20}
-                        step={1}
-                        value={numTurns}
-                        onChange={(e) => setNumTurns(Number(e.target.value))}
-                        disabled={isGenerating}
-                        className="w-full accent-indigo-600 disabled:opacity-50"
-                    />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                        <span>2往復</span>
-                        <span>20往復</span>
-                    </div>
-                </div>
-
                 {/* 生成 / キャンセルボタン */}
                 <div className="flex gap-2">
                     <button
@@ -128,8 +97,8 @@ export default function NovelDiscussionPage() {
                             </>
                         ) : (
                             <>
-                                <MessageSquare className="w-4 h-4" />
-                                読書会を生成
+                                <RadioTower className="w-4 h-4" />
+                                台本を生成
                             </>
                         )}
                     </button>
@@ -144,6 +113,14 @@ export default function NovelDiscussionPage() {
                         </button>
                     )}
                 </div>
+
+                {/* 進行段階表示 */}
+                {isGenerating && stage && (
+                    <div className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {STAGE_LABELS[stage]}
+                    </div>
+                )}
             </div>
 
             {/* エラー表示 */}
@@ -156,26 +133,51 @@ export default function NovelDiscussionPage() {
             {/* 現在の生成結果 */}
             {turns.length > 0 && (
                 <section className="space-y-3">
-                    <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        生成結果
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            生成結果
+                        </h2>
                         {isGenerating && (
-                            <span className="ml-2 text-xs text-gray-400 font-normal">
-                                生成中...
-                            </span>
+                            <span className="text-xs text-gray-400 font-normal">生成中...</span>
                         )}
-                    </h2>
-                    <div className="space-y-3">
-                        {turns.map((t, i) => (
-                            <TurnCard
-                                key={i}
-                                speaker={t.speaker}
-                                text={t.text}
-                                nameA={nameA}
-                                nameB={nameB}
-                            />
-                        ))}
-                        <div ref={bottomRef} />
+                        {!isGenerating && checks && <ChecksBadge checks={checks} />}
                     </div>
+
+                    <ScriptView turns={turns} segments={segments} />
+                    <div ref={bottomRef} />
+
+                    {/* 完了後: チェック不合格の内訳 + 再生成 + エクスポート */}
+                    {!isGenerating && checks && failedChecks.length > 0 && (
+                        <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-3 space-y-1">
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                                機械チェックで不合格の項目があります
+                            </p>
+                            <ul className="text-xs text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
+                                {failedChecks.map((r) => (
+                                    <li key={r.id}>{`${r.label} — ${r.detail}`}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {!isGenerating && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {checks && (
+                                <button
+                                    type="button"
+                                    onClick={handleRegenerate}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
+                                >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                    再生成
+                                </button>
+                            )}
+                            <ScriptExportButtons
+                                bookName={selectedBook}
+                                turns={turns}
+                                segments={segments}
+                            />
+                        </div>
+                    )}
                 </section>
             )}
 
@@ -195,7 +197,12 @@ export default function NovelDiscussionPage() {
                     ) : (
                         <div className="space-y-2">
                             {history.map((item) => (
-                                <DiscussionHistoryItemCard key={item.filename} item={item} />
+                                <DiscussionHistoryItemCard
+                                    key={item.filename}
+                                    item={item}
+                                    bookName={selectedBook}
+                                    onDelete={handleDelete}
+                                />
                             ))}
                         </div>
                     )}

@@ -166,13 +166,44 @@ export type CharacterScene = components['schemas']['CharacterScene'];
 export type CharacterDetail = components['schemas']['CharacterDetail'];
 
 // ---------------------------------------------------------------------------
-// 読書会ディスカッション（B-20）
+// 読書会 番組台本（B-20 / B-28）
 // ---------------------------------------------------------------------------
+
+/** 機械チェック 1 項目の結果（B-28）。 */
+export interface DiscussionCheckResult {
+    id: string;
+    label: string;
+    passed: boolean;
+    detail: string;
+}
+
+/** 台本生成後の機械チェック結果一式（B-28）。 */
+export interface DiscussionChecks {
+    passed: boolean;
+    results: DiscussionCheckResult[];
+}
+
+/** 台本セグメント（OPフック / テーマ 1 等）の見出し情報（B-28）。 */
+export interface DiscussionSegment {
+    id: string;
+    title: string;
+}
+
+export interface DiscussionTurn {
+    speaker: string;
+    text: string;
+    /** v2（番組台本形式）のみ。所属セグメント id。 */
+    segment?: string;
+}
 
 export interface DiscussionHistoryItem {
     filename: string;
     created_at: string | null;
     personas: { name: string; style_description: string }[];
     turn_count: number;
-    turns: { speaker: string; text: string }[];
+    turns: DiscussionTurn[];
+    /** 1 = 旧ディスカッション形式 / 2 = 番組台本形式（B-28）。 */
+    format_version: 1 | 2;
+    segments?: DiscussionSegment[] | null;
+    checks?: DiscussionChecks | null;
 }

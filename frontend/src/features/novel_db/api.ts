@@ -30,6 +30,12 @@ import type {
 } from './types';
 
 export type { DiscussionHistoryItem };
+export type {
+    DiscussionChecks,
+    DiscussionCheckResult,
+    DiscussionSegment,
+    DiscussionTurn,
+} from './types';
 
 const PREFIX = '/api/novel_db';
 
@@ -190,5 +196,12 @@ export function fetchBookDetail(bookName: string): Promise<BookDetail> {
 export function fetchDiscussionHistory(bookName: string): Promise<DiscussionHistoryItem[]> {
     return apiClient.get<unknown, DiscussionHistoryItem[]>(
         `/api/novel/discussion/history?book_name=${encodeURIComponent(bookName)}`,
+    );
+}
+
+/** 台本履歴 1 件を削除する（B-28）。 */
+export function deleteDiscussion(bookName: string, filename: string): Promise<{ status: string }> {
+    return apiClient.delete<unknown, { status: string }>(
+        `/api/novel/discussion/history/${encodeURIComponent(filename)}?book_name=${encodeURIComponent(bookName)}`,
     );
 }
