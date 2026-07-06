@@ -190,6 +190,13 @@ class DiscussionHistoryItemOut(BaseModel):
     personas: list[dict]
     turn_count: int
     turns: list[dict]
+    format_version: int = 1
+    segments: list[dict] | None = None
+    checks: dict | None = None
+
+
+class DiscussionDeleteOut(BaseModel):
+    status: str
 
 
 # ---------------------------------------------------------------------------

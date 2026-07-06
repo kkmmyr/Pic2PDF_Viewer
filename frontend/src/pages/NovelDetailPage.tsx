@@ -290,7 +290,11 @@ export default function NovelDetailPage() {
                 ) : (
                     <div className="space-y-2">
                         {discussions.slice(0, 3).map((item) => (
-                            <DiscussionHistoryItemCard key={item.filename} item={item} />
+                            <DiscussionHistoryItemCard
+                                key={item.filename}
+                                item={item}
+                                bookName={decodedName}
+                            />
                         ))}
                         {discussions.length > 3 && (
                             <button

@@ -6,7 +6,7 @@
  */
 import { API_CONFIG as API_URL_CONFIG } from '@/config/api';
 
-import type { Scope } from './types';
+import type { DiscussionChecks, Scope } from './types';
 
 // ---------------------------------------------------------------------------
 // 共通 SSE フェッチヘルパー
@@ -224,30 +224,36 @@ export async function streamChatSession(
 }
 
 // ---------------------------------------------------------------------------
-// 読書会ディスカッション生成（B-20）
+// 読書会 番組台本生成（B-20 / B-28）
 // ---------------------------------------------------------------------------
-
-export interface DiscussionPersona {
-    name: string;
-    style_description: string;
-}
 
 export interface DiscussionGenerateRequest {
     book_name: string;
-    personas: [DiscussionPersona, DiscussionPersona];
-    num_turns: number;
+}
+
+/** 生成の進行段階。planning=構成検討中 / scripting=台本執筆中。 */
+export type DiscussionStage = 'planning' | 'scripting';
+
+export interface DiscussionSegmentEvent {
+    id: string;
+    title: string;
 }
 
 export interface DiscussionTurnEvent {
     speaker: 'A' | 'B';
     text: string;
+    /** 所属セグメント id（op_hook / theme1 等）。 */
+    segment?: string;
 }
 
 export interface DiscussionDoneEvent {
     saved_path?: string;
+    checks: DiscussionChecks | null;
 }
 
 export interface DiscussionStreamHandlers {
+    onStatus: (stage: DiscussionStage) => void;
+    onSegment: (event: DiscussionSegmentEvent) => void;
     onTurn: (event: DiscussionTurnEvent) => void;
     onDone: (event: DiscussionDoneEvent) => void;
     onError: (error: Error) => void;
@@ -255,9 +261,14 @@ export interface DiscussionStreamHandlers {
 
 interface DiscussionSsePayload {
     type?: string;
+    stage?: string;
+    id?: string;
+    title?: string;
     speaker?: string;
     text?: string;
+    segment?: string;
     saved_path?: string;
+    checks?: DiscussionChecks;
     message?: string;
 }
 
@@ -271,10 +282,21 @@ export async function streamDiscussion(
         `${API_URL_CONFIG.BASE_URL}/api/novel/discussion/generate`,
         body,
         (event) => {
-            if (event.type === 'turn' && event.speaker && event.text !== undefined) {
-                handlers.onTurn({ speaker: event.speaker as 'A' | 'B', text: event.text });
+            if (
+                event.type === 'status' &&
+                (event.stage === 'planning' || event.stage === 'scripting')
+            ) {
+                handlers.onStatus(event.stage);
+            } else if (event.type === 'segment' && event.id && event.title !== undefined) {
+                handlers.onSegment({ id: event.id, title: event.title });
+            } else if (event.type === 'turn' && event.speaker && event.text !== undefined) {
+                handlers.onTurn({
+                    speaker: event.speaker as 'A' | 'B',
+                    text: event.text,
+                    segment: event.segment,
+                });
             } else if (event.type === 'done') {
-                handlers.onDone({ saved_path: event.saved_path });
+                handlers.onDone({ saved_path: event.saved_path, checks: event.checks ?? null });
                 return 'stop';
             } else if (event.type === 'error' || event.message !== undefined) {
                 handlers.onError(new Error(event.message ?? 'Unknown error'));

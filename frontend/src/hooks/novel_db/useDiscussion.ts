@@ -1,36 +1,26 @@
 /**
- * B-20 読書会ディスカッション生成ページのロジック層。
+ * B-28 読書会 番組台本生成ページのロジック層。
  *
+ * ホストキャラはレイ＆ミオ固定（サーバー側管理）のため、設定は書籍選択のみ。
  * state / effect / handler を集約し、NovelDiscussionPage は JSX の
  * オーケストレーターのみとなる。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 
-import { type PersonaState, buildStyleDesc } from '@/components/novel_db/PersonaPanel';
-import { type DiscussionHistoryItem, fetchDiscussionHistory } from '@/features/novel_db/api';
-import { type DiscussionTurnEvent, streamDiscussion } from '@/features/novel_db/sse';
-
-// ---------------------------------------------------------------------------
-// ペルソナデフォルト値
-// ---------------------------------------------------------------------------
-
-const DEFAULT_A: PersonaState = {
-    name: '批評家',
-    readingStyle: '批評家',
-    tone: '敬語丁寧',
-    perspective: '文学評論',
-    useCustom: false,
-    customDesc: '',
-};
-const DEFAULT_B: PersonaState = {
-    name: 'ファン',
-    readingStyle: 'ファン',
-    tone: 'フランク',
-    perspective: '感情重視',
-    useCustom: false,
-    customDesc: '',
-};
+import {
+    type DiscussionHistoryItem,
+    deleteDiscussion,
+    fetchDiscussionHistory,
+} from '@/features/novel_db/api';
+import {
+    type DiscussionStage,
+    type DiscussionTurnEvent,
+    streamDiscussion,
+} from '@/features/novel_db/sse';
+import type { DiscussionChecks } from '@/features/novel_db/types';
+import { errorMessage } from '@/utils/error';
 
 // ---------------------------------------------------------------------------
 // 公開型
@@ -40,28 +30,27 @@ export interface UseDiscussionReturn {
     // 書籍選択
     selectedBook: string;
     setSelectedBook: (v: string) => void;
-    // ペルソナ
-    personaA: PersonaState;
-    setPersonaA: (v: PersonaState) => void;
-    personaB: PersonaState;
-    setPersonaB: (v: PersonaState) => void;
-    // 発話数
-    numTurns: number;
-    setNumTurns: (v: number) => void;
     // 生成状態
     turns: DiscussionTurnEvent[];
+    /** 受信済みセグメント id → 見出しタイトル。 */
+    segments: Record<string, string>;
+    /** 生成の進行段階。生成中以外は null。 */
+    stage: DiscussionStage | null;
+    /** 生成完了時の機械チェック結果。未完了・旧形式は null。 */
+    checks: DiscussionChecks | null;
     isGenerating: boolean;
     error: string | null;
     // 派生値
-    nameA: string;
-    nameB: string;
     canGenerate: boolean;
     // 履歴
     history: DiscussionHistoryItem[];
     historyLoading: boolean;
     // ハンドラ
     handleGenerate: () => void;
+    handleRegenerate: () => void;
     handleCancel: () => void;
+    /** 履歴 1 件を削除して再取得する（確認 UI は呼び出し側の ConfirmDialog）。 */
+    handleDelete: (filename: string) => Promise<void>;
     // refs
     bottomRef: React.RefObject<HTMLDivElement | null>;
 }
@@ -74,11 +63,11 @@ export function useDiscussion(): UseDiscussionReturn {
     const [searchParams] = useSearchParams();
 
     const [selectedBook, setSelectedBook] = useState(() => searchParams.get('book') ?? '');
-    const [personaA, setPersonaA] = useState<PersonaState>(DEFAULT_A);
-    const [personaB, setPersonaB] = useState<PersonaState>(DEFAULT_B);
-    const [numTurns, setNumTurns] = useState(6);
 
     const [turns, setTurns] = useState<DiscussionTurnEvent[]>([]);
+    const [segments, setSegments] = useState<Record<string, string>>({});
+    const [stage, setStage] = useState<DiscussionStage | null>(null);
+    const [checks, setChecks] = useState<DiscussionChecks | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -112,8 +101,11 @@ export function useDiscussion(): UseDiscussionReturn {
     }, [turns.length]);
 
     const handleGenerate = () => {
-        if (!selectedBook) return;
+        if (!selectedBook || isGenerating) return;
         setTurns([]);
+        setSegments({});
+        setStage(null);
+        setChecks(null);
         setError(null);
         setIsGenerating(true);
 
@@ -121,22 +113,20 @@ export function useDiscussion(): UseDiscussionReturn {
         abortRef.current = ctrl;
 
         void streamDiscussion(
+            { book_name: selectedBook },
             {
-                book_name: selectedBook,
-                personas: [
-                    { name: personaA.name, style_description: buildStyleDesc(personaA) },
-                    { name: personaB.name, style_description: buildStyleDesc(personaB) },
-                ],
-                num_turns: numTurns,
-            },
-            {
+                onStatus: (s) => setStage(s),
+                onSegment: (ev) => setSegments((prev) => ({ ...prev, [ev.id]: ev.title })),
                 onTurn: (ev) => setTurns((prev) => [...prev, ev]),
-                onDone: () => {
+                onDone: (ev) => {
+                    setChecks(ev.checks);
+                    setStage(null);
                     setIsGenerating(false);
                     void loadHistory(selectedBook);
                 },
                 onError: (e) => {
                     setError(e.message);
+                    setStage(null);
                     setIsGenerating(false);
                 },
             },
@@ -146,36 +136,41 @@ export function useDiscussion(): UseDiscussionReturn {
 
     const handleCancel = () => {
         abortRef.current?.abort();
+        setStage(null);
         setIsGenerating(false);
     };
 
-    const nameA = personaA.name || 'A';
-    const nameB = personaB.name || 'B';
-    const canGenerate =
-        !!selectedBook &&
-        !isGenerating &&
-        buildStyleDesc(personaA) !== '' &&
-        buildStyleDesc(personaB) !== '';
+    const handleDelete = useCallback(
+        async (filename: string) => {
+            try {
+                await deleteDiscussion(selectedBook, filename);
+                toast.success('台本を削除しました');
+                await loadHistory(selectedBook);
+            } catch (e) {
+                toast.error(errorMessage(e, '台本の削除に失敗しました'));
+            }
+        },
+        [selectedBook, loadHistory],
+    );
+
+    const canGenerate = !!selectedBook && !isGenerating;
 
     return {
         selectedBook,
         setSelectedBook,
-        personaA,
-        setPersonaA,
-        personaB,
-        setPersonaB,
-        numTurns,
-        setNumTurns,
         turns,
+        segments,
+        stage,
+        checks,
         isGenerating,
         error,
-        nameA,
-        nameB,
         canGenerate,
         history,
         historyLoading,
         handleGenerate,
+        handleRegenerate: handleGenerate,
         handleCancel,
+        handleDelete,
         bottomRef,
     };
 }
