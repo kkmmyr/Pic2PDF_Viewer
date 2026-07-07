@@ -28,7 +28,7 @@ _SIMPLIFIED_ONLY_CHARS = frozenset(
 
 # M4: 4文字以上の連続英字のうち許容する語（小文字で比較）。
 # OP/ED 等の頻出略語は 3 字以下なので引っかからない。必要になったら追加する
-_ENGLISH_ALLOWLIST: frozenset[str] = frozenset()
+_ENGLISH_ALLOWLIST: frozenset[str] = frozenset({"bleach"})
 
 _ENGLISH_RUN_RE = re.compile(r"[A-Za-z]{4,}")
 
