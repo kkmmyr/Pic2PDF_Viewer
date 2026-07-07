@@ -119,6 +119,11 @@ def _validate_plan(plan: dict) -> None:
         raise ValueError("構成メモの cards は 1 件以上必要です")
 
 
+# 構成メモの JSON 崩れ・バリデーション不合格時のリトライ上限。
+# system 先頭（書籍本文）の KV cache が効いているため再試行は安価
+_PLAN_MAX_ATTEMPTS = 3
+
+
 async def generate_plan(
     messages: list[dict],
     *,
@@ -127,23 +132,37 @@ async def generate_plan(
 ) -> dict:
     """構成ステップ（Call 1）を実行し、バリデーション済み構成メモ dict を返す。
 
-    JSON 抽出・パース・バリデーション失敗時は ValueError
-    （呼び出し側で SSE error に変換する）。
+    LLM の JSON 出力は確率的に崩れるため、抽出・パース・バリデーション失敗時は
+    同一プロンプトで最大 _PLAN_MAX_ATTEMPTS 回まで再試行する。
+    全滅時は最後の ValueError（呼び出し側で SSE error に変換する）。
     """
     opts = options or PLAN_LLM_OPTIONS
-    chunks: list[str] = []
-    async for event in _astream_chat(messages, model=model, options=opts):
-        if event.get("response"):
-            chunks.append(event["response"])
-        if event.get("done"):
-            break
-    full_text = "".join(chunks)
-    try:
-        plan = _extract_json_object(full_text)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"構成メモの JSON パースに失敗しました: {e}") from e
-    _validate_plan(plan)
-    return plan
+    last_error: ValueError | None = None
+    for attempt in range(1, _PLAN_MAX_ATTEMPTS + 1):
+        chunks: list[str] = []
+        async for event in _astream_chat(messages, model=model, options=opts):
+            if event.get("response"):
+                chunks.append(event["response"])
+            if event.get("done"):
+                break
+        full_text = "".join(chunks)
+        try:
+            plan = _extract_json_object(full_text)
+            _validate_plan(plan)
+            return plan
+        except json.JSONDecodeError as e:
+            last_error = ValueError(f"構成メモの JSON パースに失敗しました: {e}")
+            last_error.__cause__ = e
+        except ValueError as e:
+            last_error = e
+        logger.warning(
+            "generate_plan attempt %d/%d failed: %s",
+            attempt,
+            _PLAN_MAX_ATTEMPTS,
+            last_error,
+        )
+    assert last_error is not None
+    raise last_error
 
 
 async def stream_discussion_turns(
