@@ -328,6 +328,38 @@ async def test_generate_plan_no_json_raises(monkeypatch):
         await _run_generate_plan(monkeypatch, "JSONを含まないテキスト")
 
 
+async def test_generate_plan_retries_on_broken_json(monkeypatch):
+    """1 回目が JSON 崩れでも 2 回目で正常 JSON が返れば成功する。"""
+    from services.novel_db import discussion_service
+
+    outputs = iter(["{ themes: 壊れたJSON }", json.dumps(_PLAN, ensure_ascii=False)])
+
+    async def fake_astream_chat(messages, *, model=None, options=None):
+        yield {"response": next(outputs), "done": False}
+        yield {"response": "", "done": True}
+
+    monkeypatch.setattr(discussion_service, "_astream_chat", fake_astream_chat)
+    plan = await discussion_service.generate_plan([])
+    assert plan["themes"][0]["title"] == "喪失と再生"
+
+
+async def test_generate_plan_exhausts_retries(monkeypatch):
+    """全試行が JSON 崩れなら最後の ValueError を送出し、試行回数は上限どおり。"""
+    from services.novel_db import discussion_service
+
+    calls = {"n": 0}
+
+    async def fake_astream_chat(messages, *, model=None, options=None):
+        calls["n"] += 1
+        yield {"response": "{ themes: 壊れたJSON }", "done": False}
+        yield {"response": "", "done": True}
+
+    monkeypatch.setattr(discussion_service, "_astream_chat", fake_astream_chat)
+    with pytest.raises(ValueError, match="JSON パースに失敗"):
+        await discussion_service.generate_plan([])
+    assert calls["n"] == discussion_service._PLAN_MAX_ATTEMPTS
+
+
 # ---------------------------------------------------------------------------
 # save_discussion v2 / list_discussions / delete_discussion
 # ---------------------------------------------------------------------------
