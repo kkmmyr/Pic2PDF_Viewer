@@ -8,6 +8,23 @@ on:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Secrets: push / PR のコミット範囲を gitleaks で検査
+  # ---------------------------------------------------------------------------
+  secrets:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
   # Backend: ruff lint/format + pytest (with coverage)
   # ---------------------------------------------------------------------------
   backend:
@@ -27,6 +44,10 @@ jobs:
 
       - name: Install Python dependencies
         run: uv sync
+
+      - name: Audit Python dependencies
+        working-directory: backend
+        run: uv run python -m tools.dependency_audit
 
       - name: Lint (ruff check)
         working-directory: backend
@@ -62,6 +83,10 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      - name: Audit dependencies
+        working-directory: frontend
+        run: npm audit
 
       - name: Lint (eslint)
         working-directory: frontend

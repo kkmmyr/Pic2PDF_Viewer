@@ -47,6 +47,10 @@ class _AppSettings(BaseSettings):
     GEMMA_TOOL_DIR: Path | None = None
     # meta.db バックアップ先（未設定時はバックアップ無効）
     META_DB_BACKUP_DIR: Path | None = None
+    # LinuxサーバーのDB世代バックアップ先・保持日数・復元試験先
+    SERVER_BACKUP_DIR: Path | None = None
+    SERVER_BACKUP_RETENTION_DAYS: int = 14
+    SERVER_RESTORE_TEST_DIR: Path | None = None
     # OCR venv の Python 実行ファイルパス（未設定時はプラットフォーム既定値）
     # Windows: D:\61.tool\common\ocr\venv\Scripts\python.exe
     # Mac/Linux: ~/.venv/ocr/bin/python
@@ -71,6 +75,10 @@ app_settings = _s  # public singleton
 PROJECT_ROOT = str(_BACKEND_DIR.parent)
 
 DATA_DIR = str(_s.PIC2PDF_DATA_DIR)
+_SERVER_STORAGE_ROOT = _s.PIC2PDF_DATA_DIR.parent
+SERVER_BACKUP_DIR = str(_s.SERVER_BACKUP_DIR or _SERVER_STORAGE_ROOT / "backups")
+SERVER_BACKUP_RETENTION_DAYS: int = _s.SERVER_BACKUP_RETENTION_DAYS
+SERVER_RESTORE_TEST_DIR = str(_s.SERVER_RESTORE_TEST_DIR or _SERVER_STORAGE_ROOT / "restore-tests")
 
 # Doujin
 MAIN_DATA_DIR = str(_s.PIC2PDF_DATA_DIR / "doujin")

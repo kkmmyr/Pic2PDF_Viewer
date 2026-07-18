@@ -45,7 +45,7 @@ tar czf - -C "${SRC}" deploy \
     | ssh "${LINUX}" "tar xzf - -C '${APP_ROOT}'"
 
 # ---- 3. デプロイ前バックアップ ----
-echo "=== [3/4] Backing up meta2.db ==="
+echo "=== [3/4] Backing up databases ==="
 ssh "${LINUX}" "bash '${APP_ROOT}/deploy/backup-meta.sh' \$(date +%Y-%m-%d_%H%M%S)_pre-deploy"
 
 # ---- 4. サービス再起動 ----

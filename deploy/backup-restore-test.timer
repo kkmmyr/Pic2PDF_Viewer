@@ -1,0 +1,10 @@
+[Unit]
+Description=Pic2PDF weekly backup restore verification timer
+Requires=backup-restore-test.service
+
+[Timer]
+OnCalendar=Sun *-*-* 03:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

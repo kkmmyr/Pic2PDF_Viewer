@@ -1,0 +1,37 @@
+version = 1
+
+[[exemptions]]
+package = "onnx"
+locked_version = "1.21.0"
+expires = 2026-10-18
+reason = "ONNX 1.22への更新はyomitokuのモデル読込・OCR実機互換をGPU環境で確認してから行う"
+ids = [
+  "GHSA-hwpq-hmq9-wj77",
+]
+
+[[exemptions]]
+package = "torch"
+locked_version = "2.5.1+cu121"
+expires = 2026-10-18
+reason = "CUDA 12.1・torchvision・torchaudio・yomitokuを同時更新する必要がありGPU実機検証まで現行版を維持する"
+ids = [
+  "GHSA-3749-ghw9-m3mg",
+  "GHSA-53q9-r3pm-6pq6",
+  "GHSA-887c-mr87-cxwp",
+  "GHSA-c678-jfcj-6jmf",
+  "GHSA-f4hp-rmr7-r7v8",
+  "GHSA-qfhq-4f3w-5fph",
+  "GHSA-rrmf-rvhw-rf47",
+  "GHSA-vgrw-7cvw-pwgx",
+  "GHSA-x3gm-94wq-g975",
+  "PYSEC-2025-198",
+  "PYSEC-2025-203",
+  "PYSEC-2025-204",
+  "PYSEC-2025-205",
+  "PYSEC-2025-206",
+  "PYSEC-2025-207",
+  "PYSEC-2025-208",
+  "PYSEC-2025-209",
+  "PYSEC-2026-139",
+  "PYSEC-2026-2286",
+]

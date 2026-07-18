@@ -1,10 +1,12 @@
 [Unit]
-Description=Pic2PDF meta2.db daily backup
+Description=Pic2PDF databases daily verified backup
 After=local-fs.target
 
 [Service]
 Type=oneshot
 User=amashio
+WorkingDirectory=/opt/pic2pdf-viewer/backend
+EnvironmentFile=/opt/pic2pdf-viewer/.env
 ExecStart=/bin/bash /opt/pic2pdf-viewer/deploy/backup-meta.sh
 StandardOutput=append:/opt/pic2pdf-viewer/logs/backup-meta.log
 StandardError=append:/opt/pic2pdf-viewer/logs/backup-meta.log

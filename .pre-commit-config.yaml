@@ -37,6 +37,12 @@ repos:
         files: ^(backend/.*|kindle-pdf/.*|frontend/src/.*|docs/design/詳細設計/詳細設計書_(バックエンド|フロントエンド)_ファイルマップ\.md)$
         pass_filenames: false
 
+  # --- Secrets: commit 対象のハードコード済み秘密情報を検出 ---
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
   # --- General ---
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

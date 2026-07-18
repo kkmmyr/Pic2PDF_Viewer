@@ -1,5 +1,5 @@
 [Unit]
-Description=Pic2PDF meta2.db daily backup timer
+Description=Pic2PDF databases daily verified backup timer
 Requires=backup-meta.service
 
 [Timer]

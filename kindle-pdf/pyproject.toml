@@ -5,7 +5,7 @@ description = "Kindle capture tools for Pic2PDF Viewer"
 requires-python = ">=3.12"
 dependencies = [
     "pyautogui",
-    "pillow",
+    "pillow>=12.3.0",
     "opencv-python",
     "numpy",
     "python-dotenv",
