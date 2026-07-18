@@ -1,0 +1,49 @@
+---
+name: "source-command-changelog"
+description: "直近のコミットから docs/log/変更履歴.md に追記する草稿を生成する"
+---
+
+# source-command-changelog
+
+Use this skill when the user asks to run the migrated source command `changelog`.
+
+## Command Template
+
+`docs/log/変更履歴.md` への追記草稿を作成してください。Phase / 機能追加 / バグ修正 完了直後の運用想定。
+
+## 進め方
+
+1. **直近コミット範囲を特定**
+    - 引数指定: `/changelog HEAD~5..HEAD` のように渡された場合はそれを使う
+    - 未指定: `git log --oneline -10` で表示し、ユーザーに「ここまで」を確認
+2. **対象範囲のコミットを取得**: `git log <range> --pretty=format:'%h %s%n%b'`
+3. **既存の変更履歴を Read**: `docs/log/変更履歴.md`（無ければ新規作成を提案して確認を取る）
+4. **草稿を組み立て**:
+    - 日付（今日の日付・YYYY-MM-DD）+ Phase / 機能名見出し
+    - **何をしたか**（実装側の事実、コミットメッセージから抽出）
+    - **なぜしたか**（背景・動機、コミット本文から抽出）
+    - **影響範囲**（テスト件数・パスしたか・互換性ある変更か）
+5. **ユーザーに草稿を提示** → 承認後に Edit で追記
+
+## 報告フォーマット
+
+```markdown
+## YYYY-MM-DD: <Phase/機能名>
+
+### 内容
+- 〇〇〇
+
+### 背景
+- 〇〇〇
+
+### 影響
+- テスト: <pytest N / vitest M / 等>
+- 互換性: <既存 API 互換 / breaking 等>
+- 関連: コミット <hash range>
+```
+
+## 注意
+
+- **草稿提示までで一旦止める**。勝手に書き込まない（粒度の好みがプロジェクトごとに違うため）
+- コミット本文に Co-Authored-By などの定型行が入っている場合は除外する
+- Phase 単位の大きな単位で書き、小さい修正は箇条書きにまとめる

@@ -38,6 +38,7 @@ frontend/playwright-report/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .claude/worktrees/
+.codex/worktrees/
 
 # Editor / OS
 .vscode/

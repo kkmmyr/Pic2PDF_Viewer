@@ -1,0 +1,58 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/remind_docs_update.sh\"",
+            "commandWindows": "powershell -NoProfile -Command \"& (Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\\bash.exe') (Join-Path (git rev-parse --show-toplevel) '.codex\\hooks\\remind_docs_update.sh')\"",
+            "timeout": 10,
+            "statusMessage": "Checking documentation reminder"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/remind_tests.sh\"",
+            "commandWindows": "powershell -NoProfile -Command \"& (Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\\bash.exe') (Join-Path (git rev-parse --show-toplevel) '.codex\\hooks\\remind_tests.sh')\"",
+            "timeout": 10,
+            "statusMessage": "Checking test reminder"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/remind_deps_install.sh\"",
+            "commandWindows": "powershell -NoProfile -Command \"& (Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\\bash.exe') (Join-Path (git rev-parse --show-toplevel) '.codex\\hooks\\remind_deps_install.sh')\"",
+            "timeout": 10,
+            "statusMessage": "Checking dependency reminder"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/lint_check.sh\"",
+            "commandWindows": "powershell -NoProfile -Command \"& (Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\\bash.exe') (Join-Path (git rev-parse --show-toplevel) '.codex\\hooks\\lint_check.sh')\"",
+            "timeout": 60,
+            "statusMessage": "Checking edited files"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$(git rev-parse --show-toplevel)/.codex/hooks/remind_memory_sync.sh\"",
+            "commandWindows": "powershell -NoProfile -Command \"& (Join-Path (Split-Path (Split-Path (Get-Command git).Source)) 'bin\\bash.exe') (Join-Path (git rev-parse --show-toplevel) '.codex\\hooks\\remind_memory_sync.sh')\"",
+            "timeout": 10,
+            "statusMessage": "Checking post-commit reminder"
+          }
+        ]
+      }
+    ]
+  }
+}
