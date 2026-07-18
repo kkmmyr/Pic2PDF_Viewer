@@ -79,6 +79,8 @@ EXCLUDED_DIR_GLOBS = ("playwright-*", "*.egg-info")
 EXCLUDED_RELATIVE_DIRS = frozenset(
     {
         "backend/complete",
+        "backend/data",
+        "backend/input",
         "backend/scripts/results",
     }
 )
@@ -92,12 +94,6 @@ EXCLUDED_RELATIVE_DIRS = frozenset(
 #   （2026-07 CI修理計画書 DOCS-1）
 EXCLUDED_FILE_NAMES = frozenset({".DS_Store", ".coverage"})
 
-# gitignore 対象・実行時生成データのため展開しない特別扱いディレクトリ
-# （プロジェクトルート相対パス、POSIX 区切り）
-SPECIAL_DATA_DIR_REL = "backend/data"
-SPECIAL_DATA_DIR_LINE = "data/  # 実行時生成データ（gitignore 対象、詳細は 詳細設計書_共通.md §2 参照）"
-
-
 def _is_excluded_dir(path: Path) -> bool:
     name = path.name
     if name in EXCLUDED_DIR_NAMES:
@@ -106,11 +102,6 @@ def _is_excluded_dir(path: Path) -> bool:
         return True
     rel_posix = path.relative_to(PROJECT_ROOT).as_posix()
     return rel_posix in EXCLUDED_RELATIVE_DIRS
-
-
-def _is_special_data_dir(path: Path) -> bool:
-    return path.relative_to(PROJECT_ROOT).as_posix() == SPECIAL_DATA_DIR_REL
-
 
 # ---------------------------------------------------------------------------
 # ツリー描画
@@ -146,9 +137,6 @@ def _render_children(dir_path: Path, prefix: str, lines: list[str]) -> None:
         is_last = i == last_index
         connector = "└── " if is_last else "├── "
         if child.is_dir():
-            if _is_special_data_dir(child):
-                lines.append(f"{prefix}{connector}{SPECIAL_DATA_DIR_LINE}")
-                continue
             lines.append(f"{prefix}{connector}{child.name}/")
             extension = "    " if is_last else "│   "
             _render_children(child, prefix + extension, lines)
