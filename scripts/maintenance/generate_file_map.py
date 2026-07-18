@@ -84,9 +84,13 @@ EXCLUDED_RELATIVE_DIRS = frozenset(
 )
 
 # ファイル名の完全一致で除外するもの。方針: ディレクトリレベルのノイズのみを
-# 除外し、拡張子ベースのフィルタは行わない（.tsbuildinfo / .pyc / .coverage 等も
-# 実ファイルとして存在すれば表示される）。macOS の .DS_Store のみ例外的に除外。
-EXCLUDED_FILE_NAMES = frozenset({".DS_Store"})
+# 除外し、拡張子ベースのフィルタは行わない（.tsbuildinfo / .pyc 等は
+# 実ファイルとして存在すれば表示される）。例外はここに完全一致で個別列挙する:
+# - .DS_Store: macOS のノイズ
+# - .coverage: gitignore 対象の実行時生成物。ローカルの汚れた状態で生成した
+#   ツリーが CI のクリーンチェックアウトと恒常的にドリフトした実績があるため
+#   （2026-07 CI修理計画書 DOCS-1）
+EXCLUDED_FILE_NAMES = frozenset({".DS_Store", ".coverage"})
 
 # gitignore 対象・実行時生成データのため展開しない特別扱いディレクトリ
 # （プロジェクトルート相対パス、POSIX 区切り）
