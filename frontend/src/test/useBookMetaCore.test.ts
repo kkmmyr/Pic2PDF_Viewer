@@ -43,13 +43,14 @@ describe('useBookMetaCore', () => {
         expect(result.current.getAuthors('', 'a.pdf')).toEqual(['作者A']);
     });
 
-    it('GET 失敗で meta は空 {} にフォールバック', async () => {
+    it('GET 失敗で空表示とisErrorを返す', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
         const { result } = renderHook(() => useBookMetaCore('doujin'), {
             wrapper: createWrapper(),
         });
-        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
+        await waitFor(() => expect(result.current.isError).toBe(true));
         expect(result.current.meta).toEqual({});
+        expect(result.current.error).toEqual(new Error('boom'));
     });
 
     it('GET の戻り値が undefined でも空 {} に正規化', async () => {

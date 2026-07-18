@@ -4,6 +4,8 @@ import { LibraryHeader } from './LibraryHeader';
 import { GenreFilterBar } from './GenreFilterBar';
 import { LibraryDialogs } from './LibraryDialogs';
 import { SeriesEditDialog } from './SeriesEditDialog';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 
 interface LibraryPanelProps {
     onPdfClick: (name: string) => void;
@@ -73,6 +75,8 @@ function LibraryPdfGrid() {
 }
 
 function LibraryPanelContent() {
+    const { hasLibraryLoadError, retryLibraryData } = useLibraryPanelContext();
+
     return (
         <>
             <LibraryHeader />
@@ -80,6 +84,16 @@ function LibraryPanelContent() {
             <GenreFilterBar />
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">
+                    {hasLibraryLoadError && (
+                        <Alert variant="error" className="mb-4">
+                            <div className="flex items-center justify-between gap-4">
+                                <span>ライブラリ情報の取得に失敗しました。</span>
+                                <Button size="sm" onClick={() => void retryLibraryData()}>
+                                    再試行
+                                </Button>
+                            </div>
+                        </Alert>
+                    )}
                     <LibraryPdfGrid />
                 </div>
             </div>

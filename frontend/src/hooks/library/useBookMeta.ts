@@ -23,6 +23,8 @@ export function useBookMeta(source: string) {
 
     return {
         meta: core.meta,
+        isError: core.isError,
+        error: core.error,
         getAuthors: core.getAuthors,
         getSeries: core.getSeries,
         isHidden: core.isHidden,

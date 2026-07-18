@@ -5,24 +5,22 @@ import { API_ENDPOINTS } from '@/config/api';
 import apiClient from '@/config/api_client';
 
 export const genresQueryKey = (source: LibrarySource) => ['genres', source] as const;
+const EMPTY_GENRES: string[] = [];
 
 export function useGenres(source: LibrarySource) {
     const queryClient = useQueryClient();
 
-    const { data: genres = [] } = useQuery<string[]>({
+    const query = useQuery<string[]>({
         queryKey: genresQueryKey(source),
         queryFn: async () => {
-            try {
-                const data = await apiClient.get<unknown, string[]>(API_ENDPOINTS.GENRES, {
-                    params: { source },
-                });
-                return data ?? [];
-            } catch {
-                return [];
-            }
+            const data = await apiClient.get<unknown, string[]>(API_ENDPOINTS.GENRES, {
+                params: { source },
+            });
+            return data ?? [];
         },
         staleTime: Infinity,
     });
+    const genres = query.data ?? EMPTY_GENRES;
 
     const addGenre = useCallback(
         async (name: string): Promise<void> => {
@@ -59,5 +57,13 @@ export function useGenres(source: LibrarySource) {
         [source, genres, queryClient],
     );
 
-    return { genres, addGenre, removeGenre, reorderGenres };
+    return {
+        genres,
+        addGenre,
+        removeGenre,
+        reorderGenres,
+        isError: query.isError,
+        error: query.error,
+        refetch: query.refetch,
+    };
 }

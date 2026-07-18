@@ -5,26 +5,24 @@ import { API_ENDPOINTS } from '@/config/api';
 import apiClient from '@/config/api_client';
 
 export const metaQueryKey = (source: string) => ['meta', source] as const;
+const EMPTY_META: BookMetaMap = {};
 
 export function makeBookMetaKey(path: string, name: string): string {
     return path ? `${path}/${name}` : name;
 }
 
 export function useBookMetaCore(source: string) {
-    const { data: meta = {}, refetch: fetchMeta } = useQuery<BookMetaMap>({
+    const query = useQuery<BookMetaMap>({
         queryKey: metaQueryKey(source),
         queryFn: async () => {
-            try {
-                const data = await apiClient.get<unknown, BookMetaMap>(API_ENDPOINTS.META, {
-                    params: { source },
-                });
-                return data ?? {};
-            } catch {
-                return {};
-            }
+            const data = await apiClient.get<unknown, BookMetaMap>(API_ENDPOINTS.META, {
+                params: { source },
+            });
+            return data ?? {};
         },
         staleTime: Infinity,
     });
+    const meta = query.data ?? EMPTY_META;
 
     const getAuthors = useCallback(
         (path: string, name: string): string[] => {
@@ -78,7 +76,9 @@ export function useBookMetaCore(source: string) {
 
     return {
         meta,
-        fetchMeta,
+        fetchMeta: query.refetch,
+        isError: query.isError,
+        error: query.error,
         getAuthors,
         getSeries,
         isHidden,

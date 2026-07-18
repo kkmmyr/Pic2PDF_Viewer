@@ -13,6 +13,8 @@ from datetime import date
 from pathlib import Path
 from typing import TypedDict
 
+from utils.atomic_json import atomic_write_json
+
 from . import nozomi
 
 
@@ -56,9 +58,7 @@ def load_watchlist(data_dir: Path) -> list[WatchlistEntry]:
 
 def save_watchlist(data_dir: Path, entries: list[WatchlistEntry]) -> None:
     path = _watchlist_path(data_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump({"artists": entries}, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, {"artists": entries})
 
 
 def add_artist(

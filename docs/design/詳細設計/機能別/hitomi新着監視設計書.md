@@ -1,6 +1,6 @@
 # hitomi.la 新着監視設計書
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-18
 
 特定作者の新着ギャラリーを定期監視して、ライブラリ画面から確認・hitomi.la へのリンクで遷移できる機能の設計書。本機能は **既存の Pic2PDF_Viewer 本体機能とは独立** しており、設計上も実行プロセスとしても疎結合に組む。本機能に関する仕様・実装・運用はすべて本ファイルに集約する。
 
@@ -83,6 +83,10 @@ UI 側は GET `/api/hitomi/new-arrivals` で `new_arrivals.json` を読み、画
 ---
 
 ## 4. データ構造（JSON 形式）
+
+`watchlist.json` / `state.json` / `new_arrivals.json` の更新は、同一ディレクトリの一時ファイルへ
+UTF-8 JSONを書き込み、`flush` + `fsync`後に`os.replace`する共通ヘルパーを使用する。
+シリアライズ失敗・書き込み中断・置換失敗時も既存ファイルを残し、一時ファイルは削除する。
 
 ### 4.1. `watchlist.json`
 

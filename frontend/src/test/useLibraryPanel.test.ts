@@ -19,6 +19,9 @@ const mockToggleSeriesPin = vi.fn();
 const mockToggleAuthorPin = vi.fn();
 const mockRecordView = vi.fn();
 const mockCloseRenameDialog = vi.fn();
+const mockRefetchPdfs = vi.fn();
+const mockRefreshMeta = vi.fn();
+const mockRefetchGenres = vi.fn();
 
 const mockMembersByRep = new Map<string, { name: string }[]>();
 const mockSelectedItems = new Set<string>();
@@ -28,6 +31,9 @@ const mockMeta: Record<string, { series_id?: string; authors?: string[] }> = {};
 let mockCurrentPath = '';
 let mockCurrentSource: 'doujin' | 'comic' | 'novel' = 'doujin';
 let mockRenameTarget: { name: string; isFolder: boolean } | null = null;
+let mockPdfsError = false;
+let mockMetaError = false;
+let mockGenresError = false;
 
 vi.mock('../stores/libraryStore', () => ({
     useLibraryStore: () => ({
@@ -46,7 +52,7 @@ vi.mock('../stores/libraryStore', () => ({
 }));
 
 vi.mock('../hooks/library/useLibraryPdfs', () => ({
-    useLibraryPdfs: () => ({ data: [] }),
+    useLibraryPdfs: () => ({ data: [], isError: mockPdfsError, refetch: mockRefetchPdfs }),
     pdfQueryKey: () => ['pdfs'],
 }));
 
@@ -86,7 +92,8 @@ vi.mock('../hooks/library/useBookMeta', () => ({
         allAuthors: [],
         allSeries: [],
         allSeriesWithStats: [],
-        refreshMeta: vi.fn(),
+        refreshMeta: mockRefreshMeta,
+        isError: mockMetaError,
     }),
 }));
 
@@ -151,6 +158,8 @@ vi.mock('../hooks/library/useGenres', () => ({
         addGenre: vi.fn(),
         removeGenre: vi.fn(),
         reorderGenres: vi.fn(),
+        isError: mockGenresError,
+        refetch: mockRefetchGenres,
     }),
 }));
 
@@ -212,12 +221,31 @@ describe('useLibraryPanel', () => {
         mockCurrentPath = '';
         mockCurrentSource = 'doujin';
         mockRenameTarget = null;
+        mockPdfsError = false;
+        mockMetaError = false;
+        mockGenresError = false;
     });
 
     it('スモークテスト: hook が正常にレンダーされる', () => {
         const { result } = renderHook(() => useLibraryPanel(vi.fn()), { wrapper: createWrapper() });
         expect(result.current.displayPdfs).toEqual([]);
         expect(result.current.searchText).toBe('');
+    });
+
+    it('取得エラーを公開し、再試行で一覧・メタ・ジャンルを再取得する', async () => {
+        mockPdfsError = true;
+        mockRefetchPdfs.mockResolvedValue(undefined);
+        mockRefreshMeta.mockResolvedValue(undefined);
+        mockRefetchGenres.mockResolvedValue(undefined);
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+            wrapper: createWrapper(),
+        });
+
+        expect(result.current.hasLibraryLoadError).toBe(true);
+        await act(async () => result.current.retryLibraryData());
+        expect(mockRefetchPdfs).toHaveBeenCalledTimes(1);
+        expect(mockRefreshMeta).toHaveBeenCalledTimes(1);
+        expect(mockRefetchGenres).toHaveBeenCalledTimes(1);
     });
 
     it('handleGroupModeChange: setGroupMode と seriesFilter クリアを同時に呼ぶ', () => {

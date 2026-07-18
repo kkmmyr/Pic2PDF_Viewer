@@ -42,7 +42,11 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         closeRenameDialog,
     } = useLibraryStore();
 
-    const { data: pdfs = [] } = useLibraryPdfs(currentPath, currentSource);
+    const {
+        data: pdfs = [],
+        isError: isPdfsError,
+        refetch: refetchPdfs,
+    } = useLibraryPdfs(currentPath, currentSource);
 
     const invalidatePdfs = useCallback(() => {
         void queryClient.invalidateQueries({ queryKey: pdfQueryKey(currentPath, currentSource) });
@@ -124,9 +128,22 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         allSeries,
         allSeriesWithStats,
         refreshMeta,
+        isError: isMetaError,
     } = useBookMeta(currentSource);
-    const { genres, addGenre, removeGenre, reorderGenres } = useGenres(currentSource);
+    const {
+        genres,
+        addGenre,
+        removeGenre,
+        reorderGenres,
+        isError: isGenresError,
+        refetch: refetchGenres,
+    } = useGenres(currentSource);
     const runAsync = useAsyncToast();
+
+    const hasLibraryLoadError = isPdfsError || isMetaError || isGenresError;
+    const retryLibraryData = useCallback(async () => {
+        await Promise.all([refetchPdfs(), refreshMeta(), refetchGenres()]);
+    }, [refetchPdfs, refreshMeta, refetchGenres]);
 
     const { pinnedBooks, contextualFavorites } = usePinnedBookSets({
         meta,
@@ -319,6 +336,8 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         addGenre,
         removeGenre,
         reorderGenres,
+        hasLibraryLoadError,
+        retryLibraryData,
         // display
         grouped,
         displayPdfs,

@@ -11,6 +11,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TypedDict
 
+from utils.atomic_json import atomic_write_json
+
 
 class ArtistState(TypedDict, total=False):
     top_id: int
@@ -73,9 +75,7 @@ def load_state(data_dir: Path) -> State:
 
 def save_state(data_dir: Path, state: State) -> None:
     path = _state_path(data_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, state)
 
 
 def load_arrivals(data_dir: Path) -> Arrivals:
@@ -92,9 +92,7 @@ def load_arrivals(data_dir: Path) -> Arrivals:
 
 def save_arrivals(data_dir: Path, arrivals: Arrivals) -> None:
     path = _arrivals_path(data_dir)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as f:
-        json.dump(arrivals, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, arrivals)
 
 
 def merge_new_items(data_dir: Path, new_items: list[ArrivalItem]) -> int:

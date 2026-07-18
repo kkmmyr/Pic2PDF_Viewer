@@ -45,12 +45,13 @@ describe('useGenres', () => {
         await waitFor(() => expect(result.current.genres).toEqual(['アクション', 'ロマンス']));
     });
 
-    it('GET 失敗時は空配列にフォールバック', async () => {
+    it('GET 失敗時は空配列表示とisErrorを返す', async () => {
         mockedGet.mockRejectedValue(new Error('boom'));
         const { result } = renderHook(() => useGenres('doujin'), { wrapper: createWrapper() });
 
-        await waitFor(() => expect(mockedGet).toHaveBeenCalled());
+        await waitFor(() => expect(result.current.isError).toBe(true));
         expect(result.current.genres).toEqual([]);
+        expect(result.current.error).toEqual(new Error('boom'));
     });
 
     it('GET の戻り値が undefined でも空配列に正規化', async () => {

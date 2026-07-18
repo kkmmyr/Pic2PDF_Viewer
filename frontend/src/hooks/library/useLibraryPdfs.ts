@@ -16,16 +16,12 @@ export const pdfQueryKey = (path: string, source: LibrarySource) => ['pdfs', pat
 export function useLibraryPdfs(path: string, source: LibrarySource) {
     return useQuery<PdfFile[]>({
         queryKey: pdfQueryKey(path, source),
+        throwOnError: false,
         queryFn: async () => {
-            try {
-                const data = await apiClient.get<unknown, { files: PdfFile[] }>(
-                    API_ENDPOINTS.PDFS,
-                    { params: { path, source } },
-                );
-                return data.files ?? [];
-            } catch {
-                return [];
-            }
+            const data = await apiClient.get<unknown, { files: PdfFile[] }>(API_ENDPOINTS.PDFS, {
+                params: { path, source },
+            });
+            return data.files ?? [];
         },
     });
 }
