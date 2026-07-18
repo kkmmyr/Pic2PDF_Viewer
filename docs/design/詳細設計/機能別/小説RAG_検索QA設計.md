@@ -1,6 +1,6 @@
 # 小説 RAG 検索・QA 設計
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-18
 
 novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会番組台本生成の現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
 
@@ -90,8 +90,9 @@ LLM 呼び出しとは独立した純関数群。
     1. **構成ステップ** (`generate_plan`): 書籍を読ませて構成メモ JSON（対立する 2 つの推し解釈 `stances`・テーマ 2 件・脱線ネタカード 2〜3 枚 [facts=正確な固有情報 / keywords=言及判定用]）を生成。`temperature=0.4 / num_predict=2048`。LLM の JSON 出力は確率的に崩れるため、パース・バリデーション失敗時は同一プロンプトで最大 3 回まで自動リトライする（`_PLAN_MAX_ATTEMPTS`。KV cache が効くため再試行は安価）。
     2. **台本ステップ** (`stream_discussion_turns`): 番組構成（OPフック→テーマ1→テーマ2→脱線→締め、セグメント別ターン数指定）で台本を SSE ストリーミング。`temperature=0.7 / num_predict=8192`。
     - **KV cache 最適化**: 両呼び出しの system プロンプト先頭（課題本 + 小説本文の `_COMMON_PREFIX`）を完全一致させ、llama-server の prefix cache により 2 段目の prompt processing をほぼゼロにする。
+- **台本品質指示**: 台本全体に「笑える / へえ」の山を最低 4 箇所設け、ボケ / ツッコミをテーマごとに交代する。トリビアの直後には相手の反応を続け、レイの年下キャラへの甘さとミオのカップリング語りは脱線時の小ネタに限定する。1 ターンは 20〜200 字（大半は 80〜150 字）、全体は 3,000〜3,800 字を目標とし、3,800 字超では後続を刈り込んで 4,500 字の機械チェック上限を超えないよう指示する。
 - **パーサ**: ターンマーカーは表記揺れ許容（`[A]:` / `[A>:` / `[A]：` 等）。セグメント境界は `[S:segment_id]` 行を逐次検出し `segment` イベント化（チャンク分断による ID 誤検出のガードあり）。
-- **機械チェック（DoD 層1）**: 生成完了時に `run_checks` で M1 字数 3,000〜4,500 / M2 5 セグメント出現 / M3 話者分割成功 / M4 言語リーク 0（簡体字 64 字セット + 4 字以上英字）/ M5 ネタカード言及 を判定し、done イベントと保存 JSON に含める。不合格時は UI から再生成する運用（全保存 + 削除ボタン）。
+- **機械チェック（DoD 層1）**: 生成完了時に `run_checks` で M1 字数 3,000〜4,500 / M2 5 セグメント出現 / M3 話者分割成功 / M4 言語リーク 0（簡体字 64 字セット + 4 字以上英字。正規作品名 `BLEACH` / `Fate/Grand Order` は許容）/ M5 ネタカード言及 を判定し、done イベントと保存 JSON に含める。不合格時は UI から再生成する運用（全保存 + 削除ボタン）。
 - **SSE イベント**: `status(stage=planning|scripting)` → `segment(id,title)` / `turn(speaker,text,segment)` → `done(saved_path, checks)`。エラーは `error(message)`。
 - **保存（format_version 2）**: `data/kindle_novel/discussions/{書籍名}/{JSTタイムスタンプ+0900}.json` に cast スナップショット（人格核 + 当回の stance）/ segments / cards / turns（segment 付き）/ checks を保存。旧 v1 JSON（personas/turns のみ）も `list_discussions` が互換で読める。クライアント切断時は保存スキップ。
 - **API**: `POST /api/novel/discussion/generate`（body は `{book_name}` のみ）/ `GET /history` / `DELETE /history/{filename}?book_name=`（filename 正規表現 + resolve/is_relative_to のパストラバーサル対策）。

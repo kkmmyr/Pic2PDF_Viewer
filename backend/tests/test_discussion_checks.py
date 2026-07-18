@@ -172,6 +172,14 @@ def test_m4_allows_short_latin_abbreviations():
     assert _result(checks, "M4")["passed"] is True
 
 
+def test_m4_allows_registered_english_titles():
+    """登録済みの英語作品名は言語リーク扱いしない。"""
+    turns = _passing_turns()
+    turns[6]["text"] = ("BLEACHとFate/Grand Orderを例に挙げる。" + "あ" * 220)[:250]
+    checks = run_checks(turns, _ALL_SEGMENTS, _CARDS)
+    assert _result(checks, "M4")["passed"] is True
+
+
 def test_m4_does_not_flag_japanese_shinjitai():
     """新字体と同形の字（学・国・会・写・体 等）は簡体字扱いしない。"""
     turns = _passing_turns()
