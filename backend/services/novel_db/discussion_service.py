@@ -17,6 +17,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from fastapi import HTTPException
+
 from config import (
     KINDLE_NOVEL_DIR,
     NOVEL_DB_LLM_MODEL,
@@ -24,6 +26,7 @@ from config import (
 )
 from utils.dt import JST
 from utils.logger import get_logger
+from utils.path_utils import resolve_under_base, validate_safe_name
 
 from .llm import astream_chat as _astream_chat
 from .search import SearchHit
@@ -241,6 +244,15 @@ async def stream_discussion_turns(
             return
 
 
+def _discussion_book_dir(book_name: str) -> Path:
+    """書籍別ディスカッションディレクトリをroot配下へ安全に解決する。"""
+    try:
+        validate_safe_name(book_name, param_name="book_name")
+        return Path(resolve_under_base(DISCUSSIONS_DIR, book_name, param_name="book_name"))
+    except HTTPException as exc:
+        raise ValueError(f"不正な書籍名です: {book_name}") from exc
+
+
 def save_discussion(
     book_name: str,
     cast_snapshot: list[dict],
@@ -253,7 +265,7 @@ def save_discussion(
 
     ファイル名は JST タイムスタンプ + UTC オフセット（例: 20260707T123456+0900.json）。
     """
-    book_dir = DISCUSSIONS_DIR / book_name
+    book_dir = _discussion_book_dir(book_name)
     book_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(JST).strftime("%Y%m%dT%H%M%S%z")
     out_path = book_dir / f"{ts}.json"
@@ -274,7 +286,7 @@ def save_discussion(
 
 def count_discussions(book_name: str) -> int:
     """指定書籍のディスカッション数を返す（ファイル数カウントのみ、JSON ロードなし）。"""
-    book_dir = DISCUSSIONS_DIR / book_name
+    book_dir = _discussion_book_dir(book_name)
     if not book_dir.exists():
         return 0
     return sum(1 for _ in book_dir.glob("*.json"))
@@ -286,7 +298,7 @@ def list_discussions(book_name: str) -> list[dict]:
     v1（format_version なし・自由ペルソナ）と v2（固定キャスト + segments + checks）の
     両形式を読める。v2 では personas をキャストから合成する（name + stance）。
     """
-    book_dir = DISCUSSIONS_DIR / book_name
+    book_dir = _discussion_book_dir(book_name)
     if not book_dir.exists():
         return []
     results = []
@@ -325,9 +337,7 @@ def delete_discussion(book_name: str, filename: str) -> bool:
     """
     if not _FILENAME_RE.match(filename):
         raise ValueError(f"不正なファイル名です: {filename}")
-    target = (DISCUSSIONS_DIR / book_name / filename).resolve()
-    if not target.is_relative_to(DISCUSSIONS_DIR.resolve()):
-        raise ValueError(f"不正なパスです: {book_name}/{filename}")
+    target = Path(resolve_under_base(_discussion_book_dir(book_name), filename, param_name="filename"))
     if not target.exists():
         return False
     target.unlink()

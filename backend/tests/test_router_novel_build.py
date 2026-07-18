@@ -31,9 +31,29 @@ def test_enqueue_all_books(client, db_initialized):
     assert res.json()["job_id"] > 0
 
 
+def test_enqueue_generate_relations(client, db_initialized):
+    res = client.post(
+        "/api/novel/build/enqueue",
+        json={"book_name": "花太郎", "all_books": False, "mode": "generate_relations"},
+    )
+    assert res.status_code == 200
+
+    queued = client.get("/api/novel/build/status").json()["queued_jobs"]
+    assert queued[0]["mode"] == "generate_relations"
+
+
 def test_enqueue_missing_book_name_returns_422(client, db_initialized):
     res = client.post("/api/novel/build/enqueue", json={"all_books": False})
     assert res.status_code == 422
+
+
+@pytest.mark.parametrize("book_name", ["../outside", "C:/Windows", "folder/book"])
+def test_enqueue_rejects_unsafe_book_name(client, db_initialized, book_name):
+    res = client.post(
+        "/api/novel/build/enqueue",
+        json={"book_name": book_name, "all_books": False},
+    )
+    assert res.status_code == 400
 
 
 def test_enqueue_duplicate_book_returns_422(client, db_initialized):

@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useLibraryPanelContext } from '@/contexts/LibraryPanelContext';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { LibraryNavBar } from './LibraryNavBar';
 import { LibraryFilterBar } from './LibraryFilterBar';
 import { LibraryBulkActionBar } from './LibraryBulkActionBar';
 
 export function LibraryHeader() {
+    const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const {
         currentPath,
         currentSource,
@@ -67,12 +70,24 @@ export function LibraryHeader() {
                     onBulkSetSeries={() => dialogs.open('bulkSeries')}
                     onBulkSetGenre={() => dialogs.open('bulkGenre')}
                     onBulkToggleHidden={bulkActions.handleBulkToggleHidden}
-                    onBulkDelete={bulkActions.handleBulkDelete}
+                    onBulkDelete={() => setDeleteConfirmOpen(true)}
                     onMergePdfs={() => dialogs.open('merge')}
                     onRegenThumbnailBulk={bulkActions.handleRegenThumbnailBulk}
                     onToggleSelectionMode={toggleSelectionMode}
                 />
             )}
+            <ConfirmDialog
+                open={deleteConfirmOpen}
+                title="選択した書籍を完全に削除しますか？"
+                message={`選択した ${selectedItems.size} 件をディスクから完全に削除します。\nこの操作は元に戻せません。`}
+                confirmLabel="完全に削除"
+                danger
+                onConfirm={() => {
+                    setDeleteConfirmOpen(false);
+                    void bulkActions.handleBulkDelete();
+                }}
+                onCancel={() => setDeleteConfirmOpen(false)}
+            />
         </div>
     );
 }

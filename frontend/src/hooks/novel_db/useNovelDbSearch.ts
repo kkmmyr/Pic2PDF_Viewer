@@ -1,15 +1,9 @@
-/**
- * ハイブリッド検索フック（debounce 300ms + 無限スクロール）。
- *
- * - `query` 変更を debounce してから検索開始
- * - 結果は `hits` に蓄積、`loadMore()` で次の 20 件を追加読み込み
- * - `scope` 変更時は結果をリセットして先頭から取り直す
- */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
+import { NOVEL_DB_CONFIG } from '@/constants';
 import { searchHits } from '@/features/novel_db/api';
 import type { Scope, SearchHit } from '@/features/novel_db/types';
-import { NOVEL_DB_CONFIG } from '@/constants';
 
 export interface UseNovelDbSearch {
     query: string;
@@ -25,86 +19,47 @@ export interface UseNovelDbSearch {
 export function useNovelDbSearch(scope: Scope): UseNovelDbSearch {
     const [query, setQuery] = useState('');
     const [debouncedQuery, setDebouncedQuery] = useState('');
-    const [hits, setHits] = useState<SearchHit[]>([]);
-    const [total, setTotal] = useState(0);
-    const [isSearching, setIsSearching] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    // 古いリクエストの結果が遅れて到着した場合に setHits しないためのカウンタ
-    const requestIdRef = useRef(0);
 
-    // debounce
     useEffect(() => {
-        const t = setTimeout(() => setDebouncedQuery(query), NOVEL_DB_CONFIG.SEARCH_DEBOUNCE_MS);
-        return () => clearTimeout(t);
+        const timer = setTimeout(
+            () => setDebouncedQuery(query),
+            NOVEL_DB_CONFIG.SEARCH_DEBOUNCE_MS,
+        );
+        return () => clearTimeout(timer);
     }, [query]);
 
-    // 初回 / scope 変更 / debouncedQuery 変更で先頭から検索
-    useEffect(() => {
-        const trimmed = debouncedQuery.trim();
-        if (!trimmed) {
-            setHits([]);
-            setTotal(0);
-            setError(null);
-            return;
-        }
-        const reqId = ++requestIdRef.current;
-        setIsSearching(true);
-        setError(null);
-        void searchHits({
-            query: trimmed,
-            scope,
-            offset: 0,
-            limit: NOVEL_DB_CONFIG.SEARCH_PAGE_SIZE,
-        })
-            .then((res) => {
-                if (reqId !== requestIdRef.current) return;
-                setHits(res.hits);
-                setTotal(res.total);
-            })
-            .catch((e: unknown) => {
-                if (reqId !== requestIdRef.current) return;
-                setError(e instanceof Error ? e.message : String(e));
-            })
-            .finally(() => {
-                if (reqId !== requestIdRef.current) return;
-                setIsSearching(false);
-            });
-    }, [debouncedQuery, scope]);
-
-    const loadMore = useCallback(async () => {
-        const trimmed = debouncedQuery.trim();
-        if (!trimmed || isSearching || hits.length >= total) return;
-        const reqId = ++requestIdRef.current;
-        setIsSearching(true);
-        try {
-            const res = await searchHits({
-                query: trimmed,
+    const trimmedQuery = debouncedQuery.trim();
+    const searchQuery = useInfiniteQuery({
+        queryKey: ['novelDbSearch', trimmedQuery, scope],
+        queryFn: ({ pageParam }) =>
+            searchHits({
+                query: trimmedQuery,
                 scope,
-                offset: hits.length,
+                offset: pageParam,
                 limit: NOVEL_DB_CONFIG.SEARCH_PAGE_SIZE,
-            });
-            if (reqId !== requestIdRef.current) return;
-            setHits((prev) => [...prev, ...res.hits]);
-            setTotal(res.total);
-        } catch (e) {
-            if (reqId !== requestIdRef.current) return;
-            setError(e instanceof Error ? e.message : String(e));
-        } finally {
-            // 古いリクエストの結果は捨てるため、最新リクエストのときのみ状態更新
-            if (reqId === requestIdRef.current) {
-                setIsSearching(false);
-            }
-        }
-    }, [debouncedQuery, scope, hits.length, total, isSearching]);
+            }),
+        initialPageParam: 0,
+        enabled: trimmedQuery.length > 0,
+        getNextPageParam: (lastPage) => {
+            const nextOffset = lastPage.offset + lastPage.hits.length;
+            return nextOffset < lastPage.total ? nextOffset : undefined;
+        },
+    });
+
+    const hits = searchQuery.data?.pages.flatMap((page) => page.hits) ?? [];
+    const total = searchQuery.data?.pages[0]?.total ?? 0;
 
     return {
         query,
         setQuery,
         hits,
         total,
-        hasMore: hits.length < total,
-        isSearching,
-        error,
-        loadMore,
+        hasMore: searchQuery.hasNextPage,
+        isSearching: searchQuery.isFetching,
+        error: searchQuery.error instanceof Error ? searchQuery.error.message : null,
+        loadMore: async () => {
+            if (!searchQuery.hasNextPage || searchQuery.isFetchingNextPage) return;
+            await searchQuery.fetchNextPage();
+        },
     };
 }

@@ -23,7 +23,7 @@ from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
 from utils.file_utils import is_pdf_file
 from utils.logger import get_logger
-from utils.path_utils import join_path, validate_safe_name, validate_safe_path
+from utils.path_utils import join_path, resolve_under_base, validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 
@@ -57,13 +57,13 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     dirs = get_dirs_by_source(source)
     base_thumb_dir = dirs["thumb"]
     thumb_name = get_thumbnail_name(filename)
-    thumb_path = join_path(base_thumb_dir, path, thumb_name)
+    thumb_path = resolve_under_base(base_thumb_dir, join_path(path, thumb_name))
 
     # generated は image-only モード: images/{book_name}/ から WebP を削除する
     if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
-        book_img_dir = join_path(base_img_dir, path, book_name)
+        book_img_dir = resolve_under_base(base_img_dir, join_path(path, book_name))
         if not os.path.isdir(book_img_dir):
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -80,7 +80,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
 
     # kindle / novel: 従来通り PDF から fitz でページ削除
     base_pdf_dir = dirs["pdf"]
-    pdf_path = join_path(base_pdf_dir, path, filename)
+    pdf_path = resolve_under_base(base_pdf_dir, join_path(path, filename))
 
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -103,13 +103,13 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
     dirs = get_dirs_by_source(source)
     base_thumb_dir = dirs["thumb"]
     thumb_name = get_thumbnail_name(filename)
-    thumb_path = join_path(base_thumb_dir, path, thumb_name)
+    thumb_path = resolve_under_base(base_thumb_dir, join_path(path, thumb_name))
 
     # generated は image-only モード: images/{book_name}/ の WebP を再採番リネーム
     if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
-        book_img_dir = join_path(base_img_dir, path, book_name)
+        book_img_dir = resolve_under_base(base_img_dir, join_path(path, book_name))
         if not os.path.isdir(book_img_dir):
             raise HTTPException(status_code=404, detail="File not found")
 
@@ -129,7 +129,7 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
 
     # kindle / novel: PDF を fitz で再構築
     base_pdf_dir = dirs["pdf"]
-    pdf_path = join_path(base_pdf_dir, path, filename)
+    pdf_path = resolve_under_base(base_pdf_dir, join_path(path, filename))
 
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="File not found")
@@ -170,7 +170,7 @@ def merge_pdfs(request: MergePdfsRequest):
     base_pdf_dir = dirs["pdf"]
     base_thumb_dir = dirs["thumb"]
 
-    output_path = os.path.join(base_pdf_dir, request.path, request.output_name)
+    output_path = resolve_under_base(base_pdf_dir, join_path(request.path, request.output_name))
     if os.path.exists(output_path):
         raise HTTPException(status_code=400, detail="Output file already exists")
 
@@ -178,7 +178,7 @@ def merge_pdfs(request: MergePdfsRequest):
     try:
         merged_doc = fitz.open()
         for name in request.names:
-            pdf_path = os.path.join(base_pdf_dir, request.path, name)
+            pdf_path = resolve_under_base(base_pdf_dir, join_path(request.path, name))
             if not os.path.exists(pdf_path):
                 raise HTTPException(status_code=404, detail=f"PDF not found: {name}")
             with fitz.open(pdf_path) as src:
@@ -193,7 +193,7 @@ def merge_pdfs(request: MergePdfsRequest):
             merged_doc.close()
 
     thumb_name = get_thumbnail_name(request.output_name)
-    thumb_path = os.path.join(base_thumb_dir, request.path, thumb_name)
+    thumb_path = resolve_under_base(base_thumb_dir, join_path(request.path, thumb_name))
     ThumbnailService.generate_thumbnail(output_path, thumb_path)
 
     return {"message": "PDFs merged successfully", "output_name": request.output_name, "total_pages": total_pages}

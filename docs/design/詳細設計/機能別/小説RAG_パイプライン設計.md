@@ -96,7 +96,7 @@ Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のど
 | `generate_contexts` | チャンク文脈 + 再 embedding | `contextual_text IS NULL` のチャンクを持つ書籍 |
 | `generate_relations` | キャラ関係グラフ（C-12） | OCR 済み全冊 |
 
-`job_type="book"` は `target_id` の 1 冊、`job_type="series"` は meta.db から解決したシリーズ内 novel 書籍。旧 `pdf_text`/`reocr` は起動時 migration で正規化済み。
+`job_type="book"` は `target_id` の 1 冊、`job_type="series"` は meta2.db から解決したシリーズ内 novel 書籍。旧 `pdf_text`/`reocr` は起動時 migration で正規化済み。
 
 **キャンセル仕様**: `queued` のジョブのみ `DELETE /builds/{id}` で `canceled` にできる。`running` の DELETE は **409 Conflict**（実行途中中断は embedding バッチ整合性を壊すため不可）。
 

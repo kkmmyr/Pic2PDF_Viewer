@@ -18,6 +18,7 @@ from pathlib import Path
 
 import config
 from utils.logger import get_logger
+from utils.path_utils import resolve_under_base, validate_safe_name
 
 from .chunker import chunk_page
 from .connection import with_db
@@ -37,7 +38,14 @@ ProgressCallback = Callable[[int, int], None]
 
 
 def _resolve_images_dir(book_name: str) -> Path:
-    return Path(config.KINDLE_NOVEL_IMAGES_DIR) / book_name
+    validate_safe_name(book_name, param_name="book_name")
+    return Path(
+        resolve_under_base(
+            config.KINDLE_NOVEL_IMAGES_DIR,
+            book_name,
+            param_name="book_name",
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

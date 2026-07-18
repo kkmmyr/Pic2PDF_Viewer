@@ -1,99 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { fetchBooks } from '@/features/novel_db/api';
 import type { BookSummary } from '@/features/novel_db/types';
-import type { BuildMode } from '@/features/novel_build/types';
-import { useNovelBuildQueue } from './novel_build';
-import { useOcrStatus } from './useOcrStatus';
-import { useBuildTarget } from './useBuildTarget';
+import { useBuildTarget } from '@/hooks/useBuildTarget';
+import { buildUnifiedRows, type UnifiedRow } from '@/hooks/novel_build/buildUnifiedRows';
+import { useNovelBuildQueue } from '@/hooks/novel_build/useNovelBuildQueue';
+import { useOcrStatus } from '@/hooks/useOcrStatus';
 
 export type Tab = 'ocr' | 'build';
-
-export interface UnifiedRow {
-    key: string;
-    type: string;
-    target: string;
-    state: string;
-    stateClass: string;
-    time?: string;
-}
-
-function modeLabel(mode?: BuildMode): string {
-    if (mode === 'generate_contexts') return 'コンテキスト生成';
-    if (mode === 'generate_relations') return '関係グラフ生成';
-    return 'Full Build';
-}
-
-function buildUnifiedRows(
-    ocrStatus: ReturnType<typeof useOcrStatus>['status'],
-    status: ReturnType<typeof useNovelBuildQueue>['status'],
-): UnifiedRow[] {
-    const rows: UnifiedRow[] = [];
-
-    if (ocrStatus === 'running') {
-        rows.push({
-            key: 'ocr-running',
-            type: 'OCR',
-            target: '-',
-            state: '実行中',
-            stateClass:
-                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-        });
-    } else if (ocrStatus === 'error') {
-        rows.push({
-            key: 'ocr-error',
-            type: 'OCR',
-            target: '-',
-            state: 'エラー',
-            stateClass: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-        });
-    }
-
-    if (status.current_job) {
-        const j = status.current_job;
-        rows.push({
-            key: `build-running-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: '実行中',
-            stateClass:
-                'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-            time: j.started_at,
-        });
-    }
-
-    for (const j of status.queued_jobs) {
-        rows.push({
-            key: `build-queued-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: '待機中',
-            stateClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-            time: j.enqueued_at,
-        });
-    }
-
-    for (const j of status.recent_finished) {
-        const stateLabel =
-            { completed: '完了', failed: '失敗', canceled: 'キャンセル' }[j.state] ?? '完了';
-        const stateClass =
-            {
-                completed: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300',
-                failed: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-                canceled: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-            }[j.state] ?? 'bg-gray-100 text-gray-600';
-        rows.push({
-            key: `build-finished-${j.id}`,
-            type: modeLabel(j.mode),
-            target: j.target_id ?? '全冊',
-            state: stateLabel,
-            stateClass,
-            time: j.finished_at,
-        });
-    }
-
-    return rows;
-}
+export type { UnifiedRow } from '@/hooks/novel_build/buildUnifiedRows';
 
 export interface UseNovelManage {
     activeTab: Tab;
@@ -104,7 +20,6 @@ export interface UseNovelManage {
     cancel: (jobId: number) => Promise<void>;
     ocrStatus: ReturnType<typeof useOcrStatus>['status'];
     books: BookSummary[];
-    // Full Build 用
     allBooks: boolean;
     setAllBooks: (v: boolean) => void;
     selectedBook: string;
@@ -113,7 +28,6 @@ export interface UseNovelManage {
     handleShowBuiltChange: (v: boolean) => void;
     filteredBooks: BookSummary[];
     handleEnqueueBuild: () => void;
-    // コンテキスト生成用
     allBooksCtx: boolean;
     setAllBooksCtx: (v: boolean) => void;
     selectedBookCtx: string;
@@ -122,7 +36,6 @@ export interface UseNovelManage {
     handleShowBuiltCtxChange: (v: boolean) => void;
     filteredBooksCtx: BookSummary[];
     handleEnqueueCtx: () => void;
-    // 関係グラフ生成用
     allBooksRel: boolean;
     setAllBooksRel: (v: boolean) => void;
     selectedBookRel: string;
@@ -133,59 +46,42 @@ export interface UseNovelManage {
 
 export function useNovelManage(): UseNovelManage {
     const [activeTab, setActiveTab] = useState<Tab>('ocr');
-    // OCR タブは初期タブなので初めから有効。Build タブは初訪問時に有効化する遅延起動パターン。
     const [buildEnabled, setBuildEnabled] = useState(false);
-    const [ocrEnabled] = useState(true);
-
     const { status, isEnqueuing, enqueueError, enqueue, cancel } = useNovelBuildQueue(buildEnabled);
-    const { status: ocrStatus } = useOcrStatus(ocrEnabled);
-
-    const [books, setBooks] = useState<BookSummary[]>([]);
+    const { status: ocrStatus } = useOcrStatus(true);
+    const booksQuery = useQuery({
+        queryKey: ['novelManageBooks'],
+        queryFn: fetchBooks,
+        select: (data) =>
+            data.filter((book) => book.ocr_done_at !== null || book.indexed_at !== null),
+    });
+    const books = useMemo(() => booksQuery.data ?? [], [booksQuery.data]);
+    const refetchBooks = booksQuery.refetch;
 
     const buildTarget = useBuildTarget('full_build', books, enqueue);
     const ctxTarget = useBuildTarget('generate_contexts', books, enqueue);
     const relTarget = useBuildTarget('generate_relations', books, enqueue);
-
-    // 各 setSelected は useState setter のため安定した参照
-    const { setSelected: setBuildSelected } = buildTarget;
-    const { setSelected: setCtxSelected } = ctxTarget;
-    const { setSelected: setRelSelected } = relTarget;
-
-    const refreshBooks = useCallback(
-        (initSelect = false) => {
-            fetchBooks()
-                .then((data) => {
-                    // ocr_done_at または indexed_at があれば Build 対象
-                    const buildable = data.filter(
-                        (b) => b.ocr_done_at !== null || b.indexed_at !== null,
-                    );
-                    setBooks(buildable);
-                    if (initSelect) {
-                        const unbuilt = buildable.filter((b) => b.indexed_at === null);
-                        const first = unbuilt.length > 0 ? unbuilt[0].name : '';
-                        setBuildSelected(first);
-                        setCtxSelected(first);
-                        setRelSelected(buildable.length > 0 ? buildable[0].name : '');
-                    }
-                })
-                .catch(() => {});
-        },
-        [setBuildSelected, setCtxSelected, setRelSelected],
-    );
+    const setBuildSelected = buildTarget.setSelected;
+    const setCtxSelected = ctxTarget.setSelected;
+    const setRelSelected = relTarget.setSelected;
+    const initializedRef = useRef(false);
 
     useEffect(() => {
-        refreshBooks(true);
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshBooks は setState セッターのみに依存し参照が安定するため、マウント時に一度だけ実行
-    }, []);
+        if (initializedRef.current || !booksQuery.isSuccess) return;
+        const firstUnbuilt = books.find((book) => book.indexed_at === null)?.name ?? '';
+        setBuildSelected(firstUnbuilt);
+        setCtxSelected(firstUnbuilt);
+        setRelSelected(books[0]?.name ?? '');
+        initializedRef.current = true;
+    }, [books, booksQuery.isSuccess, setBuildSelected, setCtxSelected, setRelSelected]);
 
-    // ジョブ完了時（running → 非 running）に書籍一覧を再取得
-    const prevIsRunningRef = useRef(false);
+    const previousRunningRef = useRef(false);
     useEffect(() => {
-        if (prevIsRunningRef.current && !status.is_running) {
-            refreshBooks();
+        if (previousRunningRef.current && !status.is_running) {
+            void refetchBooks();
         }
-        prevIsRunningRef.current = status.is_running;
-    }, [status.is_running, refreshBooks]);
+        previousRunningRef.current = status.is_running;
+    }, [refetchBooks, status.is_running]);
 
     const handleTabChange = useCallback((tab: Tab) => {
         setActiveTab(tab);
@@ -201,7 +97,6 @@ export function useNovelManage(): UseNovelManage {
         cancel,
         ocrStatus,
         books,
-        // Full Build（buildTarget から展開してインターフェースを維持）
         allBooks: buildTarget.all,
         setAllBooks: buildTarget.setAll,
         selectedBook: buildTarget.selected,
@@ -210,7 +105,6 @@ export function useNovelManage(): UseNovelManage {
         handleShowBuiltChange: buildTarget.handleShowBuiltChange,
         filteredBooks: buildTarget.filtered,
         handleEnqueueBuild: buildTarget.handleEnqueue,
-        // コンテキスト生成
         allBooksCtx: ctxTarget.all,
         setAllBooksCtx: ctxTarget.setAll,
         selectedBookCtx: ctxTarget.selected,
@@ -219,7 +113,6 @@ export function useNovelManage(): UseNovelManage {
         handleShowBuiltCtxChange: ctxTarget.handleShowBuiltChange,
         filteredBooksCtx: ctxTarget.filtered,
         handleEnqueueCtx: ctxTarget.handleEnqueue,
-        // 関係グラフ生成
         allBooksRel: relTarget.all,
         setAllBooksRel: relTarget.setAll,
         selectedBookRel: relTarget.selected,

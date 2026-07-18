@@ -7,6 +7,7 @@
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 vi.mock('../features/novel_db/sse', () => ({
@@ -24,8 +25,15 @@ import { streamDiscussion } from '@/features/novel_db/sse';
 import { useDiscussion } from '@/hooks/novel_db/useDiscussion';
 
 function makeWrapper(initialEntry = '/novel/discussion?book=テスト本') {
+    const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
     return function Wrapper({ children }: { children: React.ReactNode }) {
-        return <MemoryRouter initialEntries={[initialEntry]}>{children}</MemoryRouter>;
+        return (
+            <QueryClientProvider client={queryClient}>
+                <MemoryRouter initialEntries={[initialEntry]}>{children}</MemoryRouter>
+            </QueryClientProvider>
+        );
     };
 }
 
@@ -89,7 +97,7 @@ describe('useDiscussion', () => {
         });
         expect(result.current.stage).toBe(null);
         // 完了後に履歴を再取得する（初回 + done 後）
-        expect(fetchDiscussionHistory).toHaveBeenCalledTimes(2);
+        await waitFor(() => expect(fetchDiscussionHistory).toHaveBeenCalledTimes(2));
     });
 
     it('リクエスト body は book_name のみ', async () => {

@@ -1,4 +1,4 @@
-"""B-25: meta.db バックアップ API。"""
+"""B-25: meta2.db バックアップ API。"""
 
 from fastapi import APIRouter
 
@@ -10,7 +10,7 @@ router = APIRouter()
 
 @router.post("/meta_db/backup", response_model=BackupTriggeredResponse)
 def trigger_backup() -> dict:
-    """meta.db を OneDrive にスナップショットバックアップする。"""
+    """meta2.db を OneDrive にスナップショットバックアップする。"""
     return backup_meta_db()
 
 

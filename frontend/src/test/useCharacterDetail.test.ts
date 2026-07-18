@@ -7,6 +7,7 @@ vi.mock('../features/novel_db/api', () => ({
 
 import { fetchCharacterDetail } from '@/features/novel_db/api';
 import { useCharacterDetail } from '@/hooks/novel_db/useCharacterDetail';
+import { createQueryWrapper } from '@/test/queryTestUtils';
 
 const mockedFetch = fetchCharacterDetail as ReturnType<typeof vi.fn>;
 
@@ -14,24 +15,26 @@ describe('useCharacterDetail', () => {
     beforeEach(() => mockedFetch.mockReset());
 
     it('bookName/charName 両方 null では fetch しない', () => {
-        renderHook(() => useCharacterDetail(null, null));
+        renderHook(() => useCharacterDetail(null, null), { wrapper: createQueryWrapper() });
         expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('bookName のみ null では fetch しない', () => {
-        renderHook(() => useCharacterDetail(null, 'キャラA'));
+        renderHook(() => useCharacterDetail(null, 'キャラA'), { wrapper: createQueryWrapper() });
         expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('charName のみ null では fetch しない', () => {
-        renderHook(() => useCharacterDetail('book.pdf', null));
+        renderHook(() => useCharacterDetail('book.pdf', null), { wrapper: createQueryWrapper() });
         expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('両方 set されたら fetch が呼ばれる', async () => {
         const detail = { name: 'キャラA', scenes: [] };
         mockedFetch.mockResolvedValue(detail);
-        const { result } = renderHook(() => useCharacterDetail('book.pdf', 'キャラA'));
+        const { result } = renderHook(() => useCharacterDetail('book.pdf', 'キャラA'), {
+            wrapper: createQueryWrapper(),
+        });
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(mockedFetch).toHaveBeenCalledWith('book.pdf', 'キャラA');
@@ -40,7 +43,9 @@ describe('useCharacterDetail', () => {
 
     it('fetch 失敗で error がセットされる', async () => {
         mockedFetch.mockResolvedValueOnce({ name: 'キャラA', scenes: [] });
-        const { result } = renderHook(() => useCharacterDetail('book.pdf', 'キャラA'));
+        const { result } = renderHook(() => useCharacterDetail('book.pdf', 'キャラA'), {
+            wrapper: createQueryWrapper(),
+        });
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetch.mockRejectedValueOnce(new Error('not found'));
@@ -62,6 +67,7 @@ describe('useCharacterDetail', () => {
                     book: 'book.pdf' as string | null,
                     char: 'キャラA' as string | null,
                 },
+                wrapper: createQueryWrapper(),
             },
         );
 

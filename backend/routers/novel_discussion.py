@@ -36,6 +36,7 @@ from services.novel_db.discussion_service import (
 )
 from services.novel_db.search import load_all_pages_of_book
 from utils.logger import get_logger
+from utils.path_utils import validate_safe_name
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -55,6 +56,7 @@ async def generate_discussion(
     構成ステップ（planning）→ 台本ステップ（scripting）の 2 段 LLM 呼び出し。
     完了時に DoD 機械チェック（M1〜M5）を実行し done イベントに含める。
     """
+    validate_safe_name(request.book_name, param_name="book_name")
     with with_db() as conn:
         hits = load_all_pages_of_book(
             conn,
@@ -174,6 +176,7 @@ async def generate_discussion(
 @router.get("/novel/discussion/history", response_model=list[DiscussionHistoryItemOut])
 def get_discussion_history(book_name: str) -> list[dict]:
     """指定書籍のディスカッション履歴一覧を返す（B-20/B-28 両形式対応）。"""
+    validate_safe_name(book_name, param_name="book_name")
     return list_discussions(book_name)
 
 
@@ -183,6 +186,7 @@ def get_discussion_history(book_name: str) -> list[dict]:
 )
 def delete_discussion_history(filename: str, book_name: str) -> dict:
     """指定ディスカッション履歴を削除する（B-28）。"""
+    validate_safe_name(book_name, param_name="book_name")
     try:
         deleted = delete_discussion(book_name, filename)
     except ValueError as e:

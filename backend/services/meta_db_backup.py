@@ -1,4 +1,4 @@
-"""B-25: meta.db の OneDrive スナップショットバックアップ。
+"""B-25: meta2.db の OneDrive スナップショットバックアップ。
 
 sqlite3.backup() でホットバックアップを作成し META_DB_BACKUP_DIR に保存する。
 ファイル名: meta_YYYYMMDD_HHMMSS.db（タイムスタンプ付き）
@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 
 
 def backup_meta_db() -> dict:
-    """meta.db を META_DB_BACKUP_DIR に sqlite3.backup() でスナップショット保存する。"""
+    """meta2.db を META_DB_BACKUP_DIR に sqlite3.backup() でスナップショット保存する。"""
     if not META_DB_BACKUP_DIR:
         raise ValueError("META_DB_BACKUP_DIR が設定されていません。.env で META_DB_BACKUP_DIR を指定してください。")
     dest_dir = Path(META_DB_BACKUP_DIR)
@@ -39,7 +39,7 @@ def backup_meta_db() -> dict:
 
     size = dest_path.stat().st_size
     backed_up_at = datetime.now(JST).isoformat()
-    logger.info("meta.db backed up to %s (%d bytes)", dest_path, size)
+    logger.info("meta2.db backed up to %s (%d bytes)", dest_path, size)
     return {
         "path": str(dest_path),
         "size_bytes": size,

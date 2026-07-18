@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ScopeModel(BaseModel):
@@ -37,6 +37,18 @@ class ChatSessionStartRequest(BaseModel):
 
 class ChatSessionContinueRequest(BaseModel):
     question: str = Field(..., min_length=1, max_length=500)
+
+
+class ChatSessionTitleUpdate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str) -> str:
+        title = value.strip()
+        if not title:
+            raise ValueError("title is required")
+        return title
 
 
 class ChatMessagePayload(BaseModel):

@@ -6,6 +6,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { useNovelDbSearch } from '@/hooks/novel_db/useNovelDbSearch';
 import type { Scope, SearchResponse } from '@/features/novel_db/types';
+import { createQueryWrapper } from '@/test/queryTestUtils';
 
 vi.mock('../features/novel_db/api', () => ({
     searchHits: vi.fn(),
@@ -38,14 +39,16 @@ describe('useNovelDbSearch', () => {
     });
 
     it('クエリが空なら検索しない', async () => {
-        renderHook(() => useNovelDbSearch(SCOPE));
+        renderHook(() => useNovelDbSearch(SCOPE), { wrapper: createQueryWrapper() });
         await new Promise((r) => setTimeout(r, 50));
         expect(searchHits).not.toHaveBeenCalled();
     });
 
     it('クエリ入力 → debounce 後に検索', async () => {
         vi.mocked(searchHits).mockResolvedValue(makeResponse(0, 5, 5));
-        const { result } = renderHook(() => useNovelDbSearch(SCOPE));
+        const { result } = renderHook(() => useNovelDbSearch(SCOPE), {
+            wrapper: createQueryWrapper(),
+        });
 
         act(() => {
             result.current.setQuery('デューク');
@@ -69,7 +72,9 @@ describe('useNovelDbSearch', () => {
             .mockResolvedValueOnce(makeResponse(0, 20, 40)) // 初回
             .mockResolvedValueOnce(makeResponse(20, 20, 40)); // 追加
 
-        const { result } = renderHook(() => useNovelDbSearch(SCOPE));
+        const { result } = renderHook(() => useNovelDbSearch(SCOPE), {
+            wrapper: createQueryWrapper(),
+        });
         act(() => result.current.setQuery('q'));
 
         await waitFor(() => {
@@ -91,7 +96,9 @@ describe('useNovelDbSearch', () => {
     it('検索エラーは error に格納される', async () => {
         vi.mocked(searchHits).mockRejectedValue(new Error('boom'));
 
-        const { result } = renderHook(() => useNovelDbSearch(SCOPE));
+        const { result } = renderHook(() => useNovelDbSearch(SCOPE), {
+            wrapper: createQueryWrapper(),
+        });
         act(() => result.current.setQuery('q'));
 
         await waitFor(() => {

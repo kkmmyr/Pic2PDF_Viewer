@@ -136,6 +136,15 @@ def test_patch_title_rejects_empty(client, db_initialized):
     assert res.status_code == 422
 
 
+def test_patch_title_openapi_contract(client):
+    operation = client.get("/openapi.json").json()["paths"]["/api/novel_db/sessions/{session_id}/title"]["patch"]
+    schema = operation["requestBody"]["content"]["application/json"]["schema"]
+
+    assert schema["$ref"].endswith("/ChatSessionTitleUpdate")
+    assert "204" in operation["responses"]
+    assert "content" not in operation["responses"]["204"]
+
+
 # ---------------------------------------------------------------------------
 # POST /qa/sessions（初手 SSE）
 #   - stream_chat を monkeypatch して 2 token + done を吐く async generator に差替

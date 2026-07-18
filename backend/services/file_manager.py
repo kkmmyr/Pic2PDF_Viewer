@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from utils.file_naming import get_thumbnail_name
 from utils.logger import get_logger
+from utils.path_utils import join_path, resolve_under_base
 
 if TYPE_CHECKING:
     from config import SourceDirs
@@ -42,9 +43,9 @@ class FileManager:
         """
         renamed_parts: list[tuple[str, str]] = []  # (変更後, 変更前) — ロールバック用
 
-        src = os.path.join(dirs["pdf"], path, old_name)
-        dst = os.path.join(dirs["pdf"], path, new_name)
-        img_src = os.path.join(dirs["img"], path, os.path.splitext(old_name)[0])
+        src = resolve_under_base(dirs["pdf"], join_path(path, old_name))
+        dst = resolve_under_base(dirs["pdf"], join_path(path, new_name))
+        img_src = resolve_under_base(dirs["img"], join_path(path, os.path.splitext(old_name)[0]))
 
         # 存在チェック: PDF または images ディレクトリのどちらか一方が存在すれば OK
         if not os.path.exists(src) and not os.path.exists(img_src):
@@ -59,20 +60,20 @@ class FileManager:
 
             if is_folder:
                 for base_dir in (dirs["thumb"], dirs["img"]):
-                    old_sub = os.path.join(base_dir, path, old_name)
-                    new_sub = os.path.join(base_dir, path, new_name)
+                    old_sub = resolve_under_base(base_dir, join_path(path, old_name))
+                    new_sub = resolve_under_base(base_dir, join_path(path, new_name))
                     if os.path.exists(old_sub):
                         os.rename(old_sub, new_sub)
                         renamed_parts.append((new_sub, old_sub))
             else:
-                old_thumb = os.path.join(dirs["thumb"], path, get_thumbnail_name(old_name))
-                new_thumb = os.path.join(dirs["thumb"], path, get_thumbnail_name(new_name))
+                old_thumb = resolve_under_base(dirs["thumb"], join_path(path, get_thumbnail_name(old_name)))
+                new_thumb = resolve_under_base(dirs["thumb"], join_path(path, get_thumbnail_name(new_name)))
                 if os.path.exists(old_thumb):
                     os.rename(old_thumb, new_thumb)
                     renamed_parts.append((new_thumb, old_thumb))
 
-                old_img = os.path.join(dirs["img"], path, os.path.splitext(old_name)[0])
-                new_img = os.path.join(dirs["img"], path, os.path.splitext(new_name)[0])
+                old_img = resolve_under_base(dirs["img"], join_path(path, os.path.splitext(old_name)[0]))
+                new_img = resolve_under_base(dirs["img"], join_path(path, os.path.splitext(new_name)[0]))
                 if os.path.exists(old_img):
                     os.rename(old_img, new_img)
                     renamed_parts.append((new_img, old_img))
@@ -98,9 +99,9 @@ class FileManager:
             FileNotFoundError: PDF ファイルが存在しない場合
             OSError: 削除操作に失敗した場合
         """
-        pdf_path = os.path.join(dirs["pdf"], path, item) if path else os.path.join(dirs["pdf"], item)
+        pdf_path = resolve_under_base(dirs["pdf"], join_path(path, item))
         book_name = os.path.splitext(item)[0]
-        img_dir = os.path.join(dirs["img"], path, book_name) if path else os.path.join(dirs["img"], book_name)
+        img_dir = resolve_under_base(dirs["img"], join_path(path, book_name))
 
         # 存在チェック: PDF または images ディレクトリのどちらか一方が存在すれば OK
         if not os.path.exists(pdf_path) and not os.path.exists(img_dir):
@@ -111,7 +112,7 @@ class FileManager:
             os.remove(pdf_path)
 
         thumb_name = get_thumbnail_name(item)
-        thumb_path = os.path.join(dirs["thumb"], path, thumb_name) if path else os.path.join(dirs["thumb"], thumb_name)
+        thumb_path = resolve_under_base(dirs["thumb"], join_path(path, thumb_name))
         if os.path.exists(thumb_path):
             try:
                 os.remove(thumb_path)

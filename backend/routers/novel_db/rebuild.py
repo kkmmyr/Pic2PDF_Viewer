@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Response
 from routers._deps import cancel_job_response, log_and_raise_500
 from routers.api_schemas import RebuildEnqueueResponse, RebuildStatusResponse
 from services.novel_db.job_queue import job_queue
+from utils.path_utils import validate_safe_name
 
 from .schemas import RebuildRequest
 
@@ -26,6 +27,8 @@ def post_rebuild(request: RebuildRequest) -> dict:
             status_code=422,
             detail=f"target_id is required for type='{request.type}'",
         )
+    if request.type == "book" and request.target_id:
+        validate_safe_name(request.target_id, param_name="target_id")
 
     job_id, queued_position = job_queue.enqueue(request.type, request.target_id, request.mode)
     return {"job_id": job_id, "queued_position": queued_position}

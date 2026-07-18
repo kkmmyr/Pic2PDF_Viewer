@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from routers.api_schemas import OcrRunResponse, OcrStopResponse
 from services.novel_db.connection import with_db
 from services.novel_db.job_queue import job_queue
+from utils.path_utils import validate_safe_name
 
 router = APIRouter()
 
@@ -21,6 +22,7 @@ router = APIRouter()
 @router.post("/ocr/run", response_model=OcrRunResponse)
 def run_ocr(target_dir: str | None = None) -> dict:
     if target_dir:
+        validate_safe_name(target_dir, param_name="target_dir")
         job_id, position = job_queue.enqueue("book", target_id=target_dir, mode="ocr")
     else:
         job_id, position = job_queue.enqueue("all", mode="ocr")

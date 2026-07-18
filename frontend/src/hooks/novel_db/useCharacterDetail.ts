@@ -1,10 +1,5 @@
-/**
- * キャラクター詳細（サマリ + 主要シーン top 5）を取得するフック（B-15）。
- *
- * 詳細ダイアログを開いたタイミング（bookName / charName が両方 set）で fetch。
- * どちらかが null の間は API を叩かず idle 状態に戻す。
- */
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { fetchCharacterDetail } from '@/features/novel_db/api';
 import type { CharacterDetail } from '@/features/novel_db/types';
@@ -20,33 +15,28 @@ export function useCharacterDetail(
     bookName: string | null,
     charName: string | null,
 ): UseCharacterDetail {
-    const [detail, setDetail] = useState<CharacterDetail | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [refetchError, setRefetchError] = useState<string | null>(null);
+    const query = useQuery({
+        queryKey: ['novelCharacterDetail', bookName, charName],
+        queryFn: () => fetchCharacterDetail(bookName!, charName!),
+        enabled: Boolean(bookName && charName),
+    });
 
-    const load = useCallback(async () => {
-        if (!bookName || !charName) return;
-        setIsLoading(true);
-        setError(null);
-        try {
-            const d = await fetchCharacterDetail(bookName, charName);
-            setDetail(d);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e));
-            setDetail(null);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [bookName, charName]);
+    useEffect(() => setRefetchError(null), [bookName, charName]);
 
-    useEffect(() => {
-        if (!bookName || !charName) {
-            setDetail(null);
-            setError(null);
-            return;
-        }
-        void load();
-    }, [bookName, charName, load]);
-
-    return { detail, isLoading, error, refetch: load };
+    return {
+        detail: refetchError ? null : (query.data ?? null),
+        isLoading: query.isLoading,
+        error: refetchError ?? (query.error instanceof Error ? query.error.message : null),
+        refetch: async () => {
+            if (!bookName || !charName) return;
+            setRefetchError(null);
+            const result = await query.refetch();
+            if (result.error) {
+                setRefetchError(
+                    result.error instanceof Error ? result.error.message : String(result.error),
+                );
+            }
+        },
+    };
 }

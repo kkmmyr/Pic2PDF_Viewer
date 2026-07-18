@@ -7,6 +7,7 @@ vi.mock('../features/novel_db/api', () => ({
 
 import { fetchBookDetail } from '@/features/novel_db/api';
 import { useBookDetail } from '@/hooks/novel_db/useBookDetail';
+import { createQueryWrapper } from '@/test/queryTestUtils';
 
 const mockedFetch = fetchBookDetail as ReturnType<typeof vi.fn>;
 
@@ -15,21 +16,25 @@ describe('useBookDetail', () => {
 
     it('bookName があればマウント時に fetch が呼ばれる', async () => {
         mockedFetch.mockResolvedValue({ summary: 'テスト概要' });
-        const { result } = renderHook(() => useBookDetail('book.pdf'));
+        const { result } = renderHook(() => useBookDetail('book.pdf'), {
+            wrapper: createQueryWrapper(),
+        });
 
         await waitFor(() => expect(result.current.isLoading).toBe(false));
         expect(mockedFetch).toHaveBeenCalledWith('book.pdf');
     });
 
     it('bookName が空のときは fetch しない', () => {
-        renderHook(() => useBookDetail(''));
+        renderHook(() => useBookDetail(''), { wrapper: createQueryWrapper() });
         expect(mockedFetch).not.toHaveBeenCalled();
     });
 
     it('fetch 成功で detail が反映される', async () => {
         const detail = { summary: '概要テキスト', total_chunks: 100 };
         mockedFetch.mockResolvedValue(detail);
-        const { result } = renderHook(() => useBookDetail('book.pdf'));
+        const { result } = renderHook(() => useBookDetail('book.pdf'), {
+            wrapper: createQueryWrapper(),
+        });
 
         await waitFor(() => expect(result.current.detail).not.toBeNull());
         expect(result.current.detail?.summary).toBe('概要テキスト');
@@ -37,7 +42,9 @@ describe('useBookDetail', () => {
 
     it('fetch 失敗で error がセットされ detail は null のまま', async () => {
         mockedFetch.mockResolvedValueOnce({ summary: '初回' });
-        const { result } = renderHook(() => useBookDetail('book.pdf'));
+        const { result } = renderHook(() => useBookDetail('book.pdf'), {
+            wrapper: createQueryWrapper(),
+        });
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
         mockedFetch.mockRejectedValueOnce(new Error('not found'));
@@ -51,7 +58,9 @@ describe('useBookDetail', () => {
 
     it('refetch() で再フェッチできる', async () => {
         mockedFetch.mockResolvedValueOnce({ summary: '初回' });
-        const { result } = renderHook(() => useBookDetail('book.pdf'));
+        const { result } = renderHook(() => useBookDetail('book.pdf'), {
+            wrapper: createQueryWrapper(),
+        });
 
         await waitFor(() => expect(result.current.detail).not.toBeNull());
 

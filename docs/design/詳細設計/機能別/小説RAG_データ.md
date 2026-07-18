@@ -103,7 +103,7 @@ RAG のコアロジック。主なモジュール:
 - **接続 / スキーマ**: `connection.py`（sqlite3 接続）, `migrations.py`（Alembic 実行）, `models.py`（SQLModel）, `lance_store.py`（LanceDB）
 - **構築パイプライン**: `builder.py`, `full_builder.py`, `extractor.py`, `ocr_worker.py`, `chunker.py`, `embedder.py`, `contextualizer.py`
 - **ジョブ**: `job_queue.py`, `job_worker.py`
-- **検索 / QA**: `search.py`, `retrieval.py`, `prompt_builder.py`, `query_expander.py`, `llm.py`, `qa_history.py`, `qa_sessions.py`, `discussion_service.py`
+- **検索 / QA**: `search_scope.py`, `search.py`, `book_summary_search.py`, `retrieval.py`, `prompt_builder.py`, `query_expander.py`, `llm.py`, `qa_history.py`, `qa_sessions.py`, `discussion_service.py`
 - **サマリ / キャラ**: `summarizer.py`, `character_extractor.py`, `character_summarizer.py`, `character_db.py`, `extractor.py`, `relation_extractor.py`, `graph_query.py`
 - **LLM 配線**: `_llm_backend.py`（backend シングルトン）, `_prompts.py`, `_prompts` 系プロンプト, `library.py`
 

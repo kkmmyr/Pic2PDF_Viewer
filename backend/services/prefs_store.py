@@ -5,12 +5,12 @@
   - group_pins(source, pin_type, group_id, book_name; PK=(source,pin_type,group_id))
 """
 
-from services.meta_db import connect
+from services.meta_db import db_connection
 
 
 def get_prefs(source: str) -> dict:
     """ソース別のフィルター設定とピンを一括取得する。"""
-    with connect() as conn:
+    with db_connection() as conn:
         row = conn.execute(
             "SELECT read_state_filter, genre_filter FROM ui_filters WHERE source=?",
             (source,),
@@ -46,7 +46,7 @@ def update_filters(
     genre_filter: str | None = None,
 ) -> None:
     """フィルター設定を部分更新する（None のフィールドは変更しない）。"""
-    with connect() as conn:
+    with db_connection() as conn:
         existing = conn.execute(
             "SELECT read_state_filter, genre_filter FROM ui_filters WHERE source=?",
             (source,),
@@ -69,7 +69,7 @@ def update_filters(
 
 def set_pin(source: str, pin_type: str, group_id: str, book_name: str) -> None:
     """ピンを登録または上書きする。"""
-    with connect() as conn:
+    with db_connection() as conn:
         conn.execute(
             "INSERT OR REPLACE INTO group_pins (source, pin_type, group_id, book_name) VALUES (?,?,?,?)",
             (source, pin_type, group_id, book_name),
@@ -78,7 +78,7 @@ def set_pin(source: str, pin_type: str, group_id: str, book_name: str) -> None:
 
 def delete_pin(source: str, pin_type: str, group_id: str) -> None:
     """ピンを削除する（存在しない場合も成功）。"""
-    with connect() as conn:
+    with db_connection() as conn:
         conn.execute(
             "DELETE FROM group_pins WHERE source=? AND pin_type=? AND group_id=?",
             (source, pin_type, group_id),

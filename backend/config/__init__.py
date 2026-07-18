@@ -45,7 +45,7 @@ class _AppSettings(BaseSettings):
     AMAZON_DATA_DIR: Path | None = None
     # Gemma 4 ツールディレクトリ（未設定時は Gemma 連携無効）
     GEMMA_TOOL_DIR: Path | None = None
-    # meta.db バックアップ先（未設定時はバックアップ無効）
+    # meta2.db バックアップ先（未設定時はバックアップ無効）
     META_DB_BACKUP_DIR: Path | None = None
     # LinuxサーバーのDB世代バックアップ先・保持日数・復元試験先
     SERVER_BACKUP_DIR: Path | None = None

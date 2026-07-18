@@ -85,5 +85,5 @@ OCR は `services/novel_db/extractor.py` → `D:\61.tool\common\ocr\` の独立 
 ## 関連ドキュメント
 
 - [uv環境セットアップ.md](uv環境セットアップ.md) — uv 自体のインストール
-- [OCR設計書.md](../詳細設計/機能別/OCR設計書.md) — yomitoku を用いた Searchable PDF 生成設計
+- [OCR設計書.md](../詳細設計/機能別/OCR設計書.md) — yomitoku を用いた PNG OCR と `novel.db` 格納設計
 - [ADR-0005: uv 採用](../基本設計/ADR/0005_uv-python-package-manager.md)

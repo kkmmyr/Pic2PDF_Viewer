@@ -11,6 +11,7 @@ from natsort import natsorted
 
 from utils.file_utils import is_webp_file
 from utils.logger import get_logger
+from utils.path_utils import join_path, resolve_under_base
 
 logger = get_logger(__name__)
 
@@ -20,7 +21,7 @@ def list_book_images(img_dir: str, book_name: str, path: str = "") -> list[str]:
 
     ディレクトリ不在時は空リスト。
     """
-    target = os.path.join(img_dir, path, book_name) if path else os.path.join(img_dir, book_name)
+    target = resolve_under_base(img_dir, join_path(path, book_name))
     if not os.path.isdir(target):
         return []
     return [os.path.join(target, f) for f in natsorted(os.listdir(target)) if is_webp_file(f)]

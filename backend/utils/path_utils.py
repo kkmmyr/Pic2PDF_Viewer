@@ -5,7 +5,9 @@
 クロスプラットフォームのパス結合ヘルパーを提供する。
 """
 
+import ntpath
 import os
+from pathlib import Path
 
 from fastapi import HTTPException
 
@@ -30,12 +32,27 @@ def validate_safe_path(path: str, param_name: str = "path") -> str:
     Returns:
         バックスラッシュをスラッシュに統一した正規化パス
     """
-    if path.startswith("/") or path.startswith("\\"):
+    drive, _ = ntpath.splitdrive(path)
+    if path.startswith("/") or path.startswith("\\") or drive or "\x00" in path:
         raise HTTPException(status_code=400, detail=f"Invalid {param_name}")
     parts = path.replace("\\", "/").split("/")
     if any(p == ".." for p in parts):
         raise HTTPException(status_code=400, detail=f"Invalid {param_name}")
     return path.replace("\\", "/")
+
+
+def resolve_under_base(base_dir: str | os.PathLike[str], path: str, param_name: str = "path") -> str:
+    """ユーザー入力パスを ``base_dir`` 配下の絶対パスへ安全に解決する。
+
+    drive 絶対パスや ``..`` を文字列段階で拒否したうえで ``Path.resolve`` し、
+    symlink を経由した場合も最終的な解決先が基準ディレクトリ配下か確認する。
+    """
+    normalized = validate_safe_path(path, param_name=param_name)
+    base = Path(base_dir).resolve()
+    target = (base / normalized).resolve()
+    if not target.is_relative_to(base):
+        raise HTTPException(status_code=400, detail=f"Invalid {param_name}")
+    return str(target)
 
 
 def validate_safe_name(name: str, param_name: str = "name") -> str:
@@ -54,7 +71,8 @@ def validate_safe_name(name: str, param_name: str = "name") -> str:
     Returns:
         検証済みの名前文字列
     """
-    if name in (".", "..") or "/" in name or "\\" in name:
+    drive, _ = ntpath.splitdrive(name)
+    if not name or name in (".", "..") or "/" in name or "\\" in name or ":" in name or drive or "\x00" in name:
         raise HTTPException(status_code=400, detail=f"Invalid {param_name}")
     return name
 

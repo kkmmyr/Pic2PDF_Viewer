@@ -20,6 +20,7 @@ from services.novel_db.discussion_prompts import (
 from services.novel_db.discussion_service import (
     MAX_INPUT_TOKENS,
     _parse_turns_from_text,
+    count_discussions,
     delete_discussion,
     estimate_book_tokens,
     format_book_text,
@@ -470,6 +471,16 @@ def test_delete_discussion_rejects_traversal_book_name(discussions_dir):
         delete_discussion("..", "victim.json")
 
 
+@pytest.mark.parametrize("book_name", ["../outside", "C:/Windows", "C:\\Windows"])
+def test_discussion_reads_and_writes_reject_unsafe_book_name(discussions_dir, book_name):
+    with pytest.raises(ValueError):
+        count_discussions(book_name)
+    with pytest.raises(ValueError):
+        list_discussions(book_name)
+    with pytest.raises(ValueError):
+        save_discussion(book_name, _cast_snapshot(), _segments(), _PLAN["cards"], [], _sample_checks())
+
+
 # ---------------------------------------------------------------------------
 # router: generate SSE フロー
 # ---------------------------------------------------------------------------
@@ -492,6 +503,16 @@ def test_generate_token_overflow_returns_error_sse(client, monkeypatch):
     events = _parse_sse(resp.text)
     assert events[0]["type"] == "error"
     assert "長すぎます" in events[0]["message"]
+
+
+def test_generate_rejects_unsafe_book_name_before_streaming(client):
+    resp = client.post("/api/novel/discussion/generate", json={"book_name": "C:/Windows"})
+    assert resp.status_code == 400
+
+
+def test_history_rejects_unsafe_book_name(client):
+    resp = client.get("/api/novel/discussion/history", params={"book_name": "../outside"})
+    assert resp.status_code == 400
 
 
 def test_generate_no_pages_returns_error_sse(client, monkeypatch):

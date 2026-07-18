@@ -42,7 +42,7 @@ WebP / ZIP → PDF 変換 + ライブラリ管理 + OCR 起動を行う Web API 
 - 起動・記述ともに軽量（個人ツールの開発体験に合う）
 
 ### ネガティブ・受容したコスト
-- TypeScript 型と Pydantic モデルの**手動同期**が必要（自動生成は採用せず — [リファクタリング計画書 § 対象外](../../../log/計画/リファクタリング計画書.md)）
+- 型契約は当初手動同期だったが、現在は [ADR-0013](0013_openapi-typescript.md) により FastAPI OpenAPI → `openapi-typescript` の自動生成へ移行済み
 - FastAPI の DB 統合（SQLAlchemy 等）を使っていないため、ORM 採用時に別 ADR 化する必要あり
 
 ### 影響範囲

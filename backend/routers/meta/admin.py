@@ -17,8 +17,8 @@ router = APIRouter()
 def init_genre_original(source: str = Depends(validated_source)) -> dict:
     """genre 未設定の書籍に genre=オリジナル を一括設定する。
 
-    - meta.db にエントリがあるが genre が空のもの → オリジナルに更新
-    - images/ ディレクトリにあるが meta.db に未登録のもの → エントリを新規追加
+    - meta2.db にエントリがあるが genre が空のもの → オリジナルに更新
+    - images/ ディレクトリにあるが meta2.db に未登録のもの → エントリを新規追加
     """
     dirs = get_dirs_by_source(source)
     img_root = dirs["img"]

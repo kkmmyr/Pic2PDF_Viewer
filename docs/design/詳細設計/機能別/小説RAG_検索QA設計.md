@@ -1,26 +1,26 @@
 # 小説 RAG 検索・QA 設計
 
-> status: living | last-verified: 2026-07-18
+> status: living | last-verified: 2026-07-19
 
 novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会番組台本生成の現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
 
 **環境変数・スキーマ・LLM backend / port・API 一覧は [データ設計](小説RAG_データ.md) が正本**。本書は重複記載せず、検索・QA の処理フローに集中する。段階拡大（num_ctx PoC→A→B→C・top_k）や俯瞰質問三段改善（B-5/B-8/B-9）の経緯は [設計過程（凍結）](../../../archive/小説RAG_設計過程.md)、実機ベンチ・モデル選定は [技術知見](../../../log/技術知見/小説RAG_技術知見.md)。
 
-検索/QA のコアは `backend/services/novel_db/` の `search.py` / `retrieval.py` / `prompt_builder.py` / `query_expander.py` / `llm.py` / `qa_history.py` / `qa_sessions.py` / `discussion_service.py`（+ `discussion_cast.py` / `discussion_prompts.py` / `discussion_checks.py`）、ルーターは `backend/routers/novel_db/{search,qa,chat}.py`。
+検索/QA のコアは `backend/services/novel_db/` の `search_scope.py` / `search.py` / `book_summary_search.py` / `retrieval.py` / `prompt_builder.py` / `query_expander.py` / `llm.py` / `qa_history.py` / `qa_sessions.py` / `discussion_service.py`（+ `discussion_cast.py` / `discussion_prompts.py` / `discussion_checks.py`）、ルーターは `backend/routers/novel_db/{search,qa,chat}.py`。
 
 ---
 
-## 1. ハイブリッド検索（`search.py`）
+## 1. 検索（`search_scope.py` / `search.py` / `book_summary_search.py`）
 
 FTS5（BM25）とベクトル（LanceDB KNN）を Reciprocal Rank Fusion（RRF）でページ単位に融合する。
 
-- **Scope**: `Scope(type, id)`。`type` は `all` / `series` / `book`。`_resolve_book_names(scope)`（lru_cache）が対象書籍名リストを返す（`all` は None = 全件、`series` は meta.db から展開、`book` は 1 冊）。空リストなら 0 件。
+- **Scope（`search_scope.py`）**: `Scope(type, id)`。`type` は `all` / `series` / `book`。`resolve_book_names(scope)`（lru_cache）が対象書籍名リストを返す（`all` は None = 全件、`series` は `meta2.db` から展開、`book` は 1 冊）。空リストなら 0 件。
 - **FTS5（`fts_search`）**: `build_fts5_or_query` が質問から 2 文字以上のトークンを抽出し `"t1" OR "t2" …` に整形。`snippet(pages_fts, …, '<mark>', '</mark>', …)` + `bm25()` で取得。`char_count >= min_chars` と先頭/末尾 `body_page_margin` ページ除外を WHERE に、scope を `b.name IN (...)` で適用。
 - **ベクトル（`vec_search`）**: 質問を bge-m3 で埋め込み、LanceDB `chunks` を KNN 検索。フィルタ有り時は `k = max(top*5, 50)` を多めに取り、`char_count`・`book_name` を prefilter、`body_page_margin` は取得後にページ番号で後置フィルタ、`_distance` 昇順で top 件。**ベクトルの埋め込みは B-9 適用後 `(contextual_text + 本文)`**（[パイプライン設計 §5](小説RAG_パイプライン設計.md)）なので、語彙一致のない抽象クエリでも位置説明経由でヒットする。
 - **RRF 融合（`hybrid_search`）**: FTS/ベクトル各リストの順位で `score += 1/(k_rrf + rank + 1)`（`k_rrf=60`）を `(book_name, page_no)` に加算。FTS ヒットは `sanitize_snippet` 済み snippet、ベクトルのみのヒットは本文先頭 200 字（`html.escape` のみ）。`max_per_book`（scope=all/series 用）で書籍偏りを抑え top 件に絞り、`_fetch_main_characters` で各ページの主要登場人物を JOIN。返り値は `SearchHit{book_name, page_no, snippet, has_highlight, image_url, rrf_score, main_characters}`。
 - **snippet サニタイズ（`sanitize_snippet`）**: `html.escape` で全エスケープ後、`&lt;mark&gt;` のみ `<mark>` に復元。フロントは `dangerouslySetInnerHTML` を追加サニタイザ無しで安全に使える。
-- **書籍サマリ検索（`search_book_summaries`）B-8**: LanceDB `summaries` テーブルへの KNN（FTS5 は使わない — サマリは抽象表現中心で意味類似が効く）。`[(book_name, distance), …]`。空テーブル時は空リスト（後方互換）。
-- **類似書籍（`find_similar_books`）**: 対象書籍のサマリ embedding を取り自身を除く KNN。bge-m3 は正規化済みのため `score ≈ 1 - L2/2`（コサイン近似）。lib.py の類似書籍 API が利用。
+- **書籍サマリ検索（`book_summary_search.py` の `search_book_summaries`）B-8**: LanceDB `summaries` テーブルへの KNN（FTS5 は使わない — サマリは抽象表現中心で意味類似が効く）。`[(book_name, distance), …]`。空テーブル時は空リスト（後方互換）。
+- **類似書籍（`book_summary_search.py` の `find_similar_books`）**: 対象書籍のサマリ embedding を取り自身を除く KNN。bge-m3 は正規化済みのため `score ≈ 1 - L2/2`（コサイン近似）。lib.py の類似書籍 API が利用。
 - **全ページ読み（`load_all_pages_of_book`）B-13 段階 C**: hybrid_search を bypass し、`min_chars`/`body_page_margin` フィルタ後の全ページを `page_no` 順に `SearchHit` として返す。scope=book の full-book モード用。
 
 **検索フィルタのデフォルト値**（`NOVEL_DB_MIN_BODY_CHARS` / `NOVEL_DB_BODY_PAGE_MARGIN` / `NOVEL_DB_QA_MAX_PER_BOOK` / `NOVEL_DB_QA_TOP_K` 等）は [データ設計 §2](小説RAG_データ.md)。狙いと段階拡大の経緯は [設計過程](../../../archive/小説RAG_設計過程.md)。

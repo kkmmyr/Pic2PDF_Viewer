@@ -1,6 +1,6 @@
 # API 仕様
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-19
 
 バックエンド (FastAPI) が提供する API のリファレンス方針と、OpenAPI では表現できない設計意図をまとめる。
 
@@ -61,13 +61,15 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 
 ### ディスカッション生成エンドポイント（`novel_discussion`）
 
-- `data: {"type": "turn", "speaker": "A" | "B", "text": "..."}` — 発言 1 件（完全な発言文として配信され、QA/チャットのような部分トークンではない）
-- `data: {"type": "done", "saved_path": "..."}` — 完了。保存先パスを含む
+- `data: {"type": "status", "stage": "planning" | "scripting"}` — 構成作成 / 台本生成の開始通知
+- `data: {"type": "segment", "id": <int>, "title": "..."}` — セグメント開始通知
+- `data: {"type": "turn", "speaker": "A" | "B", "text": "...", "segment": <int>}` — 発言 1 件（完全な発言文として配信され、QA/チャットのような部分トークンではない）
+- `data: {"type": "done", "saved_path": "...", "checks": {...}}` — 完了。保存先パスと品質チェック結果を含む。本文が空の場合は `saved_path` / `checks` なしで完了する
 - `data: {"type": "error", "message": "..."}` — 失敗
 
 **事前チェック**: 書籍本文全体の推定トークン数を数え、**112,000 トークンを超える場合は生成を開始せずエラー SSE を即座に返して終了する**（部分生成して打ち切ることはしない）。
 
-完了時は発言全件を `kindle_novel/discussions/{book_name}/{timestamp}Z.json` に保存する。クライアント切断によるキャンセル時は保存しない（中途半端な会話ログを残さない）。
+完了時は発言全件を `kindle_novel/discussions/{book_name}/{YYYYMMDDTHHMMSS+0900}.json` に保存する。クライアント切断によるキャンセル時は保存しない（中途半端な会話ログを残さない）。
 
 ### Build / ジョブ進捗ストリームエンドポイント（`novel_build`）
 
@@ -82,6 +84,8 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 個別のスキーマ定義だけを見ても気づきにくい、複数エンドポイントにまたがる挙動をここに集約する。
 
 - **PATCH エンドポイントの部分更新セマンティクス**: フィールドを省略した場合は「変更しない」。指定した場合のみ上書きする（空文字・空配列・`null` を「削除」の意味で使う個別ルールがあるものは各スキーマの `description` を参照）。他フィールド（閲覧履歴・作者情報等）は更新対象でなければ常に保持される。
+
+- **チャットセッション題名更新**: `PATCH /api/novel_db/sessions/{session_id}/title` は `ChatSessionTitleUpdate`（`title: string`）を受け取り、成功時は `204 No Content` を返す。OpenAPIにも同じstatus codeと空bodyを出力する。
 
 - **`view_count` デバウンス**: `POST /api/meta/view` は呼び出しごとに `last_viewed_at` を更新するが、`view_count` は前回の閲覧から `VIEW_COUNT_DEBOUNCE_SEC=300`（5 分）以上経過した場合のみ +1 する（クリック連打によるカウント水増しを防ぐ）。
 

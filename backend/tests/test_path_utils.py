@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import pytest
 from fastapi import HTTPException
 
-from utils.path_utils import join_path, validate_safe_name, validate_safe_path
+from utils.path_utils import join_path, resolve_under_base, validate_safe_name, validate_safe_path
 
 # =============================================================================
 # validate_safe_path
@@ -55,6 +55,12 @@ class TestValidateSafePath:
             validate_safe_path("\\windows\\system32")
         assert exc.value.status_code == 400
 
+    @pytest.mark.parametrize("path", ["C:/Windows", "C:\\Windows", "C:relative"])
+    def test_invalid_windows_drive_path(self, path):
+        with pytest.raises(HTTPException) as exc:
+            validate_safe_path(path)
+        assert exc.value.status_code == 400
+
     def test_custom_param_name_in_detail(self):
         with pytest.raises(HTTPException) as exc:
             validate_safe_path("../bad", param_name="source_path")
@@ -91,6 +97,25 @@ class TestValidateSafePath:
         assert validate_safe_path("sub/My...file.pdf") == "sub/My...file.pdf"
 
 
+class TestResolveUnderBase:
+    def test_resolves_child_under_base(self, tmp_path):
+        resolved = resolve_under_base(tmp_path, "nested/book.pdf")
+        assert resolved == str(tmp_path / "nested" / "book.pdf")
+
+    def test_rejects_symlink_escape(self, tmp_path):
+        outside = tmp_path.parent / f"{tmp_path.name}-outside"
+        outside.mkdir()
+        link = tmp_path / "escape"
+        try:
+            link.symlink_to(outside, target_is_directory=True)
+        except OSError:
+            pytest.skip("symlink creation is unavailable on this Windows environment")
+
+        with pytest.raises(HTTPException) as exc:
+            resolve_under_base(tmp_path, "escape/secret.txt")
+        assert exc.value.status_code == 400
+
+
 # =============================================================================
 # validate_safe_name
 # =============================================================================
@@ -100,8 +125,16 @@ class TestValidateSafeName:
     def test_valid_name(self):
         assert validate_safe_name("MyFolder") == "MyFolder"
 
+    def test_invalid_empty_name(self):
+        with pytest.raises(HTTPException):
+            validate_safe_name("")
+
     def test_valid_name_with_spaces(self):
         assert validate_safe_name("My Folder") == "My Folder"
+
+    def test_invalid_windows_drive_or_ads_name(self):
+        with pytest.raises(HTTPException):
+            validate_safe_name("C:secret")
 
     def test_invalid_dot_dot_exact(self):
         # 名前自体が `..` のときだけ拒否

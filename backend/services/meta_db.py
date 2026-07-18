@@ -1,4 +1,4 @@
-"""meta.db の接続・テーブル定義・JSON ファイルからの移行。
+"""meta2.db の接続・テーブル定義・JSON ファイルからの移行。
 
 テスト時は monkeypatch.setattr(config, "META_DB_DIR", str(tmp_path)) でパスを切り替える。
 """
@@ -6,6 +6,8 @@
 import json
 import os
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import config
 
@@ -59,13 +61,27 @@ def _db_path() -> str:
 
 
 def connect() -> sqlite3.Connection:
-    """meta.db へ接続して返す。ディレクトリは自動作成。"""
+    """meta2.db へ接続して返す。呼び出し側が close する低レベルAPI。"""
     os.makedirs(config.META_DB_DIR, exist_ok=True)
     conn = sqlite3.connect(_db_path(), timeout=30.0, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
+
+
+@contextmanager
+def db_connection() -> Iterator[sqlite3.Connection]:
+    """commit/rollback と close を必ず行う短命接続context manager。"""
+    conn = connect()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def create_tables(conn: sqlite3.Connection) -> None:
@@ -77,7 +93,7 @@ def init_db() -> None:
 
     アプリ起動時（lifespan）に 1 回だけ呼ぶ。
     """
-    with connect() as conn:
+    with db_connection() as conn:
         create_tables(conn)
 
 

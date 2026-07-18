@@ -19,6 +19,7 @@ from routers.api_schemas import BuildEnqueueResponse, BuildStatusResponse
 from services.novel_db.connection import with_db
 from services.novel_db.job_queue import job_queue
 from utils.logger import get_logger
+from utils.path_utils import validate_safe_name
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -39,11 +40,11 @@ class EnqueueRequest(BaseModel):
 # ヘルパー: full_build ジョブに絞ったステータス取得
 # ---------------------------------------------------------------------------
 
-_BUILD_MODES = ("full_build", "generate_contexts")
+_BUILD_MODES = ("full_build", "generate_contexts", "generate_relations")
 
 
 def _get_full_build_status() -> dict:
-    """job_queue の get_status() を full_build / generate_contexts mode に絞って返す。"""
+    """job_queue の get_status() をビルド系 mode に絞って返す。"""
     raw = job_queue.get_status()
 
     current = raw["current_job"]
@@ -56,7 +57,7 @@ def _get_full_build_status() -> dict:
         recent_rows = conn.execute(
             "SELECT id, target_id, mode, state, finished_at, error_message "
             "FROM rebuild_jobs "
-            "WHERE mode IN ('full_build','generate_contexts') "
+            "WHERE mode IN ('full_build','generate_contexts','generate_relations') "
             "AND state IN ('completed','failed','canceled') "
             "ORDER BY finished_at DESC LIMIT 20"
         ).fetchall()
@@ -113,6 +114,8 @@ def post_enqueue(request: EnqueueRequest) -> dict:
         raise HTTPException(status_code=422, detail="book_name is required when all_books=false")
 
     target_book = None if request.all_books else request.book_name
+    if target_book:
+        validate_safe_name(target_book, param_name="book_name")
 
     if _is_already_queued_or_running(target_book, request.mode):
         raise HTTPException(status_code=422, detail="already queued or running")

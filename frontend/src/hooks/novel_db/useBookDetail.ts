@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import { fetchBookDetail } from '@/features/novel_db/api';
 import type { BookDetail } from '@/features/novel_db/types';
@@ -11,28 +12,28 @@ interface UseBookDetail {
 }
 
 export function useBookDetail(bookName: string): UseBookDetail {
-    const [detail, setDetail] = useState<BookDetail | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [refetchError, setRefetchError] = useState<string | null>(null);
+    const query = useQuery({
+        queryKey: ['novelBookDetail', bookName],
+        queryFn: () => fetchBookDetail(bookName),
+        enabled: bookName.length > 0,
+    });
 
-    const load = useCallback(async () => {
-        if (!bookName) return;
-        setIsLoading(true);
-        setError(null);
-        try {
-            const d = await fetchBookDetail(bookName);
-            setDetail(d);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : '取得失敗');
-            setDetail(null);
-        } finally {
-            setIsLoading(false);
-        }
-    }, [bookName]);
+    useEffect(() => setRefetchError(null), [bookName]);
 
-    useEffect(() => {
-        void load();
-    }, [load]);
-
-    return { detail, isLoading, error, refetch: load };
+    return {
+        detail: refetchError ? null : (query.data ?? null),
+        isLoading: query.isLoading,
+        error: refetchError ?? (query.error instanceof Error ? query.error.message : null),
+        refetch: async () => {
+            if (!bookName) return;
+            setRefetchError(null);
+            const result = await query.refetch();
+            if (result.error) {
+                setRefetchError(
+                    result.error instanceof Error ? result.error.message : String(result.error),
+                );
+            }
+        },
+    };
 }

@@ -35,6 +35,7 @@ from .schemas import (
     ChatSessionDetailPayload,
     ChatSessionStartRequest,
     ChatSessionSummary,
+    ChatSessionTitleUpdate,
 )
 
 router = APIRouter()
@@ -261,18 +262,18 @@ async def post_chat_session_message(
     )
 
 
-@router.patch("/sessions/{session_id}/title")
+@router.patch(
+    "/sessions/{session_id}/title",
+    status_code=204,
+    response_class=Response,
+    responses={204: {"description": "Title updated"}},
+)
 @log_and_raise_500("novel_db/sessions/title")
-def patch_chat_session_title(session_id: int, payload: dict) -> Response:
+def patch_chat_session_title(session_id: int, payload: ChatSessionTitleUpdate) -> Response:
     """セッションタイトルを手動更新する（B-16）。"""
-    title = (payload.get("title") or "").strip()
-    if not title:
-        raise HTTPException(status_code=422, detail="title is required")
-    if len(title) > 100:
-        raise HTTPException(status_code=422, detail="title too long (max 100)")
     with with_db() as conn:
         meta = get_session_detail(conn, session_id)
         if meta is None:
             raise HTTPException(status_code=404, detail="session not found")
-        update_session_title(conn, session_id, title)
+        update_session_title(conn, session_id, payload.title)
     return Response(status_code=204)

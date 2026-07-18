@@ -11,6 +11,7 @@ vi.mock('../config/api_client', () => ({
 }));
 
 import { useLibraryBulkActions } from '@/hooks/library/useLibraryBulkActions';
+import apiClient from '../config/api_client';
 
 const makeOptions = (overrides: Record<string, unknown> = {}) => ({
     currentPath: '',
@@ -167,6 +168,25 @@ describe('useLibraryBulkActions', () => {
             });
 
             expect(toast.error).toHaveBeenCalledWith('失敗');
+        });
+    });
+
+    describe('handleBulkDelete', () => {
+        it('選択中の書籍を削除して一覧と選択状態を更新する', async () => {
+            vi.mocked(apiClient.delete).mockResolvedValue({} as never);
+            const opts = makeOptions();
+            const { result } = renderHook(() => useLibraryBulkActions(opts));
+
+            await act(async () => {
+                await result.current.handleBulkDelete();
+            });
+
+            expect(apiClient.delete).toHaveBeenCalledWith('/api/pdfs', {
+                data: { names: ['a.pdf', 'b.pdf'], path: '', source: 'doujin' },
+            });
+            expect(opts.onRefresh).toHaveBeenCalledTimes(1);
+            expect(opts.onClearSelection).toHaveBeenCalledTimes(1);
+            expect(toast.success).toHaveBeenCalledWith('2 件を削除しました');
         });
     });
 

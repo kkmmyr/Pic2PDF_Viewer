@@ -8,6 +8,7 @@ import pytest
 from services.meta_db import (
     connect,
     create_tables,
+    db_connection,
     row_to_entry,
     upsert_entry,
 )
@@ -48,6 +49,27 @@ class TestConnect:
         create_tables(conn)
         create_tables(conn)  # 2回呼んでもエラーにならない
         conn.close()
+
+    def test_db_connectionは終了時にcloseする(self):
+        with db_connection() as conn:
+            create_tables(conn)
+            conn.execute("SELECT 1")
+
+        with pytest.raises(sqlite3.ProgrammingError):
+            conn.execute("SELECT 1")
+
+    def test_db_connectionは例外時にrollbackしてcloseする(self):
+        with db_connection() as conn:
+            create_tables(conn)
+
+        with pytest.raises(RuntimeError):
+            with db_connection() as conn:
+                upsert_entry(conn, "novel", "rollback.pdf", {"authors": []})
+                raise RuntimeError("boom")
+
+        with db_connection() as conn:
+            count = conn.execute("SELECT COUNT(*) FROM books_meta").fetchone()[0]
+        assert count == 0
 
 
 # ---------------------------------------------------------------------------

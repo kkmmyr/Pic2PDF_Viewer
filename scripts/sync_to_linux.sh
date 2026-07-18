@@ -2,7 +2,7 @@
 # Windows → Linux サーバーへ同期するスクリプト
 # 使い方: bash sync_to_linux.sh [doujin|comic|novel|all]
 # 前提: Tailscale が起動していること、SSH 鍵認証が設定済みであること
-# 注意: meta.db はサーバー側が正とするため DB 同期機能は提供しない
+# 注意: meta2.db はサーバー側が正とするため DB 同期機能は提供しない
 set -e
 
 LINUX_USER=amashio

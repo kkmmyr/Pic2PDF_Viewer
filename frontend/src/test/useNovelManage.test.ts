@@ -23,6 +23,7 @@ import { fetchBooks } from '@/features/novel_db/api';
 import { useNovelManage } from '@/hooks/useNovelManage';
 import type { BuildQueueStatus } from '@/features/novel_build/types';
 import type { BookSummary } from '@/features/novel_db/types';
+import { createQueryWrapper } from '@/test/queryTestUtils';
 
 const mockedUseBuildQueue = useNovelBuildQueue as ReturnType<typeof vi.fn>;
 const mockedUseOcrStatus = useOcrStatus as ReturnType<typeof vi.fn>;
@@ -68,6 +69,10 @@ function setupMocks(ocrStatus: string = 'idle', buildStatus: Partial<BuildQueueS
     });
 }
 
+function renderNovelManage() {
+    return renderHook(() => useNovelManage(), { wrapper: createQueryWrapper() });
+}
+
 describe('useNovelManage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -78,12 +83,12 @@ describe('useNovelManage', () => {
     // --- タブ切り替え & lazy-activation ---
 
     it('初期 activeTab は ocr', () => {
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         expect(result.current.activeTab).toBe('ocr');
     });
 
     it('handleTabChange("build") で activeTab が build になる', () => {
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         act(() => {
             result.current.handleTabChange('build');
         });
@@ -91,7 +96,7 @@ describe('useNovelManage', () => {
     });
 
     it('handleTabChange("build") 後に useNovelBuildQueue が enabled=true で呼ばれる', () => {
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         // 初回は enabled=false
         expect(mockedUseBuildQueue).toHaveBeenLastCalledWith(false);
 
@@ -102,7 +107,7 @@ describe('useNovelManage', () => {
     });
 
     it('ocr タブに戻っても buildEnabled は true のまま', () => {
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         act(() => {
             result.current.handleTabChange('build');
         });
@@ -121,7 +126,7 @@ describe('useNovelManage', () => {
             makeBook({ name: '除外C', ocr_done_at: null, indexed_at: null }),
         ]);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.books).toHaveLength(2));
         expect(result.current.books.map((b) => b.name)).toEqual(['対象A', '対象B']);
     });
@@ -132,7 +137,7 @@ describe('useNovelManage', () => {
             makeBook({ name: '完了済み', ocr_done_at: null, indexed_at: '2024-02-01' }),
         ]);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.selectedBook).toBe('未完了1'));
         expect(result.current.selectedBookCtx).toBe('未完了1');
     });
@@ -145,7 +150,7 @@ describe('useNovelManage', () => {
             makeBook({ name: '完了', ocr_done_at: null, indexed_at: '2024-02-01' }),
         ]);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.books).toHaveLength(2));
 
         act(() => {
@@ -162,7 +167,7 @@ describe('useNovelManage', () => {
             makeBook({ name: '完了', ocr_done_at: null, indexed_at: '2024-02-01' }),
         ]);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.books).toHaveLength(2));
 
         act(() => {
@@ -184,7 +189,7 @@ describe('useNovelManage', () => {
         ]);
         mockEnqueue.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.selectedBook).toBe('花太郎'));
 
         act(() => {
@@ -196,7 +201,7 @@ describe('useNovelManage', () => {
 
     it('handleEnqueueBuild — allBooks=true で enqueue(null, true, full_build) が呼ばれる', () => {
         mockEnqueue.mockResolvedValue(undefined);
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         act(() => {
             result.current.setAllBooks(true);
@@ -209,7 +214,7 @@ describe('useNovelManage', () => {
     });
 
     it('handleEnqueueBuild — selectedBook が空で allBooks=false のとき enqueue を呼ばない', () => {
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         act(() => {
             result.current.handleEnqueueBuild();
@@ -226,7 +231,7 @@ describe('useNovelManage', () => {
         ]);
         mockEnqueue.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.selectedBookCtx).toBe('花太郎'));
 
         act(() => {
@@ -238,7 +243,7 @@ describe('useNovelManage', () => {
 
     it('handleEnqueueCtx — allBooksCtx=true で enqueue(null, true, generate_contexts) が呼ばれる', () => {
         mockEnqueue.mockResolvedValue(undefined);
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         act(() => {
             result.current.setAllBooksCtx(true);
@@ -251,7 +256,7 @@ describe('useNovelManage', () => {
     });
 
     it('handleEnqueueCtx — selectedBookCtx が空で allBooksCtx=false のとき enqueue を呼ばない', () => {
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         act(() => {
             result.current.handleEnqueueCtx();
@@ -266,7 +271,7 @@ describe('useNovelManage', () => {
         ]);
         mockEnqueue.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
         await waitFor(() => expect(result.current.selectedBook).toBe('本A'));
 
         act(() => {
@@ -289,7 +294,7 @@ describe('useNovelManage', () => {
 
     it('ocrStatus=running のとき OCR 実行中行が含まれる', () => {
         setupMocks('running');
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         const row = result.current.unifiedRows.find((r) => r.key === 'ocr-running');
         expect(row).toBeDefined();
@@ -299,7 +304,7 @@ describe('useNovelManage', () => {
 
     it('ocrStatus=error のとき OCR エラー行が含まれる', () => {
         setupMocks('error');
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         const row = result.current.unifiedRows.find((r) => r.key === 'ocr-error');
         expect(row).toBeDefined();
@@ -316,7 +321,7 @@ describe('useNovelManage', () => {
                 progress_total: 1,
             },
         });
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         const row = result.current.unifiedRows.find((r) => r.key === 'build-running-1');
         expect(row).toBeDefined();
@@ -354,7 +359,7 @@ describe('useNovelManage', () => {
                 },
             ],
         });
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         const rows = result.current.unifiedRows;
         expect(rows.find((r) => r.key === 'build-finished-10')?.state).toBe('完了');
@@ -367,7 +372,7 @@ describe('useNovelManage', () => {
         setupMocks('idle', {
             current_job: { id: 99, target_id: null, progress_done: 0, progress_total: 1 },
         });
-        const { result } = renderHook(() => useNovelManage());
+        const { result } = renderNovelManage();
 
         const row = result.current.unifiedRows.find((r) => r.key === 'build-running-99');
         expect(row?.target).toBe('全冊');

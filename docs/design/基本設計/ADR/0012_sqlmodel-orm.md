@@ -1,6 +1,6 @@
 # ADR-0012: novel.db クエリを SQLModel ORM に移行
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-0015
 - **Date**: 2026-06-11
 - **決定者**: 開発者
 - **関連**: Phase 1-2（Alembic 一本化）/ Phase 1-3 / commit `eb04fc0`
@@ -10,7 +10,7 @@
 `novel.db` へのアクセスが全クエリ生 SQL 文字列 + タプルパラメータで実装されており、以下の問題があった：
 
 - `sqlite3.Row → dict` の手書き変換が多数存在し、カラム追加・リネーム時に複数箇所を修正する必要があった
-- `meta.db`（threading.Lock）と `novel.db`（DB トランザクション任せ）でロック方式が非対称
+- `meta2.db`（threading.Lock）と `novel.db`（DB トランザクション任せ）でロック方式が非対称
 - `save_meta` が `DELETE → 全行 INSERT` の非効率なパターンで実装されていた
 
 Pydantic v2 が既に導入済みで、SQLModel（Pydantic v2 + SQLAlchemy ベース）は FastAPI と親和性が高い。また Phase 1-2 で Alembic をスキーマの唯一の真実の源に一本化済みで、SQLModel の `MetaData` を Alembic に渡せる状態になっていた。

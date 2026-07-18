@@ -154,10 +154,6 @@ export function useLibraryBulkActions({
 
     const handleBulkDelete = useCallback(async () => {
         if (selectedPdfNames.length === 0) return;
-        const confirmed = window.confirm(
-            `選択した ${selectedPdfNames.length} 件をディスクから完全に削除しますか？\nこの操作は元に戻せません。`,
-        );
-        if (!confirmed) return;
         const ok = await runAsync(async () => {
             await apiClient.delete(API_ENDPOINTS.DELETE_PDFS, {
                 data: { names: selectedPdfNames, path: currentPath, source: currentSource },

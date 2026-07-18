@@ -8,11 +8,18 @@ embed_batch はモックで置き換える。
 import sqlite3
 
 import pytest
+from fastapi import HTTPException
 
 from services.novel_db import builder, with_db
 from services.novel_db.embedder import EmbeddingError
 from services.novel_db.lance_store import get_chunks_table
 from services.novel_db.migrations import upgrade_head
+
+
+@pytest.mark.parametrize("book_name", ["../outside", "C:/Windows", "folder/book"])
+def test_resolve_images_dir_rejects_unsafe_book_name(tmp_data_dir, book_name):
+    with pytest.raises(HTTPException):
+        builder._resolve_images_dir(book_name)
 
 
 def _populate_pages(conn: sqlite3.Connection, book_name: str, texts: list[str]) -> int:

@@ -5,7 +5,7 @@ services.meta_store の純関数ユニットテスト（Phase 64: SQLite バッ�
 このファイルは `merge_entry_fields` / `has_meaningful_value` /
 `update_meta_locked` を直接テストする。
 
-テスト時は config.META_DB_DIR を tmp_path に向けることで meta.db を分離する。
+テスト時は config.META_DB_DIR を tmp_path に向けることで meta2.db を分離する。
 
 実行方法:
     cd backend
@@ -178,6 +178,45 @@ class TestUpdateMetaLocked:
 
         assert load_meta("doujin") == {"a.pdf": {"authors": ["A"]}}
         assert load_meta("comic") == {"b.pdf": {"authors": ["B"]}}
+
+    def test_only_changed_entry_is_upserted(self, monkeypatch):
+        import services.meta_store as meta_store_module
+
+        save_meta(
+            "doujin",
+            {
+                "a.pdf": {"authors": ["A"]},
+                "b.pdf": {"authors": ["B"]},
+                "c.pdf": {"authors": ["C"]},
+            },
+        )
+        original_upsert = meta_store_module.upsert_entry
+        upserted: list[str] = []
+
+        def _record_upsert(conn, source, book_id, entry):
+            upserted.append(book_id)
+            original_upsert(conn, source, book_id, entry)
+
+        monkeypatch.setattr(meta_store_module, "upsert_entry", _record_upsert)
+        update_meta_locked("doujin", lambda data: data["b.pdf"].update({"genre": "X"}))
+
+        assert upserted == ["b.pdf"]
+
+    def test_unchanged_update_does_not_write(self, monkeypatch):
+        import services.meta_store as meta_store_module
+
+        save_meta("doujin", {"a.pdf": {"authors": ["A"]}})
+        upsert = monkeypatch.setattr(meta_store_module, "upsert_entry", lambda *args: pytest.fail("unexpected upsert"))
+        update_meta_locked("doujin", lambda data: None)
+        assert upsert is None
+
+    def test_deleted_entry_is_removed_without_rewriting_others(self, monkeypatch):
+        import services.meta_store as meta_store_module
+
+        save_meta("doujin", {"a.pdf": {"authors": ["A"]}, "b.pdf": {"authors": ["B"]}})
+        monkeypatch.setattr(meta_store_module, "upsert_entry", lambda *args: pytest.fail("unexpected upsert"))
+        update_meta_locked("doujin", lambda data: data.pop("a.pdf"))
+        assert load_meta("doujin") == {"b.pdf": {"authors": ["B"]}}
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 """ジャンルリストの永続化サービス（SQLite バックエンド）。
 
-保存先: meta.db の genres テーブル（source / genre / sort_order）
+保存先: meta2.db の genres テーブル（source / genre / sort_order）
 形式: 順序付き文字列リスト
 
-ファイルが存在しない場合は meta.db の books_meta.genre を収集して初期リストを生成する
+ファイルが存在しない場合は meta2.db の books_meta.genre を収集して初期リストを生成する
 （migration 用途）。並び順は UI からの `PATCH /api/genres/reorder` で更新される。
 
 ロック: `SourceLockManager` で source 単位に直列化。
@@ -11,7 +11,7 @@
 
 import sqlite3
 
-from services.meta_db import connect, create_tables
+from services.meta_db import create_tables, db_connection
 from utils.locks import SourceLockManager
 
 _lock_manager = SourceLockManager()
@@ -27,7 +27,7 @@ def load_genres(source: str) -> list[str]:
     未登録の場合は books_meta.genre を収集して初期リストを生成・保存する。
     """
     with _lock_manager.get(source):
-        with connect() as conn:
+        with db_connection() as conn:
             _ensure(conn)
             rows = conn.execute(
                 "SELECT genre FROM genres WHERE source=? ORDER BY sort_order",
@@ -43,7 +43,7 @@ def load_genres(source: str) -> list[str]:
 def save_genres(source: str, genres: list[str]) -> None:
     """ジャンルリストを genres テーブルに書き込む。"""
     with _lock_manager.get(source):
-        with connect() as conn:
+        with db_connection() as conn:
             _ensure(conn)
             _write_genres_unlocked(conn, source, genres)
 

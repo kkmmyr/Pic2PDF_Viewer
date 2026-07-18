@@ -1695,6 +1695,11 @@ export interface components {
             /** Message Count */
             message_count: number;
         };
+        /** ChatSessionTitleUpdate */
+        ChatSessionTitleUpdate: {
+            /** Title */
+            title: string;
+        };
         /** DeletePagesRequest */
         DeletePagesRequest: {
             /** Page Indices */
@@ -4206,20 +4211,16 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': {
-                    [key: string]: unknown;
-                };
+                'application/json': components['schemas']['ChatSessionTitleUpdate'];
             };
         };
         responses: {
-            /** @description Successful Response */
-            200: {
+            /** @description Title updated */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    'application/json': unknown;
-                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

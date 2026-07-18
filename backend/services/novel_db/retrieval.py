@@ -19,6 +19,7 @@ from config import (
     NOVEL_DB_QA_TOP_K,
     NOVEL_DB_QA_TOP_SUMMARIES,
 )
+from services.novel_db.book_summary_search import search_book_summaries
 from services.novel_db.llm import LLM_OPTIONS
 from services.novel_db.query_expander import expand_query
 from services.novel_db.search import (
@@ -26,7 +27,6 @@ from services.novel_db.search import (
     SearchHit,
     hybrid_search,
     load_all_pages_of_book,
-    search_book_summaries,
 )
 from services.novel_db.summarizer import load_summaries_for_books
 

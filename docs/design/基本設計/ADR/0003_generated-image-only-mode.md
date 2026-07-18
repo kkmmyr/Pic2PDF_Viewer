@@ -1,5 +1,7 @@
 # ADR-0003: `generated` ソースを image-only モードに切替（PDF 生成・配信を廃止）
 
+> 現行のsource名は `doujin`。`generated` はこの判断時点の旧名称として本文に保持する。
+
 - **Status**: Accepted
 - **Date**: 2026-05-05
 - **決定者**: プロジェクトオーナー
@@ -42,16 +44,16 @@
 
 ### ポジティブ
 - ディスク使用量が大幅減（画像のみ保持）
-- PDF 生成ジョブ・圧縮ジョブの運用が `generated` ソースで不要になり保守対象が減る
+- PDF 生成ジョブ・圧縮ジョブの運用が現 `doujin` ソース（当時の `generated`）で不要になり保守対象が減る
 - サムネイル・ページ削除等の操作が WebP 直接操作になり高速化
 
 ### ネガティブ・受容したコスト
-- `generated` ソースから PDF をエクスポートしたいユースケースで、再生成のひと手間が発生する
-- 「ソースごとに配信形式が異なる」という非対称が API 仕様に残る（`source=generated` は image、`source=kindle/novel` は PDF）
-- `/api/thumbnails/page` も `generated` は WebP 直接、`kindle`/`novel` は fitz レンダリング、と分岐が増えた
+- `doujin` ソースから PDF をエクスポートしたいユースケースで、再生成のひと手間が発生する
+- 「ソースごとに配信形式が異なる」という非対称が API 仕様に残る（`source=doujin` は image、`source=comic` は PDF、`source=novel` は専用 Reader で元 PNG）
+- `/api/thumbnails/page` も `doujin` は WebP 直接、PDF 編集対象は fitz レンダリング、と分岐が増えた
 
 ### 影響範囲
-- `backend/data/main/pdfs_compressed/` ディレクトリ削除
+- `backend/data/doujin/pdfs_compressed/` ディレクトリ削除
 - `backend/main.py` の `/pdfs` 静的マウント削除
 - `routers/generate.py` / `routers/thumbnails.py` の image-only 分岐ロジック
 - `frontend/src/components/reader/PdfCard.tsx` 等の表示経路

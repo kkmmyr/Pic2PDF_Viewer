@@ -61,6 +61,15 @@ def test_post_rebuild_book_requires_target_id(client, db_initialized):
     assert "target_id" in res.json()["detail"].lower()
 
 
+@pytest.mark.parametrize("target_id", ["../outside", "C:/Windows", "folder/book"])
+def test_post_rebuild_book_rejects_unsafe_target(client, db_initialized, target_id):
+    res = client.post(
+        "/api/novel_db/builds",
+        json={"type": "book", "target_id": target_id, "mode": "ocr"},
+    )
+    assert res.status_code == 400
+
+
 def test_post_rebuild_series_requires_target_id(client, db_initialized):
     res = client.post("/api/novel_db/builds", json={"type": "series"})
     assert res.status_code == 422

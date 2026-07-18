@@ -51,6 +51,16 @@ class TestRunOcr:
         client.post("/api/ocr/run?target_dir=mybook")
         assert calls == [("book", "mybook", "ocr")]
 
+    @pytest.mark.parametrize("target_dir", ["../outside", "C:/Windows", "folder/book"])
+    def test_rejects_unsafe_target_dir(self, client, monkeypatch, target_dir):
+        monkeypatch.setattr(
+            "routers.ocr.job_queue.enqueue",
+            lambda *args, **kwargs: pytest.fail("unsafe target must not be enqueued"),
+        )
+
+        res = client.post("/api/ocr/run", params={"target_dir": target_dir})
+        assert res.status_code == 400
+
     def test_no_target_dir_creates_all_job(self, client, monkeypatch):
         calls: list = []
 

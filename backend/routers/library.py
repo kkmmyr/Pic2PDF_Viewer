@@ -1,5 +1,4 @@
 import os
-from collections.abc import Callable
 from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -10,12 +9,12 @@ from config import SourceDirs, get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
 from routers.api_schemas import BookImagesResponse, DeleteResponse, PdfListResponse, RenameResponse
 from services.file_manager import FileManager
-from services.meta_store import MetaDict, make_key, update_meta_locked
+from services.meta_store import make_key, update_meta_locked
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from utils.file_naming import get_thumbnail_name
 from utils.file_utils import is_image_file
 from utils.logger import get_logger
-from utils.path_utils import join_path, validate_safe_name, validate_safe_path
+from utils.path_utils import join_path, resolve_under_base, validate_safe_name, validate_safe_path
 
 logger = get_logger(__name__)
 
@@ -26,14 +25,14 @@ def _list_from_images(background_tasks: BackgroundTasks, path: str, dirs: Source
     """images/ サブディレクトリを走査して書籍一覧を返す（全ソース共通）。
 
     images/{book}/ ディレクトリを正とし、WebP / PNG / JPG 等任意の画像形式に対応。
-    返却する name は "{dirname}.pdf" として meta.db のキー互換を保つ。
+    返却する name は "{dirname}.pdf" として meta2.db のキー互換を保つ。
     """
     base_img_dir = dirs["img"]
     base_thumb_dir = dirs["thumb"]
     url_prefix_thumb = dirs["thumb_url_prefix"]
 
-    target_img_dir = join_path(base_img_dir, path) if path else base_img_dir
-    target_thumb_dir = join_path(base_thumb_dir, path) if path else base_thumb_dir
+    target_img_dir = resolve_under_base(base_img_dir, path)
+    target_thumb_dir = resolve_under_base(base_thumb_dir, path)
 
     if not os.path.exists(target_img_dir):
         return {"files": [], "current_path": path}
@@ -95,7 +94,7 @@ def list_book_images(path: str, source: str = Depends(validated_source)):
     base_images_dir = dirs["img"]
     url_prefix = dirs["thumb_url_prefix"].replace("/thumbnails", "/images")
 
-    target_dir = join_path(base_images_dir, path)
+    target_dir = resolve_under_base(base_images_dir, path)
 
     if not os.path.exists(target_dir):
         raise HTTPException(status_code=404, detail="Images not found")
@@ -177,17 +176,11 @@ def delete_pdfs(request: DeletePdfsRequest):
     deleted_count = 0
     errors = []
 
-    def _make_dropper(k: str) -> Callable[[MetaDict], None]:
-        def _drop(data: MetaDict) -> None:
-            data.pop(k, None)
-
-        return _drop
-
+    deleted_keys: list[str] = []
     for name in request.names:
         try:
             FileManager.delete_with_assets(name, request.path, dirs)
-            key = make_key(request.path, name)
-            update_meta_locked(request.source, _make_dropper(key))
+            deleted_keys.append(make_key(request.path, name))
             deleted_count += 1
         except FileNotFoundError:
             errors.append(f"Not found: {name}")
@@ -196,5 +189,13 @@ def delete_pdfs(request: DeletePdfsRequest):
 
     if deleted_count == 0 and errors:
         raise HTTPException(status_code=500, detail="削除に失敗しました: " + "; ".join(errors))
+
+    if deleted_keys:
+
+        def _drop_deleted(data: dict) -> None:
+            for key in deleted_keys:
+                data.pop(key, None)
+
+        update_meta_locked(request.source, _drop_deleted)
 
     return {"message": "Items deleted", "deleted_count": deleted_count, "errors": errors}
