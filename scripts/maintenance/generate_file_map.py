@@ -79,20 +79,20 @@ EXCLUDED_DIR_GLOBS = ("playwright-*", "*.egg-info")
 EXCLUDED_RELATIVE_DIRS = frozenset(
     {
         "backend/complete",
+        "backend/data",
+        "backend/input",
         "backend/scripts/results",
     }
 )
 
 # ファイル名の完全一致で除外するもの。方針: ディレクトリレベルのノイズのみを
-# 除外し、拡張子ベースのフィルタは行わない（.tsbuildinfo / .pyc / .coverage 等も
-# 実ファイルとして存在すれば表示される）。macOS の .DS_Store のみ例外的に除外。
-EXCLUDED_FILE_NAMES = frozenset({".DS_Store"})
-
-# gitignore 対象・実行時生成データのため展開しない特別扱いディレクトリ
-# （プロジェクトルート相対パス、POSIX 区切り）
-SPECIAL_DATA_DIR_REL = "backend/data"
-SPECIAL_DATA_DIR_LINE = "data/  # 実行時生成データ（gitignore 対象、詳細は 詳細設計書_共通.md §2 参照）"
-
+# 除外し、拡張子ベースのフィルタは行わない（.tsbuildinfo / .pyc 等は
+# 実ファイルとして存在すれば表示される）。例外はここに完全一致で個別列挙する:
+# - .DS_Store: macOS のノイズ
+# - .coverage: gitignore 対象の実行時生成物。ローカルの汚れた状態で生成した
+#   ツリーが CI のクリーンチェックアウトと恒常的にドリフトした実績があるため
+#   （2026-07 CI修理計画書 DOCS-1）
+EXCLUDED_FILE_NAMES = frozenset({".DS_Store", ".coverage"})
 
 def _is_excluded_dir(path: Path) -> bool:
     name = path.name
@@ -102,11 +102,6 @@ def _is_excluded_dir(path: Path) -> bool:
         return True
     rel_posix = path.relative_to(PROJECT_ROOT).as_posix()
     return rel_posix in EXCLUDED_RELATIVE_DIRS
-
-
-def _is_special_data_dir(path: Path) -> bool:
-    return path.relative_to(PROJECT_ROOT).as_posix() == SPECIAL_DATA_DIR_REL
-
 
 # ---------------------------------------------------------------------------
 # ツリー描画
@@ -142,9 +137,6 @@ def _render_children(dir_path: Path, prefix: str, lines: list[str]) -> None:
         is_last = i == last_index
         connector = "└── " if is_last else "├── "
         if child.is_dir():
-            if _is_special_data_dir(child):
-                lines.append(f"{prefix}{connector}{SPECIAL_DATA_DIR_LINE}")
-                continue
             lines.append(f"{prefix}{connector}{child.name}/")
             extension = "    " if is_last else "│   "
             _render_children(child, prefix + extension, lines)
