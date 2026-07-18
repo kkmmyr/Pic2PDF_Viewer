@@ -251,11 +251,11 @@ def search_book_summaries(
     if book_names is not None and not book_names:
         return []
 
-    emb = embed_batch([query])[0]
-
     table = get_summaries_table()
     if table.count_rows() == 0:
         return []
+
+    emb = embed_batch([query])[0]
 
     k = max(top * 2, 22) if book_names is not None else top
     query_builder = table.search(emb).limit(k).select(["book_name"])
