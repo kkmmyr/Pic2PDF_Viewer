@@ -5,5 +5,7 @@ set -euo pipefail
 
 LABEL=${1:-$(date +%Y-%m-%d_%H%M%S)}
 
-exec /opt/pic2pdf-viewer/backend/.venv/bin/python \
+cd /opt/pic2pdf-viewer/backend
+
+exec .venv/bin/python \
   -m tools.server_backup backup --label "$LABEL"
