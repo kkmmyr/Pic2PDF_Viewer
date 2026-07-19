@@ -10,8 +10,7 @@ from dataclasses import dataclass
 
 from sqlmodel import SQLModel
 
-# キャラ名は通常 5〜15 字、まれに敬称付きで 20 字程度。30 字超は誤抽出と判断。
-_NAME_MAX_LEN = 30
+from .character_names import parse_character_names
 
 
 @dataclass(frozen=True)
@@ -31,24 +30,6 @@ class CharacterRow(SQLModel):
     page_count: int
     summary: str | None = None
     generated_at: str | None = None
-
-
-def _parse_main_characters(raw: str | None) -> list[str]:
-    """`pages.main_characters` のカンマ区切り文字列をキャラ名リストにする。
-
-    character_extractor は「,」区切りで返すが、過去データの揺れに備えて
-    「、」「・」も区切り扱い。空文字・極端に長い断片はスキップ。
-    """
-    if not raw:
-        return []
-    text = raw.replace("、", ",").replace("・", ",")
-    out: list[str] = []
-    for part in text.split(","):
-        name = part.strip().strip("「」『』\"'.。 ")
-        if not name or len(name) > _NAME_MAX_LEN:
-            continue
-        out.append(name)
-    return out
 
 
 def list_book_characters_in_db(
@@ -72,7 +53,7 @@ def list_book_characters_in_db(
 
     stats: dict[str, dict[str, int]] = {}
     for page_no, raw in rows:
-        for name in _parse_main_characters(raw):
+        for name in parse_character_names(raw):
             entry = stats.setdefault(name, {"first_page": page_no, "page_count": 0})
             entry["page_count"] += 1
             if page_no < entry["first_page"]:
@@ -106,7 +87,7 @@ def collect_character_pages(
     ).fetchall()
     out: list[tuple[int, str]] = []
     for page_no, full_text, raw in rows:
-        if char_name in _parse_main_characters(raw):
+        if char_name in parse_character_names(raw):
             out.append((page_no, full_text))
     return out
 
@@ -213,7 +194,7 @@ def top_scenes_for_character(
     ).fetchall()
     out: list[tuple[int, int]] = []
     for page_no, char_count, raw in rows:
-        if char_name in _parse_main_characters(raw):
+        if char_name in parse_character_names(raw):
             out.append((page_no, char_count))
             if len(out) >= limit:
                 break

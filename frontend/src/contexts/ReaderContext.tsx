@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
+import { createContext, useContext, useContextSelector } from 'use-context-selector';
 import { useReaderState } from '@/hooks/reader/useReaderState';
 import type { LibrarySource } from '@/types';
 
@@ -16,6 +16,13 @@ export function useReaderContext(): ReaderContextValue {
     const ctx = useContext(ReaderContext);
     if (!ctx) throw new Error('useReaderContext must be inside ReaderProvider');
     return ctx;
+}
+
+export function useReaderField<K extends keyof ReaderContextValue>(key: K): ReaderContextValue[K] {
+    return useContextSelector(ReaderContext, (value) => {
+        if (!value) throw new Error('useReaderField must be inside ReaderProvider');
+        return value[key];
+    });
 }
 
 interface ReaderProviderProps {

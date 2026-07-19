@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchCharacterDetail } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type { CharacterDetail } from '@/features/novel_db/types';
 
 export interface UseCharacterDetail {
@@ -17,7 +18,7 @@ export function useCharacterDetail(
 ): UseCharacterDetail {
     const [refetchError, setRefetchError] = useState<string | null>(null);
     const query = useQuery({
-        queryKey: ['novelCharacterDetail', bookName, charName],
+        queryKey: novelDbKeys.character(bookName, charName),
         queryFn: () => fetchCharacterDetail(bookName!, charName!),
         enabled: Boolean(bookName && charName),
     });

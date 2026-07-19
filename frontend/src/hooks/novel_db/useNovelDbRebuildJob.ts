@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { cancelRebuild, fetchRebuildStatus, postRebuild } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type { RebuildEnqueueRequest } from '@/features/novel_db/api';
 import type { RebuildEnqueueResponse, RebuildStatus } from '@/features/novel_db/types';
 import { NOVEL_DB_CONFIG } from '@/constants';
@@ -20,8 +21,6 @@ export interface UseNovelDbRebuildJob {
     cancel: (jobId: number) => Promise<void>;
     refresh: () => Promise<void>;
 }
-
-const QUERY_KEY = ['novelDbRebuildStatus'];
 
 export function useNovelDbRebuildJob(onJobCompleted?: () => void): UseNovelDbRebuildJob {
     const queryClient = useQueryClient();
@@ -36,7 +35,7 @@ export function useNovelDbRebuildJob(onJobCompleted?: () => void): UseNovelDbReb
         isLoading,
         error: queryError,
     } = useQuery<RebuildStatus>({
-        queryKey: QUERY_KEY,
+        queryKey: novelDbKeys.rebuildStatus(),
         queryFn: fetchRebuildStatus,
         refetchInterval: NOVEL_DB_CONFIG.REBUILD_POLL_INTERVAL_MS,
         staleTime: 0,
@@ -56,13 +55,13 @@ export function useNovelDbRebuildJob(onJobCompleted?: () => void): UseNovelDbReb
     const error = queryError instanceof Error ? queryError.message : null;
 
     const refresh = useCallback(async () => {
-        await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+        await queryClient.invalidateQueries({ queryKey: novelDbKeys.rebuildStatus() });
     }, [queryClient]);
 
     const enqueue = useCallback(
         async (req: RebuildEnqueueRequest) => {
             const res = await postRebuild(req);
-            await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+            await queryClient.invalidateQueries({ queryKey: novelDbKeys.rebuildStatus() });
             return res;
         },
         [queryClient],
@@ -71,7 +70,7 @@ export function useNovelDbRebuildJob(onJobCompleted?: () => void): UseNovelDbReb
     const cancel = useCallback(
         async (jobId: number) => {
             await cancelRebuild(jobId);
-            await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+            await queryClient.invalidateQueries({ queryKey: novelDbKeys.rebuildStatus() });
         },
         [queryClient],
     );

@@ -21,6 +21,8 @@ from config import NOVEL_DB_LLM_MODEL
 from utils.dt import JST
 
 from ._llm_backend import QWEN_BACKEND
+from .character_names import parse_character_names
+from .llm_options import make_llm_options
 
 _RELATION_PROMPT = """以下は小説『{book_name}』のキャラクター辞典サマリのリストです。
 各キャラクターのサマリを読み、登場人物間の関係タイプを抽出してください。
@@ -41,24 +43,7 @@ _RELATION_PROMPT = """以下は小説『{book_name}』のキャラクター辞�
 
 JSON のみ出力（前置き・説明不要）:"""
 
-_OPTIONS = {
-    "temperature": 0.1,
-    "num_predict": 2048,
-    "num_ctx": 16384,
-}
-
-
-def _parse_char_names(raw: str | None) -> list[str]:
-    """pages.main_characters のカンマ区切りをキャラ名リストに変換。"""
-    if not raw:
-        return []
-    text = raw.replace("、", ",").replace("・", ",")
-    out: list[str] = []
-    for part in text.split(","):
-        name = part.strip().strip("「」『』\"'.。 ")
-        if name and len(name) <= 30:
-            out.append(name)
-    return out
+_OPTIONS = make_llm_options(temperature=0.1, num_predict=2048, num_ctx=16384)
 
 
 def count_cooccurrences(
@@ -72,7 +57,7 @@ def count_cooccurrences(
     ).fetchall()
     counter: Counter[tuple[str, str]] = Counter()
     for (raw,) in rows:
-        names = list(dict.fromkeys(_parse_char_names(raw)))  # 重複除去・順序保持
+        names = parse_character_names(raw)
         for a, b in combinations(names, 2):
             key = (a, b) if a < b else (b, a)
             counter[key] += 1

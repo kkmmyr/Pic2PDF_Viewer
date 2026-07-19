@@ -61,7 +61,7 @@ class RecordViewRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/meta")
+@router.get("/meta", response_model=dict[str, dict[str, object]])
 def get_meta(source: str = Depends(validated_source)) -> dict:
     """
     指定ソースの meta.json 全体を返す。

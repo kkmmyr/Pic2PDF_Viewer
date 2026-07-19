@@ -16,7 +16,7 @@ from collections.abc import Callable
 
 from utils.logger import get_logger
 
-from .builder import rebuild_from_pages
+from .builder import EMBED_BATCH_SIZE, rebuild_from_pages
 from .connection import with_db
 from .contextualizer import generate_chunk_context, make_embedding_input
 from .embedder import embed_batch
@@ -184,9 +184,22 @@ def _run_generate_contexts(
         log("  skip: book summary missing (run step 2 first)")
         return
 
-    sql = "SELECT c.id, c.text FROM chunks c JOIN pages p ON c.page_id = p.id WHERE p.book_id = ?"
+    sql = """
+        SELECT
+            c.id AS chunk_id,
+            c.text AS chunk_text,
+            b.name AS book_name,
+            p.page_no,
+            p.char_count,
+            b.page_count
+        FROM chunks c
+        JOIN pages p ON c.page_id = p.id
+        JOIN books b ON p.book_id = b.id
+        WHERE p.book_id = ?
+    """
     if not redo:
         sql += " AND c.contextual_text IS NULL"
+    sql += " ORDER BY c.id"
     chunks = conn.execute(sql, (book_id,)).fetchall()
 
     if not chunks:
@@ -197,54 +210,64 @@ def _run_generate_contexts(
     log(f"  processing {total_chunks} chunks")
     lance_table = get_chunks_table()
     done = 0
-    for chunk_id, chunk_text in chunks:
-        if detail:
-            detail(f"コンテキスト {done}/{total_chunks} チャンク")
-        try:
-            ctx = generate_chunk_context(book_name, book_summary, chunk_text)
-            if not ctx:
-                continue
-            conn.execute(
-                "UPDATE chunks SET contextual_text = ? WHERE id = ?",
-                (ctx, chunk_id),
-            )
-            emb_input = make_embedding_input(ctx, chunk_text)
-            emb = embed_batch([emb_input])[0]
-            # LanceDB の embedding を更新（削除して再挿入）
-            lance_table.delete(f"chunk_id = {chunk_id}")
-            # book_name / page_no / char_count / page_count を SQLite から取得
-            meta = conn.execute(
-                """
-                SELECT b.name, p.page_no, p.char_count, b.page_count
-                FROM chunks c
-                JOIN pages p ON c.page_id = p.id
-                JOIN books b ON p.book_id = b.id
-                WHERE c.id = ?
-                """,
-                (chunk_id,),
-            ).fetchone()
-            if meta:
-                lance_table.add(
-                    [
-                        {
-                            "chunk_id": chunk_id,
-                            "book_name": meta[0],
-                            "page_no": meta[1],
-                            "text": chunk_text,
-                            "char_count": meta[2] or 0,
-                            "page_count": meta[3] or 0,
-                            "embedding": emb,
-                        }
-                    ]
+    for batch_start in range(0, total_chunks, EMBED_BATCH_SIZE):
+        batch = chunks[batch_start : batch_start + EMBED_BATCH_SIZE]
+        generated: list[tuple[sqlite3.Row, str]] = []
+
+        for row in batch:
+            chunk_id = row["chunk_id"]
+            chunk_text = row["chunk_text"]
+            if detail:
+                detail(f"コンテキスト {batch_start + len(generated)}/{total_chunks} チャンク")
+            try:
+                ctx = generate_chunk_context(book_name, book_summary, chunk_text)
+                if ctx:
+                    generated.append((row, ctx))
+            except Exception as exc:
+                log(f"  chunk {chunk_id} context error: {exc}")
+                logger.warning(
+                    "[full_build:%s] generate_context chunk %s failed: %s",
+                    book_name,
+                    chunk_id,
+                    exc,
                 )
-            conn.commit()
-            done += 1
+
+        if not generated:
+            continue
+
+        try:
+            embeddings = embed_batch([make_embedding_input(ctx, row["chunk_text"]) for row, ctx in generated])
+            lance_rows = [
+                {
+                    "chunk_id": row["chunk_id"],
+                    "book_name": row["book_name"],
+                    "page_no": row["page_no"],
+                    "text": row["chunk_text"],
+                    "char_count": row["char_count"] or 0,
+                    "page_count": row["page_count"] or 0,
+                    "embedding": embedding,
+                }
+                for (row, _), embedding in zip(generated, embeddings, strict=True)
+            ]
+            chunk_ids = ", ".join(str(row["chunk_id"]) for row, _ in generated)
+            lance_table.delete(f"chunk_id IN ({chunk_ids})")
+            lance_table.add(lance_rows)
+
+            with conn:
+                conn.executemany(
+                    "UPDATE chunks SET contextual_text = ? WHERE id = ?",
+                    [(ctx, row["chunk_id"]) for row, ctx in generated],
+                )
+            done += len(generated)
         except Exception as exc:
-            log(f"  chunk {chunk_id} error: {exc}")
+            first_id = generated[0][0]["chunk_id"]
+            last_id = generated[-1][0]["chunk_id"]
+            log(f"  batch {first_id}-{last_id} error: {exc}")
             logger.warning(
-                "[full_build:%s] generate_context chunk %s failed: %s",
+                "[full_build:%s] generate_context batch %s-%s failed: %s",
                 book_name,
-                chunk_id,
+                first_id,
+                last_id,
                 exc,
             )
     log(f"  done: {done}/{total_chunks} chunks")

@@ -3,6 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { NOVEL_DB_CONFIG } from '@/constants';
 import { searchHits } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type { Scope, SearchHit } from '@/features/novel_db/types';
 
 export interface UseNovelDbSearch {
@@ -30,7 +31,7 @@ export function useNovelDbSearch(scope: Scope): UseNovelDbSearch {
 
     const trimmedQuery = debouncedQuery.trim();
     const searchQuery = useInfiniteQuery({
-        queryKey: ['novelDbSearch', trimmedQuery, scope],
+        queryKey: novelDbKeys.search(trimmedQuery, scope),
         queryFn: ({ pageParam }) =>
             searchHits({
                 query: trimmedQuery,

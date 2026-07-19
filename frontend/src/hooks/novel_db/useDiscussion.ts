@@ -8,6 +8,7 @@ import {
     deleteDiscussion,
     fetchDiscussionHistory,
 } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import {
     type DiscussionStage,
     type DiscussionTurnEvent,
@@ -47,7 +48,7 @@ export function useDiscussion(): UseDiscussionReturn {
     const [error, setError] = useState<string | null>(null);
     const abortRef = useRef<AbortController | null>(null);
     const bottomRef = useRef<HTMLDivElement>(null);
-    const historyQueryKey = ['novelDiscussions', selectedBook] as const;
+    const historyQueryKey = novelDbKeys.discussions(selectedBook);
 
     const historyQuery = useQuery({
         queryKey: historyQueryKey,

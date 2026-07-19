@@ -31,7 +31,7 @@ def get_series() -> list[dict]:
         return [asdict(s) for s in list_series(conn)]
 
 
-@router.get("/authors")
+@router.get("/authors", response_model=list[str])
 @log_and_raise_500("novel_db/authors")
 def get_authors() -> list[str]:
     """novel ソースの全書籍から作者一覧（重複なし・アルファベット順）を返す（B-21）。"""

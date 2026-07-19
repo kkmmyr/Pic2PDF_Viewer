@@ -10,23 +10,23 @@ ADR-0009（推論バックエンド切替）。
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any
 
 from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_NUM_CTX
 
 from ._llm_backend import QWEN_BACKEND
+from .llm_options import make_llm_options
 
 # PoC で確定した QA 用 LLM パラメータ。num_ctx は config 化されており、B-13 段階 A〜C で
 # 段階拡大（既定 32768）。
 # 注意: llama-server バックエンドでは num_ctx は起動時 `-c` で決まるため、ここで
 # 渡しても無視される（指定しても害はない）。env が llama_server の場合は
 # start-qwen-server.bat 側で `-c 131072` を変更すること。
-LLM_OPTIONS: dict[str, Any] = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.2,
-    "num_predict": 4096,
-    "num_ctx": NOVEL_DB_QA_NUM_CTX,
-}
+LLM_OPTIONS = make_llm_options(
+    temperature=0.2,
+    repeat_penalty=1.2,
+    num_predict=4096,
+    num_ctx=NOVEL_DB_QA_NUM_CTX,
+)
 
 
 async def _astream_ask(

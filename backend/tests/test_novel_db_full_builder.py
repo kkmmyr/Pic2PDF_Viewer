@@ -167,6 +167,55 @@ class TestRunGenerateContexts:
         # context なしのチャンク 1 件だけが処理される
         assert mock_ctx.call_count == 1
 
+    def test_batches_embedding_and_storage_updates(self, db_conn):
+        """複数チャンクを1回のEmbedding/LanceDB更新へまとめる。"""
+        book_id = _insert_book(db_conn, "batch-book", summary="サマリ")
+        page_id = _insert_page(db_conn, book_id, 1, "本文")
+        chunk_ids = [_insert_chunk(db_conn, page_id, idx) for idx in range(3)]
+
+        mock_lance = MagicMock()
+        with (
+            patch(
+                "services.novel_db.full_builder.generate_chunk_context",
+                side_effect=["文脈1", "文脈2", "文脈3"],
+            ),
+            patch(
+                "services.novel_db.full_builder.embed_batch",
+                return_value=[[0.1] * 1024, [0.2] * 1024, [0.3] * 1024],
+            ) as mock_embed,
+            patch("services.novel_db.full_builder.get_chunks_table", return_value=mock_lance),
+        ):
+            _run_generate_contexts(db_conn, "batch-book", redo=False, log=lambda _: None)
+
+        mock_embed.assert_called_once()
+        mock_lance.delete.assert_called_once()
+        assert " IN (" in mock_lance.delete.call_args.args[0]
+        assert len(mock_lance.add.call_args.args[0]) == 3
+        stored = db_conn.execute(
+            "SELECT contextual_text FROM chunks WHERE id IN (?, ?, ?) ORDER BY id",
+            chunk_ids,
+        ).fetchall()
+        assert [row[0] for row in stored] == ["文脈1", "文脈2", "文脈3"]
+
+    def test_failed_batch_remains_retryable(self, db_conn):
+        """Embedding失敗時はSQLiteに文脈を確定しない。"""
+        book_id = _insert_book(db_conn, "retry-book", summary="サマリ")
+        page_id = _insert_page(db_conn, book_id, 1, "本文")
+        chunk_id = _insert_chunk(db_conn, page_id)
+
+        with (
+            patch("services.novel_db.full_builder.generate_chunk_context", return_value="生成文脈"),
+            patch("services.novel_db.full_builder.embed_batch", side_effect=RuntimeError("down")),
+            patch("services.novel_db.full_builder.get_chunks_table", return_value=MagicMock()),
+        ):
+            _run_generate_contexts(db_conn, "retry-book", redo=False, log=lambda _: None)
+
+        stored = db_conn.execute(
+            "SELECT contextual_text FROM chunks WHERE id = ?",
+            (chunk_id,),
+        ).fetchone()
+        assert stored[0] is None
+
 
 class TestBuildBookFull:
     """build_book_full の高レベルフローを検証する。"""

@@ -53,7 +53,7 @@ class ChatSessionTitleUpdate(BaseModel):
 
 class ChatMessagePayload(BaseModel):
     id: int
-    role: str
+    role: Literal["user", "assistant", "system"]
     content: str
     eval_count: int | None
     done_reason: str | None
@@ -62,7 +62,7 @@ class ChatMessagePayload(BaseModel):
 
 class ChatSessionSummary(BaseModel):
     id: int
-    scope_type: str
+    scope_type: Literal["all", "series", "book"]
     scope_id: str | None
     title: str | None
     started_at: str
@@ -72,7 +72,7 @@ class ChatSessionSummary(BaseModel):
 
 class ChatSessionDetailPayload(BaseModel):
     id: int
-    scope_type: str
+    scope_type: Literal["all", "series", "book"]
     scope_id: str | None
     title: str | None
     started_at: str

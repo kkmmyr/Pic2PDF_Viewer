@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchBooks } from '@/features/novel_db/api';
+import { novelBooksQueryOptions } from '@/features/novel_db/queries';
 import type { BookSummary } from '@/features/novel_db/types';
 import { useBuildTarget } from '@/hooks/useBuildTarget';
 import { buildUnifiedRows, type UnifiedRow } from '@/hooks/novel_build/buildUnifiedRows';
@@ -50,8 +50,7 @@ export function useNovelManage(): UseNovelManage {
     const { status, isEnqueuing, enqueueError, enqueue, cancel } = useNovelBuildQueue(buildEnabled);
     const { status: ocrStatus } = useOcrStatus(true);
     const booksQuery = useQuery({
-        queryKey: ['novelManageBooks'],
-        queryFn: fetchBooks,
+        ...novelBooksQueryOptions(),
         select: (data) =>
             data.filter((book) => book.ocr_done_at !== null || book.indexed_at !== null),
     });

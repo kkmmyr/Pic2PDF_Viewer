@@ -18,6 +18,7 @@ from .connection import with_db
 from .extractor import run_ocr_subprocess
 from .full_builder import build_book_contexts, build_book_full
 from .relation_extractor import generate_book_relations
+from .series_meta import book_names_for_series, load_book_series_ids
 
 logger = get_logger(__name__)
 
@@ -73,30 +74,9 @@ def _list_books_needing_contexts() -> list[str]:
     return [r[0] for r in rows]
 
 
-def _get_series_id(book_name: str) -> str | None:
-    from services.meta_store import load_meta
-
-    meta = load_meta("novel")
-    key = f"{book_name}.pdf"
-    entry = meta.get(key, {})
-    return entry.get("series_id") or None
-
-
 def _list_books_in_series(series_id: str) -> list[str]:
-    from services.meta_store import load_meta
-
     images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
-    meta = load_meta("novel")
-    names: list[str] = []
-    for key, entry in meta.items():
-        if entry.get("series_id") != series_id:
-            continue
-        if not key.endswith(".pdf"):
-            continue
-        stem = key[: -len(".pdf")]
-        if (images_dir / stem).is_dir():
-            names.append(stem)
-    return sorted(names)
+    return sorted(book_name for book_name in book_names_for_series(series_id) if (images_dir / book_name).is_dir())
 
 
 class NovelDbJobWorker:
@@ -243,8 +223,9 @@ class NovelDbJobWorker:
             def _rel_detail_cb(detail: str, _jid: int = job_id) -> None:
                 self._update_detail(_jid, detail)
 
+            series_ids = load_book_series_ids()
             for done, book_name in enumerate(targets, start=1):
-                series_id = _get_series_id(book_name)
+                series_id = series_ids.get(book_name)
                 if not series_id:
                     logger.warning("Job %d: no series_id for %s, skipping", job_id, book_name)
                     self._update_progress(job_id, done, total)

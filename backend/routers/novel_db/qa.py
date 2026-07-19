@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 
 from config import NOVEL_DB_LLM_MODEL
 from routers._deps import log_and_raise_500, sse_event
-from routers.api_schemas import QaHistoryResponse
+from routers.api_schemas import QaHistoryDetailResponse, QaHistoryResponse
 from services.novel_db import Scope, with_db
 from services.novel_db.llm import stream_qa
 from services.novel_db.prompt_builder import build_prompt
@@ -119,7 +119,7 @@ def get_qa_history(offset: int = 0, limit: int = 20, book: str | None = None) ->
         return list_history(conn, offset=offset, limit=limit, book=book)
 
 
-@router.get("/qa/history/{history_id}")
+@router.get("/qa/history/{history_id}", response_model=QaHistoryDetailResponse)
 @log_and_raise_500("novel_db/qa/history/detail")
 def get_qa_history_detail(history_id: int) -> dict:
     """履歴詳細（[API §7.6]）。"""

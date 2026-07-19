@@ -10,6 +10,7 @@ from collections.abc import Callable
 from config import NOVEL_DB_LLM_MODEL
 
 from ._llm_backend import QWEN_BACKEND
+from .llm_options import make_llm_options
 
 _PROMPT = """次は小説『{book_name}』から「{char_name}」が登場するページを page_no 順に集めた本文です。
 この本（1 冊）における「{char_name}」の人物像を、1 段落（{target} 字程度）でまとめてください。
@@ -32,14 +33,9 @@ _PROMPT = """次は小説『{book_name}』から「{char_name}」が登場する
 
 _TARGET_CHARS = 400
 
-_OPTIONS = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.15,
-    "num_predict": 1024,  # 400 字 + 余裕
-    # 主要キャラの body は 80k 字（_MAX_BODY_CHARS）まで取り得る ≒ ~50k tokens。
-    # B-14 の llama-server は num_ctx=131072 起動なので余裕を持って 65536。
-    "num_ctx": 65536,
-}
+# 主要キャラの body は 80k 字（_MAX_BODY_CHARS）まで取り得る ≒ ~50k tokens。
+# B-14 の llama-server は num_ctx=131072 起動なので余裕を持って 65536。
+_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.15, num_predict=1024, num_ctx=65536)
 
 # 1 キャラの page を全部連結したときの上限（Qwen num_ctx に余裕を持たせる）。
 _MAX_BODY_CHARS = 80_000

@@ -18,6 +18,7 @@ from local_llm import LLMError
 from config import NOVEL_DB_CHAR_EXTRACT_MODEL
 
 from ._llm_backend import GEMMA_BACKEND
+from .llm_options import make_llm_options
 
 EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大 3 名挙げてください。
 判断基準:
@@ -39,12 +40,7 @@ _TEXT_HEAD_LIMIT = 1500
 _TIMEOUT_SEC = 120
 
 # 1 ページあたりの抽出は短答型なので num_predict / num_ctx を抑える
-_OPTIONS = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.2,
-    "num_predict": 4096,
-    "num_ctx": 8192,
-}
+_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.2, num_predict=4096, num_ctx=8192)
 
 
 def extract_main_characters(

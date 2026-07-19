@@ -24,7 +24,7 @@ def _resolve_book_id(conn, book_name: str) -> int:
     return row[0]
 
 
-@router.get("/books/{book_name:path}/characters")
+@router.get("/books/{book_name:path}/characters", response_model=list[CharacterSummary])
 @log_and_raise_500("novel_db/books/characters")
 def get_book_characters(book_name: str) -> list[CharacterSummary]:
     """書籍に登録済みのキャラ一覧を返す（B-15）。
@@ -46,7 +46,7 @@ def get_book_characters(book_name: str) -> list[CharacterSummary]:
     ]
 
 
-@router.get("/books/{book_name:path}/characters/{char_name}")
+@router.get("/books/{book_name:path}/characters/{char_name}", response_model=CharacterDetail)
 @log_and_raise_500("novel_db/books/character_detail")
 def get_book_character_detail(book_name: str, char_name: str) -> CharacterDetail:
     """書籍 × キャラの詳細（サマリ + 主要シーン top 5）を返す（B-15）。"""

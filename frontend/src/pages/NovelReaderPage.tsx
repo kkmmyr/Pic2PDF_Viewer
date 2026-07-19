@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, FileText, Maximize2, Minimize2, Wand2 } from 'lucide-react';
 
@@ -7,22 +8,31 @@ import { useFullscreen } from '@/hooks/reader/useFullscreen';
 import { useReaderNavigation } from '@/hooks/reader/useReaderNavigation';
 import { useReaderUIState } from '@/hooks/reader/useReaderUIState';
 import { useSpreadMode } from '@/hooks/reader/useSpreadMode';
-import { fetchBooks } from '@/features/novel_db/api';
+import { novelBooksQueryOptions, novelDbKeys } from '@/features/novel_db/queries';
+import apiClient, { ApiError } from '@/config/api_client';
 import type { SpreadMode } from '@/types';
 
 function novelImageUrl(bookName: string, pageNo: number): string {
     return `/kindle_novel/images/${encodeURIComponent(bookName)}/${String(pageNo).padStart(3, '0')}.png`;
 }
 
-async function probePageCount(bookName: string): Promise<number> {
-    const first = await fetch(novelImageUrl(bookName, 1), { method: 'HEAD' });
-    if (!first.ok) return 0;
+export async function probePageCount(bookName: string): Promise<number> {
+    const imageExists = async (pageNo: number): Promise<boolean> => {
+        try {
+            await apiClient.head<unknown, unknown>(novelImageUrl(bookName, pageNo));
+            return true;
+        } catch (error) {
+            if (error instanceof ApiError && error.status === 404) return false;
+            throw error;
+        }
+    };
+
+    if (!(await imageExists(1))) return 0;
     let lo = 1;
     let hi = 1500;
     while (lo < hi) {
         const mid = Math.ceil((lo + hi) / 2);
-        const res = await fetch(novelImageUrl(bookName, mid), { method: 'HEAD' });
-        if (res.ok) lo = mid;
+        if (await imageExists(mid)) lo = mid;
         else hi = mid - 1;
     }
     return lo;
@@ -47,7 +57,6 @@ export default function NovelReaderPage() {
     const navigate = useNavigate();
     const initialPage = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
 
-    const [numPages, setNumPages] = useState(0);
     const [direction, setDirection] = useState<'rtl' | 'ltr'>('rtl');
     const initialPageSet = useRef(false);
 
@@ -56,6 +65,17 @@ export default function NovelReaderPage() {
         useSpreadMode();
     const { isFullscreen, toggleFullscreen } = useFullscreen();
     const { showHeader, showHeaderOff, showSlider, showSliderOff } = useReaderUIState();
+    const bookPageCountQuery = useQuery({
+        ...novelBooksQueryOptions(),
+        select: (books) => books.find((book) => book.name === bookName)?.page_count ?? null,
+    });
+    const probedPageCountQuery = useQuery({
+        queryKey: novelDbKeys.pageCount(bookName ?? ''),
+        queryFn: () => probePageCount(bookName!),
+        enabled: Boolean(bookName) && !bookPageCountQuery.isPending && !bookPageCountQuery.data,
+        staleTime: Infinity,
+    });
+    const numPages = bookPageCountQuery.data ?? probedPageCountQuery.data ?? 0;
 
     const { pageNumber, setPageNumber, handleNext, handlePrev } = useReaderNavigation({
         numPages,
@@ -65,21 +85,11 @@ export default function NovelReaderPage() {
     });
 
     useEffect(() => {
-        if (!bookName) return;
-        void (async () => {
-            const books = await fetchBooks();
-            const book = books.find((b) => b.name === bookName);
-            if (book?.page_count) {
-                setNumPages(book.page_count);
-            } else {
-                const count = await probePageCount(bookName);
-                setNumPages(count);
-            }
-        })();
+        initialPageSet.current = false;
     }, [bookName]);
 
     useEffect(() => {
-        if (numPages > 0 && initialPage > 1 && !initialPageSet.current) {
+        if (numPages > 0 && !initialPageSet.current) {
             initialPageSet.current = true;
             setPageNumber(Math.min(initialPage, numPages));
         }

@@ -7,9 +7,11 @@ main() 全体のテストはネットワーク + ファイル I/O が絡むた�
 import os
 import sys
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from tools import hitomi_monitor
 from tools.hitomi_monitor import should_skip_artist
 
 
@@ -55,3 +57,31 @@ class TestShouldSkipArtist:
         # checked_at == threshold (ぴったり) は「より新しい」ではないのでスキップしない
         threshold = self._now() - timedelta(hours=72)
         assert should_skip_artist(threshold.isoformat(), threshold) is False
+
+
+def test_main_reuses_one_http_client(monkeypatch, tmp_path):
+    state = {"artists": {}}
+    entry = {"normalized": "author", "display_name": "Author", "language": "japanese"}
+    client = MagicMock(name="shared_client")
+    client_context = MagicMock()
+    client_context.__enter__.return_value = client
+    client_context.__exit__.return_value = False
+    client_factory = MagicMock(return_value=client_context)
+    fetch_nozomi = MagicMock(return_value=[123])
+    fetch_metadata = MagicMock(return_value={"title": "book", "files": []})
+
+    monkeypatch.setattr(hitomi_monitor.httpx, "Client", client_factory)
+    monkeypatch.setattr(hitomi_monitor.state_store, "load_state", lambda _path: state)
+    monkeypatch.setattr(hitomi_monitor.watchlist, "load_watchlist", lambda _path: [entry])
+    monkeypatch.setattr(hitomi_monitor.nozomi, "fetch_nozomi_head", fetch_nozomi)
+    monkeypatch.setattr(hitomi_monitor.metadata, "fetch_metadata", fetch_metadata)
+    monkeypatch.setattr(hitomi_monitor.state_store, "merge_new_items", lambda _path, _items: 1)
+    monkeypatch.setattr(hitomi_monitor.state_store, "purge_expired", lambda _path, threshold_days: 0)
+    monkeypatch.setattr(hitomi_monitor.state_store, "save_state", lambda _path, _state: None)
+    monkeypatch.setattr(hitomi_monitor.notify, "notify_run_result", lambda **_kwargs: None)
+
+    assert hitomi_monitor.main(tmp_path) == 0
+    client_factory.assert_called_once_with(timeout=hitomi_monitor.nozomi.DEFAULT_TIMEOUT)
+    fetch_nozomi.assert_called_once_with("author", "japanese", count=20, client=client)
+    fetch_metadata.assert_called_once_with(123, client=client)
+    client_context.__exit__.assert_called_once()

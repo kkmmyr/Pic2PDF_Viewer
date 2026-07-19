@@ -20,6 +20,9 @@ dependencies = [
     "tzdata>=2026.2",
     "pydantic-settings>=2.14.1",
     "sqlmodel>=0.0.38",
+    "pydantic>=2.13.4",
+    "sqlalchemy>=2.0.50",
+    "pyarrow>=24.0.0",
 ]
 
 [dependency-groups]

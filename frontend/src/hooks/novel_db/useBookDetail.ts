@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBookDetail } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type { BookDetail } from '@/features/novel_db/types';
 
 interface UseBookDetail {
@@ -14,7 +15,7 @@ interface UseBookDetail {
 export function useBookDetail(bookName: string): UseBookDetail {
     const [refetchError, setRefetchError] = useState<string | null>(null);
     const query = useQuery({
-        queryKey: ['novelBookDetail', bookName],
+        queryKey: novelDbKeys.bookDetail(bookName),
         queryFn: () => fetchBookDetail(bookName),
         enabled: bookName.length > 0,
     });

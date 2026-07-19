@@ -25,6 +25,7 @@ from config import (
 )
 
 from ._llm_backend import QUERY_BACKEND
+from .llm_options import make_llm_options
 
 _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意味検索するための短い検索クエリを {n} 個生成してください。
 
@@ -40,12 +41,7 @@ _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意
 検索クエリ（{n} 行）:"""
 
 # 短答型（150 字程度）。temperature は多様性を少し上げる
-_OPTIONS = {
-    "temperature": 0.3,
-    "repeat_penalty": 1.2,
-    "num_predict": 256,
-    "num_ctx": 4096,
-}
+_OPTIONS = make_llm_options(temperature=0.3, repeat_penalty=1.2, num_predict=256, num_ctx=4096)
 
 
 def expand_query(

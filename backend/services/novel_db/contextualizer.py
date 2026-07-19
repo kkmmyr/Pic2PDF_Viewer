@@ -25,6 +25,7 @@ from local_llm import LLMError
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_MIN_BODY_CHARS
 
 from ._llm_backend import GEMMA_BACKEND
+from .llm_options import make_llm_options
 
 # Anthropic 流のプロンプト。書名・俯瞰サマリ・チャンク本文を与えて
 # 「retrieval のための簡潔な位置説明」を返してもらう。
@@ -60,12 +61,7 @@ _CONTEXT_PROMPT = """以下は小説『{book_name}』の俯瞰サマリと、そ
 _MAX_CHUNK_CHARS = 1200  # チャンク先頭のみを送信（プロンプト長を抑える）
 
 # 80 字程度の位置説明 + 余裕。短答型のため num_predict / num_ctx を抑える
-_OPTIONS = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.15,
-    "num_predict": 256,
-    "num_ctx": 8192,
-}
+_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.15, num_predict=256, num_ctx=8192)
 
 
 def generate_chunk_context(

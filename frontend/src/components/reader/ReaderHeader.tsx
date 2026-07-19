@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import {
     ArrowLeft,
     CheckSquare,
@@ -11,7 +12,7 @@ import {
     HelpCircle,
 } from 'lucide-react';
 import type { SpreadMode } from '@/types';
-import { useReaderContext } from '@/contexts/ReaderContext';
+import { useReaderField } from '@/contexts/ReaderContext';
 
 const SPREAD_MODE_CONFIG: Record<
     SpreadMode,
@@ -22,26 +23,24 @@ const SPREAD_MODE_CONFIG: Record<
     single: { label: 'Single', icon: <FileText className="w-4 h-4" />, next: 'auto' },
 };
 
-export function ReaderHeader() {
-    const {
-        selectedPdf,
-        direction,
-        spreadMode,
-        pageNumber,
-        numPages,
-        isEditMode,
-        showHeader,
-        isSearchOpen,
-        isFullscreen,
-        isOnRelatedPage,
-        handleClose,
-        toggleDirection,
-        cycleSpreadMode,
-        toggleEditMode,
-        toggleSearch,
-        toggleFullscreen,
-        openHelp,
-    } = useReaderContext();
+export const ReaderHeader = memo(function ReaderHeader() {
+    const selectedPdf = useReaderField('selectedPdf');
+    const direction = useReaderField('direction');
+    const spreadMode = useReaderField('spreadMode');
+    const pageNumber = useReaderField('pageNumber');
+    const numPages = useReaderField('numPages');
+    const isEditMode = useReaderField('isEditMode');
+    const showHeader = useReaderField('showHeader');
+    const isSearchOpen = useReaderField('isSearchOpen');
+    const isFullscreen = useReaderField('isFullscreen');
+    const isOnRelatedPage = useReaderField('isOnRelatedPage');
+    const handleClose = useReaderField('handleClose');
+    const toggleDirection = useReaderField('toggleDirection');
+    const cycleSpreadMode = useReaderField('cycleSpreadMode');
+    const toggleEditMode = useReaderField('toggleEditMode');
+    const toggleSearch = useReaderField('toggleSearch');
+    const toggleFullscreen = useReaderField('toggleFullscreen');
+    const openHelp = useReaderField('openHelp');
 
     return (
         <div
@@ -146,4 +145,4 @@ export function ReaderHeader() {
             </div>
         </div>
     );
-}
+});

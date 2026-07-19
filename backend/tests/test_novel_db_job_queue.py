@@ -1,5 +1,7 @@
 """services/novel_db/job_queue.py の単体テスト（worker は起動しない）。"""
 
+from unittest.mock import patch
+
 import pytest
 
 from services.novel_db import with_db
@@ -137,3 +139,28 @@ def test_update_detail_overwrites_previous_value(queue):
     with with_db() as conn:
         row = conn.execute("SELECT current_detail FROM rebuild_jobs WHERE id = ?", (job_id,)).fetchone()
     assert row[0] == "second"
+
+
+def test_generate_relations_loads_series_index_once(queue):
+    """複数書籍の関係生成でもnovelメタは1回だけ索引化する。"""
+    worker = queue._worker
+    job = {
+        "id": 1,
+        "job_type": "all",
+        "target_id": None,
+        "mode": "generate_relations",
+    }
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a", "book-b"]),
+        patch.object(worker, "_update_progress"),
+        patch(
+            "services.novel_db.job_worker.load_book_series_ids",
+            return_value={"book-a": "series-1", "book-b": "series-1"},
+        ) as mock_load_index,
+        patch("services.novel_db.job_worker.generate_book_relations") as mock_generate,
+    ):
+        worker._execute_job(job)
+
+    mock_load_index.assert_called_once_with()
+    assert mock_generate.call_count == 2

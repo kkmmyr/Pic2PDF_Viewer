@@ -1,5 +1,6 @@
+import { memo } from 'react';
 import { Dialog, DialogBody } from '@/components/ui/dialog';
-import { useReaderContext } from '@/contexts/ReaderContext';
+import { useReaderField } from '@/contexts/ReaderContext';
 
 const SHORTCUTS: { key: string; description: string }[] = [
     { key: '←  /  →', description: 'ページ送り（綴じ方向に応じて前後）' },
@@ -15,8 +16,9 @@ const SHORTCUTS: { key: string; description: string }[] = [
  * リーダー画面のキーボードショートカット一覧モーダル。
  * `?` キーまたはヘッダーの「?」ボタンから呼ばれる想定。
  */
-export function ShortcutsHelpDialog() {
-    const { isHelpOpen, closeHelp } = useReaderContext();
+export const ShortcutsHelpDialog = memo(function ShortcutsHelpDialog() {
+    const isHelpOpen = useReaderField('isHelpOpen');
+    const closeHelp = useReaderField('closeHelp');
     return (
         <Dialog
             open={isHelpOpen}
@@ -38,4 +40,4 @@ export function ShortcutsHelpDialog() {
             </DialogBody>
         </Dialog>
     );
-}
+});

@@ -1,8 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { BookSummary, SeriesSummary } from '@/features/novel_db/types';
-import { fetchBooks, fetchSeries } from '@/features/novel_db/api';
+import {
+    novelBooksQueryOptions,
+    novelDbKeys,
+    novelSeriesQueryOptions,
+} from '@/features/novel_db/queries';
 
-export const novelBooksQueryKey = ['novelBooks'] as const;
+export const novelBooksQueryKey = novelDbKeys.books();
 
 export interface UseNovelDbBooks {
     books: BookSummary[];
@@ -15,31 +19,24 @@ export interface UseNovelDbBooks {
 /**
  * novel books/series データを取得するフック。
  *
- * React Query キャッシュ ['novelBooks'] を全ページで共有する。
+ * books / series のReact Queryキャッシュを全ページで共有する。
  * 旧 novelBooksStore（Zustand）を廃止し useQuery に一本化。
  */
 export function useNovelDbBooks(): UseNovelDbBooks {
     const queryClient = useQueryClient();
 
-    const { data, isLoading, error } = useQuery({
-        queryKey: novelBooksQueryKey,
-        queryFn: async () => {
-            const [books, series] = await Promise.all([fetchBooks(), fetchSeries()]);
-            return {
-                books: Array.isArray(books) ? (books as BookSummary[]) : [],
-                series: Array.isArray(series) ? (series as SeriesSummary[]) : [],
-            };
-        },
-    });
+    const booksQuery = useQuery(novelBooksQueryOptions());
+    const seriesQuery = useQuery(novelSeriesQueryOptions());
+    const error = booksQuery.error ?? seriesQuery.error;
 
     const refetch = async () => {
-        await queryClient.invalidateQueries({ queryKey: novelBooksQueryKey });
+        await queryClient.invalidateQueries({ queryKey: novelDbKeys.library() });
     };
 
     return {
-        books: data?.books ?? [],
-        series: data?.series ?? [],
-        isLoading,
+        books: Array.isArray(booksQuery.data) ? (booksQuery.data as BookSummary[]) : [],
+        series: Array.isArray(seriesQuery.data) ? (seriesQuery.data as SeriesSummary[]) : [],
+        isLoading: booksQuery.isLoading || seriesQuery.isLoading,
         error: error instanceof Error ? error.message : error ? String(error) : null,
         refetch,
     };

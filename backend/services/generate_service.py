@@ -23,6 +23,7 @@ job_store = JobStore()
 generate_lock = asyncio.Lock()
 
 _active_job_id: str | None = None
+_background_tasks: set[asyncio.Task[None]] = set()
 
 
 def get_active_job_id() -> str | None:
@@ -80,8 +81,7 @@ def _run_generate_job(job: GenerateJob) -> None:
 
 
 async def _run_generate_job_async(job: GenerateJob) -> None:
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(None, _run_generate_job, job)
+    await asyncio.to_thread(_run_generate_job, job)
 
 
 async def start_generate_job(
@@ -113,5 +113,7 @@ async def start_generate_job(
             if on_done is not None:
                 on_done(job)
 
-    asyncio.create_task(_wrapped())
+    task = asyncio.create_task(_wrapped(), name=f"generate-{job.job_id}")
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
     return job

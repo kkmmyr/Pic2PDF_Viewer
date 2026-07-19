@@ -1,7 +1,8 @@
+import { memo } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { PageRenderer } from './PageRenderer';
-import { useReaderContext } from '@/contexts/ReaderContext';
+import { useReaderField } from '@/contexts/ReaderContext';
 
 // <Document> を使うモジュールと同じファイルで workerSrc を設定する必要がある（react-pdf の要件）
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -23,21 +24,19 @@ const PDF_DOCUMENT_OPTIONS = {
  * renderPageItem / renderSpreadPages のロジックを集約する。
  * ナビゲーションは親の ReaderPanel がクリックゾーンで一元管理する。
  */
-export function ReaderPageView() {
-    const {
-        pageNumber,
-        numPages,
-        windowHeight,
-        isSpread,
-        direction,
-        isImageMode,
-        imageUrls,
-        searchText,
-        customTextRenderer,
-        handlePageSize,
-        pdfUrl,
-        onDocumentLoadSuccess,
-    } = useReaderContext();
+export const ReaderPageView = memo(function ReaderPageView() {
+    const pageNumber = useReaderField('pageNumber');
+    const numPages = useReaderField('numPages');
+    const windowHeight = useReaderField('windowHeight');
+    const isSpread = useReaderField('isSpread');
+    const direction = useReaderField('direction');
+    const isImageMode = useReaderField('isImageMode');
+    const imageUrls = useReaderField('imageUrls');
+    const searchText = useReaderField('searchText');
+    const customTextRenderer = useReaderField('customTextRenderer');
+    const handlePageSize = useReaderField('handlePageSize');
+    const pdfUrl = useReaderField('pdfUrl');
+    const onDocumentLoadSuccess = useReaderField('onDocumentLoadSuccess');
 
     const renderPageItem = (pNum: number) => (
         <PageRenderer
@@ -99,4 +98,4 @@ export function ReaderPageView() {
             </div>
         </Document>
     );
-}
+});

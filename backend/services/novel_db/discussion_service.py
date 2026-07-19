@@ -15,7 +15,6 @@ import re
 from collections.abc import AsyncIterator
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from fastapi import HTTPException
 
@@ -29,6 +28,7 @@ from utils.logger import get_logger
 from utils.path_utils import resolve_under_base, validate_safe_name
 
 from .llm import astream_chat as _astream_chat
+from .llm_options import make_llm_options
 from .search import SearchHit
 
 logger = get_logger(__name__)
@@ -41,20 +41,20 @@ _CHARS_PER_TOKEN = 1.5
 # 131072 ctx から出力 8192 + プロンプト構造オーバーヘッドを引いた入力上限
 MAX_INPUT_TOKENS = 112_000
 
-LLM_OPTIONS: dict[str, Any] = {
-    "temperature": 0.7,
-    "repeat_penalty": 1.1,
-    "num_predict": 8192,
-    "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
-}
+LLM_OPTIONS = make_llm_options(
+    temperature=0.7,
+    repeat_penalty=1.1,
+    num_predict=8192,
+    num_ctx=NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
+)
 
 # 構成ステップ用: JSON 出力なので温度を下げ、出力上限も台本より小さくてよい
-PLAN_LLM_OPTIONS: dict[str, Any] = {
-    "temperature": 0.4,
-    "repeat_penalty": 1.1,
-    "num_predict": 2048,
-    "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
-}
+PLAN_LLM_OPTIONS = make_llm_options(
+    temperature=0.4,
+    repeat_penalty=1.1,
+    num_predict=2048,
+    num_ctx=NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
+)
 
 # 保存ファイル名のバリデーション（delete 用）
 _FILENAME_RE = re.compile(r"^[\w+\-]+\.json$")

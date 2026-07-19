@@ -49,6 +49,7 @@ class BookDetail:
     volume: int | None
     publisher: str | None
     asin: str | None
+    series_index: float | None
     isbn: str | None
     summary: str | None
     summary_generated_at: str | None
@@ -131,6 +132,7 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
         volume=meta_entry.get("volume"),
         publisher=meta_entry.get("publisher"),
         asin=meta_entry.get("asin"),
+        series_index=meta_entry.get("series_index"),
         isbn=meta_entry.get("isbn"),
         summary=summary,
         summary_generated_at=summary_generated_at,

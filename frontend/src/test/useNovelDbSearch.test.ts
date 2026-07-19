@@ -25,6 +25,7 @@ function makeResponse(offset: number, count: number, total: number): SearchRespo
             has_highlight: false,
             image_url: null,
             rrf_score: 0.1,
+            main_characters: [],
         })),
         total,
         offset,

@@ -5,6 +5,7 @@
  * AbortController で停止可能。`onToken` / `onDone` / `onError` でイベント通知。
  */
 import { API_CONFIG as API_URL_CONFIG } from '@/config/api';
+import { createParser } from 'eventsource-parser';
 
 import type { DiscussionChecks, Scope } from './types';
 
@@ -48,36 +49,44 @@ async function postSseStream<T>(
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    let buffer = '';
+    let shouldStop = false;
+    let streamError: Error | null = null;
+    const parser = createParser({
+        maxBufferSize: 1024 * 1024,
+        onEvent(message) {
+            if (shouldStop) return;
+            try {
+                const event = JSON.parse(message.data) as T;
+                shouldStop = onEvent(event) === 'stop';
+            } catch (error) {
+                streamError = new Error('Invalid JSON in SSE event', { cause: error });
+                shouldStop = true;
+            }
+        },
+        onError(error) {
+            streamError = error;
+            shouldStop = true;
+        },
+    });
 
     try {
-        outer: while (true) {
+        while (!shouldStop) {
             const { done, value } = await reader.read();
             if (done) break;
-            buffer += decoder.decode(value, { stream: true });
-
-            // SSE の境界は空行 (\n\n)。境界ごとに切り出して `data: ...` を取り出す
-            const segments = buffer.split('\n\n');
-            buffer = segments.pop() ?? '';
-
-            for (const segment of segments) {
-                for (const line of segment.split('\n')) {
-                    if (!line.startsWith('data: ')) continue;
-                    let event: T;
-                    try {
-                        event = JSON.parse(line.slice(6)) as T;
-                    } catch {
-                        continue;
-                    }
-                    if (onEvent(event) === 'stop') break outer;
-                }
-            }
+            parser.feed(decoder.decode(value, { stream: true }));
+        }
+        if (!shouldStop) {
+            const tail = decoder.decode();
+            if (tail) parser.feed(tail);
+            parser.reset({ consume: true });
         }
     } catch (e) {
         if ((e as { name?: string }).name === 'AbortError') return null;
         return e instanceof Error ? e : new Error(String(e));
+    } finally {
+        if (shouldStop) void reader.cancel();
     }
-    return null;
+    return streamError;
 }
 
 // ---------------------------------------------------------------------------

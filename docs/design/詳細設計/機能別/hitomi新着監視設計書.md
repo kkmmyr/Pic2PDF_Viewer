@@ -334,6 +334,8 @@ def fetch_nozomi_head(
     artist_normalized: str,
     language: str = "japanese",
     count: int = 20,
+    *,
+    client: httpx.Client | None = None,
 ) -> list[int]:
     """
     NOZOMI ファイル先頭 N 件の ID を取得する。
@@ -347,7 +349,7 @@ def fetch_nozomi_head(
 ### 7.2. `services/hitomi/metadata.py`
 
 ```python
-def fetch_metadata(gallery_id: int) -> dict:
+def fetch_metadata(gallery_id: int, *, client: httpx.Client | None = None) -> dict:
     """
     /galleries/<id>.js を取得し、`var galleryinfo = {...};` の右辺 JSON をパース。
     主要フィールド: id, title, artists[], language, type, date, files[]
@@ -395,6 +397,8 @@ def main() -> int:
       2: 致命的失敗（state.json 読み書き失敗等）
     """
 ```
+
+監視1回につき `httpx.Client` を1つだけ生成し、NOZOMI取得と全ギャラリーのメタデータ取得へ明示的に渡す。HTTP keep-aliveとコネクションプールを作者・ギャラリー間で再利用し、終了時はcontext managerで必ずcloseする。サービス関数を単独利用した場合だけ内部で一時Clientを所有する。
 
 1 作者で例外発生 → 握りつぶして次へ進む。`state["last_error"]` に集約。
 

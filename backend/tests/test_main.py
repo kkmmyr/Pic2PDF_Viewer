@@ -132,10 +132,10 @@ class TestStaticMounts:
         """各 router が /api プレフィクスで登録されている。"""
         from main import app
 
-        api_paths = [r.path for r in app.routes if hasattr(r, "path") and r.path.startswith("/api/")]
-        # 主要エンドポイントが含まれる
-        joined = " ".join(api_paths)
-        assert "/api/pdfs" in joined
-        assert "/api/meta" in joined
-        assert "/api/genres" in joined
-        assert "/api/series" in joined
+        # FastAPI 0.139以降はinclude_routerした経路を内部_IncludedRouterとして
+        # 保持するため、app.routesのprivate構造ではなく公開OpenAPI契約を検査する。
+        api_paths = {path for path in app.openapi()["paths"] if path.startswith("/api/")}
+        assert any(path.startswith("/api/pdfs") for path in api_paths)
+        assert "/api/meta" in api_paths
+        assert "/api/genres" in api_paths
+        assert "/api/series/assign" in api_paths

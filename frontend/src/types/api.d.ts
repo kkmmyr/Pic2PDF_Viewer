@@ -392,8 +392,8 @@ export interface paths {
          * Init Genre Original
          * @description genre 未設定の書籍に genre=オリジナル を一括設定する。
          *
-         *     - meta.db にエントリがあるが genre が空のもの → オリジナルに更新
-         *     - images/ ディレクトリにあるが meta.db に未登録のもの → エントリを新規追加
+         *     - meta2.db にエントリがあるが genre が空のもの → オリジナルに更新
+         *     - images/ ディレクトリにあるが meta2.db に未登録のもの → エントリを新規追加
          */
         post: operations['init_genre_original_api_meta_init_genre_original_post'];
         delete?: never;
@@ -1230,7 +1230,7 @@ export interface paths {
         put?: never;
         /**
          * Trigger Backup
-         * @description meta.db を OneDrive にスナップショットバックアップする。
+         * @description meta2.db を OneDrive にスナップショットバックアップする。
          */
         post: operations['trigger_backup_api_meta_db_backup_post'];
         delete?: never;
@@ -1514,31 +1514,33 @@ export interface components {
             /** Authors */
             authors: string[];
             /** Series Id */
-            series_id?: string | null;
+            series_id: string | null;
             /** Series Title */
-            series_title?: string | null;
+            series_title: string | null;
             /** Is Indexed */
             is_indexed: boolean;
             /** Page Count */
-            page_count?: number | null;
+            page_count: number | null;
             /** Indexed At */
-            indexed_at?: string | null;
+            indexed_at: string | null;
             /** Thumbnail Url */
-            thumbnail_url?: string | null;
+            thumbnail_url: string | null;
             /** Ocr Done At */
-            ocr_done_at?: string | null;
+            ocr_done_at: string | null;
             /** Volume */
-            volume?: number | null;
+            volume: number | null;
             /** Publisher */
-            publisher?: string | null;
+            publisher: string | null;
             /** Asin */
-            asin?: string | null;
+            asin: string | null;
+            /** Series Index */
+            series_index: number | null;
             /** Isbn */
-            isbn?: string | null;
+            isbn: string | null;
             /** Summary */
-            summary?: string | null;
+            summary: string | null;
             /** Summary Generated At */
-            summary_generated_at?: string | null;
+            summary_generated_at: string | null;
             /** Character Count */
             character_count: number;
             /** Discussion Count */
@@ -1556,27 +1558,27 @@ export interface components {
             /** Authors */
             authors: string[];
             /** Series Id */
-            series_id?: string | null;
+            series_id: string | null;
             /** Series Title */
-            series_title?: string | null;
+            series_title: string | null;
             /** Is Indexed */
             is_indexed: boolean;
             /** Page Count */
-            page_count?: number | null;
+            page_count: number | null;
             /** Indexed At */
-            indexed_at?: string | null;
+            indexed_at: string | null;
             /** Thumbnail Url */
-            thumbnail_url?: string | null;
+            thumbnail_url: string | null;
             /** Ocr Done At */
-            ocr_done_at?: string | null;
+            ocr_done_at: string | null;
             /** Volume */
-            volume?: number | null;
+            volume: number | null;
             /** Publisher */
-            publisher?: string | null;
+            publisher: string | null;
             /** Asin */
-            asin?: string | null;
+            asin: string | null;
             /** Series Index */
-            series_index?: number | null;
+            series_index: number | null;
         };
         /** BuildEnqueueResponse */
         BuildEnqueueResponse: {
@@ -1639,8 +1641,11 @@ export interface components {
         ChatMessagePayload: {
             /** Id */
             id: number;
-            /** Role */
-            role: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: 'user' | 'assistant' | 'system';
             /** Content */
             content: string;
             /** Eval Count */
@@ -1659,8 +1664,11 @@ export interface components {
         ChatSessionDetailPayload: {
             /** Id */
             id: number;
-            /** Scope Type */
-            scope_type: string;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: 'all' | 'series' | 'book';
             /** Scope Id */
             scope_id: string | null;
             /** Title */
@@ -1682,8 +1690,11 @@ export interface components {
         ChatSessionSummary: {
             /** Id */
             id: number;
-            /** Scope Type */
-            scope_type: string;
+            /**
+             * Scope Type
+             * @enum {string}
+             */
+            scope_type: 'all' | 'series' | 'book';
             /** Scope Id */
             scope_id: string | null;
             /** Title */
@@ -2071,12 +2082,56 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** QaHistoryDetailResponse */
+        QaHistoryDetailResponse: {
+            /** Id */
+            id: number;
+            /** Asked At */
+            asked_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            scope: components['schemas']['ScopeOut'];
+            /** Question */
+            question: string;
+            /** Answer */
+            answer: string;
+            /** Prompt */
+            prompt: string;
+            /** Context */
+            context: components['schemas']['SearchHitOut'][];
+            /** Model */
+            model: string;
+            /** Options */
+            options: {
+                [key: string]: unknown;
+            };
+            /** Eval Count */
+            eval_count: number | null;
+            /** Done Reason */
+            done_reason: string | null;
+            /** Error Message */
+            error_message: string | null;
+        };
+        /** QaHistoryItemOut */
+        QaHistoryItemOut: {
+            /** Id */
+            id: number;
+            /** Asked At */
+            asked_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            scope: components['schemas']['ScopeOut'];
+            /** Question */
+            question: string;
+            /** Answer Preview */
+            answer_preview: string;
+            /** Done Reason */
+            done_reason: string | null;
+        };
         /** QaHistoryResponse */
         QaHistoryResponse: {
             /** Items */
-            items: {
-                [key: string]: unknown;
-            }[];
+            items: components['schemas']['QaHistoryItemOut'][];
             /** Total */
             total: number;
         };
@@ -2274,6 +2329,33 @@ export interface components {
             /** Id */
             id?: string | null;
         };
+        /** ScopeOut */
+        ScopeOut: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: 'all' | 'series' | 'book';
+            /** Id */
+            id: string | null;
+        };
+        /** SearchHitOut */
+        SearchHitOut: {
+            /** Book Name */
+            book_name: string;
+            /** Page No */
+            page_no: number;
+            /** Snippet */
+            snippet: string;
+            /** Has Highlight */
+            has_highlight: boolean;
+            /** Image Url */
+            image_url: string | null;
+            /** Rrf Score */
+            rrf_score: number;
+            /** Main Characters */
+            main_characters: string[];
+        };
         /** SearchRequest */
         SearchRequest: {
             /** Query */
@@ -2293,9 +2375,7 @@ export interface components {
         /** SearchResponse */
         SearchResponse: {
             /** Hits */
-            hits: {
-                [key: string]: unknown;
-            }[];
+            hits: components['schemas']['SearchHitOut'][];
             /** Total */
             total: number;
             /** Offset */
@@ -2980,7 +3060,9 @@ export interface operations {
                 };
                 content: {
                     'application/json': {
-                        [key: string]: unknown;
+                        [key: string]: {
+                            [key: string]: unknown;
+                        };
                     };
                 };
             };
@@ -3993,9 +4075,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': {
-                        [key: string]: unknown;
-                    };
+                    'application/json': components['schemas']['QaHistoryDetailResponse'];
                 };
             };
             /** @description Validation Error */

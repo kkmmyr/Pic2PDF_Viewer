@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from .llm_options import make_llm_options
+
 # ---------------------------------------------------------------------------
 # 閾値・サイズ定数
 # ---------------------------------------------------------------------------
@@ -33,34 +35,24 @@ COMBINED_MAX_CHARACTERS = 20
 # LLM オプション
 # ---------------------------------------------------------------------------
 
-ONE_SHOT_OPTIONS: dict = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.15,
-    "num_predict": 2560,  # 1500 字サマリ + 余裕
-    "num_ctx": 131072,  # B-6 検証で 70k tokens 完走を確認（2026-05-10）
-}
+ONE_SHOT_OPTIONS = make_llm_options(
+    temperature=0.2,
+    repeat_penalty=1.15,
+    num_predict=2560,  # 1500 字サマリ + 余裕
+    num_ctx=131072,  # B-6 検証で 70k tokens 完走を確認（2026-05-10）
+)
 
-MAP_OPTIONS: dict = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.15,
-    "num_predict": 768,  # 1 チャンクあたり 400 字程度の要約 + 余裕
-    "num_ctx": 16384,
-}
+MAP_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.15, num_predict=768, num_ctx=16384)
 
-REDUCE_OPTIONS: dict = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.15,
-    "num_predict": 2560,  # 最終 1500 字サマリ + 余裕
-    "num_ctx": 16384,
-}
+REDUCE_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.15, num_predict=2560, num_ctx=16384)
 
 # サマリ 1500 字 + 最大 20 キャラ × 400 字 ≈ 9500 字 ≈ ~6000 tokens + 余裕
-COMBINED_OPTIONS: dict = {
-    "temperature": 0.2,
-    "repeat_penalty": 1.15,
-    "num_predict": 16384,
-    "num_ctx": 131072,
-}
+COMBINED_OPTIONS = make_llm_options(
+    temperature=0.2,
+    repeat_penalty=1.15,
+    num_predict=16384,
+    num_ctx=131072,
+)
 
 # ---------------------------------------------------------------------------
 # プロンプトテンプレート

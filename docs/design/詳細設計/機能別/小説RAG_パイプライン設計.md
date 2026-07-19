@@ -1,6 +1,6 @@
 # 小説 RAG 構築パイプライン設計
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-19
 
 novel タブの本文を検索・QA 可能にするための **DB 構築パイプライン**（OCR 取込 → チャンク分割 → embedding → 文脈生成 → キャラ抽出 → 書籍サマリ）の現在形設計。検索・QA 側は [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
@@ -55,6 +55,8 @@ images/*.png ──[ocr]──────────► pages.full_text (+ pag
 
 `full_builder.build_book_full()` が Qwen で一括生成する。**サマリとキャラ辞典は 1 回の Qwen 呼び出しで同時生成**する（旧 5 段構成から統合、`summarize_book_with_characters`）。
 
+LLM呼び出しごとのtemperature・出力長・context長は用途別定数として各機能側に残す。一方、Ollama互換options辞書のキー組み立ては `llm_options.make_llm_options()` に集約し、キー名の表記揺れや型なし辞書の複製を避ける。
+
 - **Step 1**: `rebuild_from_pages`（§3、常実行）。
 - **Step 2 `_run_combined_step`**: `summarize_book_with_characters(conn, book_name)` が `_prompts.COMBINED_PROMPT`（`[SUMMARY]` / `[CHARACTERS]` / `[CHARACTER_DETAIL:名前]` マーカー）で **書籍サマリ 1 本 + 最大 20 キャラの人物像**を得る。`parse_combined_output` でマーカー分解。`update_book_summary` が `books.summary` を更新し LanceDB `summaries` テーブルへ embedding を upsert（B-8）。キャラ分は `book_characters` を書き直し、`first_page`/`page_count` を `full_text LIKE %名前%` で近似する。
 - **skip 条件**: `books.summary` と `book_characters.summary` が両方存在 かつ `redo=False` なら Step 2 全体をスキップ。
@@ -70,11 +72,11 @@ Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のど
 - **生成（`contextualizer.generate_chunk_context`）**: 書名 + 書籍サマリ + チャンク先頭 1200 字を GEMMA_BACKEND に投げる。プロンプトは**本文の固有名詞と特徴的フレーズを必ず含める**よう明示（`num_predict=256`, `num_ctx=8192`）。失敗時は空文字を返し未処理のまま残す。
 - **対象**: `book.summary` がある書籍の、`contextual_text IS NULL` のチャンク（`redo=True` で全チャンク）。サマリ未生成の書籍はスキップ（Step 2 が前提）。
 - **skip 判定（`should_skip_context`）**: `char_count < NOVEL_DB_MIN_BODY_CHARS`(300) または先頭/末尾 `NOVEL_DB_BODY_PAGE_MARGIN`(5) ページ以内のチャンクは `contextual_text = NULL` に保つ。
-- **再 embedding（`make_embedding_input`）**: `ctx` があれば `ctx + "\n\n" + text`、無ければ `text` のみを bge-m3 で再計算し、LanceDB を `delete(chunk_id)` → `add` で更新。
+- **再 embedding（`make_embedding_input`）**: `ctx` があれば `ctx + "\n\n" + text`、無ければ `text` のみを bge-m3 で再計算する。文脈生成は LLM の失敗をチャンク単位で隔離し、成功分を最大 16 件ずつ `embed_batch` へ渡す。LanceDB は同一バッチの `chunk_id IN (...)` を一括削除してから行群を 1 回で追加し、SQLite は `executemany` と 1 transaction で `contextual_text` を確定する。Embedding / LanceDB 更新に失敗したバッチは SQLite を未更新に保つため、`redo=False` の次回ジョブで再試行できる。
 
 ## 6. 補助ステップ
 
-- **主要登場人物抽出（`character_extractor.extract_main_characters`）**: 各ページ本文（先頭 1500 字）を GEMMA_BACKEND に投げ、最大 3 名をカンマ区切りで取得 → `pages.main_characters`。CLI `extract_characters.py` で任意実行。用途は 3 つ: 検索ヒットのキャラヒント（[検索QA設計](小説RAG_検索QA設計.md)）、`character_db` のキャラ集計（B-15 単独経路）、C-12 の共起カウント。失敗ページは NULL のまま続行。
+- **主要登場人物抽出（`character_extractor.extract_main_characters`）**: 各ページ本文（先頭 1500 字）を GEMMA_BACKEND に投げ、最大 3 名をカンマ区切りで取得 → `pages.main_characters`。CLI `extract_characters.py` で任意実行。用途は 3 つ: 検索ヒットのキャラヒント（[検索QA設計](小説RAG_検索QA設計.md)）、`character_db` のキャラ集計（B-15 単独経路）、C-12 の共起カウント。失敗ページは NULL のまま続行。保存済み文字列のカンマ・読点分割、空白除去、重複排除、上限適用は `character_names.parse_character_names` を正本とし、キャラ集計と関係抽出の両方から利用する。
 - **キャラクター関係グラフ（`relation_extractor.generate_book_relations`）C-12**: `pages.main_characters` の同一ページ共起を数えエッジ重みとし、`book_characters.summary` を Qwen に渡して関係タイプ（友人・師弟・敵対 等）を JSON 抽出 → `character_relations` に REPLACE。`mode=generate_relations` ジョブ。読み取りは `graph_query`（series 単位で nodes/edges 組み立て、内部利用のみで専用 API 無し）。
 
 ---
@@ -85,6 +87,7 @@ Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のど
 
 - **`NovelDbJobQueue`**: `enqueue(job_type, target_id, mode)` / `cancel` / `get_status` とライフサイクル。`start()` で「`running` を `failed` に戻す（サーバ再起動時）」+ 旧 mode 名の migration（`pdf_text→rebuild` / `reocr→ocr`）を実行し worker スレッドを起動。`main.py` の lifespan で start/stop。
 - **`NovelDbJobWorker`**: 5 秒 polling + wakeup Event。`_claim_next_job`（`queued` を古い順に 1 件 `running` 化）→ `_execute_job`（mode 分岐）→ `_mark_finished`。progress/step/detail を `rebuild_jobs` に逐次書き込み、UI がポーリング表示する。
+- **シリーズメタ索引**: `series_meta.load_book_series_ids()` が meta2.db の novel メタを `book_name → series_id` の辞書へ変換する正本。`generate_relations` のジョブ開始時に1回だけ読み、全対象書籍で共有する。CLIの `--series` 対象解決も `book_names_for_series()` を使い、PDF拡張子除去や空ID判定を重複実装しない。
 
 **JobMode と対象書籍（`_resolve_targets`, `job_type="all"` 時）**:
 

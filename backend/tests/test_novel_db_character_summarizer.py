@@ -1,7 +1,7 @@
 """services/novel_db/character_summarizer.py の単体テスト（B-15）。
 
 Qwen 呼び出し（`_BACKEND.ask`）はモックする。本テストは:
-- _parse_main_characters: パーサーの境界
+- parse_character_names: パーサーの境界
 - list_book_characters_in_db: 集計とソート
 - collect_character_pages: フィルタ
 - top_scenes_for_character: char_count 順の top N
@@ -17,7 +17,6 @@ import pytest
 from services.novel_db import with_db
 from services.novel_db.character_db import (
     CharacterStat,
-    _parse_main_characters,
     collect_character_pages,
     get_character,
     list_book_characters_in_db,
@@ -25,16 +24,17 @@ from services.novel_db.character_db import (
     top_scenes_for_character,
     upsert_character,
 )
+from services.novel_db.character_names import parse_character_names
 from services.novel_db.character_summarizer import summarize_character
 from services.novel_db.migrations import upgrade_head
 
 # ---------------------------------------------------------------------------
-# _parse_main_characters
+# parse_character_names
 # ---------------------------------------------------------------------------
 
 
 def test_parse_main_characters_comma_separated():
-    assert _parse_main_characters("レティ, デューク, アストリッド") == [
+    assert parse_character_names("レティ, デューク, アストリッド") == [
         "レティ",
         "デューク",
         "アストリッド",
@@ -42,7 +42,7 @@ def test_parse_main_characters_comma_separated():
 
 
 def test_parse_main_characters_handles_japanese_separators():
-    assert _parse_main_characters("レティ、デューク・アストリッド") == [
+    assert parse_character_names("レティ、デューク・アストリッド") == [
         "レティ",
         "デューク",
         "アストリッド",
@@ -50,14 +50,14 @@ def test_parse_main_characters_handles_japanese_separators():
 
 
 def test_parse_main_characters_returns_empty_for_null():
-    assert _parse_main_characters(None) == []
-    assert _parse_main_characters("") == []
+    assert parse_character_names(None) == []
+    assert parse_character_names("") == []
 
 
 def test_parse_main_characters_skips_too_long_fragments():
     # 30 字超は誤抽出と判断してスキップ
     long_name = "あ" * 31
-    assert _parse_main_characters(f"レティ, {long_name}, デューク") == [
+    assert parse_character_names(f"レティ, {long_name}, デューク") == [
         "レティ",
         "デューク",
     ]

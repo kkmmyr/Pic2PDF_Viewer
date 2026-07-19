@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBookCharacters } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type { CharacterSummary } from '@/features/novel_db/types';
 
 export interface UseBookCharacters {
@@ -27,7 +28,7 @@ export function useBookCharacters(bookName: string, enabled: boolean): UseBookCh
     }, [bookName]);
 
     const query = useQuery({
-        queryKey: ['bookCharacters', bookName],
+        queryKey: novelDbKeys.characters(bookName),
         queryFn: () => fetchBookCharacters(bookName),
         enabled,
         staleTime: Infinity,

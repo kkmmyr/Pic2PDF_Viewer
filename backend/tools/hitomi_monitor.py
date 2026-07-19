@@ -15,6 +15,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
+
 # backend/ をパス追加してパッケージ参照を解決
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -109,48 +111,54 @@ def main(
     new_items: list[state_store.ArrivalItem] = []
     skipped = 0
 
-    for entry in entries:
-        key = f"{entry['normalized']}:{entry['language']}"
+    with httpx.Client(timeout=nozomi.DEFAULT_TIMEOUT) as client:
+        for entry in entries:
+            key = f"{entry['normalized']}:{entry['language']}"
 
-        # 直近取得済みならスキップ（state.artists[key] を更新しない）
-        prev_artist = state.get("artists", {}).get(key, {})
-        if should_skip_artist(prev_artist.get("checked_at"), threshold):
-            print(f"[hitomi_monitor] {key}: skipped (recently checked)")
-            skipped += 1
-            continue
+            # 直近取得済みならスキップ（state.artists[key] を更新しない）
+            prev_artist = state.get("artists", {}).get(key, {})
+            if should_skip_artist(prev_artist.get("checked_at"), threshold):
+                print(f"[hitomi_monitor] {key}: skipped (recently checked)")
+                skipped += 1
+                continue
 
-        try:
-            ids = nozomi.fetch_nozomi_head(entry["normalized"], entry["language"], count=20)
-        except nozomi.HitomiError as e:
-            msg = f"{key}: NOZOMI fetch failed: {e}"
-            print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
-            errors.append(msg)
-            continue
-
-        if not ids:
-            print(f"[hitomi_monitor] {key}: NOZOMI is empty, skip")
-            continue
-
-        prev_top = prev_artist.get("top_id")
-        unseen = nozomi.diff_unseen_ids(ids, prev_top)
-
-        new_for_artist = 0
-        for gid in unseen:
             try:
-                meta = metadata.fetch_metadata(gid)
-            except (nozomi.HitomiError, metadata.HitomiMetadataError) as e:
-                msg = f"{key}: metadata fetch failed for id={gid}: {e}"
+                ids = nozomi.fetch_nozomi_head(
+                    entry["normalized"],
+                    entry["language"],
+                    count=20,
+                    client=client,
+                )
+            except nozomi.HitomiError as e:
+                msg = f"{key}: NOZOMI fetch failed: {e}"
                 print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
                 errors.append(msg)
                 continue
-            new_items.append(build_arrival_item(gid, entry, meta))
-            new_for_artist += 1
 
-        state.setdefault("artists", {})[key] = {
-            "top_id": ids[0],
-            "checked_at": _now_iso(),
-        }
-        print(f"[hitomi_monitor] {key}: top={ids[0]}, new={new_for_artist}")
+            if not ids:
+                print(f"[hitomi_monitor] {key}: NOZOMI is empty, skip")
+                continue
+
+            prev_top = prev_artist.get("top_id")
+            unseen = nozomi.diff_unseen_ids(ids, prev_top)
+
+            new_for_artist = 0
+            for gid in unseen:
+                try:
+                    meta = metadata.fetch_metadata(gid, client=client)
+                except (nozomi.HitomiError, metadata.HitomiMetadataError) as e:
+                    msg = f"{key}: metadata fetch failed for id={gid}: {e}"
+                    print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
+                    errors.append(msg)
+                    continue
+                new_items.append(build_arrival_item(gid, entry, meta))
+                new_for_artist += 1
+
+            state.setdefault("artists", {})[key] = {
+                "top_id": ids[0],
+                "checked_at": _now_iso(),
+            }
+            print(f"[hitomi_monitor] {key}: top={ids[0]}, new={new_for_artist}")
 
     try:
         added = state_store.merge_new_items(data_dir, new_items)

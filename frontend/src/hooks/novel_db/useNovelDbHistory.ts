@@ -7,6 +7,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { deleteQaHistory, fetchQaHistory } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type { QaHistoryEntry, QaHistoryListResponse } from '@/features/novel_db/types';
 
 const FETCH_LIMIT = 100;
@@ -22,7 +23,7 @@ export interface UseNovelDbHistory {
 
 export function useNovelDbHistory(book?: string): UseNovelDbHistory {
     const queryClient = useQueryClient();
-    const queryKey = ['qaHistory', book ?? null] as const;
+    const queryKey = novelDbKeys.qaHistory(book);
 
     const query = useQuery({
         queryKey,
@@ -57,9 +58,7 @@ export function useNovelDbHistory(book?: string): UseNovelDbHistory {
         error: query.error instanceof Error ? query.error.message : null,
         deleteItem: (id: number) => deleteMutation.mutateAsync(id),
         refetch: async () => {
-            await queryClient.refetchQueries({
-                queryKey: queryKey as unknown as readonly unknown[],
-            });
+            await queryClient.refetchQueries({ queryKey });
         },
     };
 }

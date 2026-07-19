@@ -2,18 +2,19 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { fetchBooksInSeries, fetchGraph, fetchSeriesList } from '@/features/novel_graph/api';
+import { novelGraphKeys } from '@/features/novel_graph/queries';
 
 export function useCharacterGraph() {
     const [selectedSeries, setSelectedSeries] = useState<string | null>(null);
     const [selectedBookIds, setSelectedBookIds] = useState<number[]>([]);
 
     const seriesQuery = useQuery({
-        queryKey: ['novelGraphSeries'],
+        queryKey: novelGraphKeys.series(),
         queryFn: fetchSeriesList,
         staleTime: Infinity,
     });
     const booksQuery = useQuery({
-        queryKey: ['novelGraphBooks', selectedSeries],
+        queryKey: novelGraphKeys.books(selectedSeries),
         queryFn: () => fetchBooksInSeries(selectedSeries!),
         enabled: selectedSeries !== null,
     });
@@ -23,7 +24,7 @@ export function useCharacterGraph() {
     }, [booksQuery.data, selectedSeries]);
 
     const graphQuery = useQuery({
-        queryKey: ['novelCharacterGraph', selectedSeries, selectedBookIds],
+        queryKey: novelGraphKeys.graph(selectedSeries, selectedBookIds),
         queryFn: () =>
             fetchGraph(selectedSeries!, selectedBookIds.length > 0 ? selectedBookIds : undefined),
         enabled: selectedSeries !== null && booksQuery.isSuccess,

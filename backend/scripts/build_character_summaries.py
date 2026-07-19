@@ -32,7 +32,6 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
-from services.meta_store import load_meta
 from services.novel_db import with_db
 from services.novel_db.character_db import (
     collect_character_pages,
@@ -41,6 +40,7 @@ from services.novel_db.character_db import (
 )
 from services.novel_db.character_summarizer import summarize_character
 from services.novel_db.migrations import upgrade_head
+from services.novel_db.series_meta import book_names_for_series
 
 
 def _list_target_books(
@@ -58,12 +58,7 @@ def _list_target_books(
     if book_name is not None:
         return [t for t in candidates if t[1] == book_name]
     if series_id is not None:
-        meta = load_meta("novel")
-        series_books = {
-            key[: -len(".pdf")]
-            for key, entry in meta.items()
-            if entry.get("series_id") == series_id and key.endswith(".pdf")
-        }
+        series_books = book_names_for_series(series_id)
         return [t for t in candidates if t[1] in series_books]
     return candidates
 

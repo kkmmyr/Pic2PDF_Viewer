@@ -30,7 +30,6 @@ from utils.logger import get_logger
 
 from ._deps import require_not_locked
 from .schemas import (
-    ChatMessagePayload,
     ChatSessionContinueRequest,
     ChatSessionDetailPayload,
     ChatSessionStartRequest,
@@ -119,7 +118,7 @@ async def _chat_event_stream(
         yield sse_event({"error": str(e)})
 
 
-@router.get("/sessions")
+@router.get("/sessions", response_model=list[ChatSessionSummary])
 @log_and_raise_500("novel_db/sessions")
 def get_chat_sessions(
     offset: int = 0,
@@ -133,20 +132,22 @@ def get_chat_sessions(
     with with_db() as conn:
         rows = list_sessions(conn, offset=offset, limit=limit, scope_type=scope_type, scope_id=scope_id)
     return [
-        ChatSessionSummary(
-            id=r.id,
-            scope_type=r.scope_type,
-            scope_id=r.scope_id,
-            title=r.title,
-            started_at=r.started_at,
-            last_message_at=r.last_message_at,
-            message_count=r.message_count,
+        ChatSessionSummary.model_validate(
+            {
+                "id": r.id,
+                "scope_type": r.scope_type,
+                "scope_id": r.scope_id,
+                "title": r.title,
+                "started_at": r.started_at,
+                "last_message_at": r.last_message_at,
+                "message_count": r.message_count,
+            }
         )
         for r in rows
     ]
 
 
-@router.get("/sessions/{session_id}")
+@router.get("/sessions/{session_id}", response_model=ChatSessionDetailPayload)
 @log_and_raise_500("novel_db/sessions/detail")
 def get_chat_session(session_id: int) -> ChatSessionDetailPayload:
     """会話セッション詳細（メッセージ全件含む、system は除外）（B-16）。
@@ -158,25 +159,27 @@ def get_chat_session(session_id: int) -> ChatSessionDetailPayload:
         detail = get_session_detail(conn, session_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="session not found")
-    return ChatSessionDetailPayload(
-        id=detail.id,
-        scope_type=detail.scope_type,
-        scope_id=detail.scope_id,
-        title=detail.title,
-        started_at=detail.started_at,
-        last_message_at=detail.last_message_at,
-        messages=[
-            ChatMessagePayload(
-                id=m.id,
-                role=m.role,
-                content=m.content,
-                eval_count=m.eval_count,
-                done_reason=m.done_reason,
-                created_at=m.created_at,
-            )
-            for m in detail.messages
-            if m.role != "system"
-        ],
+    return ChatSessionDetailPayload.model_validate(
+        {
+            "id": detail.id,
+            "scope_type": detail.scope_type,
+            "scope_id": detail.scope_id,
+            "title": detail.title,
+            "started_at": detail.started_at,
+            "last_message_at": detail.last_message_at,
+            "messages": [
+                {
+                    "id": m.id,
+                    "role": m.role,
+                    "content": m.content,
+                    "eval_count": m.eval_count,
+                    "done_reason": m.done_reason,
+                    "created_at": m.created_at,
+                }
+                for m in detail.messages
+                if m.role != "system"
+            ],
+        }
     )
 
 

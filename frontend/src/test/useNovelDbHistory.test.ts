@@ -30,7 +30,7 @@ function makeList(ids: number[], total: number): QaHistoryListResponse {
             id,
             asked_at: '2026-05-09 12:00:00',
             finished_at: null,
-            scope: { type: 'all' },
+            scope: { type: 'all', id: null },
             question: `Q${id}`,
             answer_preview: `A${id}`,
             done_reason: 'stop',

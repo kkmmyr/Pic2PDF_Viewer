@@ -6,6 +6,8 @@ openapi-typescript による TypeScript 型自動生成のために、
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel
 
 # ---------------------------------------------------------------------------
@@ -355,17 +357,17 @@ class AmazonImportResponse(BaseModel):
 class BookSummaryOut(BaseModel):
     name: str
     authors: list[str]
-    series_id: str | None = None
-    series_title: str | None = None
+    series_id: str | None
+    series_title: str | None
     is_indexed: bool
-    page_count: int | None = None
-    indexed_at: str | None = None
-    thumbnail_url: str | None = None
-    ocr_done_at: str | None = None
-    volume: int | None = None
-    publisher: str | None = None
-    asin: str | None = None
-    series_index: float | None = None
+    page_count: int | None
+    indexed_at: str | None
+    thumbnail_url: str | None
+    ocr_done_at: str | None
+    volume: int | None
+    publisher: str | None
+    asin: str | None
+    series_index: float | None
 
 
 class SeriesSummaryOut(BaseModel):
@@ -384,19 +386,20 @@ class SimilarBookOut(BaseModel):
 class BookDetailOut(BaseModel):
     name: str
     authors: list[str]
-    series_id: str | None = None
-    series_title: str | None = None
+    series_id: str | None
+    series_title: str | None
     is_indexed: bool
-    page_count: int | None = None
-    indexed_at: str | None = None
-    thumbnail_url: str | None = None
-    ocr_done_at: str | None = None
-    volume: int | None = None
-    publisher: str | None = None
-    asin: str | None = None
-    isbn: str | None = None
-    summary: str | None = None
-    summary_generated_at: str | None = None
+    page_count: int | None
+    indexed_at: str | None
+    thumbnail_url: str | None
+    ocr_done_at: str | None
+    volume: int | None
+    publisher: str | None
+    asin: str | None
+    series_index: float | None
+    isbn: str | None
+    summary: str | None
+    summary_generated_at: str | None
     character_count: int
     discussion_count: int
 
@@ -423,8 +426,18 @@ class RebuildStatusResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class SearchHitOut(BaseModel):
+    book_name: str
+    page_no: int
+    snippet: str
+    has_highlight: bool
+    image_url: str | None
+    rrf_score: float
+    main_characters: list[str]
+
+
 class SearchResponse(BaseModel):
-    hits: list[dict]
+    hits: list[SearchHitOut]
     total: int
     offset: int
     limit: int
@@ -435,20 +448,40 @@ class SearchResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class ScopeOut(BaseModel):
+    type: Literal["all", "series", "book"]
+    id: str | None
+
+
+class QaHistoryItemOut(BaseModel):
+    id: int
+    asked_at: str
+    finished_at: str | None
+    scope: ScopeOut
+    question: str
+    answer_preview: str
+    done_reason: str | None
+
+
 class QaHistoryResponse(BaseModel):
-    items: list[dict]
+    items: list[QaHistoryItemOut]
     total: int
 
 
 class QaHistoryDetailResponse(BaseModel):
     id: int
+    asked_at: str
+    finished_at: str | None
+    scope: ScopeOut
     question: str
-    answer: str | None = None
-    scope_type: str
-    scope_id: str | None = None
-    model: str | None = None
-    created_at: str
-    hits: list[dict]
+    answer: str
+    prompt: str
+    context: list[SearchHitOut]
+    model: str
+    options: dict[str, object]
+    eval_count: int | None
+    done_reason: str | None
+    error_message: str | None
 
 
 # ---------------------------------------------------------------------------

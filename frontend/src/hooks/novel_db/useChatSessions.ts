@@ -13,6 +13,7 @@ import {
     fetchChatSessionDetail,
     fetchChatSessions,
 } from '@/features/novel_db/api';
+import { novelDbKeys } from '@/features/novel_db/queries';
 import type {
     ChatMessage,
     ChatSessionDetail,
@@ -32,7 +33,7 @@ export function useChatSessions(scope?: Scope): UseChatSessions {
     const queryClient = useQueryClient();
     const scopeType = scope?.type;
     const scopeId = scope?.id ?? null;
-    const queryKey = ['chatSessions', scopeType, scopeId] as const;
+    const queryKey = novelDbKeys.chatSessions(scope);
 
     const query = useQuery({
         queryKey,
@@ -44,7 +45,10 @@ export function useChatSessions(scope?: Scope): UseChatSessions {
     const removeMutation = useMutation({
         mutationFn: (id: number) => deleteChatSession(id),
         onSuccess: () =>
-            queryClient.invalidateQueries({ queryKey: ['chatSessions'], refetchType: 'active' }),
+            queryClient.invalidateQueries({
+                queryKey: novelDbKeys.chatSessionsRoot(),
+                refetchType: 'active',
+            }),
     });
 
     return {
@@ -73,7 +77,7 @@ export interface UseChatSessionDetail {
 
 export function useChatSessionDetail(sessionId: number | null): UseChatSessionDetail {
     const queryClient = useQueryClient();
-    const queryKey = useMemo(() => ['chatSessionDetail', sessionId] as const, [sessionId]);
+    const queryKey = useMemo(() => novelDbKeys.chatSession(sessionId), [sessionId]);
 
     const query = useQuery({
         queryKey,
