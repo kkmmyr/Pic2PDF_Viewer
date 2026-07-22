@@ -126,3 +126,37 @@ class RebuildJob(SQLModel, table=True):
     error_message: str | None = None
     current_step: str | None = None
     current_detail: str | None = None
+
+
+class OcrRun(SQLModel, table=True):
+    __tablename__ = "ocr_runs"  # type: ignore[reportAssignmentType]
+
+    id: int | None = Field(default=None, primary_key=True)
+    book_name: str
+    engine: str
+    model: str
+    source_page_count: int
+    state: str = "running"
+    started_at: str | None = None
+    finished_at: str | None = None
+    error_message: str | None = None
+
+
+class OcrPageResult(SQLModel, table=True):
+    __tablename__ = "ocr_page_results"  # type: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("run_id", "page_no"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="ocr_runs.id")
+    page_no: int
+    image_sha256: str
+    state: str
+    full_text: str | None = None
+    char_count: int = 0
+    raw_output: str | None = None
+    block_count: int = 0
+    quality_flags_json: str = "[]"
+    ink_coverage: float | None = None
+    attempt_count: int = 0
+    error_message: str | None = None
+    updated_at: str | None = None

@@ -58,6 +58,19 @@ class _AppSettings(BaseSettings):
     # OCR パッケージディレクトリ（ocr_engine.py が置かれた common/ocr/ パス）
     # ocr_worker.py サブプロセスに OCR_PATH 環境変数として渡される
     OCR_PACKAGE_PATH: str | None = None
+    # OCRエンジン（surya2 / yomitoku）
+    OCR_ENGINE: str = "surya2"
+    # Surya OCR 2 OpenAI互換推論サーバー
+    SURYA_INFERENCE_URL: str = "http://127.0.0.1:8768/v1"
+    SURYA_MODEL: str = "surya-ocr-2"
+    # model/mmproj/llama.cpp の固定資材を識別する監査用文字列
+    SURYA_MODEL_REVISION: str = "unversioned"
+    SURYA_LLAMA_SERVER_PATH: Path | None = None
+    SURYA_MODEL_PATH: Path | None = None
+    SURYA_MMPROJ_PATH: Path | None = None
+    SURYA_REQUEST_TIMEOUT_SEC: float = 600.0
+    SURYA_MAX_ATTEMPTS: int = 3
+    OCR_QUALITY_MIN_INK_COVERAGE: float = 0.85
     # 同人誌入力フォルダの自動監視を有効にするか
     DOUJIN_WATCH_ENABLED: bool = True
     # 監視間隔（秒）

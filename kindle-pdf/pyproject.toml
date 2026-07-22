@@ -12,6 +12,9 @@ dependencies = [
 ]
 
 [dependency-groups]
+dev = [
+    "pytest",
+]
 gpu = [
     "yomitoku",
     "torch==2.5.1",
@@ -31,3 +34,7 @@ torchaudio = { index = "pytorch-cu121" }
 
 [tool.uv]
 package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

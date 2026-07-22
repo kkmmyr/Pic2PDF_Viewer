@@ -1,6 +1,6 @@
 # 小説 RAG データ設計（スキーマ・環境変数・API・レイアウト）
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-19
 
 小説 RAG（novel_db）サブシステムの横断的な事実の正本。DB スキーマ / 環境変数 / ディレクトリレイアウト / API エンドポイント一覧 / LLM backend・port を 1 箇所に集約する。個別処理の設計は パイプライン設計（`小説RAG_パイプライン設計.md`）・検索QA設計（`小説RAG_検索QA設計.md`）を参照（※これら2文書は同 G4 で作成予定。作成後にリンク化する）。
 
@@ -19,11 +19,13 @@
 
 ### 1.1 SQLite テーブル（`novel.db`）
 
-現行 head は revision `0003`。全 10 テーブル（通常 9 + FTS5 仮想 1）。カラム詳細・インデックス・制約は Alembic revision を参照。
+現行 head は revision `0004`。OCRステージングを含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
 
 | テーブル | 用途 | 主なカラム | 定義元 |
 |---|---|---|---|
 | `books` | 書籍メタ（1 冊 = 1 PDF） | `name`(UNIQUE), `pdf_path`, `images_dir`, `page_count`, `indexed_at`, `summary`, `summary_generated_at`, `ocr_done_at` | 0003 |
+| `ocr_runs` | OCR実行単位のステージング | `book_name`, `engine`, `model`, `source_page_count`, `state`, `started_at`, `finished_at`, `error_message` | 0004 |
+| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, `state`, `full_text`, `raw_output`, `quality_flags_json`, `ink_coverage`, `attempt_count` | 0004 |
 | `pages` | ページ単位の本文 | `book_id`(FK), `page_no`, `image_path`, `full_text`, `char_count`, `main_characters`; UNIQUE(book_id, page_no) | 0003 |
 | `pages_fts` | `pages.full_text` の全文検索（FTS5, `tokenize='trigram'`, `content='pages'`） | `full_text` | 0003 |
 | `chunks` | 埋め込み単位のチャンク | `page_id`(FK), `chunk_idx`, `text`, `char_count`, `contextual_text`, `contextual_generated_at`(B-9 Contextual Retrieval) | 0003 |
@@ -38,6 +40,7 @@
 - `character_relations` は **SQLModel 定義を持たない**（`models.py` に無し）。migration 0002 の生 DDL でのみ定義され、`relation_extractor.py`（書込）/ `graph_query.py`（照会）が生 SQL で扱う。
 - `created_at` 等のタイムスタンプは JST 固定（`datetime('now', '+9 hours')`）。
 - FK は `PRAGMA foreign_keys = ON`（`connection.py`）で有効。`journal_mode = WAL`。
+- `pages.page_no` は `kindle_novel/images/{書籍名}/NNN.png` の連番に対応するキャプチャ画面番号であり、Kindleの紙面ページ番号ではない。リフロー表示では両者は1対1対応しない。
 
 ### 1.2 LanceDB テーブル（`novel.lancedb`）
 
@@ -134,6 +137,7 @@ RAG のコアロジック。主なモジュール:
 - SQLite: `backend/data/novel_db/novel.db`（`NOVEL_DB_DIR`）
 - LanceDB: `backend/data/novel.lancedb`（`NOVEL_DB_LANCE_PATH`。※novel.db とは別階層）
 - 小説の PDF / 画像 / サムネイル: `backend/data/kindle_novel/{pdfs,images,thumbnails}`（source=`novel` は内部的に `kindle_novel` ディレクトリに対応）
+- `kindle_novel/images/` 直下の各ディレクトリは書籍候補として列挙されるため、予備撮影・中断結果は置かない。診断データは `kindle_novel/capture_diagnostics/` 等の兄弟ディレクトリへ保管する。
 
 ---
 

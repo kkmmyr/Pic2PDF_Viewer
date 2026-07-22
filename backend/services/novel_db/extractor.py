@@ -13,9 +13,10 @@ import os
 import platform
 import re
 import subprocess
+import tempfile
 from collections.abc import Iterator
 from pathlib import Path
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 import fitz
 
@@ -45,30 +46,106 @@ class PageText(TypedDict):
     char_count: int
 
 
+class OcrTask(TypedDict):
+    book_name: str
+    page_no: int
+    image_path: str
+
+
+class OcrPageResult(PageText):
+    image_sha256: str
+    state: str
+    raw_output: str
+    block_count: int
+    quality_flags: list[str]
+    ink_coverage: float | None
+    attempt_count: int
+    error_message: NotRequired[str | None]
+
+
+def _ocr_worker_env() -> dict[str, str]:
+    from config import app_settings
+
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "OCR_ENGINE": app_settings.OCR_ENGINE}
+    values = {
+        "OCR_PATH": app_settings.OCR_PACKAGE_PATH,
+        "SURYA_INFERENCE_URL": app_settings.SURYA_INFERENCE_URL,
+        "SURYA_MODEL": app_settings.SURYA_MODEL,
+        "SURYA_LLAMA_SERVER_PATH": app_settings.SURYA_LLAMA_SERVER_PATH,
+        "SURYA_MODEL_PATH": app_settings.SURYA_MODEL_PATH,
+        "SURYA_MMPROJ_PATH": app_settings.SURYA_MMPROJ_PATH,
+        "SURYA_REQUEST_TIMEOUT_SEC": app_settings.SURYA_REQUEST_TIMEOUT_SEC,
+        "SURYA_MAX_ATTEMPTS": app_settings.SURYA_MAX_ATTEMPTS,
+        "OCR_QUALITY_MIN_INK_COVERAGE": app_settings.OCR_QUALITY_MIN_INK_COVERAGE,
+    }
+    for key, value in values.items():
+        if value is not None:
+            env[key] = str(value)
+    return env
+
+
+def iter_ocr_pages(tasks: list[OcrTask]) -> Iterator[tuple[str, OcrPageResult]]:
+    """Run the isolated worker and yield one durable result candidate per page."""
+    if not tasks:
+        return
+    manifest_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as manifest:
+            json.dump({"tasks": tasks}, manifest, ensure_ascii=False)
+            manifest_path = Path(manifest.name)
+
+        cmd = [_resolve_ocr_python(), str(_OCR_WORKER_SCRIPT), "--manifest", str(manifest_path)]
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            env=_ocr_worker_env(),
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            data = json.loads(line)
+            if data.get("event") == "fatal":
+                raise RuntimeError(f"OCR worker error: {data.get('error', 'unknown error')}")
+            if data.get("event") != "page":
+                raise RuntimeError(f"unknown OCR worker event: {data.get('event')}")
+            yield str(data["book_name"]), data["page"]
+
+        proc.wait()
+        if proc.returncode != 0:
+            raise RuntimeError(f"OCR worker exited with code {proc.returncode}")
+    finally:
+        if manifest_path is not None:
+            manifest_path.unlink(missing_ok=True)
+
+
 def run_ocr_subprocess(images_dirs: list[Path]) -> Iterator[tuple[str, list[PageText]]]:
-    """yomitoku OCR を common/ocr/venv で subprocess 実行し、書籍ごとに (book_name, pages) を yield する。
+    """Compatibility collector returning completed page text by book."""
+    tasks: list[OcrTask] = []
+    order: list[str] = []
+    for images_dir in images_dirs:
+        order.append(images_dir.name)
+        for image_path in sorted(images_dir.glob("*.png")):
+            if image_path.stem.isdigit():
+                tasks.append(
+                    {"book_name": images_dir.name, "page_no": int(image_path.stem), "image_path": str(image_path)}
+                )
 
-    yomitoku は 1 度だけ初期化して全書籍を連続処理する。
-    stderr は backend の stdout に流れる（GPU/モデルロードログが見える）。
-    """
-    cmd = [_resolve_ocr_python(), str(_OCR_WORKER_SCRIPT)] + [str(d) for d in images_dirs]
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True, encoding="utf-8", env=env)
-    assert proc.stdout is not None
-
-    for line in proc.stdout:
-        line = line.strip()
-        if not line:
-            continue
-        data = json.loads(line)
-        book_name: str = data["book_name"]
-        if "error" in data:
-            raise RuntimeError(f"OCR worker error for '{book_name}': {data['error']}")
-        yield book_name, data["pages"]
-
-    proc.wait()
-    if proc.returncode != 0:
-        raise RuntimeError(f"OCR worker exited with code {proc.returncode}")
+    collected: dict[str, list[PageText]] = {book_name: [] for book_name in order}
+    for book_name, page in iter_ocr_pages(tasks):
+        if page["state"] != "passed":
+            raise RuntimeError(
+                f"OCR quality gate failed for '{book_name}' page {page['page_no']}: "
+                f"{page.get('error_message') or ', '.join(page['quality_flags'])}"
+            )
+        collected.setdefault(book_name, []).append(
+            {"page_no": page["page_no"], "full_text": page["full_text"], "char_count": page["char_count"]}
+        )
+    for book_name in order:
+        yield book_name, sorted(collected.get(book_name, []), key=lambda page: page["page_no"])
 
 
 def extract_pages(pdf_path: str | Path) -> list[PageText]:

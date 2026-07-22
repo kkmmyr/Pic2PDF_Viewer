@@ -95,14 +95,7 @@ def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
                     ),
                 )
 
-            conn.execute(
-                "DELETE FROM pages_fts WHERE rowid IN (SELECT id FROM pages WHERE book_id = ?)",
-                (book_id,),
-            )
-            conn.execute(
-                "INSERT INTO pages_fts (rowid, full_text) SELECT id, full_text FROM pages WHERE book_id = ?",
-                (book_id,),
-            )
+            conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
 
     logger.info("_store_ocr_pages finished: %s (pages=%d)", book_name, len(pages))
 

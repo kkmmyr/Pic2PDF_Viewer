@@ -5,20 +5,31 @@ import datetime
 import time
 import re
 from dataclasses import dataclass
-from typing import Tuple, Optional, List
-from ctypes import windll, create_unicode_buffer, pointer, c_bool, c_int, POINTER, WINFUNCTYPE
+from typing import Optional, Tuple
+from ctypes import (
+    POINTER,
+    WINFUNCTYPE,
+    Structure,
+    c_void_p,
+    create_unicode_buffer,
+    pointer,
+    sizeof,
+    windll,
+)
+from ctypes import wintypes
 from ctypes.wintypes import RECT
 
 import cv2
 import numpy as np
 from PIL import ImageGrab, Image
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, simpledialog
 
 # プロジェクトルートの .env を読み込む（存在しない場合・dotenv 未インストール時は無視）
 try:
     from dotenv import load_dotenv as _load_dotenv
-    _load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env'))
+
+    _load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"))
 except ImportError:
     pass
 
@@ -30,17 +41,24 @@ def _resolve_comic_dir(subdir: str) -> str:
     data_dir = os.environ.get("PIC2PDF_DATA_DIR")
     if data_dir:
         return os.path.join(data_dir, "comic", subdir)
-    return os.path.abspath(os.path.join(base_dir, '..', 'backend', 'data', 'comic', subdir))
+    return os.path.abspath(
+        os.path.join(base_dir, "..", "backend", "data", "comic", subdir)
+    )
 
 
 @dataclass
 class Config:
     """アプリケーション設定"""
-    KINDLE_WINDOW_TITLE: str = 'Kindle'
-    PAGE_CHANGE_KEY: str = 'left'  # ページめくりキー (デフォルト)
-    WAIT_SEC: float = 0.15         # キー入力後の微小待機
-    PAGE_TURN_WAIT: float = 0.5    # ページめくり完了待ち
-    TIMEOUT_SEC: float = 5.0       # ページ変化待ちタイムアウト
+
+    KINDLE_WINDOW_TITLE: str = "Kindle"
+    PAGE_CHANGE_KEY: str = "left"  # ページめくりキー (デフォルト)
+    WAIT_SEC: float = 0.15  # キー入力後の微小待機
+    PAGE_TURN_WAIT: float = 0.5  # ページめくり完了待ち
+    TIMEOUT_SEC: float = 5.0  # ページ変化待ちタイムアウト
+    PAGE_STABLE_SEC: float = 0.75  # 同一画像が続けば描画完了とみなす時間
+    PAGE_CHANGE_RETRY_COUNT: int = 1  # 画面無変化時のページ送り再試行回数
+    PAGE_CLICK_INSET_PX: int = 120  # 新 Kindle の左右ボタン中心（端からの距離）
+    EXPECTED_PAGES: Optional[int] = None  # 表紙等を含む期待撮影枚数
 
     # キャプチャ領域 (ウィンドウ左上からの相対座標)
     CROP_X1: int = 111
@@ -55,24 +73,32 @@ class Config:
 
     # タイトルクリーニング用 (正規表現で PC 後のバージョン番号に対応)
     # 旧: 'Kindle for PC - Title' / 新: 'Kindle - Title'（タイトルが出ない場合は空→ダイアログで手入力）
-    TITLE_PATTERN: str = r'(?:Kindle for PC\d*|Kindle)\s*-\s*(.+)'
+    TITLE_PATTERN: str = r"(?:Kindle for PC\d*|Kindle)\s*-\s*(.+)"
+
 
 class BookInfoDialog(simpledialog.Dialog):
     def __init__(self, parent, title, initialvalue):
         self.initialvalue = initialvalue
         self.result_title = None
         self.result_direction = None
+        self.result_expected_pages = None
         super().__init__(parent, title)
 
     def body(self, master):
-        tk.Label(master, text="タイトル:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
+        tk.Label(master, text="タイトル:").grid(
+            row=0, column=0, sticky="w", padx=5, pady=5
+        )
         self.e_title = tk.Entry(master, width=50)
         self.e_title.insert(0, self.initialvalue)
         self.e_title.grid(row=0, column=1, padx=5, pady=5)
 
-        tk.Label(master, text="ページめくり:").grid(row=1, column=0, sticky="w", padx=5, pady=5)
+        tk.Label(master, text="ページめくり:").grid(
+            row=1, column=0, sticky="w", padx=5, pady=5
+        )
 
-        self.var_direction = tk.StringVar(value="left") # Default: Left Key (Standard for Vertical)
+        self.var_direction = tk.StringVar(
+            value="left"
+        )  # Default: Left Key (Standard for Vertical)
 
         frame_dir = tk.Frame(master)
         frame_dir.grid(row=1, column=1, sticky="w", padx=5, pady=5)
@@ -80,14 +106,44 @@ class BookInfoDialog(simpledialog.Dialog):
         # Note: In Kindle PC:
         # Vertical Text (Manga/Novel) -> Press Left Arrow to go Next.
         # Horizontal Text (Tech Book) -> Press Right Arrow to go Next.
-        tk.Radiobutton(frame_dir, text="左キー (縦書き/右開き)", variable=self.var_direction, value="left").pack(side="left", padx=5)
-        tk.Radiobutton(frame_dir, text="右キー (横書き/左開き)", variable=self.var_direction, value="right").pack(side="left", padx=5)
+        tk.Radiobutton(
+            frame_dir,
+            text="左キー (縦書き/右開き)",
+            variable=self.var_direction,
+            value="left",
+        ).pack(side="left", padx=5)
+        tk.Radiobutton(
+            frame_dir,
+            text="右キー (横書き/左開き)",
+            variable=self.var_direction,
+            value="right",
+        ).pack(side="left", padx=5)
 
-        return self.e_title # Focus
+        tk.Label(master, text="撮影画面数（任意・通常は空欄）:").grid(
+            row=2, column=0, sticky="w", padx=5, pady=5
+        )
+        self.e_expected_pages = tk.Entry(master, width=12)
+        self.e_expected_pages.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+
+        return self.e_title  # Focus
+
+    def validate(self):
+        raw_value = self.e_expected_pages.get().strip()
+        if raw_value and (not raw_value.isdecimal() or int(raw_value) <= 0):
+            messagebox.showwarning(
+                "入力エラー",
+                "撮影画面数には1以上の整数を入力するか、空欄にしてください。",
+                parent=self,
+            )
+            return False
+        return True
 
     def apply(self):
         self.result_title = self.e_title.get()
         self.result_direction = self.var_direction.get()
+        raw_value = self.e_expected_pages.get().strip()
+        self.result_expected_pages = int(raw_value) if raw_value else None
+
 
 class KindleCapturer:
     """Kindleの画面キャプチャとPDF化を行うクラス"""
@@ -96,13 +152,17 @@ class KindleCapturer:
         self.config = Config()
         self.hwnd = None
         self.rect = None
+        self._entered_fullscreen = False
+        self._restore_fullscreen_on_cleanup = False
+        self._maximized_window = False
+        self._new_kindle_mode = False
 
     def find_window(self) -> Optional[int]:
         """Kindleウィンドウを検索してハンドルを返す"""
         EnumWindows = windll.user32.EnumWindows
         GetWindowText = windll.user32.GetWindowTextW
         GetWindowTextLength = windll.user32.GetWindowTextLengthW
-        WNDENUMPROC = WINFUNCTYPE(c_bool, POINTER(c_int), POINTER(c_int))
+        WNDENUMPROC = WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
         found_hwnd = None
 
@@ -125,6 +185,13 @@ class KindleCapturer:
         rect = RECT()
         windll.user32.GetWindowRect(self.hwnd, pointer(rect))
         return rect
+
+    def _get_window_title(self) -> str:
+        """現在の対象ウィンドウタイトルを返す。"""
+        length = windll.user32.GetWindowTextLengthW(self.hwnd)
+        buff = create_unicode_buffer(length + 1)
+        windll.user32.GetWindowTextW(self.hwnd, buff, length + 1)
+        return buff.value
 
     def setup_window(self):
         """ウィンドウをアクティブにしてフォーカスを設定"""
@@ -154,19 +221,19 @@ class KindleCapturer:
             default_title = m.group(1)
 
             # 空白・改行の正規化
-            default_title = re.sub(r'\s+', ' ', default_title).strip()
+            default_title = re.sub(r"\s+", " ", default_title).strip()
 
             # 禁止文字の置換
             invalid_chars = '<>:"/\\|?*'
             for char in invalid_chars:
-                default_title = default_title.replace(char, '_')
+                default_title = default_title.replace(char, "_")
 
         if not default_title:
             default_title = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
         # Use Custom Dialog
         root = tk.Tk()
-        root.withdraw() # Hide main window
+        root.withdraw()  # Hide main window
 
         # Ensure dialog is top most
         root.attributes("-topmost", True)
@@ -176,7 +243,10 @@ class KindleCapturer:
         if d.result_title:
             # Update config with selected direction
             self.config.PAGE_CHANGE_KEY = d.result_direction
+            self.config.EXPECTED_PAGES = d.result_expected_pages
             print(f"Set page turn key to: {self.config.PAGE_CHANGE_KEY}")
+            if self.config.EXPECTED_PAGES:
+                print(f"Expected capture count: {self.config.EXPECTED_PAGES}")
             return d.result_title
         else:
             # Cancelled or closed
@@ -192,7 +262,10 @@ class KindleCapturer:
         capture_right = self.rect.left + self.config.CROP_X2
         capture_bottom = self.rect.top + self.config.CROP_Y2
 
-        image = ImageGrab.grab(bbox=(capture_left, capture_top, capture_right, capture_bottom))
+        image = ImageGrab.grab(
+            bbox=(capture_left, capture_top, capture_right, capture_bottom),
+            all_screens=True,
+        )
         return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
     def _save_image(self, image: np.ndarray, filepath: str):
@@ -208,10 +281,63 @@ class KindleCapturer:
 
     def _next_page(self):
         """ページめくり操作"""
-        pag.keyDown(self.config.PAGE_CHANGE_KEY)
-        time.sleep(0.1)
-        pag.keyUp(self.config.PAGE_CHANGE_KEY)
+        if self._new_kindle_mode and self.rect:
+            width = self.rect.right - self.rect.left
+            inset = min(self.config.PAGE_CLICK_INSET_PX, max(1, width // 4))
+            if self.config.PAGE_CHANGE_KEY == "left":
+                click_x = self.rect.left + inset
+            else:
+                click_x = self.rect.right - inset
+            click_y = self.rect.top + (self.rect.bottom - self.rect.top) // 2
+            pag.click(click_x, click_y)
+        else:
+            pag.keyDown(self.config.PAGE_CHANGE_KEY)
+            time.sleep(0.1)
+            pag.keyUp(self.config.PAGE_CHANGE_KEY)
         time.sleep(self.config.PAGE_TURN_WAIT)
+
+    def _wait_for_stable_page(
+        self, previous_image: Optional[np.ndarray]
+    ) -> Optional[np.ndarray]:
+        """ページ変化後、画像が一定時間同一になるまで待つ。
+
+        直前ページから一度も変化しなかった場合は ``None`` を返す。変化は
+        観測できたもののタイムアウトまで安定しない場合は、ページスキップを
+        避けるため例外にする。
+        """
+        start_time = time.perf_counter()
+        candidate = None
+        stable_since = None
+        saw_change = previous_image is None
+
+        while time.perf_counter() - start_time <= self.config.TIMEOUT_SEC:
+            time.sleep(self.config.WAIT_SEC)
+            current_image = self._capture_screen()
+            now = time.perf_counter()
+
+            if previous_image is not None and np.array_equal(
+                previous_image, current_image
+            ):
+                if not saw_change:
+                    continue
+                candidate = None
+                stable_since = None
+                continue
+
+            saw_change = True
+            if candidate is not None and np.array_equal(candidate, current_image):
+                if now - stable_since >= self.config.PAGE_STABLE_SEC:
+                    return current_image
+                continue
+
+            candidate = current_image
+            stable_since = now
+
+        if saw_change:
+            raise RuntimeError(
+                "Page changed but did not become stable before the timeout."
+            )
+        return None
 
     def capture_loop(self, title: str) -> Tuple[int, str]:
         """キャプチャのメインループ"""
@@ -232,23 +358,44 @@ class KindleCapturer:
             filename = osp.join(save_dir, f"{page:03d}.png")
             start_time = time.perf_counter()
 
-            while True:
-                time.sleep(self.config.WAIT_SEC)
-                current_image = self._capture_screen()
+            current_image = self._wait_for_stable_page(old_image)
+            retry_count = 0
+            while (
+                current_image is None
+                and retry_count < self.config.PAGE_CHANGE_RETRY_COUNT
+            ):
+                retry_count += 1
+                print(
+                    "Page did not change; retrying page turn "
+                    f"({retry_count}/{self.config.PAGE_CHANGE_RETRY_COUNT})."
+                )
+                self._next_page()
+                current_image = self._wait_for_stable_page(old_image)
 
-                if old_image is None:
-                    break
-
-                # 画像比較 (完全一致でなければ変化ありとみなす)
-                if not np.array_equal(old_image, current_image):
-                    break
-
-                if time.perf_counter() - start_time > self.config.TIMEOUT_SEC:
-                    print("Timeout: Page did not change.")
-                    return page - 1, save_dir
+            if current_image is None:
+                captured_pages = page - 1
+                if (
+                    self.config.EXPECTED_PAGES is not None
+                    and captured_pages < self.config.EXPECTED_PAGES
+                ):
+                    raise RuntimeError(
+                        "Capture stopped before the expected count: "
+                        f"{captured_pages}/{self.config.EXPECTED_PAGES}."
+                    )
+                print("End of book: Page did not change.")
+                return captured_pages, save_dir
 
             self._save_image(current_image, filename)
-            print(f'Page: {page}, {current_image.shape}, {time.perf_counter() - start_time:.2f} sec')
+            print(
+                f"Page: {page}, {current_image.shape}, {time.perf_counter() - start_time:.2f} sec"
+            )
+
+            if (
+                self.config.EXPECTED_PAGES is not None
+                and page >= self.config.EXPECTED_PAGES
+            ):
+                print(f"Reached expected capture count: {page}")
+                return page, save_dir
 
             old_image = current_image
             page += 1
@@ -261,7 +408,9 @@ class KindleCapturer:
                 os.makedirs(self.config.PDF_OUTPUT_DIR)
 
             pdf_path = os.path.join(self.config.PDF_OUTPUT_DIR, f"{title}.pdf")
-            image_files = sorted([f for f in os.listdir(image_dir) if f.endswith('.png')])
+            image_files = sorted(
+                [f for f in os.listdir(image_dir) if f.endswith(".png")]
+            )
 
             if not image_files:
                 print("No images found to convert.")
@@ -273,12 +422,18 @@ class KindleCapturer:
             for img_file in image_files:
                 img_path = os.path.join(image_dir, img_file)
                 img = Image.open(img_path)
-                if img.mode == 'RGBA':
-                    img = img.convert('RGB')
+                if img.mode == "RGBA":
+                    img = img.convert("RGB")
                 images.append(img)
 
             if images:
-                images[0].save(pdf_path, "PDF", resolution=100.0, save_all=True, append_images=images[1:])
+                images[0].save(
+                    pdf_path,
+                    "PDF",
+                    resolution=100.0,
+                    save_all=True,
+                    append_images=images[1:],
+                )
                 print(f"PDF saved to: {pdf_path}")
                 return pdf_path
 
@@ -287,11 +442,24 @@ class KindleCapturer:
             messagebox.showerror("エラー", f"PDF作成中にエラーが発生しました: {e}")
             return None
 
+
 class AutoConfig(Config):
     """メイン設定を継承し、自動検出用の設定を追加"""
+
     # 上下の固定クロップ値 (フルスクリーン時)
     FULLSCREEN_CROP_TOP: int = 0
     FULLSCREEN_CROP_BOTTOM_MARGIN: int = 0
+
+    # 新 Kindle は F11 後の案内トーストを約5秒表示する。
+    # 境界検出と初回キャプチャへ混入しないよう、実測値まで待機する。
+    FULLSCREEN_SETTLE_SEC: float = 5.0
+
+    # Microsoft Store 版 Kindle は F11 中のページ送りで本文が白くなるため、
+    # 最大化ウィンドウを使い、アプリUIを固定値で撮影範囲から除外する。
+    NEW_KINDLE_SETTLE_SEC: float = 2.0
+    NEW_KINDLE_CROP_TOP: int = 105
+    NEW_KINDLE_CROP_BOTTOM_MARGIN: int = 105
+    NEW_KINDLE_SIDE_IGNORE_PX: int = 180
 
     # 黒帯検出の閾値 (0-255)
     # RGBの各値がこの値以下なら黒とみなす
@@ -303,15 +471,57 @@ class AutoConfig(Config):
     # 左右のUI（矢印など）を無視するためのマージン
     SIDE_IGNORE_PX: int = 500
 
+
 class AutoKindleCapturer(KindleCapturer):
     """フルスクリーン・動的クロップ版キャプチャクラス"""
 
     def __init__(self):
         super().__init__()
-        self.config = AutoConfig() # 設定を上書き
+        self.config = AutoConfig()  # 設定を上書き
+
+    def _is_fullscreen(self) -> bool:
+        """対象ウィンドウが配置先モニター全体を覆っているか判定する。"""
+        if not self.hwnd:
+            return False
+
+        class MonitorInfo(Structure):
+            _fields_ = [
+                ("cbSize", wintypes.DWORD),
+                ("rcMonitor", RECT),
+                ("rcWork", RECT),
+                ("dwFlags", wintypes.DWORD),
+            ]
+
+        monitor_from_window = windll.user32.MonitorFromWindow
+        monitor_from_window.argtypes = [c_void_p, wintypes.DWORD]
+        monitor_from_window.restype = c_void_p
+        monitor = monitor_from_window(
+            c_void_p(self.hwnd),
+            2,  # MONITOR_DEFAULTTONEAREST
+        )
+        if not monitor:
+            return False
+
+        info = MonitorInfo()
+        info.cbSize = sizeof(MonitorInfo)
+        get_monitor_info = windll.user32.GetMonitorInfoW
+        get_monitor_info.argtypes = [c_void_p, POINTER(MonitorInfo)]
+        get_monitor_info.restype = wintypes.BOOL
+        if not get_monitor_info(monitor, pointer(info)):
+            return False
+
+        rect = self._get_window_rect()
+        monitor_rect = info.rcMonitor
+        tolerance = 2
+        return (
+            abs(rect.left - monitor_rect.left) <= tolerance
+            and abs(rect.top - monitor_rect.top) <= tolerance
+            and abs(rect.right - monitor_rect.right) <= tolerance
+            and abs(rect.bottom - monitor_rect.bottom) <= tolerance
+        )
 
     def setup_window(self):
-        """ウィンドウをアクティブ化し、フルスクリーンモードに設定"""
+        """Kindle版に応じて最大化またはフルスクリーンに設定する。"""
         if not self.hwnd:
             raise RuntimeError("Window handle not found. Call find_window() first.")
 
@@ -319,36 +529,61 @@ class AutoKindleCapturer(KindleCapturer):
         windll.user32.SetForegroundWindow(self.hwnd)
         time.sleep(0.5)
 
-        # フルスクリーン化 (F11)
-        pag.press('f11')
-        print("Entering fullscreen mode...")
-        time.sleep(3.0) # アニメーション待機
+        self._new_kindle_mode = self._get_window_title() == "Kindle"
 
-        # フルスクリーンになったのでRectを画面全体で更新
-        # ただし find_window で取得した hwnd の rect はフルスクリーンになっても更新されない場合があるため
-        # 画面サイズ自体を取得して使用する
-        screen_w, screen_h = pag.size()
+        if self._new_kindle_mode:
+            # F11状態で開始された場合は、ページ送り後の白画面を避けるため解除する。
+            if self._is_fullscreen() and not windll.user32.IsZoomed(self.hwnd):
+                self._restore_fullscreen_on_cleanup = True
+                pag.press("f11")
+                time.sleep(1.0)
+
+            if windll.user32.IsZoomed(self.hwnd):
+                print("Kindle is already maximized.")
+            else:
+                windll.user32.ShowWindow(self.hwnd, 3)  # SW_MAXIMIZE
+                self._maximized_window = True
+                print("Maximizing Microsoft Store Kindle window...")
+
+            self.config.FULLSCREEN_CROP_TOP = self.config.NEW_KINDLE_CROP_TOP
+            self.config.FULLSCREEN_CROP_BOTTOM_MARGIN = (
+                self.config.NEW_KINDLE_CROP_BOTTOM_MARGIN
+            )
+            self.config.SIDE_IGNORE_PX = self.config.NEW_KINDLE_SIDE_IGNORE_PX
+            time.sleep(self.config.NEW_KINDLE_SETTLE_SEC)
+        elif self._is_fullscreen():
+            print("Kindle is already in fullscreen mode.")
+        else:
+            pag.press("f11")
+            self._entered_fullscreen = True
+            print("Entering fullscreen mode...")
+            time.sleep(self.config.FULLSCREEN_SETTLE_SEC)
+
+        # primary monitor の pag.size() ではなく、対象ウィンドウの実座標を使う。
+        # これにより Kindle を別モニターに配置した場合も同じ座標系で検出・撮影できる。
+        self.rect = self._get_window_rect()
+        screen_w = self.rect.right - self.rect.left
+        screen_h = self.rect.bottom - self.rect.top
+        if screen_w <= 0 or screen_h <= 0:
+            raise RuntimeError("Kindle window has an invalid size.")
 
         # 動的検出を実行
         print("Detecting content boundaries...")
-        full_img = ImageGrab.grab() # 全画面キャプチャ
+        full_img = ImageGrab.grab(
+            bbox=(self.rect.left, self.rect.top, self.rect.right, self.rect.bottom),
+            all_screens=True,
+        )
         img_np = np.array(full_img)
 
         self._detect_boundaries(img_np, screen_w, screen_h)
 
-        # ウィンドウ矩形情報も更新しておく (マウス移動の基準などに使うため)
-        # ただしフルスクリーンなので (0, 0, w, h)
-        class RectShim:
-            left = 0
-            top = 0
-            right = screen_w
-            bottom = screen_h
-        self.rect = RectShim()
-
-        # マウスカーソルを右の黒帯部分へ退避
-        # コンテンツ右端より右側へ
-        safe_x = min(self.config.CROP_X2 + 50, screen_w - 10)
-        safe_y = screen_h // 2
+        # UI操作や本文キャプチャへ混入しない位置へカーソルを退避する。
+        if self._new_kindle_mode:
+            safe_x = self.rect.left + screen_w // 2
+            safe_y = self.rect.top + max(10, self.config.CROP_Y1 // 2)
+        else:
+            safe_x = self.rect.left + min(self.config.CROP_X2 + 50, screen_w - 10)
+            safe_y = self.rect.top + screen_h // 2
         pag.moveTo(safe_x, safe_y)
         print(f"Mouse moved to safe area: ({safe_x}, {safe_y})")
 
@@ -402,7 +637,9 @@ class AutoKindleCapturer(KindleCapturer):
 
         print(f"Scan results (Left): {left_edges} -> Selected: {final_left}")
         print(f"Scan results (Right): {right_edges} -> Selected: {final_right}")
-        print(f"Detected boundaries: Left={self.config.CROP_X1}, Right={self.config.CROP_X2}")
+        print(
+            f"Detected boundaries: Left={self.config.CROP_X1}, Right={self.config.CROP_X2}"
+        )
 
         # 異常値チェック
         if self.config.CROP_X1 >= self.config.CROP_X2:
@@ -411,10 +648,26 @@ class AutoKindleCapturer(KindleCapturer):
             self.config.CROP_X2 = w
 
     def cleanup(self):
-        """終了処理: フルスクリーン解除"""
-        if self.hwnd:
+        """終了処理: ツールが変更した表示状態だけ元へ戻す。"""
+        if self.hwnd and self._maximized_window:
+            windll.user32.ShowWindow(self.hwnd, 9)  # SW_RESTORE
+            time.sleep(1.0)
+            print("Restored Kindle window size.")
+            self._maximized_window = False
+
+        if self.hwnd and self._restore_fullscreen_on_cleanup:
             windll.user32.SetForegroundWindow(self.hwnd)
             time.sleep(0.5)
-            pag.press('f11')
+            pag.press("f11")
             time.sleep(1.0)
-            print("Exited fullscreen mode.")
+            print("Restored Kindle fullscreen mode.")
+            self._restore_fullscreen_on_cleanup = False
+
+        if self.hwnd and self._entered_fullscreen:
+            windll.user32.SetForegroundWindow(self.hwnd)
+            time.sleep(0.5)
+            if self._is_fullscreen():
+                pag.press("f11")
+                time.sleep(1.0)
+                print("Exited fullscreen mode.")
+            self._entered_fullscreen = False

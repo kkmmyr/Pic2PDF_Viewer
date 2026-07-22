@@ -4,16 +4,18 @@
 - GetWindowDisplayAffinity でキャプチャ保護の有無を確認
 - 試しにスクリーンショットを撮り、黒画面かどうかを判定
 """
+
 import sys
-from ctypes import windll, create_unicode_buffer, c_bool, c_int, c_uint, POINTER, WINFUNCTYPE, byref
-from ctypes.wintypes import HWND, DWORD
+from ctypes import WINFUNCTYPE, byref, create_unicode_buffer, windll
+from ctypes.wintypes import BOOL, DWORD, HWND, LPARAM, RECT
+
 import numpy as np
 from PIL import ImageGrab
 
 
 # ----- 定数 -----
-WDA_NONE               = 0x00000000
-WDA_MONITOR            = 0x00000001
+WDA_NONE = 0x00000000
+WDA_MONITOR = 0x00000001
 WDA_EXCLUDEFROMCAPTURE = 0x00000011  # Windows 10 2004 以降
 
 AFFINITY_NAMES = {
@@ -26,7 +28,7 @@ AFFINITY_NAMES = {
 def enum_windows() -> list[tuple[int, str]]:
     """全トップレベルウィンドウの (hwnd, title) を返す"""
     results = []
-    WNDENUMPROC = WINFUNCTYPE(c_bool, POINTER(c_int), POINTER(c_int))
+    WNDENUMPROC = WINFUNCTYPE(BOOL, HWND, LPARAM)
 
     def callback(hwnd, _):
         length = windll.user32.GetWindowTextLengthW(hwnd)
@@ -48,12 +50,10 @@ def get_display_affinity(hwnd: int) -> int:
 
 def capture_and_check_black(hwnd: int) -> tuple[bool, float]:
     """ウィンドウ全体をキャプチャして黒画面率を返す"""
-    from ctypes.wintypes import RECT
-    from ctypes import pointer as cptr
     rect = RECT()
-    windll.user32.GetWindowRect(hwnd, cptr(rect))
+    windll.user32.GetWindowRect(hwnd, byref(rect))
     bbox = (rect.left, rect.top, rect.right, rect.bottom)
-    img = ImageGrab.grab(bbox=bbox)
+    img = ImageGrab.grab(bbox=bbox, all_screens=True)
     arr = np.array(img)
     black_pixels = np.sum(np.all(arr <= 10, axis=2))
     total_pixels = arr.shape[0] * arr.shape[1]
@@ -71,7 +71,8 @@ def main():
     # Kindle らしいウィンドウを抽出
     keywords = ["kindle", "amazon"]
     kindle_windows = [
-        (hwnd, title) for hwnd, title in all_windows
+        (hwnd, title)
+        for hwnd, title in all_windows
         if any(k in title.lower() for k in keywords)
     ]
 
@@ -88,40 +89,49 @@ def main():
     for hwnd, title in kindle_windows:
         print(f"  タイトル : {title!r}")
         print(f"  HWND     : {hwnd}")
+        if title == "Kindle":
+            print("  種別     : 本文ウィンドウ（キャプチャ対象）")
+
+        rect = RECT()
+        windll.user32.GetWindowRect(hwnd, byref(rect))
+        print(
+            "  矩形     : "
+            f"({rect.left}, {rect.top}, {rect.right}, {rect.bottom}) "
+            f"{rect.right - rect.left}x{rect.bottom - rect.top}"
+        )
 
         affinity = get_display_affinity(hwnd)
         affinity_label = AFFINITY_NAMES.get(affinity, f"不明 (0x{affinity:08X})")
         print(f"  Affinity : {affinity_label}")
 
         is_black, ratio = capture_and_check_black(hwnd)
-        status = "黒画面！(キャプチャ保護の可能性)" if is_black else "OK (画像取得できています)"
+        status = (
+            "黒画面！(キャプチャ保護の可能性)"
+            if is_black
+            else "OK (画像取得できています)"
+        )
         print(f"  キャプチャ: {status}  (黒画素率 {ratio:.1%})")
         print()
 
     # --- 総合判定 ---
     print("=" * 60)
     protected = any(
-        get_display_affinity(hwnd) != WDA_NONE
-        for hwnd, _ in kindle_windows
+        get_display_affinity(hwnd) != WDA_NONE for hwnd, _ in kindle_windows
     )
-    any_black = any(
-        capture_and_check_black(hwnd)[0]
-        for hwnd, _ in kindle_windows
-    )
+    any_black = any(capture_and_check_black(hwnd)[0] for hwnd, _ in kindle_windows)
+    capture_target_found = any(title == "Kindle" for _, title in kindle_windows)
 
     if protected or any_black:
         print("【結果】キャプチャ保護が検出されました。")
         print("  → TM-1 対応: 仮想ディスプレイ (IDD) 方式への切替が必要です。")
-    else:
-        title_ok = any(
-            "kindle for pc" in title.lower()
-            for _, title in kindle_windows
+    elif not capture_target_found:
+        print(
+            "【結果】キャプチャ保護なし、ただし本文ウィンドウ 'Kindle' が見つかりません。"
         )
-        if not title_ok:
-            print("【結果】キャプチャ保護なし、ただしウィンドウタイトルが変更されています。")
-            print("  → TM-1 対応: capturer.py の KINDLE_WINDOW_TITLE / TITLE_PATTERN 修正のみで OK。")
-        else:
-            print("【結果】キャプチャ保護なし・タイトル変更なし。capturer.py の修正不要の可能性があります。")
+        print("  → 書籍を開いた状態で再実行してください。")
+    else:
+        print("【結果】本文ウィンドウを保護なしでキャプチャできます。")
+        print("  → run_comic.bat / run_novel.bat の実機キャプチャを実行できます。")
     print("=" * 60)
 
 

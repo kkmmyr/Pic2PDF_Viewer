@@ -1,6 +1,7 @@
 from tkinter import messagebox
 from capturer import AutoKindleCapturer
 
+
 def main():
     capturer = AutoKindleCapturer()
 
@@ -37,11 +38,13 @@ def main():
         # エラー時も試みてみる
         try:
             capturer.cleanup()
-        except:
+        except Exception:
             pass
         messagebox.showerror("エラー", f"予期せぬエラーが発生しました: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     main()

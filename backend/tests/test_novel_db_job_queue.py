@@ -164,3 +164,39 @@ def test_generate_relations_loads_series_index_once(queue):
 
     mock_load_index.assert_called_once_with()
     assert mock_generate.call_count == 2
+
+
+def test_ocr_combines_pending_pages_and_publishes_each_book(queue):
+    """複数冊でもworkerは1回だけ起動し、ページ保存後に冊単位で確定する。"""
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": "ocr"}
+    input_a = [object()]
+    input_b = [object()]
+    task_a = {"book_name": "book-a", "page_no": 1, "image_path": "a.png"}
+    task_b = {"book_name": "book-b", "page_no": 1, "image_path": "b.png"}
+    page_a = {"page_no": 1}
+    page_b = {"page_no": 1}
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a", "book-b"]),
+        patch.object(worker, "_update_progress"),
+        patch.object(worker, "_update_detail"),
+        patch("services.novel_db.job_worker.collect_input_pages", side_effect=[input_a, input_b]),
+        patch(
+            "services.novel_db.job_worker.prepare_run",
+            side_effect=[(11, [task_a]), (12, [task_b])],
+        ),
+        patch(
+            "services.novel_db.job_worker.iter_ocr_pages",
+            return_value=iter([("book-a", page_a), ("book-b", page_b)]),
+        ) as mock_iter,
+        patch("services.novel_db.job_worker.save_page_result") as mock_save,
+        patch("services.novel_db.job_worker.publish_run") as mock_publish,
+    ):
+        worker._execute_job(job)
+
+    mock_iter.assert_called_once_with([task_a, task_b])
+    assert mock_save.call_args_list[0].args == (11, page_a)
+    assert mock_save.call_args_list[1].args == (12, page_b)
+    assert mock_publish.call_args_list[0].args == (11, input_a)
+    assert mock_publish.call_args_list[1].args == (12, input_b)

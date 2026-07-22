@@ -33,13 +33,16 @@ images/*.png ──[ocr]──────────► pages.full_text (+ pag
 
 ---
 
-## 2. ステップ 1: OCR 取込（`builder.ocr_book` / `extractor` / `ocr_worker`）
+## 2. ステップ 1: OCR 取込（`job_worker` / `ocr_staging` / `extractor` / `ocr_worker`）
 
-`images/{書籍名}/NNN.png` を yomitoku で OCR し、`pages` テーブルへ書き込む。
+`images/{書籍名}/NNN.png` を Surya OCR 2 でページ単位に処理し、品質ゲートを通過した1冊分だけを `pages` テーブルへ書き込む。yomitoku は `OCR_ENGINE=yomitoku` の比較・後方互換用として残す。
 
-- **subprocess 分離**: yomitoku は `common/ocr/venv` の GPU パッケージ群に依存するため backend `.venv` に入れない。`extractor.run_ocr_subprocess(images_dirs)` が `ocr_worker.py` を OCR venv の Python で起動し、書籍ごとに 1 行 JSON（`{book_name, pages}` / エラー時 `{book_name, error}`）を stdout から受け取り yield する。yomitoku のモデルロード（~30 秒）は全書籍で 1 回のみ。stderr は backend ログにそのまま流れる。
-- **worker 内部**: `ocr_worker._process_book` は `*.png` を stem 昇順に読み、cv2 の非 ASCII パス問題を避けるため `np.fromfile` → `cv2.imdecode` で読み込み、`engine.extract_text` の結果を改行連結して `PageText{page_no, full_text, char_count}` を返す。
-- **保存（`_store_ocr_pages`）**: `books` を upsert（`ocr_done_at` を JST 現在時刻に、`page_count` 更新）、`pages` を `ON CONFLICT(book_id, page_no)` で upsert、`pages_fts` を該当書籍分だけ DELETE → 再 INSERT で同期する。
+- **subprocess 分離**: `extractor.iter_ocr_pages` が対象ページmanifestを一時JSONで渡し、`ocr_worker.py` をOCR venvのPythonで1回起動する。workerは1ページごとにJSON Linesを返し、stderrはbackendログへ流す。
+- **Surya推論**: Windows上のCUDA対応 `llama-server` へOpenAI互換APIで接続する。到達不能時は設定済みの実行ファイル・model・mmprojからworkerが所有サーバーを1回だけ起動する。
+- **worker内部**: PNGをバイト列として読み、SHA-256を計算してPillowで復号する。Suryaのraw HTML/bboxを解析し、不合格時だけ入力条件を変えて最大3候補を比較する。`OCR_ENGINE=yomitoku` の後方互換経路だけは OpenCV で復号する。
+- **チェックポイント**: `ocr_staging` が `ocr_runs` / `ocr_page_results` にページ単位で保存する。再実行時は画像SHAが同じ `passed` ページをスキップする。
+- **二段階保存**: 全ページ合格後だけ `_store_ocr_pages` と同等の更新を1トランザクションで行い、`books.ocr_done_at` とFTSを同期する。失敗時は公開済み本文を変更しない。
+- **直接呼出し互換経路**: `builder.ocr_book` は旧CLI向けに残る直接保存APIで、チェックポイント・二段階確定を行わない。管理画面とjob queueは必ず上記のステージング経路を使用する。
 - **PDF モード（後方互換）**: `extractor.extract_pages(pdf)` は PyMuPDF `get_text("blocks")` で縦書きブロックを取得しブロック内改行を除去して連結する。旧 Searchable PDF 由来の書籍向けで、現行の取込は画像 OCR 経路が主。
 
 ## 3. ステップ 2: チャンク分割 + embedding（`builder.rebuild_from_pages`）
@@ -93,7 +96,7 @@ Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のど
 
 | mode | 処理 | `all` 時の対象 |
 |---|---|---|
-| `ocr` | 画像 → yomitoku → `pages.full_text` | `ocr_done_at IS NULL`（未 OCR） |
+| `ocr` | 画像 → Surya OCR 2（yomitoku限定補助）→ 品質ゲート → `pages.full_text` | `ocr_done_at IS NULL`（未 OCR） |
 | `rebuild` | `pages` → chunks/embedding 再構築 | `ocr_done_at IS NOT NULL`（OCR 済み全冊） |
 | `full_build` | rebuild + サマリ + キャラ辞典 | `ocr_done_at IS NOT NULL AND indexed_at IS NULL` |
 | `generate_contexts` | チャンク文脈 + 再 embedding | `contextual_text IS NULL` のチャンクを持つ書籍 |

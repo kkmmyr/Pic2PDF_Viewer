@@ -13,10 +13,11 @@ from pathlib import Path
 import config
 from utils.logger import get_logger
 
-from .builder import _resolve_images_dir, _store_ocr_pages, rebuild_from_pages
+from .builder import rebuild_from_pages
 from .connection import with_db
-from .extractor import run_ocr_subprocess
+from .extractor import iter_ocr_pages
 from .full_builder import build_book_contexts, build_book_full
+from .ocr_staging import collect_input_pages, mark_run_failed, prepare_run, publish_run, save_page_result
 from .relation_extractor import generate_book_relations
 from .series_meta import book_names_for_series, load_book_series_ids
 
@@ -183,13 +184,41 @@ class NovelDbJobWorker:
         self._update_progress(job_id, 0, total)
 
         if mode == "ocr":
-            images_dirs = [_resolve_images_dir(name) for name in targets]
-            for done, (book_name, pages) in enumerate(run_ocr_subprocess(images_dirs), start=1):
-                if not pages:
-                    raise ValueError(f"no PNG images found for: {book_name}")
-                _store_ocr_pages(book_name, pages)
+            engine = config.app_settings.OCR_ENGINE.casefold()
+            model = config.app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine
+            contexts: dict[str, tuple[int, list]] = {}
+            tasks = []
+            for book_name in targets:
+                input_pages = collect_input_pages(book_name)
+                run_id, pending_tasks = prepare_run(book_name, engine, model, input_pages)
+                contexts[book_name] = (run_id, input_pages)
+                tasks.extend(pending_tasks)
+
+            try:
+                for book_name, page in iter_ocr_pages(tasks):
+                    context = contexts.get(book_name)
+                    if context is None:
+                        raise RuntimeError(f"OCR worker returned unknown book: {book_name}")
+                    run_id, _ = context
+                    save_page_result(run_id, page)
+                    self._update_detail(job_id, f"{book_name} | page {page['page_no']}")
+            except Exception as exc:
+                for run_id, _ in contexts.values():
+                    mark_run_failed(run_id, str(exc))
+                raise
+
+            failures: list[str] = []
+            for done, book_name in enumerate(targets, start=1):
+                run_id, input_pages = contexts[book_name]
+                try:
+                    publish_run(run_id, input_pages)
+                except Exception as exc:
+                    mark_run_failed(run_id, str(exc))
+                    failures.append(f"{book_name}: {exc}")
                 self._update_progress(job_id, done, total)
                 logger.info("Job %d OCR progress: %d/%d (%s)", job_id, done, total, book_name)
+            if failures:
+                raise RuntimeError("OCR quality gate failed: " + "; ".join(failures))
         elif mode == "full_build":
 
             def _step_cb(msg: str, _jid: int = job_id) -> None:

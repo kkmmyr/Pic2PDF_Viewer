@@ -1,6 +1,7 @@
 from tkinter import messagebox
 from novel_capturer import NovelKindleCapturer
 
+
 def main():
     try:
         capturer = NovelKindleCapturer()
@@ -14,32 +15,40 @@ def main():
 
     try:
         capturer.setup_window()
-        title = capturer.get_book_title() # Inherited from KindleCapturer (simple dialog)
+        title = (
+            capturer.get_book_title()
+        )  # Inherited from KindleCapturer (simple dialog)
 
         if not title:
             capturer.cleanup()
             return
 
-        total_pages, image_save_dir = capturer.capture_loop(title)
+        total_pages, _image_save_dir = capturer.capture_loop(title)
 
         # 終了処理 (フルスクリーン解除)
         capturer.cleanup()
 
-        msg = f"撮影が終了しました。\n合計 {total_pages} ページを処理しました。\n\n続いて batch_ocr.py を実行してOCR処理を行ってください。"
+        msg = (
+            f"撮影が終了しました。\n合計 {total_pages} 画面を処理しました。"
+            "\n\n続いて管理画面（/novel/manage）からOCR・DB構築を実行してください。"
+        )
 
         messagebox.showinfo("完了", msg)
 
     except Exception as e:
         try:
             capturer.cleanup()
-        except:
+        except Exception:
             pass
         messagebox.showerror("エラー", f"予期せぬエラーが発生しました: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     import sys
+
     # Ensure stdout/stderr are visible if run from console
-    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding="utf-8")
     main()

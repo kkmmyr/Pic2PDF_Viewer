@@ -85,6 +85,8 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 
 個別のスキーマ定義だけを見ても気づきにくい、複数エンドポイントにまたがる挙動をここに集約する。
 
+- **OCR停止APIの対象範囲**: `POST /api/ocr/stop` は、`rebuild_jobs` で `mode="ocr"` かつ `state="queued"` の待機中ジョブをすべてキャンセルする。実行中のOCRジョブ、OCR worker、workerが所有する`llama-server`は停止しない。待機中OCRジョブが1件もない場合は `400 Bad Request`（`{"detail":"No queued OCR jobs to cancel"}`）を返す。エンドポイント名は後方互換のため`stop`だが、実行中処理の停止APIではない。
+
 - **PATCH エンドポイントの部分更新セマンティクス**: フィールドを省略した場合は「変更しない」。指定した場合のみ上書きする（空文字・空配列・`null` を「削除」の意味で使う個別ルールがあるものは各スキーマの `description` を参照）。他フィールド（閲覧履歴・作者情報等）は更新対象でなければ常に保持される。
 
 - **チャットセッション題名更新**: `PATCH /api/novel_db/sessions/{session_id}/title` は `ChatSessionTitleUpdate`（`title: string`）を受け取り、成功時は `204 No Content` を返す。OpenAPIにも同じstatus codeと空bodyを出力する。
