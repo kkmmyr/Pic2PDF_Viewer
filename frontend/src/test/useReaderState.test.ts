@@ -1,12 +1,22 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
+const readerStateMocks = vi.hoisted(() => ({
+    bookImages: {
+        imageUrls: null as string[] | null,
+        numPages: 0,
+        isImageMode: false,
+    },
+    setNumPages: vi.fn(),
+    resetNumPages: vi.fn(),
+}));
+
 // 複数の API フェッチ hook をモックしてスモークテストを実現する
 vi.mock('../hooks/useWindowSize', () => ({
     useWindowSize: () => ({ height: 900 }),
 }));
 vi.mock('../hooks/reader/useBookImages', () => ({
-    useBookImages: () => ({ imageUrls: null, numPages: 0, isImageMode: false }),
+    useBookImages: () => readerStateMocks.bookImages,
 }));
 vi.mock('../hooks/reader/useImagePreloader', () => ({
     useImagePreloader: vi.fn(),
@@ -97,8 +107,8 @@ vi.mock('../hooks/reader/useReaderUIState', () => ({
 vi.mock('../hooks/reader/usePdfDocumentState', () => ({
     usePdfDocumentState: () => ({
         numPages: 0,
-        setNumPages: vi.fn(),
-        resetNumPages: vi.fn(),
+        setNumPages: readerStateMocks.setNumPages,
+        resetNumPages: readerStateMocks.resetNumPages,
         pdfVersion: 0,
         bumpPdfVersion: vi.fn(),
         handleDocumentLoadSuccess: vi.fn(),
@@ -139,6 +149,9 @@ const defaultProps = {
 describe('useReaderState', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        readerStateMocks.bookImages.imageUrls = null;
+        readerStateMocks.bookImages.numPages = 0;
+        readerStateMocks.bookImages.isImageMode = false;
     });
 
     it('初期状態: direction="rtl", numPages=0, isImageMode=false', () => {
@@ -162,5 +175,21 @@ describe('useReaderState', () => {
     it('pdfUrl を返す', () => {
         const { result } = renderHook(() => useReaderState(defaultProps));
         expect(typeof result.current.pdfUrl).toBe('string');
+    });
+
+    it('キャッシュ済み画像書籍の再オープンではリセット後にページ数を同期する', () => {
+        readerStateMocks.bookImages.imageUrls = ['/page-1.webp', '/page-2.webp'];
+        readerStateMocks.bookImages.numPages = 2;
+        readerStateMocks.bookImages.isImageMode = true;
+
+        renderHook(() => useReaderState(defaultProps));
+
+        expect(readerStateMocks.resetNumPages).toHaveBeenCalled();
+        expect(readerStateMocks.setNumPages).toHaveBeenLastCalledWith(2);
+        const resetOrder = readerStateMocks.resetNumPages.mock.invocationCallOrder.at(-1);
+        const syncOrder = readerStateMocks.setNumPages.mock.invocationCallOrder.at(-1);
+        expect(resetOrder).toBeDefined();
+        expect(syncOrder).toBeDefined();
+        expect(syncOrder!).toBeGreaterThan(resetOrder!);
     });
 });

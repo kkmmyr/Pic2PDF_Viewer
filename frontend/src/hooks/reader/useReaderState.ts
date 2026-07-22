@@ -178,10 +178,6 @@ export function useReaderState({
     useImagePreloader(imageUrls, pageNumber - 1, 3);
 
     useEffect(() => {
-        if (isImageMode) setNumPages(imageNumPages);
-    }, [isImageMode, imageNumPages, setNumPages]);
-
-    useEffect(() => {
         resetEditMode();
         resetNumPages();
         resetAutoSpread();
@@ -197,6 +193,12 @@ export function useReaderState({
         resetNumPages,
         setIsOnRelatedPage,
     ]);
+
+    // 書籍 state のリセット後に画像ページ数を同期する。キャッシュ済みの画像一覧が
+    // 初回 render から存在する再オープンでも、numPages=0 が後勝ちしない順序にする。
+    useEffect(() => {
+        if (isImageMode) setNumPages(imageNumPages);
+    }, [selectedPdf, isImageMode, imageNumPages, setNumPages]);
 
     // ページペア切替時に Auto 見開き判定をリセット。直後に PageRenderer の onRenderSuccess
     // で左右両ページの寸法が通知され、片方でも横長なら 1 ページ表示に確定する。
