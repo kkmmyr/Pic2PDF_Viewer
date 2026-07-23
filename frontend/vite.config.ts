@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { fileURLToPath, URL } from 'node:url'
+import { resolveManualChunk } from './src/config/buildChunks'
 
 export default defineConfig({
     plugins: [react(), tailwindcss()],
@@ -14,15 +15,7 @@ export default defineConfig({
         chunkSizeWarningLimit: 600,
         rollupOptions: {
             output: {
-                manualChunks(id) {
-                    if (!id.includes('node_modules')) return;
-                    if (id.includes('vis-network') || id.includes('vis-data')) return 'chunk-vis';
-                    if (id.includes('react-pdf') || id.includes('pdfjs-dist')) return 'chunk-pdf';
-                    if (id.includes('@tanstack')) return 'chunk-tanstack';
-                    if (id.includes('@dnd-kit')) return 'chunk-dnd';
-                    if (id.includes('lucide-react')) return 'chunk-lucide';
-                    return 'chunk-vendor';
-                },
+                manualChunks: resolveManualChunk,
             },
         },
     },
