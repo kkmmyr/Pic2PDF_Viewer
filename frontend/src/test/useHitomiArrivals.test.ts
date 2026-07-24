@@ -33,11 +33,18 @@ const makeItem = (id: number): ArrivalItem => ({
     published_at: '2026-05-01',
     discovered_at: '2026-05-06',
     url: `https://hitomi.la/${id}`,
-    dismissed: false,
+    is_read: false,
+    read_at: null,
 });
 
 const buildResponse = (items: ArrivalItem[]): NewArrivalsResponse => ({
     items,
+    status: 'unread',
+    total: items.length,
+    unread_count: items.length,
+    read_count: 0,
+    offset: 0,
+    limit: 60,
     last_run_at: '2026-05-06T10:00:00Z',
     last_run_status: 'ok',
     last_error: null,
@@ -54,8 +61,11 @@ describe('useHitomiArrivals', () => {
         const { result } = renderHook(() => useHitomiArrivals(), { wrapper: createWrapper() });
 
         await waitFor(() => expect(mockedGet).toHaveBeenCalled());
-        expect(mockedGet).toHaveBeenCalledWith('/api/hitomi/new-arrivals');
+        expect(mockedGet).toHaveBeenCalledWith(
+            '/api/hitomi/new-arrivals?status=unread&offset=0&limit=60',
+        );
         await waitFor(() => expect(result.current.items).toHaveLength(2));
+        expect(result.current.unreadCount).toBe(2);
         expect(result.current.lastRunAt).toBe('2026-05-06T10:00:00Z');
         expect(result.current.lastRunStatus).toBe('ok');
         expect(result.current.lastError).toBeNull();

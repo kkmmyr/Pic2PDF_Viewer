@@ -21,7 +21,7 @@ import httpx
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from config import HITOMI_DATA_DIR as _hitomi_data_dir
-from services.hitomi import metadata, notify, nozomi, state_store, watchlist
+from services.hitomi import arrival_store, metadata, notify, nozomi, state_store, watchlist
 
 DATA_DIR = Path(_hitomi_data_dir)
 GALLERY_URL_TEMPLATE = "https://hitomi.la/galleries/{id}.html"
@@ -54,7 +54,7 @@ def build_arrival_item(
     meta: dict,
     *,
     now_iso: str | None = None,
-) -> state_store.ArrivalItem:
+) -> arrival_store.ArrivalItem:
     """ギャラリー ID + watchlist エントリ + メタから new_arrivals 用 item を組み立てる。"""
     files = meta.get("files") or []
     return {
@@ -68,7 +68,7 @@ def build_arrival_item(
         "published_at": meta.get("date", ""),
         "discovered_at": now_iso or _now_iso(),
         "url": GALLERY_URL_TEMPLATE.format(id=gallery_id),
-        "dismissed": False,
+        "is_read": False,
     }
 
 
@@ -89,6 +89,7 @@ def main(
     try:
         state = state_store.load_state(data_dir)
         entries = watchlist.load_watchlist(data_dir)
+        arrival_store.import_legacy_json(data_dir)
     except Exception as e:
         print(f"[hitomi_monitor] FATAL: 初期ロード失敗: {e}", file=sys.stderr)
         return 2
@@ -108,7 +109,7 @@ def main(
         return 0
 
     errors: list[str] = []
-    new_items: list[state_store.ArrivalItem] = []
+    new_items: list[arrival_store.ArrivalItem] = []
     skipped = 0
 
     with httpx.Client(timeout=nozomi.DEFAULT_TIMEOUT) as client:
@@ -161,8 +162,7 @@ def main(
             print(f"[hitomi_monitor] {key}: top={ids[0]}, new={new_for_artist}")
 
     try:
-        added = state_store.merge_new_items(data_dir, new_items)
-        purged = state_store.purge_expired(data_dir, threshold_days=30)
+        added = arrival_store.merge_new_items(new_items)
     except Exception as e:
         print(f"[hitomi_monitor] FATAL: arrivals 書込失敗: {e}", file=sys.stderr)
         return 2
@@ -182,7 +182,7 @@ def main(
         print(f"[hitomi_monitor] FATAL: state.json 書込失敗: {e}", file=sys.stderr)
         return 2
 
-    print(f"[hitomi_monitor] done: 新着 {added} 件追加, {purged} 件 purge, {skipped} 件 skip, エラー {len(errors)} 件")
+    print(f"[hitomi_monitor] done: 新着 {added} 件追加, {skipped} 件 skip, エラー {len(errors)} 件")
     notify.notify_run_result(added=added, skipped=skipped, errors=len(errors))
     return 1 if errors else 0
 

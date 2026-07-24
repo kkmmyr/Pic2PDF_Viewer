@@ -53,6 +53,31 @@ CREATE TABLE IF NOT EXISTS group_pins (
     book_name TEXT NOT NULL,
     PRIMARY KEY (source, pin_type, group_id)
 );
+
+CREATE TABLE IF NOT EXISTS hitomi_arrivals (
+    gallery_id       INTEGER PRIMARY KEY,
+    artist           TEXT NOT NULL,
+    display_artist   TEXT NOT NULL,
+    title            TEXT NOT NULL DEFAULT '',
+    language         TEXT NOT NULL,
+    gallery_type     TEXT NOT NULL DEFAULT '',
+    page_count       INTEGER NOT NULL DEFAULT 0,
+    published_at     TEXT,
+    discovered_at    TEXT NOT NULL,
+    url              TEXT NOT NULL,
+    is_read          INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0, 1)),
+    read_at          TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_hitomi_arrivals_status
+    ON hitomi_arrivals(is_read, discovered_at DESC);
+
+CREATE TABLE IF NOT EXISTS hitomi_legacy_imports (
+    source_path      TEXT PRIMARY KEY,
+    source_mtime_ns  INTEGER NOT NULL,
+    source_size      INTEGER NOT NULL,
+    imported_at      TEXT NOT NULL
+);
 """
 
 

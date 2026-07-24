@@ -14,7 +14,8 @@ const item: ArrivalItem = {
     published_at: '2026-05-01',
     discovered_at: '2026-05-06',
     url: 'https://hitomi.la/12345',
-    dismissed: false,
+    is_read: false,
+    read_at: null,
 };
 
 describe('HitomiArrivalCard', () => {
@@ -67,5 +68,13 @@ describe('HitomiArrivalCard', () => {
             <HitomiArrivalCard item={{ ...item, published_at: '' }} onDismiss={vi.fn()} />,
         );
         expect(container.textContent).not.toMatch(/公開:/);
+    });
+
+    it('履歴表示では既読ボタンを隠し、旧移行データの日時なしを表示', () => {
+        const { queryByText, getByText } = render(
+            <HitomiArrivalCard item={{ ...item, is_read: true, read_at: null }} />,
+        );
+        expect(queryByText('既読', { selector: 'button' })).not.toBeInTheDocument();
+        expect(getByText(/日時記録なし/)).toBeInTheDocument();
     });
 });

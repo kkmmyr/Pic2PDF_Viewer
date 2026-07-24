@@ -1,15 +1,16 @@
 """hitomi.la 新着監視 API。
 
 各エンドポイントの詳細は docs/design/詳細設計/機能別/hitomi新着監視設計書.md §6 を参照。
-データは backend/data/hitomi/ 配下の JSON ファイル（個別の監視スクリプトが書き出す）。
+監視状態は hitomi/ 配下の JSON、検出作品と既読履歴は meta2.db に保存する。
 """
 
 import logging
 import threading
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from config import HITOMI_DATA_DIR as _hitomi_data_dir
@@ -22,7 +23,7 @@ from routers.api_schemas import (
     HitomiRunNowResponse,
     HitomiWatchlistResponse,
 )
-from services.hitomi import nozomi, state_store, watchlist
+from services.hitomi import arrival_store, nozomi, state_store, watchlist
 from tools import hitomi_monitor
 
 _log = logging.getLogger(__name__)
@@ -46,14 +47,20 @@ class AddWatchlistRequest(BaseModel):
 
 
 @router.get("/hitomi/new-arrivals", response_model=HitomiArrivalsResponse)
-def get_new_arrivals() -> dict:
-    """dismissed=false のアイテムを新着順で返す + ヘルス情報。"""
+def get_new_arrivals(
+    status: Literal["unread", "read", "all"] = "unread",
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=60, ge=1, le=200),
+) -> dict:
+    """指定既読状態の作品を新着順で返す + ヘルス情報。"""
+    arrival_store.import_legacy_json(DATA_DIR)
     state = state_store.load_state(DATA_DIR)
-    arrivals = state_store.load_arrivals(DATA_DIR)
-    items = [it for it in arrivals["items"] if not it.get("dismissed")]
-    items.sort(key=lambda it: it.get("discovered_at", ""), reverse=True)
+    page = arrival_store.list_arrivals(status, offset, limit)
     return {
-        "items": items,
+        **page,
+        "status": status,
+        "offset": offset,
+        "limit": limit,
         "last_run_at": state.get("last_run_at"),
         "last_run_status": state.get("last_run_status", "never"),
         "last_error": state.get("last_error"),
@@ -62,14 +69,16 @@ def get_new_arrivals() -> dict:
 
 @router.post("/hitomi/dismiss/{gallery_id}", response_model=HitomiDismissResponse)
 def post_dismiss(gallery_id: int) -> dict:
-    if not state_store.dismiss(DATA_DIR, gallery_id):
+    arrival_store.import_legacy_json(DATA_DIR)
+    if not arrival_store.dismiss(gallery_id):
         raise HTTPException(status_code=404, detail=f"Item not found: {gallery_id}")
     return {"message": "Dismissed", "id": gallery_id}
 
 
 @router.post("/hitomi/dismiss-all", response_model=HitomiDismissAllResponse)
 def post_dismiss_all() -> dict:
-    count = state_store.dismiss_all(DATA_DIR)
+    arrival_store.import_legacy_json(DATA_DIR)
+    count = arrival_store.dismiss_all()
     return {"message": "All dismissed", "dismissed_count": count}
 
 

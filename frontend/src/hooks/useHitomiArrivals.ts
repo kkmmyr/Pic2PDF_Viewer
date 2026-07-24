@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '@/config/api_client';
 import { API_ENDPOINTS } from '@/config/api';
 import { errorMessage } from '@/utils/error';
 import type {
+    ArrivalStatus,
     ArrivalItem,
     NewArrivalsResponse,
     RunNowResponse,
@@ -13,15 +14,23 @@ import type {
 
 interface ArrivalsData {
     items: ArrivalItem[];
+    total: number;
+    unreadCount: number;
+    readCount: number;
+    offset: number;
+    limit: number;
     lastRunAt: string | null;
     lastRunStatus: RunStatus;
     lastError: string | null;
 }
 
-const QUERY_KEY = ['hitomiArrivals'] as const;
+const QUERY_ROOT = ['hitomiArrivals'] as const;
 
 interface UseHitomiArrivalsResult {
     items: ArrivalItem[];
+    total: number;
+    unreadCount: number;
+    readCount: number;
     lastRunAt: string | null;
     lastRunStatus: RunStatus;
     lastError: string | null;
@@ -41,21 +50,34 @@ interface UseHitomiArrivalsResult {
  * - マウント時に 1 回 fetch（ポーリングしない）
  * - dismiss / dismissAll は楽観的更新 + サーバ反映、失敗時はロールバック
  */
-export function useHitomiArrivals(): UseHitomiArrivalsResult {
+export function useHitomiArrivals(
+    status: ArrivalStatus = 'unread',
+    offset = 0,
+    limit = 60,
+): UseHitomiArrivalsResult {
     const queryClient = useQueryClient();
     const [running, setRunning] = useState(false);
+    const queryKey = useMemo(
+        () => [...QUERY_ROOT, status, offset, limit] as const,
+        [status, offset, limit],
+    );
 
     const query = useQuery({
-        queryKey: QUERY_KEY,
+        queryKey,
         queryFn: async (): Promise<ArrivalsData> => {
             const resp = await apiClient.get<unknown, NewArrivalsResponse>(
-                API_ENDPOINTS.HITOMI_NEW_ARRIVALS,
+                API_ENDPOINTS.HITOMI_ARRIVALS(status, offset, limit),
             );
             return {
                 items: resp.items,
-                lastRunAt: resp.last_run_at,
+                total: resp.total,
+                unreadCount: resp.unread_count,
+                readCount: resp.read_count,
+                offset: resp.offset,
+                limit: resp.limit,
+                lastRunAt: resp.last_run_at ?? null,
                 lastRunStatus: resp.last_run_status,
-                lastError: resp.last_error,
+                lastError: resp.last_error ?? null,
             };
         },
         staleTime: Infinity,
@@ -64,32 +86,52 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
     const dismissMutation = useMutation({
         mutationFn: (id: number) => apiClient.post(API_ENDPOINTS.HITOMI_DISMISS(id)),
         onMutate: (id: number) => {
-            const prev = queryClient.getQueryData<ArrivalsData>(QUERY_KEY);
-            queryClient.setQueryData<ArrivalsData>(QUERY_KEY, (old) =>
-                old ? { ...old, items: old.items.filter((it) => it.id !== id) } : old,
-            );
+            const prev = queryClient.getQueryData<ArrivalsData>(queryKey);
+            queryClient.setQueryData<ArrivalsData>(queryKey, (old) => {
+                if (!old || status !== 'unread') return old;
+                return {
+                    ...old,
+                    items: old.items.filter((it) => it.id !== id),
+                    total: Math.max(0, old.total - 1),
+                    unreadCount: Math.max(0, old.unreadCount - 1),
+                    readCount: old.readCount + 1,
+                };
+            });
             return { prev };
         },
         onError: (_err, _id, context) => {
             if (context?.prev !== undefined) {
-                queryClient.setQueryData(QUERY_KEY, context.prev);
+                queryClient.setQueryData(queryKey, context.prev);
             }
+        },
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: QUERY_ROOT, refetchType: 'inactive' });
         },
     });
 
     const dismissAllMutation = useMutation({
         mutationFn: () => apiClient.post(API_ENDPOINTS.HITOMI_DISMISS_ALL),
         onMutate: () => {
-            const prev = queryClient.getQueryData<ArrivalsData>(QUERY_KEY);
-            queryClient.setQueryData<ArrivalsData>(QUERY_KEY, (old) =>
-                old ? { ...old, items: [] } : old,
-            );
+            const prev = queryClient.getQueryData<ArrivalsData>(queryKey);
+            queryClient.setQueryData<ArrivalsData>(queryKey, (old) => {
+                if (!old || status !== 'unread') return old;
+                return {
+                    ...old,
+                    items: [],
+                    total: 0,
+                    readCount: old.readCount + old.unreadCount,
+                    unreadCount: 0,
+                };
+            });
             return { prev };
         },
         onError: (_err, _vars, context) => {
             if (context?.prev !== undefined) {
-                queryClient.setQueryData(QUERY_KEY, context.prev);
+                queryClient.setQueryData(queryKey, context.prev);
             }
+        },
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: QUERY_ROOT, refetchType: 'inactive' });
         },
     });
 
@@ -116,27 +158,30 @@ export function useHitomiArrivals(): UseHitomiArrivalsResult {
             // invalidateQueries の refetchType:'active' はコンポーネント非アクティブ時に
             // refetch をスキップするため、戻ってきたときに lastRunAt 等が更新されない。
             // setQueryData で先に書いておけばアンマウント中でも結果が保持される。
-            queryClient.setQueryData<ArrivalsData>(QUERY_KEY, (old) =>
+            queryClient.setQueryData<ArrivalsData>(queryKey, (old) =>
                 old
                     ? {
                           ...old,
-                          lastRunAt: resp.last_run_at,
+                          lastRunAt: resp.last_run_at ?? null,
                           lastRunStatus: resp.last_run_status as RunStatus,
-                          lastError: resp.last_error,
+                          lastError: resp.last_error ?? null,
                       }
                     : old,
             );
-            await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
-            return resp.last_run_stats;
+            await queryClient.invalidateQueries({ queryKey: QUERY_ROOT });
+            return resp.last_run_stats ?? null;
         } finally {
             setRunning(false);
         }
-    }, [queryClient]);
+    }, [queryClient, queryKey]);
 
     const data = query.data;
 
     return {
         items: data?.items ?? [],
+        total: data?.total ?? 0,
+        unreadCount: data?.unreadCount ?? 0,
+        readCount: data?.readCount ?? 0,
         lastRunAt: data?.lastRunAt ?? null,
         lastRunStatus: data?.lastRunStatus ?? 'never',
         lastError: data?.lastError ?? null,

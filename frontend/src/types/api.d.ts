@@ -499,7 +499,7 @@ export interface paths {
         };
         /**
          * Get New Arrivals
-         * @description dismissed=false のアイテムを新着順で返す + ヘルス情報。
+         * @description 指定既読状態の作品を新着順で返す + ヘルス情報。
          */
         get: operations['get_new_arrivals_api_hitomi_new_arrivals_get'];
         put?: never;
@@ -1913,16 +1913,59 @@ export interface components {
             /** Normalized */
             normalized: string;
         };
+        /** HitomiArrivalItem */
+        HitomiArrivalItem: {
+            /** Id */
+            id: number;
+            /** Artist */
+            artist: string;
+            /** Display Artist */
+            display_artist: string;
+            /** Title */
+            title: string;
+            /** Language */
+            language: string;
+            /** Type */
+            type: string;
+            /** Page Count */
+            page_count: number;
+            /** Published At */
+            published_at?: string | null;
+            /** Discovered At */
+            discovered_at: string;
+            /** Url */
+            url: string;
+            /** Is Read */
+            is_read: boolean;
+            /** Read At */
+            read_at?: string | null;
+        };
         /** HitomiArrivalsResponse */
         HitomiArrivalsResponse: {
             /** Items */
-            items: {
-                [key: string]: unknown;
-            }[];
+            items: components['schemas']['HitomiArrivalItem'][];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: 'unread' | 'read' | 'all';
+            /** Total */
+            total: number;
+            /** Unread Count */
+            unread_count: number;
+            /** Read Count */
+            read_count: number;
+            /** Offset */
+            offset: number;
+            /** Limit */
+            limit: number;
             /** Last Run At */
             last_run_at?: string | null;
-            /** Last Run Status */
-            last_run_status: string;
+            /**
+             * Last Run Status
+             * @enum {string}
+             */
+            last_run_status: 'ok' | 'partial' | 'error' | 'never';
             /** Last Error */
             last_error?: string | null;
         };
@@ -1948,24 +1991,45 @@ export interface components {
         /** HitomiRunNowResponse */
         HitomiRunNowResponse: {
             /** Exit Code */
-            exit_code?: number | null;
+            exit_code: number;
             /** Last Run At */
             last_run_at?: string | null;
-            /** Last Run Status */
-            last_run_status: string;
+            /**
+             * Last Run Status
+             * @enum {string}
+             */
+            last_run_status: 'ok' | 'partial' | 'error' | 'never';
             /** Last Error */
             last_error?: string | null;
-            /** Last Run Stats */
-            last_run_stats?: {
-                [key: string]: unknown;
-            } | null;
+            last_run_stats?: components['schemas']['HitomiRunStats'] | null;
+        };
+        /** HitomiRunStats */
+        HitomiRunStats: {
+            /** Added */
+            added: number;
+            /** Skipped */
+            skipped: number;
+            /** Errors */
+            errors: number;
+        };
+        /** HitomiWatchlistEntry */
+        HitomiWatchlistEntry: {
+            /** Display Name */
+            display_name: string;
+            /** Normalized */
+            normalized: string;
+            /** Language */
+            language: string;
+            /**
+             * Added At
+             * @default
+             */
+            added_at: string;
         };
         /** HitomiWatchlistResponse */
         HitomiWatchlistResponse: {
             /** Artists */
-            artists: {
-                [key: string]: unknown;
-            }[];
+            artists: components['schemas']['HitomiWatchlistEntry'][];
         };
         /** MergePdfsRequest */
         MergePdfsRequest: {
@@ -3374,7 +3438,11 @@ export interface operations {
     };
     get_new_arrivals_api_hitomi_new_arrivals_get: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: 'unread' | 'read' | 'all';
+                offset?: number;
+                limit?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -3388,6 +3456,15 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['HitomiArrivalsResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
                 };
             };
         };

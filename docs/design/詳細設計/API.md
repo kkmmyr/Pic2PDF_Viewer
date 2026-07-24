@@ -1,6 +1,6 @@
 # API 仕様
 
-> status: living | last-verified: 2026-07-19
+> status: living | last-verified: 2026-07-25
 
 バックエンド (FastAPI) が提供する API のリファレンス方針と、OpenAPI では表現できない設計意図をまとめる。
 
@@ -100,6 +100,8 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 - **`has_highlight` フィールド**: `false` の場合は FTS5 ヒットなし（ベクトル検索のみのヒット）を意味し、`snippet` はチャンク先頭 200 字（`<mark>` なし、HTML エスケープのみ）になる。
 
 - **シリーズ並べ替えの再採番規則**: `series/reorder` は渡された配列の順序どおりに `series_index` を `1.0, 2.0, 3.0, ...` へ振り直す（欠番・重複を許さず常に連番化する。DnD 並べ替え UI からの呼び出しを想定）。
+
+- **Hitomi検出履歴**: `GET /api/hitomi/new-arrivals` は `status=unread|read|all`（既定 `unread`）、`offset`、`limit` を受け付ける。レスポンスは選択状態の `total` と全体の `unread_count` / `read_count` を含む。既読化は `is_read=1` と `read_at` の更新であり、作品行を削除しない。旧 `new_arrivals.json` から移行した既読行は元データに既読日時がないため `read_at=null` のまま保持する。
 
 ---
 

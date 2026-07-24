@@ -109,10 +109,31 @@ class GenreListResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class HitomiArrivalItem(BaseModel):
+    id: int
+    artist: str
+    display_artist: str
+    title: str
+    language: str
+    type: str
+    page_count: int
+    published_at: str | None = None
+    discovered_at: str
+    url: str
+    is_read: bool
+    read_at: str | None = None
+
+
 class HitomiArrivalsResponse(BaseModel):
-    items: list[dict]
+    items: list[HitomiArrivalItem]
+    status: Literal["unread", "read", "all"]
+    total: int
+    unread_count: int
+    read_count: int
+    offset: int
+    limit: int
     last_run_at: str | None = None
-    last_run_status: str
+    last_run_status: Literal["ok", "partial", "error", "never"]
     last_error: str | None = None
 
 
@@ -126,8 +147,15 @@ class HitomiDismissAllResponse(BaseModel):
     dismissed_count: int
 
 
+class HitomiWatchlistEntry(BaseModel):
+    display_name: str
+    normalized: str
+    language: str
+    added_at: str = ""
+
+
 class HitomiWatchlistResponse(BaseModel):
-    artists: list[dict]
+    artists: list[HitomiWatchlistEntry]
 
 
 class HitomiAddArtistResponse(BaseModel):
@@ -139,12 +167,18 @@ class HitomiRemoveArtistResponse(BaseModel):
     message: str
 
 
+class HitomiRunStats(BaseModel):
+    added: int
+    skipped: int
+    errors: int
+
+
 class HitomiRunNowResponse(BaseModel):
-    exit_code: int | None = None
+    exit_code: int
     last_run_at: str | None = None
-    last_run_status: str
+    last_run_status: Literal["ok", "partial", "error", "never"]
     last_error: str | None = None
-    last_run_stats: dict | None = None
+    last_run_stats: HitomiRunStats | None = None
 
 
 # ---------------------------------------------------------------------------

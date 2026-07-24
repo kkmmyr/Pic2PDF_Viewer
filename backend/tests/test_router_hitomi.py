@@ -65,7 +65,25 @@ class TestNewArrivals:
         body = res.json()
         # dismissed=true は除外、新着順
         assert [it["id"] for it in body["items"]] == [2, 1]
+        assert body["unread_count"] == 2
+        assert body["read_count"] == 1
         assert body["last_run_status"] == "ok"
+
+    def test_returns_read_history_with_paging(self, client, hitomi_data_dir):
+        _seed_arrivals(
+            hitomi_data_dir,
+            [
+                {"id": 1, "discovered_at": "2026-05-01", "dismissed": True, "title": "old"},
+                {"id": 2, "discovered_at": "2026-05-02", "dismissed": True, "title": "new"},
+                {"id": 3, "discovered_at": "2026-05-03", "dismissed": False, "title": "unread"},
+            ],
+        )
+
+        res = client.get("/api/hitomi/new-arrivals?status=read&offset=1&limit=1")
+        body = res.json()
+        assert [item["id"] for item in body["items"]] == [1]
+        assert body["total"] == 2
+        assert body["status"] == "read"
 
     def test_health_fields_default(self, client, hitomi_data_dir):
         """state.json なしでもヘルスフィールドはデフォルト値で返る。"""
@@ -90,10 +108,9 @@ class TestDismiss:
         )
         res = client.post("/api/hitomi/dismiss/100")
         assert res.status_code == 200
-        # 永続化を確認
-        with open(hitomi_data_dir / "new_arrivals.json", encoding="utf-8") as f:
-            arr = json.load(f)
-        assert arr["items"][0]["dismissed"] is True
+        history = client.get("/api/hitomi/new-arrivals?status=read").json()
+        assert history["items"][0]["id"] == 100
+        assert history["items"][0]["read_at"] is not None
 
     def test_404_when_not_found(self, client, hitomi_data_dir):
         _seed_arrivals(hitomi_data_dir, [])

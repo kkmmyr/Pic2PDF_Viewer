@@ -58,8 +58,9 @@ export const API_ENDPOINTS = {
     SERIES_REORDER: '/api/series/reorder',
     /** 既存シリーズへの紐付け候補提案（A-1） */
     SERIES_SUGGEST: '/api/series/suggest',
-    /** hitomi.la 新着一覧取得 */
-    HITOMI_NEW_ARRIVALS: '/api/hitomi/new-arrivals',
+    /** hitomi.la 新着・既読履歴取得 */
+    HITOMI_ARRIVALS: (status: 'unread' | 'read' | 'all', offset = 0, limit = 60) =>
+        `/api/hitomi/new-arrivals?status=${status}&offset=${offset}&limit=${limit}`,
     /** hitomi.la 新着個別既読化 */
     HITOMI_DISMISS: (id: number) => `/api/hitomi/dismiss/${id}`,
     /** hitomi.la 新着一括既読化 */

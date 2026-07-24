@@ -1,10 +1,10 @@
 import { ExternalLink, EyeOff, FileText } from 'lucide-react';
 import type { ArrivalItem } from '@/types/hitomi';
-import { formatDateJa } from '@/utils/date';
+import { formatDateJa, formatSqliteUtcAsJst } from '@/utils/date';
 
 interface HitomiArrivalCardProps {
     item: ArrivalItem;
-    onDismiss: (id: number) => void;
+    onDismiss?: (id: number) => void;
 }
 
 export function HitomiArrivalCard({ item, onDismiss }: HitomiArrivalCardProps) {
@@ -25,6 +25,12 @@ export function HitomiArrivalCard({ item, onDismiss }: HitomiArrivalCardProps) {
                 {item.published_at && <span>公開: {formatDateJa(item.published_at)}</span>}
                 {item.published_at && item.discovered_at && <span> / </span>}
                 {item.discovered_at && <span>検出: {formatDateJa(item.discovered_at)}</span>}
+                {item.is_read && (
+                    <span>
+                        {' '}
+                        / 既読: {item.read_at ? formatSqliteUtcAsJst(item.read_at) : '日時記録なし'}
+                    </span>
+                )}
             </div>
             <div className="flex gap-2 mt-1">
                 <a
@@ -36,14 +42,16 @@ export function HitomiArrivalCard({ item, onDismiss }: HitomiArrivalCardProps) {
                     <ExternalLink className="w-3.5 h-3.5" />
                     hitomi.la で開く
                 </a>
-                <button
-                    onClick={() => onDismiss(item.id)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                    title="既読化"
-                >
-                    <EyeOff className="w-3.5 h-3.5" />
-                    既読
-                </button>
+                {onDismiss && (
+                    <button
+                        onClick={() => onDismiss(item.id)}
+                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        title="既読化"
+                    >
+                        <EyeOff className="w-3.5 h-3.5" />
+                        既読
+                    </button>
+                )}
             </div>
         </div>
     );

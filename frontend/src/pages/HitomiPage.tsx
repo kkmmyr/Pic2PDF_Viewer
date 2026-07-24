@@ -1,5 +1,14 @@
 import { useState } from 'react';
-import { AlertCircle, CheckCircle2, Download, Loader2, RefreshCw, Users } from 'lucide-react';
+import {
+    AlertCircle,
+    CheckCircle2,
+    Download,
+    History,
+    Inbox,
+    Loader2,
+    RefreshCw,
+    Users,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useHitomiArrivals } from '@/hooks/useHitomiArrivals';
 import { useAsyncToast } from '@/hooks/useAsyncToast';
@@ -9,7 +18,9 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Alert } from '@/components/ui/alert';
 import { errorMessage } from '@/utils/error';
 import { formatDateTimeJa } from '@/utils/date';
-import type { RunStatus } from '@/types/hitomi';
+import type { ArrivalStatus, RunStatus } from '@/types/hitomi';
+
+const PAGE_SIZE = 60;
 
 function StatusBadge({ status }: { status: RunStatus }) {
     if (status === 'ok') {
@@ -44,8 +55,13 @@ function StatusBadge({ status }: { status: RunStatus }) {
 }
 
 export default function HitomiPage() {
+    const [activeStatus, setActiveStatus] = useState<ArrivalStatus>('unread');
+    const [offset, setOffset] = useState(0);
     const {
         items,
+        total,
+        unreadCount,
+        readCount,
         lastRunAt,
         lastRunStatus,
         lastError,
@@ -56,10 +72,15 @@ export default function HitomiPage() {
         dismiss,
         dismissAll,
         runNow,
-    } = useHitomiArrivals();
+    } = useHitomiArrivals(activeStatus, offset, PAGE_SIZE);
     const runAsync = useAsyncToast();
     const [watchlistOpen, setWatchlistOpen] = useState(false);
     const [confirmDismissAllOpen, setConfirmDismissAllOpen] = useState(false);
+
+    const switchStatus = (status: ArrivalStatus) => {
+        setActiveStatus(status);
+        setOffset(0);
+    };
 
     const errMsg = (label: string) => (e: unknown) => `${label}: ${errorMessage(e, '不明')}`;
 
@@ -135,14 +156,41 @@ export default function HitomiPage() {
                         )}
                         {running ? '取得中...' : '新着情報を取得'}
                     </button>
-                    <button
-                        onClick={() => setConfirmDismissAllOpen(true)}
-                        disabled={items.length === 0 || running}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        全件既読化
-                    </button>
+                    {activeStatus === 'unread' && (
+                        <button
+                            onClick={() => setConfirmDismissAllOpen(true)}
+                            disabled={items.length === 0 || running}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-primary-600 hover:bg-primary-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            全件既読化
+                        </button>
+                    )}
                 </div>
+            </div>
+
+            <div className="flex gap-2 mb-4 border-b border-gray-200 dark:border-gray-700">
+                <button
+                    onClick={() => switchStatus('unread')}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeStatus === 'unread'
+                            ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                >
+                    <Inbox className="w-4 h-4" />
+                    新着 ({unreadCount})
+                </button>
+                <button
+                    onClick={() => switchStatus('read')}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                        activeStatus === 'read'
+                            ? 'border-primary-600 text-primary-600 dark:text-primary-400'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                >
+                    <History className="w-4 h-4" />
+                    履歴 ({readCount})
+                </button>
             </div>
 
             {error && (
@@ -157,24 +205,49 @@ export default function HitomiPage() {
                 </div>
             ) : items.length === 0 ? (
                 <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-                    {lastRunStatus === 'never'
-                        ? '監視がまだ一度も実行されていません。'
-                        : '新着はありません。'}
+                    {activeStatus === 'read'
+                        ? '既読履歴はありません。'
+                        : lastRunStatus === 'never'
+                          ? '監視がまだ一度も実行されていません。'
+                          : '新着はありません。'}
                 </div>
             ) : (
                 <>
                     <div className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-                        {items.length} 件の新着
+                        {total} 件の{activeStatus === 'unread' ? '新着' : '履歴'}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {items.map((item) => (
                             <HitomiArrivalCard
                                 key={item.id}
                                 item={item}
-                                onDismiss={handleDismiss}
+                                onDismiss={activeStatus === 'unread' ? handleDismiss : undefined}
                             />
                         ))}
                     </div>
+                    {total > PAGE_SIZE && (
+                        <div className="flex items-center justify-center gap-3 mt-6">
+                            <button
+                                onClick={() =>
+                                    setOffset((current) => Math.max(0, current - PAGE_SIZE))
+                                }
+                                disabled={offset === 0 || loading}
+                                className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-600 disabled:opacity-50"
+                            >
+                                前へ
+                            </button>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                                {offset + 1}–{Math.min(offset + items.length, total)} / {total}
+                            </span>
+                            <button
+                                onClick={() => setOffset((current) => current + PAGE_SIZE)}
+                                disabled={offset + items.length >= total || loading}
+                                className="px-3 py-1.5 rounded-md text-sm border border-gray-300 dark:border-gray-600 disabled:opacity-50"
+                            >
+                                次へ
+                            </button>
+                        </div>
+                    )}
                 </>
             )}
 
@@ -190,7 +263,7 @@ export default function HitomiPage() {
             <ConfirmDialog
                 open={confirmDismissAllOpen}
                 title="全件を既読化"
-                message={`${items.length} 件すべてを既読化します。よろしいですか？`}
+                message={`${total} 件すべてを既読化します。よろしいですか？`}
                 confirmLabel="既読化"
                 onConfirm={handleDismissAllConfirmed}
                 onCancel={() => setConfirmDismissAllOpen(false)}

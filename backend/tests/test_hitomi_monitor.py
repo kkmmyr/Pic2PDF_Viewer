@@ -73,10 +73,10 @@ def test_main_reuses_one_http_client(monkeypatch, tmp_path):
     monkeypatch.setattr(hitomi_monitor.httpx, "Client", client_factory)
     monkeypatch.setattr(hitomi_monitor.state_store, "load_state", lambda _path: state)
     monkeypatch.setattr(hitomi_monitor.watchlist, "load_watchlist", lambda _path: [entry])
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "import_legacy_json", lambda _path: 0)
     monkeypatch.setattr(hitomi_monitor.nozomi, "fetch_nozomi_head", fetch_nozomi)
     monkeypatch.setattr(hitomi_monitor.metadata, "fetch_metadata", fetch_metadata)
-    monkeypatch.setattr(hitomi_monitor.state_store, "merge_new_items", lambda _path, _items: 1)
-    monkeypatch.setattr(hitomi_monitor.state_store, "purge_expired", lambda _path, threshold_days: 0)
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "merge_new_items", lambda _items: 1)
     monkeypatch.setattr(hitomi_monitor.state_store, "save_state", lambda _path, _state: None)
     monkeypatch.setattr(hitomi_monitor.notify, "notify_run_result", lambda **_kwargs: None)
 

@@ -1,6 +1,6 @@
 # hitomi.la 新着監視設計書
 
-> status: living | last-verified: 2026-07-18
+> status: living | last-verified: 2026-07-25
 
 特定作者の新着ギャラリーを定期監視して、ライブラリ画面から確認・hitomi.la へのリンクで遷移できる機能の設計書。本機能は **既存の Pic2PDF_Viewer 本体機能とは独立** しており、設計上も実行プロセスとしても疎結合に組む。本機能に関する仕様・実装・運用はすべて本ファイルに集約する。
 
@@ -18,14 +18,14 @@ hitomi.la に登録された特定作者の **新着ギャラリーを自動的�
 - バックグラウンドのスクリプトが週次（任意間隔）で監視リストを巡回し、新着 ID を検出
 - 検出した新着のメタデータ（タイトル・ページ数・公開日等）を取得して保存
 - ユーザーは UI の「新着」リンクから一覧を見て、`hitomi.la/galleries/<id>.html` を新規タブで開く
-- 既読化操作で個別 / 一括非表示。30 日経過で物理削除
+- 既読化操作で個別 / 一括非表示。既読作品は履歴タブから再確認でき、物理削除しない
 - UI から「今すぐ取得」ボタンで Task Scheduler を待たずに監視スクリプトを手動実行できる（同期処理）
 
 ### 1.3. 制約・前提
 
 - **NOZOMI は hitomi.la の内部仕様**であり、公式 API ではない。予告なく URL や形式が変わる可能性があるため、ヘルス情報を必ず記録し UI から状態確認できるようにする
 - バックエンドサーバの常駐は **不要**（使うときだけ起動する運用を維持）
-- 本機能のデータ（監視履歴・新着リスト）は個人視聴履歴に近く、**リポジトリには含めない**（`.gitignore` 対象）
+- 本機能のデータ（監視状態・新着履歴）は個人視聴履歴に近く、**リポジトリには含めない**（`.gitignore` 対象）
 - 通知（メール・Discord 等）は **対象外**。UI 表示のみ
 
 ---
@@ -44,11 +44,12 @@ hitomi.la に登録された特定作者の **新着ギャラリーを自動的�
       ├─ NOZOMI 取得 (Range 数十バイト)
       ├─ 差分検出
       ├─ /galleries/<id>.js でメタデータ取得
-      └─ new_arrivals.json / state.json に書き出し
-         (/opt/pic2pdf-viewer/backend/data/hitomi/)
+      ├─ state.json に監視状態を書き出し
+      └─ meta2.db の hitomi_arrivals に検出作品を追加
+         (/opt/pic2pdf-viewer/data/)
 
-[FastAPI] ──(JSON ファイル読込のみ)──→ [新着画面 React]
-                                       └→ hitomi.la/<id>.html へリンク
+[FastAPI] ──(SQLite + state.json 読込)──→ [新着 / 履歴画面 React]
+                                          └→ hitomi.la/<id>.html へリンク
 ```
 
 ### 2.3. NOZOMI を使う理由
@@ -71,20 +72,19 @@ NOZOMI は hitomi.la が事前生成して CDN に置いている、**条件に�
     b. big-endian 4byte 整数として ID 配列にデコード
     c. state.json の前回 top_id と比較し、新規 ID を抽出
     d. 各新規 ID について /galleries/<id>.js を取得しメタを得る
-    e. new_arrivals.json に追加（重複は無視）
+    e. meta2.db.hitomi_arrivals に追加（gallery_id 重複は無視）
     f. state.json の top_id を更新
-[4] dismissed=true かつ discovered_at が 30 日以前のエントリを物理削除
-[5] state.json に last_run_at / last_run_status を記録
-[6] 終了
+[4] state.json に last_run_at / last_run_status を記録
+[5] 終了
 ```
 
-UI 側は GET `/api/hitomi/new-arrivals` で `new_arrivals.json` を読み、画面に表示するだけ。
+UI 側は GET `/api/hitomi/new-arrivals?status=...` で SQLite を読み、新着 / 履歴を切り替える。
 
 ---
 
-## 4. データ構造（JSON 形式）
+## 4. データ構造
 
-`watchlist.json` / `state.json` / `new_arrivals.json` の更新は、同一ディレクトリの一時ファイルへ
+`watchlist.json` / `state.json` の更新は、同一ディレクトリの一時ファイルへ
 UTF-8 JSONを書き込み、`flush` + `fsync`後に`os.replace`する共通ヘルパーを使用する。
 シリアライズ失敗・書き込み中断・置換失敗時も既存ファイルを残し、一時ファイルは削除する。
 
@@ -125,29 +125,37 @@ UTF-8 JSONを書き込み、`flush` + `fsync`後に`os.replace`する共通ヘ�
 - `last_run_status` の値: `ok` / `partial` / `error` / `never`
 - `artists` のキーは `<normalized>:<language>`
 
-### 4.3. `new_arrivals.json`
+### 4.3. `meta2.db.hitomi_arrivals`
 
-```json
-{
-  "items": [
-    {
-      "id": 2034567,
-      "artist": "aka_shio",
-      "display_artist": "aka shio",
-      "title": "...",
-      "language": "japanese",
-      "type": "manga",
-      "page_count": 24,
-      "published_at": "2026-04-28T...",
-      "discovered_at": "2026-04-29T03:00:00+09:00",
-      "url": "https://hitomi.la/galleries/2034567.html",
-      "dismissed": false
-    }
-  ]
-}
+```sql
+CREATE TABLE hitomi_arrivals (
+    gallery_id       INTEGER PRIMARY KEY,
+    artist           TEXT NOT NULL,
+    display_artist   TEXT NOT NULL,
+    title            TEXT NOT NULL DEFAULT '',
+    language         TEXT NOT NULL,
+    gallery_type     TEXT NOT NULL DEFAULT '',
+    page_count       INTEGER NOT NULL DEFAULT 0,
+    published_at     TEXT,
+    discovered_at    TEXT NOT NULL,
+    url              TEXT NOT NULL,
+    is_read          INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0, 1)),
+    read_at          TEXT
+);
 ```
 
-`dismissed: true` のアイテムも 30 日間は残る（再 POLL で蒸し返さないため）。
+- `gallery_id` を主キーにし、再監視時の重複追加を無視する。
+- 新規の既読操作は `is_read=1` と `read_at=<JST>` を同一transactionで更新する。
+- 旧JSONには既読日時がないため、移行済み既読行は `is_read=1, read_at=NULL` とする。
+- 既読行は自動削除しない。削除機能を追加する場合は別の明示操作として設計する。
+
+### 4.4. 旧 `new_arrivals.json` の移行
+
+FastAPIのHitomi API利用時および監視スクリプト起動時に、旧JSONが存在すれば
+`INSERT ... ON CONFLICT DO NOTHING` で全件を取り込む。1 transaction内で実行し、
+途中失敗時は全件rollbackする。JSONは移行後も可搬バックアップとして残すが、
+新規検出・既読更新の正本には使用しない。`hitomi_legacy_imports` に移行元パス・mtime・
+サイズを記録し、JSONが変わっていない通常のAPIアクセスでは全件再走査を省略する。
 
 ---
 
@@ -163,7 +171,8 @@ UTF-8 JSONを書き込み、`flush` + `fsync`後に`os.replace`する共通ヘ�
 | `backend/services/hitomi/nozomi.py` | NOZOMI 取得・big-endian デコード |
 | `backend/services/hitomi/metadata.py` | `/galleries/<id>.js` 取得・パース |
 | `backend/services/hitomi/watchlist.py` | watchlist.json CRUD・作者名正規化 |
-| `backend/services/hitomi/state_store.py` | state.json / new_arrivals.json 操作・30日 purge |
+| `backend/services/hitomi/state_store.py` | state.json 操作 |
+| `backend/services/hitomi/arrival_store.py` | meta2.db の検出履歴CRUD・旧JSON移行 |
 | `backend/routers/hitomi.py` | `/api/hitomi/*` API（薄いラッパー） |
 | `backend/tests/test_hitomi_nozomi.py` | NOZOMI パーサのユニットテスト |
 | `backend/tests/test_hitomi_diff.py` | 差分検出ロジックのユニットテスト |
@@ -186,10 +195,11 @@ UTF-8 JSONを書き込み、`flush` + `fsync`後に`os.replace`する共通ヘ�
 backend/data/hitomi/         ← .gitignore 対象（個人データ）
 ├── watchlist.json
 ├── state.json
-└── new_arrivals.json
+└── new_arrivals.json          ← 旧データ移行元。移行後は読み取り専用
 ```
 
-`backend/data/` は既に `.gitignore` 対象であり、自動的に除外される。
+検出履歴の正本は `$META_DB_DIR/meta2.db`。`backend/data/` は既に `.gitignore` 対象であり、
+JSON・DBとも自動的に除外される。Linuxの日次DBバックアップには `meta2.db` として含まれる。
 
 ### 5.4. 依存追加
 
@@ -202,23 +212,34 @@ backend/data/hitomi/         ← .gitignore 対象（個人データ）
 
 ### 6.1. `GET /api/hitomi/new-arrivals`
 
-保留中の新着一覧と監視ジョブのヘルス情報を取得する。
+新着または既読履歴と監視ジョブのヘルス情報を取得する。
+
+**クエリ**:
+- `status`: `unread`（既定）/ `read` / `all`
+- `offset`: 0以上（既定0）
+- `limit`: 1〜200（既定60）
 
 **レスポンス**:
 ```json
 {
   "items": [ {} ],
+  "status": "unread",
+  "total": 12,
+  "unread_count": 12,
+  "read_count": 308,
+  "offset": 0,
+  "limit": 60,
   "last_run_at": "2026-04-29T03:00:00+09:00",
   "last_run_status": "ok",
   "last_error": null
 }
 ```
 
-`items` は `dismissed=false` のもののみ、新着順。
+`items` は指定statusのものを検出日時の新しい順で返す。
 
 ### 6.2. `POST /api/hitomi/dismiss/{id}`
 
-新着アイテムを既読化（dismissed=true）。
+新着アイテムを既読化（`is_read=1`, `read_at=<JST>`）。行は削除しない。
 
 **レスポンス**: `{"message": "Dismissed", "id": 2034567}`
 
@@ -301,7 +322,7 @@ watchlist への追加直後、NOZOMI 先頭 1 件を取得して `state.json` �
 ```
 
 - `exit_code`: 0 = 全成功 / 1 = 部分失敗 / 2 = 致命的失敗
-- `last_run_stats.added`: 今回の実行で `new_arrivals.json` に追加された件数
+- `last_run_stats.added`: 今回の実行で `meta2.db.hitomi_arrivals` に追加された件数
 - `last_run_stats.skipped`: 当日 0:00 以降のチェック済み判定により今回スキップされた作者数
 - `last_run_stats.errors`: NOZOMI / メタデータ取得で失敗した件数
 
@@ -377,16 +398,24 @@ def remove_artist(normalized: str) -> None: ...
 ```python
 def load_state() -> State: ...
 def save_state(state: State) -> None: ...
-def load_arrivals() -> Arrivals: ...
-def save_arrivals(arrivals: Arrivals) -> None: ...
-def merge_new_items(items: list[ArrivalItem]) -> int:
-    """new_arrivals.json に追加。重複（同 id）は無視。追加件数を返す。"""
-def dismiss(gallery_id: int) -> None: ...
-def purge_expired(threshold_days: int = 30) -> int:
-    """dismissed=true かつ discovered_at が threshold_days 以前のエントリを物理削除。削除件数を返す。"""
 ```
 
-### 7.5. `tools/hitomi_monitor.py`
+`new_arrivals.json` のCRUDと30日purgeは廃止し、state.jsonだけを担当する。
+
+### 7.5. `services/hitomi/arrival_store.py`
+
+```python
+def import_legacy_json(data_dir: Path) -> int: ...
+def merge_new_items(items: list[ArrivalItem]) -> int: ...
+def list_arrivals(status: ArrivalStatus, offset: int, limit: int) -> ArrivalPage: ...
+def dismiss(gallery_id: int) -> bool: ...
+def dismiss_all() -> int: ...
+```
+
+全関数は `services.meta_db.db_connection()` の短命接続を使う。旧JSON移行と追加は
+gallery_id主キーで冪等、更新系はtransactionでcommit/rollbackする。
+
+### 7.6. `tools/hitomi_monitor.py`
 
 ```python
 def main() -> int:
@@ -402,22 +431,25 @@ def main() -> int:
 
 1 作者で例外発生 → 握りつぶして次へ進む。`state["last_error"]` に集約。
 
-### 7.6. `routers/hitomi.py`
+### 7.7. `routers/hitomi.py`
 
 state_store / watchlist サービスを呼ぶだけの薄いラッパー。FastAPI の DI で `get_dirs_by_source()` のような既存パターンに揃える必要はない（独立データのため）。
 
-### 7.7. `hooks/useHitomiArrivals.ts` / `hooks/useHitomiWatchlist.ts`
+### 7.8. `hooks/useHitomiArrivals.ts` / `hooks/useHitomiWatchlist.ts`
 
 責務を 2 フックに分割して実装。
 
 ```typescript
-function useHitomiArrivals() {
+function useHitomiArrivals(status: 'unread' | 'read') {
   return {
     items: ArrivalItem[],
+    total: number,
+    unreadCount: number,
+    readCount: number,
     lastRunAt: string | null,
     lastRunStatus: 'ok' | 'partial' | 'error' | 'never',
-    dismiss: (id: number) => Promise<void>,    // 楽観的更新 + サーバ反映
-    dismissAll: () => Promise<void>,
+    dismiss: (id: number) => Promise<void>,    // unread時の楽観的更新 + サーバ反映
+    dismissAll: () => Promise<void>,           // unreadのみ
     runNow: () => Promise<void>,               // 同期実行（完了後に自動 refresh）
     refresh: () => Promise<void>,              // マウント時 + 手動 only（ポーリング無し）
   }
@@ -567,6 +599,7 @@ tail -50 /opt/pic2pdf-viewer/logs/hitomi-monitor.log
 |---|---|
 | NOZOMI URL / 形式の変更 | `last_run_status` で検知、UI に状態表示。再解析の起点として §8 を残す |
 | 大量の新着で NOZOMI 取得が不足 | 先頭 20 件だけだと取りこぼす可能性。週次なら問題ないが、間隔が空く場合は count を増やす |
+| 履歴DBの破損・消失 | `meta2.db` の日次Online Backup・整合性検査・週次復元試験に含める |
 | 作者名の特殊文字 | `build_nozomi_url` で URL encode するが、エッジケースは UI バリデーションで弾く |
 | ToS 観点 | 個人用途・低頻度・低帯域なら現実的に問題ないと考えるが、再配布や商用利用は想定外 |
 | メタデータ取得失敗 | 個別 ID で例外を握りつぶし、他に影響させない。state に error 集約 |
