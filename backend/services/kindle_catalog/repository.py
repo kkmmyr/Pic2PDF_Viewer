@@ -145,7 +145,8 @@ def stats() -> dict:
         returns = conn.execute("SELECT COUNT(*) FROM returns").fetchone()[0]
         series = conn.execute("SELECT COUNT(*) FROM series").fetchone()[0]
         last_run = conn.execute(
-            "SELECT id, source_kind, status, started_at, finished_at, records_processed, records_skipped "
+            "SELECT id, source_kind, status, started_at, finished_at, files_processed, "
+            "records_processed, records_skipped, error_message "
             "FROM import_runs ORDER BY id DESC LIMIT 1"
         ).fetchone()
     with db_connection() as meta_conn:
