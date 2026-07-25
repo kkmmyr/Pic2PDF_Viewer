@@ -109,6 +109,10 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 - controllerの工程別例外コードをjobへそのまま記録し、その他の例外は `capture_failed` / `transfer_failed` / `registration_failed` へ境界別に変換する。
 - agent再起動時は途中状態を暗黙再開しない。`awaiting_files` の完了APIだけを冪等再試行し、それ以前の途中jobは失敗として新規job作成を要求する。
 - heartbeat送信失敗は停止要求として保持し、次の安全な工程境界または撮影進捗callbackで処理を中断する。
+- 読書画面の安定判定と先頭移動は `ReadingArea` の矩形と縮小グレースケール画像の
+  差分を用いる。`PageUp` 後に読書領域が変化しない状態を3回連続で確認した位置を
+  先頭境界とする。漫画では `FooterLabelText` が公開されないため、フッター文字列を
+  必須条件にしない。
 
 ---
 

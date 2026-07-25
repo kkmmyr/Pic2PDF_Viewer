@@ -14,8 +14,12 @@ from pathlib import Path
 
 import pyautogui
 import uiautomation as auto
+from PIL import Image, ImageChops, ImageStat
 
 logger = logging.getLogger(__name__)
+
+_PAGE_FINGERPRINT_SIZE = (64, 64)
+_PAGE_CHANGE_MEAN_THRESHOLD = 1.0
 
 
 @dataclass(frozen=True)
@@ -98,6 +102,14 @@ def normalize_identity_text(value: str | None) -> str:
         return ""
     normalized = unicodedata.normalize("NFKC", value).casefold()
     return re.sub(r"\s+", " ", normalized).strip()
+
+
+def visual_frames_differ(left: Image.Image, right: Image.Image) -> bool:
+    """読書領域の縮小画像を比較し、ページ内容が変化したか判定する。"""
+    left_gray = left.convert("L").resize(_PAGE_FINGERPRINT_SIZE)
+    right_gray = right.convert("L").resize(_PAGE_FINGERPRINT_SIZE)
+    difference = ImageChops.difference(left_gray, right_gray)
+    return ImageStat.Stat(difference).mean[0] >= _PAGE_CHANGE_MEAN_THRESHOLD
 
 
 def _same_optional_text(left: str | None, right: str | None) -> bool:
@@ -447,18 +459,21 @@ class KindleAppController:
 
     def wait_for_reader_stable(self) -> None:
         deadline = time.monotonic() + self.config.reader_timeout_seconds
-        previous_footer = ""
+        previous_frame: Image.Image | None = None
         stable_count = 0
         while time.monotonic() < deadline:
             self._ensure_process_running()
             back = self._control_by_id("backButton", timeout=0.5)
-            footer = self._control_by_id("FooterLabelText", timeout=0.5)
-            if back is not None and footer is not None and footer.Name:
-                if footer.Name == previous_footer:
+            frame = self._reading_area_image(timeout=0.5)
+            if back is not None and frame is not None:
+                if previous_frame is not None and not visual_frames_differ(
+                    previous_frame,
+                    frame,
+                ):
                     stable_count += 1
                 else:
-                    previous_footer = footer.Name
                     stable_count = 1
+                previous_frame = frame
                 if stable_count >= 2:
                     return
             time.sleep(0.5)
@@ -467,47 +482,52 @@ class KindleAppController:
             "Kindleの読書画面が安定しませんでした",
         )
 
-    def _wait_for_footer_change(self, previous: str) -> bool:
-        deadline = time.monotonic() + self.config.page_change_timeout_seconds
-        while time.monotonic() < deadline:
-            self._ensure_process_running()
-            footer = self._control_by_id("FooterLabelText", timeout=0.5)
-            if footer is not None and footer.Name and footer.Name != previous:
-                time.sleep(self.config.page_stable_seconds)
-                return True
-            time.sleep(0.2)
-        return False
+    def _reading_area_image(self, *, timeout: float = 1.0) -> Image.Image | None:
+        reading_area = self._control_by_id("ReadingArea", timeout=timeout)
+        if reading_area is None:
+            return None
+        bounds = reading_area.BoundingRectangle
+        width = int(bounds.right - bounds.left)
+        height = int(bounds.bottom - bounds.top)
+        if width <= 0 or height <= 0:
+            return None
+        try:
+            return pyautogui.screenshot(
+                region=(int(bounds.left), int(bounds.top), width, height)
+            )
+        except OSError:
+            logger.exception("Kindle reading area screenshot failed")
+            return None
 
     def go_to_start(self, *, on_poll: Callable[[], None] | None = None) -> None:
         self.wait_for_reader_stable()
-        footer = self._control_by_id("FooterLabelText")
-        if footer is None:
+        previous_frame = self._reading_area_image()
+        if previous_frame is None:
             raise KindleControllerError(
                 "positioning_failed",
-                "Kindleの読書位置を取得できませんでした",
+                "Kindleの読書領域を取得できませんでした",
             )
-        footer.Click(simulateMove=False, waitTime=0.2)
         deadline = time.monotonic() + self.config.positioning_timeout_seconds
         boundary_count = 0
         while time.monotonic() < deadline:
             self._ensure_process_running()
             if on_poll:
                 on_poll()
-            footer = self._control_by_id("FooterLabelText", timeout=1.0)
-            if footer is None or not footer.Name:
+            pyautogui.press("pageup")
+            time.sleep(self.config.page_stable_seconds)
+            current_frame = self._reading_area_image()
+            if current_frame is None:
                 raise KindleControllerError(
                     "positioning_failed",
-                    "Kindleの読書位置を取得できませんでした",
+                    "Kindleの読書領域を取得できませんでした",
                 )
-            previous = footer.Name
-            pyautogui.press("pageup")
-            if self._wait_for_footer_change(previous):
+            if visual_frames_differ(previous_frame, current_frame):
                 boundary_count = 0
             else:
                 boundary_count += 1
                 if boundary_count >= self.config.start_boundary_checks:
                     return
-                time.sleep(self.config.page_stable_seconds)
+            previous_frame = current_frame
         raise KindleControllerError(
             "positioning_failed",
             "Kindle書籍を期限内に先頭へ移動できませんでした",

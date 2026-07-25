@@ -395,6 +395,13 @@ Phase 1 では Windows agent の手動確認処理を変更しない。自動検
 - Linux と Windows は同じ実体を、それぞれローカルパスと UNC パスで参照する。
 - `comic/images` / `kindle_novel/images` の正式領域は Samba 公開しない。
 
+### 10.5 実機で判明した先頭移動の互換性
+
+- Microsoft Store版 Kindle 1.0.18632.0 の漫画読書画面では、
+  `ReadingArea` は取得できるが `FooterLabelText` が存在しない。
+- フッター文字列へ依存した初回実行は `kindle_ui_unavailable` で撮影前に安全停止した。
+- `ReadingArea` の画像差分によるページ変化・境界判定へ切り替え、同じ書籍で再試験する。
+
 ## 11. 実装順序とコミット境界
 
 1. `docs:` 要件・計画・設計参照の確定

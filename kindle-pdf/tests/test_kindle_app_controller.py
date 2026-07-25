@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 import kindle_app_controller as controller_module
 from kindle_app_controller import (
@@ -13,6 +14,7 @@ from kindle_app_controller import (
     KindleControllerError,
     candidate_matches_identity,
     select_verified_candidate,
+    visual_frames_differ,
 )
 
 
@@ -93,6 +95,15 @@ def test_candidate_not_found_and_ambiguous_have_distinct_codes() -> None:
     assert ambiguous.value.error_code == "book_match_ambiguous"
 
 
+def test_visual_frames_differ_detects_page_change() -> None:
+    white = Image.new("RGB", (200, 300), "white")
+    same_white = Image.new("RGB", (200, 300), "white")
+    black = Image.new("RGB", (200, 300), "black")
+
+    assert not visual_frames_differ(white, same_white)
+    assert visual_frames_differ(white, black)
+
+
 def test_content_snapshot_requires_official_nonempty_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -164,6 +175,54 @@ class _Clock:
 
     def sleep(self, seconds: float) -> None:
         self.now += seconds
+
+
+class _PositionController(KindleAppController):
+    def __init__(self, frames: list[Image.Image], config: ControllerConfig) -> None:
+        super().__init__(config)
+        self.frames = frames
+
+    def wait_for_reader_stable(self) -> None:
+        return None
+
+    def _reading_area_image(self, *, timeout: float = 1.0) -> Image.Image | None:
+        del timeout
+        if len(self.frames) > 1:
+            return self.frames.pop(0)
+        return self.frames[0]
+
+    def _ensure_process_running(self) -> None:
+        return None
+
+
+def test_go_to_start_stops_after_three_unchanged_frames(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    page_two = Image.new("RGB", (100, 100), "black")
+    page_one = Image.new("RGB", (100, 100), "white")
+    controller = _PositionController(
+        [page_two, page_one, page_one, page_one, page_one],
+        ControllerConfig(
+            positioning_timeout_seconds=10,
+            page_stable_seconds=1,
+            start_boundary_checks=3,
+        ),
+    )
+    clock = _Clock()
+    presses: list[str] = []
+    polls: list[bool] = []
+    monkeypatch.setattr(controller_module.time, "monotonic", clock.monotonic)
+    monkeypatch.setattr(controller_module.time, "sleep", clock.sleep)
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "press",
+        lambda key: presses.append(key),
+    )
+
+    controller.go_to_start(on_poll=lambda: polls.append(True))
+
+    assert presses == ["pageup"] * 4
+    assert len(polls) == 4
 
 
 def test_download_waits_for_button_disappearance_and_stable_files(
