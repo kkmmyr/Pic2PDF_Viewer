@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from _ctypes import COMError
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -127,35 +128,49 @@ def test_control_lookup_treats_transient_com_error_as_not_found(
     assert controller._control_by_id("backButton", timeout=0.1) is None
 
 
-def test_search_value_retries_transient_com_error(
+def test_search_value_uses_verified_control_center_and_keyboard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    class _TransientEdit:
-        calls = 0
-        values: list[str] = []
-
-        def GetValuePattern(self):
-            return self
-
-        def SetValue(self, value: str, **_kwargs) -> None:
-            self.calls += 1
-            if self.calls == 1:
-                raise COMError(
-                    -2147220991,
-                    "event subscriber unavailable",
-                    (None, None, None, 0, None),
-                )
-            self.values.append(value)
-
-    edit = _TransientEdit()
+    edit = SimpleNamespace(
+        BoundingRectangle=SimpleNamespace(left=10, top=20, right=210, bottom=60)
+    )
     controller = KindleAppController()
     monkeypatch.setattr(controller, "_search_edit", lambda **_kwargs: edit)
-    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    clicks: list[tuple[int, int]] = []
+    hotkeys: list[tuple[str, ...]] = []
+    writes: list[tuple[str, float]] = []
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "click",
+        lambda x, y: clicks.append((x, y)),
+    )
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "hotkey",
+        lambda *keys: hotkeys.append(keys),
+    )
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "write",
+        lambda value, interval: writes.append((value, interval)),
+    )
 
     controller._set_search_value("B012345678")
 
-    assert edit.calls == 2
-    assert edit.values == ["B012345678"]
+    assert clicks == [(110, 40)]
+    assert hotkeys == [("ctrl", "a")]
+    assert writes == [("B012345678", 0.02)]
+
+
+def test_control_center_rejects_invalid_bounds() -> None:
+    control = SimpleNamespace(
+        BoundingRectangle=SimpleNamespace(left=20, top=20, right=10, bottom=40)
+    )
+
+    with pytest.raises(KindleControllerError) as exc:
+        KindleAppController._control_center(control)
+
+    assert exc.value.error_code == "kindle_ui_unavailable"
 
 
 def test_content_snapshot_requires_official_nonempty_files(
@@ -218,6 +233,9 @@ class _DownloadController(KindleAppController):
 
     def _ensure_process_running(self) -> None:
         return None
+
+    def _click_control(self, control: _Button) -> None:
+        control.clicked = True
 
 
 class _Clock:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import os
 import re
@@ -240,7 +241,21 @@ class KindleAppController:
                 "kindle_ui_unavailable",
                 "対応していないKindleウィンドウが見つかりました",
             )
-        window.SetFocus()
+        try:
+            window_handle = int(window.NativeWindowHandle)
+        except (AttributeError, COMError, TypeError, ValueError) as exc:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleウィンドウの識別情報を取得できませんでした",
+            ) from exc
+        user32 = ctypes.windll.user32
+        if window_handle <= 0 or not user32.IsWindow(window_handle):
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleウィンドウの識別情報が不正です",
+            )
+        user32.ShowWindow(window_handle, 9)
+        user32.SetForegroundWindow(window_handle)
         time.sleep(self.config.screen_transition_seconds)
         self.window = window
 
@@ -298,6 +313,29 @@ class KindleAppController:
             )
         return None
 
+    @staticmethod
+    def _control_center(control: object) -> tuple[int, int]:
+        try:
+            bounds = control.BoundingRectangle
+            left = int(bounds.left)
+            top = int(bounds.top)
+            right = int(bounds.right)
+            bottom = int(bounds.bottom)
+        except (AttributeError, COMError) as exc:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの操作対象の位置を取得できませんでした",
+            ) from exc
+        if right <= left or bottom <= top:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの操作対象の位置が不正です",
+            )
+        return ((left + right) // 2, (top + bottom) // 2)
+
+    def _click_control(self, control: object) -> None:
+        pyautogui.click(*self._control_center(control))
+
     def open_library(self) -> None:
         self._ensure_process_running()
         if self._search_edit(timeout=1.0) is not None:
@@ -308,7 +346,7 @@ class KindleAppController:
                 "kindle_ui_unavailable",
                 "Kindleのライブラリ画面または戻る操作を取得できませんでした",
             )
-        back.Click(simulateMove=False, waitTime=0.2)
+        self._click_control(back)
         deadline = time.monotonic() + self.config.reader_timeout_seconds
         while time.monotonic() < deadline:
             self._ensure_process_running()
@@ -332,11 +370,14 @@ class KindleAppController:
             edit = self._search_edit(timeout=0.5)
             if edit is not None:
                 try:
-                    edit.GetValuePattern().SetValue(value, waitTime=0.2)
+                    position = self._control_center(edit)
+                    pyautogui.click(*position)
+                    pyautogui.hotkey("ctrl", "a")
+                    pyautogui.write(value, interval=0.02)
                     return
-                except COMError:
+                except KindleControllerError:
                     logger.debug(
-                        "Kindle UI Automation search value update failed transiently",
+                        "Kindle search field position lookup failed transiently",
                         exc_info=True,
                     )
             time.sleep(0.5)
@@ -429,7 +470,7 @@ class KindleAppController:
         button = self._control_by_id(automation_id, timeout=2.0)
         started = button is not None
         if button is not None and "キャンセル" not in button.Name:
-            button.Click(simulateMove=False, waitTime=0.2)
+            self._click_control(button)
             time.sleep(1.0)
 
         deadline = time.monotonic() + self.config.download_timeout_seconds
@@ -479,9 +520,7 @@ class KindleAppController:
                 "book_identity_unverified",
                 "本人照合済みの書籍カードを取得できませんでした",
             )
-        card = candidate.card
-        card.SetFocus()
-        pyautogui.press("enter")
+        self._click_control(candidate.card)
         self.wait_for_reader_stable()
 
     def wait_for_reader_stable(self) -> None:

@@ -121,8 +121,11 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 - ライブラリから読書画面へ遷移中、UI Automation が一時的な `COMError` を返す場合は
   対象control未検出として次のpollで再取得する。単発のCOMエラーをジョブ全体の
   `capture_failed` へ昇格させない。
-- ライブラリ検索欄の `SetValue` も冪等操作として、検索欄を再取得しながら期限内に
-  再試行する。Click等の非冪等操作は機械的な二重実行を行わない。
+- Kindle 1.0.18632.0 はUI Automationの `SetValue` / `Click` と同時刻に
+  `ucrtbase.dll / 0xc0000409` でクラッシュする実測がある。そのためUI Automationは
+  controlの識別と矩形取得だけに使い、検索入力、戻る、ダウンロード、書籍オープンは
+  control矩形中心への通常のpyautogui操作で実行する。ウィンドウ前面化は取得済みの
+  ネイティブウィンドウハンドルをWin32 APIへ渡す。固定の画面絶対座標は使わない。
 
 ---
 
