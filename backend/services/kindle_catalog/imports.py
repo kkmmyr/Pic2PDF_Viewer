@@ -165,6 +165,11 @@ def _import_purchases(conn, rows: list[dict[str, str]], source_file_id: int) -> 
     inserted = 0
     for (order_id, asin, item_id), group in groups.items():
         row = group[0]
+        if conn.execute(
+            "SELECT 1 FROM purchases WHERE order_number=? AND asin=? LIMIT 1",
+            (order_id, asin),
+        ).fetchone():
+            continue
         title = _clean(row.get("Product Name")) or "(タイトル不明)"
         _ensure_book(
             conn,
@@ -203,6 +208,15 @@ def _import_borrowings(conn, rows: list[dict[str, str]], source_file_id: int) ->
         asin = (_clean(row.get("ASIN")) or "").upper()
         creation = _timestamp(row.get("Loan Creation Date"))
         if not asin or not creation:
+            continue
+        if conn.execute(
+            """
+            SELECT 1 FROM borrowings
+            WHERE asin=? AND datetime(loan_creation_date)=datetime(?)
+            LIMIT 1
+            """,
+            (asin, creation),
+        ).fetchone():
             continue
         title = _clean(row.get("Product Name")) or "(タイトル不明)"
         authors = _clean(row.get("Author"))
@@ -247,6 +261,15 @@ def _import_returns(conn, rows: list[dict[str, str]], source_file_id: int) -> in
         if not asin or not returned_at or key in seen:
             continue
         seen.add(key)
+        if conn.execute(
+            """
+            SELECT 1 FROM returns
+            WHERE asin=? AND order_id IS ? AND datetime(return_date)=datetime(?)
+            LIMIT 1
+            """,
+            (asin, order_id, returned_at),
+        ).fetchone():
+            continue
         title = _clean(row.get("Product Name")) or "(タイトル不明)"
         _ensure_book(conn, asin=asin, title=title)
         before = conn.total_changes
