@@ -8,6 +8,7 @@ import re
 import subprocess
 import time
 import unicodedata
+from _ctypes import COMError
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -264,11 +265,18 @@ class KindleAppController:
             foundIndex=found_index,
             AutomationId=automation_id,
         )
-        if control.Exists(
-            self.config.control_timeout_seconds if timeout is None else timeout,
-            0.5,
-        ):
-            return control
+        try:
+            if control.Exists(
+                self.config.control_timeout_seconds if timeout is None else timeout,
+                0.5,
+            ):
+                return control
+        except COMError:
+            logger.debug(
+                "Kindle UI Automation control lookup failed transiently: %s",
+                automation_id,
+                exc_info=True,
+            )
         return None
 
     def _search_edit(self, timeout: float | None = None) -> auto.Control | None:
@@ -277,11 +285,17 @@ class KindleAppController:
             searchDepth=self.config.control_search_depth,
             Name="検索ライブラリ",
         )
-        if edit.Exists(
-            self.config.control_timeout_seconds if timeout is None else timeout,
-            0.5,
-        ):
-            return edit
+        try:
+            if edit.Exists(
+                self.config.control_timeout_seconds if timeout is None else timeout,
+                0.5,
+            ):
+                return edit
+        except COMError:
+            logger.debug(
+                "Kindle UI Automation search field lookup failed transiently",
+                exc_info=True,
+            )
         return None
 
     def open_library(self) -> None:

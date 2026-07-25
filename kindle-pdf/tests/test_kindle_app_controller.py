@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from _ctypes import COMError
 from pathlib import Path
 
 import pytest
@@ -102,6 +103,28 @@ def test_visual_frames_differ_detects_page_change() -> None:
 
     assert not visual_frames_differ(white, same_white)
     assert visual_frames_differ(white, black)
+
+
+def test_control_lookup_treats_transient_com_error_as_not_found(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _TransientControl:
+        def Exists(self, *_args) -> bool:
+            raise COMError(
+                -2147220991,
+                "event subscriber unavailable",
+                (None, None, None, 0, None),
+            )
+
+    controller = KindleAppController()
+    controller.window = object()
+    monkeypatch.setattr(
+        controller_module.auto,
+        "Control",
+        lambda **_kwargs: _TransientControl(),
+    )
+
+    assert controller._control_by_id("backButton", timeout=0.1) is None
 
 
 def test_content_snapshot_requires_official_nonempty_files(

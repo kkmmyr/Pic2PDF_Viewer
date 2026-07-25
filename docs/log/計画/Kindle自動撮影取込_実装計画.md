@@ -401,6 +401,8 @@ Phase 1 では Windows agent の手動確認処理を変更しない。自動検
   `ReadingArea` は取得できるが `FooterLabelText` が存在しない。
 - フッター文字列へ依存した初回実行は `kindle_ui_unavailable` で撮影前に安全停止した。
 - `ReadingArea` の画像差分によるページ変化・境界判定へ切り替え、同じ書籍で再試験する。
+- 読書画面への遷移直後にUI Automation列挙が一時的な `COMError` を返す実測も確認した。
+  control探索では未検出として再pollし、遷移完了後の安定要素を取得する。
 
 ## 11. 実装順序とコミット境界
 
