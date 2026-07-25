@@ -70,12 +70,13 @@ export function useKindleLinking() {
     };
 }
 
-export function useKindleCaptureJobs() {
+export function useKindleCaptureJobs(options: { enabled?: boolean } = {}) {
     const queryClient = useQueryClient();
     const captureJobs = useQuery({
         queryKey: [...QUERY_ROOT, 'captureJobs'],
         queryFn: () =>
             apiClient.get<unknown, KindleCaptureJobsResponse>(API_ENDPOINTS.KINDLE_CAPTURE_JOBS),
+        enabled: options.enabled ?? true,
         refetchInterval: 5000,
     });
     const captureJobMutation = useMutation({

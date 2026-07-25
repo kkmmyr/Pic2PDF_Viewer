@@ -2,7 +2,7 @@
 
 作成日: 2026-07-25
 
-状態: **Phase 3 capture agent統合完了（2026-07-25）**
+状態: **Phase 4 購入書籍詳細・キャプチャUI完了（2026-07-25）**
 
 バックログ: [B-34](バックログ.md)
 
@@ -343,6 +343,15 @@ Phase 1 では Windows agent の手動確認処理を変更しない。自動検
 - `frontend/src/hooks/useKindleCatalog.ts`
 - `frontend/src/components/kindle/kindle-labels.ts`
 - `frontend/src/test/KindleCatalogPage.test.tsx`
+
+### 9.4 Phase 4 実装結果
+
+- [x] 購入書籍詳細でsourceとページ送り方向を変更し、運用前提の確認後にjobを作成する。
+- [x] 同一ASINのactive jobとmutation送信中は開始操作を無効化し、既存jobへの導線を表示する。
+- [x] 取込済み書籍は上書き撮影を無効化し、初期版の対象外であることを表示する。
+- [x] キャプチャページで工程説明、経過時間、撮影画面数、依頼・完了日時、agent、成功結果を表示する。
+- [x] 失敗コード別の日本語対処と、確認ダイアログを経由する新規job再実行を追加する。
+- [x] loading・empty・error・disabled・active・failed・succeededをレスポンシブな1画面で扱う。
 
 ## 10. Phase 5 — テストと段階導入
 

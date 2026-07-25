@@ -31,6 +31,7 @@ const link = vi.fn();
 const importOrders = vi.fn();
 const importKindleInfo = vi.fn();
 const importAutobuy = vi.fn();
+const createCaptureJob = vi.fn();
 
 const book = {
     asin: 'B000TEST01',
@@ -59,6 +60,7 @@ describe('Kindle catalog pages', () => {
         importOrders.mockReset();
         importKindleInfo.mockReset();
         importAutobuy.mockReset();
+        createCaptureJob.mockReset();
         link.mockResolvedValue({
             source: 'comic',
             book_id: 'existing-book',
@@ -90,6 +92,25 @@ describe('Kindle catalog pages', () => {
             records_processed: 1,
             records_skipped: 0,
             files: [],
+        });
+        createCaptureJob.mockResolvedValue({
+            id: 'job-new',
+            asin: 'B000TEST01',
+            source: 'comic',
+            status: 'queued',
+            direction: 'left',
+            expected_screens: null,
+            requested_at: '2026-07-25T12:10:00+09:00',
+            claimed_at: null,
+            heartbeat_at: null,
+            started_at: null,
+            completed_at: null,
+            agent_id: null,
+            book_id: null,
+            captured_screens: null,
+            error_code: null,
+            error_message: null,
+            title: 'テスト作品 1巻',
         });
         mockedUseKindleBooks.mockReturnValue({
             data: {
@@ -157,7 +178,7 @@ describe('Kindle catalog pages', () => {
             ],
             isLoading: false,
             error: null,
-            createCaptureJob: vi.fn(),
+            createCaptureJob,
             creatingCaptureJob: false,
         });
         mockedUseKindleImports.mockReturnValue({
@@ -207,7 +228,41 @@ describe('Kindle catalog pages', () => {
         fireEvent.click(screen.getByRole('button', { name: 'テスト作品 1巻' }));
 
         expect(screen.getByRole('dialog')).toBeInTheDocument();
-        expect(screen.getByText('キャプチャは利用準備中です')).toBeInTheDocument();
+        expect(screen.getByText('この書籍は待機中です')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '撮影して取り込む' })).toBeDisabled();
+    });
+
+    it('購入書籍詳細で登録先と方向を確認してジョブを作成する', async () => {
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [],
+            isLoading: false,
+            error: null,
+            createCaptureJob,
+            creatingCaptureJob: false,
+        });
+        renderWithRouter(<KindleCatalogPage />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'テスト作品 1巻' }));
+        fireEvent.change(screen.getByLabelText('撮影後の登録先'), {
+            target: { value: 'novel' },
+        });
+        fireEvent.change(screen.getByLabelText('ページ送り方向'), {
+            target: { value: 'right' },
+        });
+        fireEvent.click(screen.getByRole('button', { name: '撮影して取り込む' }));
+
+        expect(screen.getByText('Kindle撮影を開始しますか？')).toBeInTheDocument();
+        expect(screen.getByText(/登録先: 小説/)).toBeInTheDocument();
+        expect(screen.getByText(/ページ送り: 右送り/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'ジョブを作成' }));
+
+        await waitFor(() =>
+            expect(createCaptureJob).toHaveBeenCalledWith({
+                asin: 'B000TEST01',
+                source: 'novel',
+                direction: 'right',
+            }),
+        );
     });
 
     it('検索語をデバウンスして一覧クエリへ反映する', async () => {
@@ -264,12 +319,87 @@ describe('Kindle catalog pages', () => {
         );
     });
 
-    it('キャプチャ準備中は既存ジョブだけを表示する', () => {
+    it('キャプチャページで自動工程と進捗を表示する', () => {
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [
+                {
+                    id: 'job-1',
+                    asin: 'B000TEST01',
+                    source: 'comic',
+                    status: 'locating_book',
+                    direction: 'left',
+                    expected_screens: null,
+                    requested_at: '2026-07-25T12:00:00+09:00',
+                    claimed_at: '2026-07-25T12:00:05+09:00',
+                    heartbeat_at: '2026-07-25T12:00:10+09:00',
+                    started_at: null,
+                    completed_at: null,
+                    agent_id: 'windows-test',
+                    book_id: null,
+                    captured_screens: 0,
+                    error_code: null,
+                    error_message: null,
+                    title: 'テスト作品 1巻',
+                },
+            ],
+            isLoading: false,
+            error: null,
+            createCaptureJob,
+            creatingCaptureJob: false,
+        });
         renderWithRouter(<KindleCapturePage />, '/kindle/capture');
 
-        expect(screen.getByText('現在は利用準備中です')).toBeInTheDocument();
-        expect(screen.getByText('待機中')).toBeInTheDocument();
-        expect(screen.queryByText('ジョブを作成')).not.toBeInTheDocument();
+        expect(screen.getByText('書籍を検索中')).toBeInTheDocument();
+        expect(screen.getByText('KindleライブラリでASINを照合しています。')).toBeInTheDocument();
+        expect(screen.getByText('0 画面')).toBeInTheDocument();
+        expect(screen.getByText('windows-test')).toBeInTheDocument();
+    });
+
+    it('失敗ジョブは原因と対処を表示し、確認後に新しいジョブで再実行する', async () => {
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [
+                {
+                    id: 'job-failed',
+                    asin: 'B000TEST01',
+                    source: 'novel',
+                    status: 'failed',
+                    direction: 'left',
+                    expected_screens: null,
+                    requested_at: '2026-07-25T12:00:00+09:00',
+                    claimed_at: '2026-07-25T12:00:05+09:00',
+                    heartbeat_at: '2026-07-25T12:01:00+09:00',
+                    started_at: null,
+                    completed_at: '2026-07-25T12:01:00+09:00',
+                    agent_id: 'windows-test',
+                    book_id: null,
+                    captured_screens: 0,
+                    error_code: 'download_timeout',
+                    error_message: 'ダウンロードが期限内に完了しませんでした',
+                    title: 'テスト作品 1巻',
+                },
+            ],
+            isLoading: false,
+            error: null,
+            createCaptureJob,
+            creatingCaptureJob: false,
+        });
+        renderWithRouter(<KindleCapturePage />, '/kindle/capture');
+
+        expect(
+            screen.getByText('ダウンロード完了後に新しいジョブとして再実行してください。'),
+        ).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '同じ条件で再実行' }));
+        expect(screen.getByText('新しいジョブとして再実行しますか？')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: '再実行ジョブを作成' }));
+
+        await waitFor(() =>
+            expect(createCaptureJob).toHaveBeenCalledWith({
+                asin: 'B000TEST01',
+                source: 'novel',
+                direction: 'left',
+                expectedScreens: undefined,
+            }),
+        );
     });
 
     it('すべて差分取込で3処理を順に実行する', async () => {
