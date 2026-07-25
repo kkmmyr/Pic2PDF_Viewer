@@ -158,6 +158,12 @@ def test_claim_returns_identity_and_new_automatic_state_path(tmp_data_dir):
     update_state(job["id"], "windows-auto", "downloading")
     update_state(job["id"], "windows-auto", "positioning")
     capturing = update_state(job["id"], "windows-auto", "capturing")
+    progress = update_state(
+        job["id"],
+        "windows-auto",
+        "capturing",
+        captured_screens=7,
+    )
     awaiting = update_state(
         job["id"],
         "windows-auto",
@@ -166,6 +172,8 @@ def test_claim_returns_identity_and_new_automatic_state_path(tmp_data_dir):
     )
 
     assert capturing["started_at"] is not None
+    assert progress["started_at"] == capturing["started_at"]
+    assert progress["captured_screens"] == 7
     assert awaiting["captured_screens"] == 12
 
 

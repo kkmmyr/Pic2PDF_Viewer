@@ -4,6 +4,7 @@ import os.path as osp
 import datetime
 import time
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Optional, Tuple
 from ctypes import (
@@ -339,7 +340,11 @@ class KindleCapturer:
             )
         return None
 
-    def capture_loop(self, title: str) -> Tuple[int, str]:
+    def capture_loop(
+        self,
+        title: str,
+        on_page: Callable[[int], None] | None = None,
+    ) -> Tuple[int, str]:
         """キャプチャのメインループ"""
         save_dir = osp.join(self.config.IMG_OUTPUT_DIR, title)
         if not osp.exists(save_dir):
@@ -386,6 +391,8 @@ class KindleCapturer:
                 return captured_pages, save_dir
 
             self._save_image(current_image, filename)
+            if on_page is not None:
+                on_page(page)
             print(
                 f"Page: {page}, {current_image.shape}, {time.perf_counter() - start_time:.2f} sec"
             )

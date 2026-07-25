@@ -79,6 +79,28 @@ def test_capture_loop_stops_at_expected_count(tmp_path, monkeypatch):
     assert len(page_turns) == 1
 
 
+def test_capture_loop_reports_saved_page_progress(tmp_path, monkeypatch):
+    capturer = KindleCapturer()
+    capturer.hwnd = 1
+    capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
+    capturer.config.EXPECTED_PAGES = 2
+    pages = iter([_image(1), _image(2)])
+    progress = []
+
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
+    monkeypatch.setattr(capturer, "_save_image", lambda _image, _path: None)
+    monkeypatch.setattr(capturer, "_next_page", lambda: None)
+
+    total, _save_dir = capturer.capture_loop("book", on_page=progress.append)
+
+    assert total == 2
+    assert progress == [1, 2]
+
+
 def test_capture_loop_rejects_early_stop_before_expected_count(tmp_path, monkeypatch):
     capturer = KindleCapturer()
     capturer.hwnd = 1

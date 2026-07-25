@@ -2,7 +2,7 @@
 
 作成日: 2026-07-25
 
-状態: **Phase 2 Kindle操作コントローラー完了（2026-07-25）**
+状態: **Phase 3 capture agent統合完了（2026-07-25）**
 
 バックログ: [B-34](バックログ.md)
 
@@ -307,6 +307,15 @@ Phase 1 では Windows agent の手動確認処理を変更しない。自動検
 8. 各長時間工程で heartbeat を更新する。
 
 再実行は failed job を同じ ID で巻き戻さず、新しい job を作成する。agent 再起動時は stale job を暗黙再開せず、サーバーの回収結果に従う。
+
+### 8.1 Phase 3 実装結果
+
+- [x] 旧確認ダイアログを削除し、controllerによる検索・照合・ダウンロード・先頭移動へ置き換える。
+- [x] controller例外、撮影、転送、登録を工程別エラーコードへ変換する。
+- [x] 独立heartbeat workerを追加し、長時間待機と撮影progress callbackから送信失敗を検出する。
+- [x] 撮影1枚目と5枚ごとに `capturing → capturing` で `captured_screens` を更新し、初回 `started_at` を保持する。
+- [x] `awaiting_files` だけ完了APIを再試行し、それ以前の途中状態は新規job作成を要求する。
+- [x] `.partial` 転送失敗時のcleanupと `.ready` 原子的renameを自動テストで固定する。
 
 ## 9. Phase 4 — フロントエンド
 

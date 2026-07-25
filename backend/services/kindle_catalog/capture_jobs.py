@@ -37,7 +37,7 @@ _AGENT_TRANSITIONS = {
     "downloading": {"positioning", "failed"},
     "positioning": {"capturing", "failed"},
     "waiting_user": {"capturing", "failed"},
-    "capturing": {"awaiting_files", "failed"},
+    "capturing": {"capturing", "awaiting_files", "failed"},
     "awaiting_files": {"failed"},
 }
 _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -274,7 +274,7 @@ def update_state(
         if state not in _AGENT_TRANSITIONS.get(row["status"], set()):
             raise ValueError(f"許可されていない状態遷移です: {row['status']} -> {state}")
         now = jst_now().isoformat()
-        started_at = now if state == "capturing" else row["started_at"]
+        started_at = now if state == "capturing" and row["started_at"] is None else row["started_at"]
         completed_at = now if state == "failed" else row["completed_at"]
         screen_count = row["captured_screens"] if captured_screens is None else captured_screens
         updated_count = conn.execute(

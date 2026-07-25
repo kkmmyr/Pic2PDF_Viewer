@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -149,6 +150,10 @@ class NovelKindleCapturer(AutoKindleCapturer):
 
     # _perform_ocr_and_save removed
 
-    def capture_loop(self, title: str) -> Tuple[int, str]:
+    def capture_loop(
+        self,
+        title: str,
+        on_page: Callable[[int], None] | None = None,
+    ) -> Tuple[int, str]:
         """OCRを実行せず、連番画像だけを保存するキャプチャループ。"""
-        return super().capture_loop(title)
+        return super().capture_loop(title, on_page=on_page)
