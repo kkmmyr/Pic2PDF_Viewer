@@ -99,7 +99,8 @@ class _Controller:
     def open_book(self, _candidate) -> None:
         return None
 
-    def go_to_start(self, *, on_poll) -> None:
+    def go_to_start(self, *, direction, on_poll) -> None:
+        assert direction in {"left", "right"}
         on_poll()
 
 

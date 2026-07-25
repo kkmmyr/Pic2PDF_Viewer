@@ -11,16 +11,22 @@ def _image(value: int) -> np.ndarray:
     return np.full((4, 4, 3), value, dtype=np.uint8)
 
 
-def test_new_kindle_page_turn_clicks_selected_side(monkeypatch):
+def test_new_kindle_page_turn_uses_selected_arrow_key(monkeypatch):
     capturer = KindleCapturer()
     capturer._new_kindle_mode = True
     capturer.rect = RECT(100, 200, 1100, 1000)
-    capturer.config.PAGE_CLICK_INSET_PX = 120
     capturer.config.PAGE_TURN_WAIT = 0
-    clicks = []
+    key_events = []
 
     monkeypatch.setattr(
-        capturer_module.pag, "click", lambda x, y: clicks.append((x, y))
+        capturer_module.pag,
+        "keyDown",
+        lambda key: key_events.append(("down", key)),
+    )
+    monkeypatch.setattr(
+        capturer_module.pag,
+        "keyUp",
+        lambda key: key_events.append(("up", key)),
     )
     monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
 
@@ -29,7 +35,23 @@ def test_new_kindle_page_turn_clicks_selected_side(monkeypatch):
     capturer.config.PAGE_CHANGE_KEY = "right"
     capturer._next_page()
 
-    assert clicks == [(220, 600), (980, 600)]
+    assert key_events == [
+        ("down", "left"),
+        ("up", "left"),
+        ("down", "right"),
+        ("up", "right"),
+    ]
+
+
+def test_visual_page_comparison_ignores_small_ui_overlay():
+    capturer = KindleCapturer()
+    page = np.zeros((100, 100, 3), dtype=np.uint8)
+    tiny_overlay = page.copy()
+    tiny_overlay[0, 0] = 255
+    changed_page = np.full((100, 100, 3), 2, dtype=np.uint8)
+
+    assert capturer._images_visually_equal(page, tiny_overlay)
+    assert not capturer._images_visually_equal(page, changed_page)
 
 
 def test_wait_for_stable_page_skips_transient_frame(monkeypatch):

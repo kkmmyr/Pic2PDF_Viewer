@@ -513,7 +513,18 @@ class KindleAppController:
             logger.exception("Kindle reading area screenshot failed")
             return None
 
-    def go_to_start(self, *, on_poll: Callable[[], None] | None = None) -> None:
+    def go_to_start(
+        self,
+        *,
+        direction: str,
+        on_poll: Callable[[], None] | None = None,
+    ) -> None:
+        if direction not in {"left", "right"}:
+            raise KindleControllerError(
+                "positioning_failed",
+                "ページ送り方向が不正です",
+            )
+        previous_page_key = "right" if direction == "left" else "left"
         self.wait_for_reader_stable()
         previous_frame = self._reading_area_image()
         if previous_frame is None:
@@ -527,7 +538,7 @@ class KindleAppController:
             self._ensure_process_running()
             if on_poll:
                 on_poll()
-            pyautogui.press("pageup")
+            pyautogui.press(previous_page_key)
             time.sleep(self.config.page_stable_seconds)
             current_frame = self._reading_area_image()
             if current_frame is None:

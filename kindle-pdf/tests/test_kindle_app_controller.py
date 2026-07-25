@@ -242,9 +242,12 @@ def test_go_to_start_stops_after_three_unchanged_frames(
         lambda key: presses.append(key),
     )
 
-    controller.go_to_start(on_poll=lambda: polls.append(True))
+    controller.go_to_start(
+        direction="left",
+        on_poll=lambda: polls.append(True),
+    )
 
-    assert presses == ["pageup"] * 4
+    assert presses == ["right"] * 4
     assert len(polls) == 4
 
 

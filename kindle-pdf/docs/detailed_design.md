@@ -14,7 +14,7 @@
 | `PAGE_CHANGE_KEY` | ページめくり方向 (`'left'` / `'right'`) |
 | `EXPECTED_PAGES` | 表紙等を含む期待撮影画面数（空欄時は画面無変化で自動終了）。Kindleの紙面ページ総数は指定しない |
 | `WAIT_SEC` / `PAGE_STABLE_SEC` / `TIMEOUT_SEC` | 画面変化のポーリング間隔、描画安定時間、タイムアウト秒数 |
-| `PAGE_CLICK_INSET_PX` | Microsoft Store 版の左右ページ送りボタンをクリックする端からの距離 |
+| `PAGE_VISUAL_DIFF_THRESHOLD` | hover等の微小UI差分を同一画面とみなす平均画素差の上限 |
 | `CROP_X1` 〜 `CROP_Y2` | キャプチャ時のクロップ範囲（ウィンドウ相対座標） |
 | `IMG_OUTPUT_DIR` | 漫画画像の出力先: `backend/data/comic/images/` |
 | `PDF_OUTPUT_DIR` | 漫画 PDF の出力先: `backend/data/comic/pdfs/` |
@@ -25,8 +25,8 @@
 - **`setup_window()`**: ウィンドウ最前面化・フォーカス確保。
 - **`get_book_title()`**: ウィンドウタイトルから書籍名を抽出し、ダイアログで確認。
 - **`capture_loop(title)`**: メインキャプチャループ（安定画像取得→保存→ページめくり→変化・再安定待ち）。期待枚数指定時に途中で画面が変化しなければ異常終了し、期待枚数に達した時点で正常終了する。
-- **`_next_page()`**: Microsoft Store 版ではウィンドウ左右のページ送りボタンをクリックし、旧 Kindle for PC では選択方向の矢印キーを送る。
-- **`_wait_for_stable_page()`**: 直前ページとの差分を検出した後、同一画像が `PAGE_STABLE_SEC` 継続するまで待ち、白い遷移フレーム等を保存対象から除外する。
+- **`_next_page()`**: Kindle の世代にかかわらず、利用者が確定した方向の矢印キーを送る。
+- **`_wait_for_stable_page()`**: 直前ページとの平均画素差を検出した後、同等画像が `PAGE_STABLE_SEC` 継続するまで待ち、白い遷移フレームやhover表示等を保存対象から除外する。
 - **`create_pdf(title, image_dir)`**: 連番 PNG から PDF を生成。
 
 #### `AutoConfig`（継承クラス）
@@ -110,9 +110,14 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 - agent再起動時は途中状態を暗黙再開しない。`awaiting_files` の完了APIだけを冪等再試行し、それ以前の途中jobは失敗として新規job作成を要求する。
 - heartbeat送信失敗は停止要求として保持し、次の安全な工程境界または撮影進捗callbackで処理を中断する。
 - 読書画面の安定判定と先頭移動は `ReadingArea` の矩形と縮小グレースケール画像の
-  差分を用いる。`PageUp` 後に読書領域が変化しない状態を3回連続で確認した位置を
-  先頭境界とする。漫画では `FooterLabelText` が公開されないため、フッター文字列を
-  必須条件にしない。
+  差分を用いる。次ページ方向が `left` なら右キー、`right` なら左キーを押し、
+  読書領域が変化しない状態を3回連続で確認した位置を先頭境界とする。漫画では
+  `FooterLabelText` が公開されないため、フッター文字列を必須条件にしない。
+- 撮影は `left` / `right` の矢印キーでページを送る。新Kindleの端部クリックは、
+  実測した64pxのchevron領域と既存120px insetが一致せず、ページを送らずに
+  hover表示だけを変化させるため利用しない。
+- ページ安定判定は完全一致ではなく、画素の平均絶対差が1.0未満のフレームを同一と
+  みなす。実機では本文ページ遷移6.82、chevron表示だけの変化0.38で分離できた。
 - ライブラリから読書画面へ遷移中、UI Automation が一時的な `COMError` を返す場合は
   対象control未検出として次のpollで再取得する。単発のCOMエラーをジョブ全体の
   `capture_failed` へ昇格させない。

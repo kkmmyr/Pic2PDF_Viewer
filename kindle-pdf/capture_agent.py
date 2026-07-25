@@ -305,7 +305,10 @@ def _run_claimed_job(
 
     _state(api, job_id, config.agent_id, "positioning")
     controller.open_book(candidate)
-    controller.go_to_start(on_poll=heartbeat.raise_if_failed)
+    controller.go_to_start(
+        direction=job["direction"],
+        on_poll=heartbeat.raise_if_failed,
+    )
     heartbeat.raise_if_failed()
 
     _state(api, job_id, config.agent_id, "capturing")

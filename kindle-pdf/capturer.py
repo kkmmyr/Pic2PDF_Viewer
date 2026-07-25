@@ -57,8 +57,8 @@ class Config:
     PAGE_TURN_WAIT: float = 0.5  # ページめくり完了待ち
     TIMEOUT_SEC: float = 5.0  # ページ変化待ちタイムアウト
     PAGE_STABLE_SEC: float = 0.75  # 同一画像が続けば描画完了とみなす時間
+    PAGE_VISUAL_DIFF_THRESHOLD: float = 1.0  # UI微小変化を同一画面とみなす平均画素差
     PAGE_CHANGE_RETRY_COUNT: int = 1  # 画面無変化時のページ送り再試行回数
-    PAGE_CLICK_INSET_PX: int = 120  # 新 Kindle の左右ボタン中心（端からの距離）
     EXPECTED_PAGES: Optional[int] = None  # 表紙等を含む期待撮影枚数
 
     # キャプチャ領域 (ウィンドウ左上からの相対座標)
@@ -282,20 +282,21 @@ class KindleCapturer:
 
     def _next_page(self):
         """ページめくり操作"""
-        if self._new_kindle_mode and self.rect:
-            width = self.rect.right - self.rect.left
-            inset = min(self.config.PAGE_CLICK_INSET_PX, max(1, width // 4))
-            if self.config.PAGE_CHANGE_KEY == "left":
-                click_x = self.rect.left + inset
-            else:
-                click_x = self.rect.right - inset
-            click_y = self.rect.top + (self.rect.bottom - self.rect.top) // 2
-            pag.click(click_x, click_y)
-        else:
-            pag.keyDown(self.config.PAGE_CHANGE_KEY)
-            time.sleep(0.1)
-            pag.keyUp(self.config.PAGE_CHANGE_KEY)
+        pag.keyDown(self.config.PAGE_CHANGE_KEY)
+        time.sleep(0.1)
+        pag.keyUp(self.config.PAGE_CHANGE_KEY)
         time.sleep(self.config.PAGE_TURN_WAIT)
+
+    def _images_visually_equal(
+        self,
+        left: np.ndarray,
+        right: np.ndarray,
+    ) -> bool:
+        if left.shape != right.shape:
+            return False
+        channel_means = cv2.mean(cv2.absdiff(left, right))[:3]
+        mean_difference = sum(channel_means) / len(channel_means)
+        return mean_difference < self.config.PAGE_VISUAL_DIFF_THRESHOLD
 
     def _wait_for_stable_page(
         self, previous_image: Optional[np.ndarray]
@@ -316,8 +317,9 @@ class KindleCapturer:
             current_image = self._capture_screen()
             now = time.perf_counter()
 
-            if previous_image is not None and np.array_equal(
-                previous_image, current_image
+            if previous_image is not None and self._images_visually_equal(
+                previous_image,
+                current_image,
             ):
                 if not saw_change:
                     continue
@@ -326,7 +328,10 @@ class KindleCapturer:
                 continue
 
             saw_change = True
-            if candidate is not None and np.array_equal(candidate, current_image):
+            if candidate is not None and self._images_visually_equal(
+                candidate,
+                current_image,
+            ):
                 if now - stable_since >= self.config.PAGE_STABLE_SEC:
                     return current_image
                 continue
