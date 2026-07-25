@@ -131,6 +131,7 @@ def create_backup(
     label: str,
     retention_days: int,
     now: datetime | None = None,
+    kindle_catalog_db: Path | None = None,
 ) -> Path:
     """全DBを一時世代へ保存・検査し、成功した世代だけ公開する。"""
     if not _LABEL_PATTERN.fullmatch(label):
@@ -146,6 +147,17 @@ def create_backup(
     staging_path = Path(tempfile.mkdtemp(dir=backup_dir, prefix=f".{label}.tmp-"))
     try:
         artifacts: dict[str, Any] = {"meta2": _backup_sqlite(meta_db, staging_path / "meta2.db")}
+        catalog_source = kindle_catalog_db or meta_db.parent / "kindle_catalog.db"
+        if catalog_source.is_file():
+            artifacts["kindle_catalog"] = _backup_sqlite(
+                catalog_source,
+                staging_path / "kindle_catalog.db",
+            )
+        else:
+            artifacts["kindle_catalog"] = {
+                "status": "not_present",
+                "source": str(catalog_source),
+            }
         if novel_db.is_file():
             artifacts["novel"] = _backup_sqlite(novel_db, staging_path / "novel.db")
         else:
@@ -201,6 +213,8 @@ def verify_latest_backup(*, backup_dir: Path, restore_test_dir: Path) -> dict[st
         artifacts = manifest["artifacts"]
         if artifacts["meta2"]["status"] == "ok":
             checks["meta2"] = _sqlite_integrity(restored / "meta2.db")
+        if artifacts.get("kindle_catalog", {}).get("status") == "ok":
+            checks["kindle_catalog"] = _sqlite_integrity(restored / "kindle_catalog.db")
         if artifacts["novel"]["status"] == "ok":
             checks["novel"] = _sqlite_integrity(restored / "novel.db")
         if artifacts["lance"]["status"] == "ok":
@@ -223,6 +237,11 @@ def _parser() -> argparse.ArgumentParser:
     backup_parser = subparsers.add_parser("backup", help="create a verified backup")
     backup_parser.add_argument("--label", default=datetime.now().strftime("%Y-%m-%d_%H%M%S"))
     backup_parser.add_argument("--meta-db", type=Path, default=Path(config.META_DB_DIR) / "meta2.db")
+    backup_parser.add_argument(
+        "--kindle-catalog-db",
+        type=Path,
+        default=Path(config.META_DB_DIR) / "kindle_catalog.db",
+    )
     backup_parser.add_argument("--novel-db", type=Path, default=Path(config.NOVEL_DB_PATH))
     backup_parser.add_argument("--lance-db", type=Path, default=Path(config.NOVEL_DB_LANCE_PATH))
     backup_parser.add_argument("--backup-dir", type=Path, default=Path(config.SERVER_BACKUP_DIR))
@@ -244,6 +263,7 @@ def main() -> int:
             backup_dir=args.backup_dir,
             label=args.label,
             retention_days=args.retention_days,
+            kindle_catalog_db=args.kindle_catalog_db,
         )
         print(f"verified backup created: {destination}")
     else:

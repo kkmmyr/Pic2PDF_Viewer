@@ -605,6 +605,280 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/kindle-catalog/books': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Books */
+        get: operations['list_books_api_kindle_catalog_books_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/stats': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Stats */
+        get: operations['get_stats_api_kindle_catalog_stats_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/imports/sources': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import Sources */
+        get: operations['get_import_sources_api_kindle_catalog_imports_sources_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/imports/runs': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import Runs */
+        get: operations['get_import_runs_api_kindle_catalog_imports_runs_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/imports/orders': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Orders */
+        post: operations['import_orders_api_kindle_catalog_imports_orders_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/imports/kindle-info': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Kindle Info */
+        post: operations['import_kindle_info_api_kindle_catalog_imports_kindle_info_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/imports/autobuy': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Autobuy */
+        post: operations['import_autobuy_api_kindle_catalog_imports_autobuy_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/migration/preview': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Legacy Migration */
+        post: operations['preview_legacy_migration_api_kindle_catalog_migration_preview_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/migration/commit': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Commit Legacy Migration */
+        post: operations['commit_legacy_migration_api_kindle_catalog_migration_commit_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/links/unlinked': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Unlinked Books */
+        get: operations['get_unlinked_books_api_kindle_catalog_links_unlinked_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/links/candidates': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Link Candidates */
+        get: operations['get_link_candidates_api_kindle_catalog_links_candidates_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/links': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Link Existing Book */
+        put: operations['link_existing_book_api_kindle_catalog_links_put'];
+        post?: never;
+        /** Unlink Existing Book */
+        delete: operations['unlink_existing_book_api_kindle_catalog_links_delete'];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/capture-jobs': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Capture Jobs */
+        get: operations['get_capture_jobs_api_kindle_catalog_capture_jobs_get'];
+        put?: never;
+        /** Create Capture Job */
+        post: operations['create_capture_job_api_kindle_catalog_capture_jobs_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/agents/claim': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Capture Job */
+        post: operations['claim_capture_job_api_kindle_catalog_agents_claim_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/agents/jobs/{job_id}/state': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Update Capture Job State */
+        post: operations['update_capture_job_state_api_kindle_catalog_agents_jobs__job_id__state_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/agents/jobs/{job_id}/complete': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Capture Job */
+        post: operations['complete_capture_job_api_kindle_catalog_agents_jobs__job_id__complete_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/genres': {
         parameters: {
             query?: never;
@@ -1451,6 +1725,32 @@ export interface components {
             /** Inserted */
             inserted: number;
         };
+        /** AgentClaimRequest */
+        AgentClaimRequest: {
+            /** Agent Id */
+            agent_id: string;
+        };
+        /** AgentCompleteRequest */
+        AgentCompleteRequest: {
+            /** Agent Id */
+            agent_id: string;
+        };
+        /** AgentStateRequest */
+        AgentStateRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: 'waiting_user' | 'capturing' | 'awaiting_files' | 'failed';
+            /** Captured Screens */
+            captured_screens?: number | null;
+            /** Error Code */
+            error_code?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+        };
         /** AmazonImportResponse */
         AmazonImportResponse: {
             /** Updated */
@@ -1603,6 +1903,24 @@ export interface components {
             recent_finished: {
                 [key: string]: unknown;
             }[];
+        };
+        /** CaptureJobCreateRequest */
+        CaptureJobCreateRequest: {
+            /** Asin */
+            asin: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /**
+             * Direction
+             * @default left
+             * @enum {string}
+             */
+            direction: 'left' | 'right';
+            /** Expected Screens */
+            expected_screens?: number | null;
         };
         /** CharacterDetail */
         CharacterDetail: {
@@ -2031,6 +2349,323 @@ export interface components {
             /** Artists */
             artists: components['schemas']['HitomiWatchlistEntry'][];
         };
+        /** KindleAgentClaimResponse */
+        KindleAgentClaimResponse: {
+            job: components['schemas']['KindleCaptureJobOut'] | null;
+        };
+        /** KindleCaptureCompleteResponse */
+        KindleCaptureCompleteResponse: {
+            /** Job Id */
+            job_id: string;
+            /** Status */
+            status: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
+            /** Captured Screens */
+            captured_screens: number;
+        };
+        /** KindleCaptureJobOut */
+        KindleCaptureJobOut: {
+            /** Id */
+            id: string;
+            /** Asin */
+            asin: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Status */
+            status: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: 'left' | 'right';
+            /** Expected Screens */
+            expected_screens: number | null;
+            /** Requested At */
+            requested_at: string;
+            /** Claimed At */
+            claimed_at: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Agent Id */
+            agent_id: string | null;
+            /** Book Id */
+            book_id: string | null;
+            /** Captured Screens */
+            captured_screens: number | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** KindleCaptureJobsResponse */
+        KindleCaptureJobsResponse: {
+            /** Items */
+            items: components['schemas']['KindleCaptureJobOut'][];
+        };
+        /** KindleCatalogBookOut */
+        KindleCatalogBookOut: {
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string;
+            /** Authors */
+            authors: string[];
+            /** Genres */
+            genres: string[];
+            /** Publisher */
+            publisher: string | null;
+            /** Book Type */
+            book_type: string;
+            /** Kindle Acquisition Date */
+            kindle_acquisition_date: string | null;
+            /** Is Completed */
+            is_completed: boolean | null;
+            /**
+             * Ownership
+             * @enum {string}
+             */
+            ownership: 'purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown';
+            /**
+             * Capture State
+             * @enum {string}
+             */
+            capture_state: 'not_captured' | 'captured' | 'multiple_links' | 'capture_pending';
+            /** Series Id */
+            series_id: number | null;
+            /** Series Name */
+            series_name: string | null;
+            /** Volume Number */
+            volume_number: number | null;
+            /** Volume Label */
+            volume_label: string | null;
+        };
+        /** KindleCatalogBooksResponse */
+        KindleCatalogBooksResponse: {
+            /** Items */
+            items: components['schemas']['KindleCatalogBookOut'][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+        };
+        /** KindleCatalogSourceStatusResponse */
+        KindleCatalogSourceStatusResponse: {
+            /** Legacy Db Configured */
+            legacy_db_configured: boolean;
+            /** Legacy Db Available */
+            legacy_db_available: boolean;
+            /** Legacy Db Name */
+            legacy_db_name: string | null;
+            /** Amazon Data Configured */
+            amazon_data_configured: boolean;
+        };
+        /** KindleCatalogStatsResponse */
+        KindleCatalogStatsResponse: {
+            /** Books */
+            books: number;
+            /** Purchases */
+            purchases: number;
+            /** Borrowings */
+            borrowings: number;
+            /** Returns */
+            returns: number;
+            /** Series */
+            series: number;
+            /** Captured */
+            captured: number;
+            last_import: components['schemas']['KindleImportRunOut'] | null;
+        };
+        /** KindleImportFileResultOut */
+        KindleImportFileResultOut: {
+            /** Filename */
+            filename: string;
+            /** Kind */
+            kind: string;
+            /** Status */
+            status: string;
+            /** Records */
+            records: number;
+        };
+        /** KindleImportRunOut */
+        KindleImportRunOut: {
+            /** Id */
+            id: number;
+            /** Source Kind */
+            source_kind: string;
+            /** Status */
+            status: string;
+            /** Started At */
+            started_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Files Processed */
+            files_processed: number;
+            /** Records Processed */
+            records_processed: number;
+            /** Records Skipped */
+            records_skipped: number;
+            /** Error Message */
+            error_message: string | null;
+        };
+        /** KindleImportRunsResponse */
+        KindleImportRunsResponse: {
+            /** Items */
+            items: components['schemas']['KindleImportRunOut'][];
+        };
+        /** KindleLinkCandidateOut */
+        KindleLinkCandidateOut: {
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string;
+            /** Authors */
+            authors: string[];
+            /** Book Type */
+            book_type: string;
+            /** Score */
+            score: number;
+            /** Reasons */
+            reasons: string[];
+        };
+        /** KindleLinkCandidatesResponse */
+        KindleLinkCandidatesResponse: {
+            /** Items */
+            items: components['schemas']['KindleLinkCandidateOut'][];
+        };
+        /** KindleLinkResponse */
+        KindleLinkResponse: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
+            /** Asin */
+            asin: string;
+        };
+        /** KindleMigrationCommitResponse */
+        KindleMigrationCommitResponse: {
+            /** Run Id */
+            run_id: number;
+            /** Status */
+            status: string;
+            /** Records Processed */
+            records_processed: number;
+            /** Records Skipped */
+            records_skipped: number;
+            /** Images Migrated */
+            images_migrated: boolean;
+        };
+        /** KindleMigrationPreviewResponse */
+        KindleMigrationPreviewResponse: {
+            /** Configured */
+            configured: boolean;
+            /** Source Name */
+            source_name: string;
+            /** Source Size */
+            source_size: number;
+            /** Fingerprint */
+            fingerprint: string;
+            /** Integrity */
+            integrity: string;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Excluded Counts */
+            excluded_counts: {
+                [key: string]: number;
+            };
+            /** Missing Asin */
+            missing_asin: number;
+            /** Confirmation Token */
+            confirmation_token: string;
+            /** Expires At */
+            expires_at: string;
+            /** Images Migrated */
+            images_migrated: boolean;
+        };
+        /** KindleOrdersImportResponse */
+        KindleOrdersImportResponse: {
+            /** Run Id */
+            run_id: number;
+            /** Status */
+            status: string;
+            /** Files Processed */
+            files_processed: number;
+            /** Files Skipped */
+            files_skipped: number;
+            /** Records Processed */
+            records_processed: number;
+            /**
+             * Records Skipped
+             * @default 0
+             */
+            records_skipped: number;
+            /** Files */
+            files: components['schemas']['KindleImportFileResultOut'][];
+        };
+        /** KindleUnlinkResponse */
+        KindleUnlinkResponse: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
+            /** Unlinked */
+            unlinked: boolean;
+        };
+        /** KindleUnlinkedBookOut */
+        KindleUnlinkedBookOut: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
+            /** Title */
+            title: string;
+            /** Authors */
+            authors: string[];
+            /** Series Title */
+            series_title: string | null;
+        };
+        /** KindleUnlinkedBooksResponse */
+        KindleUnlinkedBooksResponse: {
+            /** Items */
+            items: components['schemas']['KindleUnlinkedBookOut'][];
+        };
+        /** LinkRequest */
+        LinkRequest: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
+            /** Asin */
+            asin: string;
+        };
         /** MergePdfsRequest */
         MergePdfsRequest: {
             /** Names */
@@ -2063,6 +2698,11 @@ export interface components {
             message: string;
             /** Updated Count */
             updated_count: number;
+        };
+        /** MigrationCommitRequest */
+        MigrationCommitRequest: {
+            /** Confirmation Token */
+            confirmation_token: string;
         };
         /**
          * NovelMetaPatchRequest
@@ -2562,6 +3202,16 @@ export interface components {
              * @default doujin
              */
             source: string;
+        };
+        /** UnlinkRequest */
+        UnlinkRequest: {
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
         };
         /** UpdateFiltersRequest */
         UpdateFiltersRequest: {
@@ -3624,6 +4274,522 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['HitomiRunNowResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    list_books_api_kindle_catalog_books_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                book_type?: ('comic' | 'novel' | 'other' | 'unknown') | null;
+                ownership?:
+                    | ('purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown')
+                    | null;
+                capture_state?:
+                    | ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending')
+                    | null;
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCatalogBooksResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_stats_api_kindle_catalog_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCatalogStatsResponse'];
+                };
+            };
+        };
+    };
+    get_import_sources_api_kindle_catalog_imports_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCatalogSourceStatusResponse'];
+                };
+            };
+        };
+    };
+    get_import_runs_api_kindle_catalog_imports_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleImportRunsResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    import_orders_api_kindle_catalog_imports_orders_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleOrdersImportResponse'];
+                };
+            };
+        };
+    };
+    import_kindle_info_api_kindle_catalog_imports_kindle_info_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleOrdersImportResponse'];
+                };
+            };
+        };
+    };
+    import_autobuy_api_kindle_catalog_imports_autobuy_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleOrdersImportResponse'];
+                };
+            };
+        };
+    };
+    preview_legacy_migration_api_kindle_catalog_migration_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleMigrationPreviewResponse'];
+                };
+            };
+        };
+    };
+    commit_legacy_migration_api_kindle_catalog_migration_commit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['MigrationCommitRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleMigrationCommitResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_unlinked_books_api_kindle_catalog_links_unlinked_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleUnlinkedBooksResponse'];
+                };
+            };
+        };
+    };
+    get_link_candidates_api_kindle_catalog_links_candidates_get: {
+        parameters: {
+            query: {
+                source: 'comic' | 'novel';
+                book_id: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleLinkCandidatesResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    link_existing_book_api_kindle_catalog_links_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['LinkRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleLinkResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    unlink_existing_book_api_kindle_catalog_links_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['UnlinkRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleUnlinkResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_capture_jobs_api_kindle_catalog_capture_jobs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureJobsResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    create_capture_job_api_kindle_catalog_capture_jobs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['CaptureJobCreateRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureJobOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    claim_capture_job_api_kindle_catalog_agents_claim_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['AgentClaimRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleAgentClaimResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    update_capture_job_state_api_kindle_catalog_agents_jobs__job_id__state_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['AgentStateRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureJobOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    complete_capture_job_api_kindle_catalog_agents_jobs__job_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['AgentCompleteRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureCompleteResponse'];
                 };
             };
             /** @description Validation Error */

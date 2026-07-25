@@ -4,6 +4,7 @@ import RouteErrorPage from '@/components/RouteErrorPage';
 import {
     GeneratorPage,
     HitomiPage,
+    KindleCatalogPage,
     NovelDbPage,
     NovelDetailPage,
     NovelDiscussionPage,
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
             { path: 'doujin/generator', element: <GeneratorPage />, errorElement: err },
             { path: 'doujin/hitomi', element: <HitomiPage />, errorElement: err },
             { path: 'comic', element: <ViewerPage />, errorElement: err },
+            { path: 'kindle/catalog', element: <KindleCatalogPage />, errorElement: err },
             { path: 'novel', element: <Navigate to="/novel/db" replace /> },
             { path: 'novel/db', element: <NovelDbPage />, errorElement: err },
             { path: 'novel/manage', element: <NovelManagePage />, errorElement: err },

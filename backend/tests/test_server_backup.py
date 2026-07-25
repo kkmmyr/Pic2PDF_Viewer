@@ -27,6 +27,7 @@ def _create_lance(path: Path) -> None:
 def test_create_backup_captures_wal_and_all_databases(tmp_path: Path) -> None:
     meta_db = tmp_path / "source" / "meta2.db"
     novel_db = tmp_path / "source" / "novel.db"
+    kindle_catalog_db = tmp_path / "source" / "kindle_catalog.db"
     lance_db = tmp_path / "source" / "novel.lancedb"
     meta_db.parent.mkdir(parents=True)
     writer = sqlite3.connect(meta_db)
@@ -35,6 +36,7 @@ def test_create_backup_captures_wal_and_all_databases(tmp_path: Path) -> None:
     writer.execute("INSERT INTO sample VALUES ('committed-in-wal')")
     writer.commit()
     _create_sqlite(novel_db, "novel")
+    _create_sqlite(kindle_catalog_db, "kindle")
     _create_lance(lance_db)
 
     try:
@@ -45,6 +47,7 @@ def test_create_backup_captures_wal_and_all_databases(tmp_path: Path) -> None:
             backup_dir=tmp_path / "backups",
             label="2026-07-18_020000",
             retention_days=14,
+            kindle_catalog_db=kindle_catalog_db,
         )
     finally:
         writer.close()
@@ -54,6 +57,7 @@ def test_create_backup_captures_wal_and_all_databases(tmp_path: Path) -> None:
     manifest = json.loads((snapshot / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["artifacts"]["meta2"]["integrity_check"] == "ok"
     assert manifest["artifacts"]["novel"]["integrity_check"] == "ok"
+    assert manifest["artifacts"]["kindle_catalog"]["integrity_check"] == "ok"
     assert manifest["artifacts"]["lance"]["tables"] == {"chunks": 1}
 
 

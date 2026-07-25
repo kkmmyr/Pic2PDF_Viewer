@@ -24,6 +24,7 @@ from routers import (
     generate,
     genres,
     hitomi,
+    kindle_catalog,
     library,
     meta,
     meta_db_backup,
@@ -38,6 +39,7 @@ from routers import (
     thumbnails,
 )
 from services.doujin_watcher import doujin_watcher
+from services.kindle_catalog.migrations import upgrade_head as upgrade_kindle_catalog
 from services.meta_db import init_db
 from services.novel_db.job_queue import job_queue
 from services.novel_db.migrations import upgrade_head
@@ -51,6 +53,7 @@ async def lifespan(app: FastAPI):
     """起動時に meta_db / novel_db の初期化・マイグレーションと job_queue / doujin_watcher を起動する。"""
     init_db()
     upgrade_head()
+    upgrade_kindle_catalog()
     await job_queue.start()
     await doujin_watcher.start()
     try:
@@ -124,6 +127,7 @@ app.include_router(ocr.router, prefix="/api", tags=["ocr"])
 app.include_router(meta.router, prefix="/api", tags=["meta"])
 app.include_router(series.router, prefix="/api", tags=["series"])
 app.include_router(hitomi.router, prefix="/api", tags=["hitomi"])
+app.include_router(kindle_catalog.router, prefix="/api", tags=["kindle_catalog"])
 app.include_router(genres.router, prefix="/api", tags=["genres"])
 app.include_router(novel_db.router, prefix="/api", tags=["novel_db"])
 app.include_router(novel_discussion.router, prefix="/api", tags=["novel_discussion"])

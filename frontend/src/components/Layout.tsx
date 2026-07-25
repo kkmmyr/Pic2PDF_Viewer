@@ -7,6 +7,7 @@ import {
     BookText,
     FileText,
     Library,
+    ShoppingBag,
     MessageSquare,
     Moon,
     Settings,
@@ -49,6 +50,10 @@ const NAV_GROUPS: NavGroup[] = [
             { to: '/novel/graph', icon: Share2, label: '関係グラフ' },
             { to: '/novel/manage', icon: Wrench, label: '管理' },
         ],
+    },
+    {
+        label: 'Kindle',
+        items: [{ to: '/kindle/catalog', icon: ShoppingBag, label: '購入書籍' }],
     },
 ];
 

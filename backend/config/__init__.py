@@ -43,6 +43,12 @@ class _AppSettings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:5176,http://127.0.0.1:5176"
     # Amazon 購入履歴 CSV ルートディレクトリ（未設定時は無効）
     AMAZON_DATA_DIR: Path | None = None
+    # Kindle 購入カタログ初回移行元 DB（未設定時は移行機能を無効化）
+    KINDLE_LEGACY_DB_PATH: Path | None = None
+    # Kindle キャプチャ成果物の Linux 受信箱
+    KINDLE_CAPTURE_INBOX_DIR: Path | None = None
+    # Windows Kindle キャプチャエージェント共有トークン
+    KINDLE_CAPTURE_AGENT_TOKEN: str | None = None
     # Gemma 4 ツールディレクトリ（未設定時は Gemma 連携無効）
     GEMMA_TOOL_DIR: Path | None = None
     # meta2.db バックアップ先（未設定時はバックアップ無効）
@@ -131,6 +137,9 @@ FRONTEND_DIST_DIR = str(_BACKEND_DIR.parent / "frontend" / "dist")
 
 # オプション設定（未設定時は None）
 AMAZON_DATA_DIR: str | None = str(_s.AMAZON_DATA_DIR) if _s.AMAZON_DATA_DIR else None
+KINDLE_LEGACY_DB_PATH: str | None = str(_s.KINDLE_LEGACY_DB_PATH) if _s.KINDLE_LEGACY_DB_PATH else None
+KINDLE_CAPTURE_INBOX_DIR: str = str(_s.KINDLE_CAPTURE_INBOX_DIR or _SERVER_STORAGE_ROOT / "inbox" / "kindle-capture")
+KINDLE_CAPTURE_AGENT_TOKEN: str | None = _s.KINDLE_CAPTURE_AGENT_TOKEN or None
 GEMMA_TOOL_DIR: str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
 META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
 HITOMI_DISCORD_WEBHOOK_URL: str | None = _s.HITOMI_DISCORD_WEBHOOK_URL or None

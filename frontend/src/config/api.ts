@@ -78,6 +78,20 @@ export const API_ENDPOINTS = {
     GENRES_REORDER: '/api/genres/reorder',
     /** Amazon CSV 固定パスインポート（authors/asin 空欄補完） */
     AMAZON_IMPORT: (source: string) => `/api/amazon/import?source=${encodeURIComponent(source)}`,
+    /** Kindle 購入カタログ */
+    KINDLE_CATALOG_BOOKS: '/api/kindle-catalog/books',
+    KINDLE_CATALOG_STATS: '/api/kindle-catalog/stats',
+    KINDLE_CATALOG_IMPORT_SOURCES: '/api/kindle-catalog/imports/sources',
+    KINDLE_CATALOG_IMPORT_RUNS: '/api/kindle-catalog/imports/runs',
+    KINDLE_CATALOG_IMPORT_ORDERS: '/api/kindle-catalog/imports/orders',
+    KINDLE_CATALOG_IMPORT_KINDLE_INFO: '/api/kindle-catalog/imports/kindle-info',
+    KINDLE_CATALOG_IMPORT_AUTOBUY: '/api/kindle-catalog/imports/autobuy',
+    KINDLE_CATALOG_MIGRATION_PREVIEW: '/api/kindle-catalog/migration/preview',
+    KINDLE_CATALOG_MIGRATION_COMMIT: '/api/kindle-catalog/migration/commit',
+    KINDLE_CATALOG_UNLINKED: '/api/kindle-catalog/links/unlinked',
+    KINDLE_CATALOG_LINK_CANDIDATES: '/api/kindle-catalog/links/candidates',
+    KINDLE_CATALOG_LINKS: '/api/kindle-catalog/links',
+    KINDLE_CAPTURE_JOBS: '/api/kindle-catalog/capture-jobs',
     /** UI プリファレンス（フィルター + ピン）取得 */
     PREFS: (source: string) => `/api/prefs?source=${encodeURIComponent(source)}`,
     /** UI フィルター更新 */

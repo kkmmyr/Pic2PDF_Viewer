@@ -1,6 +1,6 @@
 # Linux サーバー Samba セットアップ
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-25
 
 同人誌の画像ファイル（WebP / ZIP）を Windows からネットワークドライブ経由でサーバーに置けるようにする。
 配置後、ブラウザの「PDF 生成」ページからワンクリックで変換できる。
@@ -14,6 +14,14 @@
 | Linux 側の共有フォルダ | `/opt/pic2pdf-viewer/data/doujin/input/` |
 | Samba 共有名 | `pic2pdf-input` |
 | Windows からのアクセス | `\\medaroserver\pic2pdf-input`（Tailscale 経由） |
+
+Kindle キャプチャ成果物は同人誌入力と混在させず、専用共有を使用する。
+
+| 役割 | パス |
+|------|------|
+| Linux 側の Kindle 受信箱 | `/opt/pic2pdf-viewer/inbox/kindle-capture/` |
+| Samba 共有名 | `pic2pdf-capture-inbox` |
+| Windows からのアクセス | `\\medaroserver\pic2pdf-capture-inbox` |
 
 ---
 
@@ -42,6 +50,20 @@ sudo tee -a /etc/samba/smb.conf <<'EOF'
    directory mask = 0755
 EOF
 
+# Kindle キャプチャ専用受信箱（正式な画像領域は共有しない）
+sudo mkdir -p /opt/pic2pdf-viewer/inbox/kindle-capture
+sudo chown amashio:amashio /opt/pic2pdf-viewer/inbox/kindle-capture
+sudo tee -a /etc/samba/smb.conf <<'EOF'
+
+[pic2pdf-capture-inbox]
+   path = /opt/pic2pdf-viewer/inbox/kindle-capture
+   browseable = yes
+   read only = no
+   valid users = amashio
+   create mask = 0640
+   directory mask = 0750
+EOF
+
 # 5. 設定確認
 testparm
 
@@ -60,6 +82,19 @@ sudo systemctl enable smbd nmbd
 
 > **前提**: Tailscale が起動していること、`medaroserver` の名前解決ができること。
 > 解決しない場合は `\\100.76.210.48\pic2pdf-input` などの IP で試す。
+
+Kindle キャプチャエージェントでは `.env` に次を設定する。
+
+```dotenv
+PIC2PDF_API_URL=http://medaroserver:8090
+KINDLE_CAPTURE_AGENT_TOKEN=<Linux 側と同じ十分に長いランダム値>
+KINDLE_CAPTURE_AGENT_ID=kindle-windows-1
+KINDLE_CAPTURE_INBOX_DIR=\\medaroserver\pic2pdf-capture-inbox
+```
+
+Linux 側にも `KINDLE_CAPTURE_AGENT_TOKEN` と
+`KINDLE_CAPTURE_INBOX_DIR=/opt/pic2pdf-viewer/inbox/kindle-capture` を設定する。
+エージェントは `scripts\run_capture_agent.bat` から起動する。
 
 ---
 

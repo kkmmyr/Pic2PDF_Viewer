@@ -9,3 +9,4 @@ export const NovelDetailPage = lazy(() => import('@/pages/NovelDetailPage'));
 export const NovelDiscussionPage = lazy(() => import('@/pages/NovelDiscussionPage'));
 export const NovelReaderPage = lazy(() => import('@/pages/NovelReaderPage'));
 export const NovelGraphPage = lazy(() => import('@/pages/NovelGraphPage'));
+export const KindleCatalogPage = lazy(() => import('@/pages/KindleCatalogPage'));
