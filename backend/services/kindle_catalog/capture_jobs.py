@@ -7,8 +7,10 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import uuid
 from copy import deepcopy
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import config
@@ -16,10 +18,24 @@ from config import get_dirs_by_source
 from services.kindle_catalog.connection import with_db
 from services.meta_store import update_meta_locked
 from utils.dt import jst_now
+from utils.logger import get_logger
 
-_ACTIVE = ("claimed", "waiting_user", "capturing", "awaiting_files")
+logger = get_logger(__name__)
+
+ACTIVE_STATUSES = (
+    "claimed",
+    "locating_book",
+    "downloading",
+    "positioning",
+    "waiting_user",
+    "capturing",
+    "awaiting_files",
+)
 _AGENT_TRANSITIONS = {
-    "claimed": {"waiting_user", "failed"},
+    "claimed": {"locating_book", "waiting_user", "failed"},
+    "locating_book": {"downloading", "positioning", "failed"},
+    "downloading": {"positioning", "failed"},
+    "positioning": {"capturing", "failed"},
     "waiting_user": {"capturing", "failed"},
     "capturing": {"awaiting_files", "failed"},
     "awaiting_files": {"failed"},
@@ -29,6 +45,89 @@ _ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 
 def _row_dict(row) -> dict:
     return dict(row)
+
+
+def _job_with_identity(conn: sqlite3.Connection, job_id: str) -> dict:
+    row = conn.execute(
+        """
+        SELECT
+            cj.*,
+            b.title,
+            b.title_normalized,
+            s.name AS series_name,
+            bs.volume_number,
+            bs.volume_label
+        FROM capture_jobs cj
+        JOIN books b ON b.asin=cj.asin
+        LEFT JOIN book_series bs ON bs.asin=b.asin
+        LEFT JOIN series s ON s.id=bs.series_id
+        WHERE cj.id=?
+        """,
+        (job_id,),
+    ).fetchone()
+    if row is None:
+        raise ValueError("キャプチャジョブが見つかりません")
+    job = _row_dict(row)
+    authors = conn.execute(
+        """
+        SELECT a.name
+        FROM book_authors ba
+        JOIN authors a ON a.id=ba.author_id
+        WHERE ba.asin=?
+        ORDER BY ba.sort_order, ba.id
+        """,
+        (job["asin"],),
+    ).fetchall()
+    job["identity"] = {
+        "asin": job["asin"],
+        "title": job["title"],
+        "title_normalized": job["title_normalized"],
+        "authors": [author["name"] for author in authors],
+        "series_name": job["series_name"],
+        "volume_number": job["volume_number"],
+        "volume_label": job["volume_label"],
+    }
+    return job
+
+
+def _recover_stale(
+    conn: sqlite3.Connection,
+    *,
+    now: datetime,
+    timeout_seconds: int,
+) -> list[str]:
+    if timeout_seconds <= 0:
+        raise ValueError("heartbeat timeout は 1 秒以上で指定してください")
+    cutoff = (now - timedelta(seconds=timeout_seconds)).isoformat()
+    placeholders = ",".join("?" for _ in ACTIVE_STATUSES)
+    rows = conn.execute(
+        f"""
+        SELECT id
+        FROM capture_jobs
+        WHERE status IN ({placeholders})
+          AND COALESCE(heartbeat_at, claimed_at, requested_at) < ?
+        ORDER BY requested_at
+        """,
+        (*ACTIVE_STATUSES, cutoff),
+    ).fetchall()
+    job_ids = [row["id"] for row in rows]
+    if not job_ids:
+        return []
+    completed_at = now.isoformat()
+    conn.execute(
+        f"""
+        UPDATE capture_jobs SET
+            status='failed',
+            completed_at=?,
+            error_code='agent_heartbeat_timeout',
+            error_message='キャプチャエージェントの heartbeat が期限切れです'
+        WHERE status IN ({placeholders})
+          AND COALESCE(heartbeat_at, claimed_at, requested_at) < ?
+        """,
+        (completed_at, *ACTIVE_STATUSES, cutoff),
+    )
+    logger.warning("Recovered %d stale Kindle capture job(s)", len(job_ids))
+    return job_ids
 
 
 def create(asin: str, source: str, direction: str, expected_screens: int | None) -> dict:
@@ -41,8 +140,14 @@ def create(asin: str, source: str, direction: str, expected_screens: int | None)
         if book is None:
             raise ValueError("指定 ASIN は Kindle カタログに存在しません")
         existing = conn.execute(
-            "SELECT 1 FROM capture_jobs WHERE asin=? AND status IN (?,?,?,?,?)",
-            (asin, "queued", *_ACTIVE),
+            """
+            SELECT 1 FROM capture_jobs
+            WHERE asin=? AND status IN (
+                'queued','claimed','locating_book','downloading','positioning',
+                'waiting_user','capturing','awaiting_files'
+            )
+            """,
+            (asin,),
         ).fetchone()
         if existing:
             raise ValueError("この書籍には未完了のキャプチャジョブがあります")
@@ -76,45 +181,74 @@ def claim(agent_id: str) -> dict | None:
     """transaction 内の条件付き UPDATE で次の1件だけを claim する。"""
     with with_db() as conn:
         conn.execute("BEGIN IMMEDIATE")
+        now = jst_now()
+        _recover_stale(
+            conn,
+            now=now,
+            timeout_seconds=config.KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC,
+        )
+        placeholders = ",".join("?" for _ in ACTIVE_STATUSES)
         active = conn.execute(
-            "SELECT id FROM capture_jobs WHERE agent_id=? AND status IN (?,?,?,?)",
-            (agent_id, *_ACTIVE),
+            f"""
+            SELECT id FROM capture_jobs
+            WHERE agent_id=? AND status IN ({placeholders})
+            """,
+            (agent_id, *ACTIVE_STATUSES),
         ).fetchone()
         if active:
-            row = conn.execute(
-                """
-                SELECT cj.*, b.title
-                FROM capture_jobs cj JOIN books b ON b.asin=cj.asin
-                WHERE cj.id=?
-                """,
-                (active["id"],),
-            ).fetchone()
-            return _row_dict(row)
+            conn.execute(
+                "UPDATE capture_jobs SET heartbeat_at=? WHERE id=?",
+                (now.isoformat(), active["id"]),
+            )
+            return _job_with_identity(conn, active["id"])
         queued = conn.execute(
             "SELECT id FROM capture_jobs WHERE status='queued' ORDER BY requested_at LIMIT 1"
         ).fetchone()
         if queued is None:
             return None
-        now = jst_now().isoformat()
+        now_value = now.isoformat()
         updated = conn.execute(
             """
             UPDATE capture_jobs
-            SET status='claimed',agent_id=?,claimed_at=?
+            SET status='claimed',agent_id=?,claimed_at=?,heartbeat_at=?
             WHERE id=? AND status='queued'
             """,
-            (agent_id, now, queued["id"]),
+            (agent_id, now_value, now_value, queued["id"]),
         ).rowcount
         if updated != 1:
             return None
+        return _job_with_identity(conn, queued["id"])
+
+
+def heartbeat(job_id: str, agent_id: str) -> dict:
+    """agent 所有の active job の heartbeat を更新する。"""
+    with with_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
-            """
-            SELECT cj.*, b.title
-            FROM capture_jobs cj JOIN books b ON b.asin=cj.asin
-            WHERE cj.id=?
-            """,
-            (queued["id"],),
+            "SELECT status,agent_id FROM capture_jobs WHERE id=?",
+            (job_id,),
         ).fetchone()
-    return _row_dict(row)
+        if row is None:
+            raise ValueError("キャプチャジョブが見つかりません")
+        if row["agent_id"] != agent_id:
+            raise ValueError("このエージェントが claim したジョブではありません")
+        if row["status"] not in ACTIVE_STATUSES:
+            raise ValueError("heartbeat を更新できるジョブ状態ではありません")
+        heartbeat_at = jst_now().isoformat()
+        updated = conn.execute(
+            """
+            UPDATE capture_jobs SET heartbeat_at=?
+            WHERE id=? AND agent_id=? AND status=?
+            """,
+            (heartbeat_at, job_id, agent_id, row["status"]),
+        ).rowcount
+        if updated != 1:
+            raise ValueError("heartbeat の更新に失敗しました")
+    return {
+        "job_id": job_id,
+        "status": row["status"],
+        "heartbeat_at": heartbeat_at,
+    }
 
 
 def update_state(
@@ -126,7 +260,12 @@ def update_state(
     error_code: str | None = None,
     error_message: str | None = None,
 ) -> dict:
+    if captured_screens is not None and captured_screens < 0:
+        raise ValueError("captured_screens は 0 以上で指定してください")
+    if state == "failed" and not error_code:
+        raise ValueError("failed への遷移には error_code が必要です")
     with with_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         row = conn.execute("SELECT * FROM capture_jobs WHERE id=?", (job_id,)).fetchone()
         if row is None:
             raise ValueError("キャプチャジョブが見つかりません")
@@ -134,25 +273,32 @@ def update_state(
             raise ValueError("このエージェントが claim したジョブではありません")
         if state not in _AGENT_TRANSITIONS.get(row["status"], set()):
             raise ValueError(f"許可されていない状態遷移です: {row['status']} -> {state}")
-        started_at = jst_now().isoformat() if state == "capturing" else row["started_at"]
-        completed_at = jst_now().isoformat() if state == "failed" else row["completed_at"]
-        conn.execute(
+        now = jst_now().isoformat()
+        started_at = now if state == "capturing" else row["started_at"]
+        completed_at = now if state == "failed" else row["completed_at"]
+        screen_count = row["captured_screens"] if captured_screens is None else captured_screens
+        updated_count = conn.execute(
             """
             UPDATE capture_jobs SET
                 status=?,started_at=?,completed_at=?,captured_screens=?,
-                error_code=?,error_message=?
-            WHERE id=?
+                error_code=?,error_message=?,heartbeat_at=?
+            WHERE id=? AND agent_id=? AND status=?
             """,
             (
                 state,
                 started_at,
                 completed_at,
-                captured_screens,
+                screen_count,
                 error_code,
                 error_message,
+                now,
                 job_id,
+                agent_id,
+                row["status"],
             ),
-        )
+        ).rowcount
+        if updated_count != 1:
+            raise ValueError("キャプチャジョブの状態更新に失敗しました")
         updated = conn.execute("SELECT * FROM capture_jobs WHERE id=?", (job_id,)).fetchone()
     return _row_dict(updated)
 
@@ -271,13 +417,22 @@ def complete(job_id: str, agent_id: str) -> dict:
         os.replace(ready_dir, processed_package)
         archived = True
         with with_db() as conn:
+            completed_at = jst_now().isoformat()
             updated = conn.execute(
                 """
                 UPDATE capture_jobs SET
-                    status='succeeded',completed_at=?,book_id=?,captured_screens=?
+                    status='succeeded',completed_at=?,heartbeat_at=?,
+                    book_id=?,captured_screens=?
                 WHERE id=? AND status='awaiting_files' AND agent_id=?
                 """,
-                (jst_now().isoformat(), book_id, len(files), job_id, agent_id),
+                (
+                    completed_at,
+                    completed_at,
+                    book_id,
+                    len(files),
+                    job_id,
+                    agent_id,
+                ),
             ).rowcount
             if updated != 1:
                 raise ValueError("キャプチャジョブの完了更新に失敗しました")

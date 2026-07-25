@@ -180,6 +180,7 @@ class CaptureJob(KindleSQLModel, table=True):
     expected_screens: int | None = None
     requested_at: str
     claimed_at: str | None = None
+    heartbeat_at: str | None = Field(default=None, index=True)
     started_at: str | None = None
     completed_at: str | None = None
     agent_id: str | None = Field(default=None, index=True)

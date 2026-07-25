@@ -2,7 +2,7 @@
 
 作成日: 2026-07-25
 
-状態: **Phase 0 実機調査完了・条件付き合格（2026-07-25）**
+状態: **Phase 1 ジョブ契約・バックエンド完了（2026-07-25）**
 
 バックログ: [B-34](バックログ.md)
 
@@ -239,6 +239,18 @@ agent の claim 応答へ、既存カタログ DB から次を合成する。
 - `backend/routers/api_schemas.py`
 - `backend/services/kindle_catalog/migrations/`
 - `frontend/src/types/api.d.ts`（OpenAPI から再生成）
+
+### 6.5 Phase 1 実装結果
+
+- [x] `locating_book`、`downloading`、`positioning` を active 状態へ追加し、旧 `waiting_user` 経路を後方互換で維持する。
+- [x] `capture_jobs.heartbeat_at` の Alembic migration を追加する。
+- [x] claim 応答へカタログ正本から合成した ASIN、正式・正規化タイトル、著者、シリーズ、巻の `identity` を追加する。
+- [x] heartbeat API と、次回 claim 時の stale job 回収を追加する。
+- [x] `KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC` を既定 300 秒のサーバー設定として追加する。
+- [x] `kindle_app_exited` を含む工程別エラーコードを API で保持できる。
+- [x] OpenAPI 生成型と backend の状態遷移・identity・heartbeat・stale 回収テストを更新する。
+
+Phase 1 では Windows agent の手動確認処理を変更しない。自動検索・ダウンロード・先頭移動と定期 heartbeat 送信は Phase 2・3 でこの契約へ接続する。
 
 ## 7. Phase 2 — Kindle 操作コントローラー
 

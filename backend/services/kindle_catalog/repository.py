@@ -84,7 +84,10 @@ def list_books(
             EXISTS(
                 SELECT 1 FROM capture_jobs cj
                 WHERE cj.asin=b.asin
-                  AND cj.status IN ('queued','claimed','waiting_user','capturing','awaiting_files')
+                  AND cj.status IN (
+                      'queued','claimed','locating_book','downloading','positioning',
+                      'waiting_user','capturing','awaiting_files'
+                  )
             ) AS capture_pending,
             (SELECT GROUP_CONCAT(name, ' / ') FROM (
                 SELECT a.name AS name

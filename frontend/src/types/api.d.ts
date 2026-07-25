@@ -862,6 +862,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/kindle-catalog/agents/jobs/{job_id}/heartbeat': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Heartbeat Capture Job */
+        post: operations['heartbeat_capture_job_api_kindle_catalog_agents_jobs__job_id__heartbeat_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/kindle-catalog/agents/jobs/{job_id}/complete': {
         parameters: {
             query?: never;
@@ -1735,6 +1752,11 @@ export interface components {
             /** Agent Id */
             agent_id: string;
         };
+        /** AgentHeartbeatRequest */
+        AgentHeartbeatRequest: {
+            /** Agent Id */
+            agent_id: string;
+        };
         /** AgentStateRequest */
         AgentStateRequest: {
             /** Agent Id */
@@ -1743,7 +1765,14 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: 'waiting_user' | 'capturing' | 'awaiting_files' | 'failed';
+            state:
+                | 'locating_book'
+                | 'downloading'
+                | 'positioning'
+                | 'waiting_user'
+                | 'capturing'
+                | 'awaiting_files'
+                | 'failed';
             /** Captured Screens */
             captured_screens?: number | null;
             /** Error Code */
@@ -2351,7 +2380,51 @@ export interface components {
         };
         /** KindleAgentClaimResponse */
         KindleAgentClaimResponse: {
-            job: components['schemas']['KindleCaptureJobOut'] | null;
+            job: components['schemas']['KindleAgentJobOut'] | null;
+        };
+        /** KindleAgentJobOut */
+        KindleAgentJobOut: {
+            /** Id */
+            id: string;
+            /** Asin */
+            asin: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Status */
+            status: string;
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: 'left' | 'right';
+            /** Expected Screens */
+            expected_screens: number | null;
+            /** Requested At */
+            requested_at: string;
+            /** Claimed At */
+            claimed_at: string | null;
+            /** Heartbeat At */
+            heartbeat_at: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Completed At */
+            completed_at: string | null;
+            /** Agent Id */
+            agent_id: string | null;
+            /** Book Id */
+            book_id: string | null;
+            /** Captured Screens */
+            captured_screens: number | null;
+            /** Error Code */
+            error_code: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Title */
+            title?: string | null;
+            identity: components['schemas']['KindleCaptureIdentityOut'];
         };
         /** KindleCaptureCompleteResponse */
         KindleCaptureCompleteResponse: {
@@ -2368,6 +2441,32 @@ export interface components {
             book_id: string;
             /** Captured Screens */
             captured_screens: number;
+        };
+        /** KindleCaptureHeartbeatResponse */
+        KindleCaptureHeartbeatResponse: {
+            /** Job Id */
+            job_id: string;
+            /** Status */
+            status: string;
+            /** Heartbeat At */
+            heartbeat_at: string;
+        };
+        /** KindleCaptureIdentityOut */
+        KindleCaptureIdentityOut: {
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string;
+            /** Title Normalized */
+            title_normalized: string | null;
+            /** Authors */
+            authors: string[];
+            /** Series Name */
+            series_name: string | null;
+            /** Volume Number */
+            volume_number: number | null;
+            /** Volume Label */
+            volume_label: string | null;
         };
         /** KindleCaptureJobOut */
         KindleCaptureJobOut: {
@@ -2393,6 +2492,8 @@ export interface components {
             requested_at: string;
             /** Claimed At */
             claimed_at: string | null;
+            /** Heartbeat At */
+            heartbeat_at: string | null;
             /** Started At */
             started_at: string | null;
             /** Completed At */
@@ -4753,6 +4854,43 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['KindleCaptureJobOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    heartbeat_capture_job_api_kindle_catalog_agents_jobs__job_id__heartbeat_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['AgentHeartbeatRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureHeartbeatResponse'];
                 };
             };
             /** @description Validation Error */

@@ -11,6 +11,7 @@ import config
 from routers.api_schemas import (
     KindleAgentClaimResponse,
     KindleCaptureCompleteResponse,
+    KindleCaptureHeartbeatResponse,
     KindleCaptureJobOut,
     KindleCaptureJobsResponse,
     KindleCatalogBooksResponse,
@@ -65,13 +66,25 @@ class AgentClaimRequest(BaseModel):
 
 class AgentStateRequest(BaseModel):
     agent_id: str
-    state: Literal["waiting_user", "capturing", "awaiting_files", "failed"]
+    state: Literal[
+        "locating_book",
+        "downloading",
+        "positioning",
+        "waiting_user",
+        "capturing",
+        "awaiting_files",
+        "failed",
+    ]
     captured_screens: int | None = None
     error_code: str | None = None
     error_message: str | None = None
 
 
 class AgentCompleteRequest(BaseModel):
+    agent_id: str
+
+
+class AgentHeartbeatRequest(BaseModel):
     agent_id: str
 
 
@@ -238,6 +251,22 @@ def update_capture_job_state(
             error_code=request.error_code,
             error_message=request.error_message,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post(
+    "/agents/jobs/{job_id}/heartbeat",
+    response_model=KindleCaptureHeartbeatResponse,
+)
+def heartbeat_capture_job(
+    job_id: str,
+    request: AgentHeartbeatRequest,
+    x_capture_agent_token: str | None = Header(default=None),
+):
+    _require_agent_token(x_capture_agent_token)
+    try:
+        return capture_jobs.heartbeat(job_id, request.agent_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

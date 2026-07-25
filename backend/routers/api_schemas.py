@@ -681,6 +681,7 @@ class KindleCaptureJobOut(BaseModel):
     expected_screens: int | None
     requested_at: str
     claimed_at: str | None
+    heartbeat_at: str | None
     started_at: str | None
     completed_at: str | None
     agent_id: str | None
@@ -695,8 +696,28 @@ class KindleCaptureJobsResponse(BaseModel):
     items: list[KindleCaptureJobOut]
 
 
+class KindleCaptureIdentityOut(BaseModel):
+    asin: str
+    title: str
+    title_normalized: str | None
+    authors: list[str]
+    series_name: str | None
+    volume_number: float | None
+    volume_label: str | None
+
+
+class KindleAgentJobOut(KindleCaptureJobOut):
+    identity: KindleCaptureIdentityOut
+
+
 class KindleAgentClaimResponse(BaseModel):
-    job: KindleCaptureJobOut | None
+    job: KindleAgentJobOut | None
+
+
+class KindleCaptureHeartbeatResponse(BaseModel):
+    job_id: str
+    status: str
+    heartbeat_at: str
 
 
 class KindleCaptureCompleteResponse(BaseModel):

@@ -144,6 +144,7 @@ describe('Kindle catalog pages', () => {
                     expected_screens: null,
                     requested_at: '2026-07-25T12:00:00+09:00',
                     claimed_at: null,
+                    heartbeat_at: null,
                     started_at: null,
                     completed_at: null,
                     agent_id: null,

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TypedDict
 
 from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # プロジェクトルートの .env を読み込む（存在しない場合は無視）
@@ -49,6 +50,8 @@ class _AppSettings(BaseSettings):
     KINDLE_CAPTURE_INBOX_DIR: Path | None = None
     # Windows Kindle キャプチャエージェント共有トークン
     KINDLE_CAPTURE_AGENT_TOKEN: str | None = None
+    # active Kindle capture job の heartbeat 期限
+    KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC: int = Field(default=300, ge=1)
     # Gemma 4 ツールディレクトリ（未設定時は Gemma 連携無効）
     GEMMA_TOOL_DIR: Path | None = None
     # meta2.db バックアップ先（未設定時はバックアップ無効）
@@ -140,6 +143,7 @@ AMAZON_DATA_DIR: str | None = str(_s.AMAZON_DATA_DIR) if _s.AMAZON_DATA_DIR else
 KINDLE_LEGACY_DB_PATH: str | None = str(_s.KINDLE_LEGACY_DB_PATH) if _s.KINDLE_LEGACY_DB_PATH else None
 KINDLE_CAPTURE_INBOX_DIR: str = str(_s.KINDLE_CAPTURE_INBOX_DIR or _SERVER_STORAGE_ROOT / "inbox" / "kindle-capture")
 KINDLE_CAPTURE_AGENT_TOKEN: str | None = _s.KINDLE_CAPTURE_AGENT_TOKEN or None
+KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC: int = _s.KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC
 GEMMA_TOOL_DIR: str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
 META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
 HITOMI_DISCORD_WEBHOOK_URL: str | None = _s.HITOMI_DISCORD_WEBHOOK_URL or None

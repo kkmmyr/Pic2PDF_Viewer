@@ -2,6 +2,8 @@
 
 from unittest.mock import patch
 
+import config
+from services.kindle_catalog.capture_jobs import create
 from services.kindle_catalog.connection import with_db
 from services.kindle_catalog.migrations import upgrade_head
 
@@ -66,3 +68,61 @@ def test_migration_preview_hides_source_path(client):
     assert response.json()["source_name"] == "kindle.db"
     assert "source_path" not in response.json()
     assert response.json()["images_migrated"] is False
+
+
+def test_agent_claim_and_heartbeat_contract(client, monkeypatch):
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_AGENT_TOKEN", "test-token")
+    upgrade_head()
+    with with_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO books(
+                asin,title,title_normalized,category,book_type
+            ) VALUES (
+                'B000AGENT','Agent対象','agent対象','kindle','novel'
+            )
+            """
+        )
+    job = create("B000AGENT", "novel", "left", None)
+    headers = {"X-Capture-Agent-Token": "test-token"}
+
+    claim_response = client.post(
+        "/api/kindle-catalog/agents/claim",
+        headers=headers,
+        json={"agent_id": "windows-1"},
+    )
+
+    assert claim_response.status_code == 200
+    claimed = claim_response.json()["job"]
+    assert claimed["id"] == job["id"]
+    assert claimed["identity"] == {
+        "asin": "B000AGENT",
+        "title": "Agent対象",
+        "title_normalized": "agent対象",
+        "authors": [],
+        "series_name": None,
+        "volume_number": None,
+        "volume_label": None,
+    }
+
+    heartbeat_response = client.post(
+        f"/api/kindle-catalog/agents/jobs/{job['id']}/heartbeat",
+        headers=headers,
+        json={"agent_id": "windows-1"},
+    )
+
+    assert heartbeat_response.status_code == 200
+    assert heartbeat_response.json()["job_id"] == job["id"]
+    assert heartbeat_response.json()["status"] == "claimed"
+
+
+def test_agent_heartbeat_rejects_invalid_token(client, monkeypatch):
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_AGENT_TOKEN", "test-token")
+
+    response = client.post(
+        "/api/kindle-catalog/agents/jobs/job-id/heartbeat",
+        headers={"X-Capture-Agent-Token": "wrong-token"},
+        json={"agent_id": "windows-1"},
+    )
+
+    assert response.status_code == 401

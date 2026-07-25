@@ -49,7 +49,10 @@ SQLite に保存・API で返されるタイムスタンプはすべて **JST (A
 - 画像紐付けは候補取得と確定更新を分ける。候補が一件でも自動確定しない。
 - `kindle購入履歴` の画像、表紙パス、表紙キャッシュは API・移行の対象外とする。
 - capture job の agent 向け claim / 更新は条件付き状態遷移とし、同一ジョブの二重実行を拒否する。
-- 現行 capture job はユーザーが Kindle で対象書籍を開く手動確認方式である。書籍検索・照合、ダウンロード待機、先頭移動、heartbeat を含む API 拡張は[Kindle 自動撮影取込 実装計画](../../log/計画/Kindle自動撮影取込_実装計画.md)の Phase 0 合格後に反映する。
+- agent の claim 応答は capture job と `identity`（ASIN、正式・正規化タイトル、著者、シリーズ、巻）を返す。書誌情報は job 作成時の複製ではなく、claim 時にカタログ正本から合成する。
+- 自動工程は `locating_book`、`downloading`、`positioning`、`capturing`、`awaiting_files` を使用する。旧 `waiting_user` は段階導入中の後方互換経路として受け付ける。
+- claim・状態更新・heartbeat は `heartbeat_at` を更新する。次回 claim 時に既定 300 秒の期限を超えた active job を `agent_heartbeat_timeout` で失敗へ回収する。
+- Windows エージェントがまだ手動確認版でも動作できるよう、Phase 3 完了までは `claimed → waiting_user → capturing` を維持する。
 
 詳細なデータ境界は [Kindle 購入カタログ設計](機能別/Kindle購入カタログ設計.md) を参照。
 

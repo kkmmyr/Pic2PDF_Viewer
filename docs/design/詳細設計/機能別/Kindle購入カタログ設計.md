@@ -58,11 +58,15 @@ Kindle Info はカタログに存在する ASIN だけを更新し、Info 側だ
 
 ## 7. キャプチャ連携
 
-画面から作成した `capture_jobs` は Linux DB が正本となる。Windows エージェントは 1 件ずつ claim し、ユーザーが Kindle アプリで対象書籍を開いたことを確認してから既存 capturer を起動する。
+画面から作成した `capture_jobs` は Linux DB が正本となる。Windows エージェントは 1 件ずつ claim し、claim 応答の `identity`（ASIN、正式・正規化タイトル、著者、シリーズ、巻）を使って対象書籍を照合する。
+
+状態遷移は `queued → claimed → locating_book → downloading（必要時）→ positioning → capturing → awaiting_files → succeeded` とし、各実行状態から `failed` へ遷移できる。既存 Windows エージェントとの段階導入互換性のため、`claimed → waiting_user → capturing` も読み書き可能な旧経路として維持する。
+
+claim と状態更新時に `heartbeat_at` を更新し、agent は長時間工程中に heartbeat API を呼ぶ。次回 claim 時に、`KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC`（既定 300 秒）を超えた active job を `agent_heartbeat_timeout` で `failed` へ回収してから次の queued job を選ぶ。同一 agent が期限内に再 claim した場合は、現在の active job を返す。
 
 成果物は専用 Samba 受信箱へ `.partial` 名で送信し、完了後に `.ready` へ rename する。Linux は `.ready` だけを検証し、安全な相対パス、許可拡張子、件数・容量上限を確認してから正式配置する。
 
-現在は対象書籍をユーザーが Kindle アプリで開く手動確認方式である。起動済み Kindle アプリへの接続、購入済みライブラリでの検索・本人照合、未ダウンロード待機、表紙・先頭移動を自動化する後続拡張は、[Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)と[実装計画](../../../log/計画/Kindle自動撮影取込_実装計画.md)で管理する。実機成立性検証を通過するまでは、現行状態遷移と手動確認を変更しない。
+バックエンドの自動工程契約、heartbeat、stale 回収は実装済みである。Windows エージェントは Phase 2・3 完了まで旧 `waiting_user` 経路を使用する。起動済み Kindle アプリへの接続、購入済みライブラリでの検索・本人照合、未ダウンロード待機、表紙・先頭移動の実装順は、[Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)と[実装計画](../../../log/計画/Kindle自動撮影取込_実装計画.md)で管理する。
 
 ## 8. セキュリティ・障害時挙動
 
