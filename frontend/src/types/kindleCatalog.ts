@@ -12,6 +12,8 @@ export type KindleLinkCandidate = components['schemas']['KindleLinkCandidateOut'
 export type KindleLinkCandidatesResponse = components['schemas']['KindleLinkCandidatesResponse'];
 export type KindleLinkResponse = components['schemas']['KindleLinkResponse'];
 export type KindleOrdersImport = components['schemas']['KindleOrdersImportResponse'];
+export type KindleImportRun = components['schemas']['KindleImportRunOut'];
+export type KindleImportRunsResponse = components['schemas']['KindleImportRunsResponse'];
 export type KindleCaptureJob = components['schemas']['KindleCaptureJobOut'];
 export type KindleCaptureJobsResponse = components['schemas']['KindleCaptureJobsResponse'];
 

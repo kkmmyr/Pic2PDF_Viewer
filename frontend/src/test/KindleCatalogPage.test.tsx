@@ -1,74 +1,165 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/hooks/useKindleCatalog', () => ({
-    useKindleCatalog: vi.fn(),
+    useKindleBooks: vi.fn(),
+    useKindleLinking: vi.fn(),
     useKindleLinkCandidates: vi.fn(),
+    useKindleCaptureJobs: vi.fn(),
+    useKindleImports: vi.fn(),
 }));
 
-import { useKindleCatalog, useKindleLinkCandidates } from '@/hooks/useKindleCatalog';
+import {
+    useKindleBooks,
+    useKindleCaptureJobs,
+    useKindleImports,
+    useKindleLinkCandidates,
+    useKindleLinking,
+} from '@/hooks/useKindleCatalog';
+import KindleCapturePage from '@/pages/KindleCapturePage';
 import KindleCatalogPage from '@/pages/KindleCatalogPage';
+import KindleImportsPage from '@/pages/KindleImportsPage';
+import KindleLinksPage from '@/pages/KindleLinksPage';
 
-const mockedUseKindleCatalog = vi.mocked(useKindleCatalog);
+const mockedUseKindleBooks = vi.mocked(useKindleBooks);
+const mockedUseKindleLinking = vi.mocked(useKindleLinking);
 const mockedUseKindleLinkCandidates = vi.mocked(useKindleLinkCandidates);
-const preview = vi.fn();
-const commit = vi.fn();
+const mockedUseKindleCaptureJobs = vi.mocked(useKindleCaptureJobs);
+const mockedUseKindleImports = vi.mocked(useKindleImports);
 const link = vi.fn();
 const importOrders = vi.fn();
 const importKindleInfo = vi.fn();
 const importAutobuy = vi.fn();
-const createCaptureJob = vi.fn();
 
-describe('KindleCatalogPage', () => {
+const book = {
+    asin: 'B000TEST01',
+    title: 'テスト作品 1巻',
+    authors: ['著者A'],
+    genres: ['女性マンガ'],
+    publisher: '出版社A',
+    book_type: 'comic',
+    kindle_acquisition_date: '2026-07-25',
+    is_completed: false,
+    ownership: 'purchased' as const,
+    capture_state: 'not_captured' as const,
+    series_id: 1,
+    series_name: 'テスト作品',
+    volume_number: 1,
+    volume_label: '1',
+};
+
+function renderWithRouter(ui: React.ReactNode, initialEntry = '/kindle/catalog') {
+    return render(<MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter>);
+}
+
+describe('Kindle catalog pages', () => {
     beforeEach(() => {
-        preview.mockResolvedValue({
-            configured: true,
-            source_name: 'kindle.db',
-            source_size: 100,
-            fingerprint: 'a'.repeat(64),
-            integrity: 'ok',
-            counts: { books: 11419, purchases: 11415 },
-            excluded_counts: { book_reviews: 15934 },
-            missing_asin: 0,
-            confirmation_token: 'token',
-            expires_at: '2026-07-25T12:00:00+09:00',
-            images_migrated: false,
+        link.mockReset();
+        importOrders.mockReset();
+        importKindleInfo.mockReset();
+        importAutobuy.mockReset();
+        link.mockResolvedValue({
+            source: 'comic',
+            book_id: 'existing-book',
+            asin: 'B000TEST01',
         });
-        commit.mockResolvedValue({
+        importOrders.mockResolvedValue({
             run_id: 1,
             status: 'succeeded',
+            files_processed: 1,
+            files_skipped: 0,
+            records_processed: 2,
+            records_skipped: 0,
+            files: [],
+        });
+        importKindleInfo.mockResolvedValue({
+            run_id: 2,
+            status: 'succeeded',
+            files_processed: 1,
+            files_skipped: 0,
+            records_processed: 3,
+            records_skipped: 0,
+            files: [],
+        });
+        importAutobuy.mockResolvedValue({
+            run_id: 3,
+            status: 'succeeded',
+            files_processed: 1,
+            files_skipped: 0,
             records_processed: 1,
             records_skipped: 0,
-            images_migrated: false,
+            files: [],
+        });
+        mockedUseKindleBooks.mockReturnValue({
+            data: {
+                items: [book],
+                total: 1,
+                page: 1,
+                page_size: 25,
+            },
+            isLoading: false,
+            isFetching: false,
+            error: null,
+        } as ReturnType<typeof useKindleBooks>);
+        mockedUseKindleLinking.mockReturnValue({
+            unlinked: [
+                {
+                    source: 'comic',
+                    book_id: 'existing-book',
+                    title: 'テスト作品 1巻',
+                    authors: ['著者A'],
+                    series_title: 'テスト作品',
+                },
+            ],
+            isLoading: false,
+            error: null,
+            link,
+            linking: false,
         });
         mockedUseKindleLinkCandidates.mockReturnValue({
-            data: undefined,
-            isLoading: false,
-        } as ReturnType<typeof useKindleLinkCandidates>);
-        mockedUseKindleCatalog.mockReturnValue({
-            books: {
+            data: {
                 items: [
                     {
                         asin: 'B000TEST01',
                         title: 'テスト作品 1巻',
                         authors: ['著者A'],
-                        genres: ['女性マンガ'],
-                        publisher: null,
                         book_type: 'comic',
-                        kindle_acquisition_date: null,
-                        is_completed: null,
-                        ownership: 'purchased',
-                        capture_state: 'not_captured',
-                        series_id: 1,
-                        series_name: 'テスト作品',
-                        volume_number: 1,
-                        volume_label: '1',
+                        score: 120,
+                        reasons: ['タイトル一致', '種別一致'],
                     },
                 ],
-                total: 1,
-                page: 1,
-                page_size: 50,
             },
+            isLoading: false,
+            error: null,
+        } as ReturnType<typeof useKindleLinkCandidates>);
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [
+                {
+                    id: 'job-1',
+                    asin: 'B000TEST01',
+                    source: 'comic',
+                    status: 'queued',
+                    direction: 'left',
+                    expected_screens: null,
+                    requested_at: '2026-07-25T12:00:00+09:00',
+                    claimed_at: null,
+                    started_at: null,
+                    completed_at: null,
+                    agent_id: null,
+                    book_id: null,
+                    captured_screens: null,
+                    error_code: null,
+                    error_message: null,
+                    title: 'テスト作品 1巻',
+                },
+            ],
+            isLoading: false,
+            error: null,
+            createCaptureJob: vi.fn(),
+            creatingCaptureJob: false,
+        });
+        mockedUseKindleImports.mockReturnValue({
             stats: {
                 books: 1,
                 purchases: 1,
@@ -82,58 +173,116 @@ describe('KindleCatalogPage', () => {
                 legacy_db_configured: true,
                 legacy_db_available: true,
                 legacy_db_name: 'kindle.db',
-                amazon_data_configured: false,
+                amazon_data_configured: true,
             },
-            unlinked: [],
-            captureJobs: [],
+            runs: [],
             loading: false,
             error: null,
-            preview,
+            preview: vi.fn(),
             previewing: false,
-            commit,
+            commit: vi.fn(),
             committing: false,
-            link,
-            linking: false,
             importOrders,
             importingOrders: false,
             importKindleInfo,
             importingKindleInfo: false,
             importAutobuy,
             importingAutobuy: false,
-            createCaptureJob,
-            creatingCaptureJob: false,
         });
     });
 
-    it('購入書籍と所有・画像状態を表示する', () => {
-        render(<KindleCatalogPage />);
-
-        expect(screen.getByText('テスト作品 1巻')).toBeInTheDocument();
-        expect(screen.getByText('B000TEST01')).toBeInTheDocument();
-        expect(screen.getAllByText('購入')).toHaveLength(2);
-        expect(screen.getAllByText('画像なし')).toHaveLength(2);
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
-    it('検索語を一覧クエリへ反映する', () => {
-        render(<KindleCatalogPage />);
+    it('購入一覧を検索中心で表示し、行から詳細を確認できる', () => {
+        renderWithRouter(<KindleCatalogPage />);
+
+        expect(screen.getByText('テスト作品 1巻')).toBeInTheDocument();
+        expect(screen.getByText('著者A')).toBeInTheDocument();
+        expect(screen.getAllByText('漫画').length).toBeGreaterThan(0);
+        expect(screen.queryByRole('button', { name: '漫画撮影' })).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'テスト作品 1巻' }));
+
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(screen.getByText('キャプチャは利用準備中です')).toBeInTheDocument();
+    });
+
+    it('検索語をデバウンスして一覧クエリへ反映する', async () => {
+        vi.useFakeTimers();
+        renderWithRouter(<KindleCatalogPage />);
 
         fireEvent.change(screen.getByPlaceholderText('タイトル・ASIN・著者を検索'), {
             target: { value: '著者A' },
         });
 
-        expect(mockedUseKindleCatalog).toHaveBeenLastCalledWith(
-            expect.objectContaining({ q: '著者A', page: 1 }),
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(350);
+        });
+
+        expect(mockedUseKindleBooks).toHaveBeenLastCalledWith(
+            expect.objectContaining({ q: '著者A', page: 1, pageSize: 25 }),
         );
     });
 
-    it('移行確認で旧アプリ画像を移行しないことを明示する', async () => {
-        render(<KindleCatalogPage />);
+    it('URLから検索条件と表示件数を復元する', () => {
+        renderWithRouter(
+            <KindleCatalogPage />,
+            '/kindle/catalog?q=作品&book_type=comic&page=2&page_size=50',
+        );
 
-        fireEvent.click(screen.getByRole('button', { name: '旧DB移行を確認' }));
+        expect(mockedUseKindleBooks).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+                q: '作品',
+                bookType: 'comic',
+                page: 2,
+                pageSize: 50,
+            }),
+        );
+        expect(screen.getByLabelText('表示件数')).toHaveValue('50');
+    });
 
-        expect(
-            await screen.findByText(/旧アプリの画像・表紙キャッシュは移行しません。/),
-        ).toBeInTheDocument();
-        expect(screen.getByText(/レビュー除外: 15,934 件/)).toBeInTheDocument();
+    it('既存画像と候補を比較して確認後に紐付ける', async () => {
+        renderWithRouter(<KindleLinksPage />, '/kindle/links');
+
+        fireEvent.click(screen.getByRole('button', { name: /テスト作品 1巻/ }));
+        expect(screen.getByText('比較中の既存画像')).toBeInTheDocument();
+        expect(screen.getByText('スコア 120')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: 'この候補を選択' }));
+        expect(screen.getByText('このASINを紐付けますか？')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'ASINを紐付け' }));
+
+        await waitFor(() =>
+            expect(link).toHaveBeenCalledWith({
+                source: 'comic',
+                bookId: 'existing-book',
+                asin: 'B000TEST01',
+            }),
+        );
+    });
+
+    it('キャプチャ準備中は既存ジョブだけを表示する', () => {
+        renderWithRouter(<KindleCapturePage />, '/kindle/capture');
+
+        expect(screen.getByText('現在は利用準備中です')).toBeInTheDocument();
+        expect(screen.getByText('待機中')).toBeInTheDocument();
+        expect(screen.queryByText('ジョブを作成')).not.toBeInTheDocument();
+    });
+
+    it('すべて差分取込で3処理を順に実行する', async () => {
+        renderWithRouter(<KindleImportsPage />, '/kindle/imports');
+
+        fireEvent.click(screen.getByRole('button', { name: 'すべて差分取込' }));
+
+        await waitFor(() => {
+            expect(importKindleInfo).toHaveBeenCalledTimes(1);
+            expect(importOrders).toHaveBeenCalledTimes(1);
+            expect(importAutobuy).toHaveBeenCalledTimes(1);
+        });
+        expect(screen.getByText('3 件更新')).toBeInTheDocument();
+        expect(screen.getByText('2 件更新')).toBeInTheDocument();
+        expect(screen.getByText('1 件更新')).toBeInTheDocument();
     });
 });

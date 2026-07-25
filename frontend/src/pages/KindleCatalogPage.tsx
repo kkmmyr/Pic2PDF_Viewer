@@ -1,329 +1,206 @@
-import { useState } from 'react';
-import {
-    BookCopy,
-    ChevronLeft,
-    ChevronRight,
-    Database,
-    Download,
-    Link2,
-    Loader2,
-    Search,
-    ScanLine,
-} from 'lucide-react';
-import { toast } from 'sonner';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Database, Loader2, Search } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { useKindleCatalog, useKindleLinkCandidates } from '@/hooks/useKindleCatalog';
+import { KindleBookDetailDialog } from '@/components/kindle/KindleBookDetailDialog';
+import { KindlePageShell } from '@/components/kindle/KindlePageShell';
+import { bookTypeLabel, CAPTURE_LABELS, OWNERSHIP_LABELS } from '@/components/kindle/kindle-labels';
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { useKindleBooks } from '@/hooks/useKindleCatalog';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import type {
+    KindleBookType,
     KindleCatalogBook,
     KindleCatalogFilters,
-    KindleMigrationPreview,
+    KindleCaptureState,
+    KindleOwnership,
 } from '@/types/kindleCatalog';
 import { errorMessage } from '@/utils/error';
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 25;
+const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
+const BOOK_TYPES = ['comic', 'novel', 'other', 'unknown'] as const;
+const OWNERSHIP_TYPES = [
+    'purchased',
+    'borrowed_active',
+    'borrowed_ended',
+    'returned',
+    'unknown',
+] as const;
+const CAPTURE_STATES = ['not_captured', 'captured', 'multiple_links', 'capture_pending'] as const;
 
-const OWNERSHIP_LABELS: Record<KindleCatalogBook['ownership'], string> = {
-    purchased: '購入',
-    borrowed_active: 'KU借用中',
-    borrowed_ended: 'KU終了',
-    returned: '返品',
-    unknown: '不明',
-};
-
-const CAPTURE_LABELS: Record<KindleCatalogBook['capture_state'], string> = {
-    not_captured: '画像なし',
-    captured: '取込済み',
-    multiple_links: '重複確認',
-    capture_pending: '取込中',
-};
-
-function StatCard({ label, value }: { label: string; value: number | undefined }) {
-    return (
-        <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
-            <div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
-            <div className="mt-1 text-2xl font-semibold tabular-nums">{value ?? '—'}</div>
-        </div>
-    );
+function parsePositiveInt(value: string | null, fallback: number): number {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function BookRow({
+function isPageSize(value: number): value is (typeof PAGE_SIZE_OPTIONS)[number] {
+    return PAGE_SIZE_OPTIONS.includes(value as (typeof PAGE_SIZE_OPTIONS)[number]);
+}
+
+function parseEnumParam<T extends string>(value: string | null, allowed: readonly T[]): T | '' {
+    return value && allowed.includes(value as T) ? (value as T) : '';
+}
+
+function replaceParam(
+    current: URLSearchParams,
+    key: string,
+    value: string,
+    resetPage = true,
+): URLSearchParams {
+    const next = new URLSearchParams(current);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    if (resetPage) next.delete('page');
+    return next;
+}
+
+function StatusPill({ children, tone = 'gray' }: { children: string; tone?: 'blue' | 'gray' }) {
+    const toneClass =
+        tone === 'blue'
+            ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
+            : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    return <span className={`rounded-full px-2 py-1 text-xs ${toneClass}`}>{children}</span>;
+}
+
+function KindleBookRow({
     book,
-    creatingCaptureJob,
-    onCreateCaptureJob,
+    onOpen,
 }: {
     book: KindleCatalogBook;
-    creatingCaptureJob: boolean;
-    onCreateCaptureJob: (book: KindleCatalogBook, source: 'comic' | 'novel') => void;
+    onOpen: (book: KindleCatalogBook) => void;
 }) {
     return (
         <tr className="border-b border-gray-100 align-top last:border-0 dark:border-gray-800">
             <td className="px-4 py-3">
-                <div className="font-medium text-gray-900 dark:text-gray-100">{book.title}</div>
+                <button
+                    type="button"
+                    className="text-left font-medium text-gray-900 hover:text-primary-700 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:text-gray-100 dark:hover:text-primary-300"
+                    onClick={() => onOpen(book)}
+                >
+                    {book.title}
+                </button>
                 <div className="mt-1 font-mono text-xs text-gray-400">{book.asin}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5 lg:hidden">
+                    <StatusPill tone="blue">{bookTypeLabel(book.book_type)}</StatusPill>
+                    <StatusPill>{OWNERSHIP_LABELS[book.ownership]}</StatusPill>
+                    <StatusPill>{CAPTURE_LABELS[book.capture_state]}</StatusPill>
+                </div>
             </td>
-            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
+            <td className="hidden px-4 py-3 text-sm text-gray-600 dark:text-gray-300 lg:table-cell">
                 {book.authors.join(' / ') || '—'}
             </td>
-            <td className="px-4 py-3 text-sm">
-                <div>{book.series_name ?? '—'}</div>
-                {book.volume_label && (
-                    <div className="text-xs text-gray-500">巻: {book.volume_label}</div>
-                )}
+            <td className="hidden px-4 py-3 text-sm lg:table-cell">
+                {bookTypeLabel(book.book_type)}
             </td>
-            <td className="px-4 py-3">
-                <span className="rounded-full bg-blue-50 px-2 py-1 text-xs text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                    {OWNERSHIP_LABELS[book.ownership]}
-                </span>
+            <td className="hidden px-4 py-3 lg:table-cell">
+                <StatusPill tone="blue">{OWNERSHIP_LABELS[book.ownership]}</StatusPill>
             </td>
-            <td className="px-4 py-3">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-                        {CAPTURE_LABELS[book.capture_state]}
-                    </span>
-                    {book.capture_state === 'not_captured' && (
-                        <>
-                            <button
-                                type="button"
-                                disabled={creatingCaptureJob}
-                                onClick={() => onCreateCaptureJob(book, 'comic')}
-                                className="text-xs font-medium text-primary-700 hover:underline disabled:opacity-50 dark:text-primary-300"
-                            >
-                                漫画撮影
-                            </button>
-                            <button
-                                type="button"
-                                disabled={creatingCaptureJob}
-                                onClick={() => onCreateCaptureJob(book, 'novel')}
-                                className="text-xs font-medium text-primary-700 hover:underline disabled:opacity-50 dark:text-primary-300"
-                            >
-                                小説撮影
-                            </button>
-                        </>
-                    )}
-                </div>
+            <td className="hidden px-4 py-3 lg:table-cell">
+                <StatusPill>{CAPTURE_LABELS[book.capture_state]}</StatusPill>
             </td>
         </tr>
     );
 }
 
 export default function KindleCatalogPage() {
-    const [filters, setFilters] = useState<KindleCatalogFilters>({
-        q: '',
-        bookType: '',
-        ownership: '',
-        captureState: '',
-        page: 1,
-        pageSize: PAGE_SIZE,
-    });
-    const [preview, setPreview] = useState<KindleMigrationPreview | null>(null);
-    const [selectedLinkKey, setSelectedLinkKey] = useState('');
-    const catalog = useKindleCatalog(filters);
-    const selectedUnlinked =
-        catalog.unlinked.find((book) => `${book.source}:${book.book_id}` === selectedLinkKey) ??
-        null;
-    const linkCandidates = useKindleLinkCandidates(
-        selectedUnlinked?.source ?? null,
-        selectedUnlinked?.book_id ?? null,
+    const [searchParams, setSearchParams] = useSearchParams();
+    const urlQuery = searchParams.get('q') ?? '';
+    const [queryInput, setQueryInput] = useState(urlQuery);
+    const [selectedBook, setSelectedBook] = useState<KindleCatalogBook | null>(null);
+    const debouncedQuery = useDebouncedValue(queryInput, 300);
+
+    const requestedPageSize = parsePositiveInt(searchParams.get('page_size'), DEFAULT_PAGE_SIZE);
+    const pageSize = isPageSize(requestedPageSize) ? requestedPageSize : DEFAULT_PAGE_SIZE;
+    const page = parsePositiveInt(searchParams.get('page'), 1);
+    const bookType: KindleBookType = parseEnumParam(searchParams.get('book_type'), BOOK_TYPES);
+    const ownership: KindleOwnership = parseEnumParam(
+        searchParams.get('ownership'),
+        OWNERSHIP_TYPES,
+    );
+    const captureState: KindleCaptureState = parseEnumParam(
+        searchParams.get('capture_state'),
+        CAPTURE_STATES,
     );
 
-    const updateFilter = <K extends Exclude<keyof KindleCatalogFilters, 'page' | 'pageSize'>>(
-        key: K,
-        value: KindleCatalogFilters[K],
-    ) => setFilters((current) => ({ ...current, [key]: value, page: 1 }));
-    const setPage = (page: number) => setFilters((current) => ({ ...current, page }));
+    const filters = useMemo<KindleCatalogFilters>(
+        () => ({
+            q: urlQuery,
+            bookType,
+            ownership,
+            captureState,
+            page,
+            pageSize,
+        }),
+        [bookType, captureState, ownership, page, pageSize, urlQuery],
+    );
+    const books = useKindleBooks(filters);
 
-    const handlePreview = async () => {
-        try {
-            setPreview(await catalog.preview());
-        } catch (error) {
-            toast.error(errorMessage(error, '移行プレビューに失敗しました'));
-        }
+    useEffect(() => {
+        setQueryInput(urlQuery);
+    }, [urlQuery]);
+
+    useEffect(() => {
+        if (debouncedQuery.trim() === urlQuery) return;
+        setSearchParams((current) => replaceParam(current, 'q', debouncedQuery.trim()), {
+            replace: true,
+        });
+    }, [debouncedQuery, setSearchParams, urlQuery]);
+
+    const submitSearch = (event: FormEvent) => {
+        event.preventDefault();
+        setSearchParams((current) => replaceParam(current, 'q', queryInput.trim()), {
+            replace: true,
+        });
     };
 
-    const handleCommit = async () => {
-        if (!preview) return;
-        try {
-            const result = await catalog.commit(preview.confirmation_token);
-            toast.success(`${result.records_processed.toLocaleString()} 件を移行しました`);
-            setPreview(null);
-        } catch (error) {
-            toast.error(errorMessage(error, '移行に失敗しました'));
-        }
+    const totalPages = Math.max(1, Math.ceil((books.data?.total ?? 0) / pageSize));
+    const visiblePage = Math.min(page, totalPages);
+
+    const updateParam = (key: string, value: string) => {
+        setSearchParams((current) => replaceParam(current, key, value), { replace: true });
     };
 
-    const handleOrdersImport = async () => {
-        try {
-            const result = await catalog.importOrders();
-            toast.success(
-                `Amazon CSV: ${result.records_processed.toLocaleString()} 件取込 / ${result.files_skipped} ファイル変更なし`,
+    const setPage = (nextPage: number) => {
+        setSearchParams((current) => replaceParam(current, 'page', String(nextPage), false), {
+            replace: true,
+        });
+    };
+
+    const clearFilters = () => {
+        setQueryInput('');
+        setSearchParams((current) => {
+            const next = new URLSearchParams(current);
+            ['q', 'book_type', 'ownership', 'capture_state', 'page'].forEach((key) =>
+                next.delete(key),
             );
-        } catch (error) {
-            toast.error(errorMessage(error, 'Amazon CSV の取り込みに失敗しました'));
-        }
+            return next;
+        });
     };
 
-    const handleKindleInfoImport = async () => {
-        try {
-            const result = await catalog.importKindleInfo();
-            toast.success(
-                `Kindle Info: ${result.records_processed.toLocaleString()} 件更新 / ${result.files_skipped} ファイル変更なし`,
-            );
-        } catch (error) {
-            toast.error(errorMessage(error, 'Kindle Info の取り込みに失敗しました'));
-        }
-    };
-
-    const handleAutobuyImport = async () => {
-        try {
-            const result = await catalog.importAutobuy();
-            toast.success(`シリーズ自動購入: ${result.records_processed.toLocaleString()} 件取込`);
-        } catch (error) {
-            toast.error(errorMessage(error, 'シリーズ自動購入情報の取り込みに失敗しました'));
-        }
-    };
-
-    const handleLink = async (asin: string) => {
-        if (!selectedUnlinked) return;
-        try {
-            await catalog.link({
-                source: selectedUnlinked.source,
-                bookId: selectedUnlinked.book_id,
-                asin,
-            });
-            toast.success('Pic2PDFViewer の既存画像へ ASIN を紐付けました');
-            setSelectedLinkKey('');
-        } catch (error) {
-            toast.error(errorMessage(error, 'ASIN の紐付けに失敗しました'));
-        }
-    };
-
-    const handleCreateCaptureJob = async (book: KindleCatalogBook, source: 'comic' | 'novel') => {
-        try {
-            await catalog.createCaptureJob({ asin: book.asin, source });
-            toast.success(
-                `「${book.title}」を${source === 'comic' ? '漫画' : '小説'}キャプチャ待ちに追加しました`,
-            );
-        } catch (error) {
-            toast.error(errorMessage(error, 'キャプチャジョブの作成に失敗しました'));
-        }
-    };
-
-    const totalPages = Math.max(1, Math.ceil((catalog.books?.total ?? 0) / PAGE_SIZE));
+    const hasFilters = Boolean(urlQuery || bookType || ownership || captureState);
 
     return (
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h1 className="flex items-center gap-2 text-2xl font-bold">
-                        <BookCopy className="h-6 w-6" />
-                        Kindle 購入書籍
-                    </h1>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        Linux サーバー管理の購入・借用カタログ
-                    </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        onClick={() => void handleKindleInfoImport()}
-                        disabled={
-                            !catalog.sources?.amazon_data_configured || catalog.importingKindleInfo
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
-                    >
-                        {catalog.importingKindleInfo ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Download className="h-4 w-4" />
-                        )}
-                        Kindle Info 差分取込
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => void handleAutobuyImport()}
-                        disabled={
-                            !catalog.sources?.amazon_data_configured || catalog.importingAutobuy
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
-                    >
-                        {catalog.importingAutobuy ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Download className="h-4 w-4" />
-                        )}
-                        シリーズ自動購入取込
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => void handleOrdersImport()}
-                        disabled={
-                            !catalog.sources?.amazon_data_configured || catalog.importingOrders
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-900 dark:hover:bg-gray-800"
-                    >
-                        {catalog.importingOrders ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Download className="h-4 w-4" />
-                        )}
-                        Amazon CSV 差分取込
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => void handlePreview()}
-                        disabled={
-                            !catalog.sources?.legacy_db_available ||
-                            catalog.previewing ||
-                            catalog.committing
-                        }
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                        {catalog.previewing ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Database className="h-4 w-4" />
-                        )}
-                        旧DB移行を確認
-                    </button>
-                </div>
-            </div>
-
-            <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                <StatCard label="書籍" value={catalog.stats?.books} />
-                <StatCard label="購入履歴" value={catalog.stats?.purchases} />
-                <StatCard label="KU借用" value={catalog.stats?.borrowings} />
-                <StatCard label="返品" value={catalog.stats?.returns} />
-                <StatCard label="シリーズ" value={catalog.stats?.series} />
-                <StatCard label="画像紐付け" value={catalog.stats?.captured} />
-            </div>
-
-            {!catalog.sources?.legacy_db_configured && !catalog.loading && (
-                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                    初回移行を使う場合は Linux サーバーに KINDLE_LEGACY_DB_PATH を設定してください。
-                </div>
-            )}
-
-            <div className="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 md:grid-cols-[minmax(260px,1fr)_180px_180px_180px]">
-                <label className="relative">
+        <KindlePageShell title="Kindle 購入書籍" description="購入・借用カタログから本を検索します">
+            <form
+                onSubmit={submitSearch}
+                className="grid gap-3 rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900 md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_160px_170px_170px_auto]"
+            >
+                <label className="relative md:col-span-2 xl:col-span-1">
                     <span className="sr-only">タイトル・ASIN・著者を検索</span>
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
                     <input
-                        value={filters.q}
-                        onChange={(event) => updateFilter('q', event.target.value)}
+                        value={queryInput}
+                        onChange={(event) => setQueryInput(event.target.value)}
                         placeholder="タイトル・ASIN・著者を検索"
-                        className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm dark:border-gray-600 dark:bg-gray-800"
+                        className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-gray-600 dark:bg-gray-800"
                     />
                 </label>
                 <select
                     aria-label="書籍種別"
-                    value={filters.bookType}
-                    onChange={(event) =>
-                        updateFilter(
-                            'bookType',
-                            event.target.value as KindleCatalogFilters['bookType'],
-                        )
-                    }
+                    value={bookType}
+                    onChange={(event) => updateParam('book_type', event.target.value)}
                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
                 >
                     <option value="">全種別</option>
@@ -334,13 +211,8 @@ export default function KindleCatalogPage() {
                 </select>
                 <select
                     aria-label="所有状態"
-                    value={filters.ownership}
-                    onChange={(event) =>
-                        updateFilter(
-                            'ownership',
-                            event.target.value as KindleCatalogFilters['ownership'],
-                        )
-                    }
+                    value={ownership}
+                    onChange={(event) => updateParam('ownership', event.target.value)}
                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
                 >
                     <option value="">全所有状態</option>
@@ -348,16 +220,12 @@ export default function KindleCatalogPage() {
                     <option value="borrowed_active">KU借用中</option>
                     <option value="borrowed_ended">KU終了</option>
                     <option value="returned">返品</option>
+                    <option value="unknown">不明</option>
                 </select>
                 <select
                     aria-label="画像取込状態"
-                    value={filters.captureState}
-                    onChange={(event) =>
-                        updateFilter(
-                            'captureState',
-                            event.target.value as KindleCatalogFilters['captureState'],
-                        )
-                    }
+                    value={captureState}
+                    onChange={(event) => updateParam('capture_state', event.target.value)}
                     className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
                 >
                     <option value="">全画像状態</option>
@@ -366,197 +234,121 @@ export default function KindleCatalogPage() {
                     <option value="multiple_links">重複確認</option>
                     <option value="capture_pending">取込中</option>
                 </select>
-            </div>
+                <Button
+                    variant="secondary"
+                    onClick={clearFilters}
+                    disabled={!hasFilters}
+                    className="min-h-10"
+                >
+                    条件をクリア
+                </Button>
+            </form>
 
-            {catalog.error && (
-                <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:text-red-300">
-                    {errorMessage(catalog.error, 'カタログを取得できませんでした')}
-                </div>
+            {books.error && (
+                <Alert variant="error" className="mt-4">
+                    {errorMessage(books.error, 'カタログを取得できませんでした')}
+                </Alert>
             )}
 
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900">
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-[900px]">
-                        <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500 dark:bg-gray-800/70 dark:text-gray-400">
-                            <tr>
-                                <th className="px-4 py-3">書籍</th>
-                                <th className="px-4 py-3">著者</th>
-                                <th className="px-4 py-3">シリーズ</th>
-                                <th className="px-4 py-3">所有</th>
-                                <th className="px-4 py-3">画像</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {catalog.books?.items.map((book) => (
-                                <BookRow
-                                    key={book.asin}
-                                    book={book}
-                                    creatingCaptureJob={catalog.creatingCaptureJob}
-                                    onCreateCaptureJob={(target, source) =>
-                                        void handleCreateCaptureJob(target, source)
-                                    }
-                                />
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                {!catalog.loading && (catalog.books?.items.length ?? 0) === 0 && (
-                    <div className="flex flex-col items-center py-16 text-gray-500">
-                        <Database className="mb-2 h-8 w-8" />
-                        <p>該当する書籍はありません</p>
+            <div
+                className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+                aria-busy={books.isFetching}
+            >
+                {books.isLoading ? (
+                    <div className="flex items-center justify-center gap-2 py-20 text-sm text-gray-500">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        購入書籍を読み込み中
                     </div>
+                ) : (
+                    <>
+                        {books.isFetching && (
+                            <div className="flex items-center gap-2 border-b border-gray-200 bg-primary-50 px-4 py-2 text-xs text-primary-700 dark:border-gray-700 dark:bg-primary-900/20 dark:text-primary-300">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                検索結果を更新中
+                            </div>
+                        )}
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead className="bg-gray-50 text-left text-xs text-gray-500 dark:bg-gray-800/70 dark:text-gray-400">
+                                    <tr>
+                                        <th className="px-4 py-3">書籍</th>
+                                        <th className="hidden px-4 py-3 lg:table-cell">著者</th>
+                                        <th className="hidden px-4 py-3 lg:table-cell">種別</th>
+                                        <th className="hidden px-4 py-3 lg:table-cell">所有</th>
+                                        <th className="hidden px-4 py-3 lg:table-cell">画像</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {books.data?.items.map((book) => (
+                                        <KindleBookRow
+                                            key={book.asin}
+                                            book={book}
+                                            onOpen={setSelectedBook}
+                                        />
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {(books.data?.items.length ?? 0) === 0 && (
+                            <div className="flex flex-col items-center py-16 text-gray-500">
+                                <Database className="mb-2 h-8 w-8" />
+                                <p>該当する書籍はありません</p>
+                                {hasFilters && (
+                                    <Button variant="ghost" className="mt-2" onClick={clearFilters}>
+                                        検索条件を解除
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
-                <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 text-sm dark:border-gray-700">
-                    <span>{(catalog.books?.total ?? 0).toLocaleString()} 件</span>
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 px-4 py-3 text-sm dark:border-gray-700">
+                    <div className="flex items-center gap-3">
+                        <span>{(books.data?.total ?? 0).toLocaleString()} 件</span>
+                        <label className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                            表示件数
+                            <select
+                                aria-label="表示件数"
+                                value={pageSize}
+                                onChange={(event) => updateParam('page_size', event.target.value)}
+                                className="rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-600 dark:bg-gray-800"
+                            >
+                                {PAGE_SIZE_OPTIONS.map((option) => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             aria-label="前のページ"
-                            disabled={filters.page <= 1}
-                            onClick={() => setPage(filters.page - 1)}
-                            className="rounded p-1 hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-gray-800"
+                            disabled={visiblePage <= 1}
+                            onClick={() => setPage(visiblePage - 1)}
                         >
                             <ChevronLeft className="h-5 w-5" />
-                        </button>
+                        </Button>
                         <span>
-                            {filters.page} / {totalPages}
+                            {visiblePage} / {totalPages}
                         </span>
-                        <button
-                            type="button"
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             aria-label="次のページ"
-                            disabled={filters.page >= totalPages}
-                            onClick={() => setPage(filters.page + 1)}
-                            className="rounded p-1 hover:bg-gray-100 disabled:opacity-30 dark:hover:bg-gray-800"
+                            disabled={visiblePage >= totalPages}
+                            onClick={() => setPage(visiblePage + 1)}
                         >
                             <ChevronRight className="h-5 w-5" />
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
 
-            <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <ScanLine className="h-5 w-5" />
-                    キャプチャジョブ
-                </h2>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    Windows エージェントが上から順に取得します。
-                </p>
-                <div className="mt-4 space-y-2">
-                    {catalog.captureJobs.slice(0, 10).map((job) => (
-                        <div
-                            key={job.id}
-                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 px-4 py-3 text-sm dark:border-gray-700"
-                        >
-                            <div>
-                                <span className="font-medium">{job.title ?? job.asin}</span>
-                                <span className="ml-2 text-xs text-gray-500">
-                                    {job.source} / {job.direction}
-                                </span>
-                            </div>
-                            <span className="rounded-full bg-gray-100 px-2 py-1 text-xs dark:bg-gray-800">
-                                {job.status}
-                            </span>
-                        </div>
-                    ))}
-                    {catalog.captureJobs.length === 0 && (
-                        <p className="py-3 text-sm text-gray-500">キャプチャジョブはありません。</p>
-                    )}
-                </div>
-            </section>
-
-            <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
-                <div className="mb-4">
-                    <h2 className="flex items-center gap-2 text-lg font-semibold">
-                        <Link2 className="h-5 w-5" />
-                        Pic2PDFViewer 既存画像の紐付け
-                    </h2>
-                    <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                        comic / novel に既にある画像だけが対象です。候補は自動確定されません。
-                    </p>
-                </div>
-                <select
-                    aria-label="未紐付け画像書籍"
-                    value={selectedLinkKey}
-                    onChange={(event) => setSelectedLinkKey(event.target.value)}
-                    className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
-                >
-                    <option value="">未紐付け書籍を選択（{catalog.unlinked.length} 件）</option>
-                    {catalog.unlinked.map((book) => (
-                        <option
-                            key={`${book.source}:${book.book_id}`}
-                            value={`${book.source}:${book.book_id}`}
-                        >
-                            [{book.source}] {book.title}
-                        </option>
-                    ))}
-                </select>
-
-                {selectedUnlinked && (
-                    <div className="mt-4 space-y-2">
-                        {linkCandidates.isLoading && (
-                            <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                候補を検索中
-                            </div>
-                        )}
-                        {linkCandidates.data?.items.map((candidate) => (
-                            <div
-                                key={candidate.asin}
-                                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3 dark:border-gray-700"
-                            >
-                                <div>
-                                    <div className="font-medium">{candidate.title}</div>
-                                    <div className="mt-1 text-xs text-gray-500">
-                                        {candidate.asin} /{' '}
-                                        {candidate.authors.join(' / ') || '著者不明'} / スコア{' '}
-                                        {candidate.score}
-                                    </div>
-                                    <div className="mt-1 text-xs text-gray-400">
-                                        {candidate.reasons.join('・')}
-                                    </div>
-                                </div>
-                                <button
-                                    type="button"
-                                    disabled={catalog.linking}
-                                    onClick={() => void handleLink(candidate.asin)}
-                                    className="rounded-lg border border-primary-500 px-3 py-2 text-sm font-medium text-primary-700 hover:bg-primary-50 disabled:opacity-50 dark:text-primary-300 dark:hover:bg-primary-950"
-                                >
-                                    この ASIN を紐付け
-                                </button>
-                            </div>
-                        ))}
-                        {!linkCandidates.isLoading &&
-                            (linkCandidates.data?.items.length ?? 0) === 0 && (
-                                <p className="py-4 text-sm text-gray-500">
-                                    候補がありません。カタログ検索で ASIN を確認してください。
-                                </p>
-                            )}
-                    </div>
-                )}
-            </section>
-
-            <ConfirmDialog
-                open={preview !== null}
-                title="旧 Kindle カタログを移行"
-                message={
-                    preview
-                        ? [
-                              `書籍: ${(preview.counts.books ?? 0).toLocaleString()} 件`,
-                              `購入履歴: ${(preview.counts.purchases ?? 0).toLocaleString()} 件`,
-                              `レビュー除外: ${(preview.excluded_counts.book_reviews ?? 0).toLocaleString()} 件`,
-                              '',
-                              '旧アプリの画像・表紙キャッシュは移行しません。',
-                              'Pic2PDFViewer の既存画像には影響しません。',
-                          ].join('\n')
-                        : ''
-                }
-                confirmLabel={catalog.committing ? '移行中…' : 'カタログを移行'}
-                onConfirm={() => void handleCommit()}
-                onCancel={() => {
-                    if (!catalog.committing) setPreview(null);
-                }}
-            />
-        </div>
+            <KindleBookDetailDialog book={selectedBook} onClose={() => setSelectedBook(null)} />
+        </KindlePageShell>
     );
 }

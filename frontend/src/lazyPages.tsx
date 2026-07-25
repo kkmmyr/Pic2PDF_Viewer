@@ -10,3 +10,6 @@ export const NovelDiscussionPage = lazy(() => import('@/pages/NovelDiscussionPag
 export const NovelReaderPage = lazy(() => import('@/pages/NovelReaderPage'));
 export const NovelGraphPage = lazy(() => import('@/pages/NovelGraphPage'));
 export const KindleCatalogPage = lazy(() => import('@/pages/KindleCatalogPage'));
+export const KindleLinksPage = lazy(() => import('@/pages/KindleLinksPage'));
+export const KindleCapturePage = lazy(() => import('@/pages/KindleCapturePage'));
+export const KindleImportsPage = lazy(() => import('@/pages/KindleImportsPage'));

@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
     message: string;
     confirmLabel?: string;
     cancelLabel?: string;
+    confirmDisabled?: boolean;
     /** true: 危険操作（赤系のスタイル） */
     danger?: boolean;
     onConfirm: () => void;
@@ -23,6 +24,7 @@ export function ConfirmDialog({
     message,
     confirmLabel = '実行',
     cancelLabel = 'キャンセル',
+    confirmDisabled = false,
     danger = false,
     onConfirm,
     onCancel,
@@ -71,6 +73,7 @@ export function ConfirmDialog({
                             <button
                                 type="button"
                                 onClick={onConfirm}
+                                disabled={confirmDisabled}
                                 className={cn(
                                     'px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors',
                                     danger

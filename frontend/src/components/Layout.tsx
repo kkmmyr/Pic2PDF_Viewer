@@ -22,6 +22,7 @@ interface NavItem {
     to: string;
     label: string;
     icon: ComponentType<{ className?: string }>;
+    activePrefix?: string;
 }
 
 interface NavGroup {
@@ -53,13 +54,20 @@ const NAV_GROUPS: NavGroup[] = [
     },
     {
         label: 'Kindle',
-        items: [{ to: '/kindle/catalog', icon: ShoppingBag, label: '購入書籍' }],
+        items: [
+            {
+                to: '/kindle/catalog',
+                icon: ShoppingBag,
+                label: '購入書籍',
+                activePrefix: '/kindle/',
+            },
+        ],
     },
 ];
 
 const LINK_CLASS =
-    'px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-1.5';
-const DIVIDER = <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" />;
+    'px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex shrink-0 items-center gap-1.5 whitespace-nowrap';
+const DIVIDER = <div className="mx-1 h-5 w-px shrink-0 bg-gray-200 dark:bg-gray-700" />;
 
 export default function Layout() {
     const location = useLocation();
@@ -67,8 +75,9 @@ export default function Layout() {
     const isReaderMode = searchParams.has('file');
     const { isDark, toggle: toggleDark } = useDarkMode();
 
-    const isActive = (path: string) =>
-        location.pathname === path
+    const isActive = (item: NavItem) =>
+        location.pathname === item.to ||
+        (item.activePrefix && location.pathname.startsWith(item.activePrefix))
             ? 'text-primary-600 bg-primary-50 dark:text-primary-400 dark:bg-primary-900/30'
             : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-800';
 
@@ -77,8 +86,8 @@ export default function Layout() {
             {!isReaderMode && (
                 <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-header">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="flex justify-between h-16">
-                            <div className="flex items-center">
+                        <div className="flex h-16 min-w-0 justify-between">
+                            <div className="flex shrink-0 items-center">
                                 <Link to="/" className="flex items-center gap-2">
                                     <div className="bg-primary-600 p-1.5 rounded-lg">
                                         <FileText className="w-6 h-6 text-white" />
@@ -89,18 +98,18 @@ export default function Layout() {
                                 </Link>
                             </div>
 
-                            <nav className="flex items-center gap-0.5">
+                            <nav className="ml-3 flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-x-auto">
                                 {NAV_GROUPS.map((group, gi) => (
                                     <Fragment key={group.label}>
                                         {gi > 0 && DIVIDER}
-                                        <span className="text-xs text-gray-400 dark:text-gray-500 px-1.5 select-none">
+                                        <span className="shrink-0 whitespace-nowrap px-1.5 text-xs text-gray-400 select-none dark:text-gray-500">
                                             {group.label}
                                         </span>
                                         {group.items.map((item) => (
                                             <Link
                                                 key={item.to}
                                                 to={item.to}
-                                                className={`${LINK_CLASS} ${isActive(item.to)}`}
+                                                className={`${LINK_CLASS} ${isActive(item)}`}
                                             >
                                                 <item.icon className="w-4 h-4" />
                                                 {item.label}
@@ -124,7 +133,7 @@ export default function Layout() {
 
                                 <button
                                     onClick={toggleDark}
-                                    className="ml-1 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                    className="ml-1 shrink-0 rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
                                     title={
                                         isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'
                                     }
