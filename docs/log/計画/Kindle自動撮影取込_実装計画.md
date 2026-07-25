@@ -2,7 +2,7 @@
 
 作成日: 2026-07-25
 
-状態: **計画確定・未着手**
+状態: **Phase 0 実機調査中・部分合格（2026-07-25）**
 
 バックログ: [B-34](バックログ.md)
 
@@ -131,6 +131,51 @@ queued
 - ダウンロード完了判定
 - 先頭移動手順
 - 失敗画面と復旧可否の一覧
+
+### 5.4 実機調査結果（2026-07-25）
+
+対象環境:
+
+- Windows Store 版 `AMZNKindle.AmazonKindleReadingApp 1.0.18632.0`
+- プロセス `Kindle.exe`
+- トップレベルウィンドウ名 `Kindle`
+- ウィンドウクラス `Microsoft.UI.Windowing.Window`
+- ダウンロード済みローカル書籍 10 冊は、カタログ上すべて `comic`
+
+判定: **部分合格**。ASIN 検索から漫画の先頭境界到達までは成立した。未ダウンロード書籍の実ダウンロード遷移と `novel` は未確認のため、Phase 1 以降の本実装開始ゲートはまだ開かない。
+
+#### 成立を確認した項目
+
+1. ライブラリ検索欄は UI Automation の `ControlType.Edit`、名前 `検索ライブラリ` として公開され、`ValuePattern.SetValue()` で ASIN を入力できる。
+2. ASIN 検索により通常 127 カードから対象を含む結果へ絞り込める。
+3. 書籍カード内には `library-more-menu-<ASIN>` があり、対象 ASIN のカードを一意に特定できる。
+4. 未ダウンロードカードには `download-button-<ASIN>` がある。ダウンロード済みカードでは同ボタンが消えるが、`library-more-menu-<ASIN>` は残る。
+5. ダウンロード済み成果物は `%LOCALAPPDATA%\Packages\AMZNKindle.AmazonKindleReadingApp_m1sc522ngdk36\LocalState\Classic\Content\<ASIN>_EBOK` に配置される。実測例では `.voucher`、`.azw`、`.mbpV2`、`.phl`、`.res`、`.md` が存在し、待機中の `Data\Cache\book_temp_dl` は空だった。
+6. 対象カードの `library-item-container` / `library-item-image` の実測矩形を使ってクリックし、書籍を開ける。画面上の固定座標は不要である。
+7. 読書画面へ移行してもウィンドウハンドルとタイトル `Kindle` は維持され、既存 capturer の `find_window()` 条件と互換である。
+8. 読書画面では `backButton`、`page-chevron-container-left`、`page-chevron-container-right`、`FooterLabelText`、`immersive-title` を取得できる。
+9. Kindle のショートカット表示から、`PageUp` が「前のページ」、`PageDown` が「次のページ」、`Ctrl+W` がライブラリ復帰、`Ctrl+G` が位置移動として定義されていることを確認した。
+10. 固定レイアウト漫画では `Home` と `Ctrl+G` は先頭移動に使えなかったが、読書領域へフォーカスした後に `PageUp` を反復すると読書開始側へ戻れる。
+11. 実書籍で `ページ149/265` から 114 回戻り、`ページ265/265` で 3 回連続して変化しない先頭境界へ到達した。
+12. `backButton` でライブラリへ戻り、検索値が空、127 カード表示へ復元した。
+
+#### 実測から追加する実装制約
+
+- `library-item-container`、ダウンロードボタン、戻るボタンは `ControlType.Button` でも `InvokePattern` を公開しない。AutomationId で要素を特定した後、その要素から取得した実測矩形をクリックする。
+- `immersive-title` はカタログの正式タイトルと、NFKC・既存タイトル正規化後も一致または包含にならなかった。開いた後のタイトルを本人照合の正本にしない。
+- 本人照合の正本は、既知 ASIN で検索し、同じ ASIN を含む `library-more-menu-<ASIN>` を持つカードを開くこととする。
+- ページ送り直後の次入力は無視される場合がある。フッター変化後に約 2 秒の安定待ちを置き、変化なしは 1 回で境界判定せず最大 3 回再試行する。
+- 右開き漫画では「前のページ」へ戻るとフッター番号と割合が増える。数値の大小ではなく、`PageUp` 後の変化が 3 回連続で止まったことを先頭境界とする。
+- 読書領域がキーボードフォーカスを失うと `PageUp` が無視される。先頭移動前に、UI Automation で取得した読書領域またはフッター矩形をクリックしてフォーカスを確保する。
+
+#### Phase 0 の残ゲート
+
+- [ ] 利用者が指定した未ダウンロード書籍 1 冊で、ダウンロード開始、進行中表示、完了、失敗・タイムアウト条件を確認する。
+- [ ] ダウンロード中の `download-button-<ASIN>`、一時ディレクトリ、正式 `<ASIN>_EBOK` の遷移を記録し、完了条件を 2 系統以上で定義する。
+- [ ] ダウンロード済み `novel` 1 冊で、ASIN 検索、オープン、`Ctrl+G` または `PageUp` による先頭移動を確認する。
+- [ ] `novel` の先頭移動後に既存 `NovelKindleCapturer` のクロップ境界検出が成立することを確認する。
+
+未ダウンロード書籍を任意に選んで取得するとローカル状態と通信量を変更するため、今回の調査では実行していない。残ゲートは対象書籍を利用者が指定してから実施する。
 
 ## 6. Phase 1 — ジョブ契約とバックエンド
 
