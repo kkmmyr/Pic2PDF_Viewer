@@ -64,7 +64,11 @@ Kindle Info はカタログに存在する ASIN だけを更新し、Info 側だ
 
 claim と状態更新時に `heartbeat_at` を更新し、agent は長時間工程中に heartbeat API を呼ぶ。次回 claim 時に、`KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC`（既定 300 秒）を超えた active job を `agent_heartbeat_timeout` で `failed` へ回収してから次の queued job を選ぶ。同一 agent が期限内に再 claim した場合は、現在の active job を返す。
 
-成果物は専用 Samba 受信箱へ `.partial` 名で送信し、完了後に `.ready` へ rename する。Linux は `.ready` だけを検証し、安全な相対パス、許可拡張子、件数・容量上限を確認してから正式配置する。
+成果物は Samba 上の論理専用受信箱へ `.partial` 名で送信し、完了後に
+`.ready` へ rename する。既存環境では
+`pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視の対象から除外する。
+Linux は `.ready` だけを検証し、安全な相対パス、許可拡張子、件数・容量上限を
+確認してから正式配置する。
 
 バックエンドの自動工程契約、heartbeat、stale 回収は実装済みである。Windows エージェントは Phase 2・3 完了まで旧 `waiting_user` 経路を使用する。起動済み Kindle アプリへの接続、購入済みライブラリでの検索・本人照合、未ダウンロード待機、表紙・先頭移動の実装順は、[Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)と[実装計画](../../../log/計画/Kindle自動撮影取込_実装計画.md)で管理する。
 

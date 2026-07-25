@@ -386,6 +386,15 @@ Phase 1 では Windows agent の手動確認処理を変更しない。自動検
 - ライト・ダーク、loading、empty、error、disabled、success を確認する。
 - キーボード操作、フォーカス表示、accessible name を確認する。
 
+### 10.4 実環境の成果物転送
+
+- 既存 Samba 共有 `pic2pdf-input` 配下の
+  `.kindle-capture-inbox` を論理専用受信箱として使う。
+- `DoujinWatcher` はトップレベルの隠しディレクトリを無視し、Kindle成果物を
+  同人誌生成へ渡さない。
+- Linux と Windows は同じ実体を、それぞれローカルパスと UNC パスで参照する。
+- `comic/images` / `kindle_novel/images` の正式領域は Samba 公開しない。
+
 ## 11. 実装順序とコミット境界
 
 1. `docs:` 要件・計画・設計参照の確定

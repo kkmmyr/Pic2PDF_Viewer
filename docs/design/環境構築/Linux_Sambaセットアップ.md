@@ -15,13 +15,17 @@
 | Samba 共有名 | `pic2pdf-input` |
 | Windows からのアクセス | `\\medaroserver\pic2pdf-input`（Tailscale 経由） |
 
-Kindle キャプチャ成果物は同人誌入力と混在させず、専用共有を使用する。
+Kindle キャプチャ成果物は同人誌入力と混在させず、専用の論理受信箱を使用する。
+既存環境では Samba 設定の追加を不要にするため、`pic2pdf-input` 共有直下の
+隠しディレクトリ `.kindle-capture-inbox` を受信箱とする。`DoujinWatcher` は
+`.` で始まるトップレベルディレクトリをスキャン対象外とするため、同人誌の
+自動生成には渡らない。
 
 | 役割 | パス |
 |------|------|
-| Linux 側の Kindle 受信箱 | `/opt/pic2pdf-viewer/inbox/kindle-capture/` |
-| Samba 共有名 | `pic2pdf-capture-inbox` |
-| Windows からのアクセス | `\\medaroserver\pic2pdf-capture-inbox` |
+| Linux 側の Kindle 受信箱 | `/opt/pic2pdf-viewer/data/doujin/input/.kindle-capture-inbox/` |
+| Samba 共有名 | `pic2pdf-input`（既存共有を再利用） |
+| Windows からのアクセス | `\\medaroserver\pic2pdf-input\.kindle-capture-inbox` |
 
 ---
 
@@ -50,19 +54,8 @@ sudo tee -a /etc/samba/smb.conf <<'EOF'
    directory mask = 0755
 EOF
 
-# Kindle キャプチャ専用受信箱（正式な画像領域は共有しない）
-sudo mkdir -p /opt/pic2pdf-viewer/inbox/kindle-capture
-sudo chown amashio:amashio /opt/pic2pdf-viewer/inbox/kindle-capture
-sudo tee -a /etc/samba/smb.conf <<'EOF'
-
-[pic2pdf-capture-inbox]
-   path = /opt/pic2pdf-viewer/inbox/kindle-capture
-   browseable = yes
-   read only = no
-   valid users = amashio
-   create mask = 0640
-   directory mask = 0750
-EOF
+# Kindle キャプチャ専用の論理受信箱（正式な画像領域は共有しない）
+mkdir -p /opt/pic2pdf-viewer/data/doujin/input/.kindle-capture-inbox
 
 # 5. 設定確認
 testparm
@@ -89,11 +82,12 @@ Kindle キャプチャエージェントでは `.env` に次を設定する。
 PIC2PDF_API_URL=http://medaroserver:8090
 KINDLE_CAPTURE_AGENT_TOKEN=<Linux 側と同じ十分に長いランダム値>
 KINDLE_CAPTURE_AGENT_ID=kindle-windows-1
-KINDLE_CAPTURE_INBOX_DIR=\\medaroserver\pic2pdf-capture-inbox
+KINDLE_CAPTURE_INBOX_DIR=\\medaroserver\pic2pdf-input\.kindle-capture-inbox
 ```
 
 Linux 側にも `KINDLE_CAPTURE_AGENT_TOKEN` と
-`KINDLE_CAPTURE_INBOX_DIR=/opt/pic2pdf-viewer/inbox/kindle-capture` を設定する。
+`KINDLE_CAPTURE_INBOX_DIR=/opt/pic2pdf-viewer/data/doujin/input/.kindle-capture-inbox`
+を設定する。
 エージェントは `scripts\run_capture_agent.bat` から起動する。
 
 ---

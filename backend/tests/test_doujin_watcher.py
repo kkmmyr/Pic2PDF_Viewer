@@ -149,3 +149,17 @@ class TestPendingItems:
 
         names_kinds = {(p.name, p.kind) for p in watcher.pending_items}
         assert names_kinds == {("book.zip", "zip"), ("folder_book", "folder")}
+
+    async def test_hidden_top_level_directory_is_ignored(self, tmp_data_dir):
+        input_dir = tmp_data_dir["DOUJIN_INPUT_DIR"]
+        watcher = DoujinWatcher()
+
+        hidden_inbox = os.path.join(input_dir, ".kindle-capture-inbox")
+        os.makedirs(os.path.join(hidden_inbox, "job.ready", "images"))
+        with open(os.path.join(hidden_inbox, "job.ready", "images", "001.png"), "wb") as f:
+            f.write(b"kindle")
+
+        await watcher.tick()
+
+        assert watcher.state == "idle"
+        assert watcher.pending_items == []

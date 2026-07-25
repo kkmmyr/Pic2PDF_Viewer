@@ -158,6 +158,8 @@ class DoujinWatcher:
         entries: list[tuple] = []
         with os.scandir(input_dir) as it:
             for entry in it:
+                if entry.name.startswith("."):
+                    continue
                 try:
                     if entry.is_file():
                         if is_zip_file(entry.name):

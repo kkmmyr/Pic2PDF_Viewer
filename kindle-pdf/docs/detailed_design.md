@@ -104,7 +104,7 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 
 ### 1.8. `capture_agent.py`（ジョブ実行）
 
-バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、既存capturerによる全ページ撮影、Samba inboxへの原子的公開、完了APIを直列実行する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
+バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、既存capturerによる全ページ撮影、Samba上の論理専用inboxへの原子的公開、完了APIを直列実行する。既存環境では `pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視は隠しディレクトリを除外する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
 
 - controllerの工程別例外コードをjobへそのまま記録し、その他の例外は `capture_failed` / `transfer_failed` / `registration_failed` へ境界別に変換する。
 - agent再起動時は途中状態を暗黙再開しない。`awaiting_files` の完了APIだけを冪等再試行し、それ以前の途中jobは失敗として新規job作成を要求する。
