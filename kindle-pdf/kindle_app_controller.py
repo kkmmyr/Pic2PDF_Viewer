@@ -322,15 +322,28 @@ class KindleAppController:
 
     def search_book(self, identity: BookIdentity) -> BookCandidate:
         self.open_library()
-        edit = self._search_edit()
-        if edit is None:
-            raise KindleControllerError(
-                "kindle_ui_unavailable",
-                "Kindleのライブラリ検索欄を取得できませんでした",
-            )
-        edit.GetValuePattern().SetValue(identity.asin, waitTime=0.2)
+        self._set_search_value(identity.asin)
         time.sleep(self.config.screen_transition_seconds)
         return select_verified_candidate(identity, self.collect_candidates(identity))
+
+    def _set_search_value(self, value: str) -> None:
+        deadline = time.monotonic() + self.config.control_timeout_seconds
+        while time.monotonic() < deadline:
+            edit = self._search_edit(timeout=0.5)
+            if edit is not None:
+                try:
+                    edit.GetValuePattern().SetValue(value, waitTime=0.2)
+                    return
+                except COMError:
+                    logger.debug(
+                        "Kindle UI Automation search value update failed transiently",
+                        exc_info=True,
+                    )
+            time.sleep(0.5)
+        raise KindleControllerError(
+            "kindle_ui_unavailable",
+            "Kindleのライブラリ検索欄を更新できませんでした",
+        )
 
     def collect_candidates(self, identity: BookIdentity) -> list[BookCandidate]:
         """ASIN固有AutomationIdだけを最大2件探索し、曖昧性を検出する。"""

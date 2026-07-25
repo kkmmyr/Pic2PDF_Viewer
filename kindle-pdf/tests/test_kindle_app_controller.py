@@ -127,6 +127,37 @@ def test_control_lookup_treats_transient_com_error_as_not_found(
     assert controller._control_by_id("backButton", timeout=0.1) is None
 
 
+def test_search_value_retries_transient_com_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _TransientEdit:
+        calls = 0
+        values: list[str] = []
+
+        def GetValuePattern(self):
+            return self
+
+        def SetValue(self, value: str, **_kwargs) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise COMError(
+                    -2147220991,
+                    "event subscriber unavailable",
+                    (None, None, None, 0, None),
+                )
+            self.values.append(value)
+
+    edit = _TransientEdit()
+    controller = KindleAppController()
+    monkeypatch.setattr(controller, "_search_edit", lambda **_kwargs: edit)
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+
+    controller._set_search_value("B012345678")
+
+    assert edit.calls == 2
+    assert edit.values == ["B012345678"]
+
+
 def test_content_snapshot_requires_official_nonempty_files(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
