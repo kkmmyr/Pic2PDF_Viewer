@@ -2,10 +2,10 @@
 
 ## 1. システム概要
 
-Windows 版「Kindle for Windows」（Microsoft Store 版）で開いている書籍を自動的にページめくりしながらスクリーンショットを撮影し、画像として保存する自動化ツール群。旧「Kindle for PC」のウィンドウタイトルにも互換対応する。漫画用（`run_comic.bat`）と小説用（`run_novel.bat`）の 2 系統がある。
+Windows 版「Kindle for Windows」（Microsoft Store 版）で購入書籍を検索・照合し、必要ならダウンロードして先頭から最終画面まで撮影し、Pic2PDFViewerへ登録する自動化ツール群。通常運用は `scripts/run_capture_agent.bat` を使い、漫画用（`run_comic.bat`）と小説用（`run_novel.bat`）は診断・互換経路として残す。
 
-- **漫画（comic ソース）**: キャプチャ後に PDF を生成し `backend/data/comic/` へ保存。
-- **小説（novel ソース）**: キャプチャした画像を `backend/data/kindle_novel/images/` へ保存のみ。OCR・novel.db格納・RAG インデックス構築は backend の job queue（`/novel/manage`）で実施する。
+- **漫画（comic ソース）**: 自動agentはPNGをLinuxへ送り正式画像として登録する。手動互換経路だけは従来どおりPDFも生成できる。
+- **小説（novel ソース）**: 自動agentはPNGをLinuxへ送り正式画像として登録する。OCR・novel.db格納・RAG インデックス構築は backend の job queue（`/novel/manage`）で実施する。
 
 ## 2. 動作環境
 
@@ -14,6 +14,7 @@ Windows 版「Kindle for Windows」（Microsoft Store 版）で開いている�
 - **言語**: Python 3.x（`uv` で管理。`pyproject.toml` / `uv.lock`）
 - **主な外部ライブラリ**:
     - `pyautogui`: キーボード・マウス操作
+    - `uiautomation`: Kindle control の識別・属性・矩形取得
     - `pillow` (PIL): スクリーンショット取得
     - `opencv-python` (cv2): 画像保存・解析
     - `numpy`: 画像データ処理
@@ -21,6 +22,7 @@ Windows 版「Kindle for Windows」（Microsoft Store 版）で開いている�
 ## 3. 起動方法
 
 ```
+scripts\run_capture_agent.bat  # 通常運用（購入カタログのjobを1冊ずつ処理）
 kindle-pdf\run_comic.bat   # 漫画キャプチャ（main_auto.py を起動）
 kindle-pdf\run_novel.bat   # 小説キャプチャ（main_novel.py を起動）
 ```
@@ -31,10 +33,10 @@ kindle-pdf\run_novel.bat   # 小説キャプチャ（main_novel.py を起動）
 
 - Microsoft Store 版 Kindle は、F11 でページ送り後の本文が白くなる実機挙動を避けるため、ウィンドウを最大化して撮影。旧 Kindle for PC は F11 フルスクリーンを継続利用する。
 - 起動時点ですでにフルスクリーンならその状態を維持し、ツール自身が切り替えた場合だけ終了時に元へ戻す。
-- Microsoft Store 版は矢印キーではなく、画面左右のページ送りボタンをクリックする。旧 Kindle for PC は矢印キーを利用する。
+- ページ送りは利用者がjobまたは手動ダイアログで確定した `left` / `right` の矢印キーを利用する。
 - ページ画像は変化直後に保存せず、同一画像が一定時間続いて描画が安定したことを確認してから保存する。
 - 1 ページ目の画像を解析し、左右の黒帯（余白）を自動除去してコンテンツ領域を決定。
-- 撮影後に画像をまとめて PDF 化し `backend/data/comic/pdfs/` に保存。
+- 手動互換経路は撮影後に画像をまとめて PDF 化する。自動agentはPDFを生成せず、PNG packageをSamba受信箱へ送る。
 
 ### 4.2. 小説キャプチャ（白背景検出モード）
 
@@ -50,6 +52,8 @@ kindle-pdf\run_novel.bat   # 小説キャプチャ（main_novel.py を起動）
 ```text
 kindle-pdf/
 ├── capturer.py           # 基底クラス (Config, KindleCapturer, AutoConfig, AutoKindleCapturer)
+├── capture_agent.py      # Linuxのcapture jobを自動実行
+├── kindle_app_controller.py # Kindle検索・照合・ダウンロード・先頭移動
 ├── main_manual.py        # 固定クロップモード（旧 main.py）
 ├── main_auto.py          # 漫画用フルスクリーン・自動検出モード
 ├── novel_capturer.py     # 小説用クラス (NovelConfig, NovelKindleCapturer)
@@ -68,12 +72,13 @@ kindle-pdf/
 
 | 系統 | 入力 | 出力 |
 |---|---|---|
-| 漫画 | Kindle for Windows（開いた書籍） | 画像: `backend/data/comic/images/<書籍名>/` → PDF: `backend/data/comic/pdfs/<書籍名>.pdf` |
-| 小説 | Kindle for Windows（開いた書籍） | 画像のみ: `backend/data/kindle_novel/images/<書籍名>/` |
+| 自動漫画 | Kindleカタログのcapture job | Samba受信箱を経由してLinuxの `data/comic/images/<書籍名>/` へ正式配置 |
+| 自動小説 | Kindleカタログのcapture job | Samba受信箱を経由してLinuxの `data/kindle_novel/images/<書籍名>/` へ正式配置 |
+| 手動互換 | Kindle for Windows（開いた書籍） | 従来のローカル画像／PDF出力 |
 
 ## 7. OCR・後処理フロー
 
-漫画は capturer が直接 PDF を生成する。小説は画像保存のみで、後続処理は backend が担う。
+自動agentは漫画・小説ともPNGをLinuxへ送り、backendが正式画像領域へ登録する。手動漫画だけはcapturerが直接PDFを生成できる。小説のOCR以降はbackendが担う。
 
 ```
 [小説キャプチャ完了]

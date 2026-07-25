@@ -1,6 +1,6 @@
 # API 仕様
 
-> status: living | last-verified: 2026-07-25
+> status: living | last-verified: 2026-07-26
 
 バックエンド (FastAPI) が提供する API のリファレンス方針と、OpenAPI では表現できない設計意図をまとめる。
 
@@ -50,7 +50,7 @@ SQLite に保存・API で返されるタイムスタンプはすべて **JST (A
 - `kindle購入履歴` の画像、表紙パス、表紙キャッシュは API・移行の対象外とする。
 - capture job の agent 向け claim / 更新は条件付き状態遷移とし、同一ジョブの二重実行を拒否する。
 - agent の claim 応答は capture job と `identity`（ASIN、正式・正規化タイトル、著者、シリーズ、巻）を返す。書誌情報は job 作成時の複製ではなく、claim 時にカタログ正本から合成する。
-- 自動工程は `locating_book`、`downloading`、`positioning`、`capturing`、`awaiting_files` を使用する。旧 `waiting_user` は段階導入中の後方互換経路として受け付ける。
+- 現行 agent の自動工程は `locating_book`、`downloading`、`positioning`、`capturing`、`awaiting_files` を使用する。旧 `waiting_user` は後方互換経路としてのみ受け付ける。
 - claim・状態更新・heartbeat は `heartbeat_at` を更新する。次回 claim 時に既定 300 秒の期限を超えた active job を `agent_heartbeat_timeout` で失敗へ回収する。
 - `capturing → capturing` の同一状態更新は、撮影済み画面数の進捗反映に限って許可する。`started_at` は初回の撮影開始時刻を保持する。
 - 旧手動エージェントとの後方互換用に `claimed → waiting_user → capturing` は読み取り・更新契約として維持するが、現行自動エージェントは使用しない。
