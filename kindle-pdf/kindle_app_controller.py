@@ -1,0 +1,514 @@
+"""Microsoft Store 版 Kindle の検索・取得・先頭移動を自動化する。"""
+
+from __future__ import annotations
+
+import logging
+import os
+import re
+import subprocess
+import time
+import unicodedata
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import pyautogui
+import uiautomation as auto
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class BookIdentity:
+    asin: str
+    title: str
+    title_normalized: str | None = None
+    authors: tuple[str, ...] = ()
+    series_name: str | None = None
+    volume_number: float | None = None
+    volume_label: str | None = None
+
+    @classmethod
+    def from_job(cls, job: dict) -> BookIdentity:
+        raw = job.get("identity") or {}
+        return cls(
+            asin=str(raw.get("asin") or job["asin"]),
+            title=str(raw.get("title") or job.get("title") or ""),
+            title_normalized=raw.get("title_normalized"),
+            authors=tuple(str(value) for value in raw.get("authors") or ()),
+            series_name=raw.get("series_name"),
+            volume_number=raw.get("volume_number"),
+            volume_label=raw.get("volume_label"),
+        )
+
+
+@dataclass(frozen=True)
+class BookCandidate:
+    asin: str | None
+    title: str
+    authors: tuple[str, ...] = ()
+    series_name: str | None = None
+    volume_number: float | None = None
+    volume_label: str | None = None
+    card: object | None = field(default=None, repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class ControllerConfig:
+    window_title: str = "Kindle"
+    window_class_name: str = "Microsoft.UI.Windowing.Window"
+    control_search_depth: int = 30
+    control_timeout_seconds: float = 10.0
+    screen_transition_seconds: float = 2.0
+    download_timeout_seconds: float = 1800.0
+    download_poll_seconds: float = 2.0
+    download_stable_checks: int = 3
+    reader_timeout_seconds: float = 30.0
+    page_change_timeout_seconds: float = 5.0
+    page_stable_seconds: float = 2.0
+    start_boundary_checks: int = 3
+    positioning_timeout_seconds: float = 3600.0
+
+    @property
+    def content_root(self) -> Path:
+        local_app_data = os.environ.get("LOCALAPPDATA")
+        if not local_app_data:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "LOCALAPPDATA を取得できないためKindle保存先を確認できません",
+            )
+        return (
+            Path(local_app_data)
+            / "Packages"
+            / "AMZNKindle.AmazonKindleReadingApp_m1sc522ngdk36"
+            / "LocalState"
+            / "Classic"
+            / "Content"
+        )
+
+
+class KindleControllerError(RuntimeError):
+    def __init__(self, error_code: str, message: str) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+
+
+def normalize_identity_text(value: str | None) -> str:
+    if not value:
+        return ""
+    normalized = unicodedata.normalize("NFKC", value).casefold()
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def _same_optional_text(left: str | None, right: str | None) -> bool:
+    return bool(left and right) and normalize_identity_text(
+        left
+    ) == normalize_identity_text(right)
+
+
+def candidate_matches_identity(
+    identity: BookIdentity,
+    candidate: BookCandidate,
+) -> bool:
+    """ASINを優先し、ASINなしの場合だけ書誌の複合一致を許可する。"""
+    if candidate.asin:
+        return candidate.asin.casefold() == identity.asin.casefold()
+
+    expected_titles = {
+        normalize_identity_text(identity.title),
+        normalize_identity_text(identity.title_normalized),
+    }
+    expected_titles.discard("")
+    if normalize_identity_text(candidate.title) not in expected_titles:
+        return False
+
+    expected_authors = {
+        normalize_identity_text(author) for author in identity.authors if author
+    }
+    candidate_authors = {
+        normalize_identity_text(author) for author in candidate.authors if author
+    }
+    author_match = bool(expected_authors & candidate_authors)
+
+    series_match = _same_optional_text(identity.series_name, candidate.series_name)
+    volume_match = False
+    if identity.volume_number is not None and candidate.volume_number is not None:
+        volume_match = identity.volume_number == candidate.volume_number
+    elif identity.volume_label and candidate.volume_label:
+        volume_match = _same_optional_text(
+            identity.volume_label, candidate.volume_label
+        )
+
+    return author_match or (series_match and volume_match)
+
+
+def select_verified_candidate(
+    identity: BookIdentity,
+    candidates: Sequence[BookCandidate],
+) -> BookCandidate:
+    matches = [
+        candidate
+        for candidate in candidates
+        if candidate_matches_identity(identity, candidate)
+    ]
+    if not matches:
+        error_code = "book_not_found" if not candidates else "book_identity_unverified"
+        raise KindleControllerError(
+            error_code,
+            "Kindleライブラリで対象書籍を一意に照合できませんでした",
+        )
+    if len(matches) > 1:
+        raise KindleControllerError(
+            "book_match_ambiguous",
+            "Kindleライブラリで対象書籍の候補が複数見つかりました",
+        )
+    return matches[0]
+
+
+def _parse_card_name(name: str) -> tuple[str, tuple[str, ...]]:
+    title, separator, raw_authors = name.partition(" by ")
+    if not separator:
+        return name.strip(), ()
+    author_text = re.sub(r",\s*新規$", "", raw_authors).strip()
+    authors = tuple(
+        value.strip() for value in re.split(r"[;/]", author_text) if value.strip()
+    )
+    return title.strip(), authors
+
+
+class KindleAppController:
+    def __init__(self, config: ControllerConfig | None = None) -> None:
+        self.config = config or ControllerConfig()
+        self.window: auto.Control | None = None
+
+    @staticmethod
+    def _is_process_running() -> bool:
+        result = subprocess.run(
+            [
+                "tasklist",
+                "/FI",
+                "IMAGENAME eq Kindle.exe",
+                "/FO",
+                "CSV",
+                "/NH",
+            ],
+            capture_output=True,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        return '"kindle.exe"' in result.stdout.casefold()
+
+    def _ensure_process_running(self) -> None:
+        if not self._is_process_running():
+            raise KindleControllerError(
+                "kindle_app_exited",
+                "処理中にKindleアプリが終了しました",
+            )
+
+    def attach_running_app(self) -> None:
+        if not self._is_process_running():
+            raise KindleControllerError(
+                "kindle_not_running",
+                "Kindleアプリが起動していません",
+            )
+        window = auto.WindowControl(searchDepth=1, Name=self.config.window_title)
+        if not window.Exists(
+            self.config.control_timeout_seconds,
+            0.5,
+        ):
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleウィンドウを取得できませんでした",
+            )
+        if window.ClassName != self.config.window_class_name:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "対応していないKindleウィンドウが見つかりました",
+            )
+        window.SetFocus()
+        time.sleep(self.config.screen_transition_seconds)
+        self.window = window
+
+    def _require_window(self) -> auto.Control:
+        if self.window is None:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleウィンドウへ接続していません",
+            )
+        return self.window
+
+    def _control_by_id(
+        self,
+        automation_id: str,
+        *,
+        timeout: float | None = None,
+        found_index: int = 1,
+    ) -> auto.Control | None:
+        control = auto.Control(
+            searchFromControl=self._require_window(),
+            searchDepth=self.config.control_search_depth,
+            foundIndex=found_index,
+            AutomationId=automation_id,
+        )
+        if control.Exists(
+            self.config.control_timeout_seconds if timeout is None else timeout,
+            0.5,
+        ):
+            return control
+        return None
+
+    def _search_edit(self, timeout: float | None = None) -> auto.Control | None:
+        edit = auto.EditControl(
+            searchFromControl=self._require_window(),
+            searchDepth=self.config.control_search_depth,
+            Name="検索ライブラリ",
+        )
+        if edit.Exists(
+            self.config.control_timeout_seconds if timeout is None else timeout,
+            0.5,
+        ):
+            return edit
+        return None
+
+    def open_library(self) -> None:
+        self._ensure_process_running()
+        if self._search_edit(timeout=1.0) is not None:
+            return
+        back = self._control_by_id("backButton", timeout=2.0)
+        if back is None:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleのライブラリ画面または戻る操作を取得できませんでした",
+            )
+        back.Click(simulateMove=False, waitTime=0.2)
+        deadline = time.monotonic() + self.config.reader_timeout_seconds
+        while time.monotonic() < deadline:
+            self._ensure_process_running()
+            if self._search_edit(timeout=1.0) is not None:
+                return
+            time.sleep(0.5)
+        raise KindleControllerError(
+            "kindle_ui_unavailable",
+            "Kindleのライブラリ画面へ戻れませんでした",
+        )
+
+    def search_book(self, identity: BookIdentity) -> BookCandidate:
+        self.open_library()
+        edit = self._search_edit()
+        if edit is None:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleのライブラリ検索欄を取得できませんでした",
+            )
+        edit.GetValuePattern().SetValue(identity.asin, waitTime=0.2)
+        time.sleep(self.config.screen_transition_seconds)
+        return select_verified_candidate(identity, self.collect_candidates(identity))
+
+    def collect_candidates(self, identity: BookIdentity) -> list[BookCandidate]:
+        """ASIN固有AutomationIdだけを最大2件探索し、曖昧性を検出する。"""
+        automation_id = f"library-more-menu-{identity.asin}"
+        candidates: list[BookCandidate] = []
+        for found_index in (1, 2):
+            menu = self._control_by_id(
+                automation_id,
+                timeout=self.config.control_timeout_seconds
+                if found_index == 1
+                else 1.0,
+                found_index=found_index,
+            )
+            if menu is None:
+                continue
+            card = menu.GetParentControl()
+            while card is not None and card.AutomationId != "library-item-container":
+                card = card.GetParentControl()
+            if card is None:
+                raise KindleControllerError(
+                    "kindle_ui_unavailable",
+                    "対象書籍カードの操作領域を取得できませんでした",
+                )
+            title, authors = _parse_card_name(card.Name)
+            candidates.append(
+                BookCandidate(
+                    asin=identity.asin,
+                    title=title,
+                    authors=authors,
+                    card=card,
+                )
+            )
+        logger.info(
+            "Kindle candidate search completed: asin_suffix=%s count=%d",
+            identity.asin[-4:],
+            len(candidates),
+        )
+        return candidates
+
+    def needs_download(self, candidate: BookCandidate) -> bool:
+        if not candidate.asin:
+            raise KindleControllerError(
+                "book_identity_unverified",
+                "ASINを確認できない候補はダウンロードできません",
+            )
+        return (
+            self._control_by_id(
+                f"download-button-{candidate.asin}",
+                timeout=1.0,
+            )
+            is not None
+        )
+
+    def _content_snapshot(self, asin: str) -> tuple[int, int, int] | None:
+        content_dir = self.config.content_root / f"{asin}_EBOK"
+        if not content_dir.is_dir():
+            return None
+        files = [path for path in content_dir.rglob("*") if path.is_file()]
+        suffixes = {path.suffix.casefold() for path in files}
+        if ".azw" not in suffixes or ".voucher" not in suffixes:
+            return None
+        stats = [path.stat() for path in files]
+        if not stats or any(stat.st_size <= 0 for stat in stats):
+            return None
+        return (
+            len(stats),
+            sum(stat.st_size for stat in stats),
+            max(stat.st_mtime_ns for stat in stats),
+        )
+
+    def wait_for_download(
+        self,
+        candidate: BookCandidate,
+        *,
+        on_poll: Callable[[], None] | None = None,
+    ) -> None:
+        if not candidate.asin:
+            raise KindleControllerError(
+                "book_identity_unverified",
+                "ASINを確認できない候補はダウンロードできません",
+            )
+        automation_id = f"download-button-{candidate.asin}"
+        button = self._control_by_id(automation_id, timeout=2.0)
+        started = button is not None
+        if button is not None and "キャンセル" not in button.Name:
+            button.Click(simulateMove=False, waitTime=0.2)
+            time.sleep(1.0)
+
+        deadline = time.monotonic() + self.config.download_timeout_seconds
+        last_snapshot: tuple[int, int, int] | None = None
+        stable_count = 0
+        saw_downloading = False
+        while time.monotonic() < deadline:
+            self._ensure_process_running()
+            if on_poll:
+                on_poll()
+            current_button = self._control_by_id(automation_id, timeout=0.5)
+            if current_button is not None:
+                if "キャンセル" in current_button.Name:
+                    saw_downloading = True
+                elif saw_downloading:
+                    raise KindleControllerError(
+                        "download_failed",
+                        "Kindleのダウンロードが完了前に停止しました",
+                    )
+                stable_count = 0
+                last_snapshot = None
+            else:
+                snapshot = self._content_snapshot(candidate.asin)
+                if snapshot is not None and snapshot == last_snapshot:
+                    stable_count += 1
+                elif snapshot is not None:
+                    stable_count = 1
+                else:
+                    stable_count = 0
+                last_snapshot = snapshot
+                if stable_count >= self.config.download_stable_checks:
+                    return
+                if not started and snapshot is None:
+                    raise KindleControllerError(
+                        "download_failed",
+                        "Kindleのダウンロード状態と正式コンテンツを確認できません",
+                    )
+            time.sleep(self.config.download_poll_seconds)
+        raise KindleControllerError(
+            "download_timeout",
+            "Kindle書籍のダウンロードが期限内に完了しませんでした",
+        )
+
+    def open_book(self, candidate: BookCandidate) -> None:
+        if candidate.card is None:
+            raise KindleControllerError(
+                "book_identity_unverified",
+                "本人照合済みの書籍カードを取得できませんでした",
+            )
+        card = candidate.card
+        card.SetFocus()
+        pyautogui.press("enter")
+        self.wait_for_reader_stable()
+
+    def wait_for_reader_stable(self) -> None:
+        deadline = time.monotonic() + self.config.reader_timeout_seconds
+        previous_footer = ""
+        stable_count = 0
+        while time.monotonic() < deadline:
+            self._ensure_process_running()
+            back = self._control_by_id("backButton", timeout=0.5)
+            footer = self._control_by_id("FooterLabelText", timeout=0.5)
+            if back is not None and footer is not None and footer.Name:
+                if footer.Name == previous_footer:
+                    stable_count += 1
+                else:
+                    previous_footer = footer.Name
+                    stable_count = 1
+                if stable_count >= 2:
+                    return
+            time.sleep(0.5)
+        raise KindleControllerError(
+            "kindle_ui_unavailable",
+            "Kindleの読書画面が安定しませんでした",
+        )
+
+    def _wait_for_footer_change(self, previous: str) -> bool:
+        deadline = time.monotonic() + self.config.page_change_timeout_seconds
+        while time.monotonic() < deadline:
+            self._ensure_process_running()
+            footer = self._control_by_id("FooterLabelText", timeout=0.5)
+            if footer is not None and footer.Name and footer.Name != previous:
+                time.sleep(self.config.page_stable_seconds)
+                return True
+            time.sleep(0.2)
+        return False
+
+    def go_to_start(self, *, on_poll: Callable[[], None] | None = None) -> None:
+        self.wait_for_reader_stable()
+        footer = self._control_by_id("FooterLabelText")
+        if footer is None:
+            raise KindleControllerError(
+                "positioning_failed",
+                "Kindleの読書位置を取得できませんでした",
+            )
+        footer.Click(simulateMove=False, waitTime=0.2)
+        deadline = time.monotonic() + self.config.positioning_timeout_seconds
+        boundary_count = 0
+        while time.monotonic() < deadline:
+            self._ensure_process_running()
+            if on_poll:
+                on_poll()
+            footer = self._control_by_id("FooterLabelText", timeout=1.0)
+            if footer is None or not footer.Name:
+                raise KindleControllerError(
+                    "positioning_failed",
+                    "Kindleの読書位置を取得できませんでした",
+                )
+            previous = footer.Name
+            pyautogui.press("pageup")
+            if self._wait_for_footer_change(previous):
+                boundary_count = 0
+            else:
+                boundary_count += 1
+                if boundary_count >= self.config.start_boundary_checks:
+                    return
+                time.sleep(self.config.page_stable_seconds)
+        raise KindleControllerError(
+            "positioning_failed",
+            "Kindle書籍を期限内に先頭へ移動できませんでした",
+        )

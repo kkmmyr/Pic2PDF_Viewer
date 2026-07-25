@@ -91,6 +91,23 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 
 ---
 
+### 1.7. `kindle_app_controller.py`（Kindle自動操作）
+
+起動済みMicrosoft Store版 Kindleへ接続し、購入済みライブラリから対象書籍を安全に開いて撮影開始位置へ移動する。
+
+- `uiautomation` を使い、検索欄とASIN固有のAutomationIdを限定探索する。
+- `library-more-menu-<ASIN>` が一意に見つかった場合だけ対象カードを操作する。
+- 未ダウンロード時は `download-button-<ASIN>` を開始し、ボタン消失と正式コンテンツフォルダの安定を待つ。
+- 読書画面では `FooterLabelText` の変化停止を3回確認して先頭境界とする。
+- Kindleの起動、ログイン、画面ロック解除は行わない。
+- 候補なし・複数・UI取得不能・ダウンロード期限超過・先頭移動不能は工程別エラーとして終了し、capturerを起動しない。
+
+### 1.8. `capture_agent.py`（ジョブ実行）
+
+バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、既存capturerによる全ページ撮影、Samba inboxへの原子的公開、完了APIを直列実行する。処理中はheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
+
+---
+
 ## 2. 処理フロー
 
 ### 漫画（`run_comic.bat`）
