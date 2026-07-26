@@ -10,10 +10,10 @@ HTTP 層のフロー（パラメータ伝達・例外マッピング・ロック
 """
 
 import json
-import logging
 import os
 import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -220,7 +220,6 @@ class TestPostWatchlist:
         client,
         hitomi_data_dir,
         monkeypatch,
-        caplog,
     ):
         """top_id 初期化（NOZOMI 取得）が失敗しても登録自体は成功する。"""
         from services.hitomi import nozomi
@@ -229,11 +228,13 @@ class TestPostWatchlist:
             raise nozomi.HitomiError("network down")
 
         monkeypatch.setattr("routers.hitomi.nozomi.fetch_nozomi_head", _fetch)
+        warning = Mock()
+        monkeypatch.setattr("routers.hitomi.logger.warning", warning)
 
-        with caplog.at_level(logging.WARNING, logger="routers.hitomi"):
-            res = client.post("/api/hitomi/watchlist", json={"display_name": "Alice"})
+        res = client.post("/api/hitomi/watchlist", json={"display_name": "Alice"})
         assert res.status_code == 200
-        assert any("top_id 初期化スキップ" in record.message for record in caplog.records)
+        warning.assert_called_once()
+        assert "top_id 初期化スキップ" in warning.call_args.args[0]
 
 
 # ---------------------------------------------------------------------------
