@@ -6,7 +6,6 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends
 
-from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_MIN_BODY_CHARS
 from routers._deps import log_and_raise_500
 from routers.api_schemas import SearchResponse
 from services.novel_db import Scope, hybrid_search, with_db
@@ -36,8 +35,8 @@ def post_search(
             request.query,
             scope,
             top=end,
-            min_chars=NOVEL_DB_MIN_BODY_CHARS,
-            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+            min_chars=0,
+            body_page_margin=0,
         )
     page = all_hits[request.offset : end]
     return {

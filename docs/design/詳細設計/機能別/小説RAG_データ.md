@@ -1,6 +1,6 @@
 # 小説 RAG データ設計（スキーマ・環境変数・API・レイアウト）
 
-> status: living | last-verified: 2026-07-19
+> status: living | last-verified: 2026-07-26
 
 小説 RAG（novel_db）サブシステムの横断的な事実の正本。DB スキーマ / 環境変数 / ディレクトリレイアウト / API エンドポイント一覧 / LLM backend・port を 1 箇所に集約する。個別処理の設計は パイプライン設計（`小説RAG_パイプライン設計.md`）・検索QA設計（`小説RAG_検索QA設計.md`）を参照（※これら2文書は同 G4 で作成予定。作成後にリンク化する）。
 
@@ -19,14 +19,14 @@
 
 ### 1.1 SQLite テーブル（`novel.db`）
 
-現行 head は revision `0007`。OCRステージング・QA・正解コーパスを含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
+現行 head は revision `0008`。OCRステージング・QA・正解コーパスを含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
 
 | テーブル | 用途 | 主なカラム | 定義元 |
 |---|---|---|---|
 | `books` | 書籍メタ（1 冊 = 1 PDF） | `name`(UNIQUE), `pdf_path`, `images_dir`, `page_count`, `indexed_at`, `summary`, `summary_generated_at`, `ocr_done_at` | 0003 |
 | `ocr_runs` | OCR実行単位のステージング | `book_name`, `engine`, `model`, `source_page_count`, `state`, QA状態・承認情報 | 0004, 0005 |
-| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, OCR結果・品質値、QA状態、`page_type`, `index_eligible` | 0004, 0005, 0007 |
-| `ocr_ground_truth_pages` | OCR正解コーパス | `run_id`+`page_no`(UNIQUE), `image_sha256`, `page_type`, `reference_text`, `state`, `note`, 検証日時 | 0007 |
+| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, OCR結果・品質値、QA状態、`page_type`, `layout_type`, `primary_text`, `external_text`, `selected_engine`, `corrected_text`, `index_eligible` | 0004, 0005, 0007, 0008 |
+| `ocr_ground_truth_pages` | OCR正解コーパス | `run_id`+`page_no`(UNIQUE), `image_sha256`, `page_type`, `layout_type`, `reference_text`, `state`, `note`, 検証日時 | 0007, 0008 |
 | `pages` | ページ単位の本文 | `book_id`(FK), `page_no`, `image_path`, `full_text`, `char_count`, `main_characters`, `page_type`, `index_eligible`; UNIQUE(book_id, page_no) | 0003, 0007 |
 | `pages_fts` | `pages.full_text` の全文検索（FTS5, `tokenize='trigram'`, `content='pages'`） | `full_text` | 0003 |
 | `chunks` | 埋め込み単位のチャンク | `page_id`(FK), `chunk_idx`, `text`, `char_count`, `contextual_text`, `contextual_generated_at`(B-9 Contextual Retrieval) | 0003 |
@@ -42,7 +42,9 @@
 - `created_at` 等のタイムスタンプは JST 固定（`datetime('now', '+9 hours')`）。
 - FK は `PRAGMA foreign_keys = ON`（`connection.py`）で有効。`journal_mode = WAL`。
 - `pages.page_no` は `kindle_novel/images/{書籍名}/NNN.png` の連番に対応するキャプチャ画面番号であり、Kindleの紙面ページ番号ではない。リフロー表示では両者は1対1対応しない。
-- `pages.index_eligible=1`は`page_type=narrative`だけである。非本文ページは正本ページとして保持するが、FTS検索、chunk、Embedding、full-book入力、サマリ・人物抽出から除外する。
+- `pages.index_eligible=1`は`page_type=narrative`だけである。非本文ページは正本ページとして保持するが、FTS検索、chunk、Embedding、full-book入力、サマリ・人物抽出から除外する。検索・QA本文取得はこの値を正本とし、文字数や先頭・末尾位置で短い本文を再除外しない。
+- 非本文ページの`pages.full_text`は空文字とし、画像だけを公開正本に残す。機械OCR候補は`ocr_page_results`に監査用として保持し、検索索引へ混入させない。
+- `ocr_page_results.layout_type`は意味上のページ種別とは独立したOCR選択軸である。`primary_text` / `external_text`は機械候補、`corrected_text`は原画像照合済み補正、`selected_engine`は公開時の採用元を表す。
 
 ### 1.2 LanceDB テーブル（`novel.lancedb`）
 
@@ -92,9 +94,9 @@
 | 定数 | 値 | 用途 |
 |---|---|---|
 | `NOVEL_DB_EMBED_DIM` | `1024` | bge-m3 の出力次元 |
-| `NOVEL_DB_MIN_BODY_CHARS` | `300` | 薄いページ除外の文字数閾値 |
+| `NOVEL_DB_MIN_BODY_CHARS` | `300` | サマリ・コンテキスト・読書会生成で薄いページを省く文字数閾値。検索・QA取得には適用しない |
 | `NOVEL_DB_QA_MAX_PER_BOOK` | `5` | 1 書籍あたりの取得上限 |
-| `NOVEL_DB_BODY_PAGE_MARGIN` | `5` | 先頭/末尾の除外ページ数 |
+| `NOVEL_DB_BODY_PAGE_MARGIN` | `5` | サマリ・コンテキスト・読書会生成で先頭/末尾を省くページ数。検索・QA取得には適用しない |
 | `NOVEL_DB_QA_TOP_SUMMARIES` | `11` | scope=all で使う書籍サマリ上限 |
 
 ---

@@ -33,6 +33,10 @@ def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
         "ink_coverage": 1.0,
         "attempt_count": 1,
         "error_message": None,
+        "layout_type": "normal_prose",
+        "primary_text": text,
+        "external_text": None,
+        "selected_engine": "primary",
     }
 
 
@@ -79,6 +83,7 @@ def test_verified_entry_calculates_cer(corpus_run) -> None:
         entry_id,
         reference_text="吾輩は犬である",
         page_type="narrative",
+        layout_type="normal_prose",
         state="verified",
         note="猫を犬へ変更した評価例",
     )
@@ -96,6 +101,10 @@ def test_verified_entry_calculates_cer(corpus_run) -> None:
         "total_reference_chars": 7,
         "aggregate_cer": pytest.approx(1 / 7),
     }
+    layout_metrics = next(
+        metric for metric in result["metrics_by_layout_type"] if metric["layout_type"] == "normal_prose"
+    )
+    assert layout_metrics["aggregate_cer"] == pytest.approx(1 / 7)
 
 
 def test_verification_rejects_unknown_type_and_changed_image(corpus_run) -> None:
@@ -107,6 +116,7 @@ def test_verification_rejects_unknown_type_and_changed_image(corpus_run) -> None
             entry_id,
             reference_text="正解",
             page_type="unknown",
+            layout_type="normal_prose",
             state="verified",
             note=None,
         )
@@ -117,6 +127,7 @@ def test_verification_rejects_unknown_type_and_changed_image(corpus_run) -> None
             entry_id,
             reference_text="正解",
             page_type="narrative",
+            layout_type="normal_prose",
             state="verified",
             note=None,
         )

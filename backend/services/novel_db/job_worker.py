@@ -6,6 +6,7 @@ NovelDbJobQueue から生成され、rebuild_jobs テーブルの queued ジョ�
 
 from __future__ import annotations
 
+import sqlite3
 import threading
 import traceback
 from pathlib import Path
@@ -165,12 +166,21 @@ class NovelDbJobWorker:
             conn.commit()
 
     def _update_detail(self, job_id: int, detail: str) -> None:
-        with with_db() as conn:
-            conn.execute(
-                "UPDATE rebuild_jobs SET current_detail = ? WHERE id = ?",
-                (detail, job_id),
-            )
-            conn.commit()
+        try:
+            with with_db() as conn:
+                # Full Build は同じ novel.db に長い書込み transaction を持つ。
+                # current_detail は補助表示なので、ロック解放を待って本処理を
+                # 遅延させず、競合時はこの更新だけを省略する。
+                conn.execute("PRAGMA busy_timeout = 0")
+                conn.execute(
+                    "UPDATE rebuild_jobs SET current_detail = ? WHERE id = ?",
+                    (detail, job_id),
+                )
+                conn.commit()
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).casefold():
+                raise
+            logger.debug("Job %d detail update skipped because novel.db is locked", job_id)
 
     # ----- ジョブ実行 -----
 

@@ -14,7 +14,7 @@ import {
     fetchOcrQaRuns,
     reviewOcrQaPage,
 } from './api';
-import type { OcrPageType } from './types';
+import type { OcrLayoutType, OcrPageType, OcrSelectedEngine } from './types';
 
 const PAGE_TYPE_LABELS: Record<OcrPageType, string> = {
     unknown: '未分類',
@@ -22,6 +22,21 @@ const PAGE_TYPE_LABELS: Record<OcrPageType, string> = {
     toc: '目次',
     illustration: '挿絵・表紙',
     colophon_or_ad: '奥付・広告',
+};
+
+const LAYOUT_TYPE_LABELS: Record<OcrLayoutType, string> = {
+    unknown: '未判定',
+    normal_prose: '通常散文',
+    full_width: '全幅本文・要約',
+    mixed_illustration: '本文＋挿絵',
+    structured: '構造化（目次・漢文等）',
+    image_only: '画像のみ',
+};
+
+const ENGINE_LABELS: Record<OcrSelectedEngine, string> = {
+    primary: 'Surya候補',
+    external: 'yomitoku候補',
+    codex: 'Codex確認済み補正',
 };
 
 export function OCRQaPanel() {
@@ -32,6 +47,9 @@ export function OCRQaPanel() {
     const [reviewer, setReviewer] = useState('local-user');
     const [showAll, setShowAll] = useState(false);
     const [pageType, setPageType] = useState<OcrPageType>('unknown');
+    const [layoutType, setLayoutType] = useState<OcrLayoutType>('unknown');
+    const [selectedEngine, setSelectedEngine] = useState<OcrSelectedEngine>('primary');
+    const [correctedText, setCorrectedText] = useState('');
 
     const runsQuery = useQuery({
         queryKey: ['ocrQaRuns'],
@@ -77,6 +95,14 @@ export function OCRQaPanel() {
     useEffect(() => {
         setNote(selectedPage?.qa_note ?? '');
         setPageType(selectedPage?.page_type ?? 'unknown');
+        setLayoutType(selectedPage?.layout_type ?? 'unknown');
+        setSelectedEngine(selectedPage?.selected_engine ?? 'primary');
+        setCorrectedText(
+            selectedPage?.corrected_text ??
+                (selectedPage?.selected_engine === 'external'
+                    ? selectedPage.external_text
+                    : (selectedPage?.primary_text ?? '')),
+        );
     }, [selectedPage]);
 
     const refresh = async () => {
@@ -93,6 +119,9 @@ export function OCRQaPanel() {
                 state,
                 note || null,
                 pageType,
+                layoutType,
+                selectedEngine,
+                selectedEngine === 'codex' ? correctedText : null,
             ),
         onSuccess: async (_, state) => {
             toast.success(state === 'approved' ? 'ページを承認しました' : 'ページを却下しました');
@@ -245,9 +274,55 @@ export function OCRQaPanel() {
                                             </span>
                                         ))}
                                     </div>
-                                    <pre className="max-h-[400px] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-7 dark:border-gray-700 dark:bg-gray-950">
-                                        {selectedPage.full_text || '（本文なし）'}
-                                    </pre>
+                                    <div className="grid gap-2">
+                                        <label className="flex items-center gap-3 text-sm">
+                                            採用候補
+                                            <select
+                                                value={selectedEngine}
+                                                onChange={(event) => {
+                                                    const engine = event.target
+                                                        .value as OcrSelectedEngine;
+                                                    setSelectedEngine(engine);
+                                                    if (engine === 'primary') {
+                                                        setCorrectedText(selectedPage.primary_text);
+                                                    } else if (engine === 'external') {
+                                                        setCorrectedText(
+                                                            selectedPage.external_text,
+                                                        );
+                                                    }
+                                                }}
+                                                className="rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+                                            >
+                                                {Object.entries(ENGINE_LABELS).map(
+                                                    ([value, label]) => (
+                                                        <option key={value} value={value}>
+                                                            {label}
+                                                        </option>
+                                                    ),
+                                                )}
+                                            </select>
+                                        </label>
+                                        <textarea
+                                            aria-label="採用OCR本文"
+                                            value={
+                                                selectedEngine === 'primary'
+                                                    ? selectedPage.primary_text
+                                                    : selectedEngine === 'external'
+                                                      ? selectedPage.external_text
+                                                      : correctedText
+                                            }
+                                            readOnly={selectedEngine !== 'codex'}
+                                            onChange={(event) =>
+                                                setCorrectedText(event.target.value)
+                                            }
+                                            className="min-h-[280px] max-h-[400px] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-7 read-only:opacity-80 dark:border-gray-700 dark:bg-gray-950"
+                                        />
+                                        {!selectedPage.external_text && (
+                                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                                この画面にはyomitoku候補が保存されていません。
+                                            </p>
+                                        )}
+                                    </div>
                                     <label className="mt-3 flex items-center gap-3 text-sm">
                                         ページ種別
                                         <select
@@ -271,6 +346,24 @@ export function OCRQaPanel() {
                                                 : '検索・要約から除外'}
                                         </span>
                                     </label>
+                                    <label className="mt-3 flex items-center gap-3 text-sm">
+                                        レイアウト
+                                        <select
+                                            value={layoutType}
+                                            onChange={(event) =>
+                                                setLayoutType(event.target.value as OcrLayoutType)
+                                            }
+                                            className="rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+                                        >
+                                            {Object.entries(LAYOUT_TYPE_LABELS).map(
+                                                ([value, label]) => (
+                                                    <option key={value} value={value}>
+                                                        {label}
+                                                    </option>
+                                                ),
+                                            )}
+                                        </select>
+                                    </label>
                                     <textarea
                                         aria-label="QAメモ"
                                         value={note}
@@ -283,7 +376,11 @@ export function OCRQaPanel() {
                                             type="button"
                                             onClick={() => pageMutation.mutate('approved')}
                                             disabled={
-                                                pageMutation.isPending || pageType === 'unknown'
+                                                pageMutation.isPending ||
+                                                pageType === 'unknown' ||
+                                                layoutType === 'unknown' ||
+                                                (selectedEngine === 'codex' &&
+                                                    correctedText.trim().length === 0)
                                             }
                                             className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >

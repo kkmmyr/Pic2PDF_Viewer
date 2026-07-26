@@ -10,8 +10,6 @@ import sqlite3
 from dataclasses import dataclass
 
 from config import (
-    NOVEL_DB_BODY_PAGE_MARGIN,
-    NOVEL_DB_MIN_BODY_CHARS,
     NOVEL_DB_QA_EXPAND_ENABLED,
     NOVEL_DB_QA_FULL_BOOK_MODE,
     NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
@@ -52,8 +50,8 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
         hits = load_all_pages_of_book(
             conn,
             scope.id,
-            min_chars=NOVEL_DB_MIN_BODY_CHARS,
-            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+            min_chars=0,
+            body_page_margin=0,
         )
         return RetrievalResult(hits=hits, book_summaries=None, qa_options=qa_options)
 
@@ -71,9 +69,9 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             q,
             scope,
             top=NOVEL_DB_QA_TOP_K,
-            min_chars=NOVEL_DB_MIN_BODY_CHARS,
+            min_chars=0,
             max_per_book=max_per_book,
-            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+            body_page_margin=0,
         )
         for h in sub_rows:
             key = (h.book_name, h.page_no)

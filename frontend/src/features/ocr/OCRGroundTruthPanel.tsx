@@ -8,7 +8,7 @@ import { API_CONFIG } from '@/config/api';
 import { errorMessage } from '@/utils/error';
 
 import { fetchOcrGroundTruth, updateOcrGroundTruth } from './api';
-import type { OcrPageType } from './types';
+import type { OcrLayoutType, OcrPageType } from './types';
 
 const PAGE_TYPE_LABELS: Record<OcrPageType, string> = {
     unknown: '未分類',
@@ -18,11 +18,21 @@ const PAGE_TYPE_LABELS: Record<OcrPageType, string> = {
     colophon_or_ad: '奥付・広告',
 };
 
+const LAYOUT_TYPE_LABELS: Record<OcrLayoutType, string> = {
+    unknown: '未判定',
+    normal_prose: '通常散文',
+    full_width: '全幅本文・要約',
+    mixed_illustration: '本文＋挿絵',
+    structured: '構造化',
+    image_only: '画像のみ',
+};
+
 export function OCRGroundTruthPanel() {
     const queryClient = useQueryClient();
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [referenceText, setReferenceText] = useState('');
     const [pageType, setPageType] = useState<OcrPageType>('unknown');
+    const [layoutType, setLayoutType] = useState<OcrLayoutType>('unknown');
     const [note, setNote] = useState('');
 
     const corpusQuery = useQuery({
@@ -40,6 +50,7 @@ export function OCRGroundTruthPanel() {
     useEffect(() => {
         setReferenceText(selected?.reference_text ?? '');
         setPageType(selected?.page_type ?? 'unknown');
+        setLayoutType(selected?.layout_type ?? 'unknown');
         setNote(selected?.note ?? '');
     }, [selected]);
 
@@ -48,6 +59,7 @@ export function OCRGroundTruthPanel() {
             updateOcrGroundTruth(selectedId as number, {
                 reference_text: referenceText,
                 page_type: pageType,
+                layout_type: layoutType,
                 state,
                 note: note || null,
             }),
@@ -100,6 +112,36 @@ export function OCRGroundTruthPanel() {
                             >
                                 <div className="font-medium text-gray-900 dark:text-gray-100">
                                     {PAGE_TYPE_LABELS[metric.page_type]}
+                                </div>
+                                <div className="mt-1 flex justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                                    <span>
+                                        検証済み {metric.verified_count} / {metric.total_count}
+                                    </span>
+                                    <span>
+                                        CER{' '}
+                                        {metric.aggregate_cer === null
+                                            ? '—'
+                                            : `${(metric.aggregate_cer * 100).toFixed(2)}%`}
+                                    </span>
+                                </div>
+                            </div>
+                        ))}
+                </div>
+            )}
+            {corpus && corpus.metrics_by_layout_type.some((metric) => metric.total_count > 0) && (
+                <div
+                    aria-label="レイアウトごとのOCR品質"
+                    className="grid gap-2 border-b border-gray-200 px-5 py-3 sm:grid-cols-2 xl:grid-cols-3 dark:border-gray-700"
+                >
+                    {corpus.metrics_by_layout_type
+                        .filter((metric) => metric.total_count > 0)
+                        .map((metric) => (
+                            <div
+                                key={metric.layout_type}
+                                className="rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800"
+                            >
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
+                                    {LAYOUT_TYPE_LABELS[metric.layout_type]}
                                 </div>
                                 <div className="mt-1 flex justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
                                     <span>
@@ -184,6 +226,22 @@ export function OCRGroundTruthPanel() {
                                     ))}
                                 </select>
                             </label>
+                            <label className="flex items-center gap-3 text-sm">
+                                レイアウト
+                                <select
+                                    value={layoutType}
+                                    onChange={(event) =>
+                                        setLayoutType(event.target.value as OcrLayoutType)
+                                    }
+                                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+                                >
+                                    {Object.entries(LAYOUT_TYPE_LABELS).map(([value, label]) => (
+                                        <option key={value} value={value}>
+                                            {label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
                             <div>
                                 <h3 className="mb-2 font-semibold">現在のOCR本文（比較用）</h3>
                                 <pre className="max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-950">
@@ -222,6 +280,7 @@ export function OCRGroundTruthPanel() {
                                     disabled={
                                         mutation.isPending ||
                                         pageType === 'unknown' ||
+                                        layoutType === 'unknown' ||
                                         referenceText.trim().length === 0
                                     }
                                     className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-40"

@@ -62,6 +62,10 @@ class OcrPageResult(PageText):
     attempt_count: int
     server_generation: NotRequired[int]
     error_message: NotRequired[str | None]
+    layout_type: NotRequired[str]
+    primary_text: NotRequired[str | None]
+    external_text: NotRequired[str | None]
+    selected_engine: NotRequired[str]
 
 
 class OcrProgressEvent(TypedDict):

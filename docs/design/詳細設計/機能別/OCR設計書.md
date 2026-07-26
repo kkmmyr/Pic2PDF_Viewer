@@ -121,7 +121,7 @@ QA未承認runは公開・索引生成しない方向で移行する。
 段階実装と受入条件は
 [小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md)を正本とする。
 
-改善後の本番再実行では、茉莉花官吏伝は91/91画面が機械合格したが、
+以下はPhase 5c導入前の初回本番再実行結果である。茉莉花官吏伝は91/91画面が機械合格したが、
 69画面が`external_crosscheck_unavailable`となり、QA必須は73画面だった。
 通常本文8画面目の原画像照合で、Suryaの人物名誤読「暗菜莉花」と、
 yomitokuの複数の固有名詞誤読を確認した。両者の正規化一致率は0.820であり、
@@ -133,9 +133,15 @@ yomitokuの複数の固有名詞誤読を確認した。両者の正規化一致
 `external_crosscheck_unavailable`は、通常本文で補助系が品質根拠を提供できなかった
 ことを示すため、QA必須対象から除外しない。
 
-非本文ページは通常本文と同じ一致率だけで自動採否を決めず、将来のページ種別分類で
-閲覧用保持と検索索引対象を分離する。ページ種別分類が実装されるまでは、
-目次・奥付・広告を理由に品質ゲートを緩和しない。
+Phase 5cではページ種別分類とレイアウト別候補選択を実装済みである。
+2026-07-26の最終再処理では、茉莉花91画面を本文81・画像のみ10、
+十三歳92画面を本文81・画像のみ11として全画面承認した。
+機械候補147画面、Codex補正文15画面、画像のみ21画面を公開し、
+非本文の公開本文混入0件、QA採用本文との不一致0件を確認した。
+固定20画面の機械CERは全体16.42%、通常散文1.82%であるため、
+機械OCR単独の目標0.5%は未達と明記する。公開品質は機械CERではなく、
+固定正解と難ページの原画像照合済み補正、および機械品質ゲート通過候補の
+リスクベースQAによって確保する。
 
 ### キャプチャ画面番号と紙面ページ番号
 
@@ -156,13 +162,15 @@ yomitokuの複数の固有名詞誤読を確認した。両者の正規化一致
 - `ocr_runs`: 書籍・エンジン・モデル・入力ページ数・状態・エラーを記録する。
 - `ocr_agent_job_runs`: `rebuild_jobs.id`と書籍別`ocr_runs.id`を対応付け、再claim・再開時に同じrunを返す。
 - `ocr_runs.qa_state`: `pending` / `approved` / `rejected`。承認者、承認日時、QAメモを同じrunへ保存する。
-- `ocr_page_results`: ページ番号、画像SHA-256、本文、raw出力、品質フラグ、coverage、試行回数を `UNIQUE(run_id, page_no)` で保存する。`qa_state`は`not_required` / `required` / `approved` / `rejected`、`qa_note`と`reviewed_at`を保持する。ページ種別`page_type`は`unknown` / `narrative` / `toc` / `illustration` / `colophon_or_ad`、`index_eligible`は`narrative`だけ1とする。
+- `ocr_page_results`: ページ番号、画像SHA-256、採用本文、raw出力、品質フラグ、coverage、試行回数を `UNIQUE(run_id, page_no)` で保存する。`qa_state`は`not_required` / `required` / `approved` / `rejected`、`qa_note`と`reviewed_at`を保持する。ページ種別`page_type`は`unknown` / `narrative` / `toc` / `illustration` / `colophon_or_ad`、`index_eligible`は`narrative`だけ1とする。
+- 意味上の`page_type`とは別に、OCR選択用の`layout_type`を`unknown` / `normal_prose` / `full_width` / `mixed_illustration` / `structured` / `image_only`で保持する。Surya候補とyomitoku候補を`primary_text` / `external_text`へ保存し、`selected_engine`は`primary` / `external` / `codex`のいずれを公開正本に採用したかを記録する。Codexまたは人が原画像と照合した補正文は`corrected_text`へ保存し、機械OCRの原文を上書きしない。
 - 同じ書籍・エンジン・モデル・入力ページ数で状態が `running` または `failed` のrunがある場合は、その最新runを再利用する。各 `passed` ページは、そのページ番号の画像SHA-256が現在の入力と一致する場合だけスキップする。変更されたページ、不合格ページ、未処理ページは再実行する。
-- 全ページが `passed` かつページ番号と画像SHAが入力manifestに一致した場合、runを`awaiting_qa`へ進める。この時点では`books` / `pages` / `pages_fts`を更新しない。
+- ページ番号と画像SHAが入力manifestに一致し、全ページのOCR結果（`passed`または`failed`）が保存された場合、runを`awaiting_qa`へ進める。この時点では`books` / `pages` / `pages_fts`を更新しない。`failed`ページは必ずQA対象とし、本文なら画像照合済み補正文、非本文なら画像のみ公開の明示承認が必要である。
 - 全ページへ決定論的なページ種別候補を設定する。目次語、発行・広告語、文字数、前付け・後付け位置から安全に決まらない場合は`unknown`のまま残す。自動判定は既に手動設定された種別を上書きしない。
-- 先頭7画面、先頭本文・中間・最終画面、`unknown`画面、および異常・限定例外を示す品質フラグ付き全画面を`required`とする。`cross_engine_consensus`と`yomitoku_adjudication`は、通常の2エンジン照合を実施した監査記録であり、それ単独ではQA必須ページを増やさない。QA画面で原画像・本文・フラグ・ページ種別を比較し、ページ単位で承認または却下する。
-- `required`ページがすべて`approved`、`rejected`ページと`unknown`ページが0件で、再度画像SHAが一致した場合だけ、run承認APIが1トランザクションで`books` / `pages` / `pages_fts`を更新し、runを`completed`・`qa_state=approved`にする。
-- 公開後の`pages.page_type`と`pages.index_eligible`はQA確定値を保持する。`toc` / `illustration` / `colophon_or_ad`は画像・OCR本文・FTS外部コンテンツ行を保持するが、FTS検索結果、chunk、Embedding、全文読込、サマリ、人物・関係抽出の入力から除外する。
+- OCR時はraw出力のbboxラベル、本文量、非文字領域の有無から`layout_type`を安全側に提案する。`mixed_illustration`ではyomitoku候補を必ず比較し、機械選択後もQA必須とする。`full_width` / `structured` / `unknown`も自動確定せずQAへ送る。通常散文を含め、機械候補に固有名詞・列欠落の疑いがあればCodexが原画像と照合し、`corrected_text`を保存する。
+- 先頭7画面、先頭本文・中間・最終画面、OCR失敗、`unknown`または通常散文以外のレイアウト、および異常・限定例外を示す品質フラグ付き全画面を`required`とする。`cross_engine_consensus`と`yomitoku_adjudication`は、通常の2エンジン照合を実施した監査記録であり、それ単独ではQA必須ページを増やさない。QA画面で原画像・両OCR候補・採用本文・フラグ・ページ種別・レイアウト種別を比較し、ページ単位で承認または却下する。
+- `required`ページがすべて`approved`、`rejected`ページ、`unknown`ページ種別、`unknown`レイアウトが各0件で、再度画像SHAが一致した場合だけ、run承認APIが1トランザクションで`books` / `pages` / `pages_fts`を更新し、runを`completed`・`qa_state=approved`にする。`narrative`は機械合格した採用候補または非空の画像照合済み補正文を必須とする。
+- 公開後の`pages.page_type`と`pages.index_eligible`はQA確定値を保持する。`toc` / `illustration` / `colophon_or_ad`は画像パスを正本ページとして保持するが、公開本文は空文字にしてFTS検索、chunk、Embedding、全文読込、サマリ、人物・関係抽出の入力から除外する。OCR候補は`ocr_page_results`に監査用として残す。
 - 中断・失敗時は既存の公開済み本文を保持する。新規書籍では中途半端な本文を公開しない。
 - `POST /api/ocr/stop` は `rebuild_jobs` の待機中（`queued`）OCRジョブだけを `canceled` にする。実行中ジョブ・OCR worker・llama-serverは停止しない。待機中ジョブがなければ400を返す。実行中の安全な停止とserver更新の自動制御は未実装であり、手動中断時はrunとジョブを理由付きの `failed` として閉じ、ページチェックポイントを次回再開へ残す。
 
@@ -206,8 +214,8 @@ CERは挿入が正解文字数を超える場合に100%を超え得る。
 
 - 全体CERだけではyomitokuが最良だが、通常散文と漢文は現行Surya系が優位である。
   主エンジンをyomitokuへ一律置換しない。
-- yomitokuの改善は本文＋挿絵に集中した。現行実装は全ページを独立照合するが、
-  意味上の`page_type`とは別のレイアウト特性を保存・判定してエンジンを選ぶ処理は未実装である。
+- yomitokuの改善は本文＋挿絵に集中した。意味上の`page_type`とは別に
+  `layout_type`を保存し、両候補を失わずQAで選択・補正する。
 - Tesseractは挿絵の網点・輪郭を大量の文字として誤認した。
   全画面OCRには採用せず、将来文字領域を限定できた場合の列欠落・文字数確認候補に留める。
 - 現在の`metrics_by_page_type`は意味上のページ種別を集計する。

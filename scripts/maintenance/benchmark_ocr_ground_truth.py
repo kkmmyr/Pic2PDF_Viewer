@@ -27,6 +27,14 @@ from urllib.parse import urljoin
 from urllib.request import urlopen
 
 PAGE_TYPE_ORDER = ("narrative", "toc", "illustration", "colophon_or_ad", "unknown")
+LAYOUT_TYPE_ORDER = (
+    "normal_prose",
+    "full_width",
+    "mixed_illustration",
+    "structured",
+    "image_only",
+    "unknown",
+)
 
 
 def _edit_distance(reference: str, hypothesis: str) -> int:
@@ -183,7 +191,8 @@ def summarize(
             str(entry["reference_text"]), hypothesis
         )
         page_type = str(entry["page_type"])
-        for group in ("overall", page_type):
+        layout_type = str(entry.get("layout_type", "unknown"))
+        for group in ("overall", page_type, f"layout:{layout_type}"):
             totals[group]["page_count"] += 1
             totals[group]["total_edit_distance"] += distance
             totals[group]["total_reference_chars"] += reference_chars
@@ -193,6 +202,7 @@ def summarize(
                 "run_id": int(entry["run_id"]),
                 "page_no": int(entry["page_no"]),
                 "page_type": page_type,
+                "layout_type": layout_type,
                 "image_sha256": str(entry["image_sha256"]),
                 "edit_distance": distance,
                 "reference_chars": reference_chars,
@@ -202,7 +212,12 @@ def summarize(
         )
 
     metrics = []
-    for group in ("overall", *PAGE_TYPE_ORDER):
+    ordered_groups = (
+        "overall",
+        *PAGE_TYPE_ORDER,
+        *(f"layout:{layout_type}" for layout_type in LAYOUT_TYPE_ORDER),
+    )
+    for group in ordered_groups:
         values = totals[group]
         if values["page_count"] == 0:
             continue

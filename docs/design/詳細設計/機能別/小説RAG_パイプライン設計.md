@@ -89,7 +89,7 @@ Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のど
 全処理は `rebuild_jobs` テーブル経由の**全体ロック + 単一 worker 直列実行**。並列化は GPU/CPU 高負荷のため逆効果、書籍単位ロックの実装複雑化は利得薄、という判断。
 
 - **`NovelDbJobQueue`**: `enqueue(job_type, target_id, mode)` / `cancel` / `get_status` とライフサイクル。`start()` で「`running` を `failed` に戻す（サーバ再起動時）」+ 旧 mode 名の migration（`pdf_text→rebuild` / `reocr→ocr`）を実行し worker スレッドを起動。`main.py` の lifespan で start/stop。
-- **`NovelDbJobWorker`**: 5 秒 polling + wakeup Event。`_claim_next_job`（`queued` を古い順に 1 件 `running` 化）→ `_execute_job`（mode 分岐）→ `_mark_finished`。progress/step/detail を `rebuild_jobs` に逐次書き込み、UI がポーリング表示する。
+- **`NovelDbJobWorker`**: 5 秒 polling + wakeup Event。`_claim_next_job`（`queued` を古い順に 1 件 `running` 化）→ `_execute_job`（mode 分岐）→ `_mark_finished`。progress/step/detail を `rebuild_jobs` に逐次書き込み、UI がポーリング表示する。ただし、`rebuild_from_pages` が同じ `novel.db` の書込みトランザクションを保持している間の `current_detail` 更新は補助的な表示情報として扱う。別接続が `database is locked` になった場合は詳細更新だけを省略し、本文チャンク・embedding の本処理を失敗させない。ジョブ終了時の progress/state 更新は必須とする。
 - **シリーズメタ索引**: `series_meta.load_book_series_ids()` が meta2.db の novel メタを `book_name → series_id` の辞書へ変換する正本。`generate_relations` のジョブ開始時に1回だけ読み、全対象書籍で共有する。CLIの `--series` 対象解決も `book_names_for_series()` を使い、PDF拡張子除去や空ID判定を重複実装しない。
 
 **JobMode と対象書籍（`_resolve_targets`, `job_type="all"` 時）**:

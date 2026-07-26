@@ -12,6 +12,7 @@ import io
 import json
 import os
 import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,11 @@ except ImportError:
         evaluate_external_ocr,
     )
 
+try:
+    from .ocr_layout_types import suggest_layout_type
+except ImportError:
+    from ocr_layout_types import suggest_layout_type
+
 _YOMITOKU_ADJUDICATION_FLAGS = {
     "duplicate_text_recovery",
     "sparse_page_block_fallback",
@@ -49,6 +55,11 @@ def _page_payload(
     image_sha256: str,
     result: SuryaPageResult,
     server_generation: int | None = None,
+    *,
+    layout_type: str = "unknown",
+    primary_text: str | None = None,
+    external_text: str | None = None,
+    selected_engine: str = "primary",
 ) -> dict[str, Any]:
     return {
         "event": "page",
@@ -66,6 +77,10 @@ def _page_payload(
             "attempt_count": result.attempt_count,
             "server_generation": server_generation,
             "error_message": result.error_message,
+            "layout_type": layout_type,
+            "primary_text": primary_text if primary_text is not None else result.full_text,
+            "external_text": external_text,
+            "selected_engine": selected_engine,
         },
     }
 
@@ -127,6 +142,37 @@ def _emit_progress(
     _emit({"event": "progress", "progress": progress})
 
 
+def select_layout_ocr_result(
+    primary: SuryaPageResult,
+    external: SuryaPageResult,
+    *,
+    layout_type: str,
+    min_similarity: float,
+) -> tuple[SuryaPageResult, str]:
+    """Select a machine candidate while retaining QA-visible disagreement."""
+    external_is_materially_more_complete = external.char_count >= max(1, primary.char_count) * 1.02
+    if (
+        layout_type == "mixed_illustration"
+        and external.state == "passed"
+        and (primary.state != "passed" or external_is_materially_more_complete)
+    ):
+        return (
+            replace(
+                external,
+                quality_flags=[*external.quality_flags, "layout_selected_external"],
+                error_message=None,
+            ),
+            "external",
+        )
+    selected = crosscheck_ocr_results(primary, external, min_similarity=min_similarity)
+    selected_engine = (
+        "external"
+        if selected.full_text == external.full_text and selected.full_text != primary.full_text
+        else "primary"
+    )
+    return selected, selected_engine
+
+
 def _read_image(path: Path) -> tuple[bytes, str, Image.Image]:
     image_bytes = path.read_bytes()
     image_sha256 = hashlib.sha256(image_bytes).hexdigest()
@@ -183,6 +229,10 @@ def _run_surya(tasks: list[dict[str, Any]]) -> None:
                 task_index += 1
                 surya_failed = True
                 result: SuryaPageResult | None = None
+                primary_text: str | None = None
+                external_text: str | None = None
+                layout_type = "unknown"
+                selected_engine = "primary"
                 attempt_count: int | None = None
                 book_name = str(task["book_name"])
                 page_no = int(task["page_no"])
@@ -198,6 +248,12 @@ def _run_surya(tasks: list[dict[str, Any]]) -> None:
                 try:
                     _, image_sha256, image = _read_image(image_path)
                     surya_result = client.recognize_with_quality(image, max_attempts=max_attempts)
+                    primary_text = surya_result.full_text
+                    layout_type = suggest_layout_type(
+                        raw_output=surya_result.raw_output,
+                        full_text=surya_result.full_text,
+                        char_count=surya_result.char_count,
+                    )
                     surya_failed = surya_result.state == "failed"
                     trigger_flags = sorted(set(surya_result.quality_flags) & _YOMITOKU_ADJUDICATION_FLAGS)
                     if surya_failed:
@@ -223,9 +279,11 @@ def _run_surya(tasks: list[dict[str, Any]]) -> None:
                             engine_flag="yomitoku_adjudication",
                             **external_quality_kwargs,
                         )
-                        result = crosscheck_ocr_results(
+                        external_text = result.full_text
+                        result, selected_engine = select_layout_ocr_result(
                             surya_result,
                             result,
+                            layout_type=layout_type,
                             min_similarity=cross_engine_min_similarity,
                         )
                         if trigger_flags:
@@ -234,7 +292,19 @@ def _run_surya(tasks: list[dict[str, Any]]) -> None:
                                 "surya_trigger_" + "+".join(trigger_flags),
                             )
                     attempt_count = result.attempt_count
-                    _emit(_page_payload(book_name, page_no, image_sha256, result, server_generation))
+                    _emit(
+                        _page_payload(
+                            book_name,
+                            page_no,
+                            image_sha256,
+                            result,
+                            server_generation,
+                            layout_type=layout_type,
+                            primary_text=primary_text,
+                            external_text=external_text,
+                            selected_engine=selected_engine,
+                        )
+                    )
                 except Exception as exc:
                     _emit(_failed_payload(book_name, page_no, image_sha256, exc, server_generation))
                 _emit_progress(

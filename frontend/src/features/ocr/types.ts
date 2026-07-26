@@ -7,3 +7,5 @@ export type OcrQaRunListResponse = components['schemas']['OcrQaRunListResponse']
 export type OcrGroundTruthEntry = components['schemas']['OcrGroundTruthEntryOut'];
 export type OcrGroundTruthListResponse = components['schemas']['OcrGroundTruthListResponse'];
 export type OcrPageType = OcrQaPage['page_type'];
+export type OcrLayoutType = OcrQaPage['layout_type'];
+export type OcrSelectedEngine = OcrQaPage['selected_engine'];

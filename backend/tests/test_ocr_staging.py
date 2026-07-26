@@ -43,6 +43,10 @@ def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
         "ink_coverage": 1.0,
         "attempt_count": 1,
         "error_message": None,
+        "layout_type": "normal_prose",
+        "primary_text": text,
+        "external_text": None,
+        "selected_engine": "primary",
     }
 
 
@@ -74,8 +78,17 @@ def test_run_resumes_then_requires_qa_before_publication(staged_book) -> None:
         ).fetchall()
         assert [row[0] for row in required] == [1, 2]
 
-    review_qa_page(run_id, 1, "approved", None, "narrative")
-    review_qa_page(run_id, 2, "approved", "確認済み", "narrative")
+    review_qa_page(run_id, 1, "approved", None, "narrative", "normal_prose", "primary", None)
+    review_qa_page(
+        run_id,
+        2,
+        "approved",
+        "確認済み",
+        "narrative",
+        "normal_prose",
+        "primary",
+        None,
+    )
     approve_and_publish_run(run_id, "tester")
 
     with with_db() as conn:
@@ -133,7 +146,7 @@ def test_page_approval_requires_classification(staged_book) -> None:
         conn.commit()
 
     with pytest.raises(ValueError, match="classified"):
-        review_qa_page(run_id, 1, "approved", None, "unknown")
+        review_qa_page(run_id, 1, "approved", None, "unknown", "normal_prose", "primary", None)
 
 
 def test_classify_run_pages_is_conservative(staged_book) -> None:
@@ -146,6 +159,12 @@ def test_classify_run_pages_is_conservative(staged_book) -> None:
     counts = classify_run_pages(run_id)
     assert counts["toc"] == 1
     assert counts["narrative"] == 1
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT page_no, layout_type FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
+            (run_id,),
+        ).fetchall()
+    assert [tuple(row) for row in rows] == [(1, "structured"), (2, "normal_prose")]
 
 
 def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) -> None:
@@ -159,7 +178,7 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
     run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
 
     for page in input_pages:
-        result = _passed_page(page.page_no, page.image_sha256, "本文")
+        result = _passed_page(page.page_no, page.image_sha256, "これは通常の本文です。" * 40)
         if page.page_no == 9:
             result["quality_flags"] = ["cross_engine_consensus", "yomitoku_adjudication"]
         if page.page_no == 10:
@@ -174,3 +193,53 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
             (run_id,),
         ).fetchall()
     assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 12]
+
+
+def test_failed_non_index_page_can_publish_as_image_only(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    save_page_result(run_id, _passed_page(1, input_pages[0].image_sha256, "本文"))
+    failed = _passed_page(2, input_pages[1].image_sha256, "目次")
+    failed["state"] = "failed"
+    failed["error_message"] = "cross_engine_disagreement"
+    failed["layout_type"] = "structured"
+    save_page_result(run_id, failed)
+
+    stage_run_for_qa(run_id, input_pages)
+    review_qa_page(run_id, 1, "approved", None, "narrative", "normal_prose", "primary", None)
+    review_qa_page(run_id, 2, "approved", None, "toc", "structured", "primary", None)
+    approve_and_publish_run(run_id, "tester")
+
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT page_no, full_text, page_type, index_eligible FROM pages ORDER BY page_no"
+        ).fetchall()
+    assert [tuple(row) for row in rows] == [
+        (1, "本文", "narrative", 1),
+        (2, "", "toc", 0),
+    ]
+
+
+def test_failed_narrative_requires_reviewed_correction(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        failed = _passed_page(page.page_no, page.image_sha256, "誤読候補")
+        failed["state"] = "failed"
+        failed["error_message"] = "cross_engine_disagreement"
+        save_page_result(run_id, failed)
+    stage_run_for_qa(run_id, input_pages)
+
+    with pytest.raises(ValueError, match="corrected text"):
+        review_qa_page(run_id, 1, "approved", None, "narrative", "normal_prose", "primary", None)
+
+    review_qa_page(
+        run_id,
+        1,
+        "approved",
+        "Codex画像照合済み",
+        "narrative",
+        "normal_prose",
+        "codex",
+        "正しい本文",
+    )

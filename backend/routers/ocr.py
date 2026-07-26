@@ -263,7 +263,16 @@ def review_ocr_qa_page(
     request: OcrQaPageReviewRequest,
 ) -> dict:
     try:
-        review_qa_page(run_id, page_no, request.state, request.note, request.page_type)
+        review_qa_page(
+            run_id,
+            page_no,
+            request.state,
+            request.note,
+            request.page_type,
+            request.layout_type,
+            request.selected_engine,
+            request.corrected_text,
+        )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
@@ -325,6 +334,7 @@ def update_ocr_ground_truth(
             entry_id,
             reference_text=request.reference_text,
             page_type=request.page_type,
+            layout_type=request.layout_type,
             state=request.state,
             note=request.note,
         )

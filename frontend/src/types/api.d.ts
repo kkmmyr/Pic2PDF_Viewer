@@ -3195,6 +3195,28 @@ export interface components {
             server_generation?: number | null;
             /** Error Message */
             error_message?: string | null;
+            /**
+             * Layout Type
+             * @default unknown
+             * @enum {string}
+             */
+            layout_type:
+                | 'unknown'
+                | 'normal_prose'
+                | 'full_width'
+                | 'mixed_illustration'
+                | 'structured'
+                | 'image_only';
+            /** Primary Text */
+            primary_text?: string | null;
+            /** External Text */
+            external_text?: string | null;
+            /**
+             * Selected Engine
+             * @default primary
+             * @enum {string}
+             */
+            selected_engine: 'primary' | 'external';
         };
         /** OcrAgentPageSubmitRequest */
         OcrAgentPageSubmitRequest: {
@@ -3230,6 +3252,17 @@ export interface components {
              * @enum {string}
              */
             page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /**
+             * Layout Type
+             * @enum {string}
+             */
+            layout_type:
+                | 'unknown'
+                | 'normal_prose'
+                | 'full_width'
+                | 'mixed_illustration'
+                | 'structured'
+                | 'image_only';
             /** Reference Text */
             reference_text: string;
             /**
@@ -3258,6 +3291,30 @@ export interface components {
             /** Image Url */
             image_url: string;
         };
+        /** OcrGroundTruthLayoutMetricOut */
+        OcrGroundTruthLayoutMetricOut: {
+            /**
+             * Layout Type
+             * @enum {string}
+             */
+            layout_type:
+                | 'unknown'
+                | 'normal_prose'
+                | 'full_width'
+                | 'mixed_illustration'
+                | 'structured'
+                | 'image_only';
+            /** Total Count */
+            total_count: number;
+            /** Verified Count */
+            verified_count: number;
+            /** Total Edit Distance */
+            total_edit_distance: number;
+            /** Total Reference Chars */
+            total_reference_chars: number;
+            /** Aggregate Cer */
+            aggregate_cer: number | null;
+        };
         /** OcrGroundTruthListResponse */
         OcrGroundTruthListResponse: {
             /** Entries */
@@ -3274,6 +3331,8 @@ export interface components {
             aggregate_cer: number | null;
             /** Metrics By Page Type */
             metrics_by_page_type: components['schemas']['OcrGroundTruthMetricOut'][];
+            /** Metrics By Layout Type */
+            metrics_by_layout_type: components['schemas']['OcrGroundTruthLayoutMetricOut'][];
         };
         /** OcrGroundTruthMetricOut */
         OcrGroundTruthMetricOut: {
@@ -3321,6 +3380,17 @@ export interface components {
              * @enum {string}
              */
             page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /**
+             * Layout Type
+             * @enum {string}
+             */
+            layout_type:
+                | 'unknown'
+                | 'normal_prose'
+                | 'full_width'
+                | 'mixed_illustration'
+                | 'structured'
+                | 'image_only';
             /**
              * State
              * @enum {string}
@@ -3376,6 +3446,28 @@ export interface components {
              * @enum {string}
              */
             page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /**
+             * Layout Type
+             * @enum {string}
+             */
+            layout_type:
+                | 'unknown'
+                | 'normal_prose'
+                | 'full_width'
+                | 'mixed_illustration'
+                | 'structured'
+                | 'image_only';
+            /** Primary Text */
+            primary_text: string;
+            /** External Text */
+            external_text: string;
+            /**
+             * Selected Engine
+             * @enum {string}
+             */
+            selected_engine: 'primary' | 'external' | 'codex';
+            /** Corrected Text */
+            corrected_text: string | null;
             /** Index Eligible */
             index_eligible: boolean;
             /** Image Url */
@@ -3395,6 +3487,24 @@ export interface components {
              * @enum {string}
              */
             page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /**
+             * Layout Type
+             * @enum {string}
+             */
+            layout_type:
+                | 'unknown'
+                | 'normal_prose'
+                | 'full_width'
+                | 'mixed_illustration'
+                | 'structured'
+                | 'image_only';
+            /**
+             * Selected Engine
+             * @enum {string}
+             */
+            selected_engine: 'primary' | 'external' | 'codex';
+            /** Corrected Text */
+            corrected_text?: string | null;
         };
         /** OcrQaRunApproveRequest */
         OcrQaRunApproveRequest: {

@@ -40,6 +40,16 @@ const corpus: OcrGroundTruthListResponse = {
             aggregate_cer: null,
         },
     ],
+    metrics_by_layout_type: [
+        {
+            layout_type: 'unknown',
+            total_count: 1,
+            verified_count: 0,
+            total_edit_distance: 0,
+            total_reference_chars: 0,
+            aggregate_cer: null,
+        },
+    ],
     entries: [
         {
             id: 1,
@@ -47,6 +57,7 @@ const corpus: OcrGroundTruthListResponse = {
             page_no: 4,
             image_sha256: 'hash',
             page_type: 'unknown',
+            layout_type: 'unknown',
             reference_text: '',
             state: 'draft',
             note: null,
@@ -69,9 +80,10 @@ describe('OCRGroundTruthPanel', () => {
         renderPanel();
 
         expect(await screen.findByText('評価対象書籍')).toBeInTheDocument();
-        expect(screen.getAllByText('検証済み 0 / 1')).toHaveLength(2);
-        expect(screen.getAllByText('CER —')).toHaveLength(2);
+        expect(screen.getAllByText('検証済み 0 / 1')).toHaveLength(3);
+        expect(screen.getAllByText('CER —')).toHaveLength(3);
         expect(screen.getByLabelText('ページ種別ごとのOCR品質')).toHaveTextContent('未分類');
+        expect(screen.getByLabelText('レイアウトごとのOCR品質')).toHaveTextContent('未判定');
         expect(screen.getByText('OCR本文')).toBeInTheDocument();
     });
 
@@ -90,6 +102,11 @@ describe('OCRGroundTruthPanel', () => {
 
         fireEvent.change(screen.getByLabelText('正解本文'), {
             target: { value: '正しい本文' },
+        });
+        expect(verifyButton).toBeDisabled();
+
+        fireEvent.change(screen.getByLabelText('レイアウト'), {
+            target: { value: 'normal_prose' },
         });
         await waitFor(() => expect(verifyButton).toBeEnabled());
     });

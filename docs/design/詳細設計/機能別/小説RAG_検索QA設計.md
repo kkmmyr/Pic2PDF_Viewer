@@ -25,6 +25,13 @@ FTS5（BM25）とベクトル（LanceDB KNN）を Reciprocal Rank Fusion（RRF�
 
 **検索フィルタのデフォルト値**（`NOVEL_DB_MIN_BODY_CHARS` / `NOVEL_DB_BODY_PAGE_MARGIN` / `NOVEL_DB_QA_MAX_PER_BOOK` / `NOVEL_DB_QA_TOP_K` 等）は [データ設計 §2](小説RAG_データ.md)。狙いと段階拡大の経緯は [設計過程](../../../archive/小説RAG_設計過程.md)。
 
+OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`index_eligible=1`
+を検索・QA本文選択の正本とする。旧来の文字数300未満除外と先頭・末尾5ページ除外は、
+ページ種別が未整備だった時代のノイズ抑制策であり、検索・QA取得には重ねて適用しない。
+これにより章間の短文、詩、短い会話だけの本文も検索できる。目次・挿絵・広告等は
+`index_eligible=0`かつ公開本文空欄で除外する。文字数・ページ位置フィルタは、
+サマリやコンテキスト生成の処理量抑制には引き続き利用できる。
+
 ---
 
 ## 2. 検索・コンテキスト構築（`retrieval.py`）

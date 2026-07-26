@@ -565,6 +565,11 @@ class OcrQaPageOut(BaseModel):
     qa_note: str | None
     reviewed_at: str | None
     page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    layout_type: Literal["unknown", "normal_prose", "full_width", "mixed_illustration", "structured", "image_only"]
+    primary_text: str
+    external_text: str
+    selected_engine: Literal["primary", "external", "codex"]
+    corrected_text: str | None
     index_eligible: bool
     image_url: str
 
@@ -580,6 +585,9 @@ class OcrQaPageReviewRequest(BaseModel):
     state: Literal["approved", "rejected"]
     note: str | None = None
     page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    layout_type: Literal["unknown", "normal_prose", "full_width", "mixed_illustration", "structured", "image_only"]
+    selected_engine: Literal["primary", "external", "codex"]
+    corrected_text: str | None = None
 
 
 class OcrQaRunApproveRequest(BaseModel):
@@ -615,6 +623,7 @@ class OcrGroundTruthSeedResponse(BaseModel):
 class OcrGroundTruthUpdateRequest(BaseModel):
     reference_text: str | None = None
     page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    layout_type: Literal["unknown", "normal_prose", "full_width", "mixed_illustration", "structured", "image_only"]
     state: Literal["draft", "verified"]
     note: str | None = None
 
@@ -625,6 +634,7 @@ class OcrGroundTruthEntryOut(BaseModel):
     page_no: int
     image_sha256: str
     page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    layout_type: Literal["unknown", "normal_prose", "full_width", "mixed_illustration", "structured", "image_only"]
     reference_text: str
     state: Literal["draft", "verified"]
     note: str | None
@@ -648,6 +658,15 @@ class OcrGroundTruthMetricOut(BaseModel):
     aggregate_cer: float | None
 
 
+class OcrGroundTruthLayoutMetricOut(BaseModel):
+    layout_type: Literal["unknown", "normal_prose", "full_width", "mixed_illustration", "structured", "image_only"]
+    total_count: int
+    verified_count: int
+    total_edit_distance: int
+    total_reference_chars: int
+    aggregate_cer: float | None
+
+
 class OcrGroundTruthListResponse(BaseModel):
     entries: list[OcrGroundTruthEntryOut]
     total_count: int
@@ -656,6 +675,7 @@ class OcrGroundTruthListResponse(BaseModel):
     total_reference_chars: int
     aggregate_cer: float | None
     metrics_by_page_type: list[OcrGroundTruthMetricOut]
+    metrics_by_layout_type: list[OcrGroundTruthLayoutMetricOut]
 
 
 class OcrAgentClaimRequest(BaseModel):
@@ -707,6 +727,12 @@ class OcrAgentPageResultIn(BaseModel):
     attempt_count: int
     server_generation: int | None = None
     error_message: str | None = None
+    layout_type: Literal["unknown", "normal_prose", "full_width", "mixed_illustration", "structured", "image_only"] = (
+        "unknown"
+    )
+    primary_text: str | None = None
+    external_text: str | None = None
+    selected_engine: Literal["primary", "external"] = "primary"
 
 
 class OcrAgentPageSubmitRequest(BaseModel):

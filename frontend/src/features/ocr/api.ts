@@ -3,9 +3,11 @@ import { API_ENDPOINTS } from '@/config/api';
 
 import type {
     OcrGroundTruthListResponse,
+    OcrLayoutType,
     OcrPageType,
     OcrQaRunDetail,
     OcrQaRunListResponse,
+    OcrSelectedEngine,
 } from './types';
 
 export function fetchOcrQaRuns(): Promise<OcrQaRunListResponse> {
@@ -22,11 +24,17 @@ export function reviewOcrQaPage(
     state: 'approved' | 'rejected',
     note: string | null,
     pageType: OcrPageType,
+    layoutType: OcrLayoutType,
+    selectedEngine: OcrSelectedEngine,
+    correctedText: string | null,
 ): Promise<unknown> {
     return apiClient.patch(API_ENDPOINTS.OCR_QA_PAGE(runId, pageNo), {
         state,
         note,
         page_type: pageType,
+        layout_type: layoutType,
+        selected_engine: selectedEngine,
+        corrected_text: correctedText,
     });
 }
 
@@ -51,6 +59,7 @@ export function updateOcrGroundTruth(
     input: {
         reference_text: string;
         page_type: OcrPageType;
+        layout_type: OcrLayoutType;
         state: 'draft' | 'verified';
         note: string | null;
     },

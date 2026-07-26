@@ -172,6 +172,11 @@ class OcrPageResult(SQLModel, table=True):
     qa_note: str | None = None
     reviewed_at: str | None = None
     page_type: str = "unknown"
+    layout_type: str = "unknown"
+    primary_text: str | None = None
+    external_text: str | None = None
+    selected_engine: str = "primary"
+    corrected_text: str | None = None
     index_eligible: bool = False
 
 
@@ -197,6 +202,7 @@ class OcrGroundTruthPage(SQLModel, table=True):
     page_no: int
     image_sha256: str
     page_type: str = "unknown"
+    layout_type: str = "unknown"
     reference_text: str | None = None
     state: str = "draft"
     note: str | None = None

@@ -53,6 +53,8 @@ class TestRetrieveFullBookMode:
             result = retrieve(db_conn, "質問", Scope("book", "b1"))
 
         mock_load.assert_called_once()
+        assert mock_load.call_args.kwargs["min_chars"] == 0
+        assert mock_load.call_args.kwargs["body_page_margin"] == 0
         mock_hybrid.assert_not_called()
         assert result.hits == expected_hits
         assert result.book_summaries is None
@@ -100,6 +102,8 @@ class TestRetrieveNormalRAG:
             result = retrieve(db_conn, "Q", Scope("all"))
 
         mock_hybrid.assert_called_once()
+        assert mock_hybrid.call_args.kwargs["min_chars"] == 0
+        assert mock_hybrid.call_args.kwargs["body_page_margin"] == 0
         assert result.hits == [hit]
 
     def test_scope_book_returns_no_book_summaries(self, db_conn, monkeypatch):

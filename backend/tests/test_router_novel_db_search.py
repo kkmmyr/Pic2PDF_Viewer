@@ -20,8 +20,7 @@ def _stub_embed(texts):
 def search_setup(tmp_data_dir, monkeypatch):
     """検索可能な小さな DB を作って embed_batch をスタブする。
 
-    NOVEL_DB_BODY_PAGE_MARGIN=5 でフィルタされても本文ページが残るよう、
-    page_count=15 で先頭 5 / 末尾 5 を除いた中央 5 ページに本文を配置する。
+    短い本文も含め、index_eligible を検索対象判定の正本として検証する。
     """
     upgrade_head()
     with with_db() as conn:
@@ -33,11 +32,14 @@ def search_setup(tmp_data_dir, monkeypatch):
         book_id = cur.lastrowid
         body_text_a = "デュークはレティの新しい騎士である。" * 20  # 約 360 字
         body_text_b = "アストリッドは元暗殺者だった。デュークの後輩。" * 18  # 約 360 字
+        short_body = "春の花より莉杏の笑顔が美しい。"
         filler = "あ" * 320  # クエリと無関係な本文相当（min_chars 通過、検索ヒットしない）
 
         lance_table = get_chunks_table()
         for i in range(1, 16):
-            if i == 7:
+            if i == 2:
+                text = short_body
+            elif i == 7:
                 text = body_text_a
             elif i == 8:
                 text = body_text_b
@@ -106,6 +108,15 @@ def test_post_search_pagination_offset_limit(client, search_setup):
     body1 = res1.json()
     assert body1["limit"] == 1
     assert len(body1["hits"]) <= 1
+
+
+def test_post_search_includes_short_index_eligible_page(client, search_setup):
+    res = client.post(
+        "/api/novel_db/search",
+        json={"query": "春の花より莉杏の笑顔", "scope": {"type": "book", "id": "book-1"}},
+    )
+    assert res.status_code == 200
+    assert any(hit["page_no"] == 2 for hit in res.json()["hits"])
 
 
 def test_post_search_validation_empty_query(client, search_setup):

@@ -141,6 +141,27 @@ def test_update_detail_overwrites_previous_value(queue):
     assert row[0] == "second"
 
 
+def test_update_detail_skips_locked_database_without_failing_job(queue):
+    """本処理の書込み中は補助的なdetail更新だけを即時に省略する。"""
+    job_id, _ = queue.enqueue("book", "locked")
+    with with_db() as locker:
+        locker.execute("BEGIN IMMEDIATE")
+        locker.execute(
+            "UPDATE rebuild_jobs SET state='running', started_at=datetime('now') WHERE id = ?",
+            (job_id,),
+        )
+
+        queue._worker._update_detail(job_id, "embedding 0/10 チャンク")
+
+        row = locker.execute(
+            "SELECT current_detail FROM rebuild_jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+        assert row is not None
+        assert row[0] is None
+        locker.rollback()
+
+
 def test_generate_relations_loads_series_index_once(queue):
     """複数書籍の関係生成でもnovelメタは1回だけ索引化する。"""
     worker = queue._worker

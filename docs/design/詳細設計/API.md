@@ -106,13 +106,13 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 - **OCR停止APIの対象範囲**: `POST /api/ocr/stop` は、`rebuild_jobs` で `mode="ocr"` かつ `state="queued"` の待機中ジョブをすべてキャンセルする。実行中のOCRジョブ、OCR worker、workerが所有する`llama-server`は停止しない。待機中OCRジョブが1件もない場合は `400 Bad Request`（`{"detail":"No queued OCR jobs to cancel"}`）を返す。エンドポイント名は後方互換のため`stop`だが、実行中処理の停止APIではない。
 - **OCR QA API**:
   - `GET /api/ocr/qa/runs`: `awaiting_qa`を中心にrun一覧と要確認・承認・却下ページ数を返す。
-  - `GET /api/ocr/qa/runs/{run_id}`: run情報とページ番号、OCR状態、QA状態、本文、品質フラグ、ページ種別、索引対象、画像URLを返す。
+  - `GET /api/ocr/qa/runs/{run_id}`: run情報とページ番号、OCR状態、QA状態、採用本文、Surya・yomitoku候補、補正文、品質フラグ、ページ種別、レイアウト種別、採用エンジン、索引対象、画像URLを返す。
   - `GET /api/ocr/qa/runs/{run_id}/pages/{page_no}/image`: runの書籍名から登録済み画像ディレクトリ内の数値PNGだけを返す。任意パスは受け取らない。
   - `POST /api/ocr/qa/runs/{run_id}/classify-pages`: `unknown`ページだけへ決定論的な種別候補を設定し、未確定ページをQA必須にする。
-  - `PATCH /api/ocr/qa/runs/{run_id}/pages/{page_no}`: `approved`または`rejected`、確定ページ種別、任意メモを保存する。
-  - `POST /api/ocr/qa/runs/{run_id}/approve`: `required`ページの全承認、却下・`unknown`各0件、全入力画像SHA一致を検証後にOCR本文を公開する。未充足は`409 Conflict`とする。
+  - `PATCH /api/ocr/qa/runs/{run_id}/pages/{page_no}`: `approved`または`rejected`、確定ページ種別、確定レイアウト種別、採用エンジン、任意の画像照合済み補正文・メモを保存する。OCR失敗した本文の承認は非空補正文を必須とする。
+  - `POST /api/ocr/qa/runs/{run_id}/approve`: `required`ページの全承認、却下・未分類各0件、本文ページの有効な採用本文、全入力画像SHA一致を検証後に公開する。非本文ページは画像だけを公開し、OCR候補を検索索引へ流さない。未充足は`409 Conflict`とする。
 - **OCR正解コーパスAPI**:
-  - `GET /api/ocr/ground-truth`: 登録標本、OCR本文、人手正解、状態、ページ種別、ページ別CER、全verified標本の加重CER、ページ種別ごとの件数・正解文字数・加重CERを返す。
+  - `GET /api/ocr/ground-truth`: 登録標本、OCR本文、人手正解、状態、ページ種別、レイアウト種別、ページ別CER、全verified標本の加重CER、ページ種別・レイアウト種別ごとの件数・正解文字数・加重CERを返す。
   - `POST /api/ocr/ground-truth/seed`: 登録済みrun ID・画面番号の組だけを標本へ追加する。画像SHAとOCR本文はサーバー側正本から取得する。
   - `PATCH /api/ocr/ground-truth/{entry_id}`: 人手正解、ページ種別、`draft` / `verified`、メモを保存する。`verified`は非空正解・確定種別・画像SHA一致を必須とする。
 - **Windows OCR agent API**: 既存capture agentと同じ`X-Capture-Agent-Token`を定数時間比較する。`OCR_AGENT_ENABLED=false`または共有トークン未設定では503とする。

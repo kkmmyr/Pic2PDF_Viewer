@@ -12,6 +12,7 @@ from utils.path_utils import resolve_under_base, validate_safe_name
 
 from .connection import with_db
 from .extractor import OcrPageResult, OcrTask
+from .ocr_layout_types import suggest_layout_type, validate_layout_type
 from .ocr_page_types import is_index_eligible, suggest_page_type, validate_page_type
 
 _QA_AUDIT_ONLY_FLAGS = frozenset(
@@ -114,8 +115,10 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
             INSERT INTO ocr_page_results (
                 run_id, page_no, image_sha256, state, full_text, char_count,
                 raw_output, block_count, quality_flags_json, ink_coverage,
-                attempt_count, error_message, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '+9 hours'))
+                attempt_count, error_message, layout_type, primary_text,
+                external_text, selected_engine, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                      datetime('now', '+9 hours'))
             ON CONFLICT(run_id, page_no) DO UPDATE SET
                 image_sha256 = excluded.image_sha256,
                 state = excluded.state,
@@ -127,6 +130,11 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 ink_coverage = excluded.ink_coverage,
                 attempt_count = excluded.attempt_count,
                 error_message = excluded.error_message,
+                layout_type = excluded.layout_type,
+                primary_text = excluded.primary_text,
+                external_text = excluded.external_text,
+                selected_engine = excluded.selected_engine,
+                corrected_text = NULL,
                 updated_at = excluded.updated_at
             """,
             (
@@ -142,6 +150,10 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 page["ink_coverage"],
                 page["attempt_count"],
                 page.get("error_message"),
+                page.get("layout_type", "unknown"),
+                page.get("primary_text"),
+                page.get("external_text"),
+                page.get("selected_engine", "primary"),
             ),
         )
         conn.commit()
@@ -156,11 +168,11 @@ def mark_run_failed(run_id: int, error: str) -> None:
         conn.commit()
 
 
-def _validate_passed_run(
+def _validate_complete_run(
     run_id: int,
     input_pages: list[OcrInputPage],
 ) -> tuple[str, list]:
-    """Validate source immutability and return the complete passed page rows."""
+    """Validate source immutability and return all durable page rows."""
     expected_hashes = {page.page_no: page.image_sha256 for page in input_pages}
     for page in input_pages:
         with page.image_path.open("rb") as image_file:
@@ -180,7 +192,7 @@ def _validate_passed_run(
 
         rows = conn.execute(
             "SELECT page_no, image_sha256, state, full_text, char_count, error_message, quality_flags_json, "
-            "page_type, index_eligible "
+            "page_type, index_eligible, layout_type, primary_text, external_text, selected_engine, corrected_text "
             "FROM ocr_page_results WHERE run_id = ? ORDER BY page_no",
             (run_id,),
         ).fetchall()
@@ -188,9 +200,6 @@ def _validate_passed_run(
             raise ValueError(f"OCR run is incomplete: {len(rows)}/{len(input_pages)} pages")
         for row in rows:
             page_no = int(row[0])
-            if row[2] != "passed":
-                detail = f", {row[5]}" if row[5] else ""
-                raise ValueError(f"OCR quality gate failed on page {page_no}: state={row[2]}{detail}")
             if expected_hashes.get(page_no) != row[1]:
                 raise ValueError(f"source image changed during OCR: page {page_no}")
     return book_name, rows
@@ -207,7 +216,8 @@ def classify_run_pages(run_id: int, *, overwrite: bool = False) -> dict[str, int
             raise LookupError(f"OCR run not found: {run_id}")
         page_count = int(run[0])
         rows = conn.execute(
-            "SELECT page_no, full_text, char_count, page_type FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
+            "SELECT page_no, full_text, char_count, page_type, raw_output, layout_type "
+            "FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
             (run_id,),
         ).fetchall()
         counts = {page_type: 0 for page_type in ("unknown", "narrative", "toc", "illustration", "colophon_or_ad")}
@@ -225,9 +235,22 @@ def classify_run_pages(run_id: int, *, overwrite: bool = False) -> dict[str, int
                     else validate_page_type(current_type)
                 )
                 counts[page_type] += 1
+                current_layout = str(row[5] or "unknown")
+                suggested_layout = suggest_layout_type(
+                    raw_output=str(row[4] or ""),
+                    full_text=str(row[1] or ""),
+                    char_count=int(row[2] or 0),
+                    page_type=page_type,
+                )
+                layout_type = (
+                    suggested_layout
+                    if page_type != "narrative" or overwrite or current_layout == "unknown"
+                    else validate_layout_type(current_layout)
+                )
                 conn.execute(
-                    "UPDATE ocr_page_results SET page_type=?, index_eligible=? WHERE run_id=? AND page_no=?",
-                    (page_type, is_index_eligible(page_type), run_id, int(row[0])),
+                    "UPDATE ocr_page_results SET page_type=?, layout_type=?, index_eligible=? "
+                    "WHERE run_id=? AND page_no=?",
+                    (page_type, layout_type, is_index_eligible(page_type), run_id, int(row[0])),
                 )
             conn.execute(
                 "UPDATE ocr_page_results SET qa_state='required', qa_note=NULL, reviewed_at=NULL "
@@ -238,8 +261,8 @@ def classify_run_pages(run_id: int, *, overwrite: bool = False) -> dict[str, int
 
 
 def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
-    """Move a fully passed OCR run to QA without publishing canonical text."""
-    _, rows = _validate_passed_run(run_id, input_pages)
+    """Move a complete OCR run to QA without publishing canonical text."""
+    _, rows = _validate_complete_run(run_id, input_pages)
     classify_run_pages(run_id)
     flagged_pages = {int(row[0]) for row in rows if set(json.loads(str(row[6]))) - _QA_AUDIT_ONLY_FLAGS}
     page_count = len(input_pages)
@@ -260,6 +283,11 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
                 (run_id,),
             )
             conn.execute(
+                "UPDATE ocr_page_results SET qa_state='required' "
+                "WHERE run_id=? AND (state!='passed' OR layout_type!='normal_prose')",
+                (run_id,),
+            )
+            conn.execute(
                 "UPDATE ocr_runs SET state='awaiting_qa', qa_state='pending', finished_at=NULL, "
                 "error_message=NULL, qa_reviewer=NULL, qa_reviewed_at=NULL, qa_note=NULL WHERE id=?",
                 (run_id,),
@@ -272,22 +300,58 @@ def review_qa_page(
     state: str,
     note: str | None,
     page_type: str,
+    layout_type: str,
+    selected_engine: str,
+    corrected_text: str | None,
 ) -> None:
     if state not in {"approved", "rejected"}:
         raise ValueError("QA page state must be approved or rejected")
     validate_page_type(page_type)
+    validate_layout_type(layout_type)
+    if selected_engine not in {"primary", "external", "codex"}:
+        raise ValueError("selected engine must be primary, external, or codex")
     if state == "approved" and page_type == "unknown":
         raise ValueError("page type must be classified before approval")
+    if state == "approved" and layout_type == "unknown":
+        raise ValueError("layout type must be classified before approval")
     with with_db() as conn:
         run = conn.execute("SELECT state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
         if run is None:
             raise LookupError(f"OCR run not found: {run_id}")
         if run[0] != "awaiting_qa":
             raise ValueError("OCR run is not awaiting QA")
+        page = conn.execute(
+            "SELECT state, full_text, primary_text, external_text FROM ocr_page_results WHERE run_id=? AND page_no=?",
+            (run_id, page_no),
+        ).fetchone()
+        if page is None:
+            raise LookupError(f"OCR page not found: run={run_id}, page={page_no}")
+        corrected = corrected_text if corrected_text is None else corrected_text.strip()
+        if state == "approved" and page_type == "narrative":
+            if page[0] != "passed" and not corrected:
+                raise ValueError("failed narrative OCR requires reviewed corrected text")
+            selected_text = {
+                "primary": str(page[2] or page[1] or ""),
+                "external": str(page[3] or ""),
+                "codex": str(corrected or ""),
+            }[selected_engine]
+            if not selected_text.strip():
+                raise ValueError("selected narrative text is empty")
         cursor = conn.execute(
-            "UPDATE ocr_page_results SET qa_state=?, qa_note=?, page_type=?, index_eligible=?, "
+            "UPDATE ocr_page_results SET qa_state=?, qa_note=?, page_type=?, layout_type=?, "
+            "selected_engine=?, corrected_text=?, index_eligible=?, "
             "reviewed_at=datetime('now', '+9 hours') WHERE run_id=? AND page_no=?",
-            (state, note, page_type, is_index_eligible(page_type), run_id, page_no),
+            (
+                state,
+                note,
+                page_type,
+                layout_type,
+                selected_engine,
+                corrected,
+                is_index_eligible(page_type),
+                run_id,
+                page_no,
+            ),
         )
         if cursor.rowcount != 1:
             raise LookupError(f"OCR page not found: run={run_id}, page={page_no}")
@@ -340,7 +404,8 @@ def get_qa_run(run_id: int) -> dict:
         pages = conn.execute(
             "SELECT page_no, state, qa_state, full_text, char_count, quality_flags_json, "
             "ink_coverage, attempt_count, error_message, qa_note, reviewed_at, "
-            "page_type, index_eligible "
+            "page_type, index_eligible, layout_type, primary_text, external_text, "
+            "selected_engine, corrected_text "
             "FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
             (run_id,),
         ).fetchall()
@@ -377,6 +442,11 @@ def get_qa_run(run_id: int) -> dict:
                 "reviewed_at": row[10],
                 "page_type": str(row[11] or "unknown"),
                 "index_eligible": bool(row[12]),
+                "layout_type": str(row[13] or "unknown"),
+                "primary_text": str(row[14] or row[3] or ""),
+                "external_text": str(row[15] or ""),
+                "selected_engine": str(row[16] or "primary"),
+                "corrected_text": row[17],
                 "image_url": f"/api/ocr/qa/runs/{run_id}/pages/{int(row[0])}/image",
             }
             for row in pages
@@ -418,7 +488,8 @@ def approve_and_publish_run(run_id: int, reviewer: str, note: str | None = None)
             "SELECT "
             "SUM(CASE WHEN qa_state='required' THEN 1 ELSE 0 END), "
             "SUM(CASE WHEN qa_state='rejected' THEN 1 ELSE 0 END), "
-            "SUM(CASE WHEN page_type='unknown' THEN 1 ELSE 0 END) "
+            "SUM(CASE WHEN page_type='unknown' THEN 1 ELSE 0 END), "
+            "SUM(CASE WHEN layout_type='unknown' THEN 1 ELSE 0 END) "
             "FROM ocr_page_results WHERE run_id=?",
             (run_id,),
         ).fetchone()
@@ -428,10 +499,25 @@ def approve_and_publish_run(run_id: int, reviewer: str, note: str | None = None)
             raise ValueError("rejected QA pages remain")
         if int(counts[2] or 0) > 0:
             raise ValueError("unclassified OCR pages remain")
+        if int(counts[3] or 0) > 0:
+            raise ValueError("unclassified OCR layouts remain")
         book_name = str(run[0])
 
     input_pages = collect_input_pages(book_name)
-    book_name, rows = _validate_passed_run(run_id, input_pages)
+    book_name, rows = _validate_complete_run(run_id, input_pages)
+    for row in rows:
+        if row[7] != "narrative":
+            continue
+        corrected_text = str(row[13] or "")
+        if row[2] != "passed" and not corrected_text.strip():
+            raise ValueError(f"failed narrative OCR requires reviewed corrected text: page {int(row[0])}")
+        selected_text = {
+            "primary": str(row[10] or row[3] or ""),
+            "external": str(row[11] or ""),
+            "codex": corrected_text,
+        }.get(str(row[12]), "")
+        if not selected_text.strip():
+            raise ValueError(f"selected narrative text is empty: page {int(row[0])}")
     _publish_rows(run_id, book_name, rows, input_pages, reviewer, note)
 
 
@@ -469,6 +555,13 @@ def _publish_rows(
             for row in rows:
                 page_no = int(row[0])
                 image_path = input_pages[page_no - 1].image_path
+                page_type = str(row[7])
+                selected_text = {
+                    "primary": str(row[10] or row[3] or ""),
+                    "external": str(row[11] or ""),
+                    "codex": str(row[13] or ""),
+                }.get(str(row[12]), "")
+                published_text = selected_text if page_type == "narrative" else ""
                 conn.execute(
                     """
                     INSERT INTO pages (
@@ -487,9 +580,9 @@ def _publish_rows(
                         book_id,
                         page_no,
                         str(image_path),
-                        row[3] or "",
-                        int(row[4] or 0),
-                        str(row[7]),
+                        published_text,
+                        len(published_text),
+                        page_type,
                         bool(row[8]),
                     ),
                 )
