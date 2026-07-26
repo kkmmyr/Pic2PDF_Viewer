@@ -10,6 +10,7 @@ HTTP 層のフロー（パラメータ伝達・例外マッピング・ロック
 """
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -214,7 +215,13 @@ class TestPostWatchlist:
         res = client.post("/api/hitomi/watchlist", json={"display_name": "Alice"})
         assert res.status_code == 400
 
-    def test_succeeds_even_if_top_id_init_fails(self, client, hitomi_data_dir, monkeypatch):
+    def test_succeeds_even_if_top_id_init_fails(
+        self,
+        client,
+        hitomi_data_dir,
+        monkeypatch,
+        caplog,
+    ):
         """top_id 初期化（NOZOMI 取得）が失敗しても登録自体は成功する。"""
         from services.hitomi import nozomi
 
@@ -223,8 +230,10 @@ class TestPostWatchlist:
 
         monkeypatch.setattr("routers.hitomi.nozomi.fetch_nozomi_head", _fetch)
 
-        res = client.post("/api/hitomi/watchlist", json={"display_name": "Alice"})
+        with caplog.at_level(logging.WARNING, logger="routers.hitomi"):
+            res = client.post("/api/hitomi/watchlist", json={"display_name": "Alice"})
         assert res.status_code == 200
+        assert any("top_id 初期化スキップ" in record.message for record in caplog.records)
 
 
 # ---------------------------------------------------------------------------

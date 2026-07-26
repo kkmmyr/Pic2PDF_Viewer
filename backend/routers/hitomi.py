@@ -4,7 +4,6 @@
 監視状態は hitomi/ 配下の JSON、検出作品と既読履歴は meta2.db に保存する。
 """
 
-import logging
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -25,8 +24,9 @@ from routers.api_schemas import (
 )
 from services.hitomi import arrival_store, nozomi, state_store, watchlist
 from tools import hitomi_monitor
+from utils.logger import get_logger
 
-_log = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -113,7 +113,7 @@ def post_watchlist(req: AddWatchlistRequest) -> dict:
             state.setdefault("artists", {})[key] = {"top_id": ids[0]}
             state_store.save_state(DATA_DIR, state)
     except nozomi.HitomiError as e:
-        _log.warning("top_id 初期化スキップ（NOZOMI 取得失敗）: %s / %s", key, e)
+        logger.warning("top_id 初期化スキップ（NOZOMI 取得失敗）: %s / %s", key, e)
 
     return {"message": "Added", "normalized": entry["normalized"]}
 
