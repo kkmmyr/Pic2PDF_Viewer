@@ -1,0 +1,5 @@
+{
+  "backend/services/kindle_catalog/enrichment_imports.py": 477,
+  "backend/services/novel_db/ocr_worker.py": 422,
+  "backend/services/novel_db/surya_runtime.py": 532
+}

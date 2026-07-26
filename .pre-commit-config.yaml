@@ -44,6 +44,27 @@ repos:
         files: ^(backend/.*\.py|kindle-pdf/.*\.py|scripts/maintenance/(check_c901_ratchet\.py|c901_baseline\.json))$
         pass_filenames: false
 
+      - id: code-size-ratchet
+        name: code-size-ratchet (production codeの新規肥大化・既存悪化を防止)
+        entry: uv run python scripts/maintenance/check_code_size.py
+        language: system
+        files: ^(backend/.*\.py|kindle-pdf/.*\.py|frontend/src/.*\.(ts|tsx)|scripts/maintenance/(check_code_size\.py|code_size_baseline\.json))$
+        pass_filenames: false
+
+      - id: openapi-contract
+        name: openapi-contract (意図しないAPI契約差分を防止)
+        entry: uv run python scripts/maintenance/check_openapi_contract.py
+        language: system
+        files: ^(backend/.*\.py|scripts/maintenance/(check_openapi_contract\.py|openapi_baseline\.json))$
+        pass_filenames: false
+
+      - id: import-boundaries
+        name: import-boundaries (backend・frontend・Kindleの依存逆転を防止)
+        entry: uv run python scripts/maintenance/check_import_boundaries.py
+        language: system
+        files: ^(backend/.*\.py|kindle-pdf/.*\.py|frontend/src/.*\.(ts|tsx)|scripts/maintenance/check_import_boundaries\.py)$
+        pass_filenames: false
+
   # --- Secrets: commit 対象のハードコード済み秘密情報を検出 ---
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1

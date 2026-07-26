@@ -58,3 +58,12 @@ CIの復旧後、品質ゲートを次の3系統へ拡張した。
 - 期限・理由付きallowlistを検証するラッパー経由の `uv audit --locked`
 
 GPU依存の既知脆弱性は無期限に黙殺せず、期限切れをCI失敗にする。即時更新可能な通常依存はallowlistへ入れず更新で解消する。
+
+## 2026-07-27 追補: 構造・契約ラチェット
+
+backend CIとpre-commitへ、production code規模、C901、OpenAPI契約、import方向の
+blocking検査を追加した。既存負債は機械可読baselineへ固定し、新規違反と悪化だけを
+失敗させる。設計書の800行上限は既存警告0件を基準にblockingへ移行した。
+
+月次の横断確認は`monthly_health_audit.py`へ集約し、CIで常時検査する項目と
+未使用依存・完了計画残存の定期確認を同じコマンドから実行する。

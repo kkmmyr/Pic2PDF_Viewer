@@ -1,6 +1,6 @@
 # API 仕様
 
-> status: living | last-verified: 2026-07-26
+> status: living | last-verified: 2026-07-27
 
 バックエンド (FastAPI) が提供する API のリファレンス方針と、OpenAPI では表現できない設計意図をまとめる。
 
@@ -148,3 +148,17 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 ## OpenAPI がフロントエンドの型ソースであることの裏付け
 
 `frontend/package.json` の `generate:types` スクリプト（`openapi-typescript http://localhost:8766/openapi.json -o src/types/api.d.ts`）が、`/openapi.json` を型定義の正として自動生成している。バックエンドの `response_model` / Pydantic スキーマを変更すれば、この文書を編集しなくても型は追従する。
+
+## OpenAPI契約ラチェット
+
+`uv run python scripts/maintenance/check_openapi_contract.py`は、`backend/main.py`の
+FastAPIアプリからschemaを生成・正規化し、レビュー済みの
+`scripts/maintenance/openapi_baseline.json`と比較する。CIとpre-commitでは差分を
+blockingにする。
+
+APIを意図して変更する場合は次を同じ変更単位で行う。
+
+1. `uv run python scripts/maintenance/check_openapi_contract.py --update`
+2. `frontend`の`npm run generate:types`
+3. baselineと生成型の差分、関連設計、互換性をレビュー
+4. backend / frontendテストを実行

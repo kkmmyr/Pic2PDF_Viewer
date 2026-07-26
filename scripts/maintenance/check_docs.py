@@ -6,7 +6,7 @@ check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツー�
   Rule 1: docs 間の相対 Markdown リンク切れ
   Rule 2: メインの変更履歴.md の行数肥大化（週次ローテーション漏れ）
   Rule 3: mkdocs.yml の nav ツリーとの同期（dead entry / orphan ファイル）
-  Rule 4: design/ 各 spec 文書のサイズ超過（warn・非ブロック）
+  Rule 4: design/ 各 spec 文書のサイズ超過（ブロッキング）
   Rule 5: design/ 各 spec 文書の status ヘッダ欠落（ブロッキング）
   Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ（ブロッキング）
 
@@ -37,8 +37,8 @@ MKDOCS_YML = PROJECT_ROOT / "mkdocs.yml"
 # 変更履歴/YYYY-Www.md にローテーションするよう促す
 CHANGELOG_LINE_LIMIT = 800
 
-# Rule 4: design/ の spec 文書がこの行数を超えたら warn（非ブロック）。
-# 超過はまず「設計過程・歴史が本文に混ざっていないか」を疑う（分割・凍結は次善）。
+# Rule 4: design/ の spec 文書がこの行数を超えたらブロックする。
+# 既存超過0件を基準線とし、設計過程・歴史の分離または責務単位の分割を求める。
 DESIGN_DOC_LINE_LIMIT = 800
 
 MD_LINK_RE = re.compile(r"\[(?:[^\]]*)\]\(([^)#\s][^)]*)\)")
@@ -134,7 +134,9 @@ def check_changelog_size() -> list[str]:
     のみで探すため、移行フェーズでバケットが変わっても動作し続ける。
     """
     violations: list[str] = []
-    candidates = [p for p in DOCS_DIR.rglob("変更履歴.md") if p.parent.name != "変更履歴"]
+    candidates = [
+        p for p in DOCS_DIR.rglob("変更履歴.md") if p.parent.name != "変更履歴"
+    ]
     for p in sorted(candidates):
         rel = p.relative_to(PROJECT_ROOT)
         line_count = len(p.read_text(encoding="utf-8", errors="replace").splitlines())
@@ -162,7 +164,9 @@ def _ignore_python_tag(loader: yaml.Loader, suffix: str, node: yaml.Node) -> Non
     return None
 
 
-_LenientYamlLoader.add_multi_constructor("tag:yaml.org,2002:python/name:", _ignore_python_tag)
+_LenientYamlLoader.add_multi_constructor(
+    "tag:yaml.org,2002:python/name:", _ignore_python_tag
+)
 
 
 def _load_mkdocs_nav() -> list:
@@ -229,7 +233,9 @@ def check_nav_sync() -> list[str]:
     for p in nav_paths:
         resolved = DOCS_DIR / p
         if not resolved.exists():
-            violations.append(f"[dead nav entry] mkdocs.yml nav -> {p} (ファイルが存在しません)")
+            violations.append(
+                f"[dead nav entry] mkdocs.yml nav -> {p} (ファイルが存在しません)"
+            )
 
     # (b) orphans
     nav_path_set = {Path(p).as_posix() for p in nav_paths}
@@ -248,7 +254,7 @@ def check_nav_sync() -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Rule 4 / 5: design/ spec 文書のサイズ番犬（warn）と status ヘッダ（fail）
+# Rule 4 / 5: design/ spec 文書のサイズ上限と status ヘッダ（ともにfail）
 # ---------------------------------------------------------------------------
 
 
@@ -267,17 +273,19 @@ def _iter_design_docs():
 
 
 def check_design_doc_size() -> list[str]:
-    """Rule 4（warn・非ブロック）: design/ の spec 文書が上限行数を超えていないか。"""
-    warnings: list[str] = []
+    """Rule 4（fail・ブロック）: design/ の spec 文書が上限行数を超えていないか。"""
+    violations: list[str] = []
     for md_file in _iter_design_docs():
         rel = md_file.relative_to(PROJECT_ROOT)
-        line_count = len(md_file.read_text(encoding="utf-8", errors="replace").splitlines())
+        line_count = len(
+            md_file.read_text(encoding="utf-8", errors="replace").splitlines()
+        )
         if line_count > DESIGN_DOC_LINE_LIMIT:
-            warnings.append(
-                f"{rel}: {line_count} 行（目安 {DESIGN_DOC_LINE_LIMIT} 行超）"
-                f" -> まず設計過程・歴史の混在を疑い、必要なら分割/凍結を検討"
+            violations.append(
+                f"{rel}: {line_count} 行（上限 {DESIGN_DOC_LINE_LIMIT} 行超）"
+                f" -> 設計過程・歴史を分離し、責務単位で分割/凍結してください"
             )
-    return warnings
+    return violations
 
 
 def check_design_headers() -> list[str]:
@@ -327,11 +335,17 @@ def check_file_map_annotations() -> list[str]:
 
         lines = md_file.read_text(encoding="utf-8", errors="replace").splitlines()
         section_start = next(
-            (i for i, line in enumerate(lines) if line.strip() == FILE_MAP_SECTION_HEADING),
+            (
+                i
+                for i, line in enumerate(lines)
+                if line.strip() == FILE_MAP_SECTION_HEADING
+            ),
             None,
         )
         if section_start is None:
-            violations.append(f"{rel_file}: 「{FILE_MAP_SECTION_HEADING}」セクションが見つかりません")
+            violations.append(
+                f"{rel_file}: 「{FILE_MAP_SECTION_HEADING}」セクションが見つかりません"
+            )
             continue
 
         # 次の `## ` 見出し（なければ末尾）までがセクション範囲
@@ -366,7 +380,7 @@ def main() -> None:
     broken_links, frozen_link_info = check_broken_links()
     changelog_over = check_changelog_size()
     nav_violations = check_nav_sync()
-    size_warnings = check_design_doc_size()
+    size_violations = check_design_doc_size()
     header_missing = check_design_headers()
     file_map_violations = check_file_map_annotations()
 
@@ -383,21 +397,25 @@ def main() -> None:
             print(f"  [info] {line}")
     print()
 
-    print(f"[Rule 2] 変更履歴.md 行数超過 (> {CHANGELOG_LINE_LIMIT} 行): {len(changelog_over)} 件")
+    print(
+        f"[Rule 2] 変更履歴.md 行数超過 (> {CHANGELOG_LINE_LIMIT} 行): {len(changelog_over)} 件"
+    )
     for line in changelog_over:
         print(f"  {line}")
     print()
 
-    print(f"[Rule 3] mkdocs.yml nav 同期 (dead entry / orphan): {len(nav_violations)} 件")
+    print(
+        f"[Rule 3] mkdocs.yml nav 同期 (dead entry / orphan): {len(nav_violations)} 件"
+    )
     for line in nav_violations:
         print(f"  {line}")
     print()
 
     print(
         f"[Rule 4] design/ 文書サイズ (> {DESIGN_DOC_LINE_LIMIT} 行): "
-        f"{len(size_warnings)} 件 [warn・非ブロック]"
+        f"{len(size_violations)} 件 [blocking]"
     )
-    for line in size_warnings:
+    for line in size_violations:
         print(f"  {line}")
     print()
 
@@ -411,21 +429,18 @@ def main() -> None:
         print(f"  {line}")
     print()
 
-    # Rule 4 は warn のため合計には数えない（Rule 1/2/3/5/6 のみブロッキング）。
     total = (
         len(broken_links)
         + len(changelog_over)
         + len(nav_violations)
+        + len(size_violations)
         + len(header_missing)
         + len(file_map_violations)
     )
     if total == 0:
-        if size_warnings:
-            print(f"ブロッキング違反なし（Rule 4 の warn が {len(size_warnings)} 件あります）。")
-        else:
-            print("違反なし。")
+        print("違反なし。")
         sys.exit(0)
-    print(f"合計 {total} 件のブロッキング違反を検出しました（Rule 4 warn は除く）。")
+    print(f"合計 {total} 件のブロッキング違反を検出しました。")
     sys.exit(1)
 
 
