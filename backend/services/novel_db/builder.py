@@ -139,11 +139,12 @@ def rebuild_from_pages(
     book_id = book_row[0]
 
     pages_rows = conn.execute(
-        "SELECT id, full_text, char_count, page_no FROM pages WHERE book_id = ? ORDER BY page_no",
+        "SELECT id, full_text, char_count, page_no FROM pages "
+        "WHERE book_id = ? AND index_eligible = 1 ORDER BY page_no",
         (book_id,),
     ).fetchall()
     if not pages_rows:
-        raise ValueError(f"no pages found (run OCR first): {book_name}")
+        raise ValueError(f"no index-eligible narrative pages found: {book_name}")
 
     logger.info("rebuild_from_pages start: %s (pages=%d)", book_name, len(pages_rows))
 

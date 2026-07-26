@@ -17,7 +17,7 @@ from .builder import rebuild_from_pages
 from .connection import with_db
 from .extractor import iter_ocr_pages
 from .full_builder import build_book_contexts, build_book_full
-from .ocr_staging import collect_input_pages, mark_run_failed, prepare_run, publish_run, save_page_result
+from .ocr_staging import collect_input_pages, mark_run_failed, prepare_run, save_page_result, stage_run_for_qa
 from .relation_extractor import generate_book_relations
 from .series_meta import book_names_for_series, load_book_series_ids
 
@@ -125,7 +125,8 @@ class NovelDbJobWorker:
         with with_db() as conn:
             row = conn.execute(
                 "SELECT id, job_type, target_id, mode FROM rebuild_jobs "
-                "WHERE state='queued' ORDER BY enqueued_at LIMIT 1"
+                "WHERE state='queued' AND NOT (mode='ocr' AND ?) ORDER BY enqueued_at LIMIT 1",
+                (config.app_settings.OCR_AGENT_ENABLED,),
             ).fetchone()
             if row is None:
                 return None
@@ -195,7 +196,27 @@ class NovelDbJobWorker:
                 tasks.extend(pending_tasks)
 
             try:
-                for book_name, page in iter_ocr_pages(tasks):
+
+                def _ocr_progress(progress: dict) -> None:
+                    book = progress.get("book_name")
+                    page_no = progress.get("page_no")
+                    total_pages = progress.get("total_pages")
+                    generation = progress.get("server_generation")
+                    attempt = progress.get("attempt_count")
+                    parts = [str(progress.get("stage", "ocr"))]
+                    if book:
+                        parts.append(str(book))
+                    if page_no is not None:
+                        parts.append(f"page {page_no}/{total_pages or '?'}")
+                    if attempt is not None:
+                        parts.append(f"attempt {attempt}")
+                    if generation is not None:
+                        parts.append(f"server {generation}")
+                    if progress.get("detail"):
+                        parts.append(str(progress["detail"]))
+                    self._update_detail(job_id, " | ".join(parts))
+
+                for book_name, page in iter_ocr_pages(tasks, progress_callback=_ocr_progress):
                     context = contexts.get(book_name)
                     if context is None:
                         raise RuntimeError(f"OCR worker returned unknown book: {book_name}")
@@ -211,7 +232,7 @@ class NovelDbJobWorker:
             for done, book_name in enumerate(targets, start=1):
                 run_id, input_pages = contexts[book_name]
                 try:
-                    publish_run(run_id, input_pages)
+                    stage_run_for_qa(run_id, input_pages)
                 except Exception as exc:
                     mark_run_failed(run_id, str(exc))
                     failures.append(f"{book_name}: {exc}")

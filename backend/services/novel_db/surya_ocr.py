@@ -16,6 +16,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections import deque
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from html import escape
@@ -77,6 +78,36 @@ class SuryaPageResult:
     @property
     def char_count(self) -> int:
         return len(self.full_text)
+
+
+@dataclass
+class OcrSessionPolicy:
+    """Decide when a worker-owned inference server should be replaced."""
+
+    max_pages: int
+    consecutive_failure_limit: int
+    failure_window: int
+    failure_rate: float
+    pages_processed: int = 0
+    consecutive_failures: int = 0
+
+    def __post_init__(self) -> None:
+        self._recent_failures: deque[bool] = deque(maxlen=self.failure_window)
+
+    def record(self, failed: bool) -> str | None:
+        self.pages_processed += 1
+        self.consecutive_failures = self.consecutive_failures + 1 if failed else 0
+        self._recent_failures.append(failed)
+        if self.consecutive_failures >= self.consecutive_failure_limit:
+            return "consecutive_surya_failures"
+        if (
+            len(self._recent_failures) == self.failure_window
+            and sum(self._recent_failures) / self.failure_window >= self.failure_rate
+        ):
+            return "surya_failure_rate"
+        if self.pages_processed >= self.max_pages:
+            return "page_limit"
+        return None
 
 
 @dataclass
@@ -298,12 +329,15 @@ def evaluate_external_ocr(
     min_ink_coverage: float,
     attempt_count: int,
     engine_flag: str,
-    min_confidence: float = 0.9,
+    min_median_confidence: float = 0.85,
+    min_weighted_mean_confidence: float = 0.75,
+    max_low_confidence_char_ratio: float = 0.25,
+    low_confidence_threshold: float = 0.5,
 ) -> SuryaPageResult:
-    """Normalize a high-confidence secondary OCR result through the same gate."""
+    """Normalize a secondary OCR result and evaluate its confidence distribution."""
     width, height = image.size
     html_blocks: list[str] = []
-    confidences: list[float] = []
+    confidence_samples: list[tuple[float, int]] = []
     for item in items:
         text = str(item.get("text", "")).strip()
         text = re.sub(
@@ -334,7 +368,7 @@ def evaluate_external_ocr(
             confidence = float(item.get("confidence", 0.0))
         except (TypeError, ValueError):
             continue
-        confidences.append(confidence)
+        confidence_samples.append((confidence, len(text)))
         bbox_text = " ".join(f"{value:g}" for value in bbox)
         inner = escape(text, quote=False).replace("\n", "<br/>")
         html_blocks.append(f'<div data-label="Text" data-bbox="{bbox_text}">{inner}</div>')
@@ -347,7 +381,7 @@ def evaluate_external_ocr(
         attempt_count=attempt_count,
     )
     result = replace(result, quality_flags=[*result.quality_flags, engine_flag])
-    if not confidences or min(confidences) < min_confidence:
+    if not confidence_samples:
         flags = [*result.quality_flags, "external_ocr_low_confidence"]
         return replace(
             result,
@@ -355,11 +389,81 @@ def evaluate_external_ocr(
             quality_flags=flags,
             error_message="external_ocr_low_confidence",
         )
+    confidences = np.asarray([sample[0] for sample in confidence_samples], dtype=float)
+    weights = np.asarray([sample[1] for sample in confidence_samples], dtype=float)
+    median_confidence = float(np.median(confidences))
+    weighted_mean_confidence = float(np.average(confidences, weights=weights))
+    low_confidence_char_ratio = float(weights[confidences < low_confidence_threshold].sum() / weights.sum())
+    distribution_passed = (
+        median_confidence >= min_median_confidence
+        and weighted_mean_confidence >= min_weighted_mean_confidence
+        and low_confidence_char_ratio <= max_low_confidence_char_ratio
+    )
+    if not distribution_passed:
+        flags = [*result.quality_flags, "external_ocr_low_confidence"]
+        return replace(
+            result,
+            state="failed",
+            quality_flags=flags,
+            error_message="external_ocr_low_confidence",
+        )
+    if min(confidences) < min_median_confidence:
+        result = replace(
+            result,
+            quality_flags=[*result.quality_flags, "external_ocr_distribution_accepted"],
+        )
     remaining = set(result.quality_flags) - {"low_ink_coverage", engine_flag}
+    remaining.discard("external_ocr_distribution_accepted")
     if result.state == "failed" and not remaining and result.full_text and result.char_count <= 256:
-        flags = [*result.quality_flags, "external_ocr_high_confidence_exempt"]
+        flags = [*result.quality_flags, "external_ocr_confidence_exempt"]
         return replace(result, state="passed", quality_flags=flags, error_message=None)
     return result
+
+
+def normalize_ocr_text(text: str) -> str:
+    """Normalize layout-only differences before comparing independent OCR output."""
+    return re.sub(r"\s+", "", text)
+
+
+def crosscheck_ocr_results(
+    primary: SuryaPageResult,
+    external: SuryaPageResult,
+    *,
+    min_similarity: float = 0.85,
+    more_complete_ratio: float = 1.02,
+) -> SuryaPageResult:
+    """Adjudicate two independent OCR results without silently hiding disagreement."""
+    if external.state != "passed":
+        if primary.state == "passed":
+            return SuryaClient._add_quality_flag(primary, "external_crosscheck_unavailable")
+        return external
+    if primary.state != "passed":
+        return SuryaClient._add_quality_flag(external, "external_ocr_recovered_primary")
+
+    primary_text = normalize_ocr_text(primary.full_text)
+    external_text = normalize_ocr_text(external.full_text)
+    if not primary_text or not external_text:
+        flags = [*primary.quality_flags, "cross_engine_disagreement"]
+        return replace(
+            primary,
+            state="failed",
+            quality_flags=flags,
+            error_message="cross_engine_disagreement",
+        )
+
+    similarity = SequenceMatcher(None, primary_text, external_text, autojunk=False).ratio()
+    if similarity < min_similarity:
+        flags = [*primary.quality_flags, "cross_engine_disagreement"]
+        return replace(
+            primary,
+            state="failed",
+            quality_flags=flags,
+            error_message="cross_engine_disagreement",
+        )
+
+    if len(external_text) / len(primary_text) >= more_complete_ratio:
+        return SuryaClient._add_quality_flag(external, "external_ocr_more_complete")
+    return SuryaClient._add_quality_flag(primary, "cross_engine_consensus")
 
 
 class SuryaServer:
@@ -392,6 +496,10 @@ class SuryaServer:
             time.sleep(1)
         self.close()
         raise TimeoutError("llama-server did not become ready within 120 seconds")
+
+    @property
+    def owns_process(self) -> bool:
+        return self._process is not None
 
     def __exit__(self, _exc_type: object, _exc: object, _tb: object) -> None:
         self.close()

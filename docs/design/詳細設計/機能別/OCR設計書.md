@@ -30,6 +30,13 @@ POST /api/ocr/run（routers/ocr.py）→ job_queue に enqueue（rebuild_jobs �
 ```
 ジョブキュー管理・スキップロジック・API 詳細は [詳細設計書_バックエンド編](../詳細設計書_バックエンド編.md) が正。
 
+**Windows OCR agentモード**:
+
+`OCR_AGENT_ENABLED=true`の本番Linuxでは、通常workerは`mode=ocr`のジョブをclaimせず、
+Windows agentが共有トークンで1件ずつclaimする。claim時にLinux側が入力連番・SHA-256を確定し、
+`ocr_runs`とjob/run対応を作る。Windowsは登録済み画像URLだけを取得し、
+ページ結果・heartbeat・完了または失敗をAPIへ返す。Windowsから`novel.db`を直接開かない。
+
 **OCR 環境変数**（`.env` で設定）:
 
 | 変数名 | 既定値 | 説明 |
@@ -46,6 +53,13 @@ POST /api/ocr/run（routers/ocr.py）→ job_queue に enqueue（rebuild_jobs �
 | `SURYA_REQUEST_TIMEOUT_SEC` | `600` | 1ページの推論タイムアウト |
 | `SURYA_MAX_ATTEMPTS` | `3` | ページ全体OCRで比較する画像候補の最大試行数 |
 | `OCR_QUALITY_MIN_INK_COVERAGE` | `0.85` | OCR bbox が覆う文字候補成分の最低比率 |
+| `OCR_CROSSCHECK_ALL_PAGES` | `true` | Surya合格ページもyomitokuで独立再読する |
+| `OCR_CROSS_ENGINE_MIN_SIMILARITY` | `0.85` | 正規化本文のエンジン間最低一致率 |
+| `OCR_EXTERNAL_CONFIDENCE_MEDIAN` | `0.85` | 補助OCRのblock confidence中央値下限 |
+| `OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN` | `0.75` | 補助OCRの文字数加重confidence平均下限 |
+| `OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO` | `0.25` | confidence 0.5未満の文字数比率上限 |
+| `OCR_AGENT_ENABLED` | `false` | OCRジョブをWindows agentへ委譲する。本番Linuxだけで有効化する |
+| `OCR_AGENT_HEARTBEAT_TIMEOUT_SEC` | `300` | agent heartbeat期限。次回claim時に期限切れjobを失敗回収する |
 
 ### 関連ファイル
 
@@ -63,12 +77,12 @@ POST /api/ocr/run（routers/ocr.py）→ job_queue に enqueue（rebuild_jobs �
 ## Surya OCR 2 実行設計
 
 - **固定資材**: 公式GGUF、mmproj、`llama-server.exe` のパスとSHA-256を運用時に固定し、自動更新しない。
-- **サーバー寿命**: OCR worker 起動時に `/v1/models` を確認する。到達不能かつ3パスが設定済みなら `llama-server` をCUDA全層オフロード・parallel=1で起動し、全対象ページで共有して worker 終了時に停止する。既存サーバーへ接続した場合は停止しない。2026-07-19の長時間実測ではセッション後半に壊れた出力・連続不合格が増え、新しいserverセッションで同じ画像が合格へ戻る事象を確認した。ただし劣化開始ページは一定と断定できないため、固定ページ数では区切らない。当面は**本文の壊れた出力または不合格が連続した時点で中断し、workerが所有するserverだけを停止して新規セッションからチェックポイント再開する**。連続数に基づく自動再起動は未実装である。
+- **サーバー寿命**: OCR worker 起動時に `/v1/models` を確認する。到達不能かつ3パスが設定済みなら `llama-server` をCUDA全層オフロード・parallel=1で起動する。worker所有serverは有限ページ数、連続Surya不合格、または移動窓の不合格率超過で停止し、次のページを新規server世代で再開する。既存の外部管理serverへ接続した場合はworkerから停止しない。server世代、開始ページ、終了理由をstderr監査ログへ残す。
 - **プロンプト**: 公式Surya OCR 2の学習時契約であるHTML+bbox・layout JSON・block HTMLの3プロンプトを改変せず固定する。OpenAI互換APIのマルチモーダルcontentも公式クライアントと同じ**画像→指示文**の順で送る。逆順では各タスクがlayout JSONへドリフトする実測がある。通常はtemperature=0のページ全体OCRを使い、ページ全体OCRが不成立のときだけ公式のlayout→block経路へ切り替える。
 - **推論予算**: llama-serverは1並列・context 16,384を基準とし、ページ全体12,288、layout 3,072、blockはlayoutの`count + 100`（64〜8,192）の出力トークン枠を使う。長い縦書き本文を4,096トークンで途中打ち切りしない。
 - **原本保持**: キャプチャPNGを加工・上書きしない。再試行用の縮小・コントラスト調整画像はメモリ上だけで生成する。
 - **出力保持**: `raw_output`（HTML）、タグとルビ読みを除いた検索用 `full_text`、bbox・品質指標を別々に保存する。
-- **限定補助系**: Suryaで不合格になったページ、列重複を検出したページ、または疎ページの限定例外候補だけをyomitokuでも再読する。yomitokuの全blockがconfidence 0.9以上で、構造・重複検査に合格し、原則としてcoverage検査にも合格した場合だけ`yomitoku_adjudication`としてSurya候補を置換する。256文字以下の疎ページは高confidenceを前提にcoverage不足だけを限定免除できる。日本語文字間に混入した単独ASCII空白は除去し、日本語とラテン文字間の意図的な空白は保持する。通常本文はSuryaのみで処理する。
+- **独立補助系**: 列単位の欠落をSurya単独のbbox coverageだけで見逃さないため、既定ではSurya合格ページもyomitokuで再読する。補助結果はblock confidenceの中央値、文字数加重平均、confidence 0.5未満の文字比率、構造・重複検査で判定する。両方が合格でも正規化本文の一致率が0.85未満なら`cross_engine_disagreement`として不合格にし、一致する補助結果が2%以上長い場合は`external_ocr_more_complete`付きで補助結果を採用する。補助結果が不合格でSuryaだけが合格した場合は`external_crosscheck_unavailable`を残す。256文字以下の疎ページは分布判定合格を前提にcoverage不足だけを限定免除できる。日本語文字間に混入した単独ASCII空白は除去し、日本語とラテン文字間の意図的な空白は保持する。
 
 ### ページ品質ゲート
 
@@ -90,8 +104,38 @@ POST /api/ocr/run（routers/ocr.py）→ job_queue に enqueue（rebuild_jobs �
 Suryaのblock OCRは、極端に細い日本語縦列の切り出しで中国語混入・幻覚を生じた実測があるため、それ単独では公開可にしない。`sparse_page_block_fallback` / `duplicate_text_recovery`が生じたページはyomitoku補助照合を必須とし、補助照合が不合格ならページも不合格のままとする。
 
 confidence は補助情報であり、列・文章欠落を直接表さないため単独の合格条件にはしない。
+yomitoku判定は全blockの最小confidenceだけに依存せず、中央値、文字数加重平均、
+低confidence blockの文字比率、構造検査、他エンジンとの一致率を併用する。
+低confidence blockを含んでも、独立した品質根拠が揃う場合は監査フラグ付き候補として保持する。
+既知の十三歳46画面は最低confidence 0.184、中央値0.907、文字数加重平均0.78、
+confidence 0.5未満の文字比率約19%で、短い独立列を含む338文字を取得した。
+旧最小値判定では不合格、新分布判定では`external_ocr_distribution_accepted`付き合格となる。
 
 構造・coverage・反復検査の合格は、文字単位の完全一致を保証しない。実測では表紙・挿絵入りページ・目次・通常本文の一部に、助詞、小書き仮名、濁点、固有名詞の誤読や読み順のずれが残った。全run合格時は機械判定により`pages`へ自動確定するが、Full Buildを手動投入する前に、前付け全画面、限定例外フラグ付き画面、通常本文の標本を原画像と照合する。特に表紙・挿絵・目次は構造合格だけで内容精度まで保証されたとは扱わない。この目視QAは現状、DB上の公開状態をブロックするワークフローではなく運用手順である。
+
+2026-07-26の新規小説2冊・全183画面の実測では、単独実行と全冊実行で
+同一SHA-256画像の文字数が952文字から860文字へ変化し、双方がフラグなし合格になった。
+人物名の誤読と短い縦列の全欠落もカバレッジ99%以上で合格した。
+したがってFull Build前のQA承認をDB上の明示状態として追加し、
+QA未承認runは公開・索引生成しない方向で移行する。
+段階実装と受入条件は
+[小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md)を正本とする。
+
+改善後の本番再実行では、茉莉花官吏伝は91/91画面が機械合格したが、
+69画面が`external_crosscheck_unavailable`となり、QA必須は73画面だった。
+通常本文8画面目の原画像照合で、Suryaの人物名誤読「暗菜莉花」と、
+yomitokuの複数の固有名詞誤読を確認した。両者の正規化一致率は0.820であり、
+一致閾値0.85未満として停止させる現行判定は妥当だった。
+
+十三歳10巻は88/92画面まで合格し、画像目次、リンク目次、
+漢文と書き下しの併記、販促ページの4画面が3回の再試行後も
+`cross_engine_disagreement`だった。このため両書籍とも未公開のまま保持する。
+`external_crosscheck_unavailable`は、通常本文で補助系が品質根拠を提供できなかった
+ことを示すため、QA必須対象から除外しない。
+
+非本文ページは通常本文と同じ一致率だけで自動採否を決めず、将来のページ種別分類で
+閲覧用保持と検索索引対象を分離する。ページ種別分類が実装されるまでは、
+目次・奥付・広告を理由に品質ゲートを緩和しない。
 
 ### キャプチャ画面番号と紙面ページ番号
 
@@ -110,9 +154,15 @@ confidence は補助情報であり、列・文章欠落を直接表さないた
 ### チェックポイントと確定
 
 - `ocr_runs`: 書籍・エンジン・モデル・入力ページ数・状態・エラーを記録する。
-- `ocr_page_results`: ページ番号、画像SHA-256、本文、raw出力、品質フラグ、coverage、試行回数を `UNIQUE(run_id, page_no)` で保存する。
+- `ocr_agent_job_runs`: `rebuild_jobs.id`と書籍別`ocr_runs.id`を対応付け、再claim・再開時に同じrunを返す。
+- `ocr_runs.qa_state`: `pending` / `approved` / `rejected`。承認者、承認日時、QAメモを同じrunへ保存する。
+- `ocr_page_results`: ページ番号、画像SHA-256、本文、raw出力、品質フラグ、coverage、試行回数を `UNIQUE(run_id, page_no)` で保存する。`qa_state`は`not_required` / `required` / `approved` / `rejected`、`qa_note`と`reviewed_at`を保持する。ページ種別`page_type`は`unknown` / `narrative` / `toc` / `illustration` / `colophon_or_ad`、`index_eligible`は`narrative`だけ1とする。
 - 同じ書籍・エンジン・モデル・入力ページ数で状態が `running` または `failed` のrunがある場合は、その最新runを再利用する。各 `passed` ページは、そのページ番号の画像SHA-256が現在の入力と一致する場合だけスキップする。変更されたページ、不合格ページ、未処理ページは再実行する。
-- 全ページが `passed` かつページ番号と画像SHAが入力manifestに一致した場合のみ、1トランザクションで `books` / `pages` / `pages_fts` を更新してrunを `completed` にする。
+- 全ページが `passed` かつページ番号と画像SHAが入力manifestに一致した場合、runを`awaiting_qa`へ進める。この時点では`books` / `pages` / `pages_fts`を更新しない。
+- 全ページへ決定論的なページ種別候補を設定する。目次語、発行・広告語、文字数、前付け・後付け位置から安全に決まらない場合は`unknown`のまま残す。自動判定は既に手動設定された種別を上書きしない。
+- 先頭7画面、先頭本文・中間・最終画面、`unknown`画面、および異常・限定例外を示す品質フラグ付き全画面を`required`とする。`cross_engine_consensus`と`yomitoku_adjudication`は、通常の2エンジン照合を実施した監査記録であり、それ単独ではQA必須ページを増やさない。QA画面で原画像・本文・フラグ・ページ種別を比較し、ページ単位で承認または却下する。
+- `required`ページがすべて`approved`、`rejected`ページと`unknown`ページが0件で、再度画像SHAが一致した場合だけ、run承認APIが1トランザクションで`books` / `pages` / `pages_fts`を更新し、runを`completed`・`qa_state=approved`にする。
+- 公開後の`pages.page_type`と`pages.index_eligible`はQA確定値を保持する。`toc` / `illustration` / `colophon_or_ad`は画像・OCR本文・FTS外部コンテンツ行を保持するが、FTS検索結果、chunk、Embedding、全文読込、サマリ、人物・関係抽出の入力から除外する。
 - 中断・失敗時は既存の公開済み本文を保持する。新規書籍では中途半端な本文を公開しない。
 - `POST /api/ocr/stop` は `rebuild_jobs` の待機中（`queued`）OCRジョブだけを `canceled` にする。実行中ジョブ・OCR worker・llama-serverは停止しない。待機中ジョブがなければ400を返す。実行中の安全な停止とserver更新の自動制御は未実装であり、手動中断時はrunとジョブを理由付きの `failed` として閉じ、ページチェックポイントを次回再開へ残す。
 
@@ -124,6 +174,45 @@ confidence は補助情報であり、列・文章欠落を直接表さないた
 - 次回は同一書籍・エンジン・モデル識別子・入力97件を指定し、各ページの画像SHA-256が一致する合格67件を再利用して、不合格14件と未処理16件だけを新しいserverセッションで処理する。
 - server再起動後の再試行では、少なくとも画面4・25・26・39・44・50・52・53・55・56が合格へ回復した。一方、画面4・39・58・60〜69・74は停止時点でも不合格であり、server更新は品質ゲートの代替ではなく回復試行として扱う。
 - 全画面yomitoku比較は通常本文で低confidence（実測最小0.06）、誤字、列欠落、隣接画面の混入があり主系にはできない。一方、3画面目の細い縦列は3列ともconfidence 0.993以上で正読したため、現行どおりSurya不合格ページに限定した補助判定に用いる。
+
+### 正解コーパス
+
+- `ocr_ground_truth_pages`はrun・画面番号・画像SHA-256を一意キー相当として保持し、OCR結果の変更や画像差し替えを追跡可能にする。
+- `reference_text`は原画像と照合した人手確定文字列だけを保存する。OCR本文から初期化した文字列は`draft`であり、評価の正解には数えない。
+- 状態は`draft` / `verified`。`verified`への変更は非空の`reference_text`、確定ページ種別、現在画像SHA一致を必須とする。
+- 評価は空白を正規化した文字列のLevenshtein距離からCERを計算し、ページ別、
+  全`verified`ページの加重CER、ページ種別別の件数・文字数・加重CERを返す。
+  全体CERは表紙・目次・挿絵混在・広告の難度に強く影響されるため、
+  通常本文の受入可否は`narrative`集計と個別の列欠落を併記して判断する。
+- 初期20画面は、通常本文だけでなく表紙、目次、挿絵・章扉、漢文併記、奥付・広告、既知不一致ページを含める。20件を登録しただけでは受入完了とせず、`verified`件数を別表示する。
+- コーパスの画像は複製せず正式画像を参照する。画像SHAが変わった項目は検証済み扱いを解除し、再確認する。
+
+#### 固定20画面の実測基準（2026-07-26）
+
+全20画面を原画像と照合して`verified`にした。同じ画像SHA-256と正解本文に対し、
+現行Surya系、yomitoku、Tesseract `jpn_vert`を再実行した加重CERは次のとおり。
+CERは挿入が正解文字数を超える場合に100%を超え得る。
+
+| 評価範囲 | 画面数 | 現行Surya系 | yomitoku | Tesseract |
+|---|---:|---:|---:|---:|
+| 全体 | 20 | 16.42% | **11.51%** | 57.20% |
+| 通常散文 | 4 | **1.82%** | 4.55% | 8.46% |
+| 全幅要約 | 1 | 19.19% | 11.22% | **8.03%** |
+| 本文＋挿絵 | 3 | 38.28% | **10.71%** | 151.74% |
+| 漢文・書き下し | 1 | **22.64%** | 57.23% | 67.30% |
+| 目次 | 4 | 70.00% | **50.00%** | 141.54% |
+| 挿絵・表紙 | 4 | **61.24%** | 64.61% | 340.45% |
+| 奥付・広告 | 3 | **0.87%** | 21.68% | 65.32% |
+
+- 全体CERだけではyomitokuが最良だが、通常散文と漢文は現行Surya系が優位である。
+  主エンジンをyomitokuへ一律置換しない。
+- yomitokuの改善は本文＋挿絵に集中した。現行実装は全ページを独立照合するが、
+  意味上の`page_type`とは別のレイアウト特性を保存・判定してエンジンを選ぶ処理は未実装である。
+- Tesseractは挿絵の網点・輪郭を大量の文字として誤認した。
+  全画面OCRには採用せず、将来文字領域を限定できた場合の列欠落・文字数確認候補に留める。
+- 現在の`metrics_by_page_type`は意味上のページ種別を集計する。
+  `narrative`には通常散文、全幅要約、本文＋挿絵、漢文が含まれるため、
+  受入判断では個別画面と実装計画のレイアウト別集計を併記する。
 
 ---
 

@@ -41,6 +41,8 @@ class Page(SQLModel, table=True):
     full_text: str | None = None
     char_count: int
     main_characters: str | None = None
+    page_type: str = "narrative"
+    index_eligible: bool = True
 
 
 class Chunk(SQLModel, table=True):
@@ -126,6 +128,8 @@ class RebuildJob(SQLModel, table=True):
     error_message: str | None = None
     current_step: str | None = None
     current_detail: str | None = None
+    agent_id: str | None = None
+    heartbeat_at: str | None = None
 
 
 class OcrRun(SQLModel, table=True):
@@ -140,6 +144,10 @@ class OcrRun(SQLModel, table=True):
     started_at: str | None = None
     finished_at: str | None = None
     error_message: str | None = None
+    qa_state: str = "pending"
+    qa_reviewer: str | None = None
+    qa_reviewed_at: str | None = None
+    qa_note: str | None = None
 
 
 class OcrPageResult(SQLModel, table=True):
@@ -160,3 +168,38 @@ class OcrPageResult(SQLModel, table=True):
     attempt_count: int = 0
     error_message: str | None = None
     updated_at: str | None = None
+    qa_state: str = "not_required"
+    qa_note: str | None = None
+    reviewed_at: str | None = None
+    page_type: str = "unknown"
+    index_eligible: bool = False
+
+
+class OcrAgentJobRun(SQLModel, table=True):
+    __tablename__ = "ocr_agent_job_runs"  # type: ignore[reportAssignmentType]
+    __table_args__ = (
+        UniqueConstraint("job_id", "book_name"),
+        UniqueConstraint("job_id", "run_id"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: int = Field(foreign_key="rebuild_jobs.id")
+    run_id: int = Field(foreign_key="ocr_runs.id")
+    book_name: str
+
+
+class OcrGroundTruthPage(SQLModel, table=True):
+    __tablename__ = "ocr_ground_truth_pages"  # type: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("run_id", "page_no"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    run_id: int = Field(foreign_key="ocr_runs.id")
+    page_no: int
+    image_sha256: str
+    page_type: str = "unknown"
+    reference_text: str | None = None
+    state: str = "draft"
+    note: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+    verified_at: str | None = None

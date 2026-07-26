@@ -16,7 +16,25 @@ from pathlib import Path
 from typing import Any
 
 from PIL import Image
-from surya_ocr import SuryaClient, SuryaPageResult, SuryaServer, evaluate_external_ocr
+
+try:
+    from .surya_ocr import (
+        OcrSessionPolicy,
+        SuryaClient,
+        SuryaPageResult,
+        SuryaServer,
+        crosscheck_ocr_results,
+        evaluate_external_ocr,
+    )
+except ImportError:
+    from surya_ocr import (
+        OcrSessionPolicy,
+        SuryaClient,
+        SuryaPageResult,
+        SuryaServer,
+        crosscheck_ocr_results,
+        evaluate_external_ocr,
+    )
 
 _YOMITOKU_ADJUDICATION_FLAGS = {
     "duplicate_text_recovery",
@@ -30,6 +48,7 @@ def _page_payload(
     page_no: int,
     image_sha256: str,
     result: SuryaPageResult,
+    server_generation: int | None = None,
 ) -> dict[str, Any]:
     return {
         "event": "page",
@@ -45,12 +64,19 @@ def _page_payload(
             "quality_flags": result.quality_flags,
             "ink_coverage": result.ink_coverage,
             "attempt_count": result.attempt_count,
+            "server_generation": server_generation,
             "error_message": result.error_message,
         },
     }
 
 
-def _failed_payload(book_name: str, page_no: int, image_sha256: str, exc: Exception) -> dict[str, Any]:
+def _failed_payload(
+    book_name: str,
+    page_no: int,
+    image_sha256: str,
+    exc: Exception,
+    server_generation: int | None = None,
+) -> dict[str, Any]:
     return {
         "event": "page",
         "book_name": book_name,
@@ -65,6 +91,7 @@ def _failed_payload(book_name: str, page_no: int, image_sha256: str, exc: Except
             "quality_flags": ["worker_error"],
             "ink_coverage": None,
             "attempt_count": 0,
+            "server_generation": server_generation,
             "error_message": str(exc),
         },
     }
@@ -72,6 +99,32 @@ def _failed_payload(book_name: str, page_no: int, image_sha256: str, exc: Except
 
 def _emit(payload: dict[str, Any]) -> None:
     print(json.dumps(payload, ensure_ascii=False), flush=True)
+
+
+def _emit_progress(
+    stage: str,
+    *,
+    server_generation: int,
+    total_pages: int,
+    book_name: str | None = None,
+    page_no: int | None = None,
+    attempt_count: int | None = None,
+    detail: str | None = None,
+) -> None:
+    progress = {
+        "stage": stage,
+        "server_generation": server_generation,
+        "total_pages": total_pages,
+    }
+    if book_name is not None:
+        progress["book_name"] = book_name
+    if page_no is not None:
+        progress["page_no"] = page_no
+    if attempt_count is not None:
+        progress["attempt_count"] = attempt_count
+    if detail is not None:
+        progress["detail"] = detail
+    _emit({"event": "progress", "progress": progress})
 
 
 def _read_image(path: Path) -> tuple[bytes, str, Image.Image]:
@@ -84,57 +137,133 @@ def _read_image(path: Path) -> tuple[bytes, str, Image.Image]:
 
 def _run_surya(tasks: list[dict[str, Any]]) -> None:
     base_url = os.environ.get("SURYA_INFERENCE_URL", "http://127.0.0.1:8768/v1")
-    with SuryaServer(
-        base_url,
-        executable=os.environ.get("SURYA_LLAMA_SERVER_PATH"),
-        model_path=os.environ.get("SURYA_MODEL_PATH"),
-        mmproj_path=os.environ.get("SURYA_MMPROJ_PATH"),
-    ):
-        client = SuryaClient(
-            base_url,
-            model=os.environ.get("SURYA_MODEL", "surya-ocr-2"),
-            timeout_sec=float(os.environ.get("SURYA_REQUEST_TIMEOUT_SEC", "600")),
-            min_ink_coverage=float(os.environ.get("OCR_QUALITY_MIN_INK_COVERAGE", "0.85")),
-        )
-        max_attempts = int(os.environ.get("SURYA_MAX_ATTEMPTS", "3"))
-        yomitoku_engine: Any | None = None
-        for task in tasks:
-            book_name = str(task["book_name"])
-            page_no = int(task["page_no"])
-            image_path = Path(task["image_path"])
-            image_sha256 = ""
-            try:
-                _, image_sha256, image = _read_image(image_path)
-                result = client.recognize_with_quality(image, max_attempts=max_attempts)
-                trigger_flags = sorted(set(result.quality_flags) & _YOMITOKU_ADJUDICATION_FLAGS)
-                if result.state == "failed":
-                    trigger_flags.append("surya_failed")
-                if trigger_flags:
-                    if yomitoku_engine is None:
-                        ocr_path = os.environ.get("OCR_PATH", r"D:\61.tool\common\ocr")
-                        if ocr_path not in sys.path:
-                            sys.path.insert(0, ocr_path)
-                        from ocr_engine import get_ocr_engine  # type: ignore[import-not-found]
+    server_kwargs = {
+        "executable": os.environ.get("SURYA_LLAMA_SERVER_PATH"),
+        "model_path": os.environ.get("SURYA_MODEL_PATH"),
+        "mmproj_path": os.environ.get("SURYA_MMPROJ_PATH"),
+    }
+    client_kwargs = {
+        "model": os.environ.get("SURYA_MODEL", "surya-ocr-2"),
+        "timeout_sec": float(os.environ.get("SURYA_REQUEST_TIMEOUT_SEC", "600")),
+        "min_ink_coverage": float(os.environ.get("OCR_QUALITY_MIN_INK_COVERAGE", "0.85")),
+    }
+    max_attempts = int(os.environ.get("SURYA_MAX_ATTEMPTS", "3"))
+    policy_kwargs = {
+        "max_pages": int(os.environ.get("OCR_SERVER_MAX_PAGES", "24")),
+        "consecutive_failure_limit": int(os.environ.get("OCR_SERVER_CONSECUTIVE_FAILURES", "2")),
+        "failure_window": int(os.environ.get("OCR_SERVER_FAILURE_WINDOW", "8")),
+        "failure_rate": float(os.environ.get("OCR_SERVER_FAILURE_RATE", "0.5")),
+    }
+    crosscheck_all_pages = os.environ.get("OCR_CROSSCHECK_ALL_PAGES", "true").lower() in {"1", "true", "yes"}
+    cross_engine_min_similarity = float(os.environ.get("OCR_CROSS_ENGINE_MIN_SIMILARITY", "0.85"))
+    external_quality_kwargs = {
+        "min_median_confidence": float(os.environ.get("OCR_EXTERNAL_CONFIDENCE_MEDIAN", "0.85")),
+        "min_weighted_mean_confidence": float(os.environ.get("OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN", "0.75")),
+        "max_low_confidence_char_ratio": float(os.environ.get("OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO", "0.25")),
+    }
+    yomitoku_engine: Any | None = None
+    task_index = 0
+    server_generation = 0
+    total_pages = len(tasks)
+    while task_index < total_pages:
+        server_generation += 1
+        policy = OcrSessionPolicy(**policy_kwargs)
+        restart_reason = "completed"
+        with SuryaServer(base_url, **server_kwargs) as server:
+            server_owned = server.owns_process
+            _emit_progress(
+                "server_started",
+                server_generation=server_generation,
+                total_pages=total_pages,
+                detail="worker_owned" if server_owned else "external",
+            )
+            client = SuryaClient(base_url, **client_kwargs)
+            while task_index < total_pages:
+                task = tasks[task_index]
+                task_index += 1
+                surya_failed = True
+                result: SuryaPageResult | None = None
+                attempt_count: int | None = None
+                book_name = str(task["book_name"])
+                page_no = int(task["page_no"])
+                image_path = Path(task["image_path"])
+                image_sha256 = ""
+                _emit_progress(
+                    "page_started",
+                    server_generation=server_generation,
+                    total_pages=total_pages,
+                    book_name=book_name,
+                    page_no=page_no,
+                )
+                try:
+                    _, image_sha256, image = _read_image(image_path)
+                    surya_result = client.recognize_with_quality(image, max_attempts=max_attempts)
+                    surya_failed = surya_result.state == "failed"
+                    trigger_flags = sorted(set(surya_result.quality_flags) & _YOMITOKU_ADJUDICATION_FLAGS)
+                    if surya_failed:
+                        trigger_flags.append("surya_failed")
+                    result = surya_result
+                    if trigger_flags or crosscheck_all_pages:
+                        if yomitoku_engine is None:
+                            ocr_path = os.environ.get("OCR_PATH", r"D:\61.tool\common\ocr")
+                            if ocr_path not in sys.path:
+                                sys.path.insert(0, ocr_path)
+                            from ocr_engine import get_ocr_engine  # type: ignore[import-not-found]
 
-                        yomitoku_engine = get_ocr_engine("yomitoku")
-                        yomitoku_engine.initialize()
-                    import numpy as np
+                            yomitoku_engine = get_ocr_engine("yomitoku")
+                            yomitoku_engine.initialize()
+                        import numpy as np
 
-                    items = yomitoku_engine.extract_text(np.asarray(image))
-                    result = evaluate_external_ocr(
-                        image,
-                        items,
-                        min_ink_coverage=client.min_ink_coverage,
-                        attempt_count=result.attempt_count + 1,
-                        engine_flag="yomitoku_adjudication",
+                        items = yomitoku_engine.extract_text(np.asarray(image))
+                        result = evaluate_external_ocr(
+                            image,
+                            items,
+                            min_ink_coverage=client.min_ink_coverage,
+                            attempt_count=surya_result.attempt_count + 1,
+                            engine_flag="yomitoku_adjudication",
+                            **external_quality_kwargs,
+                        )
+                        result = crosscheck_ocr_results(
+                            surya_result,
+                            result,
+                            min_similarity=cross_engine_min_similarity,
+                        )
+                        if trigger_flags:
+                            result = SuryaClient._add_quality_flag(
+                                result,
+                                "surya_trigger_" + "+".join(trigger_flags),
+                            )
+                    attempt_count = result.attempt_count
+                    _emit(_page_payload(book_name, page_no, image_sha256, result, server_generation))
+                except Exception as exc:
+                    _emit(_failed_payload(book_name, page_no, image_sha256, exc, server_generation))
+                _emit_progress(
+                    "page_completed",
+                    server_generation=server_generation,
+                    total_pages=total_pages,
+                    book_name=book_name,
+                    page_no=page_no,
+                    attempt_count=attempt_count,
+                    detail=result.state if result is not None else "worker_error",
+                )
+                reason = policy.record(surya_failed)
+                if reason is not None and task_index < total_pages and server_owned:
+                    restart_reason = reason
+                    break
+                if reason is not None and task_index < total_pages and not server_owned:
+                    _emit_progress(
+                        "server_restart_skipped",
+                        server_generation=server_generation,
+                        total_pages=total_pages,
+                        detail=f"{reason}:external_server",
                     )
-                    result = SuryaClient._add_quality_flag(
-                        result,
-                        "surya_trigger_" + "+".join(trigger_flags),
-                    )
-                _emit(_page_payload(book_name, page_no, image_sha256, result))
-            except Exception as exc:
-                _emit(_failed_payload(book_name, page_no, image_sha256, exc))
+                    policy = OcrSessionPolicy(**policy_kwargs)
+            _emit_progress(
+                "server_stopping",
+                server_generation=server_generation,
+                total_pages=total_pages,
+                detail=restart_reason,
+            )
 
 
 def _run_yomitoku(tasks: list[dict[str, Any]]) -> None:

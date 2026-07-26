@@ -11,6 +11,8 @@ import {
     SectionHeader,
 } from '@/components/novel_build';
 import { OCRPanel } from '@/features/ocr/OCRPanel';
+import { OCRGroundTruthPanel } from '@/features/ocr/OCRGroundTruthPanel';
+import { OCRQaPanel } from '@/features/ocr/OCRQaPanel';
 import { useNovelManage } from '@/hooks/useNovelManage';
 
 const TAB_BASE =
@@ -56,7 +58,7 @@ export default function NovelManagePage() {
     } = useNovelManage();
 
     return (
-        <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="mx-auto max-w-6xl px-4 py-8">
             {/* ヘッダー */}
             <div className="flex items-center gap-3 mb-6">
                 <div className="bg-primary-100 dark:bg-primary-900/40 p-2 rounded-lg">
@@ -93,8 +95,12 @@ export default function NovelManagePage() {
 
             {/* OCR タブ */}
             {activeTab === 'ocr' && (
-                <div className="h-[500px] flex flex-col">
-                    <OCRPanel />
+                <div className="flex flex-col gap-6">
+                    <div className="h-[420px]">
+                        <OCRPanel />
+                    </div>
+                    <OCRQaPanel />
+                    <OCRGroundTruthPanel />
                 </div>
             )}
 

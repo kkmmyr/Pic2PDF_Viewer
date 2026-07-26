@@ -1,6 +1,6 @@
 """services/novel_db/job_queue.py の単体テスト（worker は起動しない）。"""
 
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 
@@ -191,12 +191,12 @@ def test_ocr_combines_pending_pages_and_publishes_each_book(queue):
             return_value=iter([("book-a", page_a), ("book-b", page_b)]),
         ) as mock_iter,
         patch("services.novel_db.job_worker.save_page_result") as mock_save,
-        patch("services.novel_db.job_worker.publish_run") as mock_publish,
+        patch("services.novel_db.job_worker.stage_run_for_qa") as mock_stage,
     ):
         worker._execute_job(job)
 
-    mock_iter.assert_called_once_with([task_a, task_b])
+    mock_iter.assert_called_once_with([task_a, task_b], progress_callback=ANY)
     assert mock_save.call_args_list[0].args == (11, page_a)
     assert mock_save.call_args_list[1].args == (12, page_b)
-    assert mock_publish.call_args_list[0].args == (11, input_a)
-    assert mock_publish.call_args_list[1].args == (12, input_b)
+    assert mock_stage.call_args_list[0].args == (11, input_a)
+    assert mock_stage.call_args_list[1].args == (12, input_b)

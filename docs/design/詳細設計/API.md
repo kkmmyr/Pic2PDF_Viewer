@@ -104,6 +104,24 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 個別のスキーマ定義だけを見ても気づきにくい、複数エンドポイントにまたがる挙動をここに集約する。
 
 - **OCR停止APIの対象範囲**: `POST /api/ocr/stop` は、`rebuild_jobs` で `mode="ocr"` かつ `state="queued"` の待機中ジョブをすべてキャンセルする。実行中のOCRジョブ、OCR worker、workerが所有する`llama-server`は停止しない。待機中OCRジョブが1件もない場合は `400 Bad Request`（`{"detail":"No queued OCR jobs to cancel"}`）を返す。エンドポイント名は後方互換のため`stop`だが、実行中処理の停止APIではない。
+- **OCR QA API**:
+  - `GET /api/ocr/qa/runs`: `awaiting_qa`を中心にrun一覧と要確認・承認・却下ページ数を返す。
+  - `GET /api/ocr/qa/runs/{run_id}`: run情報とページ番号、OCR状態、QA状態、本文、品質フラグ、ページ種別、索引対象、画像URLを返す。
+  - `GET /api/ocr/qa/runs/{run_id}/pages/{page_no}/image`: runの書籍名から登録済み画像ディレクトリ内の数値PNGだけを返す。任意パスは受け取らない。
+  - `POST /api/ocr/qa/runs/{run_id}/classify-pages`: `unknown`ページだけへ決定論的な種別候補を設定し、未確定ページをQA必須にする。
+  - `PATCH /api/ocr/qa/runs/{run_id}/pages/{page_no}`: `approved`または`rejected`、確定ページ種別、任意メモを保存する。
+  - `POST /api/ocr/qa/runs/{run_id}/approve`: `required`ページの全承認、却下・`unknown`各0件、全入力画像SHA一致を検証後にOCR本文を公開する。未充足は`409 Conflict`とする。
+- **OCR正解コーパスAPI**:
+  - `GET /api/ocr/ground-truth`: 登録標本、OCR本文、人手正解、状態、ページ種別、ページ別CER、全verified標本の加重CER、ページ種別ごとの件数・正解文字数・加重CERを返す。
+  - `POST /api/ocr/ground-truth/seed`: 登録済みrun ID・画面番号の組だけを標本へ追加する。画像SHAとOCR本文はサーバー側正本から取得する。
+  - `PATCH /api/ocr/ground-truth/{entry_id}`: 人手正解、ページ種別、`draft` / `verified`、メモを保存する。`verified`は非空正解・確定種別・画像SHA一致を必須とする。
+- **Windows OCR agent API**: 既存capture agentと同じ`X-Capture-Agent-Token`を定数時間比較する。`OCR_AGENT_ENABLED=false`または共有トークン未設定では503とする。
+  - `POST /api/ocr/agents/claim`: 同一agentの実行中jobを再提示し、それ以外は最古の待機中OCR jobを1件だけclaimする。書籍別run IDと未処理ページの画像URL・SHA-256を返す。
+  - `GET /api/ocr/agents/jobs/{job_id}/pages/{book_name}/{page_no}/image`: claim済みmanifestに含まれる数値PNGだけを返す。
+  - `POST /api/ocr/agents/jobs/{job_id}/heartbeat`: job所有者だけheartbeatを更新する。
+  - `POST /api/ocr/agents/jobs/{job_id}/pages`: ページ結果を受け、manifestの書籍・画面番号・SHA-256と一致する場合だけcheckpoint保存する。
+  - `POST /api/ocr/agents/jobs/{job_id}/complete`: 全runを再検証して`awaiting_qa`へ進め、jobを完了する。本文公開は行わない。
+  - `POST /api/ocr/agents/jobs/{job_id}/fail`: jobと対応runを理由付き失敗にする。
 
 - **PATCH エンドポイントの部分更新セマンティクス**: フィールドを省略した場合は「変更しない」。指定した場合のみ上書きする（空文字・空配列・`null` を「削除」の意味で使う個別ルールがあるものは各スキーマの `description` を参照）。他フィールド（閲覧履歴・作者情報等）は更新対象でなければ常に保持される。
 

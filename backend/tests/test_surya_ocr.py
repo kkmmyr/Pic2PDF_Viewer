@@ -9,12 +9,55 @@ from services.novel_db.surya_ocr import (
     SURYA_BLOCK_PROMPT,
     SURYA_LAYOUT_PROMPT,
     SURYA_PROMPT,
+    OcrSessionPolicy,
+    SuryaBlock,
     SuryaClient,
+    SuryaPageResult,
+    crosscheck_ocr_results,
     evaluate_external_ocr,
     evaluate_page_quality,
     parse_surya_html,
     parse_surya_layout,
 )
+
+
+def test_session_policy_restarts_at_page_limit() -> None:
+    policy = OcrSessionPolicy(
+        max_pages=3,
+        consecutive_failure_limit=2,
+        failure_window=4,
+        failure_rate=0.75,
+    )
+
+    assert policy.record(False) is None
+    assert policy.record(False) is None
+    assert policy.record(False) == "page_limit"
+
+
+def test_session_policy_restarts_after_consecutive_surya_failures() -> None:
+    policy = OcrSessionPolicy(
+        max_pages=24,
+        consecutive_failure_limit=2,
+        failure_window=8,
+        failure_rate=0.5,
+    )
+
+    assert policy.record(True) is None
+    assert policy.record(True) == "consecutive_surya_failures"
+
+
+def test_session_policy_restarts_on_failure_rate() -> None:
+    policy = OcrSessionPolicy(
+        max_pages=24,
+        consecutive_failure_limit=4,
+        failure_window=4,
+        failure_rate=0.5,
+    )
+
+    assert policy.record(True) is None
+    assert policy.record(False) is None
+    assert policy.record(True) is None
+    assert policy.record(False) == "surya_failure_rate"
 
 
 def test_parse_surya_html_keeps_body_and_discards_ruby_reading() -> None:
@@ -326,3 +369,64 @@ def test_external_ocr_adjudication_rejects_low_confidence_result() -> None:
 
     assert result.state == "failed"
     assert "external_ocr_low_confidence" in result.quality_flags
+
+
+def test_external_ocr_adjudication_accepts_confidence_distribution_with_one_low_block() -> None:
+    image = Image.new("RGB", (400, 300), "white")
+    draw = ImageDraw.Draw(image)
+    items = []
+    for index, confidence in enumerate([0.99, 0.97, 0.95, 0.92, 0.40]):
+        x0 = 350 - index * 50
+        draw.rectangle((x0, 20, x0 + 30, 280), fill="black")
+        items.append(
+            {
+                "text": f"十分な長さの縦書き本文です{index}" if confidence >= 0.9 else "短い注記",
+                "confidence": confidence,
+                "position": [[x0, 20], [x0 + 30, 20], [x0 + 30, 280], [x0, 280]],
+            }
+        )
+
+    result = evaluate_external_ocr(
+        image,
+        items,
+        min_ink_coverage=0.85,
+        attempt_count=2,
+        engine_flag="yomitoku_adjudication",
+    )
+
+    assert result.state == "passed"
+    assert "external_ocr_distribution_accepted" in result.quality_flags
+
+
+def _page_result(text: str, *, state: str = "passed") -> SuryaPageResult:
+    return SuryaPageResult(
+        full_text=text,
+        raw_output="",
+        blocks=[SuryaBlock("Text", (0, 0, 1000, 1000), text)],
+        state=state,
+        quality_flags=[],
+        ink_coverage=1.0,
+        attempt_count=1,
+        error_message="failed" if state == "failed" else None,
+    )
+
+
+def test_crosscheck_prefers_more_complete_consistent_external_text() -> None:
+    primary = _page_result("今はまだ踏みとどまれている。けれども、踏みとどま")
+    external = _page_result("今はまだ踏みとどまれている。けれども、踏みとどまらなくていいのだ。")
+
+    result = crosscheck_ocr_results(primary, external, min_similarity=0.7)
+
+    assert result.state == "passed"
+    assert result.full_text == external.full_text
+    assert "external_ocr_more_complete" in result.quality_flags
+
+
+def test_crosscheck_rejects_material_engine_disagreement() -> None:
+    primary = _page_result("第一章。これは正しい本文です。")
+    external = _page_result("目次。まったく異なる文字列です。")
+
+    result = crosscheck_ocr_results(primary, external, min_similarity=0.85)
+
+    assert result.state == "failed"
+    assert "cross_engine_disagreement" in result.quality_flags

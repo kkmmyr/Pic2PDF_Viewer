@@ -34,6 +34,13 @@ export const API_ENDPOINTS = {
     OCR_RUN: '/api/ocr/run',
     OCR_STOP: '/api/ocr/stop',
     OCR_STATUS: '/api/ocr/status',
+    OCR_QA_RUNS: '/api/ocr/qa/runs',
+    OCR_QA_RUN: (runId: number) => `/api/ocr/qa/runs/${runId}`,
+    OCR_QA_PAGE: (runId: number, pageNo: number) => `/api/ocr/qa/runs/${runId}/pages/${pageNo}`,
+    OCR_QA_CLASSIFY: (runId: number) => `/api/ocr/qa/runs/${runId}/classify-pages`,
+    OCR_QA_APPROVE: (runId: number) => `/api/ocr/qa/runs/${runId}/approve`,
+    OCR_GROUND_TRUTH: '/api/ocr/ground-truth',
+    OCR_GROUND_TRUTH_ENTRY: (entryId: number) => `/api/ocr/ground-truth/${entryId}`,
     /** Generate ジョブ進捗取得 */
     GENERATE_JOB: (jobId: string) => `/api/generate/job/${jobId}`,
     /** 同人誌フォルダ自動監視の状態取得 */

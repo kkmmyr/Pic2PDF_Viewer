@@ -80,6 +80,19 @@ class _AppSettings(BaseSettings):
     SURYA_REQUEST_TIMEOUT_SEC: float = 600.0
     SURYA_MAX_ATTEMPTS: int = 3
     OCR_QUALITY_MIN_INK_COVERAGE: float = 0.85
+    # worker所有llama-serverの世代交代条件
+    OCR_SERVER_MAX_PAGES: int = Field(default=24, ge=1)
+    OCR_SERVER_CONSECUTIVE_FAILURES: int = Field(default=2, ge=1)
+    OCR_SERVER_FAILURE_WINDOW: int = Field(default=8, ge=2)
+    OCR_SERVER_FAILURE_RATE: float = Field(default=0.5, gt=0.0, le=1.0)
+    # Surya の成功ページも独立エンジンで照合し、列単位の欠落を検出する
+    OCR_CROSSCHECK_ALL_PAGES: bool = True
+    OCR_CROSS_ENGINE_MIN_SIMILARITY: float = Field(default=0.85, ge=0.0, le=1.0)
+    OCR_EXTERNAL_CONFIDENCE_MEDIAN: float = Field(default=0.85, ge=0.0, le=1.0)
+    OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN: float = Field(default=0.75, ge=0.0, le=1.0)
+    OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO: float = Field(default=0.25, ge=0.0, le=1.0)
+    OCR_AGENT_ENABLED: bool = False
+    OCR_AGENT_HEARTBEAT_TIMEOUT_SEC: int = Field(default=300, ge=1)
     # 同人誌入力フォルダの自動監視を有効にするか
     DOUJIN_WATCH_ENABLED: bool = True
     # 監視間隔（秒）

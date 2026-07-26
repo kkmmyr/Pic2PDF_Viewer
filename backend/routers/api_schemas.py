@@ -534,6 +534,200 @@ class OcrStopResponse(BaseModel):
     canceled_jobs: list[int]
 
 
+class OcrQaRunSummary(BaseModel):
+    id: int
+    book_name: str
+    engine: str
+    model: str
+    source_page_count: int
+    state: str
+    qa_state: str
+    required_pages: int
+    approved_pages: int
+    rejected_pages: int
+    started_at: str | None
+
+
+class OcrQaRunListResponse(BaseModel):
+    runs: list[OcrQaRunSummary]
+
+
+class OcrQaPageOut(BaseModel):
+    page_no: int
+    state: str
+    qa_state: str
+    full_text: str
+    char_count: int
+    quality_flags: list[str]
+    ink_coverage: float | None
+    attempt_count: int
+    error_message: str | None
+    qa_note: str | None
+    reviewed_at: str | None
+    page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    index_eligible: bool
+    image_url: str
+
+
+class OcrQaRunDetail(OcrQaRunSummary):
+    qa_reviewer: str | None
+    qa_reviewed_at: str | None
+    qa_note: str | None
+    pages: list[OcrQaPageOut]
+
+
+class OcrQaPageReviewRequest(BaseModel):
+    state: Literal["approved", "rejected"]
+    note: str | None = None
+    page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+
+
+class OcrQaRunApproveRequest(BaseModel):
+    reviewer: str
+    note: str | None = None
+
+
+class OcrQaActionResponse(BaseModel):
+    status: str
+    run_id: int
+
+
+class OcrPageTypeClassificationResponse(BaseModel):
+    status: str
+    run_id: int
+    counts: dict[str, int]
+
+
+class OcrGroundTruthSeedSample(BaseModel):
+    run_id: int
+    page_no: int
+
+
+class OcrGroundTruthSeedRequest(BaseModel):
+    samples: list[OcrGroundTruthSeedSample]
+
+
+class OcrGroundTruthSeedResponse(BaseModel):
+    status: str
+    created: int
+
+
+class OcrGroundTruthUpdateRequest(BaseModel):
+    reference_text: str | None = None
+    page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    state: Literal["draft", "verified"]
+    note: str | None = None
+
+
+class OcrGroundTruthEntryOut(BaseModel):
+    id: int
+    run_id: int
+    page_no: int
+    image_sha256: str
+    page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    reference_text: str
+    state: Literal["draft", "verified"]
+    note: str | None
+    created_at: str | None
+    updated_at: str | None
+    verified_at: str | None
+    book_name: str
+    ocr_text: str
+    edit_distance: int | None
+    reference_chars: int | None
+    cer: float | None
+    image_url: str
+
+
+class OcrGroundTruthMetricOut(BaseModel):
+    page_type: Literal["unknown", "narrative", "toc", "illustration", "colophon_or_ad"]
+    total_count: int
+    verified_count: int
+    total_edit_distance: int
+    total_reference_chars: int
+    aggregate_cer: float | None
+
+
+class OcrGroundTruthListResponse(BaseModel):
+    entries: list[OcrGroundTruthEntryOut]
+    total_count: int
+    verified_count: int
+    total_edit_distance: int
+    total_reference_chars: int
+    aggregate_cer: float | None
+    metrics_by_page_type: list[OcrGroundTruthMetricOut]
+
+
+class OcrAgentClaimRequest(BaseModel):
+    agent_id: str
+
+
+class OcrAgentTaskOut(BaseModel):
+    book_name: str
+    page_no: int
+    image_sha256: str
+    image_url: str
+
+
+class OcrAgentBookOut(BaseModel):
+    book_name: str
+    run_id: int
+    source_page_count: int
+    tasks: list[OcrAgentTaskOut]
+
+
+class OcrAgentJobOut(BaseModel):
+    id: int
+    job_type: str
+    target_id: str | None
+    agent_id: str
+    progress_total: int
+    progress_done: int
+    books: list[OcrAgentBookOut]
+
+
+class OcrAgentClaimResponse(BaseModel):
+    job: OcrAgentJobOut | None
+
+
+class OcrAgentHeartbeatRequest(BaseModel):
+    agent_id: str
+
+
+class OcrAgentPageResultIn(BaseModel):
+    page_no: int
+    image_sha256: str
+    state: str
+    full_text: str
+    char_count: int
+    raw_output: str
+    block_count: int
+    quality_flags: list[str]
+    ink_coverage: float | None
+    attempt_count: int
+    server_generation: int | None = None
+    error_message: str | None = None
+
+
+class OcrAgentPageSubmitRequest(BaseModel):
+    agent_id: str
+    book_name: str
+    page: OcrAgentPageResultIn
+
+
+class OcrAgentFailRequest(BaseModel):
+    agent_id: str
+    error: str
+
+
+class OcrAgentActionResponse(BaseModel):
+    job_id: int
+    status: str
+    book_name: str | None = None
+    page_no: int | None = None
+    books: int | None = None
+
+
 # ---------------------------------------------------------------------------
 # kindle_catalog.py 用
 # ---------------------------------------------------------------------------

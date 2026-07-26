@@ -106,6 +106,29 @@ def test_rebuild_from_pages_creates_chunks(novel_db_env, monkeypatch):
     assert vec_count == chunks_count
 
 
+def test_rebuild_from_pages_excludes_non_narrative_pages(novel_db_env, monkeypatch):
+    book_name = "test-page-types"
+    monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
+
+    with with_db(str(novel_db_env["db_path"])) as conn:
+        book_id = _populate_pages(
+            conn,
+            book_name,
+            ["Narrative content long enough for a chunk.", "Table of contents should not be indexed."],
+        )
+        conn.execute(
+            "UPDATE pages SET page_type='toc', index_eligible=0 WHERE book_id=? AND page_no=2",
+            (book_id,),
+        )
+        conn.commit()
+        builder.rebuild_from_pages(conn, book_name)
+
+        indexed_pages = conn.execute(
+            "SELECT p.page_no FROM chunks c JOIN pages p ON p.id=c.page_id ORDER BY p.page_no"
+        ).fetchall()
+        assert {row[0] for row in indexed_pages} == {1}
+
+
 def test_rebuild_from_pages_replaces_existing_chunks(novel_db_env, monkeypatch):
     book_name = "test-book-replace"
     monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)

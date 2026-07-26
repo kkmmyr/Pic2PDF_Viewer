@@ -1,9 +1,11 @@
 """services/novel_db/extractor.py の単体テスト。"""
 
+import json
 import os
 
 import fitz
 
+from services.novel_db import extractor
 from services.novel_db.extractor import extract_pages
 
 
@@ -56,3 +58,61 @@ def test_extract_pages_empty_pdf(tmp_path):
     assert len(pages) == 1
     assert pages[0]["page_no"] == 1
     assert pages[0]["char_count"] == 0
+
+
+def test_iter_ocr_pages_forwards_progress_events(monkeypatch):
+    lines = [
+        json.dumps(
+            {
+                "event": "progress",
+                "progress": {
+                    "stage": "page_started",
+                    "book_name": "book",
+                    "page_no": 1,
+                    "total_pages": 1,
+                    "server_generation": 2,
+                },
+            }
+        ),
+        json.dumps(
+            {
+                "event": "page",
+                "book_name": "book",
+                "page": {
+                    "page_no": 1,
+                    "image_sha256": "hash",
+                    "state": "passed",
+                    "full_text": "本文",
+                    "char_count": 2,
+                    "raw_output": "",
+                    "block_count": 1,
+                    "quality_flags": [],
+                    "ink_coverage": 1.0,
+                    "attempt_count": 1,
+                    "server_generation": 2,
+                    "error_message": None,
+                },
+            }
+        ),
+    ]
+
+    class FakeProcess:
+        stdout = iter(line + "\n" for line in lines)
+        returncode = 0
+
+        def wait(self):
+            return 0
+
+    monkeypatch.setattr(extractor.subprocess, "Popen", lambda *_args, **_kwargs: FakeProcess())
+    progress = []
+
+    pages = list(
+        extractor.iter_ocr_pages(
+            [{"book_name": "book", "page_no": 1, "image_path": "001.png"}],
+            progress_callback=progress.append,
+        )
+    )
+
+    assert progress[0]["stage"] == "page_started"
+    assert progress[0]["server_generation"] == 2
+    assert pages[0][1]["full_text"] == "本文"

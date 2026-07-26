@@ -14,7 +14,7 @@ import platform
 import re
 import subprocess
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
@@ -60,7 +60,18 @@ class OcrPageResult(PageText):
     quality_flags: list[str]
     ink_coverage: float | None
     attempt_count: int
+    server_generation: NotRequired[int]
     error_message: NotRequired[str | None]
+
+
+class OcrProgressEvent(TypedDict):
+    stage: str
+    book_name: NotRequired[str]
+    page_no: NotRequired[int]
+    total_pages: NotRequired[int]
+    attempt_count: NotRequired[int]
+    server_generation: NotRequired[int]
+    detail: NotRequired[str]
 
 
 def _ocr_worker_env() -> dict[str, str]:
@@ -77,6 +88,15 @@ def _ocr_worker_env() -> dict[str, str]:
         "SURYA_REQUEST_TIMEOUT_SEC": app_settings.SURYA_REQUEST_TIMEOUT_SEC,
         "SURYA_MAX_ATTEMPTS": app_settings.SURYA_MAX_ATTEMPTS,
         "OCR_QUALITY_MIN_INK_COVERAGE": app_settings.OCR_QUALITY_MIN_INK_COVERAGE,
+        "OCR_SERVER_MAX_PAGES": app_settings.OCR_SERVER_MAX_PAGES,
+        "OCR_SERVER_CONSECUTIVE_FAILURES": app_settings.OCR_SERVER_CONSECUTIVE_FAILURES,
+        "OCR_SERVER_FAILURE_WINDOW": app_settings.OCR_SERVER_FAILURE_WINDOW,
+        "OCR_SERVER_FAILURE_RATE": app_settings.OCR_SERVER_FAILURE_RATE,
+        "OCR_CROSSCHECK_ALL_PAGES": app_settings.OCR_CROSSCHECK_ALL_PAGES,
+        "OCR_CROSS_ENGINE_MIN_SIMILARITY": app_settings.OCR_CROSS_ENGINE_MIN_SIMILARITY,
+        "OCR_EXTERNAL_CONFIDENCE_MEDIAN": app_settings.OCR_EXTERNAL_CONFIDENCE_MEDIAN,
+        "OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN": app_settings.OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN,
+        "OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO": app_settings.OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO,
     }
     for key, value in values.items():
         if value is not None:
@@ -84,7 +104,11 @@ def _ocr_worker_env() -> dict[str, str]:
     return env
 
 
-def iter_ocr_pages(tasks: list[OcrTask]) -> Iterator[tuple[str, OcrPageResult]]:
+def iter_ocr_pages(
+    tasks: list[OcrTask],
+    *,
+    progress_callback: Callable[[OcrProgressEvent], None] | None = None,
+) -> Iterator[tuple[str, OcrPageResult]]:
     """Run the isolated worker and yield one durable result candidate per page."""
     if not tasks:
         return
@@ -110,6 +134,10 @@ def iter_ocr_pages(tasks: list[OcrTask]) -> Iterator[tuple[str, OcrPageResult]]:
             data = json.loads(line)
             if data.get("event") == "fatal":
                 raise RuntimeError(f"OCR worker error: {data.get('error', 'unknown error')}")
+            if data.get("event") == "progress":
+                if progress_callback is not None:
+                    progress_callback(data["progress"])
+                continue
             if data.get("event") != "page":
                 raise RuntimeError(f"unknown OCR worker event: {data.get('event')}")
             yield str(data["book_name"]), data["page"]

@@ -150,7 +150,8 @@ def _run_combined_step(
         for name, char_summary in char_summaries.items():
             # first_page / page_count をテキスト検索で近似
             result = conn.execute(
-                "SELECT MIN(page_no), COUNT(*) FROM pages WHERE book_id = ? AND full_text LIKE ?",
+                "SELECT MIN(page_no), COUNT(*) FROM pages "
+                "WHERE book_id = ? AND index_eligible = 1 AND full_text LIKE ?",
                 (book_id, f"%{name}%"),
             ).fetchone()
             first_page = result[0] or 1

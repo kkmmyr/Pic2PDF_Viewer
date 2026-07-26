@@ -90,6 +90,12 @@ Linux 側にも `KINDLE_CAPTURE_AGENT_TOKEN` と
 を設定する。
 エージェントは `scripts\run_capture_agent.bat` から起動する。
 
+OCRをWindows GPUへ委譲する場合は、Linux側で`OCR_AGENT_ENABLED=true`、
+双方で同じ`KINDLE_CAPTURE_AGENT_TOKEN`を設定する。Windows側は必要に応じて
+`OCR_AGENT_ID`、`OCR_AGENT_POLL_SECONDS`、`OCR_AGENT_HEARTBEAT_SECONDS`を設定し、
+`scripts\run_ocr_agent.bat`を起動する。OCR agentは画像を一時ディレクトリへ取得し、
+`novel.db`や正式画像を直接更新しない。
+
 ---
 
 ## 使い方（新刊追加フロー）

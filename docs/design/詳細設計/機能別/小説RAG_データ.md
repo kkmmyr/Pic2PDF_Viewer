@@ -19,14 +19,15 @@
 
 ### 1.1 SQLite テーブル（`novel.db`）
 
-現行 head は revision `0004`。OCRステージングを含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
+現行 head は revision `0007`。OCRステージング・QA・正解コーパスを含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
 
 | テーブル | 用途 | 主なカラム | 定義元 |
 |---|---|---|---|
 | `books` | 書籍メタ（1 冊 = 1 PDF） | `name`(UNIQUE), `pdf_path`, `images_dir`, `page_count`, `indexed_at`, `summary`, `summary_generated_at`, `ocr_done_at` | 0003 |
-| `ocr_runs` | OCR実行単位のステージング | `book_name`, `engine`, `model`, `source_page_count`, `state`, `started_at`, `finished_at`, `error_message` | 0004 |
-| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, `state`, `full_text`, `raw_output`, `quality_flags_json`, `ink_coverage`, `attempt_count` | 0004 |
-| `pages` | ページ単位の本文 | `book_id`(FK), `page_no`, `image_path`, `full_text`, `char_count`, `main_characters`; UNIQUE(book_id, page_no) | 0003 |
+| `ocr_runs` | OCR実行単位のステージング | `book_name`, `engine`, `model`, `source_page_count`, `state`, QA状態・承認情報 | 0004, 0005 |
+| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, OCR結果・品質値、QA状態、`page_type`, `index_eligible` | 0004, 0005, 0007 |
+| `ocr_ground_truth_pages` | OCR正解コーパス | `run_id`+`page_no`(UNIQUE), `image_sha256`, `page_type`, `reference_text`, `state`, `note`, 検証日時 | 0007 |
+| `pages` | ページ単位の本文 | `book_id`(FK), `page_no`, `image_path`, `full_text`, `char_count`, `main_characters`, `page_type`, `index_eligible`; UNIQUE(book_id, page_no) | 0003, 0007 |
 | `pages_fts` | `pages.full_text` の全文検索（FTS5, `tokenize='trigram'`, `content='pages'`） | `full_text` | 0003 |
 | `chunks` | 埋め込み単位のチャンク | `page_id`(FK), `chunk_idx`, `text`, `char_count`, `contextual_text`, `contextual_generated_at`(B-9 Contextual Retrieval) | 0003 |
 | `qa_history` | 単発 QA の実行ログ | `scope_type`, `scope_id`, `question`, `answer`, `prompt`, `context_json`, `model`, `options_json`, `eval_count`, `done_reason`, `error_message` | 0003 |
@@ -41,6 +42,7 @@
 - `created_at` 等のタイムスタンプは JST 固定（`datetime('now', '+9 hours')`）。
 - FK は `PRAGMA foreign_keys = ON`（`connection.py`）で有効。`journal_mode = WAL`。
 - `pages.page_no` は `kindle_novel/images/{書籍名}/NNN.png` の連番に対応するキャプチャ画面番号であり、Kindleの紙面ページ番号ではない。リフロー表示では両者は1対1対応しない。
+- `pages.index_eligible=1`は`page_type=narrative`だけである。非本文ページは正本ページとして保持するが、FTS検索、chunk、Embedding、full-book入力、サマリ・人物抽出から除外する。
 
 ### 1.2 LanceDB テーブル（`novel.lancedb`）
 

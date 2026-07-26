@@ -284,6 +284,278 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/ocr/agents/claim': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Claim Ocr Agent Job */
+        post: operations['claim_ocr_agent_job_api_ocr_agents_claim_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/agents/jobs/{job_id}/pages/{book_name}/{page_no}/image': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr Agent Page Image */
+        get: operations['get_ocr_agent_page_image_api_ocr_agents_jobs__job_id__pages__book_name___page_no__image_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/agents/jobs/{job_id}/heartbeat': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Heartbeat Ocr Agent Job */
+        post: operations['heartbeat_ocr_agent_job_api_ocr_agents_jobs__job_id__heartbeat_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/agents/jobs/{job_id}/pages': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Ocr Agent Page */
+        post: operations['submit_ocr_agent_page_api_ocr_agents_jobs__job_id__pages_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/agents/jobs/{job_id}/complete': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete Ocr Agent Job */
+        post: operations['complete_ocr_agent_job_api_ocr_agents_jobs__job_id__complete_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/agents/jobs/{job_id}/fail': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fail Ocr Agent Job */
+        post: operations['fail_ocr_agent_job_api_ocr_agents_jobs__job_id__fail_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/qa/runs': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr Qa Runs */
+        get: operations['get_ocr_qa_runs_api_ocr_qa_runs_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/qa/runs/{run_id}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr Qa Run */
+        get: operations['get_ocr_qa_run_api_ocr_qa_runs__run_id__get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/qa/runs/{run_id}/pages/{page_no}/image': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr Qa Page Image */
+        get: operations['get_ocr_qa_page_image_api_ocr_qa_runs__run_id__pages__page_no__image_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/qa/runs/{run_id}/pages/{page_no}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Review Ocr Qa Page */
+        patch: operations['review_ocr_qa_page_api_ocr_qa_runs__run_id__pages__page_no__patch'];
+        trace?: never;
+    };
+    '/api/ocr/qa/runs/{run_id}/classify-pages': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Classify Ocr Qa Pages */
+        post: operations['classify_ocr_qa_pages_api_ocr_qa_runs__run_id__classify_pages_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/qa/runs/{run_id}/approve': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Ocr Qa Run */
+        post: operations['approve_ocr_qa_run_api_ocr_qa_runs__run_id__approve_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/ground-truth': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr Ground Truth */
+        get: operations['get_ocr_ground_truth_api_ocr_ground_truth_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/ground-truth/seed': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Seed Ocr Ground Truth */
+        post: operations['seed_ocr_ground_truth_api_ocr_ground_truth_seed_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/ocr/ground-truth/{entry_id}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Ocr Ground Truth */
+        patch: operations['update_ocr_ground_truth_api_ocr_ground_truth__entry_id__patch'];
+        trace?: never;
+    };
+    '/api/ocr/ground-truth/{entry_id}/image': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ocr Ground Truth Image */
+        get: operations['get_ocr_ground_truth_image_api_ocr_ground_truth__entry_id__image_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/meta': {
         parameters: {
             query?: never;
@@ -2835,6 +3107,365 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** OcrAgentActionResponse */
+        OcrAgentActionResponse: {
+            /** Job Id */
+            job_id: number;
+            /** Status */
+            status: string;
+            /** Book Name */
+            book_name?: string | null;
+            /** Page No */
+            page_no?: number | null;
+            /** Books */
+            books?: number | null;
+        };
+        /** OcrAgentBookOut */
+        OcrAgentBookOut: {
+            /** Book Name */
+            book_name: string;
+            /** Run Id */
+            run_id: number;
+            /** Source Page Count */
+            source_page_count: number;
+            /** Tasks */
+            tasks: components['schemas']['OcrAgentTaskOut'][];
+        };
+        /** OcrAgentClaimRequest */
+        OcrAgentClaimRequest: {
+            /** Agent Id */
+            agent_id: string;
+        };
+        /** OcrAgentClaimResponse */
+        OcrAgentClaimResponse: {
+            job: components['schemas']['OcrAgentJobOut'] | null;
+        };
+        /** OcrAgentFailRequest */
+        OcrAgentFailRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /** Error */
+            error: string;
+        };
+        /** OcrAgentHeartbeatRequest */
+        OcrAgentHeartbeatRequest: {
+            /** Agent Id */
+            agent_id: string;
+        };
+        /** OcrAgentJobOut */
+        OcrAgentJobOut: {
+            /** Id */
+            id: number;
+            /** Job Type */
+            job_type: string;
+            /** Target Id */
+            target_id: string | null;
+            /** Agent Id */
+            agent_id: string;
+            /** Progress Total */
+            progress_total: number;
+            /** Progress Done */
+            progress_done: number;
+            /** Books */
+            books: components['schemas']['OcrAgentBookOut'][];
+        };
+        /** OcrAgentPageResultIn */
+        OcrAgentPageResultIn: {
+            /** Page No */
+            page_no: number;
+            /** Image Sha256 */
+            image_sha256: string;
+            /** State */
+            state: string;
+            /** Full Text */
+            full_text: string;
+            /** Char Count */
+            char_count: number;
+            /** Raw Output */
+            raw_output: string;
+            /** Block Count */
+            block_count: number;
+            /** Quality Flags */
+            quality_flags: string[];
+            /** Ink Coverage */
+            ink_coverage: number | null;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Server Generation */
+            server_generation?: number | null;
+            /** Error Message */
+            error_message?: string | null;
+        };
+        /** OcrAgentPageSubmitRequest */
+        OcrAgentPageSubmitRequest: {
+            /** Agent Id */
+            agent_id: string;
+            /** Book Name */
+            book_name: string;
+            page: components['schemas']['OcrAgentPageResultIn'];
+        };
+        /** OcrAgentTaskOut */
+        OcrAgentTaskOut: {
+            /** Book Name */
+            book_name: string;
+            /** Page No */
+            page_no: number;
+            /** Image Sha256 */
+            image_sha256: string;
+            /** Image Url */
+            image_url: string;
+        };
+        /** OcrGroundTruthEntryOut */
+        OcrGroundTruthEntryOut: {
+            /** Id */
+            id: number;
+            /** Run Id */
+            run_id: number;
+            /** Page No */
+            page_no: number;
+            /** Image Sha256 */
+            image_sha256: string;
+            /**
+             * Page Type
+             * @enum {string}
+             */
+            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /** Reference Text */
+            reference_text: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: 'draft' | 'verified';
+            /** Note */
+            note: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Updated At */
+            updated_at: string | null;
+            /** Verified At */
+            verified_at: string | null;
+            /** Book Name */
+            book_name: string;
+            /** Ocr Text */
+            ocr_text: string;
+            /** Edit Distance */
+            edit_distance: number | null;
+            /** Reference Chars */
+            reference_chars: number | null;
+            /** Cer */
+            cer: number | null;
+            /** Image Url */
+            image_url: string;
+        };
+        /** OcrGroundTruthListResponse */
+        OcrGroundTruthListResponse: {
+            /** Entries */
+            entries: components['schemas']['OcrGroundTruthEntryOut'][];
+            /** Total Count */
+            total_count: number;
+            /** Verified Count */
+            verified_count: number;
+            /** Total Edit Distance */
+            total_edit_distance: number;
+            /** Total Reference Chars */
+            total_reference_chars: number;
+            /** Aggregate Cer */
+            aggregate_cer: number | null;
+            /** Metrics By Page Type */
+            metrics_by_page_type: components['schemas']['OcrGroundTruthMetricOut'][];
+        };
+        /** OcrGroundTruthMetricOut */
+        OcrGroundTruthMetricOut: {
+            /**
+             * Page Type
+             * @enum {string}
+             */
+            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /** Total Count */
+            total_count: number;
+            /** Verified Count */
+            verified_count: number;
+            /** Total Edit Distance */
+            total_edit_distance: number;
+            /** Total Reference Chars */
+            total_reference_chars: number;
+            /** Aggregate Cer */
+            aggregate_cer: number | null;
+        };
+        /** OcrGroundTruthSeedRequest */
+        OcrGroundTruthSeedRequest: {
+            /** Samples */
+            samples: components['schemas']['OcrGroundTruthSeedSample'][];
+        };
+        /** OcrGroundTruthSeedResponse */
+        OcrGroundTruthSeedResponse: {
+            /** Status */
+            status: string;
+            /** Created */
+            created: number;
+        };
+        /** OcrGroundTruthSeedSample */
+        OcrGroundTruthSeedSample: {
+            /** Run Id */
+            run_id: number;
+            /** Page No */
+            page_no: number;
+        };
+        /** OcrGroundTruthUpdateRequest */
+        OcrGroundTruthUpdateRequest: {
+            /** Reference Text */
+            reference_text?: string | null;
+            /**
+             * Page Type
+             * @enum {string}
+             */
+            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /**
+             * State
+             * @enum {string}
+             */
+            state: 'draft' | 'verified';
+            /** Note */
+            note?: string | null;
+        };
+        /** OcrPageTypeClassificationResponse */
+        OcrPageTypeClassificationResponse: {
+            /** Status */
+            status: string;
+            /** Run Id */
+            run_id: number;
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+        };
+        /** OcrQaActionResponse */
+        OcrQaActionResponse: {
+            /** Status */
+            status: string;
+            /** Run Id */
+            run_id: number;
+        };
+        /** OcrQaPageOut */
+        OcrQaPageOut: {
+            /** Page No */
+            page_no: number;
+            /** State */
+            state: string;
+            /** Qa State */
+            qa_state: string;
+            /** Full Text */
+            full_text: string;
+            /** Char Count */
+            char_count: number;
+            /** Quality Flags */
+            quality_flags: string[];
+            /** Ink Coverage */
+            ink_coverage: number | null;
+            /** Attempt Count */
+            attempt_count: number;
+            /** Error Message */
+            error_message: string | null;
+            /** Qa Note */
+            qa_note: string | null;
+            /** Reviewed At */
+            reviewed_at: string | null;
+            /**
+             * Page Type
+             * @enum {string}
+             */
+            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            /** Index Eligible */
+            index_eligible: boolean;
+            /** Image Url */
+            image_url: string;
+        };
+        /** OcrQaPageReviewRequest */
+        OcrQaPageReviewRequest: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: 'approved' | 'rejected';
+            /** Note */
+            note?: string | null;
+            /**
+             * Page Type
+             * @enum {string}
+             */
+            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+        };
+        /** OcrQaRunApproveRequest */
+        OcrQaRunApproveRequest: {
+            /** Reviewer */
+            reviewer: string;
+            /** Note */
+            note?: string | null;
+        };
+        /** OcrQaRunDetail */
+        OcrQaRunDetail: {
+            /** Id */
+            id: number;
+            /** Book Name */
+            book_name: string;
+            /** Engine */
+            engine: string;
+            /** Model */
+            model: string;
+            /** Source Page Count */
+            source_page_count: number;
+            /** State */
+            state: string;
+            /** Qa State */
+            qa_state: string;
+            /** Required Pages */
+            required_pages: number;
+            /** Approved Pages */
+            approved_pages: number;
+            /** Rejected Pages */
+            rejected_pages: number;
+            /** Started At */
+            started_at: string | null;
+            /** Qa Reviewer */
+            qa_reviewer: string | null;
+            /** Qa Reviewed At */
+            qa_reviewed_at: string | null;
+            /** Qa Note */
+            qa_note: string | null;
+            /** Pages */
+            pages: components['schemas']['OcrQaPageOut'][];
+        };
+        /** OcrQaRunListResponse */
+        OcrQaRunListResponse: {
+            /** Runs */
+            runs: components['schemas']['OcrQaRunSummary'][];
+        };
+        /** OcrQaRunSummary */
+        OcrQaRunSummary: {
+            /** Id */
+            id: number;
+            /** Book Name */
+            book_name: string;
+            /** Engine */
+            engine: string;
+            /** Model */
+            model: string;
+            /** Source Page Count */
+            source_page_count: number;
+            /** State */
+            state: string;
+            /** Qa State */
+            qa_state: string;
+            /** Required Pages */
+            required_pages: number;
+            /** Approved Pages */
+            approved_pages: number;
+            /** Rejected Pages */
+            rejected_pages: number;
+            /** Started At */
+            started_at: string | null;
+        };
         /** OcrRunResponse */
         OcrRunResponse: {
             /** Status */
@@ -3853,6 +4484,523 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['StatusResponse'];
+                };
+            };
+        };
+    };
+    claim_ocr_agent_job_api_ocr_agents_claim_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrAgentClaimRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrAgentClaimResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_ocr_agent_page_image_api_ocr_agents_jobs__job_id__pages__book_name___page_no__image_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-ocr-agent-id'?: string | null;
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: number;
+                book_name: string;
+                page_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    heartbeat_ocr_agent_job_api_ocr_agents_jobs__job_id__heartbeat_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrAgentHeartbeatRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    submit_ocr_agent_page_api_ocr_agents_jobs__job_id__pages_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrAgentPageSubmitRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    complete_ocr_agent_job_api_ocr_agents_jobs__job_id__complete_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrAgentHeartbeatRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    fail_ocr_agent_job_api_ocr_agents_jobs__job_id__fail_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                'x-capture-agent-token'?: string | null;
+            };
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrAgentFailRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_ocr_qa_runs_api_ocr_qa_runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrQaRunListResponse'];
+                };
+            };
+        };
+    };
+    get_ocr_qa_run_api_ocr_qa_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrQaRunDetail'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_ocr_qa_page_image_api_ocr_qa_runs__run_id__pages__page_no__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+                page_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    review_ocr_qa_page_api_ocr_qa_runs__run_id__pages__page_no__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+                page_no: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrQaPageReviewRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrQaActionResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    classify_ocr_qa_pages_api_ocr_qa_runs__run_id__classify_pages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrPageTypeClassificationResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    approve_ocr_qa_run_api_ocr_qa_runs__run_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrQaRunApproveRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrQaActionResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_ocr_ground_truth_api_ocr_ground_truth_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrGroundTruthListResponse'];
+                };
+            };
+        };
+    };
+    seed_ocr_ground_truth_api_ocr_ground_truth_seed_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrGroundTruthSeedRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrGroundTruthSeedResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    update_ocr_ground_truth_api_ocr_ground_truth__entry_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['OcrGroundTruthUpdateRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['OcrGroundTruthListResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_ocr_ground_truth_image_api_ocr_ground_truth__entry_id__image_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
                 };
             };
         };

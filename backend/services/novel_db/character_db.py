@@ -45,7 +45,8 @@ def list_book_characters_in_db(
         """
         SELECT page_no, main_characters
         FROM pages
-        WHERE book_id = ? AND main_characters IS NOT NULL AND main_characters <> ''
+        WHERE book_id = ? AND index_eligible = 1
+            AND main_characters IS NOT NULL AND main_characters <> ''
         ORDER BY page_no
         """,
         (book_id,),
@@ -79,7 +80,8 @@ def collect_character_pages(
         """
         SELECT page_no, full_text, main_characters
         FROM pages
-        WHERE book_id = ? AND main_characters IS NOT NULL AND main_characters <> ''
+        WHERE book_id = ? AND index_eligible = 1
+            AND main_characters IS NOT NULL AND main_characters <> ''
             AND full_text IS NOT NULL AND full_text <> ''
         ORDER BY page_no
         """,
@@ -187,7 +189,8 @@ def top_scenes_for_character(
         """
         SELECT page_no, char_count, main_characters
         FROM pages
-        WHERE book_id = ? AND main_characters IS NOT NULL AND main_characters <> ''
+        WHERE book_id = ? AND index_eligible = 1
+            AND main_characters IS NOT NULL AND main_characters <> ''
         ORDER BY char_count DESC
         """,
         (book_id,),

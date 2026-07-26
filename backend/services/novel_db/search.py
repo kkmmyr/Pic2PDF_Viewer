@@ -130,6 +130,7 @@ def fts_search(
         JOIN pages p ON pages_fts.rowid = p.id
         JOIN books b ON p.book_id = b.id
         WHERE pages_fts MATCH ?
+          AND p.index_eligible = 1
           AND p.char_count >= ?
           AND p.page_no > ?
           AND p.page_no <= b.page_count - ?
@@ -333,7 +334,7 @@ def load_all_pages_of_book(
         return []
     book_id = book_row[0]
 
-    where_clauses = ["book_id = ?"]
+    where_clauses = ["book_id = ?", "index_eligible = 1"]
     params: list[object] = [book_id]
     if min_chars > 0:
         where_clauses.append("char_count >= ?")

@@ -238,6 +238,7 @@ def _load_body_text(
         SELECT page_no, full_text
         FROM pages
         WHERE book_id = ?
+          AND index_eligible = 1
           AND char_count >= ?
           AND page_no > ?
           AND page_no <= ?

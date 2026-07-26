@@ -122,6 +122,7 @@ class TestGetOcrStatus:
         res = client.get("/api/ocr/status")
         body = res.json()
         assert body["status"] == "running"
+        assert any("2" in log for log in body["logs"])
         assert "OCR中" in body["logs"]
         assert body["last_return_code"] is None
 
@@ -137,6 +138,70 @@ class TestGetOcrStatus:
         body = res.json()
         assert body["status"] == "running"
         assert any("2" in log for log in body["logs"])
+
+
+class TestOcrAgentApi:
+    def test_claim_requires_enabled_agent_and_valid_token(self, client, monkeypatch):
+        import config
+
+        monkeypatch.setattr(config.app_settings, "OCR_AGENT_ENABLED", True)
+        monkeypatch.setattr(config, "KINDLE_CAPTURE_AGENT_TOKEN", "test-token")
+        monkeypatch.setattr("routers.ocr.ocr_agent_jobs.claim", lambda agent_id: None)
+
+        unauthorized = client.post(
+            "/api/ocr/agents/claim",
+            json={"agent_id": "windows-1"},
+            headers={"X-Capture-Agent-Token": "wrong"},
+        )
+        assert unauthorized.status_code == 401
+
+        response = client.post(
+            "/api/ocr/agents/claim",
+            json={"agent_id": "windows-1"},
+            headers={"X-Capture-Agent-Token": "test-token"},
+        )
+        assert response.status_code == 200
+        assert response.json() == {"job": None}
+
+    def test_page_submit_forwards_validated_payload(self, client, monkeypatch):
+        import config
+
+        monkeypatch.setattr(config.app_settings, "OCR_AGENT_ENABLED", True)
+        monkeypatch.setattr(config, "KINDLE_CAPTURE_AGENT_TOKEN", "test-token")
+        captured: list[tuple] = []
+
+        def submit(job_id, agent_id, book_name, page):
+            captured.append((job_id, agent_id, book_name, page))
+            return {
+                "job_id": job_id,
+                "status": "passed",
+                "book_name": book_name,
+                "page_no": page["page_no"],
+            }
+
+        monkeypatch.setattr("routers.ocr.ocr_agent_jobs.submit_page", submit)
+        response = client.post(
+            "/api/ocr/agents/jobs/7/pages",
+            headers={"X-Capture-Agent-Token": "test-token"},
+            json={
+                "agent_id": "windows-1",
+                "book_name": "book",
+                "page": {
+                    "page_no": 1,
+                    "image_sha256": "a" * 64,
+                    "state": "passed",
+                    "full_text": "本文",
+                    "char_count": 2,
+                    "raw_output": "",
+                    "block_count": 1,
+                    "quality_flags": [],
+                    "ink_coverage": 1.0,
+                    "attempt_count": 1,
+                },
+            },
+        )
+        assert response.status_code == 200
+        assert captured[0][0:3] == (7, "windows-1", "book")
 
     def test_idle_after_completed_job(self, client, novel_db):
         from services.novel_db.connection import with_db
