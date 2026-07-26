@@ -71,7 +71,8 @@ export interface GenerateJob {
     error: string | null;
 }
 
-// TODO: backend マージ後に `npm run generate:types` を実行し、生成型 (api.d.ts) に置き換える
+// OpenAPIのstateはstring、nullable項目はoptionalで生成されるため、
+// UIで必要な閉じたunionと必須keyをこのadapter型で狭める。
 export type DoujinWatcherState =
     | 'idle'
     | 'waiting_stable'

@@ -1,9 +1,9 @@
 # ADR-0016: Kindle 購入カタログの初期データストアに SQLite を採用
 
-- **Status**: Accepted
+- **Status**: Accepted（実行時アクセス方式はADR-0017で追補）
 - **Date**: 2026-07-25
 - **決定者**: 開発者
-- **関連**: [Kindle 購入カタログ設計](../../詳細設計/機能別/Kindle購入カタログ設計.md)、[実装計画](../../../log/計画/Kindle購入カタログ統合_実装計画.md)
+- **関連**: [Kindle 購入カタログ設計](../../詳細設計/機能別/Kindle購入カタログ設計.md)、[完了記録](../../../archive/Kindle購入カタログ統合_実装計画.md)、[ADR-0017](0017_kindle-catalog-runtime-sqlite3.md)
 
 ## コンテキスト
 
@@ -23,7 +23,10 @@ PostgreSQL は同時書き込みと複数プロセス運用に強い一方、専
 
 Kindle 購入カタログは専用 SQLite DB `kindle_catalog.db` で開始する。SQLModel でスキーマを定義し、実行時クエリは短命な transaction で行う。接続時に WAL、foreign keys、busy timeout を有効化する。
 
-PostgreSQL へ移行できるよう、API とサービス層は SQLAlchemy URL から接続し、SQLite 固有処理を接続初期化と保守処理へ閉じ込める。
+実装後の実行時アクセス方式は[ADR-0017](0017_kindle-catalog-runtime-sqlite3.md)で追補する。
+現行はSQLModel/Alembicをschema管理に、`sqlite3`を実行時queryに使用する。
+PostgreSQL移行は接続URLの差し替えだけでは行わず、移行条件成立時にrepository境界を含む
+独立ADRを作成する。
 
 ## 根拠
 

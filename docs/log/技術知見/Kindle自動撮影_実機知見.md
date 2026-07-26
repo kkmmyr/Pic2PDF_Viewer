@@ -7,7 +7,7 @@
 関連:
 
 - [Kindle 自動撮影取込 要件](../../design/要件定義/Kindle自動撮影取込_要件.md)
-- [Kindle 自動撮影取込 実装計画](../計画/Kindle自動撮影取込_実装計画.md)
+- [Kindle 自動撮影取込 完了記録](../../archive/Kindle自動撮影取込_実装計画.md)
 - [バックエンド詳細設計](../../design/詳細設計/詳細設計書_バックエンド編.md)
 - [フロントエンド詳細設計](../../design/詳細設計/詳細設計書_フロントエンド編.md)
 - Kindle キャプチャツール詳細設計: `kindle-pdf/docs/detailed_design.md`

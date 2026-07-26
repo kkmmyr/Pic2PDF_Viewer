@@ -122,12 +122,15 @@ nav:
       - 基本設計:
           - 基本設計書: design/基本設計/基本設計書.md
           - ADR 一覧: design/基本設計/ADR/README.md
+          - ADR-0017 Kindle runtime sqlite3: design/基本設計/ADR/0017_kindle-catalog-runtime-sqlite3.md
       - 詳細設計:
           - 共通: design/詳細設計/詳細設計書_共通.md
           - バックエンド編: design/詳細設計/詳細設計書_バックエンド編.md
           - バックエンド編_ファイルマップ: design/詳細設計/詳細設計書_バックエンド_ファイルマップ.md
           - フロントエンド編: design/詳細設計/詳細設計書_フロントエンド編.md
           - フロントエンド編_ファイルマップ: design/詳細設計/詳細設計書_フロントエンド_ファイルマップ.md
+          - ライブラリ・リーダー UI: design/詳細設計/機能別/ライブラリ・リーダーUI設計.md
+          - 小説 RAG フロントエンド: design/詳細設計/機能別/小説RAG_フロントエンド設計.md
           - API: design/詳細設計/API.md
           - OCR 設計書: design/詳細設計/機能別/OCR設計書.md
           - hitomi 新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
@@ -154,9 +157,6 @@ nav:
       - テスト知見: log/技術知見/テスト知見.md
   - 計画:
       - バックログ: log/計画/バックログ.md
-      - Kindle購入カタログ統合 実装計画: log/計画/Kindle購入カタログ統合_実装計画.md
-      - Kindle購入カタログ画面 UI改善引継ぎ: log/計画/Kindle購入カタログ画面_UI改善引継ぎ.md
-      - Kindle自動撮影取込 実装計画: log/計画/Kindle自動撮影取込_実装計画.md
       - 小説OCR品質改善 実装計画: log/計画/小説OCR品質改善_実装計画.md
       - リファクタリング計画書: log/計画/リファクタリング計画書.md
       - 設計書・ソースコード健全性維持計画: log/計画/設計書・ソースコード健全性維持計画.md
@@ -169,6 +169,9 @@ nav:
       - やりたいこと整理_2026-05-12: archive/やりたいこと整理_2026-05-12.md
       - 実装ログ_2026-04-14: archive/実装ログ_2026-04-14.md
       - LLM 層リファクタリング_完了記録: archive/LLM層リファクタリング_完了記録.md
+      - Kindle購入カタログ統合 完了記録: archive/Kindle購入カタログ統合_実装計画.md
+      - Kindle購入カタログ画面 UI改善 完了記録: archive/Kindle購入カタログ画面_UI改善引継ぎ.md
+      - Kindle自動撮影取込 完了記録: archive/Kindle自動撮影取込_実装計画.md
       - 漫画 AI 検証: archive/検証/漫画AI検証.md
       - OCR 旧 SearchablePDF 設計: archive/OCR_旧SearchablePDF設計.md
       - hitomi 監視 実装計画と設計判断: archive/hitomi監視_実装計画と設計判断.md
