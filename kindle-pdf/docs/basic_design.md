@@ -1,5 +1,8 @@
 # Kindle キャプチャツール 基本設計書
 
+実機依存の観測値、障害切り分け、再撮影後の品質確認は
+[Kindle 自動撮影 実機知見](../../docs/log/技術知見/Kindle自動撮影_実機知見.md)を参照する。
+
 ## 1. システム概要
 
 Windows 版「Kindle for Windows」（Microsoft Store 版）で購入書籍を検索・照合し、必要ならダウンロードして先頭から最終画面まで撮影し、Pic2PDFViewerへ登録する自動化ツール群。通常運用は `scripts/run_capture_agent.bat` を使い、漫画用（`run_comic.bat`）と小説用（`run_novel.bat`）は診断・互換経路として残す。

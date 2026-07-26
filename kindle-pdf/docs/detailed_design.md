@@ -1,5 +1,8 @@
 # Kindle キャプチャツール 詳細設計書
 
+実機依存の観測値、障害切り分け、再撮影後の品質確認は
+[Kindle 自動撮影 実機知見](../../docs/log/技術知見/Kindle自動撮影_実機知見.md)を参照する。
+
 ## 1. モジュール構成・クラス設計
 
 ### 1.1. `capturer.py`（基底クラス群）
@@ -38,7 +41,7 @@
 | `FULLSCREEN_CROP_TOP` / `FULLSCREEN_CROP_BOTTOM_MARGIN` | 上下の固定マージン |
 | `FULLSCREEN_SETTLE_SEC` | F11 後の新 Kindle 案内トーストが消えるまでの待機時間（実測 `5.0` 秒） |
 | `NEW_KINDLE_SETTLE_SEC` | Microsoft Store 版を最大化した後の待機時間 |
-| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | `ReadingArea` を取得できない場合だけ使う Microsoft Store 版の上下フォールバック |
+| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | controller provider を使わない手動・互換経路だけの Microsoft Store 版上下フォールバック。自動 agent は UI 矩形取得失敗時に停止する |
 | `NEW_KINDLE_SIDE_IGNORE_PX` | Microsoft Store 版の左右ページ送り UI 除外幅 |
 | `BLACK_THRESHOLD` | 黒帯判定閾値 |
 | `SIDE_IGNORE_PX` | 左右 UI（矢印等）を無視する開始オフセット |
@@ -184,7 +187,7 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 | `BLACK_THRESHOLD` | 漫画 | 書籍背景が純黒でない場合に調整 |
 | `FULLSCREEN_SETTLE_SEC` | 漫画・小説 | F11 後の案内トーストが残る場合に調整 |
 | `PAGE_STABLE_SEC` | 漫画・小説 | ページ描画の中間フレームを除外する安定待ち時間 |
-| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | 漫画・小説 | `ReadingArea` 取得失敗時の上下フォールバック |
+| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | 漫画・小説 | controller provider を使わない手動・互換経路の上下フォールバック |
 | `NEW_KINDLE_SIDE_IGNORE_PX` | 漫画・小説 | Microsoft Store 版の左右 UI 除外幅 |
 | `SIDE_IGNORE_PX` | 漫画 | ページ送り矢印位置が変わった場合に調整 |
 | `COMIC_WHITE_THRESHOLD` / `COMIC_MIN_PAGE_ASPECT_RATIO` | 漫画 | 見開き安全幅のページ境界・最小幅を調整 |
@@ -196,7 +199,7 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 
 - **検証環境**: Windows、3840×2160モニター、新Kindle本文ウィンドウ（タイトルは厳密に `Kindle`）。旧固定クロップの保存画像は1918px高だったが、実際の `ReadingArea` は最大化ウィンドウ相対で上端56pxから最下端まであり、下105px固定除外が本文を切ることを2026-07-26に確認した。
 - **source別レイアウト**: `aaMenuButton` 配下の漫画用 `aaOption-Split` と ToggleState を実機確認した。固定レイアウト小説で `aaOption-Single` が存在する場合は明示選択する。リフロー型小説ではページ数 option が表示されず、`フォント-item`、フォントサイズ、余白、間隔が表示されることを確認したため、この構成を単ページ表示として受け入れる。
-- **再撮影受入（2026-07-26）**: 小説2冊を91枚・92枚、全画像3516×2064で正式登録し、本文サンプルの最下部とフッターに欠落がないことを確認した。漫画1冊を85見開き、全画像2936×2064で正式登録し、通常見開きの外側余白中央値が左15px・右17px、単ページの表紙と奥付は中央配置となることを確認した。3冊とも連番欠落、SHA-256完全重複、全面白画像は0件だった。
+- **再撮影受入（2026-07-26）**: 小説2冊を91枚・92枚、全画像3516×1940で正式登録し、本文サンプルの最上部・最下部を残しながら上部書名と下部ページ進捗を除外できたことを確認した。漫画1冊を85見開き、全画像2936×2064で正式登録し、通常見開きの外側余白中央値が左15px・右17px、単ページの表紙と奥付は中央配置となることを確認した。3冊とも連番欠落、SHA-256完全重複、全面白画像は0件だった。
 - **F11を使わない理由**: F11中にページ送りすると、本文描画が全面白のまま復帰しない事象を実測した。最大化ウィンドウでは同じページが正常描画される。
 - **入力方式**: 当初は左右端から120pxのクリックを使ったが、実際のchevron領域は64pxで
   hover表示だけが変化する場合があった。現在は確定済みの `left` / `right` 矢印キーを使う。
