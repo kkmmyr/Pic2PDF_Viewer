@@ -76,6 +76,7 @@ class _Controller:
     needs_download_result = False
     search_count = 0
     layout_sources: list[str] = []
+    start_sources: list[str] = []
 
     def __init__(self, _config) -> None:
         self.candidate = BookCandidate(
@@ -107,7 +108,8 @@ class _Controller:
         assert source == "novel"
         return (0, 100, 1000, 728)
 
-    def go_to_start(self, *, direction, on_poll) -> None:
+    def go_to_start(self, *, source, direction, on_poll) -> None:
+        type(self).start_sources.append(source)
         assert direction in {"left", "right"}
         on_poll()
 
@@ -117,6 +119,7 @@ def _reset_controller() -> None:
     _Controller.needs_download_result = False
     _Controller.search_count = 0
     _Controller.layout_sources = []
+    _Controller.start_sources = []
 
 
 def _fake_capture(
@@ -151,6 +154,7 @@ def test_run_once_executes_automatic_flow_and_reports_progress(
 
     assert handled
     assert _Controller.layout_sources == ["novel"]
+    assert _Controller.start_sources == ["novel"]
     assert [state["state"] for state in api.states] == [
         "locating_book",
         "positioning",

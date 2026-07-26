@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 _PAGE_FINGERPRINT_SIZE = (64, 64)
 _PAGE_CHANGE_MEAN_THRESHOLD = 1.0
+_LOCATION_FOOTER_PATTERN = re.compile(
+    r"\bLocation\s+(\d+)\s+of\s+\d+\s*[•·]\s*(\d+)%",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,22 @@ def visual_frames_differ(left: Image.Image, right: Image.Image) -> bool:
     right_gray = right.convert("L").resize(_PAGE_FINGERPRINT_SIZE)
     difference = ImageChops.difference(left_gray, right_gray)
     return ImageStat.Stat(difference).mean[0] >= _PAGE_CHANGE_MEAN_THRESHOLD
+
+
+def _footer_indicates_start(source: str, footer_name: str | None) -> bool:
+    """source別のKindle先頭ロケーション表示を判定する。"""
+    if source not in {"comic", "novel"} or not footer_name:
+        return False
+    match = _LOCATION_FOOTER_PATTERN.search(footer_name)
+    if match is None:
+        return False
+    location = int(match.group(1))
+    progress = int(match.group(2))
+    if progress != 0:
+        return False
+    if source == "novel":
+        return location == 1
+    return location in {1, 2}
 
 
 def _same_optional_text(left: str | None, right: str | None) -> bool:
@@ -309,6 +329,34 @@ class KindleAppController:
         except COMError:
             logger.debug(
                 "Kindle UI Automation search field lookup failed transiently",
+                exc_info=True,
+            )
+        return None
+
+    def _control_by_name(
+        self,
+        name: str,
+        *,
+        automation_id: str,
+        timeout: float | None = None,
+    ) -> auto.Control | None:
+        """NameとAutomationIdを併用して同名・同ID controlの誤選択を防ぐ。"""
+        control = auto.Control(
+            searchFromControl=self._require_window(),
+            searchDepth=self.config.control_search_depth,
+            Name=name,
+            AutomationId=automation_id,
+        )
+        try:
+            if control.Exists(
+                self.config.control_timeout_seconds if timeout is None else timeout,
+                0.5,
+            ):
+                return control
+        except COMError:
+            logger.debug(
+                "Kindle UI Automation named control lookup failed transiently: %s",
+                automation_id,
                 exc_info=True,
             )
         return None
@@ -718,17 +766,122 @@ class KindleAppController:
             logger.exception("Kindle reading area screenshot failed")
             return None
 
+    def _try_go_to_location_start(
+        self,
+        source: str,
+        *,
+        on_poll: Callable[[], None] | None = None,
+    ) -> bool:
+        """「位置に移動」で先頭へ移動し、source別フッターで検証する。"""
+        ui_opened = False
+        verified = False
+        try:
+            self._ensure_process_running()
+            if on_poll:
+                on_poll()
+
+            reading_area = self._control_by_id("ReadingArea", timeout=1.0)
+            if reading_area is None:
+                return False
+            more_menu = self._control_by_id("moreMenuButton", timeout=0.5)
+            if more_menu is None:
+                self._click_control(reading_area)
+                time.sleep(0.25)
+                more_menu = self._control_by_id("moreMenuButton", timeout=1.0)
+            if more_menu is None:
+                return False
+
+            self._click_control(more_menu)
+            ui_opened = True
+            time.sleep(0.25)
+            go_to_item = self._control_by_name(
+                "位置に移動",
+                automation_id="btn-popover-menu-item",
+                timeout=1.0,
+            )
+            if go_to_item is None:
+                return False
+            self._click_control(go_to_item)
+            time.sleep(0.25)
+
+            location_input = self._control_by_id(
+                "go-to-page-input",
+                timeout=1.0,
+            )
+            if location_input is None:
+                return False
+            location_input.SetFocus()
+            pyautogui.hotkey("ctrl", "a")
+            pyautogui.write("1", interval=0.02)
+            time.sleep(0.1)
+            try:
+                raw_input_value = location_input.GetValuePattern().Value
+                input_value = None if raw_input_value is None else str(raw_input_value)
+            except (AttributeError, COMError, TypeError, ValueError):
+                input_value = None
+            if input_value is not None and input_value != "1":
+                return False
+
+            confirm = self._control_by_name(
+                "位置に移動",
+                automation_id="modal-confirm",
+                timeout=1.0,
+            )
+            if confirm is None:
+                return False
+            self._click_control(confirm)
+            ui_opened = False
+            if on_poll:
+                on_poll()
+            self.wait_for_reader_stable()
+
+            footer = self._control_by_id("FooterLabelText", timeout=1.0)
+            verified = footer is not None and _footer_indicates_start(
+                source,
+                footer.Name,
+            )
+            if on_poll:
+                on_poll()
+            return verified
+        except KindleControllerError as exc:
+            if exc.error_code == "kindle_app_exited":
+                raise
+            logger.info(
+                "Kindle location jump unavailable; falling back to page scan: %s",
+                exc,
+            )
+            return False
+        except (AttributeError, COMError, OSError, TypeError, ValueError):
+            logger.info(
+                "Kindle location jump failed; falling back to page scan",
+                exc_info=True,
+            )
+            return False
+        finally:
+            if ui_opened and not verified:
+                pyautogui.press("esc")
+                time.sleep(0.1)
+
     def go_to_start(
         self,
         *,
+        source: str,
         direction: str,
         on_poll: Callable[[], None] | None = None,
     ) -> None:
+        if source not in {"comic", "novel"}:
+            raise KindleControllerError(
+                "positioning_failed",
+                "Kindleの撮影領域種別が不正です",
+            )
         if direction not in {"left", "right"}:
             raise KindleControllerError(
                 "positioning_failed",
                 "ページ送り方向が不正です",
             )
+        if self._try_go_to_location_start(source, on_poll=on_poll):
+            return
+
         previous_page_key = "right" if direction == "left" else "left"
         self.wait_for_reader_stable()
         previous_frame = self._reading_area_image()

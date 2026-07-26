@@ -285,6 +285,15 @@ class _PositionController(KindleAppController):
     def _ensure_process_running(self) -> None:
         return None
 
+    def _try_go_to_location_start(
+        self,
+        source: str,
+        *,
+        on_poll=None,
+    ) -> bool:
+        del source, on_poll
+        return False
+
 
 class _LayoutController(KindleAppController):
     def __init__(self) -> None:
@@ -309,6 +318,79 @@ class _LayoutController(KindleAppController):
         elif control.AutomationId == "aaOption-Single":
             self.controls["aaOption-Split"].Element.on = False
             self.controls["aaOption-Single"].Element.on = True
+
+
+class _LocationControl(_LayoutControl):
+    def __init__(
+        self,
+        automation_id: str,
+        *,
+        name: str = "",
+        value: str = "",
+    ) -> None:
+        super().__init__(automation_id)
+        self.Name = name
+        self.value_pattern = SimpleNamespace(Value=value)
+        self.focused = False
+
+    def SetFocus(self) -> None:
+        self.focused = True
+
+    def GetValuePattern(self):
+        return self.value_pattern
+
+
+class _LocationController(KindleAppController):
+    def __init__(self, footer_name: str) -> None:
+        super().__init__(ControllerConfig(control_timeout_seconds=0.2))
+        self.controls = {
+            "ReadingArea": _LocationControl("ReadingArea"),
+            "moreMenuButton": _LocationControl(
+                "moreMenuButton",
+                name="もっと",
+            ),
+            "go-to-page-input": _LocationControl(
+                "go-to-page-input",
+                name="ロケーション番号入力",
+            ),
+            "FooterLabelText": _LocationControl(
+                "FooterLabelText",
+                name=footer_name,
+            ),
+        }
+        self.named_controls = {
+            ("位置に移動", "btn-popover-menu-item"): _LocationControl(
+                "btn-popover-menu-item",
+                name="位置に移動",
+            ),
+            ("位置に移動", "modal-confirm"): _LocationControl(
+                "modal-confirm",
+                name="位置に移動",
+            ),
+        }
+        self.clicked: list[str] = []
+        self.stable_waits = 0
+
+    def _control_by_id(self, automation_id: str, **_kwargs):
+        return self.controls.get(automation_id)
+
+    def _control_by_name(
+        self,
+        name: str,
+        *,
+        automation_id: str,
+        **_kwargs,
+    ):
+        return self.named_controls.get((name, automation_id))
+
+    def _click_control(self, control: _LocationControl) -> None:
+        self.clicked.append(control.AutomationId)
+
+    def _ensure_process_running(self) -> None:
+        return None
+
+    def wait_for_reader_stable(self) -> None:
+        self.stable_waits += 1
 
 
 def test_go_to_start_stops_after_three_unchanged_frames(
@@ -336,12 +418,128 @@ def test_go_to_start_stops_after_three_unchanged_frames(
     )
 
     controller.go_to_start(
+        source="novel",
         direction="left",
         on_poll=lambda: polls.append(True),
     )
 
     assert presses == ["right"] * 4
     assert len(polls) == 4
+
+
+@pytest.mark.parametrize(
+    ("source", "footer_name", "expected"),
+    [
+        ("novel", "Location 1 of 3304  • 0%", True),
+        ("novel", "Location 2 of 3304  • 0%", False),
+        ("comic", "Location 1 of 169  • 0%", True),
+        ("comic", "Location 2 of 169  • 0%", True),
+        ("comic", "Location 2 of 169  • 1%", False),
+        ("comic", "", False),
+    ],
+)
+def test_footer_start_detection_is_source_specific(
+    source: str,
+    footer_name: str,
+    expected: bool,
+) -> None:
+    assert controller_module._footer_indicates_start(source, footer_name) is expected
+
+
+@pytest.mark.parametrize(
+    ("source", "footer_name"),
+    [
+        ("novel", "Location 1 of 3304  • 0%"),
+        ("comic", "Location 2 of 169  • 0%"),
+    ],
+)
+def test_go_to_start_uses_location_dialog_before_page_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    source: str,
+    footer_name: str,
+) -> None:
+    controller = _LocationController(footer_name)
+    hotkeys: list[tuple[str, ...]] = []
+    writes: list[tuple[str, float]] = []
+    presses: list[str] = []
+    polls: list[bool] = []
+    edit = controller.controls["go-to-page-input"]
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "hotkey",
+        lambda *keys: hotkeys.append(keys),
+    )
+
+    def _write(value: str, interval: float) -> None:
+        writes.append((value, interval))
+        edit.value_pattern.Value = value
+
+    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "press",
+        lambda key: presses.append(key),
+    )
+
+    controller.go_to_start(
+        source=source,
+        direction="left",
+        on_poll=lambda: polls.append(True),
+    )
+
+    assert controller.clicked == [
+        "moreMenuButton",
+        "btn-popover-menu-item",
+        "modal-confirm",
+    ]
+    assert edit.focused
+    assert hotkeys == [("ctrl", "a")]
+    assert writes == [("1", 0.02)]
+    assert presses == []
+    assert controller.stable_waits == 1
+    assert polls
+
+
+def test_location_start_rejects_unverified_keyboard_input(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LocationController("Location 1 of 3304  • 0%")
+    presses: list[str] = []
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "write",
+        lambda _value, interval: None,
+    )
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "press",
+        lambda key: presses.append(key),
+    )
+
+    assert not controller._try_go_to_location_start("novel")
+    assert "esc" in presses
+    assert "modal-confirm" not in controller.clicked
+
+
+def test_location_start_accepts_missing_value_readback_when_footer_verifies(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LocationController("Location 2 of 169  • 0%")
+    edit = controller.controls["go-to-page-input"]
+    edit.value_pattern.Value = None
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "write",
+        lambda _value, interval: None,
+    )
+
+    assert controller._try_go_to_location_start("comic")
+    assert "modal-confirm" in controller.clicked
 
 
 def test_page_layout_selects_spread_and_verifies_toggle_state(

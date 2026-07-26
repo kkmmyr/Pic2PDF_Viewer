@@ -312,6 +312,7 @@ def _run_claimed_job(
     controller.open_book(candidate)
     controller.set_page_layout(job["source"])
     controller.go_to_start(
+        source=job["source"],
         direction=job["direction"],
         on_poll=heartbeat.raise_if_failed,
     )
