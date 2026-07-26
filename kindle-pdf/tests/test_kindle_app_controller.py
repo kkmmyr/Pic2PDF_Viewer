@@ -269,19 +269,6 @@ class _Clock:
 
 
 class _PositionController(KindleAppController):
-    def __init__(self, frames: list[Image.Image], config: ControllerConfig) -> None:
-        super().__init__(config)
-        self.frames = frames
-
-    def wait_for_reader_stable(self) -> None:
-        return None
-
-    def _reading_area_image(self, *, timeout: float = 1.0) -> Image.Image | None:
-        del timeout
-        if len(self.frames) > 1:
-            return self.frames.pop(0)
-        return self.frames[0]
-
     def _ensure_process_running(self) -> None:
         return None
 
@@ -289,9 +276,10 @@ class _PositionController(KindleAppController):
         self,
         source: str,
         *,
+        direction: str = "left",
         on_poll=None,
     ) -> bool:
-        del source, on_poll
+        del source, direction, on_poll
         return False
 
 
@@ -359,9 +347,17 @@ class _LocationController(KindleAppController):
             ),
         }
         self.named_controls = {
+            ("ページへ移動する", "btn-popover-menu-item"): _LocationControl(
+                "btn-popover-menu-item",
+                name="ページへ移動する",
+            ),
             ("位置に移動", "btn-popover-menu-item"): _LocationControl(
                 "btn-popover-menu-item",
                 name="位置に移動",
+            ),
+            ("ページへ移動する", "modal-confirm"): _LocationControl(
+                "modal-confirm",
+                name="ページへ移動する",
             ),
             ("位置に移動", "modal-confirm"): _LocationControl(
                 "modal-confirm",
@@ -393,38 +389,61 @@ class _LocationController(KindleAppController):
         self.stable_waits += 1
 
 
-def test_go_to_start_stops_after_three_unchanged_frames(
+def test_popup_control_must_be_within_kindle_window() -> None:
+    controller = KindleAppController()
+    controller.window = SimpleNamespace(
+        BoundingRectangle=SimpleNamespace(left=100, top=100, right=900, bottom=700)
+    )
+    inside = SimpleNamespace(
+        BoundingRectangle=SimpleNamespace(left=700, top=200, right=800, bottom=300)
+    )
+    outside = SimpleNamespace(
+        BoundingRectangle=SimpleNamespace(left=950, top=200, right=1050, bottom=300)
+    )
+
+    assert controller._control_is_within_window(inside)
+    assert not controller._control_is_within_window(outside)
+
+
+def test_control_keyboard_activation_focuses_before_enter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    page_two = Image.new("RGB", (100, 100), "black")
-    page_one = Image.new("RGB", (100, 100), "white")
-    controller = _PositionController(
-        [page_two, page_one, page_one, page_one, page_one],
-        ControllerConfig(
-            positioning_timeout_seconds=10,
-            page_stable_seconds=1,
-            start_boundary_checks=3,
-        ),
-    )
-    clock = _Clock()
+    control = _LocationControl("backButton")
     presses: list[str] = []
-    polls: list[bool] = []
-    monkeypatch.setattr(controller_module.time, "monotonic", clock.monotonic)
-    monkeypatch.setattr(controller_module.time, "sleep", clock.sleep)
     monkeypatch.setattr(
         controller_module.pyautogui,
         "press",
         lambda key: presses.append(key),
     )
 
-    controller.go_to_start(
-        source="novel",
-        direction="left",
-        on_poll=lambda: polls.append(True),
+    KindleAppController._activate_control_with_keyboard(control)
+
+    assert control.focused
+    assert presses == ["enter"]
+
+
+def test_go_to_start_fails_without_sequential_page_scan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _PositionController(ControllerConfig())
+    presses: list[str] = []
+    polls: list[bool] = []
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "press",
+        lambda key: presses.append(key),
     )
 
-    assert presses == ["right"] * 4
-    assert len(polls) == 4
+    with pytest.raises(KindleControllerError) as exc:
+        controller.go_to_start(
+            source="novel",
+            direction="left",
+            on_poll=lambda: polls.append(True),
+        )
+
+    assert exc.value.error_code == "positioning_failed"
+    assert presses == []
+    assert polls == []
 
 
 @pytest.mark.parametrize(
@@ -432,9 +451,12 @@ def test_go_to_start_stops_after_three_unchanged_frames(
     [
         ("novel", "Location 1 of 3304  • 0%", True),
         ("novel", "Location 2 of 3304  • 0%", False),
+        ("novel", "ページ1/233  • 0%", True),
+        ("novel", "ページ2/233  • 0%", False),
         ("comic", "Location 1 of 169  • 0%", True),
         ("comic", "Location 2 of 169  • 0%", True),
         ("comic", "Location 2 of 169  • 1%", False),
+        ("comic", "ページ1/85  • 0%", False),
         ("comic", "", False),
     ],
 )
@@ -447,16 +469,18 @@ def test_footer_start_detection_is_source_specific(
 
 
 @pytest.mark.parametrize(
-    ("source", "footer_name"),
+    ("source", "footer_name", "expected_presses"),
     [
-        ("novel", "Location 1 of 3304  • 0%"),
-        ("comic", "Location 2 of 169  • 0%"),
+        ("novel", "Location 1 of 3304  • 0%", []),
+        ("novel", "ページ1/233  • 0%", ["right"]),
+        ("comic", "Location 2 of 169  • 0%", []),
     ],
 )
-def test_go_to_start_uses_location_dialog_before_page_fallback(
+def test_go_to_start_uses_direct_location_and_at_most_one_cover_step(
     monkeypatch: pytest.MonkeyPatch,
     source: str,
     footer_name: str,
+    expected_presses: list[str],
 ) -> None:
     controller = _LocationController(footer_name)
     hotkeys: list[tuple[str, ...]] = []
@@ -476,11 +500,13 @@ def test_go_to_start_uses_location_dialog_before_page_fallback(
         edit.value_pattern.Value = value
 
     monkeypatch.setattr(controller_module.pyautogui, "write", _write)
-    monkeypatch.setattr(
-        controller_module.pyautogui,
-        "press",
-        lambda key: presses.append(key),
-    )
+
+    def _press(key: str) -> None:
+        presses.append(key)
+        if source == "novel" and footer_name.startswith("ページ1/"):
+            controller.controls["FooterLabelText"].Name = "Location 1 of 3304  • 0%"
+
+    monkeypatch.setattr(controller_module.pyautogui, "press", _press)
 
     controller.go_to_start(
         source=source,
@@ -488,17 +514,55 @@ def test_go_to_start_uses_location_dialog_before_page_fallback(
         on_poll=lambda: polls.append(True),
     )
 
-    assert controller.clicked == [
+    expected_clicks = [
         "moreMenuButton",
         "btn-popover-menu-item",
         "modal-confirm",
     ]
+    if expected_presses:
+        expected_clicks.append("ReadingArea")
+    assert controller.clicked == expected_clicks
     assert edit.focused
     assert hotkeys == [("ctrl", "a")]
     assert writes == [("1", 0.02)]
-    assert presses == []
-    assert controller.stable_waits == 1
+    assert presses == expected_presses
+    assert controller.stable_waits == 1 + len(expected_presses)
     assert polls
+
+
+def test_go_to_start_waits_for_delayed_cover_footer_without_extra_page_turns(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LocationController("ページ1/233  • 0%")
+    original_control_by_id = controller._control_by_id
+    footer_lookups = 0
+    presses: list[str] = []
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
+
+    def _write(value: str, interval: float) -> None:
+        del interval
+        controller.controls["go-to-page-input"].value_pattern.Value = value
+
+    def _press(key: str) -> None:
+        presses.append(key)
+
+    def _control_by_id(automation_id: str, **kwargs):
+        nonlocal footer_lookups
+        if automation_id == "FooterLabelText":
+            footer_lookups += 1
+            if footer_lookups >= 7:
+                controller.controls["FooterLabelText"].Name = "Location 1 of 3304  • 0%"
+        return original_control_by_id(automation_id, **kwargs)
+
+    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
+    monkeypatch.setattr(controller_module.pyautogui, "press", _press)
+    monkeypatch.setattr(controller, "_control_by_id", _control_by_id)
+
+    controller.go_to_start(source="novel", direction="left")
+
+    assert presses == ["right"]
+    assert footer_lookups == 7
 
 
 def test_location_start_rejects_unverified_keyboard_input(

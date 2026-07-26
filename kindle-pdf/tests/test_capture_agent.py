@@ -34,7 +34,6 @@ def _config(tmp_path):
         agent_id="windows-test",
         heartbeat_seconds=30,
         download_timeout_seconds=60,
-        positioning_timeout_seconds=60,
     )
 
 

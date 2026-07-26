@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
-import os
-import re
-import shutil
-import socket
 import tempfile
-import threading
 import time
-import urllib.error
-import urllib.request
 from pathlib import Path
 
+from capture_agent_transport import (
+    AgentConfig,
+    AgentExecutionError,
+    ApiClient,
+    HeartbeatWorker,
+)
+from capture_package import (
+    package_path as _package_path,
+    publish_package as _publish_package,
+    safe_capture_title as _safe_capture_title,
+)
 from capturer import AutoKindleCapturer
 from kindle_app_controller import (
     BookIdentity,
@@ -31,118 +33,7 @@ try:
 except ImportError:
     pass
 
-
-class AgentExecutionError(RuntimeError):
-    def __init__(self, error_code: str, message: str) -> None:
-        super().__init__(message)
-        self.error_code = error_code
-
-
-class AgentConfig:
-    def __init__(self) -> None:
-        self.api_url = os.environ.get(
-            "PIC2PDF_API_URL", "http://medaroserver:8090"
-        ).rstrip("/")
-        self.token = os.environ.get("KINDLE_CAPTURE_AGENT_TOKEN", "")
-        inbox_value = os.environ.get("KINDLE_CAPTURE_INBOX_DIR", "")
-        self.inbox = Path(inbox_value) if inbox_value else Path()
-        self.agent_id = os.environ.get("KINDLE_CAPTURE_AGENT_ID", socket.gethostname())
-        self.poll_seconds = max(
-            2, int(os.environ.get("KINDLE_CAPTURE_POLL_SECONDS", "10"))
-        )
-        self.heartbeat_seconds = max(
-            5, int(os.environ.get("KINDLE_CAPTURE_HEARTBEAT_SECONDS", "30"))
-        )
-        self.download_timeout_seconds = max(
-            1, int(os.environ.get("KINDLE_DOWNLOAD_TIMEOUT_SECONDS", "1800"))
-        )
-        self.positioning_timeout_seconds = max(
-            1, int(os.environ.get("KINDLE_POSITIONING_TIMEOUT_SECONDS", "3600"))
-        )
-        if not self.token:
-            raise RuntimeError("KINDLE_CAPTURE_AGENT_TOKEN が設定されていません")
-        if not inbox_value:
-            raise RuntimeError("KINDLE_CAPTURE_INBOX_DIR が設定されていません")
-
-
-class ApiClient:
-    def __init__(self, config: AgentConfig) -> None:
-        self.config = config
-
-    def post(self, path: str, body: dict) -> dict:
-        request = urllib.request.Request(
-            f"{self.config.api_url}{path}",
-            data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "X-Capture-Agent-Token": self.config.token,
-            },
-            method="POST",
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=60) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"API {exc.code}: {detail}") from exc
-
-
-class HeartbeatWorker:
-    def __init__(
-        self,
-        api: ApiClient,
-        job_id: str,
-        agent_id: str,
-        interval_seconds: int,
-    ) -> None:
-        self.api = api
-        self.job_id = job_id
-        self.agent_id = agent_id
-        self.interval_seconds = interval_seconds
-        self._stop = threading.Event()
-        self._error: Exception | None = None
-        self._thread = threading.Thread(
-            target=self._run,
-            name=f"kindle-heartbeat-{job_id[:8]}",
-            daemon=True,
-        )
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._stop.set()
-        self._thread.join(timeout=max(1, self.interval_seconds + 1))
-
-    def _run(self) -> None:
-        while not self._stop.wait(self.interval_seconds):
-            try:
-                self.api.post(
-                    f"/api/kindle-catalog/agents/jobs/{self.job_id}/heartbeat",
-                    {"agent_id": self.agent_id},
-                )
-            except Exception as exc:
-                self._error = exc
-                return
-
-    def raise_if_failed(self) -> None:
-        if self._error is not None:
-            raise AgentExecutionError(
-                "capture_failed",
-                f"heartbeatの送信に失敗しました: {self._error}",
-            )
-
-
-def _safe_capture_title(job: dict) -> str:
-    identity = job.get("identity") or {}
-    title = str(identity.get("title") or job.get("title") or job["asin"])
-    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", title).strip().rstrip(".")
-    if not cleaned:
-        raise AgentExecutionError(
-            "book_identity_unverified",
-            "書籍タイトルを安全な保存名へ変換できません",
-        )
-    return cleaned[:180]
+_COMPATIBILITY_EXPORTS = (_package_path,)
 
 
 def _capture(
@@ -177,69 +68,6 @@ def _capture(
         return page_count, Path(image_dir)
     finally:
         capturer.cleanup()
-
-
-def _package_path(inbox: Path, job_id: str, suffix: str) -> Path:
-    root = inbox.resolve()
-    target = (root / f"{job_id}.{suffix}").resolve()
-    if not target.is_relative_to(root):
-        raise AgentExecutionError("transfer_failed", "capture packageのパスが不正です")
-    return target
-
-
-def _publish_package(config: AgentConfig, job: dict, image_dir: Path) -> Path:
-    job_id = job["id"]
-    partial = _package_path(config.inbox, job_id, "partial")
-    ready = _package_path(config.inbox, job_id, "ready")
-    config.inbox.mkdir(parents=True, exist_ok=True)
-    if partial.exists():
-        if partial.is_symlink() or not partial.is_dir():
-            raise AgentExecutionError(
-                "transfer_failed",
-                "既存の.partial packageが安全なディレクトリではありません",
-            )
-        shutil.rmtree(partial)
-    if ready.exists():
-        raise AgentExecutionError(
-            "transfer_failed",
-            "同じジョブの.ready packageが既にあります",
-        )
-    try:
-        images = partial / "images"
-        images.mkdir(parents=True)
-        manifest_files: list[dict[str, str]] = []
-        for source in sorted(
-            image_dir.iterdir(),
-            key=lambda path: path.name.casefold(),
-        ):
-            if source.suffix.casefold() not in {".png", ".jpg", ".jpeg", ".webp"}:
-                continue
-            target = images / source.name
-            shutil.copy2(source, target)
-            manifest_files.append(
-                {
-                    "name": source.name,
-                    "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
-                }
-            )
-        if not manifest_files:
-            raise AgentExecutionError("transfer_failed", "キャプチャ画像がありません")
-        manifest = {
-            "job_id": job_id,
-            "asin": job["asin"],
-            "source": job["source"],
-            "files": manifest_files,
-        }
-        (partial / "manifest.json").write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        os.replace(partial, ready)
-        return ready
-    except Exception:
-        if partial.is_dir() and not partial.is_symlink():
-            shutil.rmtree(partial)
-        raise
 
 
 def _state(
@@ -404,7 +232,6 @@ def run_once(
         controller = controller_factory(
             ControllerConfig(
                 download_timeout_seconds=config.download_timeout_seconds,
-                positioning_timeout_seconds=config.positioning_timeout_seconds,
             )
         )
         _run_claimed_job(config, api, job, controller, heartbeat)

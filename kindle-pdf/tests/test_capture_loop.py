@@ -129,7 +129,7 @@ def test_capture_loop_rejects_early_stop_before_expected_count(tmp_path, monkeyp
     capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
     capturer.config.EXPECTED_PAGES = 2
     capturer.config.PAGE_CHANGE_RETRY_COUNT = 0
-    pages = iter([_image(1), None])
+    pages = iter([_image(1), None, None])
 
     monkeypatch.setattr(
         capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
@@ -138,9 +138,40 @@ def test_capture_loop_rejects_early_stop_before_expected_count(tmp_path, monkeyp
     monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
     monkeypatch.setattr(capturer, "_save_image", lambda _image_value, _path: None)
     monkeypatch.setattr(capturer, "_next_page", lambda: None)
+    monkeypatch.setattr(capturer, "_next_page_opposite", lambda: None)
 
     with pytest.raises(RuntimeError, match="1/2"):
         capturer.capture_loop("book")
+
+
+def test_capture_loop_tries_opposite_key_only_for_first_transition(
+    tmp_path, monkeypatch
+):
+    capturer = KindleCapturer()
+    capturer.hwnd = 1
+    capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
+    capturer.config.EXPECTED_PAGES = 2
+    capturer.config.PAGE_CHANGE_RETRY_COUNT = 0
+    pages = iter([_image(1), None, _image(2)])
+    page_turns = []
+
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
+    monkeypatch.setattr(capturer, "_save_image", lambda _image_value, _path: None)
+    monkeypatch.setattr(capturer, "_next_page", lambda: page_turns.append("selected"))
+    monkeypatch.setattr(
+        capturer,
+        "_next_page_opposite",
+        lambda: page_turns.append("opposite"),
+    )
+
+    total, _save_dir = capturer.capture_loop("book")
+
+    assert total == 2
+    assert page_turns == ["selected", "opposite"]
 
 
 def test_new_kindle_restores_preexisting_fullscreen_on_cleanup(monkeypatch):
@@ -183,6 +214,22 @@ def test_reading_area_bounds_replace_fixed_vertical_crop():
     assert capturer._reading_area_relative == (8, 56, 1008, 608)
     assert capturer.config.FULLSCREEN_CROP_TOP == 56
     assert capturer.config.FULLSCREEN_CROP_BOTTOM_MARGIN == 8
+
+
+def test_new_kindle_focuses_reading_area_after_maximize(monkeypatch):
+    capturer = AutoKindleCapturer()
+    capturer.rect = RECT(-8, -8, 1008, 608)
+    capturer._reading_area_relative = (8, 56, 1008, 608)
+    clicks = []
+
+    monkeypatch.setattr(
+        capturer_module.pag, "click", lambda x, y: clicks.append((x, y))
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+
+    capturer._focus_reading_area()
+
+    assert clicks == [(500, 324)]
 
 
 def test_comic_single_cover_reserves_two_page_spread_width():

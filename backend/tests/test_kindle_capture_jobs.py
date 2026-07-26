@@ -9,6 +9,7 @@ import pytest
 
 import config
 from services.kindle_catalog import capture_jobs as capture_jobs_service
+from services.kindle_catalog import capture_registration
 from services.kindle_catalog.capture_jobs import (
     claim,
     complete,
@@ -19,7 +20,7 @@ from services.kindle_catalog.capture_jobs import (
 from services.kindle_catalog.connection import with_db
 from services.kindle_catalog.migrations import upgrade_head
 from services.kindle_catalog.repository import list_books
-from services.meta_store import load_meta
+from services.meta_store import load_meta, update_meta_locked
 from utils.dt import JST
 
 
@@ -50,6 +51,34 @@ def _seed_identity() -> None:
             """,
             ("B000CAPTURE", series_id),
         )
+
+
+def _prepare_ready_job(inbox: Path, make_png) -> dict:
+    upgrade_head()
+    _seed_book()
+    job = create("B000CAPTURE", "comic", "left", 1)
+    claim("windows-1")
+    update_state(job["id"], "windows-1", "waiting_user")
+    update_state(job["id"], "windows-1", "capturing")
+
+    ready = inbox / f"{job['id']}.ready"
+    image_path = ready / "images" / "001.png"
+    make_png(str(image_path))
+    digest = hashlib.sha256(image_path.read_bytes()).hexdigest()
+    (ready / "manifest.json").write_text(
+        json.dumps(
+            {
+                "job_id": job["id"],
+                "asin": "B000CAPTURE",
+                "source": "comic",
+                "files": [{"name": "001.png", "sha256": digest}],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    update_state(job["id"], "windows-1", "awaiting_files", captured_screens=1)
+    return job
 
 
 def test_capture_job_claim_and_ready_package_publish(tmp_data_dir, tmp_path, monkeypatch, make_png):
@@ -91,6 +120,72 @@ def test_capture_job_claim_and_ready_package_publish(tmp_data_dir, tmp_path, mon
     assert Path(tmp_data_dir["COMIC_IMAGES_DIR"], "キャプチャ作品", "001.png").is_file()
     assert load_meta("comic")["キャプチャ作品.pdf"]["asin"] == "B000CAPTURE"
     assert Path(inbox, "processed", job["id"], "manifest.json").is_file()
+
+
+def test_capture_job_replaces_same_asin_and_keeps_generation_backup(
+    tmp_data_dir,
+    tmp_path,
+    monkeypatch,
+    make_png,
+):
+    inbox = tmp_path / "capture-inbox"
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_INBOX_DIR", str(inbox))
+    target = Path(tmp_data_dir["COMIC_IMAGES_DIR"], "キャプチャ作品")
+    target.mkdir(parents=True)
+    old_image = target / "001.png"
+    old_image.write_bytes(b"old-image")
+
+    def seed_meta(data):
+        data["キャプチャ作品.pdf"] = {
+            "authors": ["既存著者"],
+            "asin": "B000CAPTURE",
+            "read_state": "reading",
+        }
+
+    update_meta_locked("comic", seed_meta)
+    job = _prepare_ready_job(inbox, make_png)
+
+    result = complete(job["id"], "windows-1")
+
+    assert result["status"] == "succeeded"
+    assert (target / "001.png").read_bytes() != b"old-image"
+    backups = list(
+        Path(config.DATA_DIR, ".capture-replacement-backup").glob(f"*_{job['id'][:8]}/comic-キャプチャ作品/001.png")
+    )
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == b"old-image"
+    meta = load_meta("comic")["キャプチャ作品.pdf"]
+    assert meta["asin"] == "B000CAPTURE"
+    assert meta["authors"] == ["既存著者"]
+    assert meta["read_state"] == "reading"
+
+
+def test_capture_job_rejects_same_title_with_different_asin(
+    tmp_data_dir,
+    tmp_path,
+    monkeypatch,
+    make_png,
+):
+    inbox = tmp_path / "capture-inbox"
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_INBOX_DIR", str(inbox))
+    target = Path(tmp_data_dir["COMIC_IMAGES_DIR"], "キャプチャ作品")
+    target.mkdir(parents=True)
+    (target / "001.png").write_bytes(b"other-book")
+
+    def seed_meta(data):
+        data["キャプチャ作品.pdf"] = {
+            "authors": [],
+            "asin": "B000DIFFERENT",
+        }
+
+    update_meta_locked("comic", seed_meta)
+    job = _prepare_ready_job(inbox, make_png)
+
+    with pytest.raises(ValueError, match="別書籍"):
+        complete(job["id"], "windows-1")
+
+    assert (target / "001.png").read_bytes() == b"other-book"
+    assert Path(inbox, f"{job['id']}.ready", "manifest.json").is_file()
 
 
 def test_capture_package_rejects_path_traversal_filename(tmp_data_dir, tmp_path, monkeypatch, make_png):
@@ -241,3 +336,70 @@ def test_claim_recovers_stale_job_before_claiming_next(
     assert row["status"] == "failed"
     assert row["error_code"] == "agent_heartbeat_timeout"
     assert row["completed_at"] == "2026-07-25T10:10:00+09:00"
+
+
+@pytest.mark.parametrize(
+    "failure_point",
+    [
+        "after_existing_backup",
+        "after_target_publish",
+        "after_meta_update",
+        "after_package_archive",
+        "before_job_update",
+    ],
+)
+@pytest.mark.parametrize("replacing_existing", [False, True])
+def test_complete_rolls_back_each_publish_boundary(
+    failure_point,
+    replacing_existing,
+    tmp_data_dir,
+    tmp_path,
+    monkeypatch,
+    make_png,
+):
+    inbox = tmp_path / "capture-inbox"
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_INBOX_DIR", str(inbox))
+    job = _prepare_ready_job(inbox, make_png)
+    target = Path(tmp_data_dir["COMIC_IMAGES_DIR"], "キャプチャ作品")
+    if replacing_existing:
+        target.mkdir(parents=True)
+        (target / "001.png").write_bytes(b"old-image")
+
+        def seed_meta(data):
+            data["キャプチャ作品.pdf"] = {
+                "authors": ["既存著者"],
+                "asin": "B000CAPTURE",
+                "read_state": "reading",
+            }
+
+        update_meta_locked("comic", seed_meta)
+    elif failure_point == "after_existing_backup":
+        pytest.skip("既存画像の退避地点は置換時だけ通過する")
+
+    def fail_at(point: str) -> None:
+        if point == failure_point:
+            raise RuntimeError(f"injected: {point}")
+
+    monkeypatch.setattr(capture_registration, "_inject_failure", fail_at)
+
+    with pytest.raises(RuntimeError, match=failure_point):
+        complete(job["id"], "windows-1")
+
+    if replacing_existing:
+        assert (target / "001.png").read_bytes() == b"old-image"
+        meta = load_meta("comic")["キャプチャ作品.pdf"]
+        assert meta["asin"] == "B000CAPTURE"
+        assert meta["authors"] == ["既存著者"]
+        assert meta["read_state"] == "reading"
+    else:
+        assert not target.exists()
+        assert "キャプチャ作品.pdf" not in load_meta("comic")
+    assert Path(inbox, f"{job['id']}.ready", "manifest.json").is_file()
+    assert not Path(inbox, "processed", job["id"]).exists()
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT status,book_id FROM capture_jobs WHERE id=?",
+            (job["id"],),
+        ).fetchone()
+    assert row["status"] == "awaiting_files"
+    assert row["book_id"] is None
