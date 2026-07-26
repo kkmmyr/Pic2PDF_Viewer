@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { ReadingDirection, LibrarySource } from '@/types';
 import { API_ENDPOINTS, buildApiUrl } from '@/config/api';
+import { normalizeReaderPage } from '@/features/reader/page-navigation';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 
 interface PageSliderProps {
@@ -15,22 +16,6 @@ interface PageSliderProps {
     onPageJump: (page: number) => void;
     onDragStart?: () => void;
     onDragEnd?: () => void;
-}
-
-/**
- * RTL/LTR 見開きモードにおいて、スライダーでジャンプした先のページを
- * 左ページ境界（有効な開始ページ）に正規化する。
- *
- * - RTL spread: 有効開始ページは 1, 2, 4, 6, … (1 は単独表紙、以降は偶数)
- * - LTR spread: 有効開始ページは 1, 3, 5, … (奇数)
- */
-function normalizeSpreadPage(page: number, isSpread: boolean, direction: ReadingDirection): number {
-    if (!isSpread) return page;
-    if (direction === 'rtl') {
-        if (page === 1) return 1;
-        return page % 2 === 0 ? page : page - 1;
-    }
-    return page % 2 === 1 ? page : Math.max(1, page - 1);
 }
 
 /**
@@ -67,8 +52,7 @@ export function PageSlider({
     const commitPage = useCallback(
         (value: number) => {
             setIsDragging(false);
-            const clamped = Math.max(1, Math.min(value, numPages));
-            onPageJump(normalizeSpreadPage(clamped, isSpread, direction));
+            onPageJump(normalizeReaderPage(value, numPages, isSpread, direction));
         },
         [numPages, isSpread, direction, onPageJump],
     );

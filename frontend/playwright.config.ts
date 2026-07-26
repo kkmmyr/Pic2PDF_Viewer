@@ -5,7 +5,7 @@ export default defineConfig({
     timeout: 30_000,
     retries: 1,
     use: {
-        baseURL: 'http://localhost:8090',
+        baseURL: process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:8090',
         headless: true,
         viewport: { width: 1280, height: 800 },
         // スクリーンショットはテスト失敗時のみ保存

@@ -184,6 +184,9 @@ Phase 5cではページ種別分類とレイアウト別候補選択を実装済
 - 全ページへ決定論的なページ種別候補を設定する。目次語、発行・広告語、文字数、前付け・後付け位置から安全に決まらない場合は`unknown`のまま残す。自動判定は既に手動設定された種別を上書きしない。
 - OCR時はraw出力のbboxラベル、本文量、非文字領域の有無から`layout_type`を安全側に提案する。`mixed_illustration`ではyomitoku候補を必ず比較し、機械選択後もQA必須とする。`full_width` / `structured` / `unknown`も自動確定せずQAへ送る。通常散文を含め、機械候補に固有名詞・列欠落の疑いがあればCodexが原画像と照合し、`corrected_text`を保存する。
 - 先頭7画面、先頭本文・中間・最終画面、OCR失敗、`unknown`または通常散文以外のレイアウト、および異常・限定例外を示す品質フラグ付き全画面を`required`とする。`cross_engine_consensus`と`yomitoku_adjudication`は、通常の2エンジン照合を実施した監査記録であり、それ単独ではQA必須ページを増やさない。QA画面で原画像・両OCR候補・採用本文・フラグ・ページ種別・レイアウト種別を比較し、ページ単位で承認または却下する。
+- フロントエンドは`useOCRQaController`がQA run/page選択、TanStack Query、
+  承認mutation、候補・補正入力を所有し、`OCRQaPanel`は表示へ限定する。
+  API、QA必須条件、候補選択、公開可否は分割前から変更しない。
 - `required`ページがすべて`approved`、`rejected`ページ、`unknown`ページ種別、`unknown`レイアウトが各0件で、再度画像SHAが一致した場合だけ、run承認APIが1トランザクションで`books` / `pages` / `pages_fts`を更新し、runを`completed`・`qa_state=approved`にする。`narrative`は機械合格した採用候補または非空の画像照合済み補正文を必須とする。
 - 公開後の`pages.page_type`と`pages.index_eligible`はQA確定値を保持する。`toc` / `illustration` / `colophon_or_ad`は画像パスを正本ページとして保持するが、公開本文は空文字にしてFTS検索、chunk、Embedding、全文読込、サマリ、人物・関係抽出の入力から除外する。OCR候補は`ocr_page_results`に監査用として残す。
 - 中断・失敗時は既存の公開済み本文を保持する。新規書籍では中途半端な本文を公開しない。

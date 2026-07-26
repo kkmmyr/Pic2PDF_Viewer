@@ -136,7 +136,10 @@ ReaderPanel（JSX orchestration）
 - autoは縦長pageを見開き候補とし、横長pageを検出したpairはsingle表示にする。
 - RTL spreadは表紙1を単独、以降を`2, 4, 6...`開始とする。
 - LTR spreadは`1, 3, 5...`開始とする。
-- slider jumpと前後移動は同じ純粋なpage正規化規則を使う。
+- `features/reader/page-navigation.ts`をpage計算の正本とし、
+  `PageSlider`と`useReaderNavigation`は同じ`normalizeReaderPage`、
+  `nextReaderPage`、`previousReaderPage`を使う。
+- RTL/LTR、single/spread、表紙単独、末尾、奇数最終pageは表形式unit testで固定する。
 
 ### 画面操作
 

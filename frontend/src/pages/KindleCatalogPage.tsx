@@ -7,54 +7,16 @@ import { KindlePageShell } from '@/components/kindle/KindlePageShell';
 import { bookTypeLabel, CAPTURE_LABELS, OWNERSHIP_LABELS } from '@/components/kindle/kindle-labels';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import {
+    clearKindleCatalogFilters,
+    KINDLE_CATALOG_PAGE_SIZE_OPTIONS,
+    parseKindleCatalogQuery,
+    replaceKindleCatalogParam,
+} from '@/features/kindle/catalog-query';
 import { useKindleBooks } from '@/hooks/useKindleCatalog';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import type {
-    KindleBookType,
-    KindleCatalogBook,
-    KindleCatalogFilters,
-    KindleCaptureState,
-    KindleOwnership,
-} from '@/types/kindleCatalog';
+import type { KindleCatalogBook, KindleCatalogFilters } from '@/types/kindleCatalog';
 import { errorMessage } from '@/utils/error';
-
-const DEFAULT_PAGE_SIZE = 25;
-const PAGE_SIZE_OPTIONS = [25, 50, 100] as const;
-const BOOK_TYPES = ['comic', 'novel', 'other', 'unknown'] as const;
-const OWNERSHIP_TYPES = [
-    'purchased',
-    'borrowed_active',
-    'borrowed_ended',
-    'returned',
-    'unknown',
-] as const;
-const CAPTURE_STATES = ['not_captured', 'captured', 'multiple_links', 'capture_pending'] as const;
-
-function parsePositiveInt(value: string | null, fallback: number): number {
-    const parsed = Number(value);
-    return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function isPageSize(value: number): value is (typeof PAGE_SIZE_OPTIONS)[number] {
-    return PAGE_SIZE_OPTIONS.includes(value as (typeof PAGE_SIZE_OPTIONS)[number]);
-}
-
-function parseEnumParam<T extends string>(value: string | null, allowed: readonly T[]): T | '' {
-    return value && allowed.includes(value as T) ? (value as T) : '';
-}
-
-function replaceParam(
-    current: URLSearchParams,
-    key: string,
-    value: string,
-    resetPage = true,
-): URLSearchParams {
-    const next = new URLSearchParams(current);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    if (resetPage) next.delete('page');
-    return next;
-}
 
 function StatusPill({ children, tone = 'gray' }: { children: string; tone?: 'blue' | 'gray' }) {
     const toneClass =
@@ -106,23 +68,11 @@ function KindleBookRow({
 
 export default function KindleCatalogPage() {
     const [searchParams, setSearchParams] = useSearchParams();
-    const urlQuery = searchParams.get('q') ?? '';
+    const parsedQuery = useMemo(() => parseKindleCatalogQuery(searchParams), [searchParams]);
+    const { q: urlQuery, pageSize, page, bookType, ownership, captureState } = parsedQuery;
     const [queryInput, setQueryInput] = useState(urlQuery);
     const [selectedBook, setSelectedBook] = useState<KindleCatalogBook | null>(null);
     const debouncedQuery = useDebouncedValue(queryInput, 300);
-
-    const requestedPageSize = parsePositiveInt(searchParams.get('page_size'), DEFAULT_PAGE_SIZE);
-    const pageSize = isPageSize(requestedPageSize) ? requestedPageSize : DEFAULT_PAGE_SIZE;
-    const page = parsePositiveInt(searchParams.get('page'), 1);
-    const bookType: KindleBookType = parseEnumParam(searchParams.get('book_type'), BOOK_TYPES);
-    const ownership: KindleOwnership = parseEnumParam(
-        searchParams.get('ownership'),
-        OWNERSHIP_TYPES,
-    );
-    const captureState: KindleCaptureState = parseEnumParam(
-        searchParams.get('capture_state'),
-        CAPTURE_STATES,
-    );
 
     const filters = useMemo<KindleCatalogFilters>(
         () => ({
@@ -143,14 +93,17 @@ export default function KindleCatalogPage() {
 
     useEffect(() => {
         if (debouncedQuery.trim() === urlQuery) return;
-        setSearchParams((current) => replaceParam(current, 'q', debouncedQuery.trim()), {
-            replace: true,
-        });
+        setSearchParams(
+            (current) => replaceKindleCatalogParam(current, 'q', debouncedQuery.trim()),
+            {
+                replace: true,
+            },
+        );
     }, [debouncedQuery, setSearchParams, urlQuery]);
 
     const submitSearch = (event: FormEvent) => {
         event.preventDefault();
-        setSearchParams((current) => replaceParam(current, 'q', queryInput.trim()), {
+        setSearchParams((current) => replaceKindleCatalogParam(current, 'q', queryInput.trim()), {
             replace: true,
         });
     };
@@ -159,24 +112,21 @@ export default function KindleCatalogPage() {
     const visiblePage = Math.min(page, totalPages);
 
     const updateParam = (key: string, value: string) => {
-        setSearchParams((current) => replaceParam(current, key, value), { replace: true });
-    };
-
-    const setPage = (nextPage: number) => {
-        setSearchParams((current) => replaceParam(current, 'page', String(nextPage), false), {
+        setSearchParams((current) => replaceKindleCatalogParam(current, key, value), {
             replace: true,
         });
     };
 
+    const setPage = (nextPage: number) => {
+        setSearchParams(
+            (current) => replaceKindleCatalogParam(current, 'page', String(nextPage), false),
+            { replace: true },
+        );
+    };
+
     const clearFilters = () => {
         setQueryInput('');
-        setSearchParams((current) => {
-            const next = new URLSearchParams(current);
-            ['q', 'book_type', 'ownership', 'capture_state', 'page'].forEach((key) =>
-                next.delete(key),
-            );
-            return next;
-        });
+        setSearchParams(clearKindleCatalogFilters);
     };
 
     const hasFilters = Boolean(urlQuery || bookType || ownership || captureState);
@@ -314,7 +264,7 @@ export default function KindleCatalogPage() {
                                 onChange={(event) => updateParam('page_size', event.target.value)}
                                 className="rounded border border-gray-300 bg-white px-2 py-1 dark:border-gray-600 dark:bg-gray-800"
                             >
-                                {PAGE_SIZE_OPTIONS.map((option) => (
+                                {KINDLE_CATALOG_PAGE_SIZE_OPTIONS.map((option) => (
                                     <option key={option} value={option}>
                                         {option}
                                     </option>

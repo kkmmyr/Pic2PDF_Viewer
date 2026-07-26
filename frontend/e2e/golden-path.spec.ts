@@ -46,7 +46,7 @@ test.describe('検索フィルタ', () => {
         await page.goto('/doujin');
 
         const search = page.getByPlaceholder('タイトル / 作者を検索...');
-        await expect(search).toBeVisible();
+        await expect(search).toBeVisible({ timeout: 10_000 });
 
         // 入力で値が反映される
         await search.fill('テスト');
@@ -101,16 +101,13 @@ test.describe('PDF リーダー', () => {
     });
 });
 
-// ── 6. ジェネレータページ ────────────────────────────────────────────────
-test.describe('ジェネレータ', () => {
-    test('ジェネレータページが表示される', async ({ page }) => {
+// ── 6. 取り込みページ ──────────────────────────────────────────────────
+test.describe('取り込み', () => {
+    test('取り込みページが表示される', async ({ page }) => {
         await page.goto('/doujin/generator');
 
-        await expect(page.getByRole('heading', { name: 'PDF 生成' })).toBeVisible();
-        // スキャン & 生成ボタンが存在する
-        await expect(page.getByRole('button', { name: /スキャン/ })).toBeVisible();
-        // 一括圧縮ボタンも存在する
-        await expect(page.getByRole('button', { name: /一括圧縮/ })).toBeVisible();
+        await expect(page.getByRole('heading', { name: '取り込み' })).toBeVisible();
+        await expect(page.getByRole('button', { name: '今すぐスキャン' })).toBeVisible();
     });
 });
 

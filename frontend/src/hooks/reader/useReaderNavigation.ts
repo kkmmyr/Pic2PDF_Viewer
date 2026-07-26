@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { nextReaderPage, previousReaderPage } from '@/features/reader/page-navigation';
 import type { ReadingDirection } from '@/types';
 
 interface UseReaderNavigationProps {
@@ -43,31 +44,14 @@ export function useReaderNavigation({
         (e?: React.MouseEvent | KeyboardEvent) => {
             e?.stopPropagation?.();
 
-            if (!isSpread) {
-                // Single Page Mode
-                if (pageNumber < numPages) setPageNumber((prev) => prev + 1);
-                else onNextAtEnd?.();
-                return;
-            }
-
-            // Spread Mode
-            if (direction === 'rtl') {
-                // RTL:
-                // Page 1 (Cover) -> Next -> Page 2 (Right) + Page 3 (Left) [Display: 3 | 2]
-                if (pageNumber === 1) {
-                    if (pageNumber + 1 <= numPages) setPageNumber(2);
-                    else onNextAtEnd?.();
-                } else {
-                    if (pageNumber + 2 <= numPages) setPageNumber((prev) => prev + 2);
-                    else onNextAtEnd?.();
-                }
-            } else {
-                // LTR:
-                // Page 1 (Left) + Page 2 (Right) -> Next -> Page 3 (Left) + Page 4 (Right)
-                if (pageNumber + 2 <= numPages) setPageNumber((prev) => prev + 2);
-                else if (pageNumber + 1 <= numPages) setPageNumber((prev) => prev + 1);
-                else onNextAtEnd?.();
-            }
+            const nextPage = nextReaderPage({
+                page: pageNumber,
+                numPages,
+                isSpread,
+                direction,
+            });
+            if (nextPage === null) onNextAtEnd?.();
+            else setPageNumber(nextPage);
         },
         [pageNumber, numPages, isSpread, direction, onNextAtEnd],
     );
@@ -78,27 +62,15 @@ export function useReaderNavigation({
 
             if (onPrevIntercept?.()) return;
 
-            if (!isSpread) {
-                // Single Page Mode
-                if (pageNumber > 1) setPageNumber((prev) => prev - 1);
-                return;
-            }
-
-            // Spread Mode
-            if (direction === 'rtl') {
-                // RTL:
-                if (pageNumber === 2) {
-                    setPageNumber(1);
-                } else if (pageNumber > 2) {
-                    setPageNumber((prev) => prev - 2);
-                }
-            } else {
-                // LTR:
-                if (pageNumber > 2) setPageNumber((prev) => prev - 2);
-                else if (pageNumber === 2) setPageNumber(1);
-            }
+            const previousPage = previousReaderPage({
+                page: pageNumber,
+                numPages,
+                isSpread,
+                direction,
+            });
+            if (previousPage !== null) setPageNumber(previousPage);
         },
-        [pageNumber, isSpread, direction, onPrevIntercept],
+        [pageNumber, numPages, isSpread, direction, onPrevIntercept],
     );
 
     const resetPage = useCallback(() => {
