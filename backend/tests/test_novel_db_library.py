@@ -1,6 +1,8 @@
 """services/novel_db/library.py の単体テスト。"""
 
+import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -94,7 +96,9 @@ def test_list_books_thumbnail_url_uses_first_image(setup_db):
     with with_db() as conn:
         books = list_books(conn)
 
-    assert books[0].thumbnail_url == "/kindle_novel/images/book-1/001.png"
+    url = urlsplit(books[0].thumbnail_url)
+    assert url.path == "/kindle_novel/images/book-1/001.png"
+    assert parse_qs(url.query)["v"]
 
 
 def test_list_books_url_encodes_japanese_book_name(setup_db):
@@ -104,7 +108,32 @@ def test_list_books_url_encodes_japanese_book_name(setup_db):
         books = list_books(conn)
 
     assert "%" in books[0].thumbnail_url
-    assert books[0].thumbnail_url.endswith("/001.png")
+    assert urlsplit(books[0].thumbnail_url).path.endswith("/001.png")
+
+
+def test_list_books_thumbnail_version_changes_when_images_are_replaced(setup_db):
+    _put_image_dir(setup_db, "book-1")
+    image_path = Path(setup_db["KINDLE_NOVEL_IMAGES_DIR"]) / "book-1" / "001.png"
+    image_path.write_bytes(b"first")
+
+    with with_db() as conn:
+        first_url = list_books(conn)[0].thumbnail_url
+
+    first_mtime_ns = image_path.stat().st_mtime_ns
+    image_path.write_bytes(b"second")
+    image_path.touch()
+    image_path_stat = image_path.stat()
+    if image_path_stat.st_mtime_ns == first_mtime_ns:
+        os.utime(
+            image_path,
+            ns=(first_mtime_ns + 1_000_000_000, first_mtime_ns + 1_000_000_000),
+        )
+
+    with with_db() as conn:
+        second_url = list_books(conn)[0].thumbnail_url
+
+    assert urlsplit(first_url).path == urlsplit(second_url).path
+    assert parse_qs(urlsplit(first_url).query)["v"] != parse_qs(urlsplit(second_url).query)["v"]
 
 
 def test_list_series_excludes_unaffiliated_books(setup_db):

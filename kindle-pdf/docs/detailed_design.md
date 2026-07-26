@@ -38,15 +38,22 @@
 | `FULLSCREEN_CROP_TOP` / `FULLSCREEN_CROP_BOTTOM_MARGIN` | 上下の固定マージン |
 | `FULLSCREEN_SETTLE_SEC` | F11 後の新 Kindle 案内トーストが消えるまでの待機時間（実測 `5.0` 秒） |
 | `NEW_KINDLE_SETTLE_SEC` | Microsoft Store 版を最大化した後の待機時間 |
-| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | Microsoft Store 版の上部ツールバー・下部進捗バー除外幅 |
+| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | `ReadingArea` を取得できない場合だけ使う Microsoft Store 版の上下フォールバック |
 | `NEW_KINDLE_SIDE_IGNORE_PX` | Microsoft Store 版の左右ページ送り UI 除外幅 |
 | `BLACK_THRESHOLD` | 黒帯判定閾値 |
 | `SIDE_IGNORE_PX` | 左右 UI（矢印等）を無視する開始オフセット |
+| `CAPTURE_SPREAD` | 自動agentの漫画で 2 ページ分の安全幅を確保するか |
+| `COMIC_WHITE_THRESHOLD` / `COMIC_MIN_PAGE_ASPECT_RATIO` | 先頭ページの非白色領域と最小 1 ページ幅を推定する閾値 |
 
 #### `AutoKindleCapturer`（継承クラス）
 
-- **`setup_window()` (オーバーライド)**: タイトルが厳密に `Kindle` の Microsoft Store 版は最大化し、旧 Kindle for PC は必要な場合だけ F11 で切り替える。実ウィンドウ矩形を取得して `_detect_boundaries` を実行し、マルチモニターでも対象ウィンドウの座標系を使用する。
-- **`_detect_boundaries(img, w, h)`**: 上部・中央・下部の 3 ラインをスキャンし、黒帯を除いたコンテンツ領域を算出。
+- **`setup_window(reading_area_bounds_provider=None)` (オーバーライド)**:
+  タイトルが厳密に `Kindle` の Microsoft Store 版は最大化し、旧 Kindle for PC は必要な場合だけ F11 で切り替える。
+  agent 経路では最大化後に provider から `ReadingArea` の画面座標を再取得し、
+  実ウィンドウ矩形に対する相対上下境界へ変換する。
+- **`_detect_boundaries(img, w, h)`**: 手動互換経路は従来の黒帯検出を使う。
+  `CAPTURE_SPREAD` の agent 漫画は、読書領域内の非白色列から 1 ページ幅を推定し、
+  その 2 倍以上を中央の見開き安全幅として算出する。
 - **`cleanup()`**: ツール自身が最大化または F11 切り替えを行った場合だけ元の状態へ戻す。
 
 ---
@@ -100,12 +107,23 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 - 未ダウンロード時は `download-button-<ASIN>` を開始し、ボタン消失と正式コンテンツフォルダの安定を待つ。
 - 読書画面では指定した次ページ方向と逆の矢印キーを送り、`ReadingArea` の画像差分が
   3回連続で変化しない位置を先頭境界とする。
+- `set_page_layout(source)` は読書領域中央をクリックしてツールバーを表示し、
+  `aaMenuButton` から `comic=aaOption-Split` を選ぶ。`novel` は
+  `aaOption-Single` が存在すれば選択し、リフロー型書籍でページ数 option が
+  存在しない場合は `フォント-item` の存在を確認して単ページ表示として扱う。
+  ページ数 option の `ToggleToggleStateProperty` が On にならない場合は
+  `positioning_failed` とし、`CloseSideMenuHeaderButton` と読書領域中央の
+  クリックで設定 UI を閉じる。
+- `capture_area_bounds(source)` は最大化後の撮影矩形を返す。`comic` は
+  `ReadingArea` 全体、`novel` は `ReadingArea` の左右端と
+  `TopChrome.bottom` / `Footer.top` を合成し、書名とページ・進捗表示を除外する。
+  各矩形の包含関係を検証できない場合は撮影を開始しない。
 - Kindleの起動、ログイン、画面ロック解除は行わない。
 - 候補なし・複数・UI取得不能・ダウンロード期限超過・先頭移動不能は工程別エラーとして終了し、capturerを起動しない。
 
 ### 1.8. `capture_agent.py`（ジョブ実行）
 
-バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、既存capturerによる全ページ撮影、Samba上の論理専用inboxへの原子的公開、完了APIを直列実行する。既存環境では `pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視は隠しディレクトリを除外する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
+バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、source別ページレイアウトの明示選択、既存capturerによる全ページ撮影、Samba上の論理専用inboxへの原子的公開、完了APIを直列実行する。既存環境では `pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視は隠しディレクトリを除外する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
 
 - controllerの工程別例外コードをjobへそのまま記録し、その他の例外は `capture_failed` / `transfer_failed` / `registration_failed` へ境界別に変換する。
 - agent再起動時は途中状態を暗黙再開しない。`awaiting_files` の完了APIだけを冪等再試行し、それ以前の途中jobは失敗として新規job作成を要求する。
@@ -135,9 +153,10 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 ### 漫画（`run_comic.bat`）
 
 ```
-起動 → Kindle ウィンドウ検索 → 新 Kindle は最大化 / 旧 Kindle は F11
+起動 → Kindle ウィンドウ検索 → agent はページ設定を「2 ページ」へ固定
+    → 新 Kindle は最大化 / 旧 Kindle は F11
     → ダイアログでタイトル確認
-    → 黒帯スキャン → CROP 座標確定
+    → ReadingArea上下境界 + 見開き安全幅を検出 → CROP 座標確定
     → キャプチャループ（確定済みの左右矢印キーを使用。安定画像だけ保存）
     → ツールが変更した最大化/F11状態だけ復元（起動時フルスクリーンは維持）
     → PNG → PDF 結合（backend/data/comic/pdfs/<書籍名>.pdf）
@@ -146,7 +165,8 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 ### 小説（`run_novel.bat`）
 
 ```
-起動 → Kindle ウィンドウ検索 → 新 Kindle は最大化 / 旧 Kindle は F11
+起動 → Kindle ウィンドウ検索 → agent はページ設定を「1 ページ」へ固定
+    → 新 Kindle は最大化 / 旧 Kindle は F11
     → ダイアログでタイトル確認
     → 白背景スキャン → CROP 座標確定
     → 任意で期待撮影画面数を指定（通常は空欄。紙面ページ総数とは別の値）
@@ -164,16 +184,19 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 | `BLACK_THRESHOLD` | 漫画 | 書籍背景が純黒でない場合に調整 |
 | `FULLSCREEN_SETTLE_SEC` | 漫画・小説 | F11 後の案内トーストが残る場合に調整 |
 | `PAGE_STABLE_SEC` | 漫画・小説 | ページ描画の中間フレームを除外する安定待ち時間 |
-| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | 漫画・小説 | Microsoft Store 版の上下 UI 除外幅 |
+| `NEW_KINDLE_CROP_TOP` / `NEW_KINDLE_CROP_BOTTOM_MARGIN` | 漫画・小説 | `ReadingArea` 取得失敗時の上下フォールバック |
 | `NEW_KINDLE_SIDE_IGNORE_PX` | 漫画・小説 | Microsoft Store 版の左右 UI 除外幅 |
 | `SIDE_IGNORE_PX` | 漫画 | ページ送り矢印位置が変わった場合に調整 |
+| `COMIC_WHITE_THRESHOLD` / `COMIC_MIN_PAGE_ASPECT_RATIO` | 漫画 | 見開き安全幅のページ境界・最小幅を調整 |
 | `WHITE_THRESHOLD` | 小説 | 背景がオフホワイトの場合に調整 |
 | `MIN_CROP_WIDTH_RATIO` | 小説 | ページ内容に依存した過剰クロップを防ぐ最小幅を調整 |
 | `DETECTION_PADDING_PX` | 小説 | 検出した本文領域の左右余白を調整 |
 
 ## 4. Microsoft Store版 Kindle 実機基準（2026-07-19）
 
-- **検証環境**: Windows、3840×2160モニター、新Kindle本文ウィンドウ（タイトルは厳密に `Kindle`）。最大化後の保存画像は全件1918×3516px。
+- **検証環境**: Windows、3840×2160モニター、新Kindle本文ウィンドウ（タイトルは厳密に `Kindle`）。旧固定クロップの保存画像は1918px高だったが、実際の `ReadingArea` は最大化ウィンドウ相対で上端56pxから最下端まであり、下105px固定除外が本文を切ることを2026-07-26に確認した。
+- **source別レイアウト**: `aaMenuButton` 配下の漫画用 `aaOption-Split` と ToggleState を実機確認した。固定レイアウト小説で `aaOption-Single` が存在する場合は明示選択する。リフロー型小説ではページ数 option が表示されず、`フォント-item`、フォントサイズ、余白、間隔が表示されることを確認したため、この構成を単ページ表示として受け入れる。
+- **再撮影受入（2026-07-26）**: 小説2冊を91枚・92枚、全画像3516×2064で正式登録し、本文サンプルの最下部とフッターに欠落がないことを確認した。漫画1冊を85見開き、全画像2936×2064で正式登録し、通常見開きの外側余白中央値が左15px・右17px、単ページの表紙と奥付は中央配置となることを確認した。3冊とも連番欠落、SHA-256完全重複、全面白画像は0件だった。
 - **F11を使わない理由**: F11中にページ送りすると、本文描画が全面白のまま復帰しない事象を実測した。最大化ウィンドウでは同じページが正常描画される。
 - **入力方式**: 当初は左右端から120pxのクリックを使ったが、実際のchevron領域は64pxで
   hover表示だけが変化する場合があった。現在は確定済みの `left` / `right` 矢印キーを使う。

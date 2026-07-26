@@ -9,34 +9,13 @@ import { useReaderNavigation } from '@/hooks/reader/useReaderNavigation';
 import { useReaderUIState } from '@/hooks/reader/useReaderUIState';
 import { useSpreadMode } from '@/hooks/reader/useSpreadMode';
 import { novelBooksQueryOptions, novelDbKeys } from '@/features/novel_db/queries';
-import apiClient, { ApiError } from '@/config/api_client';
+import {
+    imageVersionFromThumbnailUrl,
+    novelImageUrl,
+    probePageCount,
+    shouldProbePageCount,
+} from '@/features/novel_db/reader';
 import type { SpreadMode } from '@/types';
-
-function novelImageUrl(bookName: string, pageNo: number): string {
-    return `/kindle_novel/images/${encodeURIComponent(bookName)}/${String(pageNo).padStart(3, '0')}.png`;
-}
-
-export async function probePageCount(bookName: string): Promise<number> {
-    const imageExists = async (pageNo: number): Promise<boolean> => {
-        try {
-            await apiClient.head<unknown, unknown>(novelImageUrl(bookName, pageNo));
-            return true;
-        } catch (error) {
-            if (error instanceof ApiError && error.status === 404) return false;
-            throw error;
-        }
-    };
-
-    if (!(await imageExists(1))) return 0;
-    let lo = 1;
-    let hi = 1500;
-    while (lo < hi) {
-        const mid = Math.ceil((lo + hi) / 2);
-        if (await imageExists(mid)) lo = mid;
-        else hi = mid - 1;
-    }
-    return lo;
-}
 
 const SPREAD_ICON: Record<SpreadMode, React.ReactNode> = {
     auto: <Wand2 className="w-4 h-4" />,
@@ -67,15 +46,24 @@ export default function NovelReaderPage() {
     const { showHeader, showHeaderOff, showSlider, showSliderOff } = useReaderUIState();
     const bookPageCountQuery = useQuery({
         ...novelBooksQueryOptions(),
-        select: (books) => books.find((book) => book.name === bookName)?.page_count ?? null,
+        select: (books) => {
+            const book = books.find((candidate) => candidate.name === bookName);
+            return {
+                pageCount: book?.page_count ?? null,
+                imageVersion: imageVersionFromThumbnailUrl(book?.thumbnail_url),
+            };
+        },
     });
     const probedPageCountQuery = useQuery({
         queryKey: novelDbKeys.pageCount(bookName ?? ''),
         queryFn: () => probePageCount(bookName!),
-        enabled: Boolean(bookName) && !bookPageCountQuery.isPending && !bookPageCountQuery.data,
+        enabled:
+            Boolean(bookName) &&
+            shouldProbePageCount(bookPageCountQuery.isPending, bookPageCountQuery.data),
         staleTime: Infinity,
     });
-    const numPages = bookPageCountQuery.data ?? probedPageCountQuery.data ?? 0;
+    const numPages = bookPageCountQuery.data?.pageCount ?? probedPageCountQuery.data ?? 0;
+    const imageVersion = bookPageCountQuery.data?.imageVersion ?? null;
 
     const { pageNumber, setPageNumber, handleNext, handlePrev } = useReaderNavigation({
         numPages,
@@ -220,7 +208,7 @@ export default function NovelReaderPage() {
                         {leftPage !== null && (
                             <img
                                 key={`l-${leftPage}`}
-                                src={novelImageUrl(bookName, leftPage)}
+                                src={novelImageUrl(bookName, leftPage, imageVersion)}
                                 alt={`page ${leftPage}`}
                                 className="object-contain bg-white"
                                 style={imgStyle('50vw')}
@@ -233,7 +221,7 @@ export default function NovelReaderPage() {
                         {rightPage !== null && (
                             <img
                                 key={`r-${rightPage}`}
-                                src={novelImageUrl(bookName, rightPage)}
+                                src={novelImageUrl(bookName, rightPage, imageVersion)}
                                 alt={`page ${rightPage}`}
                                 className="object-contain bg-white"
                                 style={imgStyle('50vw')}
@@ -246,7 +234,7 @@ export default function NovelReaderPage() {
                         {singlePage !== null && (
                             <img
                                 key={`s-${singlePage}`}
-                                src={novelImageUrl(bookName, singlePage)}
+                                src={novelImageUrl(bookName, singlePage, imageVersion)}
                                 alt={`page ${singlePage}`}
                                 className="object-contain bg-white"
                                 style={imgStyle('100vw')}

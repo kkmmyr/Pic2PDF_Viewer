@@ -72,7 +72,10 @@ def _meta_key(book_name: str) -> str:
 def _thumbnail_url(book_name: str) -> str:
     """先頭画像 (`001.png`) を縮小表示用の URL として返す。事前生成しない。"""
     encoded = quote(book_name, safe="")
-    return f"/kindle_novel/images/{encoded}/001.png"
+    image_path = Path(config.KINDLE_NOVEL_IMAGES_DIR) / book_name / "001.png"
+    version_target = image_path if image_path.is_file() else image_path.parent
+    version = version_target.stat().st_mtime_ns
+    return f"/kindle_novel/images/{encoded}/001.png?v={version}"
 
 
 def _fetch_indexed_status(conn: sqlite3.Connection) -> dict[str, dict]:

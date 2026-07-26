@@ -469,8 +469,8 @@ class AutoConfig(Config):
     # Microsoft Store 版 Kindle は F11 中のページ送りで本文が白くなるため、
     # 最大化ウィンドウを使い、アプリUIを固定値で撮影範囲から除外する。
     NEW_KINDLE_SETTLE_SEC: float = 2.0
-    NEW_KINDLE_CROP_TOP: int = 105
-    NEW_KINDLE_CROP_BOTTOM_MARGIN: int = 105
+    NEW_KINDLE_CROP_TOP: int = 56
+    NEW_KINDLE_CROP_BOTTOM_MARGIN: int = 8
     NEW_KINDLE_SIDE_IGNORE_PX: int = 180
 
     # 黒帯検出の閾値 (0-255)
@@ -483,6 +483,13 @@ class AutoConfig(Config):
     # 左右のUI（矢印など）を無視するためのマージン
     SIDE_IGNORE_PX: int = 500
 
+    # 自動agentの漫画はKindleを2ページ表示にして、見開き全体を保存する。
+    CAPTURE_SPREAD: bool = False
+    COMIC_WHITE_THRESHOLD: int = 245
+    COMIC_MIN_PAGE_ASPECT_RATIO: float = 0.68
+    COMIC_SPREAD_DETECTION_RATIO: float = 1.1
+    COMIC_SPREAD_PADDING_PX: int = 16
+
 
 class AutoKindleCapturer(KindleCapturer):
     """フルスクリーン・動的クロップ版キャプチャクラス"""
@@ -490,6 +497,7 @@ class AutoKindleCapturer(KindleCapturer):
     def __init__(self):
         super().__init__()
         self.config = AutoConfig()  # 設定を上書き
+        self._reading_area_relative: tuple[int, int, int, int] | None = None
 
     def _is_fullscreen(self) -> bool:
         """対象ウィンドウが配置先モニター全体を覆っているか判定する。"""
@@ -532,7 +540,11 @@ class AutoKindleCapturer(KindleCapturer):
             and abs(rect.bottom - monitor_rect.bottom) <= tolerance
         )
 
-    def setup_window(self):
+    def setup_window(
+        self,
+        reading_area_bounds_provider: Callable[[], tuple[int, int, int, int]]
+        | None = None,
+    ):
         """Kindle版に応じて最大化またはフルスクリーンに設定する。"""
         if not self.hwnd:
             raise RuntimeError("Window handle not found. Call find_window() first.")
@@ -579,6 +591,19 @@ class AutoKindleCapturer(KindleCapturer):
         if screen_w <= 0 or screen_h <= 0:
             raise RuntimeError("Kindle window has an invalid size.")
 
+        self._reading_area_relative = (
+            0,
+            self.config.FULLSCREEN_CROP_TOP,
+            screen_w,
+            screen_h - self.config.FULLSCREEN_CROP_BOTTOM_MARGIN,
+        )
+        if self._new_kindle_mode and reading_area_bounds_provider is not None:
+            self._apply_reading_area_bounds(
+                reading_area_bounds_provider(),
+                screen_w,
+                screen_h,
+            )
+
         # 動的検出を実行
         print("Detecting content boundaries...")
         full_img = ImageGrab.grab(
@@ -599,6 +624,34 @@ class AutoKindleCapturer(KindleCapturer):
         pag.moveTo(safe_x, safe_y)
         print(f"Mouse moved to safe area: ({safe_x}, {safe_y})")
 
+    def _apply_reading_area_bounds(
+        self,
+        bounds: tuple[int, int, int, int],
+        w: int,
+        h: int,
+    ) -> None:
+        """画面座標のReadingAreaをウィンドウ相対クロップへ変換する。"""
+        if self.rect is None:
+            raise RuntimeError("Kindle window rectangle is unavailable.")
+        left, top, right, bottom = bounds
+        relative = (
+            max(0, min(w, left - self.rect.left)),
+            max(0, min(h, top - self.rect.top)),
+            max(0, min(w, right - self.rect.left)),
+            max(0, min(h, bottom - self.rect.top)),
+        )
+        if relative[0] >= relative[2] or relative[1] >= relative[3]:
+            raise RuntimeError("Kindle ReadingArea has an invalid size.")
+
+        self._reading_area_relative = relative
+        self.config.FULLSCREEN_CROP_TOP = relative[1]
+        self.config.FULLSCREEN_CROP_BOTTOM_MARGIN = h - relative[3]
+        print(
+            "Using Kindle ReadingArea: "
+            f"Left={relative[0]}, Top={relative[1]}, "
+            f"Right={relative[2]}, Bottom={relative[3]}"
+        )
+
     def _detect_boundaries(self, img: np.ndarray, w: int, h: int):
         """
         全画面画像からコンテンツ領域を検出して config を更新する
@@ -607,6 +660,10 @@ class AutoKindleCapturer(KindleCapturer):
         # 上下は固定値
         self.config.CROP_Y1 = self.config.FULLSCREEN_CROP_TOP
         self.config.CROP_Y2 = h - self.config.FULLSCREEN_CROP_BOTTOM_MARGIN
+
+        if self.config.CAPTURE_SPREAD:
+            self._detect_spread_boundaries(img, w)
+            return
 
         # スキャンするY座標のリスト (上部1/4, 中央, 下部3/4)
         scan_y_list = [h // 4, h // 2, (h * 3) // 4]
@@ -658,6 +715,63 @@ class AutoKindleCapturer(KindleCapturer):
             print("Warning: Detected invalid boundaries. Using full width.")
             self.config.CROP_X1 = 0
             self.config.CROP_X2 = w
+
+    def _detect_spread_boundaries(self, img: np.ndarray, w: int) -> None:
+        """先頭の単ページから、後続2ページを切らない中央安全幅を決める。"""
+        if self._reading_area_relative is None:
+            reading_left = 0
+            reading_right = w
+        else:
+            reading_left, _, reading_right, _ = self._reading_area_relative
+
+        y1 = self.config.CROP_Y1
+        y2 = self.config.CROP_Y2
+        region = img[y1:y2, reading_left:reading_right]
+        if region.size == 0:
+            raise RuntimeError("Kindle comic reading area is empty.")
+
+        non_white = np.any(region < self.config.COMIC_WHITE_THRESHOLD, axis=2)
+        minimum_pixels = max(3, int(region.shape[0] * 0.002))
+        active_columns = np.flatnonzero(
+            np.count_nonzero(non_white, axis=0) >= minimum_pixels
+        )
+        reading_width = reading_right - reading_left
+        if active_columns.size == 0:
+            print(
+                "Warning: Comic page width was not detected; "
+                "using the full ReadingArea."
+            )
+            self.config.CROP_X1 = reading_left
+            self.config.CROP_X2 = reading_right
+            return
+
+        detected_left = reading_left + int(active_columns[0])
+        detected_right = reading_left + int(active_columns[-1]) + 1
+        detected_width = detected_right - detected_left
+        content_height = y2 - y1
+        minimum_page_width = int(
+            content_height * self.config.COMIC_MIN_PAGE_ASPECT_RATIO
+        )
+        padding = self.config.COMIC_SPREAD_PADDING_PX
+
+        if detected_width >= content_height * self.config.COMIC_SPREAD_DETECTION_RATIO:
+            target_width = detected_width + padding * 2
+        else:
+            page_width = max(detected_width, minimum_page_width)
+            target_width = page_width * 2 + padding * 2
+        target_width = min(reading_width, target_width)
+
+        center = (reading_left + reading_right) // 2
+        crop_left = max(reading_left, center - target_width // 2)
+        crop_right = min(reading_right, crop_left + target_width)
+        crop_left = max(reading_left, crop_right - target_width)
+        self.config.CROP_X1 = crop_left
+        self.config.CROP_X2 = crop_right
+        print(
+            "Detected comic spread boundaries: "
+            f"page=({detected_left}, {detected_right}), "
+            f"crop=({crop_left}, {crop_right})"
+        )
 
     def cleanup(self):
         """終了処理: ツールが変更した表示状態だけ元へ戻す。"""

@@ -336,6 +336,155 @@ class KindleAppController:
     def _click_control(self, control: object) -> None:
         pyautogui.click(*self._control_center(control))
 
+    @staticmethod
+    def _toggle_is_on(control: object) -> bool:
+        try:
+            state = control.Element.GetCurrentPropertyValue(
+                auto.PropertyId.ToggleToggleStateProperty
+            )
+        except (AttributeError, COMError, TypeError, ValueError):
+            return False
+        return int(state) == auto.ToggleState.On
+
+    def reading_area_bounds(self) -> tuple[int, int, int, int]:
+        """現在のReadingAreaを画面座標で返す。"""
+        reading_area = self._control_by_id("ReadingArea", timeout=2.0)
+        if reading_area is None:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの読書領域を取得できませんでした",
+            )
+        try:
+            bounds = reading_area.BoundingRectangle
+            result = (
+                int(bounds.left),
+                int(bounds.top),
+                int(bounds.right),
+                int(bounds.bottom),
+            )
+        except (AttributeError, COMError, TypeError, ValueError) as exc:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの読書領域の位置を取得できませんでした",
+            ) from exc
+        if result[0] >= result[2] or result[1] >= result[3]:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの読書領域の位置が不正です",
+            )
+        return result
+
+    def capture_area_bounds(self, source: str) -> tuple[int, int, int, int]:
+        """source別に保存対象となる読書領域を画面座標で返す。"""
+        reading_left, reading_top, reading_right, reading_bottom = (
+            self.reading_area_bounds()
+        )
+        if source == "comic":
+            return (reading_left, reading_top, reading_right, reading_bottom)
+        if source != "novel":
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの撮影領域種別が不正です",
+            )
+
+        top_chrome = self._control_by_id("TopChrome", timeout=2.0)
+        footer = self._control_by_id("Footer", timeout=2.0)
+        if top_chrome is None or footer is None:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの小説本文領域を取得できませんでした",
+            )
+        try:
+            content_top = int(top_chrome.BoundingRectangle.bottom)
+            content_bottom = int(footer.BoundingRectangle.top)
+        except (AttributeError, COMError, TypeError, ValueError) as exc:
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの小説本文領域の位置を取得できませんでした",
+            ) from exc
+        if not (reading_top <= content_top < content_bottom <= reading_bottom):
+            raise KindleControllerError(
+                "kindle_ui_unavailable",
+                "Kindleの小説本文領域の位置が不正です",
+            )
+        return (reading_left, content_top, reading_right, content_bottom)
+
+    def set_page_layout(self, source: str) -> None:
+        """comicは2ページ、novelは1ページを選択して状態を検証する。"""
+        option_ids = {
+            "comic": "aaOption-Split",
+            "novel": "aaOption-Single",
+        }
+        option_id = option_ids.get(source)
+        if option_id is None:
+            raise KindleControllerError(
+                "positioning_failed",
+                "Kindleのページレイアウト種別が不正です",
+            )
+
+        reading_area = self._control_by_id("ReadingArea", timeout=2.0)
+        if reading_area is None:
+            raise KindleControllerError(
+                "positioning_failed",
+                "Kindleの読書領域を取得できませんでした",
+            )
+        page_settings = self._control_by_id("aaMenuButton", timeout=0.5)
+        if page_settings is None:
+            self._click_control(reading_area)
+            time.sleep(0.5)
+            page_settings = self._control_by_id("aaMenuButton", timeout=2.0)
+        if page_settings is None:
+            raise KindleControllerError(
+                "positioning_failed",
+                "Kindleのページ設定を開けませんでした",
+            )
+
+        menu_opened = False
+        try:
+            self._click_control(page_settings)
+            menu_opened = True
+            time.sleep(0.5)
+            option = self._control_by_id(option_id, timeout=2.0)
+            if option is None:
+                if (
+                    source == "novel"
+                    and self._control_by_id("フォント-item", timeout=1.0) is not None
+                ):
+                    return
+                raise KindleControllerError(
+                    "positioning_failed",
+                    "Kindleのページレイアウトを取得できませんでした",
+                )
+            if not self._toggle_is_on(option):
+                self._click_control(option)
+
+            deadline = time.monotonic() + self.config.control_timeout_seconds
+            while time.monotonic() < deadline:
+                option = self._control_by_id(option_id, timeout=0.5)
+                if option is not None and self._toggle_is_on(option):
+                    return
+                time.sleep(0.25)
+            raise KindleControllerError(
+                "positioning_failed",
+                "Kindleのページレイアウトを確認できませんでした",
+            )
+        finally:
+            if menu_opened:
+                close_button = self._control_by_id(
+                    "CloseSideMenuHeaderButton",
+                    timeout=1.0,
+                )
+                if close_button is not None:
+                    self._click_control(close_button)
+                else:
+                    pyautogui.press("esc")
+                time.sleep(0.25)
+            if self._control_by_id("aaMenuButton", timeout=0.5) is not None:
+                reading_area = self._control_by_id("ReadingArea", timeout=1.0)
+                if reading_area is not None:
+                    self._click_control(reading_area)
+                    time.sleep(0.25)
+
     def open_library(self) -> None:
         self._ensure_process_running()
         if self._search_edit(timeout=1.0) is not None:

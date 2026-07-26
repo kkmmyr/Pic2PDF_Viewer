@@ -172,3 +172,46 @@ def test_new_kindle_restores_preexisting_fullscreen_on_cleanup(monkeypatch):
 
     assert pressed_keys == ["f11", "f11"]
     assert capturer._restore_fullscreen_on_cleanup is False
+
+
+def test_reading_area_bounds_replace_fixed_vertical_crop():
+    capturer = AutoKindleCapturer()
+    capturer.rect = RECT(-8, -8, 1008, 608)
+
+    capturer._apply_reading_area_bounds((0, 48, 1000, 600), 1016, 616)
+
+    assert capturer._reading_area_relative == (8, 56, 1008, 608)
+    assert capturer.config.FULLSCREEN_CROP_TOP == 56
+    assert capturer.config.FULLSCREEN_CROP_BOTTOM_MARGIN == 8
+
+
+def test_comic_single_cover_reserves_two_page_spread_width():
+    capturer = AutoKindleCapturer()
+    capturer.config.CAPTURE_SPREAD = True
+    capturer.config.FULLSCREEN_CROP_TOP = 0
+    capturer.config.FULLSCREEN_CROP_BOTTOM_MARGIN = 0
+    capturer.config.COMIC_MIN_PAGE_ASPECT_RATIO = 0.3
+    capturer.config.COMIC_SPREAD_PADDING_PX = 0
+    capturer._reading_area_relative = (0, 0, 1000, 600)
+    image = np.full((600, 1000, 3), 255, dtype=np.uint8)
+    image[:, 400:600] = 0
+
+    capturer._detect_boundaries(image, 1000, 600)
+
+    assert (capturer.config.CROP_X1, capturer.config.CROP_X2) == (300, 700)
+    assert (capturer.config.CROP_Y1, capturer.config.CROP_Y2) == (0, 600)
+
+
+def test_comic_existing_spread_is_not_doubled_again():
+    capturer = AutoKindleCapturer()
+    capturer.config.CAPTURE_SPREAD = True
+    capturer.config.FULLSCREEN_CROP_TOP = 0
+    capturer.config.FULLSCREEN_CROP_BOTTOM_MARGIN = 0
+    capturer.config.COMIC_SPREAD_PADDING_PX = 0
+    capturer._reading_area_relative = (0, 0, 1000, 600)
+    image = np.full((600, 1000, 3), 255, dtype=np.uint8)
+    image[:, 100:900] = 0
+
+    capturer._detect_boundaries(image, 1000, 600)
+
+    assert (capturer.config.CROP_X1, capturer.config.CROP_X2) == (100, 900)

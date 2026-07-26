@@ -110,7 +110,8 @@ def list_book_images(path: str, source: str = Depends(validated_source)):
     for img in images:
         rel_path = join_path(path, img)
         encoded = "/".join(quote(seg, safe="") for seg in rel_path.replace(os.sep, "/").split("/"))
-        image_urls.append(f"{url_prefix}/{encoded}")
+        version = os.stat(join_path(target_dir, img)).st_mtime_ns
+        image_urls.append(f"{url_prefix}/{encoded}?v={version}")
 
     return {"images": image_urls}
 

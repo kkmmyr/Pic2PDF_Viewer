@@ -10,6 +10,7 @@ routers.library のユニットテスト。
 """
 
 import os
+from urllib.parse import parse_qs, urlsplit
 
 from services.meta_store import load_meta, save_meta
 
@@ -165,9 +166,31 @@ class TestListBookImages:
         assert res.status_code == 200
         urls = res.json()["images"]
         # natsort: 1, 2, 10 の順
-        assert urls[0].endswith("/1.webp")
-        assert urls[1].endswith("/2.webp")
-        assert urls[2].endswith("/10.webp")
+        assert urlsplit(urls[0]).path.endswith("/1.webp")
+        assert urlsplit(urls[1]).path.endswith("/2.webp")
+        assert urlsplit(urls[2]).path.endswith("/10.webp")
+        assert all(parse_qs(urlsplit(url).query)["v"] for url in urls)
+
+    def test_image_url_version_changes_when_same_name_is_replaced(self, client, tmp_data_dir, make_webp):
+        image_path = os.path.join(tmp_data_dir["COMIC_IMAGES_DIR"], "book", "001.png")
+        make_webp(image_path)
+
+        first = client.get("/api/books/book/images?source=comic")
+        assert first.status_code == 200
+        first_url = first.json()["images"][0]
+
+        first_mtime_ns = os.stat(image_path).st_mtime_ns
+        os.utime(
+            image_path,
+            ns=(first_mtime_ns + 1_000_000_000, first_mtime_ns + 1_000_000_000),
+        )
+
+        second = client.get("/api/books/book/images?source=comic")
+        assert second.status_code == 200
+        second_url = second.json()["images"][0]
+
+        assert urlsplit(first_url).path == urlsplit(second_url).path
+        assert parse_qs(urlsplit(first_url).query)["v"] != parse_qs(urlsplit(second_url).query)["v"]
 
     def test_404_when_path_missing(self, client, tmp_data_dir):
         res = client.get("/api/books/nope/images?source=doujin")

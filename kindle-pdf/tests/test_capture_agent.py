@@ -75,6 +75,7 @@ class _Heartbeat:
 class _Controller:
     needs_download_result = False
     search_count = 0
+    layout_sources: list[str] = []
 
     def __init__(self, _config) -> None:
         self.candidate = BookCandidate(
@@ -99,6 +100,13 @@ class _Controller:
     def open_book(self, _candidate) -> None:
         return None
 
+    def set_page_layout(self, source: str) -> None:
+        type(self).layout_sources.append(source)
+
+    def capture_area_bounds(self, source: str) -> tuple[int, int, int, int]:
+        assert source == "novel"
+        return (0, 100, 1000, 728)
+
     def go_to_start(self, *, direction, on_poll) -> None:
         assert direction in {"left", "right"}
         on_poll()
@@ -108,9 +116,17 @@ class _Controller:
 def _reset_controller() -> None:
     _Controller.needs_download_result = False
     _Controller.search_count = 0
+    _Controller.layout_sources = []
 
 
-def _fake_capture(_job, output_root, on_page):
+def _fake_capture(
+    _job,
+    output_root,
+    on_page,
+    *,
+    reading_area_bounds_provider,
+):
+    assert reading_area_bounds_provider() == (0, 100, 1000, 728)
     image_dir = output_root / "captured"
     image_dir.mkdir()
     for page in range(1, 6):
@@ -134,6 +150,7 @@ def test_run_once_executes_automatic_flow_and_reports_progress(
     )
 
     assert handled
+    assert _Controller.layout_sources == ["novel"]
     assert [state["state"] for state in api.states] == [
         "locating_book",
         "positioning",

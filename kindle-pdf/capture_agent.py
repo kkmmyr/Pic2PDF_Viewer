@@ -149,6 +149,8 @@ def _capture(
     job: dict,
     output_root: Path,
     on_page,
+    *,
+    reading_area_bounds_provider,
 ) -> tuple[int, Path]:
     capturer = (
         NovelKindleCapturer() if job["source"] == "novel" else AutoKindleCapturer()
@@ -156,13 +158,16 @@ def _capture(
     capturer.config.IMG_OUTPUT_DIR = str(output_root)
     capturer.config.PAGE_CHANGE_KEY = job["direction"]
     capturer.config.EXPECTED_PAGES = job.get("expected_screens")
+    capturer.config.CAPTURE_SPREAD = job["source"] == "comic"
     if not capturer.find_window():
         raise AgentExecutionError(
             "kindle_app_exited",
             "撮影開始時にKindleウィンドウが見つかりません",
         )
     try:
-        capturer.setup_window()
+        capturer.setup_window(
+            reading_area_bounds_provider=reading_area_bounds_provider,
+        )
         page_count, image_dir = capturer.capture_loop(
             _safe_capture_title(job),
             on_page=on_page,
@@ -305,6 +310,7 @@ def _run_claimed_job(
 
     _state(api, job_id, config.agent_id, "positioning")
     controller.open_book(candidate)
+    controller.set_page_layout(job["source"])
     controller.go_to_start(
         direction=job["direction"],
         on_poll=heartbeat.raise_if_failed,
@@ -326,7 +332,14 @@ def _run_claimed_job(
 
     try:
         with tempfile.TemporaryDirectory(prefix=f"kindle-{job_id}-") as temp:
-            page_count, image_dir = _capture(job, Path(temp), on_page)
+            page_count, image_dir = _capture(
+                job,
+                Path(temp),
+                on_page,
+                reading_area_bounds_provider=lambda: controller.capture_area_bounds(
+                    job["source"]
+                ),
+            )
             heartbeat.raise_if_failed()
             try:
                 _publish_package(config, job, image_dir)

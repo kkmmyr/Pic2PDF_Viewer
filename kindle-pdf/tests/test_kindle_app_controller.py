@@ -210,6 +210,26 @@ class _Button:
         self.clicked = True
 
 
+class _ToggleElement:
+    def __init__(self, on: bool) -> None:
+        self.on = on
+
+    def GetCurrentPropertyValue(self, _property_id: int) -> int:
+        return int(self.on)
+
+
+class _LayoutControl:
+    def __init__(self, automation_id: str, *, on: bool = False) -> None:
+        self.AutomationId = automation_id
+        self.Element = _ToggleElement(on)
+        self.BoundingRectangle = SimpleNamespace(
+            left=10,
+            top=20,
+            right=110,
+            bottom=60,
+        )
+
+
 class _DownloadController(KindleAppController):
     def __init__(
         self,
@@ -267,6 +287,31 @@ class _PositionController(KindleAppController):
         return None
 
 
+class _LayoutController(KindleAppController):
+    def __init__(self) -> None:
+        super().__init__(ControllerConfig(control_timeout_seconds=0.2))
+        self.controls = {
+            "ReadingArea": _LayoutControl("ReadingArea"),
+            "aaMenuButton": _LayoutControl("aaMenuButton"),
+            "aaOption-Split": _LayoutControl("aaOption-Split"),
+            "aaOption-Single": _LayoutControl("aaOption-Single", on=True),
+            "CloseSideMenuHeaderButton": _LayoutControl("CloseSideMenuHeaderButton"),
+        }
+        self.clicked: list[str] = []
+
+    def _control_by_id(self, automation_id: str, **_kwargs):
+        return self.controls.get(automation_id)
+
+    def _click_control(self, control: _LayoutControl) -> None:
+        self.clicked.append(control.AutomationId)
+        if control.AutomationId == "aaOption-Split":
+            self.controls["aaOption-Split"].Element.on = True
+            self.controls["aaOption-Single"].Element.on = False
+        elif control.AutomationId == "aaOption-Single":
+            self.controls["aaOption-Split"].Element.on = False
+            self.controls["aaOption-Single"].Element.on = True
+
+
 def test_go_to_start_stops_after_three_unchanged_frames(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -298,6 +343,101 @@ def test_go_to_start_stops_after_three_unchanged_frames(
 
     assert presses == ["right"] * 4
     assert len(polls) == 4
+
+
+def test_page_layout_selects_spread_and_verifies_toggle_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LayoutController()
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+
+    controller.set_page_layout("comic")
+
+    assert controller.controls["aaOption-Split"].Element.on
+    assert "aaOption-Split" in controller.clicked
+    assert "CloseSideMenuHeaderButton" in controller.clicked
+
+
+def test_page_layout_accepts_reflowable_novel_without_page_count_option(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LayoutController()
+    controller.controls.pop("aaOption-Single")
+    controller.controls["フォント-item"] = _LayoutControl("フォント-item")
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+
+    controller.set_page_layout("novel")
+
+    assert "aaOption-Split" not in controller.clicked
+    assert "CloseSideMenuHeaderButton" in controller.clicked
+
+
+def test_reading_area_bounds_returns_verified_rectangle() -> None:
+    controller = _LayoutController()
+    controller.controls["ReadingArea"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=48,
+        right=3840,
+        bottom=2112,
+    )
+
+    assert controller.reading_area_bounds() == (0, 48, 3840, 2112)
+
+
+def test_capture_area_bounds_excludes_novel_header_and_footer() -> None:
+    controller = _LayoutController()
+    controller.controls["ReadingArea"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=48,
+        right=3840,
+        bottom=2112,
+    )
+    controller.controls["TopChrome"] = _LayoutControl("TopChrome")
+    controller.controls["TopChrome"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=48,
+        right=3840,
+        bottom=100,
+    )
+    controller.controls["Footer"] = _LayoutControl("Footer")
+    controller.controls["Footer"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=2040,
+        right=3840,
+        bottom=2112,
+    )
+
+    assert controller.capture_area_bounds("novel") == (0, 100, 3840, 2040)
+    assert controller.capture_area_bounds("comic") == (0, 48, 3840, 2112)
+
+
+def test_capture_area_bounds_rejects_invalid_novel_controls() -> None:
+    controller = _LayoutController()
+    controller.controls["ReadingArea"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=48,
+        right=3840,
+        bottom=2112,
+    )
+    controller.controls["TopChrome"] = _LayoutControl("TopChrome")
+    controller.controls["TopChrome"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=48,
+        right=3840,
+        bottom=2050,
+    )
+    controller.controls["Footer"] = _LayoutControl("Footer")
+    controller.controls["Footer"].BoundingRectangle = SimpleNamespace(
+        left=0,
+        top=2040,
+        right=3840,
+        bottom=2112,
+    )
+
+    with pytest.raises(KindleControllerError) as exc:
+        controller.capture_area_bounds("novel")
+
+    assert exc.value.error_code == "kindle_ui_unavailable"
 
 
 def test_download_waits_for_button_disappearance_and_stable_files(
