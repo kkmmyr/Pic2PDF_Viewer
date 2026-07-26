@@ -37,6 +37,13 @@ repos:
         files: ^(backend/.*|kindle-pdf/.*|frontend/src/.*|docs/design/詳細設計/詳細設計書_(バックエンド|フロントエンド)_ファイルマップ\.md)$
         pass_filenames: false
 
+      - id: c901-ratchet
+        name: c901-ratchet (既存複雑度の悪化・新規超過を防止)
+        entry: uv run python scripts/maintenance/check_c901_ratchet.py
+        language: system
+        files: ^(backend/.*\.py|kindle-pdf/.*\.py|scripts/maintenance/(check_c901_ratchet\.py|c901_baseline\.json))$
+        pass_filenames: false
+
   # --- Secrets: commit 対象のハードコード済み秘密情報を検出 ---
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
