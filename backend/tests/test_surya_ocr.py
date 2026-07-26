@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from PIL import Image, ImageDraw
@@ -19,6 +22,31 @@ from services.novel_db.surya_ocr import (
     parse_surya_html,
     parse_surya_layout,
 )
+from services.novel_db.surya_parsing import parse_surya_html as parsing_parse_surya_html
+from services.novel_db.surya_quality import evaluate_page_quality as quality_evaluate_page_quality
+from services.novel_db.surya_runtime import SuryaClient as RuntimeSuryaClient
+from services.novel_db.surya_types import SuryaPageResult as TypesSuryaPageResult
+
+
+def test_facade_preserves_public_symbol_identity() -> None:
+    assert parse_surya_html is parsing_parse_surya_html
+    assert evaluate_page_quality is quality_evaluate_page_quality
+    assert SuryaClient is RuntimeSuryaClient
+    assert SuryaPageResult is TypesSuryaPageResult
+
+
+def test_facade_imports_in_standalone_worker_mode() -> None:
+    module_dir = Path(__file__).resolve().parents[1] / "services" / "novel_db"
+    completed = subprocess.run(
+        [sys.executable, "-c", "import surya_ocr; print(surya_ocr.SuryaClient.__name__)"],
+        cwd=module_dir,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.strip() == "SuryaClient"
 
 
 def test_session_policy_restarts_at_page_limit() -> None:

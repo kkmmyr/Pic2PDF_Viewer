@@ -1,6 +1,6 @@
 # OCR設計・改善記録
 
-> status: living | last-verified: 2026-07-19
+> status: living | last-verified: 2026-07-26
 
 縦書き小説を Surya OCR 2 でテキスト化し、ページ欠落を検査してから `novel.db` へ確定する設計。yomitoku は比較・後方互換用エンジンとして残す。
 
@@ -16,8 +16,9 @@
 kindle-pdf/main_novel.py  →  kindle_novel/images/{書籍名}/*.png  (キャプチャのみ)
                                           ↓
 POST /api/ocr/run（routers/ocr.py）→ job_queue に enqueue（rebuild_jobs テーブル）
-  → job_worker.py（mode="ocr"）
-  → ocr_staging.py（実行開始 / 前回の未完了ページを再開）
+  → job_worker.py（queue loopの互換facade）
+  → job_state.py / job_targets.py / job_executor.py（状態 / 対象選択 / 工程実行）
+  → ocr_run_store.py（実行開始 / 前回の未完了ページを再開）
   → extractor.py (iter_ocr_pages)
   → $OCR_PYTHON ocr_worker.py --manifest <一時JSON>
   → Surya OCR 2（OpenAI互換 llama-server。Windows CUDA）
@@ -67,14 +68,28 @@ Windows agentが共有トークンで1件ずつclaimする。claim時にLinux側
 |---|---|
 | `backend/routers/ocr.py` | `/api/ocr/run` `/api/ocr/stop` `/api/ocr/status` — job_queue ベースの OCR ジョブ API。`stop` は待機中ジョブだけをキャンセルする |
 | `backend/services/novel_db/extractor.py` | `run_ocr_subprocess` — common/ocr venv を呼び出して画像からテキストを取得 |
-| `backend/services/novel_db/surya_ocr.py` | llama-server の起動・HTTP呼び出し・HTML/bbox解析・品質検査 |
-| `backend/services/novel_db/ocr_staging.py` | OCR run/page のチェックポイントと二段階確定 |
+| `backend/services/novel_db/surya_ocr.py` | 既存importを維持する互換facade |
+| `backend/services/novel_db/surya_types.py` | OCR block・layout・page結果とserver再起動policyのデータ型 |
+| `backend/services/novel_db/surya_parsing.py` | 公式promptとHTML/layout/bbox解析 |
+| `backend/services/novel_db/surya_quality.py` | coverage・品質flag・補助OCR照合 |
+| `backend/services/novel_db/surya_runtime.py` | llama-server寿命管理とOpenAI互換HTTP client |
+| `backend/services/novel_db/ocr_staging.py` | 既存importを維持する互換facade |
+| `backend/services/novel_db/ocr_run_store.py` | 入力画像SHA検証、run再開、ページ結果チェックポイント |
+| `backend/services/novel_db/ocr_page_classification.py` | ページ種別・layout種別の安全側提案 |
+| `backend/services/novel_db/ocr_qa.py` | QA対象選定・レビュー・原子的な正式公開 |
+| `backend/services/novel_db/job_worker.py` | queue loopと既存テスト拡張点を維持するfacade |
+| `backend/services/novel_db/job_state.py` / `job_targets.py` / `job_executor.py` | ジョブ状態永続化、対象解決、mode別工程 |
 | `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー。テキスト抽出・フリガナ除去・正規化 |
 | `D:\61.tool\common\ocr\debug_yomitoku.py` | yomitoku出力構造の診断ツール |
 
 ---
 
 ## Surya OCR 2 実行設計
+
+上記分割は責務境界だけを変更する。prompt、閾値、品質flag、ページ分類、
+QA必須条件、正式公開トランザクションは分割前と同一である。
+`surya_ocr.py`と`ocr_staging.py`は公開symbolを同一objectのまま再exportし、
+既存worker・router・テストのimport契約を維持する。
 
 - **固定資材**: 公式GGUF、mmproj、`llama-server.exe` のパスとSHA-256を運用時に固定し、自動更新しない。
 - **サーバー寿命**: OCR worker 起動時に `/v1/models` を確認する。到達不能かつ3パスが設定済みなら `llama-server` をCUDA全層オフロード・parallel=1で起動する。worker所有serverは有限ページ数、連続Surya不合格、または移動窓の不合格率超過で停止し、次のページを新規server世代で再開する。既存の外部管理serverへ接続した場合はworkerから停止しない。server世代、開始ページ、終了理由をstderr監査ログへ残す。

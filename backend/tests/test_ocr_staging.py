@@ -8,6 +8,9 @@ from PIL import Image
 from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
 from services.novel_db.migrations import upgrade_head
+from services.novel_db.ocr_page_classification import classify_run_pages as classification_classify_run_pages
+from services.novel_db.ocr_qa import stage_run_for_qa as qa_stage_run_for_qa
+from services.novel_db.ocr_run_store import collect_input_pages as store_collect_input_pages
 from services.novel_db.ocr_staging import (
     approve_and_publish_run,
     classify_run_pages,
@@ -17,6 +20,12 @@ from services.novel_db.ocr_staging import (
     save_page_result,
     stage_run_for_qa,
 )
+
+
+def test_facade_preserves_public_symbol_identity() -> None:
+    assert collect_input_pages is store_collect_input_pages
+    assert classify_run_pages is classification_classify_run_pages
+    assert stage_run_for_qa is qa_stage_run_for_qa
 
 
 @pytest.fixture
