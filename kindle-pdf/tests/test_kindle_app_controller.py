@@ -128,36 +128,35 @@ def test_control_lookup_treats_transient_com_error_as_not_found(
     assert controller._control_by_id("backButton", timeout=0.1) is None
 
 
-def test_search_value_uses_verified_control_center_and_keyboard(
+def test_search_value_focuses_control_and_verifies_keyboard_input(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    pattern = SimpleNamespace(Value="")
+    focused: list[bool] = []
     edit = SimpleNamespace(
-        BoundingRectangle=SimpleNamespace(left=10, top=20, right=210, bottom=60)
+        SetFocus=lambda: focused.append(True),
+        GetValuePattern=lambda: pattern,
     )
     controller = KindleAppController()
     monkeypatch.setattr(controller, "_search_edit", lambda **_kwargs: edit)
-    clicks: list[tuple[int, int]] = []
     hotkeys: list[tuple[str, ...]] = []
     writes: list[tuple[str, float]] = []
-    monkeypatch.setattr(
-        controller_module.pyautogui,
-        "click",
-        lambda x, y: clicks.append((x, y)),
-    )
     monkeypatch.setattr(
         controller_module.pyautogui,
         "hotkey",
         lambda *keys: hotkeys.append(keys),
     )
-    monkeypatch.setattr(
-        controller_module.pyautogui,
-        "write",
-        lambda value, interval: writes.append((value, interval)),
-    )
+
+    def _write(value: str, interval: float) -> None:
+        writes.append((value, interval))
+        pattern.Value = value
+
+    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
 
     controller._set_search_value("B012345678")
 
-    assert clicks == [(110, 40)]
+    assert focused == [True]
     assert hotkeys == [("ctrl", "a")]
     assert writes == [("B012345678", 0.02)]
 

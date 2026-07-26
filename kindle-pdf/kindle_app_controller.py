@@ -519,20 +519,24 @@ class KindleAppController:
             edit = self._search_edit(timeout=0.5)
             if edit is not None:
                 try:
-                    position = self._control_center(edit)
-                    pyautogui.click(*position)
+                    # UI Automation の矩形と pyautogui の座標系は、表示倍率が異なる
+                    # マルチモニター環境で一致しない場合がある。値の設定自体は通常の
+                    # キーボード入力を維持し、フォーカスだけを control へ直接渡す。
+                    edit.SetFocus()
                     pyautogui.hotkey("ctrl", "a")
                     pyautogui.write(value, interval=0.02)
-                    return
-                except KindleControllerError:
+                    time.sleep(0.1)
+                    if str(edit.GetValuePattern().Value) == value:
+                        return
+                except (AttributeError, COMError, TypeError, ValueError):
                     logger.debug(
-                        "Kindle search field position lookup failed transiently",
+                        "Kindle search field focus or value verification failed transiently",
                         exc_info=True,
                     )
             time.sleep(0.5)
         raise KindleControllerError(
             "kindle_ui_unavailable",
-            "Kindleのライブラリ検索欄を更新できませんでした",
+            "Kindleのライブラリ検索欄を更新・確認できませんでした",
         )
 
     def collect_candidates(self, identity: BookIdentity) -> list[BookCandidate]:

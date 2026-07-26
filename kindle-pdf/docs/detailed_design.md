@@ -106,10 +106,23 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 起動済みMicrosoft Store版 Kindleへ接続し、購入済みライブラリから対象書籍を安全に開いて撮影開始位置へ移動する。
 
 - `uiautomation` を使い、検索欄とASIN固有のAutomationIdを限定探索する。
+- 検索欄はUI Automationでフォーカスだけを設定し、通常のキーボード入力後に
+  `ValuePattern`を読み戻してASINが完全一致した場合だけ候補探索へ進む。
+  表示倍率が異なるマルチモニター環境でも検索欄の矩形クリックには依存しない。
 - `library-more-menu-<ASIN>` が一意に見つかった場合だけ対象カードを操作する。
 - 未ダウンロード時は `download-button-<ASIN>` を開始し、ボタン消失と正式コンテンツフォルダの安定を待つ。
 - 読書画面では指定した次ページ方向と逆の矢印キーを送り、`ReadingArea` の画像差分が
   3回連続で変化しない位置を先頭境界とする。
+- 現行の `go_to_start()` は1画面ずつ戻る実装である。2026-07-26 の実機調査では、
+  `moreMenuButton` → Name `位置に移動` のメニュー項目 →
+  `go-to-page-input` へロケーション `1` を入力 → `modal-confirm` の順で、
+  小説・漫画とも約0.2秒以内に表紙へ移動できた。ただし高速経路は未実装であり、
+  技術メンテナンス候補として管理する。
+- 高速経路を実装する場合も UI Automation の `SetValue` / `Click` は使わず、
+  controlの限定探索とフォーカス設定、通常のキーボード・マウス操作を用いる。
+  小説は `FooterLabelText=Location 1 ...・0%`、2ページ表示の漫画はロケーション
+  `1`を指定しても実測上 `Location 2 ...・0%` となるため、source別に検証する。
+  高速経路の要素を取得・検証できない場合は、現行の画像差分方式へフォールバックする。
 - `set_page_layout(source)` は読書領域中央をクリックしてツールバーを表示し、
   `aaMenuButton` から `comic=aaOption-Split` を選ぶ。`novel` は
   `aaOption-Single` が存在すれば選択し、リフロー型書籍でページ数 option が
@@ -128,13 +141,20 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 
 バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、source別ページレイアウトの明示選択、既存capturerによる全ページ撮影、Samba上の論理専用inboxへの原子的公開、完了APIを直列実行する。既存環境では `pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視は隠しディレクトリを除外する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
 
+- active job中はcapture agentだけがKindleウィンドウとUI Automationを操作する。
+  診断用controllerも接続時にウィンドウ復元・前面化を行うため、読み取り目的でも併用しない。
+  監視はcapture job APIとheartbeatに限定し、画像の目視確認はjob完了後に行う。
 - controllerの工程別例外コードをjobへそのまま記録し、その他の例外は `capture_failed` / `transfer_failed` / `registration_failed` へ境界別に変換する。
 - agent再起動時は途中状態を暗黙再開しない。`awaiting_files` の完了APIだけを冪等再試行し、それ以前の途中jobは失敗として新規job作成を要求する。
 - heartbeat送信失敗は停止要求として保持し、次の安全な工程境界または撮影進捗callbackで処理を中断する。
 - 読書画面の安定判定と先頭移動は `ReadingArea` の矩形と縮小グレースケール画像の
   差分を用いる。次ページ方向が `left` なら右キー、`right` なら左キーを押し、
   読書領域が変化しない状態を3回連続で確認した位置を先頭境界とする。漫画では
-  `FooterLabelText` が公開されないため、フッター文字列を必須条件にしない。
+  ツールバー非表示時に `FooterLabelText` を取得できない。ツールバー表示後に
+  取得できる場合もあるが、常時存在しないためフッター文字列を必須条件にしない。
+- ロケーション指定による先頭移動は実機成立性を確認済みだが、現行コードには
+  未配線である。実装後も `set_page_layout(source)` を先に実行し、ロケーション
+  `1`指定、source別の開始位置検証、画像差分フォールバックの順序を維持する。
 - 撮影は `left` / `right` の矢印キーでページを送る。新Kindleの端部クリックは、
   実測した64pxのchevron領域と既存120px insetが一致せず、ページを送らずに
   hover表示だけを変化させるため利用しない。
@@ -145,9 +165,10 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   `capture_failed` へ昇格させない。
 - Kindle 1.0.18632.0 はUI Automationの `SetValue` / `Click` と同時刻に
   `ucrtbase.dll / 0xc0000409` でクラッシュする実測がある。そのためUI Automationは
-  controlの識別と矩形取得だけに使い、検索入力、戻る、ダウンロード、書籍オープンは
-  control矩形中心への通常のpyautogui操作で実行する。ウィンドウ前面化は取得済みの
-  ネイティブウィンドウハンドルをWin32 APIへ渡す。固定の画面絶対座標は使わない。
+  controlの識別・矩形取得・検索欄のフォーカス設定だけに使う。検索文字の設定、
+  戻る、ダウンロード、書籍オープンは通常のpyautogui操作で実行し、検索値は
+  `ValuePattern`による読取専用確認を行う。ウィンドウ前面化は取得済みのネイティブ
+  ウィンドウハンドルをWin32 APIへ渡す。固定の画面絶対座標は使わない。
 
 ---
 
