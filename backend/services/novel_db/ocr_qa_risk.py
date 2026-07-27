@@ -6,15 +6,20 @@ import json
 import re
 
 from .connection import with_db
+from .ocr_content_guards import has_suspicious_repetition
 
 _HONORIFIC_NAME_RE = re.compile(r"([\u3400-\u9fff々〆ヵヶ]{2,8})(?:さん|様|殿|君|くん|ちゃん)")
 _KATAKANA_TERM_RE = re.compile(r"[ァ-ヴー]{4,}")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LONG_NON_NARRATIVE_TEXT = 300
+_CANDIDATE_AUDIT_FLAGS = frozenset({"primary_text_repetition", "external_text_repetition"})
 _MANAGED_RISK_FLAGS = frozenset(
     {
         "named_entity_candidate_disagreement",
         "page_type_text_conflict",
+        "primary_text_repetition",
+        "external_text_repetition",
+        "selected_text_repetition",
     }
 )
 
@@ -53,6 +58,13 @@ def detect_qa_risk_flags(
         external_terms = _candidate_terms(external_text)
         if _has_single_character_variant(primary_terms, external_terms):
             flags.add("named_entity_candidate_disagreement")
+
+    if has_suspicious_repetition(primary_text):
+        flags.add("primary_text_repetition")
+    if has_suspicious_repetition(external_text):
+        flags.add("external_text_repetition")
+    if has_suspicious_repetition(full_text):
+        flags.add("selected_text_repetition")
     return flags
 
 
@@ -76,8 +88,10 @@ def annotate_run_qa_risks(run_id: int) -> set[int]:
                 )
                 page_no = int(row[0])
                 quality_flags = set(json.loads(str(row[6] or "[]")))
+                if "sample_content_excluded" in quality_flags:
+                    risk_flags.discard("page_type_text_conflict")
                 updated_flags = sorted((quality_flags - _MANAGED_RISK_FLAGS) | risk_flags)
-                if risk_flags:
+                if risk_flags - _CANDIDATE_AUDIT_FLAGS:
                     risky_pages.add(page_no)
                 if updated_flags == sorted(quality_flags):
                     continue

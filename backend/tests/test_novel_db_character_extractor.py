@@ -20,6 +20,10 @@ def test_parse_names_japanese_comma():
     assert _parse_names("レティ、デューク") == ["レティ", "デューク"]
 
 
+def test_parse_names_preserves_foreign_middle_dot_and_normalizes_titles():
+    assert _parse_names("ジャン・ピエール, 第一皇子 守伸殿") == ["ジャン・ピエール", "守伸"]
+
+
 def test_parse_names_with_prompt_echo():
     """LLM がプロンプトを反復しても、`:` 以降を採用できる。"""
     assert _parse_names("主要登場人物: レティ, デューク") == ["レティ", "デューク"]

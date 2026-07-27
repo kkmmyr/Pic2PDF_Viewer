@@ -41,10 +41,10 @@ def test_parse_main_characters_comma_separated():
     ]
 
 
-def test_parse_main_characters_handles_japanese_separators():
-    assert parse_character_names("レティ、デューク・アストリッド") == [
+def test_parse_main_characters_handles_japanese_comma_and_preserves_middle_dot():
+    assert parse_character_names("レティ、ジャン・ピエール、アストリッド") == [
         "レティ",
-        "デューク",
+        "ジャン・ピエール",
         "アストリッド",
     ]
 

@@ -64,7 +64,7 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 LLM呼び出しごとのtemperature・出力長・context長は用途別定数として各機能側に残す。一方、Ollama互換options辞書のキー組み立ては `llm_options.make_llm_options()` に集約し、キー名の表記揺れや型なし辞書の複製を避ける。
 
 - **Step 1**: `rebuild_from_pages`（§3、常実行）。
-- **Step 2 `_run_combined_step`**: `summarize_book_with_characters(conn, book_name)` が `_prompts.COMBINED_PROMPT`（`[SUMMARY]` / `[CHARACTERS]` / `[CHARACTER_DETAIL:名前]` マーカー）で **書籍サマリ 1 本 + 最大 20 キャラの人物像**を得る。`parse_combined_output` でマーカー分解。`update_book_summary` が `books.summary` を更新し LanceDB `summaries` テーブルへ embedding を upsert（B-8）。キャラ分は `book_characters` を書き直し、`first_page`/`page_count` を `full_text LIKE %名前%` で近似する。
+- **Step 2 `_run_combined_step`**: `summarize_book_with_characters(conn, book_name)` が `_prompts.COMBINED_PROMPT`（`[SUMMARY]` / `[CHARACTERS]` / `[CHARACTER_DETAIL:名前]` マーカー）で **書籍サマリ 1 本 + 最大 20 キャラの人物像**を得る。`parse_combined_output` でマーカー分解。`update_book_summary` が `books.summary` を更新し LanceDB `summaries` テーブルへ embedding を upsert（B-8）。キャラ分は`character_names.normalize_character_entries`で敬称・皇子等の肩書を除き、同じ正規名を統合する。匿名役職だけの項目と、当該巻の索引本文に正規名・元表記のどちらも存在しない項目は保存しない。漢字3〜5字名の姓を除いた表記、外国人名の先頭構成名は、2ページ以上で一致した場合だけ補助根拠にできる。根拠ページ一致から`first_page`/`page_count`を計算して`book_characters`を書き直す。2026-07-28の茉莉花官吏伝18巻dry-runでは既存169人物を全件維持し、根拠なし保存は0件だった。
 - **skip 条件**: `books.summary` と `book_characters.summary` が両方存在 かつ `redo=False` なら Step 2 全体をスキップ。
 - **本文入力（`_load_body_text`）**: `char_count >= NOVEL_DB_MIN_BODY_CHARS` かつ先頭/末尾 `NOVEL_DB_BODY_PAGE_MARGIN` ページを除いた本文をページ順連結。
 - **サイズ分岐（`summarizer`）**: 本文 ≤ `ONE_SHOT_MAX_BODY_CHARS`(200,000) は 1-shot（`num_ctx=131072`）。超過時は combined を諦めサマリのみ map-reduce（20,000 字 × 最大 8 チャンク → reduce）で生成し、キャラ辞典は空。
@@ -82,7 +82,7 @@ Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のど
 
 ## 6. 補助ステップ
 
-- **主要登場人物抽出（`character_extractor.extract_main_characters`）**: 各ページ本文（先頭 1500 字）を GEMMA_BACKEND に投げ、最大 3 名をカンマ区切りで取得 → `pages.main_characters`。CLI `extract_characters.py` で任意実行。用途は 3 つ: 検索ヒットのキャラヒント（[検索QA設計](小説RAG_検索QA設計.md)）、`character_db` のキャラ集計（B-15 単独経路）、C-12 の共起カウント。失敗ページは NULL のまま続行。保存済み文字列のカンマ・読点分割、空白除去、重複排除、上限適用は `character_names.parse_character_names` を正本とし、キャラ集計と関係抽出の両方から利用する。
+- **主要登場人物抽出（`character_extractor.extract_main_characters`）**: 各ページ本文（先頭 1500 字）を GEMMA_BACKEND に投げ、最大 3 名をカンマ区切りで取得 → `pages.main_characters`。CLI `extract_characters.py` で任意実行。用途は 3 つ: 検索ヒットのキャラヒント（[検索QA設計](小説RAG_検索QA設計.md)）、`character_db` のキャラ集計（B-15 単独経路）、C-12 の共起カウント。失敗ページは NULL のまま続行。保存済み文字列のカンマ・読点分割、敬称・肩書除去、匿名役職除外、重複排除、上限適用は`character_names`を正本とし、ページ抽出・キャラ集計・full build・関係抽出から共用する。外国人名の中黒`・`は名前の一部として保持し、区切りには使わない。
 - **キャラクター関係グラフ（`relation_extractor.generate_book_relations`）C-12**: `pages.main_characters` の同一ページ共起を数えエッジ重みとし、`book_characters.summary` を Qwen に渡して関係タイプ（友人・師弟・敵対 等）を JSON 抽出 → `character_relations` に REPLACE。`mode=generate_relations` ジョブ。読み取りは `graph_query`（series 単位で nodes/edges 組み立て、内部利用のみで専用 API 無し）。
 
 ---

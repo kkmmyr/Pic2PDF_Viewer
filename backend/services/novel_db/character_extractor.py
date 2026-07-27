@@ -18,6 +18,7 @@ from local_llm import LLMError
 from config import NOVEL_DB_CHAR_EXTRACT_MODEL
 
 from ._llm_backend import GEMMA_BACKEND
+from .character_names import parse_character_names
 from .llm_options import make_llm_options
 
 EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大 3 名挙げてください。
@@ -86,15 +87,4 @@ def _parse_names(text: str) -> list[str]:
     if line in ("不明", "なし", "該当なし", "-", "－"):
         return []
 
-    # カンマ・読点・スペースで分割
-    raw = line.replace("、", ",").replace("・", ",")
-    names: list[str] = []
-    for part in raw.split(","):
-        cleaned = part.strip().strip("「」『』\"'.。 ")
-        if not cleaned or cleaned in ("不明", "なし"):
-            continue
-        # 過度に長い断片（説明文）はスキップ
-        if len(cleaned) > 30:
-            continue
-        names.append(cleaned)
-    return names[:3]
+    return parse_character_names(line)[:3]

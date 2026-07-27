@@ -17,6 +17,7 @@ from collections.abc import Callable
 from utils.logger import get_logger
 
 from .builder import EMBED_BATCH_SIZE, rebuild_from_pages
+from .character_names import derive_character_evidence_aliases, normalize_character_entries
 from .connection import with_db
 from .contextualizer import generate_chunk_context, make_embedding_input
 from .embedder import embed_batch
@@ -146,25 +147,46 @@ def _run_combined_step(
     if char_summaries:
         if detail:
             detail("キャラクタ抽出中")
+        entries = normalize_character_entries(char_summaries)
+        page_rows = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id = ? AND index_eligible = 1 ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
         conn.execute("DELETE FROM book_characters WHERE book_id = ?", (book_id,))
-        for name, char_summary in char_summaries.items():
-            # first_page / page_count をテキスト検索で近似
-            result = conn.execute(
-                "SELECT MIN(page_no), COUNT(*) FROM pages "
-                "WHERE book_id = ? AND index_eligible = 1 AND full_text LIKE ?",
-                (book_id, f"%{name}%"),
-            ).fetchone()
-            first_page = result[0] or 1
-            page_count = result[1] or 1
+        saved_count = 0
+        for entry in entries:
+            derived_aliases = derive_character_evidence_aliases(entry.name)
+            derived_page_counts = {
+                alias: sum(alias in str(page[1] or "") for page in page_rows) for alias in derived_aliases
+            }
+            evidence_aliases = (
+                *entry.aliases,
+                *(alias for alias, count in derived_page_counts.items() if count >= 2),
+            )
+            evidence_pages = [
+                int(page[0]) for page in page_rows if any(alias in str(page[1] or "") for alias in evidence_aliases)
+            ]
+            if not evidence_pages:
+                log(f"  omit character without page evidence: {entry.name}")
+                continue
             conn.execute(
                 """INSERT INTO book_characters
                        (book_id, name, summary, first_page, page_count, generated_at)
                    VALUES (?, ?, ?, ?, ?, datetime('now', '+9 hours'))""",
-                (book_id, name, char_summary, first_page, page_count),
+                (
+                    book_id,
+                    entry.name,
+                    entry.summary,
+                    min(evidence_pages),
+                    len(evidence_pages),
+                ),
             )
+            saved_count += 1
         conn.commit()
+    else:
+        saved_count = 0
 
-    log(f"  done: summary={len(summary)} chars, {len(char_summaries)} characters")
+    log(f"  done: summary={len(summary)} chars, {saved_count} characters")
 
 
 def _run_generate_contexts(

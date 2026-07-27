@@ -115,6 +115,66 @@ class TestRunCombinedStep:
         chars = db_conn.execute("SELECT name FROM book_characters WHERE book_id = ?", (book_id,)).fetchall()
         assert [r[0] for r in chars] == ["アリス"]
 
+    def test_characters_are_normalized_merged_and_require_page_evidence(self, db_conn):
+        book_id = _insert_book(db_conn, "guarded-charbook")
+        _insert_page(db_conn, book_id, 3, "第一皇子 守伸は茉莉花に書類を渡した。")
+        _insert_page(db_conn, book_id, 8, "守伸殿は静かにうなずいた。")
+
+        char_summaries = {
+            "第一皇子 守伸": "第一皇子。",
+            "守伸殿": "茉莉花を支える。",
+            "幻の人物": "本文には存在しない。",
+            "国王陛下": "匿名の役職。",
+        }
+        mock_summarize = MagicMock(return_value=("本のサマリ", char_summaries))
+        logs: list[str] = []
+
+        with (
+            patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
+            patch("services.novel_db.full_builder.update_book_summary"),
+        ):
+            _run_combined_step(db_conn, "guarded-charbook", redo=False, log=logs.append)
+
+        chars = db_conn.execute(
+            "SELECT name, summary, first_page, page_count FROM book_characters WHERE book_id = ?",
+            (book_id,),
+        ).fetchall()
+        assert [tuple(row) for row in chars] == [
+            ("守伸", "第一皇子。\n茉莉花を支える。", 3, 2),
+        ]
+        assert any("omit character without page evidence: 幻の人物" in message for message in logs)
+
+    def test_derived_character_alias_requires_repeated_page_evidence(self, db_conn):
+        book_id = _insert_book(db_conn, "derived-alias-book")
+        _insert_page(db_conn, book_id, 2, "茉莉花は書類を読んだ。ラーナシュは歩いた。天河の名も一度だけ出た。")
+        _insert_page(db_conn, book_id, 5, "茉莉花は珀陽へ報告した。ラーナシュも同席した。")
+
+        mock_summarize = MagicMock(
+            return_value=(
+                "本のサマリ",
+                {
+                    "皓茉莉花": "主人公。",
+                    "ラーナシュ・ヴァルマ": "異国の人物。",
+                    "黎天河": "一度だけ似た短名が出る。",
+                },
+            )
+        )
+
+        with (
+            patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
+            patch("services.novel_db.full_builder.update_book_summary"),
+        ):
+            _run_combined_step(db_conn, "derived-alias-book", redo=False, log=lambda _: None)
+
+        chars = db_conn.execute(
+            "SELECT name, first_page, page_count FROM book_characters WHERE book_id=? ORDER BY name",
+            (book_id,),
+        ).fetchall()
+        assert [tuple(row) for row in chars] == [
+            ("ラーナシュ・ヴァルマ", 2, 2),
+            ("皓茉莉花", 2, 2),
+        ]
+
 
 class TestRunGenerateContexts:
     """_run_generate_contexts のスキップ条件を検証する。"""

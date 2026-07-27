@@ -15,6 +15,9 @@ from .ocr_run_store import OcrInputPage, collect_input_pages, validate_complete_
 _QA_AUDIT_ONLY_FLAGS = frozenset(
     {
         "cross_engine_consensus",
+        "external_text_repetition",
+        "primary_text_repetition",
+        "sample_content_excluded",
         "yomitoku_adjudication",
     }
 )
@@ -22,10 +25,17 @@ _QA_AUDIT_ONLY_FLAGS = frozenset(
 
 def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
     """Move a complete OCR run to QA without publishing canonical text."""
-    _, rows = validate_complete_run(run_id, input_pages)
+    validate_complete_run(run_id, input_pages)
     classify_run_pages(run_id)
     risk_pages = annotate_run_qa_risks(run_id)
-    flagged_pages = {int(row[0]) for row in rows if set(json.loads(str(row[6]))) - _QA_AUDIT_ONLY_FLAGS}
+    with with_db() as conn:
+        current_flags = conn.execute(
+            "SELECT page_no, quality_flags_json FROM ocr_page_results WHERE run_id=?",
+            (run_id,),
+        ).fetchall()
+    flagged_pages = {
+        int(row[0]) for row in current_flags if set(json.loads(str(row[1] or "[]"))) - _QA_AUDIT_ONLY_FLAGS
+    }
     flagged_pages.update(risk_pages)
     page_count = len(input_pages)
     required_pages = set(range(1, min(7, page_count) + 1)) | flagged_pages
@@ -46,7 +56,8 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
             )
             conn.execute(
                 "UPDATE ocr_page_results SET qa_state='required' "
-                "WHERE run_id=? AND (state!='passed' OR layout_type!='normal_prose')",
+                "WHERE run_id=? AND (state!='passed' OR layout_type!='normal_prose') "
+                "AND quality_flags_json NOT LIKE '%\"sample_content_excluded\"%'",
                 (run_id,),
             )
             conn.execute(

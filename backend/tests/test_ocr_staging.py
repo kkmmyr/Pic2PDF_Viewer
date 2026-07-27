@@ -178,6 +178,68 @@ def test_classify_run_pages_is_conservative(staged_book) -> None:
     assert [tuple(row) for row in rows] == [(1, "structured"), (2, "normal_prose")]
 
 
+def test_classify_run_pages_excludes_appended_sample(tmp_data_dir) -> None:
+    upgrade_head()
+    book_name = "sample-boundary"
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
+    images_dir.mkdir(parents=True)
+    for page_no in range(1, 17):
+        Image.new("RGB", (100, 140), "white").save(images_dir / f"{page_no:03d}.png")
+    input_pages = collect_input_pages(book_name)
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+
+    for page in input_pages:
+        text = "これは物語本文として十分な長さを持つ文章です。" * 20
+        if page.page_no == 12:
+            text = "別作品 電子特別お試し版"
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, text))
+
+    counts = classify_run_pages(run_id)
+
+    assert counts["colophon_or_ad"] == 5
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT page_no, page_type, index_eligible, quality_flags_json "
+            "FROM ocr_page_results WHERE run_id=? AND page_no>=11 ORDER BY page_no",
+            (run_id,),
+        ).fetchall()
+    assert [tuple(row[:3]) for row in rows] == [
+        (11, "narrative", 1),
+        (12, "colophon_or_ad", 0),
+        (13, "colophon_or_ad", 0),
+        (14, "colophon_or_ad", 0),
+        (15, "colophon_or_ad", 0),
+        (16, "colophon_or_ad", 0),
+    ]
+    assert "sample_content_boundary" in rows[1][3]
+    assert all("sample_content_excluded" in row[3] for row in rows[2:])
+
+
+def test_stage_requires_sample_boundary_but_not_every_excluded_page(tmp_data_dir) -> None:
+    upgrade_head()
+    book_name = "sample-boundary-qa"
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
+    images_dir.mkdir(parents=True)
+    for page_no in range(1, 17):
+        Image.new("RGB", (100, 140), "white").save(images_dir / f"{page_no:03d}.png")
+    input_pages = collect_input_pages(book_name)
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        text = "これは物語本文として十分な長さを持つ文章です。" * 20
+        if page.page_no == 12:
+            text = "別作品 電子特別お試し版"
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, text))
+
+    stage_run_for_qa(run_id, input_pages)
+
+    with with_db() as conn:
+        required = conn.execute(
+            "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
+            (run_id,),
+        ).fetchall()
+    assert [row[0] for row in required] == [1, 2, 3, 4, 5, 6, 7, 8, 12, 16]
+
+
 @pytest.mark.parametrize(
     ("page_no", "page_count", "text", "expected"),
     [
@@ -234,6 +296,25 @@ def test_qa_risk_ignores_unpaired_candidate_omissions() -> None:
     )
 
 
+def test_qa_risk_detects_repetition_per_candidate_and_selected_text() -> None:
+    repeated = "\n".join(["茉莉花は静かに書類へ目を落とした。"] * 3)
+    assert detect_qa_risk_flags(
+        page_type="narrative",
+        full_text=repeated,
+        char_count=len(repeated),
+        primary_text=repeated,
+        external_text="正常な外部OCR本文です。",
+    ) == {"primary_text_repetition", "selected_text_repetition"}
+
+    assert detect_qa_risk_flags(
+        page_type="narrative",
+        full_text="正常な採用本文です。",
+        char_count=9,
+        primary_text="正常な主OCR本文です。",
+        external_text=repeated,
+    ) == {"external_text_repetition"}
+
+
 def test_classification_preserves_ocr_candidate_selection(staged_book) -> None:
     book_name, input_pages = staged_book
     run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
@@ -266,7 +347,12 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
     for page in input_pages:
         result = _passed_page(page.page_no, page.image_sha256, "これは通常の本文です。" * 40)
         if page.page_no == 9:
-            result["quality_flags"] = ["cross_engine_consensus", "yomitoku_adjudication"]
+            result["quality_flags"] = [
+                "cross_engine_consensus",
+                "primary_text_repetition",
+                "sample_content_excluded",
+                "yomitoku_adjudication",
+            ]
         if page.page_no == 10:
             result["quality_flags"] = ["external_ocr_more_complete"]
         save_page_result(run_id, result)
