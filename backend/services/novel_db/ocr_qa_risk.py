@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import json
 import re
+import sqlite3
+from dataclasses import dataclass
 
 from .connection import with_db
 from .ocr_content_guards import has_suspicious_repetition
+from .ocr_publication import list_current_published_runs, resolve_selected_text
 
 _HONORIFIC_NAME_RE = re.compile(r"([\u3400-\u9fff々〆ヵヶ]{2,8})(?:さん|様|殿|君|くん|ちゃん)")
 _KATAKANA_TERM_RE = re.compile(r"[ァ-ヴー]{4,}")
@@ -22,6 +25,16 @@ _MANAGED_RISK_FLAGS = frozenset(
         "selected_text_repetition",
     }
 )
+
+
+@dataclass(frozen=True)
+class PublishedRepetitionRisk:
+    """現在公開中runで反復が検出されたページ。"""
+
+    run_id: int
+    book_name: str
+    page_no: int
+    sources: tuple[str, ...]
 
 
 def _candidate_terms(text: str) -> set[str]:
@@ -80,11 +93,13 @@ def annotate_run_qa_risks(run_id: int) -> set[int]:
         ).fetchall()
         with conn:
             for row in rows:
-                selected_text = {
-                    "primary": str(row[4] or row[2] or ""),
-                    "external": str(row[5] or ""),
-                    "codex": str(row[8] or ""),
-                }.get(str(row[7] or "primary"), str(row[2] or ""))
+                selected_text = resolve_selected_text(
+                    full_text=str(row[2] or ""),
+                    primary_text=str(row[4] or ""),
+                    external_text=str(row[5] or ""),
+                    selected_engine=str(row[7] or "primary"),
+                    corrected_text=str(row[8] or ""),
+                )
                 risk_flags = detect_qa_risk_flags(
                     page_type=str(row[1] or "unknown"),
                     full_text=selected_text,
@@ -106,3 +121,53 @@ def annotate_run_qa_risks(run_id: int) -> set[int]:
                     (json.dumps(updated_flags, ensure_ascii=False), run_id, page_no),
                 )
     return risky_pages
+
+
+def audit_current_published_repetitions(
+    conn: sqlite3.Connection,
+    *,
+    book_names: list[str] | tuple[str, ...] | None = None,
+) -> list[PublishedRepetitionRisk]:
+    """書籍ごとの現在公開中runだけを反復監査する。"""
+    published_runs = list_current_published_runs(conn, book_names=book_names)
+    if not published_runs:
+        return []
+
+    run_by_id = {run.id: run for run in published_runs}
+    placeholders = ", ".join("?" for _ in published_runs)
+    rows = conn.execute(
+        "SELECT run_id, page_no, full_text, primary_text, external_text, "
+        "selected_engine, corrected_text "
+        f"FROM ocr_page_results WHERE run_id IN ({placeholders}) "
+        "ORDER BY run_id, page_no",
+        tuple(run_by_id),
+    ).fetchall()
+
+    risks: list[PublishedRepetitionRisk] = []
+    for row in rows:
+        selected_text = resolve_selected_text(
+            full_text=str(row[2] or ""),
+            primary_text=str(row[3] or ""),
+            external_text=str(row[4] or ""),
+            selected_engine=str(row[5] or "primary"),
+            corrected_text=str(row[6] or ""),
+        )
+        sources: list[str] = []
+        if has_suspicious_repetition(str(row[3] or row[2] or "")):
+            sources.append("primary")
+        if has_suspicious_repetition(str(row[4] or "")):
+            sources.append("external")
+        if has_suspicious_repetition(selected_text):
+            sources.append("selected")
+        if not sources:
+            continue
+        run_id = int(row[0])
+        risks.append(
+            PublishedRepetitionRisk(
+                run_id=run_id,
+                book_name=run_by_id[run_id].book_name,
+                page_no=int(row[1]),
+                sources=tuple(sources),
+            )
+        )
+    return risks

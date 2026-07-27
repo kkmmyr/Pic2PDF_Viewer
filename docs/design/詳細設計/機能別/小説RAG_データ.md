@@ -129,7 +129,7 @@ RAG のコアロジック。主なモジュール:
 
 | スクリプト | 役割 |
 |---|---|
-| `build_novel_db.py` | OCR → チャンク → embedding の本構築（`--book` / `--all` / `--list`） |
+| `build_novel_db.py` | OCR済み本文 → チャンク → embedding の再構築（`--book` / `--all` / `--list`）。`--book`と`--page`を併用すると補正済み1ページだけを再構築 |
 | `build_chunk_contexts.py` | B-9 Contextual Retrieval のチャンク文脈生成 + 再 embedding |
 | `build_novel_summaries.py` | 書籍サマリ（あらすじ）を map-reduce で生成 |
 | `build_character_summaries.py` | B-15 キャラ辞典の人物像サマリ生成 |

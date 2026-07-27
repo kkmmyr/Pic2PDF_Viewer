@@ -10,7 +10,7 @@ import sqlite3
 import pytest
 from fastapi import HTTPException
 
-from services.novel_db import builder, with_db
+from services.novel_db import builder, page_index_builder, with_db
 from services.novel_db.embedder import EmbeddingError
 from services.novel_db.lance_store import get_chunks_table
 from services.novel_db.migrations import upgrade_head
@@ -188,3 +188,189 @@ def test_rebuild_book_alias_works(novel_db_env, monkeypatch):
         builder.rebuild_book(conn, book_name)
 
         assert conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0] > 0
+
+
+def _lance_rows() -> list[dict]:
+    return get_chunks_table().search().limit(100).to_list()
+
+
+def test_rebuild_page_changes_only_target_page_and_refreshes_fts(novel_db_env, monkeypatch):
+    book_name = "test-page-rebuild"
+    monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
+    monkeypatch.setattr(page_index_builder, "embed_batch", _stub_embed_batch)
+
+    with with_db(str(novel_db_env["db_path"])) as conn:
+        book_id = _populate_pages(
+            conn,
+            book_name,
+            [
+                "obsoletekeyword remains in the first narrative page long enough.",
+                "stablekeyword remains in the second narrative page long enough.",
+            ],
+        )
+        builder.rebuild_from_pages(conn, book_name)
+        stable_before = conn.execute(
+            "SELECT c.id, c.text FROM chunks c JOIN pages p ON p.id=c.page_id WHERE p.book_id=? AND p.page_no=2",
+            (book_id,),
+        ).fetchall()
+        stable_lance_before = sorted(
+            (int(row["chunk_id"]), str(row["text"])) for row in _lance_rows() if int(row["page_no"]) == 2
+        )
+
+        new_text = "freshkeyword replaces the first narrative page and is long enough."
+        conn.execute(
+            "UPDATE pages SET full_text=?, char_count=? WHERE book_id=? AND page_no=1",
+            (new_text, len(new_text), book_id),
+        )
+        conn.commit()
+        page_index_builder.rebuild_page_from_pages(conn, book_name, 1)
+
+        stable_after = conn.execute(
+            "SELECT c.id, c.text FROM chunks c JOIN pages p ON p.id=c.page_id WHERE p.book_id=? AND p.page_no=2",
+            (book_id,),
+        ).fetchall()
+        stable_lance_after = sorted(
+            (int(row["chunk_id"]), str(row["text"])) for row in _lance_rows() if int(row["page_no"]) == 2
+        )
+        assert stable_after == stable_before
+        assert stable_lance_after == stable_lance_before
+        assert conn.execute("SELECT COUNT(*) FROM pages_fts WHERE pages_fts MATCH 'freshkeyword'").fetchone()[0] == 1
+        assert conn.execute("SELECT COUNT(*) FROM pages_fts WHERE pages_fts MATCH 'obsoletekeyword'").fetchone()[0] == 0
+        assert (
+            conn.execute(
+                "SELECT indexed_at FROM books WHERE id=?",
+                (book_id,),
+            ).fetchone()[0]
+            is not None
+        )
+
+
+def test_rebuild_page_removes_chunks_for_non_indexable_page(novel_db_env, monkeypatch):
+    book_name = "test-page-excluded"
+    monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
+    monkeypatch.setattr(page_index_builder, "embed_batch", _stub_embed_batch)
+
+    with with_db(str(novel_db_env["db_path"])) as conn:
+        book_id = _populate_pages(
+            conn,
+            book_name,
+            [
+                "This narrative page initially has a searchable chunk.",
+                "This second page remains indexed and unchanged throughout.",
+            ],
+        )
+        builder.rebuild_from_pages(conn, book_name)
+        conn.execute(
+            "UPDATE pages SET page_type='advertisement', index_eligible=0 WHERE book_id=? AND page_no=1",
+            (book_id,),
+        )
+        conn.commit()
+
+        page_index_builder.rebuild_page_from_pages(conn, book_name, 1)
+
+        indexed_pages = conn.execute(
+            "SELECT p.page_no FROM chunks c JOIN pages p ON p.id=c.page_id WHERE p.book_id=? ORDER BY p.page_no",
+            (book_id,),
+        ).fetchall()
+        assert [int(row[0]) for row in indexed_pages] == [2]
+        assert {int(row["page_no"]) for row in _lance_rows()} == {2}
+
+
+def test_rebuild_page_embedding_failure_does_not_mutate_existing_index(novel_db_env, monkeypatch):
+    book_name = "test-page-precompute-fail"
+    monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
+
+    with with_db(str(novel_db_env["db_path"])) as conn:
+        book_id = _populate_pages(
+            conn,
+            book_name,
+            ["Original indexed page content is long enough for one chunk."],
+        )
+        builder.rebuild_from_pages(conn, book_name)
+        chunks_before = conn.execute("SELECT id, text FROM chunks ORDER BY id").fetchall()
+        lance_before = sorted((int(row["chunk_id"]), str(row["text"])) for row in _lance_rows())
+        indexed_at_before = conn.execute(
+            "SELECT indexed_at FROM books WHERE id=?",
+            (book_id,),
+        ).fetchone()[0]
+
+        new_text = "Changed page content would require a new embedding calculation."
+        conn.execute(
+            "UPDATE pages SET full_text=?, char_count=? WHERE book_id=? AND page_no=1",
+            (new_text, len(new_text), book_id),
+        )
+        conn.commit()
+        monkeypatch.setattr(page_index_builder, "embed_batch", _stub_embed_batch_failing)
+
+        with pytest.raises(EmbeddingError):
+            page_index_builder.rebuild_page_from_pages(conn, book_name, 1)
+
+        assert conn.execute("SELECT id, text FROM chunks ORDER BY id").fetchall() == chunks_before
+        assert sorted((int(row["chunk_id"]), str(row["text"])) for row in _lance_rows()) == lance_before
+        assert (
+            conn.execute(
+                "SELECT indexed_at FROM books WHERE id=?",
+                (book_id,),
+            ).fetchone()[0]
+            == indexed_at_before
+        )
+
+
+def test_rebuild_page_restores_lance_rows_when_add_fails(novel_db_env, monkeypatch):
+    book_name = "test-page-lance-fail"
+    monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
+    monkeypatch.setattr(page_index_builder, "embed_batch", _stub_embed_batch)
+
+    with with_db(str(novel_db_env["db_path"])) as conn:
+        book_id = _populate_pages(
+            conn,
+            book_name,
+            ["Original page content is long enough to preserve during rollback."],
+        )
+        builder.rebuild_from_pages(conn, book_name)
+        chunks_before = conn.execute("SELECT id, text FROM chunks ORDER BY id").fetchall()
+        lance_before = sorted((int(row["chunk_id"]), str(row["text"])) for row in _lance_rows())
+
+        new_text = "Replacement page content triggers a simulated LanceDB add failure."
+        conn.execute(
+            "UPDATE pages SET full_text=?, char_count=? WHERE book_id=? AND page_no=1",
+            (new_text, len(new_text), book_id),
+        )
+        conn.commit()
+
+        real_table = get_chunks_table()
+
+        class FailOnceTable:
+            def __init__(self):
+                self.add_calls = 0
+
+            def search(self):
+                return real_table.search()
+
+            def delete(self, predicate):
+                return real_table.delete(predicate)
+
+            def add(self, rows):
+                self.add_calls += 1
+                if self.add_calls == 1:
+                    raise RuntimeError("simulated LanceDB add failure")
+                return real_table.add(rows)
+
+        monkeypatch.setattr(
+            page_index_builder,
+            "get_chunks_table",
+            lambda: FailOnceTable(),
+        )
+
+        with pytest.raises(RuntimeError, match="simulated LanceDB add failure"):
+            page_index_builder.rebuild_page_from_pages(conn, book_name, 1)
+
+        assert conn.execute("SELECT id, text FROM chunks ORDER BY id").fetchall() == chunks_before
+        assert sorted((int(row["chunk_id"]), str(row["text"])) for row in _lance_rows()) == lance_before
+        assert (
+            conn.execute(
+                "SELECT indexed_at FROM books WHERE id=?",
+                (book_id,),
+            ).fetchone()[0]
+            is None
+        )

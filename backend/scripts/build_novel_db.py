@@ -4,6 +4,7 @@
 
     cd backend
     uv run python scripts/build_novel_db.py --book "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)"
+    uv run python scripts/build_novel_db.py --book "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)" --page 42
     uv run python scripts/build_novel_db.py --all
     uv run python scripts/build_novel_db.py --list
 
@@ -23,7 +24,7 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from config import KINDLE_NOVEL_PDF_DIR
-from services.novel_db import rebuild_book, with_db
+from services.novel_db import rebuild_book, rebuild_page_from_pages, with_db
 from services.novel_db.migrations import upgrade_head
 
 
@@ -52,13 +53,34 @@ def _rebuild_one(book_name: str) -> bool:
     return True
 
 
+def _rebuild_one_page(book_name: str, page_no: int) -> bool:
+    print(f"[rebuild-page] {book_name} p{page_no}", flush=True)
+    try:
+        with with_db() as conn:
+            rebuild_page_from_pages(conn, book_name, page_no)
+    except Exception as e:
+        print(f"  FAILED: {e}", file=sys.stderr, flush=True)
+        return False
+    print("  OK", flush=True)
+    return True
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build novel.db from existing PDFs.")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--all", action="store_true", help="全書籍を順次再構築する")
     group.add_argument("--book", metavar="NAME", help="指定書籍 1 冊を再構築する（PDF stem）")
     group.add_argument("--list", action="store_true", help="再構築可能な書籍一覧を表示する")
+    parser.add_argument(
+        "--page",
+        type=int,
+        metavar="PAGE_NO",
+        help="--bookの指定ページだけを再構築する（1以上の画面番号）",
+    )
     args = parser.parse_args(argv)
+
+    if args.page is not None and (not args.book or args.page < 1):
+        parser.error("--page requires --book and a page number greater than zero")
 
     upgrade_head()
 
@@ -72,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.book:
+        if args.page is not None:
+            return 0 if _rebuild_one_page(args.book, args.page) else 1
         return 0 if _rebuild_one(args.book) else 1
 
     # --all

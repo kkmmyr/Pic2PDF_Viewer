@@ -6,6 +6,7 @@
 
 各ステップは独立して実行可能。rebuild_from_pages は OCR 済みの full_text を前提とし、
 pages テーブルは一切変更しない（chunks/chunks_vec のみ再構築）。
+補正済み1ページだけの再構築は page_index_builder が担う。
 
 詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §3・§7。
 """
@@ -20,16 +21,13 @@ import config
 from utils.logger import get_logger
 from utils.path_utils import resolve_under_base, validate_safe_name
 
-from .chunker import chunk_page
+from .chunker import MIN_CHARS_FOR_CHUNK, chunk_page
 from .connection import with_db
 from .embedder import embed_batch
 from .extractor import PageText, run_ocr_subprocess
 from .lance_store import get_chunks_table
 
 logger = get_logger(__name__)
-
-# 短すぎるページ（章扉・人物紹介の小さな bbox 集まり）はチャンク化しない
-MIN_CHARS_FOR_CHUNK = 30
 
 # embedding API 呼び出しのバッチサイズ
 EMBED_BATCH_SIZE = 16
