@@ -132,6 +132,11 @@ def test_dry_run_does_not_create_jobs():
     assert api.created == []
 
 
+def test_apply_requires_expected_total_before_api_access():
+    with pytest.raises(SystemExit, match="--expected-total is required with --apply"):
+        series_capture.main(["--apply"])
+
+
 def test_apply_creates_next_job_only_after_previous_success():
     api = FakeApi({"NOVEL8": "succeeded", "NOVEL9": "succeeded"})
     books = series_capture.build_inventory(

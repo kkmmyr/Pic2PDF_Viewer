@@ -5,19 +5,13 @@
 Pic2PDF Viewer のリリースサーバー（uvicorn on :8090）を **NSSM (Non-Sucking Service Manager)** で Windows サービスとして登録する手順。
 他環境への移植時はこの手順を上から順に実施。
 
-> **現行スクリプトの制約**: `scripts/setup_service.bat` は旧
-> `backend/.venv` を参照する。標準の uv workspace はルート `.venv` を正とするため、
-> 新規端末へこの手順を適用する前にスクリプト側のパス修正が必要。
-> 既存端末の `backend/.venv` はサービス移行が完了するまで削除しない。
-> 詳細は [既知の問題](../../log/既知の問題.md) を参照。
-
 ## 概要
 
 | 項目 | 内容 |
 |---|---|
 | サービス名 | `Pic2PDFViewer` |
 | 表示名 | `Pic2PDF Viewer` |
-| 実行コマンド | `backend\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8090` |
+| 実行コマンド | `.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8090` |
 | 起動種別 | 自動（遅延開始） |
 | 実行アカウント | ローカルユーザー（OneDrive 配下のデータアクセスに必要） |
 | crash 時挙動 | 5 秒待機して自動再起動（ただし 10 秒以内連続失敗時は throttle） |
@@ -25,14 +19,18 @@ Pic2PDF Viewer のリリースサーバー（uvicorn on :8090）を **NSSM (Non-
 
 ## 前提条件
 
-1. backend の venv が存在すること
-   - `backend\.venv\Scripts\python.exe` が存在
-   - 未作成の新規 workspace ではこの文書の手順を中断し、setup script の
-     ルート `.venv` 対応後に登録する
+1. workspace ルートの venv が存在すること
+   - `.venv\Scripts\python.exe` が存在
+   - 未作成ならリポジトリルートで `uv sync` を実行する
 2. frontend の dist が build 済みであること
    - `frontend\dist\index.html` が存在
    - 未作成なら `scripts\build_release.bat` を実行
 3. 管理者権限の PowerShell or コマンドプロンプトが使えること
+
+> 2026-07-27 時点で旧 Windows サービスは停止・無効化され、
+> `backend\.venv` を参照する登録だけが残っている。Linux 本番運用には影響しない。
+> 将来このサービスを再利用する場合は、管理者として本手順を実行して
+> ルート `.venv` へ再登録してから有効化する。
 
 ## セットアップ手順
 
@@ -164,8 +162,8 @@ Get-Content "D:\61.tool\Pic2PDF_Viewer\backend\data\logs\service-stderr.log" -Ta
 
 よくある原因:
 - `frontend\dist\index.html` が存在しない → `scripts\build_release.bat` 実行
-- `backend\.venv` が壊れている／存在しない → 現行 setup script の旧パス依存。
-  ルート `.venv` 対応を行ってからサービスを再登録する
+- ルート `.venv` が壊れている／存在しない → リポジトリルートで `uv sync` を
+  実行し、サービスを再登録する
 - alembic migration の失敗 → DB ファイルの権限 / WAL ロックを確認
 
 ### 書籍リストが 0 件 / OneDrive データが見えない

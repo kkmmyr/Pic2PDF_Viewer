@@ -38,6 +38,13 @@ def test_get_series_empty_when_no_series_assigned(client, db_initialized):
     assert res.json() == []
 
 
+@pytest.mark.parametrize("book_name", ["folder/book", "C:%5CWindows"])
+def test_get_book_detail_rejects_unsafe_book_name(client, db_initialized, book_name):
+    res = client.get(f"/api/novel_db/books/{book_name}")
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid book_name"
+
+
 def test_post_rebuild_book_enqueues_and_returns_job_id(client, db_initialized):
     res = client.post(
         "/api/novel_db/builds",

@@ -2152,6 +2152,40 @@ export interface components {
             /** Images */
             images: string[];
         };
+        /**
+         * BookMetaEntryOut
+         * @description meta2.db の書籍メタデータ 1 件。
+         */
+        BookMetaEntryOut: {
+            /** Authors */
+            authors: string[];
+            /** View Count */
+            view_count?: number | null;
+            /** Last Viewed At */
+            last_viewed_at?: number | null;
+            /** Hidden */
+            hidden?: boolean | null;
+            /** Genre */
+            genre?: string | null;
+            /** Read State */
+            read_state?: ('unread' | 'reading' | 'done') | null;
+            /** Series Id */
+            series_id?: string | null;
+            /** Series Title */
+            series_title?: string | null;
+            /** Series Index */
+            series_index?: number | null;
+            /** Volume */
+            volume?: number | null;
+            /** Publisher */
+            publisher?: string | null;
+            /** Asin */
+            asin?: string | null;
+            /** Isbn */
+            isbn?: string | null;
+            /** Release Date */
+            release_date?: string | null;
+        };
         /** BookSummaryOut */
         BookSummaryOut: {
             /** Name */
@@ -2188,22 +2222,72 @@ export interface components {
             /** Queued Position */
             queued_position: number;
         };
+        /** BuildFinishedJobOut */
+        BuildFinishedJobOut: {
+            /** Id */
+            id: number;
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            /**
+             * State
+             * @enum {string}
+             */
+            state: 'completed' | 'failed' | 'canceled';
+            /** Finished At */
+            finished_at?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+        };
+        /** BuildQueuedJobOut */
+        BuildQueuedJobOut: {
+            /** Id */
+            id: number;
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            /** Enqueued At */
+            enqueued_at?: string | null;
+        };
+        /** BuildRunningJobOut */
+        BuildRunningJobOut: {
+            /** Id */
+            id: number;
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            /** Started At */
+            started_at?: string | null;
+            /** Progress Total */
+            progress_total?: number | null;
+            /** Progress Done */
+            progress_done?: number | null;
+            /** Current Step */
+            current_step?: string | null;
+            /** Current Detail */
+            current_detail?: string | null;
+        };
         /** BuildStatusResponse */
         BuildStatusResponse: {
             /** Is Running */
             is_running: boolean;
-            /** Current Job */
-            current_job?: {
-                [key: string]: unknown;
-            } | null;
+            current_job?: components['schemas']['BuildRunningJobOut'] | null;
             /** Queued Jobs */
-            queued_jobs: {
-                [key: string]: unknown;
-            }[];
+            queued_jobs: components['schemas']['BuildQueuedJobOut'][];
             /** Recent Finished */
-            recent_finished: {
-                [key: string]: unknown;
-            }[];
+            recent_finished: components['schemas']['BuildFinishedJobOut'][];
         };
         /** CaptureJobCreateRequest */
         CaptureJobCreateRequest: {
@@ -2366,6 +2450,24 @@ export interface components {
             /** Errors */
             errors: string[];
         };
+        /** DiscussionCheckResultOut */
+        DiscussionCheckResultOut: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Passed */
+            passed: boolean;
+            /** Detail */
+            detail: string;
+        };
+        /** DiscussionChecksOut */
+        DiscussionChecksOut: {
+            /** Passed */
+            passed: boolean;
+            /** Results */
+            results: components['schemas']['DiscussionCheckResultOut'][];
+        };
         /** DiscussionDeleteOut */
         DiscussionDeleteOut: {
             /** Status */
@@ -2378,30 +2480,43 @@ export interface components {
             /** Created At */
             created_at?: string | null;
             /** Personas */
-            personas: {
-                [key: string]: unknown;
-            }[];
+            personas: components['schemas']['DiscussionPersonaOut'][];
             /** Turn Count */
             turn_count: number;
             /** Turns */
-            turns: {
-                [key: string]: unknown;
-            }[];
+            turns: components['schemas']['DiscussionTurnOut'][];
             /**
              * Format Version
              * @default 1
+             * @enum {integer}
              */
-            format_version: number;
+            format_version: 1 | 2;
             /** Segments */
-            segments?:
-                | {
-                      [key: string]: unknown;
-                  }[]
-                | null;
-            /** Checks */
-            checks?: {
-                [key: string]: unknown;
-            } | null;
+            segments?: components['schemas']['DiscussionSegmentOut'][] | null;
+            checks?: components['schemas']['DiscussionChecksOut'] | null;
+        };
+        /** DiscussionPersonaOut */
+        DiscussionPersonaOut: {
+            /** Name */
+            name: string;
+            /** Style Description */
+            style_description: string;
+        };
+        /** DiscussionSegmentOut */
+        DiscussionSegmentOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /** DiscussionTurnOut */
+        DiscussionTurnOut: {
+            /** Speaker */
+            speaker: string;
+            /** Text */
+            text: string;
+            /** Segment */
+            segment?: string | null;
         };
         /** EnqueueRequest */
         EnqueueRequest: {
@@ -2415,8 +2530,9 @@ export interface components {
             /**
              * Mode
              * @default full_build
+             * @enum {string}
              */
-            mode: string;
+            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
         };
         /**
          * GenerateJobOut
@@ -3694,6 +3810,51 @@ export interface components {
             /** Queued Position */
             queued_position: number;
         };
+        /** RebuildFinishedJobOut */
+        RebuildFinishedJobOut: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: 'book' | 'series' | 'all';
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            /**
+             * State
+             * @enum {string}
+             */
+            state: 'completed' | 'failed' | 'canceled';
+            /** Finished At */
+            finished_at?: string | null;
+            /** Error Message */
+            error_message?: string | null;
+        };
+        /** RebuildQueuedJobOut */
+        RebuildQueuedJobOut: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: 'book' | 'series' | 'all';
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            /** Enqueued At */
+            enqueued_at?: string | null;
+        };
         /** RebuildRequest */
         RebuildRequest: {
             /**
@@ -3708,24 +3869,44 @@ export interface components {
              * @default rebuild
              * @enum {string}
              */
-            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts';
+            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+        };
+        /** RebuildRunningJobOut */
+        RebuildRunningJobOut: {
+            /** Id */
+            id: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: 'book' | 'series' | 'all';
+            /** Target Id */
+            target_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            /** Started At */
+            started_at?: string | null;
+            /** Progress Total */
+            progress_total?: number | null;
+            /** Progress Done */
+            progress_done?: number | null;
+            /** Current Step */
+            current_step?: string | null;
+            /** Current Detail */
+            current_detail?: string | null;
         };
         /** RebuildStatusResponse */
         RebuildStatusResponse: {
             /** Is Running */
             is_running: boolean;
-            /** Current Job */
-            current_job?: {
-                [key: string]: unknown;
-            } | null;
+            current_job?: components['schemas']['RebuildRunningJobOut'] | null;
             /** Queued Jobs */
-            queued_jobs: {
-                [key: string]: unknown;
-            }[];
+            queued_jobs: components['schemas']['RebuildQueuedJobOut'][];
             /** Recent Finished */
-            recent_finished: {
-                [key: string]: unknown;
-            }[];
+            recent_finished: components['schemas']['RebuildFinishedJobOut'][];
         };
         /**
          * RecordViewRequest
@@ -5133,9 +5314,7 @@ export interface operations {
                 };
                 content: {
                     'application/json': {
-                        [key: string]: {
-                            [key: string]: unknown;
-                        };
+                        [key: string]: components['schemas']['BookMetaEntryOut'];
                     };
                 };
             };
@@ -6365,8 +6544,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                book_name: string;
                 char_name: string;
+                book_name: string;
             };
             cookie?: never;
         };

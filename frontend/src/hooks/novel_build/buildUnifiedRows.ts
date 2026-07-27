@@ -51,7 +51,7 @@ export function buildUnifiedRows(
             state: '実行中',
             stateClass:
                 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300',
-            time: job.started_at,
+            time: job.started_at ?? undefined,
         });
     }
 
@@ -62,7 +62,7 @@ export function buildUnifiedRows(
             target: job.target_id ?? '全冊',
             state: '待機中',
             stateClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-            time: job.enqueued_at,
+            time: job.enqueued_at ?? undefined,
         });
     }
 
@@ -81,7 +81,7 @@ export function buildUnifiedRows(
             target: job.target_id ?? '全冊',
             state,
             stateClass,
-            time: job.finished_at,
+            time: job.finished_at ?? undefined,
         });
     }
 

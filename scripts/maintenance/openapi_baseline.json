@@ -502,6 +502,171 @@
         "title": "BookImagesResponse",
         "type": "object"
       },
+      "BookMetaEntryOut": {
+        "description": "meta2.db の書籍メタデータ 1 件。",
+        "properties": {
+          "asin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asin"
+          },
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
+          "hidden": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden"
+          },
+          "isbn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isbn"
+          },
+          "last_viewed_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Viewed At"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "read_state": {
+            "anyOf": [
+              {
+                "enum": [
+                  "unread",
+                  "reading",
+                  "done"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read State"
+          },
+          "release_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Date"
+          },
+          "series_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Id"
+          },
+          "series_index": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Index"
+          },
+          "series_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series Title"
+          },
+          "view_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View Count"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "authors"
+        ],
+        "title": "BookMetaEntryOut",
+        "type": "object"
+      },
       "BookSummaryOut": {
         "properties": {
           "asin": {
@@ -666,19 +831,220 @@
         "title": "BuildEnqueueResponse",
         "type": "object"
       },
-      "BuildStatusResponse": {
+      "BuildFinishedJobOut": {
         "properties": {
-          "current_job": {
+          "error_message": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Current Job"
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "completed",
+              "failed",
+              "canceled"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          }
+        },
+        "required": [
+          "id",
+          "target_id",
+          "mode",
+          "state"
+        ],
+        "title": "BuildFinishedJobOut",
+        "type": "object"
+      },
+      "BuildQueuedJobOut": {
+        "properties": {
+          "enqueued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enqueued At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          }
+        },
+        "required": [
+          "id",
+          "target_id",
+          "mode"
+        ],
+        "title": "BuildQueuedJobOut",
+        "type": "object"
+      },
+      "BuildRunningJobOut": {
+        "properties": {
+          "current_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Detail"
+          },
+          "current_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Step"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "progress_done": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Done"
+          },
+          "progress_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Total"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          }
+        },
+        "required": [
+          "id",
+          "target_id",
+          "mode"
+        ],
+        "title": "BuildRunningJobOut",
+        "type": "object"
+      },
+      "BuildStatusResponse": {
+        "properties": {
+          "current_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BuildRunningJobOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "is_running": {
             "title": "Is Running",
@@ -686,16 +1052,14 @@
           },
           "queued_jobs": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/BuildQueuedJobOut"
             },
             "title": "Queued Jobs",
             "type": "array"
           },
           "recent_finished": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/BuildFinishedJobOut"
             },
             "title": "Recent Finished",
             "type": "array"
@@ -1185,6 +1549,55 @@
         "title": "DeleteResponse",
         "type": "object"
       },
+      "DiscussionCheckResultOut": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "passed",
+          "detail"
+        ],
+        "title": "DiscussionCheckResultOut",
+        "type": "object"
+      },
+      "DiscussionChecksOut": {
+        "properties": {
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/DiscussionCheckResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "passed",
+          "results"
+        ],
+        "title": "DiscussionChecksOut",
+        "type": "object"
+      },
       "DiscussionDeleteOut": {
         "properties": {
           "status": {
@@ -1203,14 +1616,12 @@
           "checks": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/DiscussionChecksOut"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Checks"
+            ]
           },
           "created_at": {
             "anyOf": [
@@ -1229,13 +1640,16 @@
           },
           "format_version": {
             "default": 1,
+            "enum": [
+              1,
+              2
+            ],
             "title": "Format Version",
             "type": "integer"
           },
           "personas": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/DiscussionPersonaOut"
             },
             "title": "Personas",
             "type": "array"
@@ -1244,8 +1658,7 @@
             "anyOf": [
               {
                 "items": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/DiscussionSegmentOut"
                 },
                 "type": "array"
               },
@@ -1261,8 +1674,7 @@
           },
           "turns": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/DiscussionTurnOut"
             },
             "title": "Turns",
             "type": "array"
@@ -1275,6 +1687,71 @@
           "turns"
         ],
         "title": "DiscussionHistoryItemOut",
+        "type": "object"
+      },
+      "DiscussionPersonaOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "style_description": {
+            "title": "Style Description",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "style_description"
+        ],
+        "title": "DiscussionPersonaOut",
+        "type": "object"
+      },
+      "DiscussionSegmentOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "DiscussionSegmentOut",
+        "type": "object"
+      },
+      "DiscussionTurnOut": {
+        "properties": {
+          "segment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segment"
+          },
+          "speaker": {
+            "title": "Speaker",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "speaker",
+          "text"
+        ],
+        "title": "DiscussionTurnOut",
         "type": "object"
       },
       "EnqueueRequest": {
@@ -1297,6 +1774,11 @@
           },
           "mode": {
             "default": "full_build",
+            "enum": [
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
             "title": "Mode",
             "type": "string"
           }
@@ -5078,6 +5560,143 @@
         "title": "RebuildEnqueueResponse",
         "type": "object"
       },
+      "RebuildFinishedJobOut": {
+        "properties": {
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "rebuild",
+              "ocr",
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "completed",
+              "failed",
+              "canceled"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "type": {
+            "enum": [
+              "book",
+              "series",
+              "all"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "target_id",
+          "mode",
+          "state"
+        ],
+        "title": "RebuildFinishedJobOut",
+        "type": "object"
+      },
+      "RebuildQueuedJobOut": {
+        "properties": {
+          "enqueued_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enqueued At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "rebuild",
+              "ocr",
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "type": {
+            "enum": [
+              "book",
+              "series",
+              "all"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "target_id",
+          "mode"
+        ],
+        "title": "RebuildQueuedJobOut",
+        "type": "object"
+      },
       "RebuildRequest": {
         "properties": {
           "mode": {
@@ -5086,7 +5705,8 @@
               "rebuild",
               "ocr",
               "full_build",
-              "generate_contexts"
+              "generate_contexts",
+              "generate_relations"
             ],
             "title": "Mode",
             "type": "string"
@@ -5118,19 +5738,119 @@
         "title": "RebuildRequest",
         "type": "object"
       },
-      "RebuildStatusResponse": {
+      "RebuildRunningJobOut": {
         "properties": {
-          "current_job": {
+          "current_detail": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Current Job"
+            "title": "Current Detail"
+          },
+          "current_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Step"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "mode": {
+            "enum": [
+              "rebuild",
+              "ocr",
+              "full_build",
+              "generate_contexts",
+              "generate_relations"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "progress_done": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Done"
+          },
+          "progress_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Total"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "type": {
+            "enum": [
+              "book",
+              "series",
+              "all"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "target_id",
+          "mode"
+        ],
+        "title": "RebuildRunningJobOut",
+        "type": "object"
+      },
+      "RebuildStatusResponse": {
+        "properties": {
+          "current_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RebuildRunningJobOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "is_running": {
             "title": "Is Running",
@@ -5138,16 +5858,14 @@
           },
           "queued_jobs": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/RebuildQueuedJobOut"
             },
             "title": "Queued Jobs",
             "type": "array"
           },
           "recent_finished": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/RebuildFinishedJobOut"
             },
             "title": "Recent Finished",
             "type": "array"
@@ -7626,8 +8344,7 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/BookMetaEntryOut"
                   },
                   "title": "Response Get Meta Api Meta Get",
                   "type": "object"
@@ -8326,19 +9043,19 @@
         "parameters": [
           {
             "in": "path",
-            "name": "book_name",
+            "name": "char_name",
             "required": true,
             "schema": {
-              "title": "Book Name",
+              "title": "Char Name",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "char_name",
+            "name": "book_name",
             "required": true,
             "schema": {
-              "title": "Char Name",
+              "title": "Book Name",
               "type": "string"
             }
           }

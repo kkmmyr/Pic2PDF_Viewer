@@ -4,28 +4,94 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+RebuildJobType = Literal["book", "series", "all"]
+RebuildJobMode = Literal[
+    "rebuild",
+    "ocr",
+    "full_build",
+    "generate_contexts",
+    "generate_relations",
+]
+BuildJobMode = Literal["full_build", "generate_contexts", "generate_relations"]
+FinishedJobState = Literal["completed", "failed", "canceled"]
+
 
 class BuildEnqueueResponse(BaseModel):
     job_id: int
     queued_position: int
 
 
+class BuildRunningJobOut(BaseModel):
+    id: int
+    target_id: str | None
+    mode: BuildJobMode
+    started_at: str | None = None
+    progress_total: int | None = None
+    progress_done: int | None = None
+    current_step: str | None = None
+    current_detail: str | None = None
+
+
+class BuildQueuedJobOut(BaseModel):
+    id: int
+    target_id: str | None
+    mode: BuildJobMode
+    enqueued_at: str | None = None
+
+
+class BuildFinishedJobOut(BaseModel):
+    id: int
+    target_id: str | None
+    mode: BuildJobMode
+    state: FinishedJobState
+    finished_at: str | None = None
+    error_message: str | None = None
+
+
 class BuildStatusResponse(BaseModel):
     is_running: bool
-    current_job: dict | None = None
-    queued_jobs: list[dict]
-    recent_finished: list[dict]
+    current_job: BuildRunningJobOut | None = None
+    queued_jobs: list[BuildQueuedJobOut]
+    recent_finished: list[BuildFinishedJobOut]
+
+
+class DiscussionPersonaOut(BaseModel):
+    name: str
+    style_description: str
+
+
+class DiscussionTurnOut(BaseModel):
+    speaker: str
+    text: str
+    segment: str | None = None
+
+
+class DiscussionSegmentOut(BaseModel):
+    id: str
+    title: str
+
+
+class DiscussionCheckResultOut(BaseModel):
+    id: str
+    label: str
+    passed: bool
+    detail: str
+
+
+class DiscussionChecksOut(BaseModel):
+    passed: bool
+    results: list[DiscussionCheckResultOut]
 
 
 class DiscussionHistoryItemOut(BaseModel):
     filename: str
     created_at: str | None = None
-    personas: list[dict]
+    personas: list[DiscussionPersonaOut]
     turn_count: int
-    turns: list[dict]
-    format_version: int = 1
-    segments: list[dict] | None = None
-    checks: dict | None = None
+    turns: list[DiscussionTurnOut]
+    format_version: Literal[1, 2] = 1
+    segments: list[DiscussionSegmentOut] | None = None
+    checks: DiscussionChecksOut | None = None
 
 
 class DiscussionDeleteOut(BaseModel):
@@ -103,11 +169,41 @@ class RebuildEnqueueResponse(BaseModel):
     queued_position: int
 
 
+class RebuildRunningJobOut(BaseModel):
+    id: int
+    type: RebuildJobType
+    target_id: str | None
+    mode: RebuildJobMode
+    started_at: str | None = None
+    progress_total: int | None = None
+    progress_done: int | None = None
+    current_step: str | None = None
+    current_detail: str | None = None
+
+
+class RebuildQueuedJobOut(BaseModel):
+    id: int
+    type: RebuildJobType
+    target_id: str | None
+    mode: RebuildJobMode
+    enqueued_at: str | None = None
+
+
+class RebuildFinishedJobOut(BaseModel):
+    id: int
+    type: RebuildJobType
+    target_id: str | None
+    mode: RebuildJobMode
+    state: FinishedJobState
+    finished_at: str | None = None
+    error_message: str | None = None
+
+
 class RebuildStatusResponse(BaseModel):
     is_running: bool
-    current_job: dict | None = None
-    queued_jobs: list[dict]
-    recent_finished: list[dict]
+    current_job: RebuildRunningJobOut | None = None
+    queued_jobs: list[RebuildQueuedJobOut]
+    recent_finished: list[RebuildFinishedJobOut]
 
 
 class SearchHitOut(BaseModel):

@@ -40,6 +40,7 @@ class TestGetMeta:
         assert res.status_code == 200
         body = res.json()
         assert body["a.pdf"]["authors"] == ["A"]
+        assert "view_count" not in body["a.pdf"]
         assert body["b.pdf"]["genre"] == "G"
 
     def test_returns_empty_dict_when_no_meta(self, client, tmp_data_dir):

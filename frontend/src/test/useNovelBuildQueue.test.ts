@@ -57,7 +57,13 @@ describe('useNovelBuildQueue', () => {
 
         const newStatus: BuildQueueStatus = {
             is_running: true,
-            current_job: { id: 1, target_id: '花太郎', progress_done: 0, progress_total: 1 },
+            current_job: {
+                id: 1,
+                target_id: '花太郎',
+                mode: 'full_build',
+                progress_done: 0,
+                progress_total: 1,
+            },
             queued_jobs: [],
             recent_finished: [],
         };
@@ -192,8 +198,8 @@ describe('useNovelBuildQueue', () => {
         const updated: BuildQueueStatus = {
             ...EMPTY_STATUS,
             queued_jobs: [
-                { id: 2, target_id: '千の刀' },
-                { id: 3, target_id: '海辺のカフカ' },
+                { id: 2, target_id: '千の刀', mode: 'full_build' },
+                { id: 3, target_id: '海辺のカフカ', mode: 'full_build' },
             ],
         };
 

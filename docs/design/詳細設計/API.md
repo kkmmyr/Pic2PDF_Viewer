@@ -18,9 +18,10 @@
 フロントエンドのAPIレスポンス型は `openapi-typescript` で生成した
 `frontend/src/types/api.d.ts` の `components['schemas']` を参照し、同じ構造を
 手書きで複製しない。SSE・ファイルダウンロード・204レスポンスはこの対象外とする。
-`GET /api/meta`、一部の build / discussion schema、novel_db の手書き job mode 型には
-旧形式が残っており、現行 OpenAPI が実際の契約の正本である。解消までは
-[既知の問題](../../log/既知の問題.md)として追跡する。
+`GET /api/meta` は書籍キーを任意キーとする map の値を `BookMetaEntryOut` で定義する。
+build の実行中・待機中・完了ジョブと discussion の人物・ターン・セグメント・
+機械チェックも具象 Pydantic model を使う。フロントエンドの rebuild / build /
+discussion 型は、これらの OpenAPI 生成型から参照する。
 
 このファイルが記すのは、OpenAPI のスキーマ定義だけでは読み取れない **横断的な設計意図・挙動ルール** のみ。
 

@@ -409,6 +409,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.apply and args.expected_total is None:
+        raise SystemExit("--expected-total is required with --apply")
     if args.expected_total is not None and args.expected_total <= 0:
         raise SystemExit("--expected-total must be greater than zero")
     if args.poll_seconds < 0:

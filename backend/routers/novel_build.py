@@ -9,6 +9,7 @@ GET    /api/novel/build/stream          — キュー状態 SSE ストリーム�
 from __future__ import annotations
 
 import asyncio
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response, StreamingResponse
@@ -33,7 +34,7 @@ logger = get_logger(__name__)
 class EnqueueRequest(BaseModel):
     book_name: str | None = Field(default=None)
     all_books: bool = Field(default=False)
-    mode: str = Field(default="full_build")
+    mode: Literal["full_build", "generate_contexts", "generate_relations"] = Field(default="full_build")
 
 
 # ---------------------------------------------------------------------------

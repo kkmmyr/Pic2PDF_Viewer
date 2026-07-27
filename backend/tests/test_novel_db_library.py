@@ -5,10 +5,11 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from fastapi import HTTPException
 
 from services.meta_store import save_meta
 from services.novel_db import with_db
-from services.novel_db.library import list_books, list_series
+from services.novel_db.library import get_book_detail, list_books, list_series
 from services.novel_db.migrations import upgrade_head
 
 
@@ -37,6 +38,12 @@ def _insert_indexed_book(conn, name: str, page_count: int = 100) -> int:
         (name, f"/dummy/{name}.pdf", f"/dummy/images/{name}", page_count),
     )
     return cur.lastrowid
+
+
+def test_get_book_detail_rejects_unsafe_name_at_service_boundary(setup_db):
+    with with_db() as conn:
+        with pytest.raises(HTTPException, match="Invalid book_name"):
+            get_book_detail(conn, "folder/book")
 
 
 def test_list_books_returns_images_dirs_with_unindexed_status(setup_db):

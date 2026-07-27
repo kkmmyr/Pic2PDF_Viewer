@@ -24,7 +24,7 @@ const IDLE_STATUS: RebuildStatus = {
 
 const RUNNING_STATUS: RebuildStatus = {
     is_running: true,
-    current_job: { id: 1, type: 'book', target_id: 'テスト本', mode: 'rebuild', state: 'running' },
+    current_job: { id: 1, type: 'book', target_id: 'テスト本', mode: 'rebuild' },
     queued_jobs: [],
     recent_finished: [],
 };

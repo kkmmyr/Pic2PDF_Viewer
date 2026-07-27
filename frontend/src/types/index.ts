@@ -126,26 +126,15 @@ export type SortOrder =
  */
 export type ReadState = 'unread' | 'reading' | 'done';
 
+type GeneratedBookMetaEntry = components['schemas']['BookMetaEntryOut'];
+
 /**
- * 書籍メタデータ（1冊分）
+ * 書籍メタデータ（1冊分）。
+ * API は未設定値を除外するため、生成型の各フィールドを optional / non-null に正規化する。
  */
-export interface BookMetaEntry {
-    authors?: string[];
-    view_count?: number;
-    last_viewed_at?: number;
-    /** シリーズ識別子（同シリーズで共通） */
-    series_id?: string;
-    /** シリーズ表示名（共通プレフィックス） */
-    series_title?: string;
-    /** シリーズ内の巻数 (1 始まり) */
-    series_index?: number;
-    /** 非表示フラグ。true なら通常モードでは一覧・検索・フィルタに表示されない */
-    hidden?: boolean;
-    /** ジャンル（例: "プリンセスコネクト" / "Voiceloid" / "オリジナル"） */
-    genre?: string;
-    /** 読書状態。未設定なら view_count から派生（getReadState で吸収） */
-    read_state?: ReadState;
-}
+export type BookMetaEntry = {
+    [K in keyof GeneratedBookMetaEntry]?: NonNullable<GeneratedBookMetaEntry[K]>;
+};
 
 /**
  * meta.json 全体（キー: "{path}/{filename}" または "{filename}"）

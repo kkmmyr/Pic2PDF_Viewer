@@ -15,7 +15,13 @@ class ScopeModel(BaseModel):
 class RebuildRequest(BaseModel):
     type: Literal["book", "series", "all"]
     target_id: str | None = None
-    mode: Literal["rebuild", "ocr", "full_build", "generate_contexts"] = Field(default="rebuild")
+    mode: Literal[
+        "rebuild",
+        "ocr",
+        "full_build",
+        "generate_contexts",
+        "generate_relations",
+    ] = Field(default="rebuild")
 
 
 class SearchRequest(BaseModel):

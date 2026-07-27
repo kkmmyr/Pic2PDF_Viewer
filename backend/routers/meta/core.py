@@ -9,7 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
-from routers.api_schemas import MetaUpdateResponse, RecordViewResponse
+from routers.api_schemas import BookMetaEntryOut, MetaUpdateResponse, RecordViewResponse
 from services.meta_store import (
     VALID_READ_STATES,
     has_meaningful_value,
@@ -61,7 +61,11 @@ class RecordViewRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/meta", response_model=dict[str, dict[str, object]])
+@router.get(
+    "/meta",
+    response_model=dict[str, BookMetaEntryOut],
+    response_model_exclude_none=True,
+)
 def get_meta(source: str = Depends(validated_source)) -> dict:
     """
     指定ソースの meta.json 全体を返す。

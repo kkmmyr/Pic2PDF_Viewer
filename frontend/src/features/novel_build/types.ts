@@ -1,37 +1,14 @@
 /**
  * novel_build 機能の共通型定義。
- * バックエンド API §8 スキーマと一致させる。
+ * バックエンド OpenAPI 生成型を正本とする。
  */
+import type { components } from '@/types/api';
 
-export type BuildMode = 'full_build' | 'generate_contexts' | 'generate_relations';
-
-export interface BuildJob {
-    id: number;
-    target_id: string | null;
-    mode?: BuildMode;
-    started_at?: string;
-    enqueued_at?: string;
-    progress_total?: number;
-    progress_done?: number;
-    current_step?: string | null;
-    current_detail?: string | null;
-}
-
-export interface FinishedJob {
-    id: number;
-    target_id: string | null;
-    mode?: BuildMode;
-    state: 'completed' | 'failed' | 'canceled';
-    finished_at: string;
-    error_message: string | null;
-}
-
-export interface BuildQueueStatus {
-    is_running: boolean;
-    current_job: BuildJob | null;
-    queued_jobs: BuildJob[];
-    recent_finished: FinishedJob[];
-}
+export type BuildMode = components['schemas']['EnqueueRequest']['mode'];
+export type BuildJob = components['schemas']['BuildRunningJobOut'];
+export type QueuedBuildJob = components['schemas']['BuildQueuedJobOut'];
+export type FinishedJob = components['schemas']['BuildFinishedJobOut'];
+export type BuildQueueStatus = components['schemas']['BuildStatusResponse'];
 
 export interface BuildStreamHandlers {
     onStatus: (status: BuildQueueStatus) => void;

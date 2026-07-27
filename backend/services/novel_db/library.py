@@ -14,6 +14,7 @@ from urllib.parse import quote
 
 import config
 from services.meta_store import load_meta
+from utils.path_utils import resolve_under_base, validate_safe_name
 
 
 @dataclass
@@ -96,23 +97,30 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
 
     書籍ディレクトリが存在しない場合は None。
     """
-    images_dir = Path(config.KINDLE_NOVEL_IMAGES_DIR)
-    if not (images_dir / book_name).is_dir():
+    safe_name = validate_safe_name(book_name, param_name="book_name")
+    book_images_dir = Path(
+        resolve_under_base(
+            config.KINDLE_NOVEL_IMAGES_DIR,
+            safe_name,
+            param_name="book_name",
+        )
+    )
+    if not book_images_dir.is_dir():
         return None
 
     meta = load_meta("novel")
-    meta_entry = meta.get(_meta_key(book_name), {})
+    meta_entry = meta.get(_meta_key(safe_name), {})
 
     db_row = conn.execute(
         "SELECT page_count, indexed_at, ocr_done_at, summary, summary_generated_at FROM books WHERE name = ?",
-        (book_name,),
+        (safe_name,),
     ).fetchone()
 
     if db_row:
         page_count, indexed_at, ocr_done_at, summary, summary_generated_at = db_row
         char_count = conn.execute(
             "SELECT COUNT(*) FROM book_characters bc JOIN books b ON bc.book_id = b.id WHERE b.name = ?",
-            (book_name,),
+            (safe_name,),
         ).fetchone()[0]
     else:
         page_count = indexed_at = ocr_done_at = summary = summary_generated_at = None
@@ -120,17 +128,17 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
 
     from services.novel_db.discussion_service import count_discussions
 
-    discussion_count = count_discussions(book_name)
+    discussion_count = count_discussions(safe_name)
 
     return BookDetail(
-        name=book_name,
+        name=safe_name,
         authors=list(meta_entry.get("authors", [])),
         series_id=meta_entry.get("series_id"),
         series_title=meta_entry.get("series_title"),
         is_indexed=bool(db_row and indexed_at is not None),
         page_count=page_count,
         indexed_at=indexed_at,
-        thumbnail_url=_thumbnail_url(book_name),
+        thumbnail_url=_thumbnail_url(safe_name),
         ocr_done_at=ocr_done_at,
         volume=meta_entry.get("volume"),
         publisher=meta_entry.get("publisher"),

@@ -12,6 +12,7 @@ from services.novel_db.character_db import (
     top_scenes_for_character,
 )
 
+from ._deps import ValidatedBookName
 from .schemas import CharacterDetail, CharacterScene, CharacterSummary
 
 router = APIRouter()
@@ -26,7 +27,7 @@ def _resolve_book_id(conn, book_name: str) -> int:
 
 @router.get("/books/{book_name:path}/characters", response_model=list[CharacterSummary])
 @log_and_raise_500("novel_db/books/characters")
-def get_book_characters(book_name: str) -> list[CharacterSummary]:
+def get_book_characters(book_name: ValidatedBookName) -> list[CharacterSummary]:
     """書籍に登録済みのキャラ一覧を返す（B-15）。
 
     `book_characters` に未登録（CLI 未実行）の書籍は空配列。フロントは空配列なら
@@ -48,7 +49,7 @@ def get_book_characters(book_name: str) -> list[CharacterSummary]:
 
 @router.get("/books/{book_name:path}/characters/{char_name}", response_model=CharacterDetail)
 @log_and_raise_500("novel_db/books/character_detail")
-def get_book_character_detail(book_name: str, char_name: str) -> CharacterDetail:
+def get_book_character_detail(book_name: ValidatedBookName, char_name: str) -> CharacterDetail:
     """書籍 × キャラの詳細（サマリ + 主要シーン top 5）を返す（B-15）。"""
     with with_db() as conn:
         book_id = _resolve_book_id(conn, book_name)

@@ -178,6 +178,25 @@ class PrefsUpdateResponse(BaseModel):
     message: str
 
 
+class BookMetaEntryOut(BaseModel):
+    """meta2.db の書籍メタデータ 1 件。"""
+
+    authors: list[str]
+    view_count: int | None = None
+    last_viewed_at: float | None = None
+    hidden: bool | None = None
+    genre: str | None = None
+    read_state: Literal["unread", "reading", "done"] | None = None
+    series_id: str | None = None
+    series_title: str | None = None
+    series_index: float | None = None
+    volume: int | None = None
+    publisher: str | None = None
+    asin: str | None = None
+    isbn: str | None = None
+    release_date: str | None = None
+
+
 class SeriesAssignResponse(BaseModel):
     message: str
     id: str

@@ -7,6 +7,7 @@
  * （既存パターン: hooks/useGenres.ts 等を参照）。
  */
 import apiClient from '@/config/api_client';
+import type { components } from '@/types/api';
 
 import type {
     BookDetail,
@@ -21,7 +22,6 @@ import type {
     DiscussionHistoryItem,
     RebuildEnqueueResponse,
     RebuildJobMode,
-    RebuildJobType,
     RebuildStatus,
     Scope,
     SearchResponse,
@@ -103,11 +103,10 @@ export function deleteQaHistory(id: number): Promise<void> {
 // 再構築ジョブ
 // ---------------------------------------------------------------------------
 
-export interface RebuildEnqueueRequest {
-    type: RebuildJobType;
-    target_id?: string | null;
+type GeneratedRebuildRequest = components['schemas']['RebuildRequest'];
+export type RebuildEnqueueRequest = Omit<GeneratedRebuildRequest, 'mode'> & {
     mode?: RebuildJobMode;
-}
+};
 
 export function postRebuild(req: RebuildEnqueueRequest): Promise<RebuildEnqueueResponse> {
     return apiClient.post<unknown, RebuildEnqueueResponse>(`${PREFIX}/builds`, req);

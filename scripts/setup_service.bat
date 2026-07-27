@@ -21,7 +21,7 @@ set "NSSM=C:\Users\amashio\AppData\Local\Microsoft\WinGet\Packages\NSSM.NSSM_Mic
 set "SVC=Pic2PDFViewer"
 set "ROOT=D:\61.tool\Pic2PDF_Viewer"
 set "BACKEND=%ROOT%\backend"
-set "PY=%BACKEND%\.venv\Scripts\python.exe"
+set "PY=%ROOT%\.venv\Scripts\python.exe"
 set "LOGDIR=%BACKEND%\data\logs"
 
 REM --- Sanity checks --------------------------------------------------

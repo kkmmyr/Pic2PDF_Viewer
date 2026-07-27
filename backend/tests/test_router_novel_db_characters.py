@@ -48,6 +48,12 @@ def test_get_characters_returns_404_for_missing_book(client, db_initialized):
     assert "book not found" in res.json()["detail"]
 
 
+def test_get_characters_rejects_unsafe_book_name(client, db_initialized):
+    res = client.get("/api/novel_db/books/folder/book/characters")
+    assert res.status_code == 400
+    assert res.json()["detail"] == "Invalid book_name"
+
+
 def test_get_characters_returns_empty_list_when_none_registered(client, book_with_pages):
     """book_characters テーブルが空でも 200 + [] を返す（CLI 未実行のケース）。"""
     res = client.get("/api/novel_db/books/sample-book/characters")

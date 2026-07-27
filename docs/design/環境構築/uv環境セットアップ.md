@@ -49,9 +49,9 @@ uv --version
 過去の端末に残っている member 直下の `.venv` は互換残骸であり、
 標準環境として扱わない。
 
-> `scripts/setup_service.bat` は現時点で旧 `backend/.venv` を参照しており、
-> 新規 workspace セットアップと不整合がある。既存 Windows サービスの環境を
-> 削除せず、修正までは [既知の問題](../../log/既知の問題.md) を参照する。
+`scripts/setup_service.bat` もルート `.venv\Scripts\python.exe` を参照する。
+既存 Windows サービスが旧 `backend/.venv` を登録している場合は、
+ルートで `uv sync` 後に setup script でサービスを再登録してから旧環境を削除する。
 
 外部の `D:\61.tool\common\ocr\` は workspace member ではない。
 これは yomitoku 独立照合を含む OCR 専用環境であり、

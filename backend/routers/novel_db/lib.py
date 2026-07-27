@@ -12,6 +12,8 @@ from services.novel_db import with_db
 from services.novel_db.book_summary_search import find_similar_books
 from services.novel_db.library import get_book_detail, list_authors, list_books, list_series
 
+from ._deps import ValidatedBookName
+
 router = APIRouter()
 
 
@@ -41,14 +43,14 @@ def get_authors() -> list[str]:
 
 @router.get("/books/{book_name}/similar", response_model=list[SimilarBookOut])
 @log_and_raise_500("novel_db/books/similar")
-def get_similar_books(book_name: str, top: int = 5) -> list[dict]:
+def get_similar_books(book_name: ValidatedBookName, top: int = 5) -> list[dict]:
     """指定書籍に意味的に近い書籍を返す（B-19）。サマリ embedding の KNN。"""
     return find_similar_books(book_name, top=min(top, 20))
 
 
 @router.get("/books/{book_name:path}", response_model=BookDetailOut)
 @log_and_raise_500("novel_db/books/detail")
-def get_book_detail_route(book_name: str) -> dict:
+def get_book_detail_route(book_name: ValidatedBookName) -> dict:
     """単一書籍の詳細情報（summary / character_count / discussion_count 含む）を返す。"""
     with with_db() as conn:
         detail = get_book_detail(conn, book_name)

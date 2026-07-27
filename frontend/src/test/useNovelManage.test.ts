@@ -370,7 +370,13 @@ describe('useNovelManage', () => {
 
     it('target_id が null のとき target は "全冊"', () => {
         setupMocks('idle', {
-            current_job: { id: 99, target_id: null, progress_done: 0, progress_total: 1 },
+            current_job: {
+                id: 99,
+                target_id: null,
+                mode: 'full_build',
+                progress_done: 0,
+                progress_total: 1,
+            },
         });
         const { result } = renderNovelManage();
 
