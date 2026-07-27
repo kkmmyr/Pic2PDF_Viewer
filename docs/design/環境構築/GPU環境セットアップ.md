@@ -1,89 +1,122 @@
-# OCR GPU環境セットアップガイド
+# OCR・Embedding GPU 環境セットアップ
 
-> status: living | last-verified: 2026-05-07
+> status: living | last-verified: 2026-07-27
 
-Novel機能のOCR処理 (`yomitoku`) を高速化するために、NVIDIA GPU (CUDA) を利用可能な環境を構築する手順。
+小説処理で GPU を使う箇所は、主系 OCR、補助 OCR、Embedding の
+3 系統に分かれる。依存環境と設定を混同しないこと。
 
-> **重要**: OCR ツール群は `kindle-pdf/` 配下に独立した uv プロジェクト ([kindle-pdf/pyproject.toml](../../kindle-pdf/pyproject.toml)) として構成されている。本体バックエンド (`backend/`) とは別の `.venv` を持つ。これは PyTorch 等の重量級 ML 依存をバックエンド側に持ち込まないための意図的な分離（[ADR-0005: Python パッケージ管理を `uv` に移行](../基本設計/ADR/0005_uv-python-package-manager.md) 参照）。
+| 系統 | 通常運用 | 実行基盤 |
+|---|---|---|
+| Surya OCR 2 | OCR 主系 | OpenAI 互換 `llama-server` + GGUF |
+| yomitoku | 独立照合・比較・後方互換 | Python + PyTorch CUDA |
+| bge-m3 | チャンク・サマリ Embedding | Ollama |
 
-## 前提条件
+## 1. 共通前提
 
-- NVIDIA GPU 搭載マシン
-- NVIDIA ドライバがインストール済み
-- Python **3.12+**（kindle-pdf の `pyproject.toml` で要件定義）
-- uv インストール済み（[uv環境セットアップ.md](uv環境セットアップ.md) 参照）
+- NVIDIA GPU と対応ドライバが導入済み
+- `nvidia-smi` が成功する
+- Python 依存はリポジトリルートの uv workspace で管理する
+- 初回はリポジトリルートで `uv sync` を実行する
 
-## セットアップ手順
+uv workspace の正本はルート `pyproject.toml` と `uv.lock` であり、
+`.venv/` もリポジトリルートに作られる。詳細は
+[ADR-0010](../基本設計/ADR/0010_uv-workspace-monorepo.md) と
+[uv 環境セットアップ](uv環境セットアップ.md) を参照。
 
-### 1. 依存マニフェストの確認
+## 2. Surya OCR 2（主系）
 
-`kindle-pdf/pyproject.toml` で GPU 依存は `[dependency-groups.gpu]` に分離されている:
+管理画面 `/novel/manage` から投入した OCR ジョブは、既定で
+`OCR_ENGINE=surya2` を使う。Surya は PyTorch の
+`kindle-pdf` GPU group ではなく、OpenAI 互換の
+`llama-server` を通じて実行する。
 
-```toml
-[dependency-groups]
-gpu = [
-    "yomitoku",
-    "torch==2.5.1",
-    "torchvision==0.20.1",
-    "torchaudio==2.5.1",
-]
+主な環境変数:
 
-[[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
+```dotenv
+OCR_ENGINE=surya2
+SURYA_INFERENCE_URL=http://127.0.0.1:8768/v1
+SURYA_MODEL=surya-ocr-2
+SURYA_MODEL_REVISION=<model/mmproj/llama.cpp の固定版識別子>
 
-[tool.uv.sources]
-torch = { index = "pytorch-cu121" }
-torchvision = { index = "pytorch-cu121" }
-torchaudio = { index = "pytorch-cu121" }
+# 既存サーバーへ到達できない場合に worker が自動起動するための設定
+SURYA_LLAMA_SERVER_PATH=C:\path\to\llama-server.exe
+SURYA_MODEL_PATH=D:\path\to\surya-ocr-2.gguf
+SURYA_MMPROJ_PATH=D:\path\to\surya-2-mmproj.gguf
 ```
 
-CUDA 12.1 ビルドの PyTorch を専用 index から取得する設定。
+- `SURYA_INFERENCE_URL` に既存サーバーが応答する場合、3 つのローカルパスは不要。
+- worker に自動起動させる場合は、3 つのパスをすべて設定する。
+- モデルと実行ファイルの実パス・固定版識別子は環境固有なので、
+  `.env` と運用記録で管理し、設計書へ端末固有値を固定しない。
+- Linux 本番で `OCR_AGENT_ENABLED=true` の場合、OCR は Windows agent が
+  claim する。Linux 本番だけで GPU 推論が完結する構成ではない。
 
-### 2. GPU 依存のインストール
+実行条件、品質ゲート、モデル版監査は
+[OCR 設計書](../詳細設計/機能別/OCR設計書.md) を正本とする。
+
+## 3. yomitoku（補助・互換系）
+
+`kindle-pdf/pyproject.toml` の `gpu` dependency group は、
+yomitoku と CUDA 12.1 版 PyTorch を含む。主系 Surya の実行には不要だが、
+yomitoku の診断・比較を `kindle-pdf` 環境で行う場合に使用できる。
 
 ```powershell
-cd kindle-pdf
-uv sync --group gpu
+# リポジトリルートで実行
+uv sync --package pic2pdf-viewer-kindle --group gpu
+uv run --package pic2pdf-viewer-kindle python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
-`uv sync --group gpu` で通常依存 + `gpu` グループ依存（yomitoku + PyTorch CUDA 版）が `kindle-pdf/.venv` にインストールされる。
-ファイルサイズが大きい（PyTorch CUDA 版は 2GB 超）ため、初回は時間を要する。
+`True` が返らない場合は NVIDIA ドライバと、インストールされた
+PyTorch が `+cu121` かを確認する。
 
-### 3. インストール確認
+通常の backend OCR で行う yomitoku 独立照合は、
+`OCR_PYTHON` / `OCR_PACKAGE_PATH` が指す外部 OCR 環境を使用する。
+リポジトリの `kindle-pdf` GPU group と外部 OCR 環境は同一ではない。
 
-以下のコマンドで `True` が返れば成功:
+## 4. bge-m3 Embedding（Ollama）
 
-```powershell
-cd kindle-pdf
-uv run python -c "import torch; print(f'CUDA Available: {torch.cuda.is_available()}')"
+Embedding は `NOVEL_DB_OLLAMA_BASE_URL` の Ollama を使用する。
+CPU 運用の既定は `NOVEL_DB_EMBED_NUM_GPU=0`。GPU を使う場合は
+接続先だけでなく `NOVEL_DB_EMBED_NUM_GPU` も変更する。
+
+```dotenv
+NOVEL_DB_OLLAMA_BASE_URL=http://<ollama-host>:11434
+NOVEL_DB_EMBED_NUM_GPU=99
 ```
 
-## 実行方法
+リモート GPU は処理中だけ使用し、終了後は通常の接続先と
+`NOVEL_DB_EMBED_NUM_GPU=0` へ戻してバックエンドを再起動する。
+片方だけを変更すると、リモートへ接続できても CPU 推論のままになる。
 
-GPU 環境での OCR は管理画面（`/novel/manage`）の「OCR」タブから実行する。
-`batch_ocr.py` / `start_batch_ocr.bat` は Phase 5 で削除済み。
-OCR は `services/novel_db/extractor.py` → `D:\61.tool\common\ocr\` の独立 venv 経由で動作する。
+## 5. トラブルシューティング
 
-## トラブルシューティング
+### OCR ジョブが claim されない
 
-### `False` が返る / "CUDA is not available" と出る
+- Linux 本番の `OCR_AGENT_ENABLED`
+- Windows OCR agent の heartbeat
+- agent token と API URL
 
-- NVIDIA ドライバを最新版に更新する
-- インストールされた `torch` バージョンを確認:
-  ```powershell
-  cd kindle-pdf
-  uv run python -c "import torch; print(torch.__version__)"
-  ```
-  バージョン名に `+cu121` が含まれている必要がある。`+cpu` の場合は `[tool.uv.sources]` 設定が読まれていない可能性があるため、`uv.lock` を一度削除して `uv sync --group gpu` を再実行する
+を確認する。
 
-### CUDA 12.x との互換性
+### Surya server に接続できない
 
-`pyproject.toml` で固定している `cu121` は CUDA 12.1。マシン側の CUDA バージョン（`nvidia-smi` で確認）と PyTorch のビルドが一致している必要がある。CUDA 12.4 等を使いたい場合は `[[tool.uv.index]]` の URL を `cu124` 等に変更する。
+- `SURYA_INFERENCE_URL` の `/models` が応答するか確認
+- 自動起動構成なら `SURYA_LLAMA_SERVER_PATH`、
+  `SURYA_MODEL_PATH`、`SURYA_MMPROJ_PATH` の 3 件を確認
+- `nvidia-smi` で他プロセスの GPU 占有を確認
+
+### yomitoku で CUDA が利用できない
+
+- `uv run --package pic2pdf-viewer-kindle python -c "import torch; print(torch.__version__, torch.cuda.is_available())"`
+- バージョンが `+cpu` の場合は `kindle-pdf/pyproject.toml` の
+  `pytorch-cu121` source が適用されたか確認
+
+CUDA / PyTorch の組み合わせを変更する場合は、yomitoku の実機比較と
+セキュリティ allowlist の再確認を伴うため、依存更新だけを単独で行わない。
 
 ## 関連ドキュメント
 
-- [uv環境セットアップ.md](uv環境セットアップ.md) — uv 自体のインストール
-- [OCR設計書.md](../詳細設計/機能別/OCR設計書.md) — yomitoku を用いた PNG OCR と `novel.db` 格納設計
-- [ADR-0005: uv 採用](../基本設計/ADR/0005_uv-python-package-manager.md)
+- [uv 環境セットアップ](uv環境セットアップ.md)
+- [OCR 設計書](../詳細設計/機能別/OCR設計書.md)
+- [小説 RAG パイプライン設計](../詳細設計/機能別/小説RAG_パイプライン設計.md)
+- [ADR-0010: uv workspace](../基本設計/ADR/0010_uv-workspace-monorepo.md)

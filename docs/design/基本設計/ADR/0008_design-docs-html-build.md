@@ -38,7 +38,7 @@
 3. `frontend/public/site/` は `.gitignore`。`mkdocs build` で都度生成
 4. 開発時プレビューは `mkdocs serve`（`http://localhost:8000`、ファイル変更で自動リロード）
 5. 統合モード（FastAPI `:8090`）では `http://localhost:8090/site/index.html` または `/docs-html/` から閲覧
-6. フロントエンドヘッダー右上の「設計書」リンクから別タブで開ける（[`frontend/src/components/Layout.tsx`](../../../frontend/src/components/Layout.tsx)）
+6. フロントエンドヘッダー右上の「設計書」リンクから別タブで開ける（[`frontend/src/components/Layout.tsx`](../../../../frontend/src/components/Layout.tsx)）
 7. **Mermaid 図** を ` ```mermaid` フェンスで MD 内に記述可能（mkdocs-material が描画）
 
 ## 根拠

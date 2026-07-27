@@ -1,9 +1,15 @@
 # Windows サービス化セットアップ
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-27
 
 Pic2PDF Viewer のリリースサーバー（uvicorn on :8090）を **NSSM (Non-Sucking Service Manager)** で Windows サービスとして登録する手順。
 他環境への移植時はこの手順を上から順に実施。
+
+> **現行スクリプトの制約**: `scripts/setup_service.bat` は旧
+> `backend/.venv` を参照する。標準の uv workspace はルート `.venv` を正とするため、
+> 新規端末へこの手順を適用する前にスクリプト側のパス修正が必要。
+> 既存端末の `backend/.venv` はサービス移行が完了するまで削除しない。
+> 詳細は [既知の問題](../../log/既知の問題.md) を参照。
 
 ## 概要
 
@@ -21,10 +27,11 @@ Pic2PDF Viewer のリリースサーバー（uvicorn on :8090）を **NSSM (Non-
 
 1. backend の venv が存在すること
    - `backend\.venv\Scripts\python.exe` が存在
-   - 未作成なら `cd backend && uv sync` で作成
+   - 未作成の新規 workspace ではこの文書の手順を中断し、setup script の
+     ルート `.venv` 対応後に登録する
 2. frontend の dist が build 済みであること
    - `frontend\dist\index.html` が存在
-   - 未作成なら `build_release.bat` を実行
+   - 未作成なら `scripts\build_release.bat` を実行
 3. 管理者権限の PowerShell or コマンドプロンプトが使えること
 
 ## セットアップ手順
@@ -45,7 +52,7 @@ winget install NSSM.NSSM
 
 ### Step 2. サービス登録
 
-`setup_service.bat` を**管理者として実行**（エクスプローラで右クリック → 管理者として実行）。
+`scripts\setup_service.bat` を**管理者として実行**（エクスプローラで右クリック → 管理者として実行）。
 
 実行内容:
 - 既存サービスがあれば停止 + 削除
@@ -63,7 +70,7 @@ GUI が開いたら**何もせず**閉じて構わない（Log On 設定は Step
 
 NSSM / services.msc は自動付与を試みるが Windows 11 では失敗することがあるため、明示的に付与する。
 
-`grant_logon_right.bat` を**管理者として実行**。
+`scripts\grant_logon_right.bat` を**管理者として実行**。
 
 内部で `grant_logon_right.ps1` が LSA API (`LsaAddAccountRights`) を直接呼んで `SeServiceLogonRight` をユーザーに付与する。
 
@@ -142,9 +149,9 @@ PC 再起動 → ログイン直後（または遅延 auto-start のため 2 分
 | サービス状態確認 | `Get-Service Pic2PDFViewer` |
 | 起動 | services.msc から「開始」 or `Start-Service Pic2PDFViewer`（要管理者） |
 | 停止 | services.msc から「停止」 or `Stop-Service Pic2PDFViewer`（要管理者） |
-| **rebuild 後の再起動** | `build_release.bat` → `restart_service.bat`（管理者で実行） |
+| **rebuild 後の再起動** | `scripts\build_release.bat` → `scripts\restart_service.bat`（管理者で実行） |
 | ログ tail | `Get-Content "D:\61.tool\Pic2PDF_Viewer\backend\data\logs\service-stdout.log" -Tail 50 -Wait` |
-| ブラウザを開くだけ | `open_viewer.bat` |
+| ブラウザを開くだけ | `scripts\open_viewer.bat` |
 
 ## トラブルシューティング
 
@@ -156,8 +163,9 @@ Get-Content "D:\61.tool\Pic2PDF_Viewer\backend\data\logs\service-stderr.log" -Ta
 ```
 
 よくある原因:
-- `frontend\dist\index.html` が存在しない → `build_release.bat` 実行
-- `backend\.venv` が壊れている → `cd backend && uv sync` で再生成
+- `frontend\dist\index.html` が存在しない → `scripts\build_release.bat` 実行
+- `backend\.venv` が壊れている／存在しない → 現行 setup script の旧パス依存。
+  ルート `.venv` 対応を行ってからサービスを再登録する
 - alembic migration の失敗 → DB ファイルの権限 / WAL ロックを確認
 
 ### 書籍リストが 0 件 / OneDrive データが見えない

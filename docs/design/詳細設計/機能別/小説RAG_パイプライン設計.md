@@ -1,6 +1,6 @@
 # 小説 RAG 構築パイプライン設計
 
-> status: living | last-verified: 2026-07-19
+> status: living | last-verified: 2026-07-27
 
 novel タブの本文を検索・QA 可能にするための **DB 構築パイプライン**（OCR 取込 → チャンク分割 → embedding → 文脈生成 → キャラ抽出 → 書籍サマリ）の現在形設計。検索・QA 側は [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
@@ -35,13 +35,16 @@ images/*.png ──[ocr]──────────► pages.full_text (+ pag
 
 ## 2. ステップ 1: OCR 取込（`job_worker` / `ocr_staging` / `extractor` / `ocr_worker`）
 
-`images/{書籍名}/NNN.png` を Surya OCR 2 でページ単位に処理し、品質ゲートを通過した1冊分だけを `pages` テーブルへ書き込む。yomitoku は `OCR_ENGINE=yomitoku` の比較・後方互換用として残す。
+`images/{書籍名}/NNN.png` を Surya OCR 2 でページ単位に処理し、
+品質結果を staging へ保存する。処理完了後は `awaiting_qa` とし、
+必須ページのQAとrun承認が完了した1冊分だけを `pages` テーブルへ書き込む。
+yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用として残す。
 
 - **subprocess 分離**: `extractor.iter_ocr_pages` が対象ページmanifestを一時JSONで渡し、`ocr_worker.py` をOCR venvのPythonで1回起動する。workerは1ページごとにJSON Linesを返し、stderrはbackendログへ流す。
 - **Surya推論**: Windows上のCUDA対応 `llama-server` へOpenAI互換APIで接続する。到達不能時は設定済みの実行ファイル・model・mmprojからworkerが所有サーバーを1回だけ起動する。
 - **worker内部**: PNGをバイト列として読み、SHA-256を計算してPillowで復号する。Suryaのraw HTML/bboxを解析し、不合格時だけ入力条件を変えて最大3候補を比較する。`OCR_ENGINE=yomitoku` の後方互換経路だけは OpenCV で復号する。
 - **チェックポイント**: `ocr_staging` が `ocr_runs` / `ocr_page_results` にページ単位で保存する。再実行時は画像SHAが同じ `passed` ページをスキップする。
-- **二段階保存**: 全ページ合格後だけ `_store_ocr_pages` と同等の更新を1トランザクションで行い、`books.ocr_done_at` とFTSを同期する。失敗時は公開済み本文を変更しない。
+- **二段階保存**: 全ページの結果を staging へ保存して `awaiting_qa` に進める。この時点では公開済み本文を変更しない。必須ページの承認・補正と run 承認後だけ `_store_ocr_pages` と同等の更新を1トランザクションで行い、`books.ocr_done_at` とFTSを同期する。
 - **直接呼出し互換経路**: `builder.ocr_book` は旧CLI向けに残る直接保存APIで、チェックポイント・二段階確定を行わない。管理画面とjob queueは必ず上記のステージング経路を使用する。
 - **PDF モード（後方互換）**: `extractor.extract_pages(pdf)` は PyMuPDF `get_text("blocks")` で縦書きブロックを取得しブロック内改行を除去して連結する。旧 Searchable PDF 由来の書籍向けで、現行の取込は画像 OCR 経路が主。
 

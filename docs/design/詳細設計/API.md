@@ -8,12 +8,19 @@
 
 **エンドポイント一覧・リクエスト/レスポンススキーマは OpenAPI が正** — このファイルはエンドポイントを列挙しない。個別の HTTP メソッド・パス・パラメータ・レスポンス例は、実装（`response_model` / Pydantic スキーマ）から FastAPI が自動生成する以下で確認する。
 
-- **Swagger UI**: `http://localhost:8766/docs`（開発時）。リリース／統合モードでもバックエンドポート（`:8090` 相当）で同様に配信されるが、フロントエンドからはリンクしていない。
+- **Swagger UI**: `http://localhost:8766/docs`（開発時）。Windows ローカルリリースは FastAPI 直接配信のため `http://localhost:8090/docs`。Linux 本番の nginx は `/api/` だけを uvicorn へ転送するため、Swagger UI と `/openapi.json` は外部入口 `:8090` へ公開しない。
 - **OpenAPI スキーマ**: `http://localhost:8766/openapi.json`
 
 旧 `API仕様書.md` として 1,900 行超のエンドポイント表を手書き維持していた方式は廃止した。実装とドキュメントが乖離するリスクを避けるため、スキーマは常にコードから機械生成されたものを正とする。
 
-JSON エンドポイントはネストした要素を含めて Pydantic の `response_model` を明示し、`list[dict]` / `dict` のまま公開しない。フロントエンドのAPIレスポンス型は `openapi-typescript` で生成した `frontend/src/types/api.d.ts` の `components['schemas']` を参照し、同じ構造を手書きで複製しない。SSE・ファイルダウンロード・204レスポンスはこの対象外とする。
+新規・変更する JSON エンドポイントは、ネストした要素を含めて Pydantic の
+`response_model` を明示し、`list[dict]` / `dict` のまま新たに公開しない。
+フロントエンドのAPIレスポンス型は `openapi-typescript` で生成した
+`frontend/src/types/api.d.ts` の `components['schemas']` を参照し、同じ構造を
+手書きで複製しない。SSE・ファイルダウンロード・204レスポンスはこの対象外とする。
+`GET /api/meta`、一部の build / discussion schema、novel_db の手書き job mode 型には
+旧形式が残っており、現行 OpenAPI が実際の契約の正本である。解消までは
+[既知の問題](../../log/既知の問題.md)として追跡する。
 
 このファイルが記すのは、OpenAPI のスキーマ定義だけでは読み取れない **横断的な設計意図・挙動ルール** のみ。
 

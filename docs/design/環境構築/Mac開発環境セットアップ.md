@@ -1,6 +1,6 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-07-27
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
@@ -45,8 +45,9 @@ ALLOWED_ORIGINS=http://localhost:5176,http://127.0.0.1:5176
 # API ベース URL（デフォルトのままでよい）
 VITE_API_URL=http://localhost:8766
 
-# OCR 機能を Mac で使う場合のみ設定（省略すると OCR 関連テストはスキップ）
+# OCR worker を Mac で実行する場合のみ設定
 # OCR_PYTHON=/Users/<user>/.venv/ocr/bin/python
+# SURYA_INFERENCE_URL=http://<surya-host>:8768/v1
 
 # データディレクトリ（省略時: <repo>/backend/data/）
 # PIC2PDF_DATA_DIR=/Users/<user>/Documents/Pic2PDF
@@ -58,11 +59,11 @@ VITE_API_URL=http://localhost:8766
 ### 3. バックエンドセットアップ
 
 ```bash
-cd backend
+# リポジトリルートで workspace 全体を同期
 uv sync --group dev
 ```
 
-`.venv/` が生成されます。`activate` は不要です（`uv run` が自動検出）。
+ルート `.venv/` が生成される。`activate` は不要（`uv run` が自動検出）。
 
 ### 4. フロントエンドセットアップ
 
@@ -110,16 +111,23 @@ open http://localhost:5176
 
 ### Windows 専用スクリプト
 
-`.bat` ファイル（`start.bat`、`restart_service.bat` 等）は Mac では実行できない。開発中は不要なので無視してよい。
+`.bat` ファイル（`scripts/start.bat`、`scripts/restart_service.bat` 等）は Mac では実行できない。開発中は不要なので無視してよい。
 
-### OCR 機能（yomitoku）
+### OCR 機能（Surya 主系 / yomitoku 補助）
 
-`backend/services/novel_db/extractor.py` の OCR サブプロセスが使う Python は環境変数 `OCR_PYTHON` で設定する。
+`backend/services/novel_db/extractor.py` の OCR サブプロセスが使う Python は
+`OCR_PYTHON` で設定する。主系の Surya OCR 2 は
+`SURYA_INFERENCE_URL` の OpenAI 互換 llama-server を呼び出す。
 
-- **設定しない場合**: OCR 関連処理はエラーになるが、それ以外の機能は動作する
-- **設定する場合**: Mac 上に yomitoku の venv を別途作成し、`OCR_PYTHON=/path/to/venv/bin/python` を `.env` に追記
+- **OCR を使わない場合**: OCR ジョブを投入しなければ、その他の開発・テストは動作する
+- **リモート Surya を使う場合**: worker の依存を入れた Python を
+  `OCR_PYTHON` に設定し、`SURYA_INFERENCE_URL` を到達可能なサーバーへ向ける
+- **yomitoku 補助照合も使う場合**: `OCR_PACKAGE_PATH` が指す環境へ
+  yomitoku と対応する PyTorch を別途用意する
 
-yomitoku は CUDA 依存のため、Mac（GPU なし）では推論速度が非常に遅くなる点に注意。
+Mac 上でのローカル Surya / yomitoku 実行は標準運用ではなく、
+GPU・モデル互換性と推論時間を個別に検証する。通常の Mac 開発では
+OCR を実行しないか、既存の Windows OCR agent / 推論サーバーを利用する。
 
 ### Linux 同期 / NSSM サービス
 

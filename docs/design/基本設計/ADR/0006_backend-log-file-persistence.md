@@ -3,7 +3,7 @@
 - **Status**: Accepted
 - **Date**: 2026-05-07
 - **決定者**: プロジェクトオーナー
-- **関連**: [運用ガイド §5](../../環境構築/運用ガイド.md)、[セキュリティ設計書 §2-5 / §2-6](../../詳細設計/セキュリティ設計書.md)、[backend/utils/logger.py](../../../backend/utils/logger.py)（旧 `機能追加候補.md A-7` で起票、本 ADR で実装決定）
+- **関連**: [運用ガイド §5](../../環境構築/運用ガイド.md)、[セキュリティ設計書 §2-5 / §2-6](../../詳細設計/セキュリティ設計書.md)、[backend/utils/logger.py](../../../../backend/utils/logger.py)（旧 `機能追加候補.md A-7` で起票、本 ADR で実装決定）
 
 ## コンテキスト
 
@@ -35,7 +35,7 @@
 
 | 項目 | 値 | 理由 |
 |---|---|---|
-| 出力先 | `backend/data/logs/app.log` | `backend/data/` は既に [`.gitignore`](../../../.gitignore) 済み（コミットされない） |
+| 出力先 | `backend/data/logs/app.log` | `backend/data/` は既に [`.gitignore`](../../../../.gitignore) 済み（コミットされない） |
 | ローテーション戦略 | サイズベース（`RotatingFileHandler`） | 個人ツールでは容量を予測したい |
 | 最大サイズ | **10 MB** × **5 世代**（合計 50 MB 上限） | 1 行 ≒ 100 バイト × 通常運用日次 1〜10k 行 ≒ 数日〜数週間分が常時確保できる |
 | エンコーディング | UTF-8（明示） | Windows のデフォルト `cp932` で日本語ログが文字化けするのを回避 |
@@ -67,8 +67,8 @@
 - ログが書き換わるため、**長期保管したい場合は手動アーカイブが必要**（個人ツール前提では運用ガイドに記載するに留める）
 
 ### 影響範囲
-- [backend/utils/logger.py](../../../backend/utils/logger.py) — 実装変更
-- [backend/tests/test_logger.py](../../../backend/tests/test_logger.py) — テスト追加（FileHandler 付与・ディレクトリ作成・既存挙動互換）
+- [backend/utils/logger.py](../../../../backend/utils/logger.py) — 実装変更
+- [backend/tests/test_logger.py](../../../../backend/tests/test_logger.py) — テスト追加（FileHandler 付与・ディレクトリ作成・既存挙動互換）
 - [docs/03_詳細設計/詳細設計書_バックエンド編.md](../../詳細設計/詳細設計書_バックエンド編.md) — ロギング節の更新
 - [docs/03_詳細設計/セキュリティ設計書.md](../../詳細設計/セキュリティ設計書.md) — §2-5 の「監査ログ保全」が成立するようになった旨を反映
 - [docs/04_環境構築/運用ガイド.md §5](../../環境構築/運用ガイド.md) — 「過去のサーバーログを確認したい」の記述を「`backend/data/logs/app.log` を見る」に書き換え
