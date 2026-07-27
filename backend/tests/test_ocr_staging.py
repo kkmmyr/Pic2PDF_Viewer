@@ -11,7 +11,7 @@ from services.novel_db.migrations import upgrade_head
 from services.novel_db.ocr_page_classification import classify_run_pages as classification_classify_run_pages
 from services.novel_db.ocr_page_types import suggest_page_type
 from services.novel_db.ocr_qa import stage_run_for_qa as qa_stage_run_for_qa
-from services.novel_db.ocr_qa_risk import detect_qa_risk_flags
+from services.novel_db.ocr_qa_risk import annotate_run_qa_risks, detect_qa_risk_flags
 from services.novel_db.ocr_run_store import collect_input_pages as store_collect_input_pages
 from services.novel_db.ocr_staging import (
     approve_and_publish_run,
@@ -313,6 +313,36 @@ def test_qa_risk_detects_repetition_per_candidate_and_selected_text() -> None:
         primary_text="正常な主OCR本文です。",
         external_text=repeated,
     ) == {"external_text_repetition"}
+
+
+def test_qa_risk_uses_selected_engine_text(tmp_data_dir) -> None:
+    upgrade_head()
+    book_name = "qa-selected-engine"
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
+    images_dir.mkdir(parents=True)
+    Image.new("RGB", (100, 140), "white").save(images_dir / "001.png")
+    input_pages = collect_input_pages(book_name)
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    repeated = "\n".join(["茉莉花は静かに書類へ目を落とした。"] * 3)
+    result = _passed_page(1, input_pages[0].image_sha256, repeated)
+    result["external_text"] = "外部OCRで修正された正常な本文です。" * 20
+    save_page_result(run_id, result)
+    with with_db() as conn:
+        conn.execute(
+            "UPDATE ocr_page_results SET selected_engine='external', page_type='narrative' "
+            "WHERE run_id=? AND page_no=1",
+            (run_id,),
+        )
+        conn.commit()
+
+    assert annotate_run_qa_risks(run_id) == set()
+    with with_db() as conn:
+        flags = conn.execute(
+            "SELECT quality_flags_json FROM ocr_page_results WHERE run_id=? AND page_no=1",
+            (run_id,),
+        ).fetchone()[0]
+    assert "primary_text_repetition" in flags
+    assert "selected_text_repetition" not in flags
 
 
 def test_classification_preserves_ocr_candidate_selection(staged_book) -> None:

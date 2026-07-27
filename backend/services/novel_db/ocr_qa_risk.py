@@ -74,15 +74,21 @@ def annotate_run_qa_risks(run_id: int) -> set[int]:
     with with_db() as conn:
         rows = conn.execute(
             "SELECT page_no, page_type, full_text, char_count, primary_text, external_text, "
-            "quality_flags_json FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
+            "quality_flags_json, selected_engine, corrected_text "
+            "FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
             (run_id,),
         ).fetchall()
         with conn:
             for row in rows:
+                selected_text = {
+                    "primary": str(row[4] or row[2] or ""),
+                    "external": str(row[5] or ""),
+                    "codex": str(row[8] or ""),
+                }.get(str(row[7] or "primary"), str(row[2] or ""))
                 risk_flags = detect_qa_risk_flags(
                     page_type=str(row[1] or "unknown"),
-                    full_text=str(row[2] or ""),
-                    char_count=int(row[3] or 0),
+                    full_text=selected_text,
+                    char_count=len(selected_text),
                     primary_text=str(row[4] or row[2] or ""),
                     external_text=str(row[5] or ""),
                 )

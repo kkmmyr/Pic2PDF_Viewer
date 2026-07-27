@@ -11,9 +11,11 @@ _AFTERWORD_OR_COLOPHON_RE = re.compile(r"(?:あとがき|後書き|奥付|発行
 _TOC_RE = re.compile(r"(?:目\s*次|もくじ)")
 _SECTION_RE = re.compile(r"(?:序章|終章|プロローグ|エピローグ|第[0-9一二三四五六七八九十百]+[章話節])")
 _SPACE_RE = re.compile(r"\s+")
+_CONTENT_CHAR_RE = re.compile(r"[\w\u3040-\u30ff\u3400-\u9fff]", re.UNICODE)
 
 _MIN_REPEATED_LINE_LENGTH = 10
 _MIN_REPEATED_LINE_COUNT = 3
+_MIN_LONG_LINE_LENGTH = 40
 _MIN_REPEATED_BLOCK_LENGTH = 40
 _MIN_REPEATED_BLOCK_COUNT = 2
 
@@ -55,13 +57,19 @@ def detect_sample_boundary(
 def has_suspicious_repetition(text: str | None) -> bool:
     """Return whether OCR text contains implausibly repeated lines or blocks."""
     lines = [_SPACE_RE.sub("", line) for line in (text or "").splitlines()]
-    significant = [line for line in lines if len(line) >= _MIN_REPEATED_LINE_LENGTH]
-    if any(count >= _MIN_REPEATED_LINE_COUNT for count in Counter(significant).values()):
+    significant = [line for line in lines if len(_CONTENT_CHAR_RE.findall(line)) >= _MIN_REPEATED_LINE_LENGTH]
+    line_counts = Counter(significant)
+    if any(count >= _MIN_REPEATED_LINE_COUNT for count in line_counts.values()):
+        return True
+    if any(
+        count >= 2 and len(_CONTENT_CHAR_RE.findall(line)) >= _MIN_LONG_LINE_LENGTH
+        for line, count in line_counts.items()
+    ):
         return True
 
     blocks = [
-        lines[index] + lines[index + 1]
-        for index in range(len(lines) - 1)
-        if len(lines[index] + lines[index + 1]) >= _MIN_REPEATED_BLOCK_LENGTH
+        significant[index] + significant[index + 1]
+        for index in range(len(significant) - 1)
+        if len(_CONTENT_CHAR_RE.findall(significant[index] + significant[index + 1])) >= _MIN_REPEATED_BLOCK_LENGTH
     ]
     return any(count >= _MIN_REPEATED_BLOCK_COUNT for count in Counter(blocks).values())

@@ -49,11 +49,31 @@ def test_repetition_detects_repeated_long_line() -> None:
     assert has_suspicious_repetition("\n".join(["茉莉花は静かに書類へ目を落とした。"] * 3))
 
 
+def test_repetition_detects_same_long_line_twice() -> None:
+    line = (
+        "茉莉花は官吏たちの報告を読み、問題の原因と解決策を一つずつ丁寧に書き出し、"
+        "関係者へ確認する順番まで整理していった。"
+    )
+    assert has_suspicious_repetition(f"{line}\n別の文章です。\n{line}")
+
+
 def test_repetition_detects_repeated_two_line_block() -> None:
-    block = ["これは十分に長い一行目の文章として扱われます。", "こちらも十分に長い二行目の文章です。"]
+    block = [
+        "これは十分に長い一行目の文章として扱われます。",
+        "こちらも十分に長い二行目の文章として扱われます。",
+    ]
     assert has_suspicious_repetition("\n".join([*block, "間の文章", *block]))
 
 
 def test_repetition_ignores_short_dialogue_and_normal_prose() -> None:
     text = "\n".join(["はい", "はい", "はい", "茉莉花は書類を読んだ。", "珀陽は窓の外を見た。"])
     assert not has_suspicious_repetition(text)
+
+
+def test_repetition_ignores_alternating_blank_lines() -> None:
+    text = "\n".join(["茉莉花は大虎へ報告した。", "", "茉莉花は大虎へ報告した。"])
+    assert not has_suspicious_repetition(text)
+
+
+def test_repetition_ignores_intentional_short_onomatopoeia() -> None:
+    assert not has_suspicious_repetition("\n".join(["コンコン……カサカサ……"] * 4))
