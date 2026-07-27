@@ -69,6 +69,23 @@ def test_list_books_merges_indexed_status(setup_db):
     assert by_name["book-2"].is_indexed is False
 
 
+def test_list_books_ocr_only_record_is_not_embedding_indexed(setup_db):
+    _put_image_dir(setup_db, "book-1")
+    with with_db() as conn:
+        conn.execute(
+            "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at, ocr_done_at) "
+            "VALUES (?, ?, ?, ?, NULL, datetime('now'))",
+            ("book-1", "/dummy/book-1.pdf", "/dummy/images/book-1", 120),
+        )
+        conn.commit()
+        book = list_books(conn)[0]
+
+    assert book.page_count == 120
+    assert book.ocr_done_at is not None
+    assert book.indexed_at is None
+    assert book.is_indexed is False
+
+
 def test_list_books_merges_meta_authors_and_series(setup_db):
     _put_image_dir(setup_db, "book-1")
     _put_meta(

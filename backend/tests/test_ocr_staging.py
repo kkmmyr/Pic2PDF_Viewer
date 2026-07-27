@@ -9,7 +9,9 @@ from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
 from services.novel_db.migrations import upgrade_head
 from services.novel_db.ocr_page_classification import classify_run_pages as classification_classify_run_pages
+from services.novel_db.ocr_page_types import suggest_page_type
 from services.novel_db.ocr_qa import stage_run_for_qa as qa_stage_run_for_qa
+from services.novel_db.ocr_qa_risk import detect_qa_risk_flags
 from services.novel_db.ocr_run_store import collect_input_pages as store_collect_input_pages
 from services.novel_db.ocr_staging import (
     approve_and_publish_run,
@@ -176,6 +178,81 @@ def test_classify_run_pages_is_conservative(staged_book) -> None:
     assert [tuple(row) for row in rows] == [(1, "structured"), (2, "normal_prose")]
 
 
+@pytest.mark.parametrize(
+    ("page_no", "page_count", "text", "expected"),
+    [
+        (79, 86, "本文中で目次という語に触れます。" * 160, "narrative"),
+        (95, 98, "あとがき\n今回の執筆についてお話しします。" * 40, "narrative"),
+        (97, 102, "物語の結末に続く文章です。" * 40, "narrative"),
+        (95, 99, "発行所 発行者 電子書籍 無断転載 " * 30, "colophon_or_ad"),
+    ],
+)
+def test_page_type_does_not_exclude_late_narrative(
+    page_no: int,
+    page_count: int,
+    text: str,
+    expected: str,
+) -> None:
+    assert (
+        suggest_page_type(
+            page_no=page_no,
+            page_count=page_count,
+            full_text=text,
+            char_count=len(text),
+        )
+        == expected
+    )
+
+
+def test_qa_risk_detects_long_non_narrative_and_name_disagreement() -> None:
+    assert detect_qa_risk_flags(
+        page_type="colophon_or_ad",
+        full_text="広告の説明です。" * 80,
+        char_count=640,
+        primary_text="広告の説明です。" * 80,
+        external_text="",
+    ) == {"page_type_text_conflict"}
+    assert detect_qa_risk_flags(
+        page_type="narrative",
+        full_text="珀陽様がお見えになりました。",
+        char_count=14,
+        primary_text="珀陽様がお見えになりました。",
+        external_text="伯陽様がお見えになりました。",
+    ) == {"named_entity_candidate_disagreement"}
+
+
+def test_qa_risk_ignores_unpaired_candidate_omissions() -> None:
+    assert (
+        detect_qa_risk_flags(
+            page_type="narrative",
+            full_text="茉莉花様とラーナシュが話しています。",
+            char_count=18,
+            primary_text="茉莉花様とラーナシュが話しています。",
+            external_text="茉莉花様が話しています。",
+        )
+        == set()
+    )
+
+
+def test_classification_preserves_ocr_candidate_selection(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    result = _passed_page(1, input_pages[0].image_sha256, "目次\n第一章\n第二章")
+    result["external_text"] = "外部OCR候補"
+    result["selected_engine"] = "external"
+    save_page_result(run_id, result)
+    save_page_result(run_id, _passed_page(2, input_pages[1].image_sha256, "本文" * 200))
+
+    classify_run_pages(run_id)
+
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT primary_text, external_text, selected_engine FROM ocr_page_results WHERE run_id=? AND page_no=1",
+            (run_id,),
+        ).fetchone()
+    assert tuple(row) == ("目次\n第一章\n第二章", "外部OCR候補", "external")
+
+
 def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "qa-flag-selection"
@@ -202,6 +279,43 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
             (run_id,),
         ).fetchall()
     assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 12]
+
+
+def test_stage_requires_content_risks(tmp_data_dir) -> None:
+    upgrade_head()
+    book_name = "qa-name-risk"
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
+    images_dir.mkdir(parents=True)
+    for page_no in range(1, 13):
+        Image.new("RGB", (100, 140), "white").save(images_dir / f"{page_no:03d}.png")
+    input_pages = collect_input_pages(book_name)
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+
+    for page in input_pages:
+        result = _passed_page(page.page_no, page.image_sha256, "これは通常の本文です。" * 40)
+        if page.page_no == 9:
+            result["primary_text"] = "本文です。" * 60 + "珀陽様が来ました。"
+            result["external_text"] = "本文です。" * 60 + "伯陽様が来ました。"
+            result["quality_flags"] = ["cross_engine_consensus", "yomitoku_adjudication"]
+        if page.page_no == 10:
+            result = _passed_page(
+                page.page_no,
+                page.image_sha256,
+                "発行所 発行者 電子書籍 無断転載 " * 40,
+            )
+        save_page_result(run_id, result)
+
+    stage_run_for_qa(run_id, input_pages)
+
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT page_no, qa_state, quality_flags_json FROM ocr_page_results "
+            "WHERE run_id=? AND page_no IN (9, 10) ORDER BY page_no",
+            (run_id,),
+        ).fetchall()
+    assert [row[1] for row in rows] == ["required", "required"]
+    assert "named_entity_candidate_disagreement" in rows[0][2]
+    assert "page_type_text_conflict" in rows[1][2]
 
 
 def test_failed_non_index_page_can_publish_as_image_only(staged_book) -> None:

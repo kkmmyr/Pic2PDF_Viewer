@@ -9,6 +9,7 @@ from .connection import with_db
 from .ocr_layout_types import validate_layout_type
 from .ocr_page_classification import classify_run_pages
 from .ocr_page_types import is_index_eligible, validate_page_type
+from .ocr_qa_risk import annotate_run_qa_risks
 from .ocr_run_store import OcrInputPage, collect_input_pages, validate_complete_run
 
 _QA_AUDIT_ONLY_FLAGS = frozenset(
@@ -23,7 +24,9 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
     """Move a complete OCR run to QA without publishing canonical text."""
     _, rows = validate_complete_run(run_id, input_pages)
     classify_run_pages(run_id)
+    risk_pages = annotate_run_qa_risks(run_id)
     flagged_pages = {int(row[0]) for row in rows if set(json.loads(str(row[6]))) - _QA_AUDIT_ONLY_FLAGS}
+    flagged_pages.update(risk_pages)
     page_count = len(input_pages)
     required_pages = set(range(1, min(7, page_count) + 1)) | flagged_pages
     required_pages.update({min(8, page_count), max(1, (page_count + 1) // 2), page_count})

@@ -111,6 +111,11 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
   - `POST /api/ocr/qa/runs/{run_id}/classify-pages`: `unknown`ページだけへ決定論的な種別候補を設定し、未確定ページをQA必須にする。
   - `PATCH /api/ocr/qa/runs/{run_id}/pages/{page_no}`: `approved`または`rejected`、確定ページ種別、確定レイアウト種別、採用エンジン、任意の画像照合済み補正文・メモを保存する。OCR失敗した本文の承認は非空補正文を必須とする。
   - `POST /api/ocr/qa/runs/{run_id}/approve`: `required`ページの全承認、却下・未分類各0件、本文ページの有効な採用本文、全入力画像SHA一致を検証後に公開する。非本文ページは画像だけを公開し、OCR候補を検索索引へ流さない。未充足は`409 Conflict`とする。
+- **小説DB状態 API**:
+  - `GET /api/novel_db/books`と`GET /api/novel_db/books/{book_name}`の
+    `is_indexed`は`indexed_at != null`と同義で、チャンク・Embedding構築完了を表す。
+    OCR本文の公開完了は`ocr_done_at`で判定する。小説DBに書籍行が存在するだけでは
+    `is_indexed=true`にしない。
 - **OCR正解コーパスAPI**:
   - `GET /api/ocr/ground-truth`: 登録標本、OCR本文、人手正解、状態、ページ種別、レイアウト種別、ページ別CER、全verified標本の加重CER、ページ種別・レイアウト種別ごとの件数・正解文字数・加重CERを返す。
   - `POST /api/ocr/ground-truth/seed`: 登録済みrun ID・画面番号の組だけを標本へ追加する。画像SHAとOCR本文はサーバー側正本から取得する。
