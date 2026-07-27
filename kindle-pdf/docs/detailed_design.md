@@ -133,6 +133,9 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   先頭付近へ移動できた。
 - 高速経路も UI Automation の `SetValue` / `Click` は使わず、
   controlの限定探索とフォーカス設定、通常のキーボード・マウス操作を用いる。
+  `attach_running_app()`はWindowsのforeground threadへ一時的にinput queueを接続して
+  Kindleを前面化し、`GetForegroundWindow()`が対象handleと一致したことを確認する。
+  一致しない場合はcontrol中心をクリックせず`kindle_ui_unavailable`で停止する。
   小説は `FooterLabelText=Location 1 ...・0%` を表紙とする。直接遷移後が
   `ページ1/N・0%` の場合は表紙の次の画面であるため、`ReadingArea` へ
   フォーカスを戻してから逆方向へ1回だけ送り、
@@ -166,6 +169,9 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 `capture_agent_transport.py`は設定・API・heartbeat、`capture_package.py`はmanifestと
 `.partial → .ready`公開、`capture_agent.py`は工程制御とエラー変換を担当する。
 
+- Sambaの一時的な共有違反・アクセス拒否により`.partial → .ready`の同一共有内renameが
+  失敗した場合は、コピーやmanifest生成をやり直さず、renameだけを短いバックオフ付きで
+  有界回数再試行する。恒常的に失敗する場合は`.partial`を削除して`transfer_failed`とする。
 - active job中はcapture agentだけがKindleウィンドウとUI Automationを操作する。
   診断用controllerも接続時にウィンドウ復元・前面化を行うため、読み取り目的でも併用しない。
   監視はcapture job APIとheartbeatに限定し、画像の目視確認はjob完了後に行う。
@@ -193,6 +199,23 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   戻る、ダウンロード、書籍オープンは通常のpyautogui操作で実行し、検索値は
   `ValuePattern`による読取専用確認を行う。ウィンドウ前面化は取得済みのネイティブ
   ウィンドウハンドルをWin32 APIへ渡す。固定の画面絶対座標は使わない。
+
+### 1.9. `scripts/capture_kindle_series.py`（シリーズ直列実行）
+
+購入カタログAPIを使い、シリーズの未撮影書籍を安全に1冊ずつcapture agentへ渡す
+運用補助スクリプトである。KindleウィンドウやUI Automationには接続しない。
+
+- 既定はdry-runとし、対象タイトル、ASIN、`source`、巻順、撮影状態だけを表示する。
+- 実行時はシリーズ検索結果、所有状態、レーベル別`source`、期待総冊数を検証する。
+- カタログの誤った`book_type`を使わず、利用者が確定したレーベル対応
+  （`ビーズログ文庫=novel`、`プリンセス・コミックス=comic`）を使う。
+- `captured`は再撮影せず、`capture_pending`、`multiple_links`、別の未完了jobが
+  ある場合は開始しない。
+- 小説、漫画の順に巻番号で並べ、1冊分のjobだけを作成する。
+- jobの`succeeded`後に対象ASINの`capture_state=captured`を再確認できた場合だけ
+  次のjobを作成する。
+- `failed`、監視タイムアウト、API不整合、割り込み時は次のjobを作成しない。
+  監視側の停止は実行中job自体を中断しない。
 
 ---
 

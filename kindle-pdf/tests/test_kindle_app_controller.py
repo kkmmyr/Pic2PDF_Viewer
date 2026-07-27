@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 
 import kindle_app_controller as controller_module
+import kindle_controller.window as window_module
 from kindle_app_controller import (
     BookCandidate,
     BookIdentity,
@@ -126,6 +127,82 @@ def test_control_lookup_treats_transient_com_error_as_not_found(
     )
 
     assert controller._control_by_id("backButton", timeout=0.1) is None
+
+
+def test_foreground_activation_attaches_threads_and_verifies_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _User32:
+        foreground = 100
+        attached: list[tuple[int, int, bool]] = []
+
+        def GetForegroundWindow(self) -> int:
+            return self.foreground
+
+        def GetWindowThreadProcessId(self, handle, _process_id) -> int:
+            return {100: 10, 200: 20}[handle]
+
+        def AttachThreadInput(self, current, target, attach) -> int:
+            self.attached.append((current, target, bool(attach)))
+            return 1
+
+        def ShowWindow(self, _handle, _command) -> int:
+            return 1
+
+        def BringWindowToTop(self, _handle) -> int:
+            return 1
+
+        def SetForegroundWindow(self, handle) -> int:
+            self.foreground = handle
+            return 1
+
+    user32 = _User32()
+    monkeypatch.setattr(
+        window_module.ctypes,
+        "windll",
+        SimpleNamespace(
+            user32=user32,
+            kernel32=SimpleNamespace(GetCurrentThreadId=lambda: 30),
+        ),
+    )
+    controller = KindleAppController()
+
+    controller._bring_to_foreground(200)
+
+    assert user32.foreground == 200
+    assert user32.attached == [
+        (30, 10, True),
+        (30, 20, True),
+        (30, 20, False),
+        (30, 10, False),
+    ]
+
+
+def test_foreground_activation_stops_when_windows_rejects_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 100,
+        GetWindowThreadProcessId=lambda _handle, _process_id: 10,
+        AttachThreadInput=lambda _current, _target, _attach: 1,
+        ShowWindow=lambda _handle, _command: 1,
+        BringWindowToTop=lambda _handle: 1,
+        SetForegroundWindow=lambda _handle: 0,
+    )
+    monkeypatch.setattr(
+        window_module.ctypes,
+        "windll",
+        SimpleNamespace(
+            user32=user32,
+            kernel32=SimpleNamespace(GetCurrentThreadId=lambda: 30),
+        ),
+    )
+    controller = KindleAppController(
+        ControllerConfig(foreground_timeout_seconds=0),
+    )
+
+    with pytest.raises(KindleControllerError, match="前面化"):
+        controller._bring_to_foreground(200)
 
 
 def test_search_value_focuses_control_and_verifies_keyboard_input(

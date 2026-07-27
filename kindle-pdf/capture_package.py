@@ -3,9 +3,12 @@ import json
 import os
 import re
 import shutil
+import time
 from pathlib import Path
 
 from capture_agent_transport import AgentConfig, AgentExecutionError
+
+_READY_RENAME_RETRY_DELAYS = (0.5, 1.0, 2.0, 4.0)
 
 
 def safe_capture_title(job: dict) -> str:
@@ -26,6 +29,18 @@ def package_path(inbox: Path, job_id: str, suffix: str) -> Path:
     if not target.is_relative_to(root):
         raise AgentExecutionError("transfer_failed", "capture packageのパスが不正です")
     return target
+
+
+def _promote_ready(partial: Path, ready: Path) -> None:
+    for retry, delay in enumerate((0.0, *_READY_RENAME_RETRY_DELAYS)):
+        if retry:
+            time.sleep(delay)
+        try:
+            os.replace(partial, ready)
+            return
+        except PermissionError:
+            if retry == len(_READY_RENAME_RETRY_DELAYS):
+                raise
 
 
 def publish_package(config: AgentConfig, job: dict, image_dir: Path) -> Path:
@@ -75,7 +90,7 @@ def publish_package(config: AgentConfig, job: dict, image_dir: Path) -> Path:
             json.dumps(manifest, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-        os.replace(partial, ready)
+        _promote_ready(partial, ready)
         return ready
     except Exception:
         if partial.is_dir() and not partial.is_symlink():

@@ -76,10 +76,48 @@ class WindowController:
                 "kindle_ui_unavailable",
                 "Kindleウィンドウの識別情報が不正です",
             )
-        user32.ShowWindow(window_handle, 9)
-        user32.SetForegroundWindow(window_handle)
+        self._bring_to_foreground(window_handle)
         time.sleep(self.config.screen_transition_seconds)
         self.window = window
+
+    def _bring_to_foreground(self, window_handle: int) -> None:
+        """前面threadへ一時接続し、Kindleが実際に前面になったことを確認する。"""
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+        foreground_handle = int(user32.GetForegroundWindow() or 0)
+        current_thread = int(kernel32.GetCurrentThreadId())
+        related_threads = {
+            int(user32.GetWindowThreadProcessId(handle, None))
+            for handle in (foreground_handle, window_handle)
+            if handle
+        }
+        attached_threads: list[int] = []
+        try:
+            for thread_id in sorted(related_threads):
+                if thread_id != current_thread and user32.AttachThreadInput(
+                    current_thread,
+                    thread_id,
+                    True,
+                ):
+                    attached_threads.append(thread_id)
+            user32.ShowWindow(window_handle, 9)
+            user32.BringWindowToTop(window_handle)
+            user32.SetForegroundWindow(window_handle)
+        finally:
+            for thread_id in reversed(attached_threads):
+                user32.AttachThreadInput(current_thread, thread_id, False)
+
+        deadline = time.monotonic() + self.config.foreground_timeout_seconds
+        while True:
+            if int(user32.GetForegroundWindow() or 0) == window_handle:
+                return
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.1)
+        raise KindleControllerError(
+            "kindle_ui_unavailable",
+            "Kindleウィンドウを前面化できませんでした",
+        )
 
     def _require_window(self) -> auto.Control:
         if self.window is None:

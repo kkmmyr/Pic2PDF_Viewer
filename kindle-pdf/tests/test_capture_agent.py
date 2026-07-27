@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 import capture_agent
+import capture_package
 from kindle_app_controller import BookCandidate, KindleControllerError
 
 
@@ -286,4 +287,32 @@ def test_publish_failure_removes_partial_package(tmp_path) -> None:
         capture_agent._publish_package(config, _job(), empty_images)
 
     assert exc.value.error_code == "transfer_failed"
+    assert not (config.inbox / f"{_job()['id']}.partial").exists()
+
+
+def test_publish_retries_transient_ready_rename(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _config(tmp_path)
+    images = tmp_path / "images"
+    images.mkdir()
+    (images / "001.png").write_bytes(b"image")
+    real_replace = capture_package.os.replace
+    attempts = 0
+
+    def transient_replace(source, target):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise PermissionError(5, "access denied")
+        real_replace(source, target)
+
+    monkeypatch.setattr(capture_package.os, "replace", transient_replace)
+    monkeypatch.setattr(capture_package.time, "sleep", lambda _seconds: None)
+
+    ready = capture_agent._publish_package(config, _job(), images)
+
+    assert attempts == 3
+    assert ready.is_dir()
     assert not (config.inbox / f"{_job()['id']}.partial").exists()

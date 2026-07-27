@@ -68,6 +68,7 @@ class ControllerConfig:
     control_search_depth: int = 30
     control_timeout_seconds: float = 10.0
     screen_transition_seconds: float = 2.0
+    foreground_timeout_seconds: float = 2.0
     download_timeout_seconds: float = 1800.0
     download_poll_seconds: float = 2.0
     download_stable_checks: int = 3
