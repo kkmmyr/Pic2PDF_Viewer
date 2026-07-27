@@ -59,7 +59,9 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
   対象ページのSQLite `chunks`とLanceDBベクトルだけを再生成する。他ページのchunk IDと
   embeddingは保持する。FTS5はexternal-contentテーブルから古い語を確実に除くため
   `pages_fts`全体を`rebuild`するが、embedding計算は対象ページに限定する。運用時は
-  `build_novel_db.py --book "<書籍名>" --page <画面番号>`から実行する。
+  `build_novel_db.py --book "<書籍名>" --page <画面番号>`から実行する。2026-07-28の
+  本番6ページ再構築では、全件で対象外ページのchunk件数・ID合計が不変で、
+  書籍全体のchunk総数も再構築前後で一致した。
 - **ページ単位再構築の失敗安全性**: 新本文のチャンク分割とembeddingを変更前に完了し、
   旧LanceDB行を退避してから更新する。更新開始時に`books.indexed_at=NULL`を確定して
   不完全状態を可視化する。SQLiteまたはLanceDB更新に失敗した場合はSQLiteをrollbackし、
