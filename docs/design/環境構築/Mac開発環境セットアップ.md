@@ -1,10 +1,13 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-07-27
+> status: living | last-verified: 2026-07-28
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
-> **前提**: アプリの本番運用（NSSM サービス・Linux デプロイ）は Windows / Linux で行う。Mac は開発専用。
+> **前提**: アプリの本番運用（NSSM サービス・Linux デプロイ）は Windows / Linux で行う。
+> Macは現在も開発専用であり、ローカルLLM推論ホストとしての利用は
+> [MacローカルLLM移行・比較計画](../../log/計画/MacローカルLLM移行・比較計画.md)の
+> 受入完了後に限る。
 
 ---
 
@@ -132,6 +135,23 @@ OCR を実行しないか、既存の Windows OCR agent / 推論サーバーを�
 ### Linux 同期 / NSSM サービス
 
 `LINUX_SYNC_ENABLED` はデフォルト無効。`setup_service.bat` / NSSM は Windows 専用のため Mac では使用しない。
+
+---
+
+## 将来のローカルLLM推論ホスト利用
+
+M1 Max 64GBを小説RAGのLLM推論ホストとして使う案は計画中であり、
+現時点の本番構成ではない。採否は、現行Qwen3.6-35B-A3B、Qwen3.6-27B Dense、
+Gemma 4-31Bを同じ10巻入力で比較して決める。
+
+- Macから本番DBを直接開かない。
+- 推論APIをLANへ無認証公開しない。Linux本番へのSSH reverse tunnelを使う。
+- 比較中の生成物は公開せず、監査スナップショットと全文差分を保存する。
+- Mac停止やモデル不採用時はWindowsの現行推論環境へ戻す。
+- Kindle撮影、OCR、検索索引構築はMac移行と独立して継続する。
+
+環境構築、モデル候補、固定評価、受入条件、段階導入は
+[MacローカルLLM移行・比較計画](../../log/計画/MacローカルLLM移行・比較計画.md)を正本とする。
 
 ---
 
