@@ -55,18 +55,24 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 - **チャンク分割（`chunker.chunk_page`）**: 全文 ≤ 800 字なら 1 チャンク。超える場合は末尾 100 字以内の句点境界（`。」!?`）優先で切り、50 字オーバーラップ。`char_count < 30` のページ（章扉・ヘッダのみ）はスキップ。
 - **embedding（`embedder.embed_batch`）**: Ollama `/api/embed`（httpx）で bge-m3（1024 次元）。builder は 16 件バッチ。`options.num_gpu` に `NOVEL_DB_EMBED_NUM_GPU`（既定 CPU）を渡し llama-server に VRAM を譲る。次元・件数不一致は `EmbeddingError`。
 - **保存**: 既存 chunks を LanceDB（`chunk_id IN (...)`）と SQLite の両方から削除 → `chunk_page` の結果を `chunks` に INSERT、embedding を LanceDB に `add`（本文・page_no・char_count・page_count を同梱）。完了時に `books.indexed_at` を更新。progress_callback で `embedding done/total` を通知。
-- **ページ単位再構築（`rebuild_page_from_pages`）**: 画像照合後に1ページだけ本文を補正した場合、
+- **ページ単位再構築（`page_index_builder.rebuild_page_from_pages`）**:
+  画像照合後に1ページだけ本文を補正した場合、
   対象ページのSQLite `chunks`とLanceDBベクトルだけを再生成する。他ページのchunk IDと
   embeddingは保持する。FTS5はexternal-contentテーブルから古い語を確実に除くため
   `pages_fts`全体を`rebuild`するが、embedding計算は対象ページに限定する。運用時は
   `build_novel_db.py --book "<書籍名>" --page <画面番号>`から実行する。2026-07-28の
   本番6ページ再構築では、全件で対象外ページのchunk件数・ID合計が不変で、
   書籍全体のchunk総数も再構築前後で一致した。
+- **入力の責務**: ページ単位再構築は`pages.full_text`、`char_count`、
+  `index_eligible`を変更しない。OCR runの承認・画像照合補正を先に完了し、公開済み
+  `pages`を正本として索引だけを同期する。`page_no`は紙面ページではなくキャプチャ画面番号。
 - **ページ単位再構築の失敗安全性**: 新本文のチャンク分割とembeddingを変更前に完了し、
   旧LanceDB行を退避してから更新する。更新開始時に`books.indexed_at=NULL`を確定して
   不完全状態を可視化する。SQLiteまたはLanceDB更新に失敗した場合はSQLiteをrollbackし、
   追加したLanceDB行を削除して退避行を復元する。復元の成否にかかわらず
   `indexed_at`はNULLのままとし、通常の書籍単位`rebuild_from_pages`を復旧手段とする。
+  更新前から対象chunk IDのSQLite件数とLanceDB件数が一致しない場合は変更せず中止し、
+  ページ単位処理で不整合を上書きせず書籍単位再構築へフォールバックする。
 - **クロスページ実験 `chunk_book`**: 全ページ連結 + bisect で page_id 解決する実験実装（1200 字 / overlap 120）。本番未採用、`eval_chunk_strategy.py` 用に残置（判断経緯は [設計過程](../../../archive/小説RAG_設計過程.md)）。
 
 ## 4. ステップ 3: 書籍サマリ + キャラクター辞典（`full_builder` + `summarizer`）

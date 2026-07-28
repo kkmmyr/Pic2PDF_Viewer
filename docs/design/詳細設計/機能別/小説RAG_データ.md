@@ -1,8 +1,8 @@
 # 小説 RAG データ設計（スキーマ・環境変数・API・レイアウト）
 
-> status: living | last-verified: 2026-07-26
+> status: living | last-verified: 2026-07-28
 
-小説 RAG（novel_db）サブシステムの横断的な事実の正本。DB スキーマ / 環境変数 / ディレクトリレイアウト / API エンドポイント一覧 / LLM backend・port を 1 箇所に集約する。個別処理の設計は パイプライン設計（`小説RAG_パイプライン設計.md`）・検索QA設計（`小説RAG_検索QA設計.md`）を参照（※これら2文書は同 G4 で作成予定。作成後にリンク化する）。
+小説 RAG（novel_db）サブシステムの横断的な事実の正本。DB スキーマ / 環境変数 / ディレクトリレイアウト / API エンドポイント一覧 / LLM backend・port を 1 箇所に集約する。個別処理の設計は [パイプライン設計](小説RAG_パイプライン設計.md)・[検索QA設計](小説RAG_検索QA設計.md)を参照。
 
 本書は「現在の事実」だけを記載する。モデル選定の経緯・ベンチマークは `docs/log/技術知見/小説RAG_技術知見.md` を参照。
 
@@ -45,6 +45,14 @@
 - `pages.index_eligible=1`は`page_type=narrative`だけである。非本文ページは正本ページとして保持するが、FTS検索、chunk、Embedding、full-book入力、サマリ・人物抽出から除外する。検索・QA本文取得はこの値を正本とし、文字数や先頭・末尾位置で短い本文を再除外しない。
 - 非本文ページの`pages.full_text`は空文字とし、画像だけを公開正本に残す。機械OCR候補は`ocr_page_results`に監査用として保持し、検索索引へ混入させない。
 - `ocr_page_results.layout_type`は意味上のページ種別とは独立したOCR選択軸である。`primary_text` / `external_text`は機械候補、`corrected_text`は原画像照合済み補正、`selected_engine`は公開時の採用元を表す。
+- `ocr_runs`は履歴を削除せず保持するため、公開監査で`completed + approved`の全runを
+  そのまま数えてはならない。現在公開中runは`ocr_publication.list_current_published_runs()`を
+  正本とし、書籍ごとに`COALESCE(qa_reviewed_at, finished_at, started_at)`降順、
+  同時刻は`id`降順の先頭1件を採用する。未承認runと同一書籍の旧承認runは履歴監査には
+  残すが、公開本文の品質集計から除外する。
+- 公開候補本文の解決は`ocr_publication.resolve_selected_text()`を正本とする。
+  `selected_engine=primary / external / codex`に応じて候補を選び、未採用候補の反復を
+  公開本文の異常として扱わない。
 
 ### 1.2 LanceDB テーブル（`novel.lancedb`）
 
@@ -56,6 +64,9 @@
 | `summaries` | `book_id:int64`, `book_name:utf8`, `embedding:list<float32>[1024]` | 書籍サマリのベクトル（scope=all の書籍選定） |
 
 - `chunks.chunk_id` は SQLite `chunks.id` と対応（LanceDB 側は本文とベクトルのみ保持、リレーショナル情報は SQLite が正）。
+- `books.indexed_at IS NULL`は「未構築」だけでなく、SQLiteとLanceDBをまたぐ更新が
+  完了しなかった可能性を示す不完全状態でもある。この状態では検索品質を保証せず、
+  書籍単位再構築で両ストアを収束させる。
 - ANN インデックス（IVF_PQ, `num_partitions=256`, `num_sub_vectors=64`）はチャンク数 > **50,000** で `maybe_create_index()` が自動構築する。それ未満はフルスキャン KNN。
 
 ---
