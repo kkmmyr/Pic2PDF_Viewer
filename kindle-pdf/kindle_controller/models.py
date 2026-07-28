@@ -120,7 +120,10 @@ def footer_indicates_cover(source: str, footer_name: str | None) -> bool:
     if progress != 0:
         return False
     if source == "novel":
-        return location == 1
+        # Kindle may clamp a requested location 1 to the first renderable
+        # cover location. A real book reported Location 4 while showing its
+        # cover, so keep the accepted range deliberately narrow.
+        return 1 <= location <= 4
     return location in {1, 2}
 
 

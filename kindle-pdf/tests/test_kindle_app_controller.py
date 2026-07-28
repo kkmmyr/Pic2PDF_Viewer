@@ -527,7 +527,10 @@ def test_go_to_start_fails_without_sequential_page_scan(
     ("source", "footer_name", "expected"),
     [
         ("novel", "Location 1 of 3304  • 0%", True),
-        ("novel", "Location 2 of 3304  • 0%", False),
+        ("novel", "Location 2 of 3304  • 0%", True),
+        ("novel", "Location 4 of 4006  • 0%", True),
+        ("novel", "Location 5 of 4006  • 0%", False),
+        ("novel", "Location 4 of 4006  • 1%", False),
         ("novel", "ページ1/233  • 0%", True),
         ("novel", "ページ2/233  • 0%", False),
         ("comic", "Location 1 of 169  • 0%", True),
@@ -549,6 +552,7 @@ def test_footer_start_detection_is_source_specific(
     ("source", "footer_name", "expected_presses"),
     [
         ("novel", "Location 1 of 3304  • 0%", []),
+        ("novel", "Location 4 of 4006  • 0%", []),
         ("novel", "ページ1/233  • 0%", ["right"]),
         ("comic", "Location 2 of 169  • 0%", []),
     ],
