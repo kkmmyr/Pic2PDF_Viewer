@@ -119,7 +119,8 @@ def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
 def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book):
     with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = [
-            "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。\n[CHARACTER_FACT:主人公]\n- [page 3] 事件を解決した。",
+            "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。",
+            "[CHARACTER_FACT:主人公]\n- [page 3] 事件を解決した。",
             "主人公が事件を解決した。",
             "主人公は事件の原因を調べ、問題を解決した。",
         ]
@@ -131,11 +132,12 @@ def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book):
                 body_page_margin=2,
             )
     assert summary == "主人公は事件の原因を調べ、問題を解決した。"
-    assert mock_ask.call_count == 3
+    assert mock_ask.call_count == 4
     prompts = [call.args[0] for call in mock_ask.call_args_list]
     assert "[page 3]" in prompts[0]
-    assert "ページ根拠付きで抽出した事実" in prompts[1]
-    assert "意味を変えずに読みやすい完成文" in prompts[2]
+    assert "主要人物ごとの事実へ再編" in prompts[1]
+    assert "ページ根拠付きで抽出した事実" in prompts[2]
+    assert "意味を変えずに読みやすい完成文" in prompts[3]
 
 
 def test_summarize_book_long_input_extracts_every_page_block(tmp_data_dir):
@@ -156,11 +158,13 @@ def test_summarize_book_long_input_extracts_every_page_block(tmp_data_dir):
             )
         conn.commit()
 
-    fact_response = "[BOOK_FACTS]\n- [page 6] 出来事が進んだ。\n[CHARACTER_FACT:主人公]\n- [page 6] 主人公が行動した。"
+    fact_response = "[BOOK_FACTS]\n- [page 6] 出来事が進んだ。"
 
     def fake_ask(prompt, **_kwargs):
-        if "完成したあらすじや人物紹介を書く前の材料" in prompt:
+        if "完成したあらすじを書く前の材料" in prompt:
             return fact_response
+        if "主要人物ごとの事実へ再編" in prompt:
+            return "[CHARACTER_FACT:主人公]\n- [page 6] 主人公が行動した。"
         if "ページ根拠付きで抽出した事実" in prompt:
             return "長編の初稿。"
         return "長編の最終要約。"
@@ -178,7 +182,7 @@ def test_summarize_book_long_input_extracts_every_page_block(tmp_data_dir):
             )
     assert summary == "長編の最終要約。"
     extraction_prompts = [
-        call.args[0] for call in mock_ask.call_args_list if "完成したあらすじや人物紹介を書く前の材料" in call.args[0]
+        call.args[0] for call in mock_ask.call_args_list if "完成したあらすじを書く前の材料" in call.args[0]
     ]
     assert len(extraction_prompts) >= 2
     combined_prompts = "\n".join(extraction_prompts)
@@ -222,7 +226,7 @@ def test_summary_and_characters_are_written_and_edited_separately(db_with_book):
         conn.commit()
 
     responses = [
-        "[BOOK_FACTS]\n- [page 3] レティが事件を解決した。\n"
+        "[BOOK_FACTS]\n- [page 3] レティが事件を解決した。",
         "[CHARACTER_FACT:レティ]\n- [page 3] レティは主人公で、友人を助けた。",
         "レティが事件を解決した。",
         "レティは事件を調査し、友人を助けて解決へ導いた。",

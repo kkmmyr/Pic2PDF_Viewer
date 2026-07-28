@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from ._llm_backend import QWEN_BACKEND
 from ._prompts import (
+    CHARACTER_FACT_EXTRACTION_PROMPT,
     FACT_CHUNK_MAX_CHARS,
     FACT_EXTRACTION_OPTIONS,
     FACT_EXTRACTION_PROMPT,
@@ -54,14 +55,31 @@ def extract_fact_sheet(
             part_count=len(chunks),
             text=format_page_blocks(chunk),
         )
-        response = QWEN_BACKEND.ask(
+        book_response = QWEN_BACKEND.ask(
             prompt,
             model=model,
             options=FACT_EXTRACTION_OPTIONS,
         ).strip()
-        sheet = parse_fact_sheet(response)
-        if not sheet.book_facts:
+        book_sheet = parse_fact_sheet(book_response)
+        if not book_sheet.book_facts:
             raise ValueError(f"fact extraction block {index} did not contain [BOOK_FACTS]")
+
+        character_prompt = CHARACTER_FACT_EXTRACTION_PROMPT.format(
+            book_name=book_name,
+            book_facts=book_sheet.book_facts,
+        )
+        character_response = QWEN_BACKEND.ask(
+            character_prompt,
+            model=model,
+            options=FACT_EXTRACTION_OPTIONS,
+        ).strip()
+        character_sheet = parse_fact_sheet(character_response)
+        if not character_sheet.character_facts:
+            raise ValueError(f"fact extraction block {index} did not contain named character facts")
+        sheet = BookFactSheet(
+            book_facts=book_sheet.book_facts,
+            character_facts=character_sheet.character_facts,
+        )
         sheets.append(sheet)
         _log(
             progress,
