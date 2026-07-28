@@ -265,8 +265,36 @@ def test_summarize_character_calls_backend_with_book_and_name():
     assert "レティ" in prompt
     assert "page 3" in prompt
     assert "page 4" in prompt
+    assert "長さや段落数は指定しません" in prompt
+    assert "重要人物は話題ごとに段落を分け" in prompt
+    assert "字程度" not in prompt
+    assert "1 段落" not in prompt
 
 
 def test_summarize_character_raises_for_empty_pages():
     with pytest.raises(ValueError, match="no pages"):
         summarize_character("book", "char", [])
+
+
+def test_summarize_character_keeps_final_occurrence_when_context_is_limited(monkeypatch):
+    pages = [(page_no, f"レティ page {page_no} " + ("本文" * 500)) for page_no in range(1, 21)]
+    monkeypatch.setattr(
+        "services.novel_db.character_summarizer._MAX_BODY_CHARS",
+        7000,
+    )
+
+    with patch(
+        "services.novel_db._llm_backend.QWEN_BACKEND.ask",
+        return_value="レティは全編を通じて変化する人物である。",
+    ) as mock_ask:
+        summarize_character(
+            "テスト本",
+            "レティ",
+            pages,
+            fact_notes="レティは終盤で決断する。",
+        )
+
+    prompt = mock_ask.call_args.args[0]
+    assert "[page 1]" in prompt
+    assert "[page 20]" in prompt
+    assert "レティは終盤で決断する。" in prompt

@@ -79,9 +79,10 @@ class TestRunCombinedStep:
 
         assert any("skip" in m for m in logs)
 
-    def test_redo_true_skips_even_with_existing(self, db_conn):
+    def test_redo_true_replaces_existing_generated_content(self, db_conn):
         """redo=True なら既存のサマリ・キャラクタがあっても実行する。"""
         book_id = _insert_book(db_conn, "mybook2", summary="古いサマリ")
+        _insert_page(db_conn, book_id, 1, "キャラは行動した。")
         db_conn.execute(
             "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
             (book_id, "キャラ", "説明", 1, 3),
@@ -89,14 +90,19 @@ class TestRunCombinedStep:
         db_conn.commit()
 
         logs = []
-        mock_summarize = MagicMock(return_value=("新サマリ", {}))
+        mock_summarize = MagicMock(return_value=("新サマリ", {"キャラ": "キャラは行動した。"}))
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
-            patch("services.novel_db.full_builder.update_book_summary"),
+            patch("services.novel_db.full_builder.index_book_summary"),
         ):
             _run_combined_step(db_conn, "mybook2", redo=True, log=logs.append)
 
         mock_summarize.assert_called_once()
+        row = db_conn.execute(
+            "SELECT summary FROM books WHERE id = ?",
+            (book_id,),
+        ).fetchone()
+        assert row[0] == "新サマリ"
 
     def test_characters_are_inserted_to_db(self, db_conn):
         """summarize_book_with_characters が返したキャラクターが DB に INSERT される。"""
@@ -108,7 +114,7 @@ class TestRunCombinedStep:
 
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
-            patch("services.novel_db.full_builder.update_book_summary"),
+            patch("services.novel_db.full_builder.index_book_summary"),
         ):
             _run_combined_step(db_conn, "charbook", redo=False, log=lambda _: None)
 
@@ -131,7 +137,7 @@ class TestRunCombinedStep:
 
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
-            patch("services.novel_db.full_builder.update_book_summary"),
+            patch("services.novel_db.full_builder.index_book_summary"),
         ):
             _run_combined_step(db_conn, "guarded-charbook", redo=False, log=logs.append)
 
@@ -162,7 +168,7 @@ class TestRunCombinedStep:
 
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
-            patch("services.novel_db.full_builder.update_book_summary"),
+            patch("services.novel_db.full_builder.index_book_summary"),
         ):
             _run_combined_step(db_conn, "derived-alias-book", redo=False, log=lambda _: None)
 
@@ -174,6 +180,38 @@ class TestRunCombinedStep:
             ("ラーナシュ・ヴァルマ", 2, 2),
             ("皓茉莉花", 2, 2),
         ]
+
+    def test_invalid_new_characters_preserve_existing_summary_and_dictionary(self, db_conn):
+        book_id = _insert_book(db_conn, "atomic-book", summary="旧サマリ")
+        _insert_page(db_conn, book_id, 1, "既存人物は登場する。")
+        db_conn.execute(
+            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
+            (book_id, "既存人物", "旧人物説明", 1, 1),
+        )
+        db_conn.commit()
+
+        with patch(
+            "services.novel_db.full_builder.summarize_book_with_characters",
+            return_value=("新サマリ", {"幻の人物": "本文に根拠がない。"}),
+        ):
+            with pytest.raises(ValueError, match="existing generated content was preserved"):
+                _run_combined_step(
+                    db_conn,
+                    "atomic-book",
+                    redo=True,
+                    log=lambda _: None,
+                )
+
+        summary = db_conn.execute(
+            "SELECT summary FROM books WHERE id = ?",
+            (book_id,),
+        ).fetchone()[0]
+        characters = db_conn.execute(
+            "SELECT name, summary FROM book_characters WHERE book_id = ?",
+            (book_id,),
+        ).fetchall()
+        assert summary == "旧サマリ"
+        assert [tuple(row) for row in characters] == [("既存人物", "旧人物説明")]
 
 
 class TestRunGenerateContexts:

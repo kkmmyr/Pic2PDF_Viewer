@@ -3,7 +3,7 @@
 Qwen 呼び出し（`ask`）はモックする。本テストは:
 - _chunk_for_map: チャンク分割ロジックの境界
 - _load_body_text: フィルタ（min_chars / body_page_margin）の挙動
-- summarize_book: map / reduce 切替と LLM 呼び出し回数
+- summarize_book: 事実抽出 → 執筆 → 編集の呼び出し順
 - update_book_summary / load_summaries_for_books: DB 入出力
 を確認する。
 """
@@ -13,6 +13,11 @@ from unittest.mock import patch
 import pytest
 
 from services.novel_db import with_db
+from services.novel_db._prompts import parse_combined_output
+from services.novel_db.generation_quality import (
+    choose_publishable_prose,
+    select_pages_across_book,
+)
 from services.novel_db.lance_store import get_summaries_table
 from services.novel_db.migrations import upgrade_head
 from services.novel_db.summarizer import (
@@ -20,6 +25,7 @@ from services.novel_db.summarizer import (
     _load_body_text,
     load_summaries_for_books,
     summarize_book,
+    summarize_book_with_characters,
     update_book_summary,
 )
 
@@ -109,10 +115,13 @@ def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
 # ---------------------------------------------------------------------------
 
 
-def test_summarize_book_one_shot_for_short_book(db_with_book):
-    """単一チャンクで収まる本では _BACKEND.ask() が 1 回だけ呼ばれる。"""
+def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book):
     with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
-        mock_ask.return_value = "  これは要約です。  "
+        mock_ask.side_effect = [
+            "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。\n[CHARACTER_FACT:主人公]\n- [page 3] 事件を解決した。",
+            "主人公が事件を解決した。",
+            "主人公は事件の原因を調べ、問題を解決した。",
+        ]
         with with_db() as conn:
             summary = summarize_book(
                 conn,
@@ -120,12 +129,15 @@ def test_summarize_book_one_shot_for_short_book(db_with_book):
                 min_chars=100,
                 body_page_margin=2,
             )
-    assert summary == "これは要約です。"
-    assert mock_ask.call_count == 1
+    assert summary == "主人公は事件の原因を調べ、問題を解決した。"
+    assert mock_ask.call_count == 3
+    prompts = [call.args[0] for call in mock_ask.call_args_list]
+    assert "[page 3]" in prompts[0]
+    assert "ページ根拠付きで抽出した事実" in prompts[1]
+    assert "意味を変えずに読みやすい完成文" in prompts[2]
 
 
-def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
-    """長い本では map（チャンク数）+ reduce（1 回）が呼ばれる。"""
+def test_summarize_book_long_input_extracts_every_page_block(tmp_data_dir):
     upgrade_head()
     with with_db() as conn:
         cur = conn.execute(
@@ -143,8 +155,19 @@ def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
             )
         conn.commit()
 
-    with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
-        mock_ask.side_effect = [f"map-{i}" for i in range(8)] + ["最終要約"]
+    fact_response = "[BOOK_FACTS]\n- [page 6] 出来事が進んだ。\n[CHARACTER_FACT:主人公]\n- [page 6] 主人公が行動した。"
+
+    def fake_ask(prompt, **_kwargs):
+        if "完成したあらすじや人物紹介を書く前の材料" in prompt:
+            return fact_response
+        if "ページ根拠付きで抽出した事実" in prompt:
+            return "長編の初稿。"
+        return "長編の最終要約。"
+
+    with patch(
+        "services.novel_db._llm_backend.QWEN_BACKEND.ask",
+        side_effect=fake_ask,
+    ) as mock_ask:
         with with_db() as conn:
             summary = summarize_book(
                 conn,
@@ -152,9 +175,14 @@ def test_summarize_book_map_reduce_for_long_book(tmp_data_dir):
                 min_chars=100,
                 body_page_margin=5,
             )
-    assert summary == "最終要約"
-    # map（最大 8 チャンク）+ reduce（1 回）
-    assert mock_ask.call_count >= 2  # 少なくとも map 1 + reduce 1
+    assert summary == "長編の最終要約。"
+    extraction_prompts = [
+        call.args[0] for call in mock_ask.call_args_list if "完成したあらすじや人物紹介を書く前の材料" in call.args[0]
+    ]
+    assert len(extraction_prompts) >= 2
+    combined_prompts = "\n".join(extraction_prompts)
+    assert "[page 6]" in combined_prompts
+    assert "[page 55]" in combined_prompts
 
 
 def test_summarize_book_raises_for_missing_book(tmp_data_dir):
@@ -182,6 +210,89 @@ def test_summarize_book_raises_for_empty_body(tmp_data_dir):
 
         with pytest.raises(ValueError, match="no body content"):
             summarize_book(conn, "empty-book")
+
+
+def test_summary_and_characters_are_written_and_edited_separately(db_with_book):
+    with with_db() as conn:
+        conn.execute(
+            "UPDATE pages SET full_text = ?, char_count = ? WHERE book_id = ? AND page_no = 3",
+            ("レティは事件を調査し、友人を助けた。", 1000, db_with_book),
+        )
+        conn.commit()
+
+    responses = [
+        "[BOOK_FACTS]\n- [page 3] レティが事件を解決した。\n"
+        "[CHARACTER_FACT:レティ]\n- [page 3] レティは主人公で、友人を助けた。",
+        "レティが事件を解決した。",
+        "レティは事件を調査し、友人を助けて解決へ導いた。",
+        "レティは主人公である。",
+        "レティは主人公として事件を調査し、友人を助けた。",
+    ]
+    with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
+        mock_ask.side_effect = responses
+        with with_db() as conn:
+            summary, characters = summarize_book_with_characters(
+                conn,
+                "test-book",
+                min_chars=100,
+                body_page_margin=2,
+            )
+
+    assert summary == "レティは事件を調査し、友人を助けて解決へ導いた。"
+    assert characters == {"レティ": "レティは主人公として事件を調査し、友人を助けた。"}
+    prompts = [call.args[0] for call in mock_ask.call_args_list]
+    assert any("事実抽出工程の人物メモ" in prompt for prompt in prompts)
+    assert any("人物説明の初稿" in prompt for prompt in prompts)
+
+
+def test_parse_combined_output_preserves_full_unmarked_summary():
+    long_summary = "因果関係を省略しない説明。" * 300
+    summary, characters = parse_combined_output(
+        f"{long_summary}\n[CHARACTERS]\nレティ\n[CHARACTER_DETAIL:レティ]\n人物像",
+    )
+
+    assert len(summary) > 3000
+    assert summary == long_summary
+    assert characters == {"レティ": "人物像"}
+
+
+def test_generation_rejects_fact_output_without_book_facts(db_with_book):
+    response = """[CHARACTER_FACT:レティ]
+- [page 3] 人物事実だけが返された。"""
+    with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
+        mock_ask.return_value = response
+        with with_db() as conn:
+            with pytest.raises(ValueError, match=r"did not contain \[BOOK_FACTS\]"):
+                summarize_book_with_characters(
+                    conn,
+                    "test-book",
+                    min_chars=100,
+                    body_page_margin=2,
+                )
+
+
+def test_character_evidence_selection_keeps_first_and_final_occurrence():
+    pages = [(page_no, str(page_no) * 1000) for page_no in range(1, 21)]
+    selected = select_pages_across_book(pages, max_chars=6500, coverage_bins=5)
+
+    selected_page_nos = [page_no for page_no, _ in selected]
+    assert selected_page_nos[0] == 1
+    assert selected_page_nos[-1] == 20
+    assert any(5 <= page_no <= 16 for page_no in selected_page_nos)
+
+
+def test_character_evidence_selection_fails_instead_of_dropping_final_page():
+    pages = [(1, "a" * 6000), (2, "b" * 100), (3, "c" * 3000)]
+
+    with pytest.raises(ValueError, match="first and final"):
+        select_pages_across_book(pages, max_chars=8000)
+
+
+def test_editor_failure_falls_back_to_valid_draft():
+    draft = "レティは主人公として事件を調査した。"
+    edited = "[SUMMARY]\nレティは主人公である。"
+
+    assert choose_publishable_prose(draft, edited, required_subject="レティ") == draft
 
 
 def test_update_and_load_summary_roundtrip(db_with_book):

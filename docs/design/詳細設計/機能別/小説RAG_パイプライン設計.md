@@ -20,7 +20,7 @@ images/*.png ──[ocr]──────────► pages.full_text (+ pag
       │                              ▼
       │           [rebuild]  chunks + LanceDB chunks(embedding)        … builder.rebuild_from_pages
       │                              │
-      │        [full_build] ────────┤ books.summary + book_characters  … full_builder（Qwen 1 回で一括）
+      │        [full_build] ────────┤ books.summary + book_characters  … full_builder（事実抽出→個別執筆→校正）
       │                              │
       │  [generate_contexts] ───────┤ chunks.contextual_text + 再embed  … full_builder.build_book_contexts
       │                              │
@@ -77,17 +77,35 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 
 ## 4. ステップ 3: 書籍サマリ + キャラクター辞典（`full_builder` + `summarizer`）
 
-`full_builder.build_book_full()` が Qwen で一括生成する。**サマリとキャラ辞典は 1 回の Qwen 呼び出しで同時生成**する（旧 5 段構成から統合、`summarize_book_with_characters`）。
+`full_builder.build_book_full()`は、本文から完成文を一度に生成せず、**事実抽出 → 要約・人物の個別執筆 → 編集校正 → 品質ゲート → 一括確定**の順で処理する。処理時間より、本文根拠の維持、後半の変化の取りこぼし防止、読みやすい日本語を優先する。
 
-LLM呼び出しごとのtemperature・出力長・context長は用途別定数として各機能側に残す。一方、Ollama互換options辞書のキー組み立ては `llm_options.make_llm_options()` に集約し、キー名の表記揺れや型なし辞書の複製を避ける。
+LLM呼び出しごとのtemperature・出力長・context長は用途別定数として各機能側に残す。一方、Ollama互換options辞書のキー組み立ては`llm_options.make_llm_options()`に集約し、キー名の表記揺れや型なし辞書の複製を避ける。
 
 - **Step 1**: `rebuild_from_pages`（§3、常実行）。
-- **Step 2 `_run_combined_step`**: `summarize_book_with_characters(conn, book_name)` が `_prompts.COMBINED_PROMPT`（`[SUMMARY]` / `[CHARACTERS]` / `[CHARACTER_DETAIL:名前]` マーカー）で **書籍サマリ 1 本 + 最大 20 キャラの人物像**を得る。`parse_combined_output` でマーカー分解。`update_book_summary` が `books.summary` を更新し LanceDB `summaries` テーブルへ embedding を upsert（B-8）。キャラ分は`character_names.normalize_character_entries`で敬称・皇子等の肩書を除き、同じ正規名を統合する。匿名役職だけの項目と、当該巻の索引本文に正規名・元表記のどちらも存在しない項目は保存しない。漢字3〜5字名の姓を除いた表記、外国人名の先頭構成名は、2ページ以上で一致した場合だけ補助根拠にできる。根拠ページ一致から`first_page`/`page_count`を計算して`book_characters`を書き直す。2026-07-28の茉莉花官吏伝18巻dry-runでは既存169人物を全件維持し、根拠なし保存は0件だった。
-- **skip 条件**: `books.summary` と `book_characters.summary` が両方存在 かつ `redo=False` なら Step 2 全体をスキップ。
-- **本文入力（`_load_body_text`）**: `char_count >= NOVEL_DB_MIN_BODY_CHARS` かつ先頭/末尾 `NOVEL_DB_BODY_PAGE_MARGIN` ページを除いた本文をページ順連結。
-- **サイズ分岐（`summarizer`）**: 本文 ≤ `ONE_SHOT_MAX_BODY_CHARS`(200,000) は 1-shot（`num_ctx=131072`）。超過時は combined を諦めサマリのみ map-reduce（20,000 字 × 最大 8 チャンク → reduce）で生成し、キャラ辞典は空。
+- **Step 2a 事実抽出**: `summarizer`が採用本文を`[page N]`付きでQwenへ渡し、出来事の発端・行動・理由・結果・関係変化と、人物ごとの立場・行動・変化をマーカー形式の事実表として抽出する。本文が技術上限を超える場合だけページ境界で複数ブロックへ分け、各ブロックの事実表を後段へすべて渡す。事実抽出では完成した紹介文を書かせない。
+- **Step 2b 要約執筆**: 書籍要約は事実表だけから独立生成する。中心人物、因果、時系列、対立、転機、結果、関係変化、巻の意味を自然な複数段落へ編集する。
+- **Step 2c 人物別執筆**: 事実表の人物名を`character_names.normalize_character_entries`で正規化し、本文に根拠がある人物を登場ページ数順で最大20名選ぶ。人物ごとに関連ページと事実メモを渡し、他人物と混在させず個別に説明を生成する。
+- **全巻を覆う人物入力**: 関連本文が入力上限を超える場合、先頭からの単純切り捨ては禁止する。初出と最終出現を必ず含め、全登場範囲を時間帯に分けて各区間から情報量の多いページを選び、その後に残容量を埋める。終盤の選択や関係変化を入力から落とさない。
+- **Step 2d 編集校正**: 書籍要約と人物説明を別の編集プロンプトへ渡し、主語不明、因果の飛躍、曖昧な代名詞、電文調、重複、名詞句の連結を修正する。校正は事実表にない設定や心理を追加してはならない。校正版が品質ゲートを通らない場合は、合格している初稿へ戻す。
+- **品質ゲート**: 空出力、生成マーカーやコードフェンスの混入、同一文・同一段落の反復、人物名を一度も明示しない人物説明を不合格にする。人物は本文一致ページが1件以上必要で、保守的な短縮別名は2ページ以上一致した場合だけ根拠に使う。
+- **一括確定**: 要約と全人物説明をメモリ上で完成・検査してから、`books.summary`と`book_characters`を単一SQLiteトランザクションで置換する。いずれかの人物生成・校正・検査が失敗した場合はDBを書き換えず、既存公開版を維持する。コミット後にLanceDBのサマリembeddingを更新し、失敗時は従来どおりSQLite本文を正として次回再実行する。
+- **skip 条件**: `books.summary`と`book_characters.summary`が両方存在し、かつ`redo=False`ならStep 2全体をスキップする。
+- **本文入力**: `char_count >= NOVEL_DB_MIN_BODY_CHARS`かつ先頭/末尾`NOVEL_DB_BODY_PAGE_MARGIN`ページを除いた`index_eligible=1`本文を、ページ番号付きでページ順に使用する。
+- **生成文の品質方針**: 書籍サマリ、分割要約、人物像には目標文字数や
+  1段落固定を設けない。`num_predict`はLLM暴走防止とcontext保護の技術上限であり、
+  文章をその長さへ縮める要件ではない。必要情報を過不足なく伝え、主語・因果・
+  時系列・人物関係を省略しない自然な日本語を優先する。
+- **書籍サマリの受入条件**: 中心人物、発端、主要な対立と出来事、転機、結果、
+  関係性の変化、巻のテーマまたはシリーズ上の意味が、未読の内部事情を知らない
+  読者にも流れとして理解できる。場面羅列、名詞句の連結、文字数合わせの圧縮を
+  避け、話題の切れ目では段落を分ける。
+- **人物像の受入条件**: 「誰で、どの立場にあり、誰とどう関係するか」を最初に
+  明示し、この巻での主要な行動・選択、その理由や心情、関係の変化、物語上の役割を
+  根拠本文の範囲で説明する。登場量が少ない人物は情報を水増しせず、重要人物は
+  必要に応じて複数段落で説明する。曖昧な代名詞、電文調、根拠のない補完を避ける。
+- **不完全出力の扱い**: 事実表の書籍事実または人物事実を識別できない、完成文を品質ゲートへ通せない場合はエラーにして再実行する。不完全な生成物の一部だけを保存しない。
 
-補足: `character_summarizer.summarize_character`（1 キャラ × 1 冊を単独 Qwen 生成、body ≤ 80,000 字 / `num_ctx=65536`）と `character_db`（`book_characters` の集計・CRUD）は、`pages.main_characters` を材料にした**単独 B-15 経路**（CLI `build_character_summaries.py`）。full_build は上記の combined 経路を使うため、この単独経路とは独立に併存する。
+補足: `character_summarizer.summarize_character`は、1キャラ×1冊の個別執筆と全巻範囲入力選択を担い、full buildとCLI `build_character_summaries.py`から共用する。`character_db`は`book_characters`の集計・CRUDを担う。
 
 ## 5. ステップ 4: チャンク文脈生成（`full_builder.build_book_contexts` + `contextualizer`）B-9
 

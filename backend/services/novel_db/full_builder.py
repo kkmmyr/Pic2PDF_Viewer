@@ -2,8 +2,8 @@
 
 処理ステップ:
   1. rebuild_from_pages  — チャンク分割 + embedding 再構築（常実行）
-  2. summarize_and_characters — 書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成
-                                （redo=False かつ summary・book_characters 両方存在でスキップ）
+  2. summarize_and_characters — 事実抽出後に書籍サマリと人物辞典を個別生成・校正し、
+                                全件合格後に一括確定
   3. generate_contexts   — チャンク位置説明生成 + 再 embedding（redo=False かつ contextual_text 存在でスキップ）
 
 詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §4・§7。
@@ -22,7 +22,7 @@ from .connection import with_db
 from .contextualizer import generate_chunk_context, make_embedding_input
 from .embedder import embed_batch
 from .lance_store import get_chunks_table
-from .summarizer import summarize_book_with_characters, update_book_summary
+from .summarizer import index_book_summary, summarize_book_with_characters
 
 logger = get_logger(__name__)
 
@@ -65,7 +65,7 @@ def build_book_full(
     with with_db() as conn:
         rebuild_from_pages(conn, book_name, progress_callback=_rebuild_progress)
 
-    # ステップ 2: 書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成
+    # ステップ 2: 事実抽出 → 要約/人物個別生成 → 校正 → 一括確定
     _log("step 2/2: summarize_book + characters")
     with with_db() as conn:
         _run_combined_step(conn, book_name, redo=redo, log=_log, detail=_detail)
@@ -114,7 +114,7 @@ def _run_combined_step(
     log: StepCallback,
     detail: StepCallback | None = None,
 ) -> None:
-    """書籍サマリ + キャラクター辞典を Qwen 1 回で一括生成して DB に保存する。"""
+    """Generate all prose first, then atomically replace published SQLite rows."""
     row = conn.execute("SELECT id, summary FROM books WHERE name = ?", (book_name,)).fetchone()
     if row is None:
         log("  skip: book not found in DB")
@@ -142,51 +142,81 @@ def _run_combined_step(
         logger.exception("[full_build:%s] combined_step failed", book_name)
         raise
 
-    update_book_summary(conn, book_name, summary)
+    if detail:
+        detail("生成結果を検査中")
+    prepared_characters = _prepare_character_rows(
+        conn,
+        book_id,
+        char_summaries,
+        log=log,
+    )
+    if not prepared_characters:
+        raise ValueError("no publishable characters; existing generated content was preserved")
 
-    if char_summaries:
-        if detail:
-            detail("キャラクタ抽出中")
-        entries = normalize_character_entries(char_summaries)
-        page_rows = conn.execute(
-            "SELECT page_no, full_text FROM pages WHERE book_id = ? AND index_eligible = 1 ORDER BY page_no",
-            (book_id,),
-        ).fetchall()
+    try:
+        conn.execute(
+            "UPDATE books SET summary = ?, summary_generated_at = datetime('now', '+9 hours') WHERE id = ?",
+            (summary, book_id),
+        )
         conn.execute("DELETE FROM book_characters WHERE book_id = ?", (book_id,))
-        saved_count = 0
-        for entry in entries:
-            derived_aliases = derive_character_evidence_aliases(entry.name)
-            derived_page_counts = {
-                alias: sum(alias in str(page[1] or "") for page in page_rows) for alias in derived_aliases
-            }
-            evidence_aliases = (
-                *entry.aliases,
-                *(alias for alias, count in derived_page_counts.items() if count >= 2),
-            )
-            evidence_pages = [
-                int(page[0]) for page in page_rows if any(alias in str(page[1] or "") for alias in evidence_aliases)
-            ]
-            if not evidence_pages:
-                log(f"  omit character without page evidence: {entry.name}")
-                continue
-            conn.execute(
-                """INSERT INTO book_characters
-                       (book_id, name, summary, first_page, page_count, generated_at)
-                   VALUES (?, ?, ?, ?, ?, datetime('now', '+9 hours'))""",
-                (
-                    book_id,
-                    entry.name,
-                    entry.summary,
-                    min(evidence_pages),
-                    len(evidence_pages),
-                ),
-            )
-            saved_count += 1
+        conn.executemany(
+            """INSERT INTO book_characters
+                   (book_id, name, summary, first_page, page_count, generated_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now', '+9 hours'))""",
+            [
+                (book_id, name, char_summary, first_page, page_count)
+                for name, char_summary, first_page, page_count in prepared_characters
+            ],
+        )
         conn.commit()
-    else:
-        saved_count = 0
+    except Exception:
+        conn.rollback()
+        raise
+
+    index_book_summary(conn, book_id, summary)
+    saved_count = len(prepared_characters)
 
     log(f"  done: summary={len(summary)} chars, {saved_count} characters")
+
+
+def _prepare_character_rows(
+    conn: sqlite3.Connection,
+    book_id: int,
+    char_summaries: dict[str, str],
+    *,
+    log: StepCallback,
+) -> list[tuple[str, str, int, int]]:
+    """Validate page evidence and prepare rows without mutating the database."""
+    entries = normalize_character_entries(char_summaries)
+    page_rows = conn.execute(
+        "SELECT page_no, full_text FROM pages WHERE book_id = ? AND index_eligible = 1 ORDER BY page_no",
+        (book_id,),
+    ).fetchall()
+    prepared: list[tuple[str, str, int, int]] = []
+    for entry in entries:
+        derived_aliases = derive_character_evidence_aliases(entry.name)
+        derived_page_counts = {
+            alias: sum(alias in str(page[1] or "") for page in page_rows) for alias in derived_aliases
+        }
+        evidence_aliases = (
+            *entry.aliases,
+            *(alias for alias, count in derived_page_counts.items() if count >= 2),
+        )
+        evidence_pages = [
+            int(page[0]) for page in page_rows if any(alias in str(page[1] or "") for alias in evidence_aliases)
+        ]
+        if not evidence_pages:
+            log(f"  omit character without page evidence: {entry.name}")
+            continue
+        prepared.append(
+            (
+                entry.name,
+                entry.summary,
+                min(evidence_pages),
+                len(evidence_pages),
+            )
+        )
+    return prepared
 
 
 def _run_generate_contexts(
