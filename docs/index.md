@@ -33,6 +33,9 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 | meta.db スキーマ（SQLModel / `MetaEntry`）・backend クラス設計 | [詳細設計書_バックエンド編.md](design/詳細設計/詳細設計書_バックエンド編.md) |
 | API エンドポイント一覧・リクエスト/レスポンススキーマ | FastAPI `/openapi.json`・Swagger UI `/docs`（**手書きしない**）。OpenAPI で表せない設計意図のみ [API.md](design/詳細設計/API.md) |
 | セキュリティ規約（`validate_safe_path` 等） | [セキュリティ設計書.md](design/詳細設計/セキュリティ設計書.md) |
+| 品質ゲート・baseline・例外・月次監査のルール | [品質ガードレール.md](design/詳細設計/品質ガードレール.md) |
+| 日常運用・本番デプロイの判定基準・障害対応 | [運用ガイド.md](design/環境構築/運用ガイド.md) |
+| サーバー操作のコピー用コマンド | [サーバー連携コマンド](design/環境構築/サーバー連携よく利用するコマンド.md) |
 | 小説 RAG の実機ベンチ・モデル選定・トラブルシュート | [小説RAG_技術知見.md](log/技術知見/小説RAG_技術知見.md) |
 | 小説 RAG の DB スキーマ・`NOVEL_DB_*` 環境変数・LLM backend/port・API 一覧 | [小説RAG_データ.md](design/詳細設計/機能別/小説RAG_データ.md)（構築は [パイプライン設計](design/詳細設計/機能別/小説RAG_パイプライン設計.md)、検索/QA は [検索QA設計](design/詳細設計/機能別/小説RAG_検索QA設計.md)） |
 
@@ -42,15 +45,19 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 
 ## 整合性の自動チェック（ガバナンス）
 
-`docs/**/*.md` または `mkdocs.yml` を変更するコミットは、pre-commit フック経由で `scripts/maintenance/check_docs.py` が検査する。ブロッキング違反（Rule 1/2/3/5）があるとコミットがブロックされ、Rule 4 は警告のみ：
+`docs/**/*.md`または`mkdocs.yml`を変更するコミットは、pre-commitフック経由で
+`scripts/maintenance/check_docs.py`が検査する。次のRule 1〜6はすべてblockingである。
 
 1. **リンク切れ**（ブロック） — living 文書の相対 Markdown リンクが実在ファイルを指しているか（`archive/` と週次変更履歴アーカイブの歴史的リンク切れは非ブロックの info 扱い — 過去の記録を doc 再編のたびに書き換えないため）
 2. **変更履歴の肥大化**（ブロック） — `log/変更履歴.md` が上限 800 行を超えていないか（超過時は週次ローテーションを促す）
 3. **nav 同期**（ブロック） — `mkdocs.yml` の nav ツリーが実ファイルと一致しているか（dead entry / orphan ファイルがないか）
-4. **サイズ番犬**（warn・非ブロック） — `design/` 各設計書が 800 行を超えていないか（超過はまず設計過程・歴史の混在を疑う）
+4. **サイズ上限**（ブロック） — `design/`各設計書が800行を超えていないか（超過時は設計過程・歴史の混在と責務境界を確認する）
 5. **status ヘッダ**（ブロック） — `design/` 各設計書の冒頭 10 行に `> status: living｜absorption-pending | last-verified: YYYY-MM-DD` があるか
+6. **ファイルマップ注釈**（ブロック） — 自動生成ファイルマップの「主要ファイル補足」が実在パスを参照しているか
 
-さらに CI では `mkdocs build --strict` を独立した第二のチェックとして実行し、警告をエラー扱いにしてビルド段階でも壊れたリンクや設定ミスを検出する。
+詳細な基準、baseline、例外管理は
+[品質ガードレール](design/詳細設計/品質ガードレール.md)を正本とする。
+さらにCIでは`mkdocs build --strict`を独立した第二のチェックとして実行する。
 
 ---
 
@@ -58,10 +65,10 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 
 ```powershell
 # 単発ビルド（→ frontend/public/site/ に出力）
-mkdocs build
+uv run mkdocs build --clean
 
 # 開発時プレビュー（→ http://localhost:8000）
-mkdocs serve
+uv run mkdocs serve
 ```
 
 出力先は Vite の `publicDir`（`frontend/public/site/`）。これにより以下の経路すべてで閲覧可能:
