@@ -15,11 +15,15 @@ _HONORIFIC_NAME_RE = re.compile(r"([\u3400-\u9fff々〆ヵヶ]{2,8})(?:さん|�
 _KATAKANA_TERM_RE = re.compile(r"[ァ-ヴー]{4,}")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LONG_NON_NARRATIVE_TEXT = 300
+_MIN_PRIMARY_LENGTH_FOR_CANDIDATE_COMPLETENESS = 256
+_MIN_EXTERNAL_LENGTH_ADVANTAGE = 30
+_MIN_EXTERNAL_LENGTH_RATIO = 1.02
 _CANDIDATE_AUDIT_FLAGS = frozenset({"primary_text_repetition", "external_text_repetition"})
 _MANAGED_RISK_FLAGS = frozenset(
     {
         "named_entity_candidate_disagreement",
         "page_type_text_conflict",
+        "unselected_external_candidate_more_complete",
         "primary_text_repetition",
         "external_text_repetition",
         "selected_text_repetition",
@@ -71,6 +75,18 @@ def detect_qa_risk_flags(
         external_terms = _candidate_terms(external_text)
         if _has_single_character_variant(primary_terms, external_terms):
             flags.add("named_entity_candidate_disagreement")
+
+        primary_compact = _WHITESPACE_RE.sub("", primary_text)
+        external_compact = _WHITESPACE_RE.sub("", external_text)
+        selected_compact = _WHITESPACE_RE.sub("", full_text)
+        external_advantage = len(external_compact) - len(primary_compact)
+        if (
+            selected_compact != external_compact
+            and len(primary_compact) >= _MIN_PRIMARY_LENGTH_FOR_CANDIDATE_COMPLETENESS
+            and external_advantage >= _MIN_EXTERNAL_LENGTH_ADVANTAGE
+            and len(external_compact) >= len(primary_compact) * _MIN_EXTERNAL_LENGTH_RATIO
+        ):
+            flags.add("unselected_external_candidate_more_complete")
 
     if has_suspicious_repetition(primary_text):
         flags.add("primary_text_repetition")

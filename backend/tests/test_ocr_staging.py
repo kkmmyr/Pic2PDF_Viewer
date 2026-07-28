@@ -296,6 +296,30 @@ def test_qa_risk_ignores_unpaired_candidate_omissions() -> None:
     )
 
 
+def test_qa_risk_detects_unselected_longer_external_candidate() -> None:
+    primary = "".join(f"主系で取得した通常本文の段落{index}です。" for index in range(30))
+    external = primary + "".join(f"補助候補だけが保持した縦列{index}です。" for index in range(4))
+
+    assert detect_qa_risk_flags(
+        page_type="narrative",
+        full_text=primary,
+        char_count=len(primary),
+        primary_text=primary,
+        external_text=external,
+    ) == {"unselected_external_candidate_more_complete"}
+
+    assert (
+        detect_qa_risk_flags(
+            page_type="narrative",
+            full_text=external,
+            char_count=len(external),
+            primary_text=primary,
+            external_text=external,
+        )
+        == set()
+    )
+
+
 def test_qa_risk_detects_repetition_per_candidate_and_selected_text() -> None:
     repeated = "\n".join(["茉莉花は静かに書類へ目を落とした。"] * 3)
     assert detect_qa_risk_flags(
