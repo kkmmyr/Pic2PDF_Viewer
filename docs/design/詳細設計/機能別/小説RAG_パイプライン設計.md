@@ -104,6 +104,12 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別定数�
   根拠本文の範囲で説明する。登場量が少ない人物は情報を水増しせず、重要人物は
   必要に応じて複数段落で説明する。曖昧な代名詞、電文調、根拠のない補完を避ける。
 - **不完全出力の扱い**: 事実表の書籍事実または人物事実を識別できない、完成文を品質ゲートへ通せない場合はエラーにして再実行する。不完全な生成物の一部だけを保存しない。
+- **再生成監査**: 既存公開版を`audit_generated_content.py snapshot`でJSONへ退避してから
+  再生成する。再生成後は`diff`で要約・人物集合・人物説明・生成日時・機械品質ゲートの
+  差分をJSONとMarkdownへ出力し、変更された全文をCodex補助QAの対象にする。
+  人手QAで不採用の場合は、書名の完全一致確認を必須とする`restore`でSQLiteの旧版を
+  トランザクション復元する。復元後のサマリembedding更新に失敗した場合もSQLiteを正本とし、
+  エラー終了して次回の再index対象とする。
 
 補足: `character_summarizer.summarize_character`は、1キャラ×1冊の個別執筆と全巻範囲入力選択を担い、full buildとCLI `build_character_summaries.py`から共用する。`character_db`は`book_characters`の集計・CRUDを担う。
 

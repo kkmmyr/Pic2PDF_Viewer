@@ -317,8 +317,14 @@ def index_book_summary(
     conn: sqlite3.Connection,
     book_id: int,
     summary: str,
+    *,
+    raise_on_error: bool = False,
 ) -> None:
-    """書籍サマリを bge-m3 で embedding し、LanceDB summaries テーブルに upsert する。"""
+    """書籍サマリを bge-m3 で embedding し、LanceDB summaries テーブルに upsert する。
+
+    通常ビルドではSQLite本文の確定を優先して失敗を警告に留める。復元監査など、
+    クロスストア同期を完了条件にする呼び出し元は ``raise_on_error=True`` を指定する。
+    """
     try:
         emb = embed_batch([summary])[0]
         book_name_row = conn.execute(
@@ -337,6 +343,8 @@ def index_book_summary(
             book_id,
             e,
         )
+        if raise_on_error:
+            raise
 
 
 def _log(cb: Callable[[str], None] | None, msg: str) -> None:

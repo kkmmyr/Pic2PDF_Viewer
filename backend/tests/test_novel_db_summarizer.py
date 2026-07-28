@@ -23,6 +23,7 @@ from services.novel_db.migrations import upgrade_head
 from services.novel_db.summarizer import (
     _chunk_for_map,
     _load_body_text,
+    index_book_summary,
     load_summaries_for_books,
     summarize_book,
     summarize_book_with_characters,
@@ -370,6 +371,18 @@ def test_update_book_summary_handles_embed_failure(db_with_book):
         # LanceDB summaries は空のまま
         table = get_summaries_table()
         assert table.count_rows() == 0
+
+
+def test_index_book_summary_can_make_embed_failure_blocking(db_with_book):
+    with (
+        patch(
+            "services.novel_db.summarizer.embed_batch",
+            side_effect=TimeoutError("ollama timeout"),
+        ),
+        with_db() as conn,
+        pytest.raises(TimeoutError, match="ollama timeout"),
+    ):
+        index_book_summary(conn, 1, "テスト", raise_on_error=True)
 
 
 def test_update_book_summary_replaces_existing_vector(db_with_book):
