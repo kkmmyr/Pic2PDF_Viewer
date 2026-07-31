@@ -176,6 +176,22 @@ Phase 5cではページ種別分類とレイアウト別候補選択を実装済
 完全には検出できない。シリーズ固有名詞台帳は自動置換には使わず、
 同一run・シリーズ内の表記揺れ検出とQA優先順位付けに使用する。
 
+2026-07-29〜31には4小説シリーズ46冊・5,585画面を1冊ずつ処理し、全runを
+`completed / approved`まで確定した。内訳は本文4,625画面、挿絵等801画面、
+目次59画面、奥付・広告等100画面である。Codex補正文は1,354画面へ保存した。
+この実測では、候補間の文字量差が小さい画面にも列欠落、段落欠落、同一文反復、
+隣接列混入、固有名詞誤読が残った。したがって、文字量差の閾値だけでQA対象を
+限定せず、全画面の接触シートで連続性とページ種別を確認し、疑義画面は
+原解像度画像・主系・補助系・採用本文を比較する。
+
+薬屋11〜16巻では、`corrected_text`を保存した308画面で
+`selected_engine=primary / external`のまま承認する運用ミスが発生し、
+補正文ではなく機械候補が公開された。`corrected_text`は監査用の予備欄ではなく、
+`selected_engine=codex`のときだけ公開本文として解決される。このため、
+非空の`corrected_text`を送るQA更新は`selected_engine=codex`を必須とし、
+組み合わせが不整合なら公開前に拒否する。既存の不整合runはDBバックアップ後に
+採用元と公開本文を補正文へ再同期し、FTSを再構築する。
+
 ### キャプチャ画面番号と紙面ページ番号
 
 - `ocr_page_results.page_no` / `pages.page_no` / 検索結果のページ番号は、PNGファイル名由来の**キャプチャ画面番号**を正とする。
@@ -209,6 +225,14 @@ Phase 5cではページ種別分類とレイアウト別候補選択を実装済
 - OCRの全ページ処理が終わっても、runはまず`awaiting_qa`となる。ページ種別分類、
   必須ページの画像照合・補正、run承認を終えるまで`books` / `pages` / FTSへ
   新しい本文を公開しない。
+- 既存のASINなしOCR書籍と、新規ASINへ紐付いた再撮影書籍が同一巻として
+  併存する場合は、旧画像・旧OCR・DBを先に検証付きバックアップへ退避し、
+  新ASIN版を運用上の正本とする。旧版は削除せず復旧専用の読み取り対象として保持し、
+  検索・再処理・派生データ生成の対象を指定する運用では新ASIN版だけを選ぶ。
+- 『ふつつかな悪女ではございますが』1・2巻では、旧画像316画面と`novel.db` /
+  `meta2.db`を`/opt/pic2pdf-viewer/backups/kindle-four-series-pre-ocr-20260729-0442/`
+  へ保存し、SHA-256付きmanifestとSQLite整合性検査を完了した。新ASIN版
+  `B08R5QJSZ3` / `B095YPRX3G`を正本とし、旧ASINなし版は復旧用に残す。
 - 2026-07-27の茉莉花官吏伝シリーズでは、新規撮影した小説8〜17巻の10冊だけを
   OCR対象とする。既存の1〜3巻・18巻の承認済み本文は再処理せず、今回の対象外である
   4〜7巻の未OCR状態も暗黙に巻き込まない。
@@ -247,7 +271,7 @@ Phase 5cではページ種別分類とレイアウト別候補選択を実装済
 - `ocr_agent_job_runs`: `rebuild_jobs.id`と書籍別`ocr_runs.id`を対応付け、再claim・再開時に同じrunを返す。
 - `ocr_runs.qa_state`: `pending` / `approved` / `rejected`。承認者、承認日時、QAメモを同じrunへ保存する。
 - `ocr_page_results`: ページ番号、画像SHA-256、採用本文、raw出力、品質フラグ、coverage、試行回数を `UNIQUE(run_id, page_no)` で保存する。`qa_state`は`not_required` / `required` / `approved` / `rejected`、`qa_note`と`reviewed_at`を保持する。ページ種別`page_type`は`unknown` / `narrative` / `toc` / `illustration` / `colophon_or_ad`、`index_eligible`は`narrative`だけ1とする。
-- 意味上の`page_type`とは別に、OCR選択用の`layout_type`を`unknown` / `normal_prose` / `full_width` / `mixed_illustration` / `structured` / `image_only`で保持する。Surya候補とyomitoku候補を`primary_text` / `external_text`へ保存し、`selected_engine`は`primary` / `external` / `codex`のいずれを公開正本に採用したかを記録する。Codexまたは人が原画像と照合した補正文は`corrected_text`へ保存し、機械OCRの原文を上書きしない。
+- 意味上の`page_type`とは別に、OCR選択用の`layout_type`を`unknown` / `normal_prose` / `full_width` / `mixed_illustration` / `structured` / `image_only`で保持する。Surya候補とyomitoku候補を`primary_text` / `external_text`へ保存し、`selected_engine`は`primary` / `external` / `codex`のいずれを公開正本に採用したかを記録する。Codexまたは人が原画像と照合した補正文は`corrected_text`へ保存し、機械OCRの原文を上書きしない。非空の`corrected_text`を公開に使う場合は`selected_engine=codex`を必須とし、QA APIは不整合な組み合わせを拒否する。
 - 同じ書籍・エンジン・モデル・入力ページ数で状態が `running` または `failed` のrunがある場合は、その最新runを再利用する。各 `passed` ページは、そのページ番号の画像SHA-256が現在の入力と一致する場合だけスキップする。変更されたページ、不合格ページ、未処理ページは再実行する。
 - ページ番号と画像SHAが入力manifestに一致し、全ページのOCR結果（`passed`または`failed`）が保存された場合、runを`awaiting_qa`へ進める。この時点では`books` / `pages` / `pages_fts`を更新しない。`failed`ページは必ずQA対象とし、本文なら画像照合済み補正文、非本文なら画像のみ公開の明示承認が必要である。
 - 全ページへ決定論的なページ種別候補を設定する。目次は前付け位置と複数章見出しを

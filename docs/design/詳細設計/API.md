@@ -117,7 +117,7 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
   - `GET /api/ocr/qa/runs/{run_id}`: run情報とページ番号、OCR状態、QA状態、採用本文、Surya・yomitoku候補、補正文、品質フラグ、ページ種別、レイアウト種別、採用エンジン、索引対象、画像URLを返す。
   - `GET /api/ocr/qa/runs/{run_id}/pages/{page_no}/image`: runの書籍名から登録済み画像ディレクトリ内の数値PNGだけを返す。任意パスは受け取らない。
   - `POST /api/ocr/qa/runs/{run_id}/classify-pages`: `unknown`ページだけへ決定論的な種別候補を設定し、未確定ページをQA必須にする。
-  - `PATCH /api/ocr/qa/runs/{run_id}/pages/{page_no}`: `approved`または`rejected`、確定ページ種別、確定レイアウト種別、採用エンジン、任意の画像照合済み補正文・メモを保存する。OCR失敗した本文の承認は非空補正文を必須とする。
+  - `PATCH /api/ocr/qa/runs/{run_id}/pages/{page_no}`: `approved`または`rejected`、確定ページ種別、確定レイアウト種別、採用エンジン、任意の画像照合済み補正文・メモを保存する。OCR失敗した本文の承認は非空補正文を必須とする。`corrected_text`が非空の場合は`selected_engine=codex`を必須とし、補正文を保存しても公開時に機械候補が採用される不整合な更新は`409 Conflict`で拒否する。
   - `POST /api/ocr/qa/runs/{run_id}/approve`: `required`ページの全承認、却下・未分類各0件、本文ページの有効な採用本文、全入力画像SHA一致を検証後に公開する。非本文ページは画像だけを公開し、OCR候補を検索索引へ流さない。未充足は`409 Conflict`とする。
 - **小説DB状態 API**:
   - `GET /api/novel_db/books`と`GET /api/novel_db/books/{book_name}`の

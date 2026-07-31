@@ -506,3 +506,30 @@ def test_failed_narrative_requires_reviewed_correction(staged_book) -> None:
         "codex",
         "正しい本文",
     )
+
+
+def test_review_rejects_unused_corrected_text(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, "機械候補"))
+    stage_run_for_qa(run_id, input_pages)
+
+    with pytest.raises(ValueError, match="corrected text requires selected engine codex"):
+        review_qa_page(
+            run_id,
+            1,
+            "approved",
+            "画像照合済み",
+            "narrative",
+            "normal_prose",
+            "primary",
+            "補正文",
+        )
+
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT qa_state, selected_engine, corrected_text FROM ocr_page_results WHERE run_id=? AND page_no=1",
+            (run_id,),
+        ).fetchone()
+    assert tuple(row) == ("required", "primary", None)

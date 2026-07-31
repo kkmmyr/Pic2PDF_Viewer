@@ -23,6 +23,13 @@ _QA_AUDIT_ONLY_FLAGS = frozenset(
 )
 
 
+def _normalize_corrected_text(corrected_text: str | None, selected_engine: str) -> str | None:
+    corrected = corrected_text if corrected_text is None else corrected_text.strip()
+    if corrected and selected_engine != "codex":
+        raise ValueError("corrected text requires selected engine codex")
+    return corrected
+
+
 def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
     """Move a complete OCR run to QA without publishing canonical text."""
     validate_complete_run(run_id, input_pages)
@@ -99,7 +106,7 @@ def review_qa_page(
         ).fetchone()
         if page is None:
             raise LookupError(f"OCR page not found: run={run_id}, page={page_no}")
-        corrected = corrected_text if corrected_text is None else corrected_text.strip()
+        corrected = _normalize_corrected_text(corrected_text, selected_engine)
         if state == "approved" and page_type == "narrative":
             if page[0] != "passed" and not corrected:
                 raise ValueError("failed narrative OCR requires reviewed corrected text")

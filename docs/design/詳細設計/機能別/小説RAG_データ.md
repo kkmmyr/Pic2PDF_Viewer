@@ -44,7 +44,7 @@
 - `pages.page_no` は `kindle_novel/images/{書籍名}/NNN.png` の連番に対応するキャプチャ画面番号であり、Kindleの紙面ページ番号ではない。リフロー表示では両者は1対1対応しない。
 - `pages.index_eligible=1`は`page_type=narrative`だけである。非本文ページは正本ページとして保持するが、FTS検索、chunk、Embedding、full-book入力、サマリ・人物抽出から除外する。検索・QA本文取得はこの値を正本とし、文字数や先頭・末尾位置で短い本文を再除外しない。
 - 非本文ページの`pages.full_text`は空文字とし、画像だけを公開正本に残す。機械OCR候補は`ocr_page_results`に監査用として保持し、検索索引へ混入させない。
-- `ocr_page_results.layout_type`は意味上のページ種別とは独立したOCR選択軸である。`primary_text` / `external_text`は機械候補、`corrected_text`は原画像照合済み補正、`selected_engine`は公開時の採用元を表す。
+- `ocr_page_results.layout_type`は意味上のページ種別とは独立したOCR選択軸である。`primary_text` / `external_text`は機械候補、`corrected_text`は原画像照合済み補正、`selected_engine`は公開時の採用元を表す。`corrected_text`が非空のQA更新は`selected_engine=codex`を必須とし、補正文だけが保存されて公開に使われない状態を許可しない。
 - `ocr_runs`は履歴を削除せず保持するため、公開監査で`completed + approved`の全runを
   そのまま数えてはならない。現在公開中runは`ocr_publication.list_current_published_runs()`を
   正本とし、書籍ごとに`COALESCE(qa_reviewed_at, finished_at, started_at)`降順、
