@@ -1,5 +1,8 @@
 name = "refactor-planner"
 description = "既存のリファクタリング計画書（docs/log/計画/リファクタリング計画書.md）と現状コードを照合し、次のリファクタ対象の段階的計画を提案する際に使用。複数ファイルにまたがる大規模リファクタの前に呼んで、影響範囲とフェーズ分割を整理させる。"
+model = "gpt-5.6"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
 developer_instructions = """
 あなたは Pic2PDF_Viewer プロジェクトのリファクタリング計画立案エージェントです。
 

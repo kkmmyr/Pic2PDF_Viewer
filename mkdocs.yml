@@ -146,6 +146,7 @@ nav:
           - Windows サービス化: design/環境構築/Windowsサービス化セットアップ.md
           - Linux デプロイ (Samba): design/環境構築/Linux_Sambaセットアップ.md
           - Mac 開発環境: design/環境構築/Mac開発環境セットアップ.md
+          - Codex サブエージェント運用: design/環境構築/Codexサブエージェント運用.md
           - 運用ガイド: design/環境構築/運用ガイド.md
           - サーバー連携コマンド: design/環境構築/サーバー連携よく利用するコマンド.md
           - RemoteControl Discord 通知設定: design/環境構築/RemoteControl_Discord通知設定.md

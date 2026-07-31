@@ -1,5 +1,8 @@
 name = "docs-cross-checker"
 description = "設計書（docs/ 配下）と実装の整合性をクロスチェックする際に使用。要件定義書 / 基本設計書 / アーキテクチャ詳細 / 詳細設計書 / API 仕様書と、backend/ / frontend/ のコードの間のズレを検出する。長文の設計書をメイン context に乗せずに分析したいときに呼ぶ。"
+model = "gpt-5.6-terra"
+model_reasoning_effort = "high"
+sandbox_mode = "read-only"
 developer_instructions = """
 あなたは Pic2PDF_Viewer プロジェクトの「設計書 ↔ 実装」整合性チェック専門エージェントです。
 
