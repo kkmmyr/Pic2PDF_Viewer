@@ -192,61 +192,56 @@ class ReaderControllerMixin(WindowController):
             reading_area = self._control_by_id("ReadingArea", timeout=1.0)
             if reading_area is None:
                 return False
-            more_menu = self._control_by_id("moreMenuButton", timeout=0.5)
+            more_menu = self._button_by_id("moreMenuButton", timeout=0.5)
             if more_menu is None:
                 self._click_control(reading_area)
                 time.sleep(0.25)
-                more_menu = self._control_by_id("moreMenuButton", timeout=1.0)
+                more_menu = self._button_by_id("moreMenuButton", timeout=1.0)
             if more_menu is None:
                 return False
 
             self._click_control(more_menu)
             ui_opened = True
             time.sleep(0.25)
-            go_to_item = None
-            for item_name in ("ページへ移動する", "位置に移動"):
-                go_to_item = self._control_by_name(
-                    item_name,
-                    automation_id="btn-popover-menu-item",
-                    timeout=1.0,
-                )
-                if go_to_item is not None:
-                    break
-            if go_to_item is None:
+            # The Store app exposes this popover through a separate UIA root and
+            # its item rectangle is intermittent. The first item stays anchored
+            # to the verified menu button; the typed edit appearing afterwards
+            # is the safety proof that the intended item was selected.
+            if not self._click_relative_to_control(
+                more_menu,
+                x_offset=-30,
+                y_offset=45,
+            ):
                 return False
-            self._click_control(go_to_item)
             time.sleep(0.25)
 
-            location_input = self._control_by_id(
+            location_input = self._edit_by_id(
                 "go-to-page-input",
                 timeout=1.0,
             )
             if location_input is None:
                 return False
-            location_input.SetFocus()
-            pyautogui.hotkey("ctrl", "a")
-            pyautogui.write("1", interval=0.02)
-            time.sleep(0.1)
             try:
-                raw_input_value = location_input.GetValuePattern().Value
+                value_pattern = location_input.GetValuePattern()
+                value_pattern.SetValue("1")
+                time.sleep(0.1)
+                raw_input_value = value_pattern.Value
                 input_value = None if raw_input_value is None else str(raw_input_value)
             except (AttributeError, COMError, TypeError, ValueError):
                 input_value = None
-            if input_value is not None and input_value != "1":
+            if input_value != "1":
                 return False
 
-            confirm = None
-            for confirm_name in ("ページへ移動する", "位置に移動"):
-                confirm = self._control_by_name(
-                    confirm_name,
-                    automation_id="modal-confirm",
-                    timeout=1.0,
-                )
-                if confirm is not None:
-                    break
+            confirm = self._button_by_id("modal-confirm", timeout=1.0)
             if confirm is None:
                 return False
             self._click_control(confirm)
+            for _attempt in range(20):
+                if self._edit_by_id("go-to-page-input", timeout=0.25) is None:
+                    break
+                time.sleep(0.1)
+            else:
+                return False
             ui_opened = False
             if on_poll:
                 on_poll()
@@ -326,6 +321,41 @@ class ReaderControllerMixin(WindowController):
             time.sleep(0.25)
         return None
 
+    def _try_use_current_start(
+        self,
+        source: str,
+        *,
+        direction: str,
+        on_poll: Callable[[], None] | None,
+    ) -> bool:
+        try:
+            footer = self._control_by_id("FooterLabelText", timeout=1.0)
+        except KindleControllerError as exc:
+            if exc.error_code == "kindle_app_exited":
+                raise
+            return False
+        footer_name = None if footer is None else str(footer.Name)
+        if footer_indicates_cover(source, footer_name):
+            return True
+        if source != "novel" or not novel_footer_indicates_first_page(footer_name):
+            return False
+        reading_area = self._control_by_id("ReadingArea", timeout=1.0)
+        if reading_area is None:
+            return False
+        self._click_control(reading_area)
+        time.sleep(0.25)
+        previous_page_key = "right" if direction == "left" else "left"
+        pyautogui.press(previous_page_key)
+        self.wait_for_reader_stable()
+        return (
+            self._wait_for_start_footer(
+                source,
+                cover_only=True,
+                on_poll=on_poll,
+            )
+            is not None
+        )
+
     def go_to_start(
         self,
         *,
@@ -343,7 +373,11 @@ class ReaderControllerMixin(WindowController):
                 "positioning_failed",
                 "ページ送り方向が不正です",
             )
-        if self._try_go_to_location_start(
+        if self._try_use_current_start(
+            source,
+            direction=direction,
+            on_poll=on_poll,
+        ) or self._try_go_to_location_start(
             source,
             direction=direction,
             on_poll=on_poll,

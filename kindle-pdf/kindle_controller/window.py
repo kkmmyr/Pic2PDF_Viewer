@@ -173,6 +173,58 @@ class WindowController:
             )
         return None
 
+    def _edit_by_id(
+        self,
+        automation_id: str,
+        *,
+        timeout: float | None = None,
+    ) -> auto.Control | None:
+        """Return a typed edit control so UIA value patterns remain available."""
+        edit = auto.EditControl(
+            searchFromControl=self._require_window(),
+            searchDepth=self.config.control_search_depth,
+            AutomationId=automation_id,
+        )
+        try:
+            if edit.Exists(
+                self.config.control_timeout_seconds if timeout is None else timeout,
+                0.5,
+            ):
+                return edit
+        except COMError:
+            logger.debug(
+                "Kindle UI Automation edit lookup failed transiently: %s",
+                automation_id,
+                exc_info=True,
+            )
+        return None
+
+    def _button_by_id(
+        self,
+        automation_id: str,
+        *,
+        timeout: float | None = None,
+    ) -> auto.Control | None:
+        """Return a typed button control so its verified rectangle can be clicked."""
+        button = auto.ButtonControl(
+            searchFromControl=self._require_window(),
+            searchDepth=self.config.control_search_depth,
+            AutomationId=automation_id,
+        )
+        try:
+            if button.Exists(
+                self.config.control_timeout_seconds if timeout is None else timeout,
+                0.5,
+            ):
+                return button
+        except COMError:
+            logger.debug(
+                "Kindle UI Automation button lookup failed transiently: %s",
+                automation_id,
+                exc_info=True,
+            )
+        return None
+
     def _control_by_name(
         self,
         name: str,
@@ -233,6 +285,15 @@ class WindowController:
         except (AttributeError, COMError, TypeError, ValueError):
             return False
 
+    def _point_is_within_window(self, x: int, y: int) -> bool:
+        try:
+            bounds = self._require_window().BoundingRectangle
+            return int(bounds.left) <= x <= int(bounds.right) and int(
+                bounds.top
+            ) <= y <= int(bounds.bottom)
+        except (AttributeError, COMError, TypeError, ValueError):
+            return False
+
     @staticmethod
     def _control_center(control: object) -> tuple[int, int]:
         try:
@@ -255,6 +316,21 @@ class WindowController:
 
     def _click_control(self, control: object) -> None:
         pyautogui.click(*self._control_center(control))
+
+    def _click_relative_to_control(
+        self,
+        control: object,
+        *,
+        x_offset: int,
+        y_offset: int,
+    ) -> bool:
+        center_x, center_y = self._control_center(control)
+        target_x = center_x + x_offset
+        target_y = center_y + y_offset
+        if not self._point_is_within_window(target_x, target_y):
+            return False
+        pyautogui.click(target_x, target_y)
+        return True
 
     @staticmethod
     def _activate_control_with_keyboard(control: object) -> None:

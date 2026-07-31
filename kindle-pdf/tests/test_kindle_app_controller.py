@@ -205,10 +205,19 @@ def test_foreground_activation_stops_when_windows_rejects_it(
         controller._bring_to_foreground(200)
 
 
-def test_search_value_focuses_control_and_verifies_keyboard_input(
+def test_search_value_replaces_existing_full_width_input_with_exact_asin(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    pattern = SimpleNamespace(Value="")
+    class _ValuePattern:
+        def __init__(self) -> None:
+            self.Value = "Ｂ０１２３４５６７８Ｂ０１２３４５６７８"
+            self.set_values: list[str] = []
+
+        def SetValue(self, value: str) -> None:
+            self.set_values.append(value)
+            self.Value = value
+
+    pattern = _ValuePattern()
     focused: list[bool] = []
     edit = SimpleNamespace(
         SetFocus=lambda: focused.append(True),
@@ -216,26 +225,38 @@ def test_search_value_focuses_control_and_verifies_keyboard_input(
     )
     controller = KindleAppController()
     monkeypatch.setattr(controller, "_search_edit", lambda **_kwargs: edit)
-    hotkeys: list[tuple[str, ...]] = []
-    writes: list[tuple[str, float]] = []
-    monkeypatch.setattr(
-        controller_module.pyautogui,
-        "hotkey",
-        lambda *keys: hotkeys.append(keys),
-    )
-
-    def _write(value: str, interval: float) -> None:
-        writes.append((value, interval))
-        pattern.Value = value
-
-    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
     monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
 
     controller._set_search_value("B012345678")
 
     assert focused == [True]
-    assert hotkeys == [("ctrl", "a")]
-    assert writes == [("B012345678", 0.02)]
+    assert pattern.set_values == ["B012345678"]
+    assert pattern.Value == "B012345678"
+
+
+def test_search_book_waits_for_delayed_asin_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = KindleAppController(ControllerConfig(screen_transition_seconds=0.0))
+    identity = _identity()
+    candidate = BookCandidate(
+        asin=identity.asin,
+        title=identity.title,
+        card=object(),
+    )
+    candidate_reads: list[bool] = []
+    monkeypatch.setattr(controller, "open_library", lambda: None)
+    monkeypatch.setattr(controller, "_set_search_value", lambda _value: None)
+
+    def _collect_candidates(_identity: BookIdentity) -> list[BookCandidate]:
+        candidate_reads.append(True)
+        return [] if len(candidate_reads) == 1 else [candidate]
+
+    monkeypatch.setattr(controller, "collect_candidates", _collect_candidates)
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+
+    assert controller.search_book(identity) == candidate
+    assert len(candidate_reads) == 2
 
 
 def test_control_center_rejects_invalid_bounds() -> None:
@@ -395,7 +416,7 @@ class _LocationControl(_LayoutControl):
     ) -> None:
         super().__init__(automation_id)
         self.Name = name
-        self.value_pattern = SimpleNamespace(Value=value)
+        self.value_pattern = _LocationValuePattern(value)
         self.focused = False
 
     def SetFocus(self) -> None:
@@ -403,6 +424,14 @@ class _LocationControl(_LayoutControl):
 
     def GetValuePattern(self):
         return self.value_pattern
+
+
+class _LocationValuePattern:
+    def __init__(self, value: str) -> None:
+        self.Value = value
+
+    def SetValue(self, value: str) -> None:
+        self.Value = value
 
 
 class _LocationController(KindleAppController):
@@ -442,9 +471,25 @@ class _LocationController(KindleAppController):
             ),
         }
         self.clicked: list[str] = []
+        self.keyboard_activated: list[str] = []
         self.stable_waits = 0
 
     def _control_by_id(self, automation_id: str, **_kwargs):
+        return self.controls.get(automation_id)
+
+    def _edit_by_id(self, automation_id: str, **_kwargs):
+        return self.controls.get(automation_id)
+
+    def _button_by_id(self, automation_id: str, **_kwargs):
+        if automation_id == "modal-confirm":
+            return next(
+                (
+                    control
+                    for (_name, control_id), control in self.named_controls.items()
+                    if control_id == automation_id
+                ),
+                None,
+            )
         return self.controls.get(automation_id)
 
     def _control_by_name(
@@ -458,6 +503,24 @@ class _LocationController(KindleAppController):
 
     def _click_control(self, control: _LocationControl) -> None:
         self.clicked.append(control.AutomationId)
+        if control.AutomationId == "modal-confirm":
+            self.controls.pop("go-to-page-input", None)
+
+    def _click_relative_to_control(
+        self,
+        control: _LocationControl,
+        *,
+        x_offset: int,
+        y_offset: int,
+    ) -> bool:
+        del x_offset, y_offset
+        self.clicked.append(f"{control.AutomationId}:first-item")
+        return True
+
+    def _activate_control_with_keyboard(self, control: _LocationControl) -> None:
+        self.keyboard_activated.append(control.AutomationId)
+        if control.AutomationId == "modal-confirm":
+            self.controls.pop("go-to-page-input", None)
 
     def _ensure_process_running(self) -> None:
         return None
@@ -564,32 +627,19 @@ def test_go_to_start_uses_direct_location_and_at_most_one_cover_step(
     expected_presses: list[str],
 ) -> None:
     controller = _LocationController(footer_name)
-    hotkeys: list[tuple[str, ...]] = []
-    writes: list[tuple[str, float]] = []
     presses: list[str] = []
     polls: list[bool] = []
     edit = controller.controls["go-to-page-input"]
     monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(
-        controller_module.pyautogui,
-        "hotkey",
-        lambda *keys: hotkeys.append(keys),
-    )
-
-    def _write(value: str, interval: float) -> None:
-        writes.append((value, interval))
-        edit.value_pattern.Value = value
-
-    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
 
     def _press(key: str) -> None:
         presses.append(key)
-        if source == "novel" and footer_name.startswith("ページ1/"):
+        if key == "right" and source == "novel" and footer_name.startswith("ページ1/"):
             controller.controls["FooterLabelText"].Name = "Location 1 of 3304  • 0%"
 
     monkeypatch.setattr(controller_module.pyautogui, "press", _press)
 
-    controller.go_to_start(
+    assert controller._try_go_to_location_start(
         source=source,
         direction="left",
         on_poll=lambda: polls.append(True),
@@ -597,18 +647,28 @@ def test_go_to_start_uses_direct_location_and_at_most_one_cover_step(
 
     expected_clicks = [
         "moreMenuButton",
-        "btn-popover-menu-item",
+        "moreMenuButton:first-item",
         "modal-confirm",
     ]
     if expected_presses:
         expected_clicks.append("ReadingArea")
     assert controller.clicked == expected_clicks
-    assert edit.focused
-    assert hotkeys == [("ctrl", "a")]
-    assert writes == [("1", 0.02)]
+    assert controller.keyboard_activated == []
+    assert not edit.focused
+    assert edit.value_pattern.Value == "1"
     assert presses == expected_presses
     assert controller.stable_waits == 1 + len(expected_presses)
     assert polls
+
+
+def test_go_to_start_accepts_current_cover_without_opening_dialog() -> None:
+    controller = _LocationController("Location 4 of 4006  • 0%")
+
+    controller.go_to_start(source="novel", direction="right")
+
+    assert controller.clicked == []
+    assert controller.keyboard_activated == []
+    assert controller.stable_waits == 0
 
 
 def test_go_to_start_waits_for_delayed_cover_footer_without_extra_page_turns(
@@ -658,6 +718,9 @@ def test_location_start_rejects_unverified_keyboard_input(
         "write",
         lambda _value, interval: None,
     )
+    edit = controller.controls["go-to-page-input"]
+    edit.value_pattern.SetValue = lambda _value: None
+    monkeypatch.setattr(controller_module.pyautogui, "press", lambda _key: None)
     monkeypatch.setattr(
         controller_module.pyautogui,
         "press",
@@ -669,12 +732,16 @@ def test_location_start_rejects_unverified_keyboard_input(
     assert "modal-confirm" not in controller.clicked
 
 
-def test_location_start_accepts_missing_value_readback_when_footer_verifies(
+def test_location_start_rejects_missing_value_readback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     controller = _LocationController("Location 2 of 169  • 0%")
     edit = controller.controls["go-to-page-input"]
-    edit.value_pattern.Value = None
+    edit.value_pattern.SetValue = lambda _value: setattr(
+        edit.value_pattern,
+        "Value",
+        None,
+    )
     monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
     monkeypatch.setattr(
@@ -683,8 +750,76 @@ def test_location_start_accepts_missing_value_readback_when_footer_verifies(
         lambda _value, interval: None,
     )
 
-    assert controller._try_go_to_location_start("comic")
-    assert "modal-confirm" in controller.clicked
+    assert not controller._try_go_to_location_start("comic")
+    assert "modal-confirm" not in controller.clicked
+
+
+def test_location_start_rejects_confirmed_dialog_that_remains_open(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LocationController("Location 1 of 3304  • 0%")
+    edit = controller.controls["go-to-page-input"]
+    presses: list[str] = []
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
+
+    def _write(value: str, interval: float) -> None:
+        del interval
+        edit.value_pattern.Value = value
+
+    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
+    monkeypatch.setattr(controller_module.pyautogui, "press", lambda _key: None)
+    monkeypatch.setattr(
+        controller_module.pyautogui,
+        "press",
+        lambda key: presses.append(key),
+    )
+    original_click_control = controller._click_control
+
+    def _click_control(control: _LocationControl) -> None:
+        if control.AutomationId == "modal-confirm":
+            controller.clicked.append(control.AutomationId)
+            return
+        original_click_control(control)
+
+    monkeypatch.setattr(controller, "_click_control", _click_control)
+
+    assert not controller._try_go_to_location_start("novel")
+    assert "esc" in presses
+    assert controller.stable_waits == 0
+
+
+def test_location_start_waits_for_stale_dialog_control_to_disappear(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    controller = _LocationController("Location 4 of 4006  • 0%")
+    edit = controller.controls["go-to-page-input"]
+    original_edit_by_id = controller._edit_by_id
+    stale_lookups = 0
+    monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
+
+    def _write(value: str, interval: float) -> None:
+        del interval
+        edit.value_pattern.Value = value
+
+    def _edit_by_id(automation_id: str, **kwargs):
+        nonlocal stale_lookups
+        if (
+            automation_id == "go-to-page-input"
+            and "modal-confirm" in controller.clicked
+        ):
+            stale_lookups += 1
+            if stale_lookups <= 12:
+                return edit
+        return original_edit_by_id(automation_id, **kwargs)
+
+    monkeypatch.setattr(controller_module.pyautogui, "write", _write)
+    monkeypatch.setattr(controller, "_edit_by_id", _edit_by_id)
+
+    assert controller._try_go_to_location_start("novel", direction="right")
+    assert stale_lookups == 13
+    assert controller.stable_waits == 1
 
 
 def test_page_layout_selects_spread_and_verifies_toggle_state(

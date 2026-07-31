@@ -38,6 +38,25 @@ class CaptureLoopMixin:
 
     def _turn_page(self, key: str) -> None:
         """指定したキーでページめくり操作を行う。"""
+        if self.hwnd:
+            windll.user32.SetForegroundWindow(self.hwnd)
+            time.sleep(0.1)
+            if int(windll.user32.GetForegroundWindow() or 0) != int(self.hwnd):
+                raise RuntimeError(
+                    "Kindle window is not foreground before the page turn."
+                )
+            if self._new_kindle_mode and self._reading_area_relative is not None:
+                if self.rect is None:
+                    raise RuntimeError("Kindle window rectangle is unavailable.")
+                left, top, right, bottom = self._reading_area_relative
+                focus_x = self.rect.left + (left + right) // 2
+                focus_y = self.rect.top + (top + bottom) // 2
+                pag.click(focus_x, focus_y)
+                time.sleep(0.1)
+                if int(windll.user32.GetForegroundWindow() or 0) != int(self.hwnd):
+                    raise RuntimeError(
+                        "Kindle window lost foreground while restoring reading focus."
+                    )
         pag.keyDown(key)
         time.sleep(0.1)
         pag.keyUp(key)
@@ -46,6 +65,23 @@ class CaptureLoopMixin:
     def _next_page(self) -> None:
         """通常のページ送り方向でページをめくる。"""
         self._turn_page(self.config.PAGE_CHANGE_KEY)
+
+    def _next_page_retry(self) -> None:
+        """Store版のキー無反応時だけ、ReadingArea相対の矢印をクリックする。"""
+        if not self._new_kindle_mode or self._reading_area_relative is None:
+            self._next_page()
+            return
+        if self.rect is None or not self.hwnd:
+            raise RuntimeError("Kindle ReadingArea is unavailable for page retry.")
+        windll.user32.SetForegroundWindow(self.hwnd)
+        time.sleep(0.1)
+        if int(windll.user32.GetForegroundWindow() or 0) != int(self.hwnd):
+            raise RuntimeError("Kindle window is not foreground before page retry.")
+        left, top, right, bottom = self._reading_area_relative
+        page_x = left + 120 if self.config.PAGE_CHANGE_KEY == "left" else right - 120
+        page_y = (top + bottom) // 2
+        pag.click(self.rect.left + page_x, self.rect.top + page_y)
+        time.sleep(self.config.PAGE_TURN_WAIT)
 
     def _next_page_opposite(self) -> None:
         """通常と反対の方向でページをめくる。"""
@@ -59,9 +95,16 @@ class CaptureLoopMixin:
     ) -> bool:
         if left.shape != right.shape:
             return False
-        channel_means = cv2.mean(cv2.absdiff(left, right))[:3]
+        absolute_difference = cv2.absdiff(left, right)
+        channel_means = cv2.mean(absolute_difference)[:3]
         mean_difference = sum(channel_means) / len(channel_means)
-        return mean_difference < self.config.PAGE_VISUAL_DIFF_THRESHOLD
+        if mean_difference >= self.config.PAGE_VISUAL_DIFF_THRESHOLD:
+            return False
+        gray_difference = cv2.cvtColor(absolute_difference, cv2.COLOR_BGR2GRAY)
+        changed_ratio = float(
+            np.mean(gray_difference > self.config.PAGE_VISUAL_PIXEL_THRESHOLD)
+        )
+        return changed_ratio < self.config.PAGE_VISUAL_CHANGED_RATIO_THRESHOLD
 
     def _wait_for_stable_page(
         self, previous_image: Optional[np.ndarray]
@@ -138,7 +181,7 @@ class CaptureLoopMixin:
                     "Page did not change; retrying page turn "
                     f"({retry_count}/{self.config.PAGE_CHANGE_RETRY_COUNT})."
                 )
-                self._next_page()
+                self._next_page_retry()
                 current_image = self._wait_for_stable_page(old_image)
 
             if current_image is None and page == 2:

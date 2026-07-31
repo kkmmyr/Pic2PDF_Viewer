@@ -43,6 +43,76 @@ def test_new_kindle_page_turn_uses_selected_arrow_key(monkeypatch):
     ]
 
 
+def test_page_turn_refocuses_kindle_before_sending_key(monkeypatch):
+    capturer = KindleCapturer()
+    capturer.hwnd = 123
+    capturer._new_kindle_mode = True
+    capturer.rect = RECT(100, 200, 1100, 1000)
+    capturer._reading_area_relative = (0, 40, 1000, 760)
+    capturer.config.PAGE_TURN_WAIT = 0
+    calls: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        capturer_module.windll.user32,
+        "SetForegroundWindow",
+        lambda hwnd: calls.append(("foreground", hwnd)),
+    )
+    monkeypatch.setattr(
+        capturer_module.windll.user32,
+        "GetForegroundWindow",
+        lambda: 123,
+    )
+    monkeypatch.setattr(
+        capturer_module.pag,
+        "click",
+        lambda x, y: calls.append(("click", (x, y))),
+    )
+    monkeypatch.setattr(
+        capturer_module.pag,
+        "keyDown",
+        lambda key: calls.append(("down", key)),
+    )
+    monkeypatch.setattr(
+        capturer_module.pag,
+        "keyUp",
+        lambda key: calls.append(("up", key)),
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+
+    capturer._turn_page("left")
+
+    assert calls == [
+        ("foreground", 123),
+        ("click", (600, 600)),
+        ("down", "left"),
+        ("up", "left"),
+    ]
+
+
+def test_new_kindle_page_retry_clicks_relative_next_arrow(monkeypatch):
+    capturer = KindleCapturer()
+    capturer.hwnd = 123
+    capturer._new_kindle_mode = True
+    capturer.rect = RECT(100, 200, 1100, 1000)
+    capturer._reading_area_relative = (10, 40, 990, 760)
+    capturer.config.PAGE_TURN_WAIT = 0
+    capturer.config.PAGE_CHANGE_KEY = "left"
+    clicks: list[tuple[int, int]] = []
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "GetForegroundWindow", lambda: 123
+    )
+    monkeypatch.setattr(
+        capturer_module.pag, "click", lambda x, y: clicks.append((x, y))
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+
+    capturer._next_page_retry()
+
+    assert clicks == [(230, 600)]
+
+
 def test_visual_page_comparison_ignores_small_ui_overlay():
     capturer = KindleCapturer()
     page = np.zeros((100, 100, 3), dtype=np.uint8)
@@ -52,6 +122,15 @@ def test_visual_page_comparison_ignores_small_ui_overlay():
 
     assert capturer._images_visually_equal(page, tiny_overlay)
     assert not capturer._images_visually_equal(page, changed_page)
+
+
+def test_visual_page_comparison_detects_sparse_text_change():
+    capturer = KindleCapturer()
+    title_page = np.full((1000, 1000, 3), 255, dtype=np.uint8)
+    copyright_page = title_page.copy()
+    copyright_page[100:140, 450:500] = 0
+
+    assert not capturer._images_visually_equal(title_page, copyright_page)
 
 
 def test_wait_for_stable_page_skips_transient_frame(monkeypatch):

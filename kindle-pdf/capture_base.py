@@ -46,6 +46,8 @@ class Config:
     TIMEOUT_SEC: float = 5.0
     PAGE_STABLE_SEC: float = 0.75
     PAGE_VISUAL_DIFF_THRESHOLD: float = 1.0
+    PAGE_VISUAL_PIXEL_THRESHOLD: int = 20
+    PAGE_VISUAL_CHANGED_RATIO_THRESHOLD: float = 0.001
     PAGE_CHANGE_RETRY_COUNT: int = 1
     EXPECTED_PAGES: Optional[int] = None
 

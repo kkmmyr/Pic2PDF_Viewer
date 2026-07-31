@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "name": "B-35 OCR machine candidate acceptance",
+  "corpus": {
+    "min_verified_pages": 20,
+    "min_total_reference_chars": 9000,
+    "min_page_type_counts": {
+      "narrative": 9,
+      "toc": 4,
+      "illustration": 4,
+      "colophon_or_ad": 3
+    },
+    "min_layout_type_counts": {
+      "normal_prose": 4
+    },
+    "min_layout_reference_chars": {
+      "normal_prose": 4000
+    }
+  },
+  "quality": {
+    "aggregate_cer_max_by_group": {
+      "layout:normal_prose": 0.005
+    },
+    "max_page_cer_by_layout": {
+      "normal_prose": 0.01
+    },
+    "column_omission": {
+      "page_type": "narrative",
+      "min_deleted_chars": 40,
+      "min_deletion_rate": 0.05,
+      "max_suspect_pages": 0
+    },
+    "proper_noun_recall_min": 1.0,
+    "proper_noun_missing_occurrences_max": 0,
+    "min_proper_noun_terms": 10,
+    "min_proper_noun_expected_occurrences": 50
+  },
+  "proper_nouns": [
+    {
+      "image_sha256": "d15fc0e68a273897999e0e39035534af9475a11833222daf82f722f967c43df4",
+      "terms": ["高福", "天河", "哲徳", "茉莉花", "蒼天"]
+    },
+    {
+      "image_sha256": "c7facff50e76b75d55b336e2e31da7a78004f6c057fee4d8295ef1fa79d0a583",
+      "terms": ["采青国", "高福", "天河", "茉莉花", "琉晴", "蒼天"]
+    },
+    {
+      "image_sha256": "da8dd3d0cbbfbef0a2f9ef74ea1b6788b4f97503c4b3a0cdf2fc5e2d66ca61c6",
+      "terms": ["采青国", "白楼国", "高福", "天河", "茉莉花", "琉晴", "雲嵐", "湘杜垂"]
+    },
+    {
+      "image_sha256": "213b78216a234d95f778c8df85127d5ceb2005e54f112adc9eafb4f75c9412a7",
+      "terms": ["采青国", "白楼国", "高福", "天河", "哲徳", "茉莉花", "琉晴", "蒼天", "雲嵐"]
+    }
+  ]
+}

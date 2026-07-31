@@ -18,6 +18,11 @@ _LONG_NON_NARRATIVE_TEXT = 300
 _MIN_PRIMARY_LENGTH_FOR_CANDIDATE_COMPLETENESS = 256
 _MIN_EXTERNAL_LENGTH_ADVANTAGE = 30
 _MIN_EXTERNAL_LENGTH_RATIO = 1.02
+_UI_OVERLAY_STRONG_MARKERS = ("chatgpt",)
+_UI_OVERLAY_MARKER_COMBINATIONS = (
+    ("Kindleカタログ", "UI改善"),
+    ("Kindleカタログ", "要件整理"),
+)
 _CANDIDATE_AUDIT_FLAGS = frozenset({"primary_text_repetition", "external_text_repetition"})
 _MANAGED_RISK_FLAGS = frozenset(
     {
@@ -27,6 +32,7 @@ _MANAGED_RISK_FLAGS = frozenset(
         "primary_text_repetition",
         "external_text_repetition",
         "selected_text_repetition",
+        "ui_overlay_text_detected",
     }
 )
 
@@ -54,6 +60,14 @@ def _has_single_character_variant(primary_terms: set[str], external_terms: set[s
         for primary in primary_only
         for external in external_only
     )
+
+
+def _has_ui_overlay_text(text: str) -> bool:
+    normalized = _WHITESPACE_RE.sub("", text)
+    lowercase = normalized.lower()
+    if any(marker in lowercase for marker in _UI_OVERLAY_STRONG_MARKERS):
+        return True
+    return any(all(marker in normalized for marker in markers) for markers in _UI_OVERLAY_MARKER_COMBINATIONS)
 
 
 def detect_qa_risk_flags(
@@ -94,6 +108,8 @@ def detect_qa_risk_flags(
         flags.add("external_text_repetition")
     if has_suspicious_repetition(full_text):
         flags.add("selected_text_repetition")
+    if any(_has_ui_overlay_text(text) for text in (primary_text, external_text, full_text)):
+        flags.add("ui_overlay_text_detected")
     return flags
 
 

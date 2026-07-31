@@ -339,6 +339,42 @@ def test_qa_risk_detects_repetition_per_candidate_and_selected_text() -> None:
     ) == {"external_text_repetition"}
 
 
+@pytest.mark.parametrize(
+    ("primary_text", "external_text", "full_text"),
+    [
+        ("ChatGPT 通知の処理が完了しました", "正常な補助候補です。", "正常な採用本文です。"),
+        ("正常な主系候補です。", "Kindleカタログ UI改善 要件整理", "正常な採用本文です。"),
+        ("正常な主系候補です。", "正常な補助候補です。", "KindleカタログのUI改善を完了しました"),
+    ],
+)
+def test_qa_risk_detects_ui_overlay_text_in_any_candidate(
+    primary_text: str,
+    external_text: str,
+    full_text: str,
+) -> None:
+    assert detect_qa_risk_flags(
+        page_type="narrative",
+        full_text=full_text,
+        char_count=len(full_text),
+        primary_text=primary_text,
+        external_text=external_text,
+    ) == {"ui_overlay_text_detected"}
+
+
+def test_qa_risk_does_not_treat_generic_notification_words_as_ui_overlay() -> None:
+    narrative = "城門から届いた通知を読み、使者は任務が完了しましたと告げた。"
+    assert (
+        detect_qa_risk_flags(
+            page_type="narrative",
+            full_text=narrative,
+            char_count=len(narrative),
+            primary_text=narrative,
+            external_text=narrative,
+        )
+        == set()
+    )
+
+
 def test_qa_risk_uses_selected_engine_text(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "qa-selected-engine"
@@ -443,6 +479,8 @@ def test_stage_requires_content_risks(tmp_data_dir) -> None:
                 page.image_sha256,
                 "発行所 発行者 電子書籍 無断転載 " * 40,
             )
+        if page.page_no == 11:
+            result["external_text"] = "ChatGPT KindleカタログUI改善要件整理"
         save_page_result(run_id, result)
 
     stage_run_for_qa(run_id, input_pages)
@@ -450,12 +488,13 @@ def test_stage_requires_content_risks(tmp_data_dir) -> None:
     with with_db() as conn:
         rows = conn.execute(
             "SELECT page_no, qa_state, quality_flags_json FROM ocr_page_results "
-            "WHERE run_id=? AND page_no IN (9, 10) ORDER BY page_no",
+            "WHERE run_id=? AND page_no IN (9, 10, 11) ORDER BY page_no",
             (run_id,),
         ).fetchall()
-    assert [row[1] for row in rows] == ["required", "required"]
+    assert [row[1] for row in rows] == ["required", "required", "required"]
     assert "named_entity_candidate_disagreement" in rows[0][2]
     assert "page_type_text_conflict" in rows[1][2]
+    assert "ui_overlay_text_detected" in rows[2][2]
 
 
 def test_failed_non_index_page_can_publish_as_image_only(staged_book) -> None:

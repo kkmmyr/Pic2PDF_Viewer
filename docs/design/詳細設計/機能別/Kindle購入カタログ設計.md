@@ -1,6 +1,6 @@
 # Kindle 購入カタログ設計
 
-> status: living | last-verified: 2026-07-26
+> status: living | last-verified: 2026-07-31
 
 ## 1. 目的と境界
 
@@ -73,7 +73,11 @@ claim と状態更新時に `heartbeat_at` を更新し、agent は長時間工�
 Linux は `.ready` だけを検証し、安全な相対パス、許可拡張子、件数・容量上限を
 確認してから正式配置する。
 
-現行 Windows agent は自動工程を使用し、起動済み Kindle アプリへの接続、ASIN付きカードの一意照合、未ダウンロード待機、先頭移動、全画面撮影、Samba転送、正式登録までを 1 冊ずつ直列実行する。旧 `waiting_user` は後方互換契約として残すが、現行 agent は使用しない。詳細は [Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)と[完了記録](../../../archive/Kindle自動撮影取込_実装計画.md)を参照する。
+現行 Windows agent は自動工程を使用し、起動済み Kindle アプリへの接続、ASIN付きカードの一意照合、未ダウンロード待機、先頭移動、全画面撮影、Samba転送、正式登録までを 1 冊ずつ直列実行する。検索欄はIME依存のキーボード入力を使わず、UI Automationの`ValuePattern.SetValue`で半角ASINへ全置換し、読み戻し完全一致後だけASIN付きカードを探索する。旧 `waiting_user` は後方互換契約として残すが、現行 agent は使用しない。詳細は [Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)と[完了記録](../../../archive/Kindle自動撮影取込_実装計画.md)を参照する。
+
+撮影後・共有前に件数を検証し、`expected_screens`指定時は指定件数、未指定時は
+小説50画面・漫画10画面を最低件数とする。未満なら`capture_incomplete`として
+一時成果物を破棄し、既存の正式画像を置換しない。
 
 ## 8. セキュリティ・障害時挙動
 

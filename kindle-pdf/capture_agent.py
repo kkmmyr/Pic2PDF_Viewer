@@ -34,6 +34,21 @@ except ImportError:
     pass
 
 _COMPATIBILITY_EXPORTS = (_package_path,)
+_MIN_CAPTURE_SCREENS = {"novel": 50, "comic": 10}
+
+
+def _validate_capture_count(job: dict, page_count: int) -> None:
+    expected_screens = job.get("expected_screens")
+    minimum = (
+        int(expected_screens)
+        if expected_screens is not None
+        else _MIN_CAPTURE_SCREENS[job["source"]]
+    )
+    if page_count < minimum:
+        raise AgentExecutionError(
+            "capture_incomplete",
+            f"撮影結果が最低件数を満たしていません: {page_count}/{minimum}画面",
+        )
 
 
 def _capture(
@@ -170,6 +185,7 @@ def _run_claimed_job(
                 ),
             )
             heartbeat.raise_if_failed()
+            _validate_capture_count(job, page_count)
             try:
                 _publish_package(config, job, image_dir)
             except AgentExecutionError:

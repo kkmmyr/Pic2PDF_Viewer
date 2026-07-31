@@ -3,7 +3,6 @@ import time
 from _ctypes import COMError
 from collections.abc import Callable
 
-import pyautogui
 from PIL import Image
 
 from .models import (
@@ -46,7 +45,12 @@ class LibraryControllerMixin(WindowController):
         self.open_library()
         self._set_search_value(identity.asin)
         time.sleep(self.config.screen_transition_seconds)
-        return select_verified_candidate(identity, self.collect_candidates(identity))
+        deadline = time.monotonic() + self.config.reader_timeout_seconds
+        while True:
+            candidates = self.collect_candidates(identity)
+            if candidates or time.monotonic() >= deadline:
+                return select_verified_candidate(identity, candidates)
+            time.sleep(0.5)
 
     def _set_search_value(self, value: str) -> None:
         deadline = time.monotonic() + self.config.control_timeout_seconds
@@ -54,18 +58,20 @@ class LibraryControllerMixin(WindowController):
             edit = self._search_edit(timeout=0.5)
             if edit is not None:
                 try:
-                    # UI Automation の矩形と pyautogui の座標系は、表示倍率が異なる
-                    # マルチモニター環境で一致しない場合がある。値の設定自体は通常の
-                    # キーボード入力を維持し、フォーカスだけを control へ直接渡す。
+                    # Keyboard input is affected by the active IME. On the
+                    # Japanese environment it converted an ASIN to full-width
+                    # characters and appended it on every retry. Replacing the
+                    # complete ValuePattern is independent of focus geometry,
+                    # selection state, and IME mode.
                     edit.SetFocus()
-                    pyautogui.hotkey("ctrl", "a")
-                    pyautogui.write(value, interval=0.02)
+                    value_pattern = edit.GetValuePattern()
+                    value_pattern.SetValue(value)
                     time.sleep(0.1)
-                    if str(edit.GetValuePattern().Value) == value:
+                    if str(value_pattern.Value) == value:
                         return
                 except (AttributeError, COMError, TypeError, ValueError):
                     logger.debug(
-                        "Kindle search field focus or value verification failed transiently",
+                        "Kindle search field replacement or verification failed transiently",
                         exc_info=True,
                     )
             time.sleep(0.5)

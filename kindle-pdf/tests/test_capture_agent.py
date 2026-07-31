@@ -9,13 +9,13 @@ import capture_package
 from kindle_app_controller import BookCandidate, KindleControllerError
 
 
-def _job(status: str = "claimed") -> dict:
+def _job(status: str = "claimed", *, expected_screens: int | None = 5) -> dict:
     return {
         "id": "11111111-1111-1111-1111-111111111111",
         "asin": "B012345678",
         "source": "novel",
         "direction": "left",
-        "expected_screens": None,
+        "expected_screens": expected_screens,
         "status": status,
         "identity": {
             "asin": "B012345678",
@@ -216,6 +216,26 @@ def test_controller_error_is_recorded_without_capture(
     assert not capture_called
     assert api.states[-1]["state"] == "failed"
     assert api.states[-1]["error_code"] == "book_not_found"
+
+
+def test_incomplete_novel_capture_is_not_published(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _Api(_job(expected_screens=None))
+    monkeypatch.setattr(capture_agent, "HeartbeatWorker", _Heartbeat)
+    monkeypatch.setattr(capture_agent, "_capture", _fake_capture)
+
+    capture_agent.run_once(
+        _config(tmp_path),
+        api,
+        controller_factory=_Controller,
+    )
+
+    assert api.states[-1]["state"] == "failed"
+    assert api.states[-1]["error_code"] == "capture_incomplete"
+    assert not any(path.endswith("/complete") for path, _body in api.calls)
+    assert not (_config(tmp_path).inbox / f"{_job()['id']}.ready").exists()
 
 
 def test_midflight_job_is_not_implicitly_resumed(
