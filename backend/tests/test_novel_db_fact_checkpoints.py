@@ -68,6 +68,28 @@ def test_validate_rejects_page_outside_source_block() -> None:
         validate_and_structure_fact_sheet(sheet, allowed_pages={1, 2})
 
 
+def test_validate_accepts_grouped_page_evidence_and_checks_every_page() -> None:
+    sheet = BookFactSheet(
+        book_facts="- [page 18, page 20] 影傑が茉莉花を出迎えた。",
+        character_facts={"影傑": "- [page 18、20] 茉莉花と面会した。"},
+    )
+
+    records = validate_and_structure_fact_sheet(sheet, allowed_pages={18, 20})
+
+    assert [record.pages for record in records] == [(18, 20), (18, 20)]
+    assert records[0].text == "影傑が茉莉花を出迎えた。"
+
+
+def test_validate_rejects_invalid_page_inside_grouped_evidence() -> None:
+    sheet = BookFactSheet(
+        book_facts="- [page 18, page 99] 影傑が茉莉花を出迎えた。",
+        character_facts={"影傑": "- [page 18] 茉莉花と面会した。"},
+    )
+
+    with pytest.raises(ValueError, match="outside its block: 99"):
+        validate_and_structure_fact_sheet(sheet, allowed_pages={18, 20})
+
+
 def test_checkpoint_roundtrip_and_identity(book_id: int) -> None:
     pages = [(1, "第一ページ"), (2, "第二ページ")]
     source_hash = hash_source_pages(pages)
@@ -114,6 +136,15 @@ def test_checkpoint_roundtrip_and_identity(book_id: int) -> None:
         "pages": [1],
         "text": "茉莉花が課題を引き受けた。",
     }
+
+
+def test_source_hash_changes_when_character_ledger_changes() -> None:
+    pages = [(1, "第一ページ")]
+
+    assert hash_source_pages(pages, prompt_context="- 皓茉莉花") != hash_source_pages(
+        pages,
+        prompt_context="- 茉莉花",
+    )
 
 
 def test_prune_removes_only_obsolete_tail_blocks(book_id: int) -> None:

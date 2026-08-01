@@ -17,6 +17,7 @@ from services.novel_db import with_db
 from services.novel_db._prompts import parse_combined_output
 from services.novel_db.generation_quality import (
     choose_publishable_prose,
+    parse_fact_sheet,
     select_pages_across_book,
 )
 from services.novel_db.lance_store import get_summaries_table
@@ -34,8 +35,7 @@ from services.novel_db.summarizer import (
 
 _CATALOG_SUMMARY = (
     "レティは友人を助けるため事件の調査を引き受け、"
-    + "集めた手掛かりを照合しながら周囲との信頼を深め、真相へ近づいていく過程を描き、"
-    * 11
+    + "集めた手掛かりを照合しながら周囲との信頼を深め、真相へ近づいていく過程を描き、" * 11
     + "最後には事件を解決して新たな役割を担う。"
 )
 
@@ -134,6 +134,13 @@ def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
 
 
 def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book, mock_summary_grounding):
+    with with_db() as conn:
+        conn.execute(
+            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
+            (db_with_book, "主人公", "公開版の人物説明", 3, 1),
+        )
+        conn.commit()
+
     with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = [
             "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。",
@@ -152,6 +159,8 @@ def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book, mock_
     assert mock_ask.call_count == 4
     prompts = [call.args[0] for call in mock_ask.call_args_list]
     assert "[page 3]" in prompts[0]
+    assert "公開版人物名台帳（名前だけ。人物説明や事実ではない）:\n- 主人公" in prompts[0]
+    assert "公開版の人物説明" not in prompts[0]
     assert "主要人物ごとの事実へ再編" in prompts[1]
     assert "ページ根拠付きで抽出した事実" in prompts[2]
     assert "意味を変えずに読みやすい完成文" in prompts[3]
@@ -334,6 +343,19 @@ def test_parse_combined_output_preserves_full_unmarked_summary():
     assert len(summary) > 3000
     assert summary == long_summary
     assert characters == {"レティ": "人物像"}
+
+
+def test_parse_fact_sheet_ignores_explicit_empty_character_candidate():
+    sheet = parse_fact_sheet(
+        """[BOOK_FACTS]
+- [page 18] 影傑が茉莉花を出迎えた。
+[CHARACTER_FACT:影傑]
+- [page 18] 茉莉花と面会した。
+[CHARACTER_FACT:芳子星]
+（該当事実なし：このブロックには芳子星への言及がありません。）"""
+    )
+
+    assert sheet.character_facts == {"影傑": "- [page 18] 茉莉花と面会した。"}
 
 
 def test_generation_rejects_fact_output_without_book_facts(db_with_book):

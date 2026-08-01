@@ -101,9 +101,7 @@ class TestRunCombinedStep:
         db_conn.commit()
 
         logs = []
-        mock_summarize = MagicMock(
-            return_value=("新サマリ", "新しい一覧向け要約", {"キャラ": "キャラは行動した。"})
-        )
+        mock_summarize = MagicMock(return_value=("新サマリ", "新しい一覧向け要約", {"キャラ": "キャラは行動した。"}))
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
             patch("services.novel_db.full_builder.index_book_summary"),
@@ -195,6 +193,94 @@ class TestRunCombinedStep:
             ("ラーナシュ・ヴァルマ", 2, 2),
             ("皓茉莉花", 2, 2),
         ]
+
+    def test_redo_preserves_published_canonical_names_for_aliases(self, db_conn):
+        book_id = _insert_book(db_conn, "canonical-book", summary="旧サマリ")
+        _insert_page(db_conn, book_id, 2, "皓茉莉花は芳子星に相談し、封大虎と出発した。")
+        for name in ("皓茉莉花", "芳子星", "封大虎"):
+            db_conn.execute(
+                "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
+                (book_id, name, f"旧{name}説明", 2, 1),
+            )
+        db_conn.commit()
+
+        generated = {
+            "茉莉花": "茉莉花は主人公として行動する。",
+            "子星": "子星は茉莉花を指導する。",
+            "冬虎皇子": "冬虎皇子（封大虎）は茉莉花に同行する。",
+        }
+        with (
+            patch(
+                "services.novel_db.full_builder.summarize_book_with_characters",
+                return_value=("新サマリ", "新しい一覧向け要約", generated),
+            ),
+            patch("services.novel_db.full_builder.index_book_summary"),
+        ):
+            _run_combined_step(db_conn, "canonical-book", redo=True, log=lambda _: None)
+
+        rows = db_conn.execute(
+            "SELECT name FROM book_characters WHERE book_id = ? ORDER BY name",
+            (book_id,),
+        ).fetchall()
+        assert [row[0] for row in rows] == ["封大虎", "皓茉莉花", "芳子星"]
+
+    def test_evidenced_published_character_deletion_preserves_old_content(self, db_conn):
+        book_id = _insert_book(db_conn, "deletion-guard-book", summary="旧サマリ")
+        _insert_page(db_conn, book_id, 2, "既存人物と削除人物が協力した。")
+        for name in ("既存人物", "削除人物"):
+            db_conn.execute(
+                "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
+                (book_id, name, f"旧{name}説明", 2, 1),
+            )
+        db_conn.commit()
+
+        with patch(
+            "services.novel_db.full_builder.summarize_book_with_characters",
+            return_value=("新サマリ", "新しい一覧向け要約", {"既存人物": "既存人物の新説明。"}),
+        ):
+            with pytest.raises(ValueError, match="evidenced published characters missing: 削除人物"):
+                _run_combined_step(db_conn, "deletion-guard-book", redo=True, log=lambda _: None)
+
+        book = db_conn.execute(
+            "SELECT summary, catalog_summary FROM books WHERE id = ?",
+            (book_id,),
+        ).fetchone()
+        rows = db_conn.execute(
+            "SELECT name, summary FROM book_characters WHERE book_id = ? ORDER BY name",
+            (book_id,),
+        ).fetchall()
+        assert tuple(book) == ("旧サマリ", "既存の一覧向け要約")
+        assert [tuple(row) for row in rows] == [
+            ("削除人物", "旧削除人物説明"),
+            ("既存人物", "旧既存人物説明"),
+        ]
+
+    def test_published_character_without_current_evidence_can_be_removed(self, db_conn):
+        book_id = _insert_book(db_conn, "stale-character-book", summary="旧サマリ")
+        _insert_page(db_conn, book_id, 2, "既存人物だけが行動した。")
+        for name in ("既存人物", "旧ノイズ"):
+            db_conn.execute(
+                "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
+                (book_id, name, f"旧{name}説明", 2, 1),
+            )
+        db_conn.commit()
+        logs: list[str] = []
+
+        with (
+            patch(
+                "services.novel_db.full_builder.summarize_book_with_characters",
+                return_value=("新サマリ", "新しい一覧向け要約", {"既存人物": "既存人物の新説明。"}),
+            ),
+            patch("services.novel_db.full_builder.index_book_summary"),
+        ):
+            _run_combined_step(db_conn, "stale-character-book", redo=True, log=logs.append)
+
+        rows = db_conn.execute(
+            "SELECT name FROM book_characters WHERE book_id = ?",
+            (book_id,),
+        ).fetchall()
+        assert [row[0] for row in rows] == ["既存人物"]
+        assert any("allow removal without current page evidence: 旧ノイズ" in message for message in logs)
 
     def test_invalid_new_characters_preserve_existing_summary_and_dictionary(self, db_conn):
         book_id = _insert_book(db_conn, "atomic-book", summary="旧サマリ")

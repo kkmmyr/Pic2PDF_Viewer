@@ -55,8 +55,11 @@ def extract_fact_sheet(
     *,
     model: str,
     progress: ProgressCallback | None,
+    canonical_character_names: list[str] | None = None,
 ) -> BookFactSheet:
     """Extract page-grounded book and character facts from every body block."""
+    canonical_names = canonical_character_names or []
+    character_ledger = _render_character_ledger(canonical_names)
     chunks = chunk_pages_by_chars(pages, max_chars=FACT_CHUNK_MAX_CHARS)
     _log(
         progress,
@@ -64,7 +67,7 @@ def extract_fact_sheet(
     )
     sheets: list[BookFactSheet] = []
     for index, chunk in enumerate(chunks, 1):
-        source_hash = hash_source_pages(chunk)
+        source_hash = hash_source_pages(chunk, prompt_context=character_ledger)
         allowed_pages = {page_no for page_no, _ in chunk}
         cached = load_fact_block(
             conn,
@@ -87,6 +90,7 @@ def extract_fact_sheet(
             book_name=book_name,
             part_index=index,
             part_count=len(chunks),
+            character_ledger=character_ledger,
             text=format_page_blocks(chunk),
         )
         book_response = QWEN_BACKEND.ask(
@@ -100,6 +104,7 @@ def extract_fact_sheet(
 
         character_prompt = CHARACTER_FACT_EXTRACTION_PROMPT.format(
             book_name=book_name,
+            character_ledger=character_ledger,
             book_facts=book_sheet.book_facts,
         )
         character_response = QWEN_BACKEND.ask(
@@ -139,7 +144,14 @@ def extract_fact_sheet(
     merged = merge_fact_sheets(sheets)
     if not merged.character_facts:
         raise ValueError("fact extraction did not contain any named character facts")
-    return merged
+    normalized_characters = normalize_character_entries(
+        merged.character_facts,
+        canonical_names=canonical_names,
+    )
+    return BookFactSheet(
+        book_facts=merged.book_facts,
+        character_facts={entry.name: entry.summary for entry in normalized_characters},
+    )
 
 
 def write_and_edit_summary(
@@ -307,6 +319,12 @@ def _render_fact_sheet(fact_sheet: BookFactSheet) -> str:
     parts = [f"[BOOK_FACTS]\n{fact_sheet.book_facts}"]
     parts.extend(f"[CHARACTER_FACT:{name}]\n{facts}" for name, facts in fact_sheet.character_facts.items())
     return "\n\n".join(parts)
+
+
+def _render_character_ledger(names: list[str]) -> str:
+    if not names:
+        return "（なし）"
+    return "\n".join(f"- {name}" for name in names)
 
 
 def _find_character_evidence_pages(

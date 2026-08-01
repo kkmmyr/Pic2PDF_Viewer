@@ -52,6 +52,37 @@ def test_normalize_character_entries_merges_aliases_and_summaries():
     assert entries[0].aliases == ("第一皇子 守伸", "守伸", "守伸殿")
 
 
+def test_normalize_character_entries_prefers_published_short_form_match():
+    entries = normalize_character_entries(
+        {
+            "茉莉花": "茉莉花は主人公。",
+            "子星": "子星は茉莉花を指導する。",
+        },
+        canonical_names=["皓茉莉花", "芳子星"],
+    )
+
+    assert [entry.name for entry in entries] == ["皓茉莉花", "芳子星"]
+
+
+def test_normalize_character_entries_uses_only_explicit_non_lexical_alias():
+    entries = normalize_character_entries(
+        {"冬虎皇子": "冬虎皇子（封大虎）は茉莉花に同行する。"},
+        canonical_names=["封大虎", "苑翔景"],
+    )
+
+    assert entries[0].name == "封大虎"
+    assert "冬虎皇子" in entries[0].aliases
+
+
+def test_normalize_character_entries_keeps_ambiguous_short_form():
+    entries = normalize_character_entries(
+        {"茉莉花": "茉莉花は行動する。"},
+        canonical_names=["皓茉莉花", "葉茉莉花"],
+    )
+
+    assert entries[0].name == "茉莉花"
+
+
 def test_derive_character_evidence_aliases_uses_common_short_forms():
     assert derive_character_evidence_aliases("皓茉莉花") == ("茉莉花",)
     assert derive_character_evidence_aliases("ラーナシュ・ヴァルマ") == ("ラーナシュ",)

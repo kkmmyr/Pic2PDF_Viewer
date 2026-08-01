@@ -89,6 +89,7 @@ def summarize_book(
     if book_row is None:
         raise ValueError(f"book not found: {book_name}")
     book_id, page_count = book_row
+    canonical_character_names = _load_published_character_names(conn, book_id)
 
     body_pages = _load_body_pages(
         conn,
@@ -107,6 +108,7 @@ def summarize_book(
         body_pages,
         model=model,
         progress=progress,
+        canonical_character_names=canonical_character_names,
     )
     summary = write_and_edit_summary(
         book_name,
@@ -156,6 +158,7 @@ def summarize_book_with_characters(
     if book_row is None:
         raise ValueError(f"book not found: {book_name}")
     book_id, page_count = book_row
+    canonical_character_names = _load_published_character_names(conn, book_id)
 
     body_pages = _load_body_pages(
         conn,
@@ -174,6 +177,7 @@ def summarize_book_with_characters(
         body_pages,
         model=model,
         progress=progress,
+        canonical_character_names=canonical_character_names,
     )
     summary = write_and_edit_summary(
         book_name=book_name,
@@ -230,6 +234,16 @@ def summarize_book_with_characters(
         f"{len(char_summaries)} characters",
     )
     return summary, catalog_summary, char_summaries
+
+
+def _load_published_character_names(conn: sqlite3.Connection, book_id: int) -> list[str]:
+    return [
+        str(row[0])
+        for row in conn.execute(
+            "SELECT name FROM book_characters WHERE book_id = ? ORDER BY id",
+            (book_id,),
+        ).fetchall()
+    ]
 
 
 def update_book_summary(

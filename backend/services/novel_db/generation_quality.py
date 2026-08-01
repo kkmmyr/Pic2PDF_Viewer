@@ -11,6 +11,10 @@ _CHARACTER_FACT_RE = re.compile(
     r"\[CHARACTER_FACT:([^\]]+)\](.*?)(?=\[CHARACTER_FACT:|$)",
     re.DOTALL,
 )
+_EMPTY_CHARACTER_FACT_RE = re.compile(
+    r"^[（(]?\s*(?:該当(?:する)?事実|該当|関連事実|事実|言及|登場)"
+    r"(?:は|が)?(?:なし|ない|ありません)(?:[：:。、）)\s]|$)",
+)
 _SENTENCE_RE = re.compile(r"[^。！？!?\n]+[。！？!?]")
 _EDITOR_PREFIX_RE = re.compile(r"^(?:修正版|校正版|編集後|書き直し(?:後)?)[：:\s]")
 
@@ -35,6 +39,8 @@ def parse_fact_sheet(text: str) -> BookFactSheet:
     for match in _CHARACTER_FACT_RE.finditer(text):
         name = match.group(1).strip()
         facts = match.group(2).strip()
+        if _EMPTY_CHARACTER_FACT_RE.match(facts):
+            continue
         if name and facts:
             previous = character_facts.get(name)
             character_facts[name] = f"{previous}\n{facts}" if previous else facts

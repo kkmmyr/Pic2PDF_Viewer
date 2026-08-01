@@ -12,7 +12,7 @@ from typing import Any, Literal
 
 from local_llm import Backend
 
-from ._prompts import GROUNDING_OPTIONS, SUMMARY_GROUNDING_PROMPT
+from ._prompts import GROUNDING_OPTIONS, SUMMARY_GROUNDING_PROMPT, SUMMARY_GROUNDING_REPAIR_PROMPT
 from .fact_checkpoints import FactRecord, validate_and_structure_fact_sheet
 from .generation_quality import BookFactSheet
 from .search import Scope, hybrid_search
@@ -26,8 +26,9 @@ _NON_CONTENT_RE = re.compile(r"[\s、。！？!?「」『』（）()・：:―�
 _MAX_CLAIMS = 64
 _RAG_TOP_PER_CLAIM = 4
 _FACT_TOP_PER_CLAIM = 2
-_MAX_EVIDENCE_PAGES = 48
-_MAX_EVIDENCE_CHARS = 60_000
+_MANDATORY_PAGES_PER_CLAIM = 2
+_MAX_EVIDENCE_PAGES = 64
+_MAX_EVIDENCE_CHARS = 90_000
 
 
 class GroundingError(ValueError):
@@ -58,12 +59,8 @@ class GroundingReport:
 
     @property
     def passed(self) -> bool:
-        return (
-            all(claim.verdict == "supported" for claim in self.claims)
-            and (
-                not self.coverage_required
-                or (self.coverage_verdict == "pass" and not self.missing_facts)
-            )
+        return all(claim.verdict == "supported" for claim in self.claims) and (
+            not self.coverage_required or (self.coverage_verdict == "pass" and not self.missing_facts)
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -96,7 +93,26 @@ def verify_summary_grounding(
     if not claims:
         raise GroundingError("summary grounding requires at least one claim")
     if len(claims) > _MAX_CLAIMS:
-        raise GroundingError(f"summary grounding claim limit exceeded: {len(claims)}")
+        error = f"summary grounding claim limit exceeded: {len(claims)}"
+        _save_report(
+            conn,
+            book_id=book_id,
+            summary=summary,
+            writer_model=writer_model,
+            verifier_model=verifier_model,
+            content_type=content_type,
+            passed=False,
+            payload={
+                "passed": False,
+                "error": error,
+                "claim_limit": _MAX_CLAIMS,
+                "claims": [
+                    {"id": claim_id, "text": claim}
+                    for claim_id, claim in enumerate(claims, 1)
+                ],
+            },
+        )
+        raise GroundingError(error)
 
     page_rows = conn.execute(
         "SELECT page_no, full_text FROM pages WHERE book_id = ? AND index_eligible = 1 ORDER BY page_no",
@@ -115,6 +131,10 @@ def verify_summary_grounding(
         claims=claims,
         book_records=book_records,
     )
+    candidates = {
+        claim_id: _expand_candidate_neighbors(pages, available_pages=set(page_texts))
+        for claim_id, pages in candidates.items()
+    }
     selected_pages = _select_evidence_pages(candidates, page_texts)
     selected_set = set(selected_pages)
     candidates = {
@@ -140,25 +160,73 @@ def verify_summary_grounding(
         options=GROUNDING_OPTIONS,
     ).strip()
 
+    initial_error: str | None = None
+    initial_raw_response: str | None = None
     try:
         report = parse_grounding_response(
             raw_response,
             claims=claims,
             candidate_pages=candidates,
             coverage_required=coverage_required,
+            allowed_evidence_pages=selected_set,
         )
     except GroundingError as exc:
-        _save_report(
-            conn,
-            book_id=book_id,
-            summary=summary,
-            writer_model=writer_model,
-            verifier_model=verifier_model,
-            content_type=content_type,
-            passed=False,
-            payload={"passed": False, "error": str(exc), "raw_response": raw_response},
+        initial_error = str(exc)
+        initial_raw_response = raw_response
+        repair_prompt = SUMMARY_GROUNDING_REPAIR_PROMPT.format(
+            validation_error=initial_error,
+            original_prompt=prompt,
+            previous_response=initial_raw_response,
         )
-        raise
+        raw_response = verifier_backend.ask(
+            repair_prompt,
+            model=verifier_model,
+            options=GROUNDING_OPTIONS,
+        ).strip()
+        try:
+            report = parse_grounding_response(
+                raw_response,
+                claims=claims,
+                candidate_pages=candidates,
+                coverage_required=coverage_required,
+                allowed_evidence_pages=selected_set,
+            )
+        except GroundingError as repair_exc:
+            diagnostic_claims = [
+                {
+                    "id": claim_id,
+                    "text": claim,
+                    "candidate_pages": list(candidates.get(claim_id, ())),
+                }
+                for claim_id, claim in enumerate(claims, 1)
+            ]
+            _save_report(
+                conn,
+                book_id=book_id,
+                summary=summary,
+                writer_model=writer_model,
+                verifier_model=verifier_model,
+                content_type=content_type,
+                passed=False,
+                payload={
+                    "passed": False,
+                    "error": str(repair_exc),
+                    "initial_error": initial_error,
+                    "claims": diagnostic_claims,
+                    "selected_evidence_pages": selected_pages,
+                    "initial_raw_response": initial_raw_response,
+                    "raw_response": raw_response,
+                },
+            )
+            raise
+
+    payload = report.to_dict()
+    if initial_error is not None and initial_raw_response is not None:
+        payload["repair"] = {
+            "attempted": True,
+            "initial_error": initial_error,
+            "initial_raw_response": initial_raw_response,
+        }
 
     _save_report(
         conn,
@@ -168,7 +236,7 @@ def verify_summary_grounding(
         verifier_model=verifier_model,
         content_type=content_type,
         passed=report.passed,
-        payload=report.to_dict(),
+        payload=payload,
     )
     if not report.passed:
         failed_claims = [str(claim.claim_id) for claim in report.claims if claim.verdict != "supported"]
@@ -198,6 +266,7 @@ def parse_grounding_response(
     claims: list[str],
     candidate_pages: dict[int, tuple[int, ...]],
     coverage_required: bool = True,
+    allowed_evidence_pages: set[int] | None = None,
 ) -> GroundingReport:
     """Parse and strictly validate the verifier's JSON contract."""
     try:
@@ -225,9 +294,14 @@ def parse_grounding_response(
         if verdict not in {"supported", "contradicted", "unsupported"}:
             raise GroundingError(f"invalid grounding verdict for claim {claim_id}: {verdict}")
         evidence_pages = _integer_tuple(item.get("evidence_pages"), label=f"claim {claim_id} evidence_pages")
-        allowed = set(candidate_pages.get(claim_id, ()))
+        allowed = (
+            allowed_evidence_pages
+            if allowed_evidence_pages is not None
+            else set(candidate_pages.get(claim_id, ()))
+        )
         if set(evidence_pages) - allowed:
-            raise GroundingError(f"claim {claim_id} cited a page outside its candidates")
+            label = "provided evidence pages" if allowed_evidence_pages is not None else "candidates"
+            raise GroundingError(f"claim {claim_id} cited a page outside its {label}")
         if verdict == "supported" and not evidence_pages:
             raise GroundingError(f"supported claim {claim_id} has no evidence page")
         reason = item.get("reason")
@@ -289,6 +363,13 @@ def _candidate_pages_by_claim(
     scope = Scope(type="book", id=book_name)
     for claim_id, claim in enumerate(claims, 1):
         pages: list[int] = []
+        related = sorted(
+            book_records,
+            key=lambda record: (-_bigram_overlap(claim, record.text), record.pages[0]),
+        )
+        for record in related[:_FACT_TOP_PER_CLAIM]:
+            if _bigram_overlap(claim, record.text) > 0:
+                pages.extend(record.pages)
         hits = hybrid_search(
             conn,
             claim,
@@ -298,13 +379,6 @@ def _candidate_pages_by_claim(
             vec_n=12,
         )
         pages.extend(int(hit.page_no) for hit in hits)
-        related = sorted(
-            book_records,
-            key=lambda record: (-_bigram_overlap(claim, record.text), record.pages[0]),
-        )
-        for record in related[:_FACT_TOP_PER_CLAIM]:
-            if _bigram_overlap(claim, record.text) > 0:
-                pages.extend(record.pages)
         result[claim_id] = tuple(dict.fromkeys(pages))
     return result
 
@@ -314,7 +388,14 @@ def _select_evidence_pages(
     page_texts: dict[int, str],
 ) -> list[int]:
     counts = Counter(page for pages in candidates.values() for page in pages if page in page_texts)
-    mandatory = list(dict.fromkeys(pages[0] for pages in candidates.values() if pages and pages[0] in page_texts))
+    mandatory = list(
+        dict.fromkeys(
+            page
+            for pages in candidates.values()
+            for page in pages[:_MANDATORY_PAGES_PER_CLAIM]
+            if page in page_texts
+        )
+    )
     remaining = sorted(
         (page for page in counts if page not in mandatory),
         key=lambda page: (-counts[page], page),
@@ -331,6 +412,22 @@ def _select_evidence_pages(
         selected.append(page)
         used_chars += page_chars
     return sorted(selected)
+
+
+def _expand_candidate_neighbors(
+    pages: tuple[int, ...],
+    *,
+    available_pages: set[int],
+) -> tuple[int, ...]:
+    """Keep direct candidates first, then add existing adjacent pages."""
+    direct = [page for page in pages if page in available_pages]
+    adjacent = [
+        neighbor
+        for page in direct
+        for neighbor in (page - 1, page + 1)
+        if neighbor in available_pages
+    ]
+    return tuple(dict.fromkeys([*direct, *adjacent]))
 
 
 def _render_claims(claims: list[str], candidates: dict[int, tuple[int, ...]]) -> str:

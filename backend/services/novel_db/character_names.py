@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 NAME_MAX_LENGTH = 30
@@ -94,14 +94,20 @@ def parse_character_names(raw: str | None) -> list[str]:
     return names
 
 
-def normalize_character_entries(entries: Mapping[str, str]) -> list[NormalizedCharacter]:
-    """Normalize and merge LLM-generated character dictionary entries."""
+def normalize_character_entries(
+    entries: Mapping[str, str],
+    *,
+    canonical_names: Iterable[str] = (),
+) -> list[NormalizedCharacter]:
+    """Normalize and merge entries, preferring unambiguous published names."""
+    canonical = _normalize_canonical_names(canonical_names)
     merged: dict[str, dict[str, list[str]]] = {}
     for raw_name, raw_summary in entries.items():
         name = normalize_character_name(raw_name)
         summary = str(raw_summary or "").strip()
         if name is None or not summary:
             continue
+        name = _resolve_canonical_name(name, summary, canonical)
         bucket = merged.setdefault(name, {"summaries": [], "aliases": []})
         if summary not in bucket["summaries"]:
             bucket["summaries"].append(summary)
@@ -130,3 +136,44 @@ def derive_character_evidence_aliases(name: str) -> tuple[str, ...]:
         if len(first_component) >= 4:
             return (first_component,)
     return ()
+
+
+def _normalize_canonical_names(names: Iterable[str]) -> tuple[str, ...]:
+    normalized: list[str] = []
+    for value in names:
+        name = normalize_character_name(value)
+        if name is not None and name not in normalized:
+            normalized.append(name)
+    return tuple(normalized)
+
+
+def _resolve_canonical_name(
+    name: str,
+    summary: str,
+    canonical_names: tuple[str, ...],
+) -> str:
+    if name in canonical_names:
+        return name
+
+    matches = {
+        canonical
+        for canonical in canonical_names
+        if name in derive_character_evidence_aliases(canonical)
+        or canonical in derive_character_evidence_aliases(name)
+        or _has_explicit_alias_pair(summary, name, canonical)
+    }
+    if len(matches) == 1:
+        return matches.pop()
+    return name
+
+
+def _has_explicit_alias_pair(text: str, left: str, right: str) -> bool:
+    escaped_left = re.escape(left)
+    escaped_right = re.escape(right)
+    pair_patterns = (
+        rf"{escaped_left}\s*[（(]\s*{escaped_right}\s*[）)]",
+        rf"{escaped_right}\s*[（(]\s*{escaped_left}\s*[）)]",
+        rf"{escaped_left}\s*(?:こと|別名|通称|本名|正体は)\s*{escaped_right}",
+        rf"{escaped_right}\s*(?:こと|別名|通称|本名|正体は)\s*{escaped_left}",
+    )
+    return any(re.search(pattern, text) for pattern in pair_patterns)

@@ -123,6 +123,13 @@ def _run_combined_step(
         log("  skip: book not found in DB")
         return
     book_id, existing_summary, existing_catalog_summary = row
+    existing_character_names = [
+        str(character[0])
+        for character in conn.execute(
+            "SELECT name FROM book_characters WHERE book_id = ? ORDER BY id",
+            (book_id,),
+        ).fetchall()
+    ]
 
     has_chars = (
         conn.execute(
@@ -156,9 +163,17 @@ def _run_combined_step(
         book_id,
         char_summaries,
         log=log,
+        canonical_names=existing_character_names,
     )
     if not prepared_characters:
         raise ValueError("no publishable characters; existing generated content was preserved")
+    _guard_character_deletion_regression(
+        conn,
+        book_id,
+        existing_names=existing_character_names,
+        prepared_names=[row[0] for row in prepared_characters],
+        log=log,
+    )
 
     try:
         conn.execute(
@@ -190,10 +205,7 @@ def _run_combined_step(
     index_book_summary(conn, book_id, summary)
     saved_count = len(prepared_characters)
 
-    log(
-        f"  done: detailed={len(summary)} chars, catalog={len(catalog_summary)} chars, "
-        f"{saved_count} characters"
-    )
+    log(f"  done: detailed={len(summary)} chars, catalog={len(catalog_summary)} chars, {saved_count} characters")
 
 
 def _prepare_character_rows(
@@ -202,9 +214,13 @@ def _prepare_character_rows(
     char_summaries: dict[str, str],
     *,
     log: StepCallback,
+    canonical_names: list[str] | None = None,
 ) -> list[tuple[str, str, int, int]]:
     """Validate page evidence and prepare rows without mutating the database."""
-    entries = normalize_character_entries(char_summaries)
+    entries = normalize_character_entries(
+        char_summaries,
+        canonical_names=canonical_names or [],
+    )
     page_rows = conn.execute(
         "SELECT page_no, full_text FROM pages WHERE book_id = ? AND index_eligible = 1 ORDER BY page_no",
         (book_id,),
@@ -234,6 +250,56 @@ def _prepare_character_rows(
             )
         )
     return prepared
+
+
+def _guard_character_deletion_regression(
+    conn: sqlite3.Connection,
+    book_id: int,
+    *,
+    existing_names: list[str],
+    prepared_names: list[str],
+    log: StepCallback,
+) -> None:
+    """Reject unexplained deletion of published characters with current page evidence."""
+    if not existing_names:
+        return
+
+    published = normalize_character_entries(
+        {name: name for name in existing_names},
+        canonical_names=existing_names,
+    )
+    prepared = normalize_character_entries(
+        {name: name for name in prepared_names},
+        canonical_names=[entry.name for entry in published],
+    )
+    prepared_set = {entry.name for entry in prepared}
+    page_texts = [
+        str(row[0] or "")
+        for row in conn.execute(
+            "SELECT full_text FROM pages WHERE book_id = ? AND index_eligible = 1",
+            (book_id,),
+        ).fetchall()
+    ]
+
+    unexplained: list[str] = []
+    for entry in published:
+        if entry.name in prepared_set:
+            continue
+        exact_count = sum(entry.name in text for text in page_texts)
+        derived_counts = {
+            alias: sum(alias in text for text in page_texts) for alias in derive_character_evidence_aliases(entry.name)
+        }
+        if exact_count > 0 or any(count >= 2 for count in derived_counts.values()):
+            unexplained.append(entry.name)
+        else:
+            log(f"  allow removal without current page evidence: {entry.name}")
+
+    if unexplained:
+        names = ", ".join(unexplained)
+        raise ValueError(
+            "character deletion regression failed; evidenced published characters missing: "
+            f"{names}; existing generated content was preserved"
+        )
 
 
 def _run_generate_contexts(

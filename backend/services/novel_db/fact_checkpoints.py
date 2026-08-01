@@ -11,9 +11,13 @@ from typing import TypedDict
 
 from .generation_quality import BookFactSheet
 
-FACT_EXTRACTION_SCHEMA_VERSION = 1
+FACT_EXTRACTION_SCHEMA_VERSION = 3
 
-_PAGE_RE = re.compile(r"\[page\s+(\d+)\]", re.IGNORECASE)
+_PAGE_GROUP_RE = re.compile(
+    r"\[\s*page\s+\d+(?:\s*[,、/&・]\s*(?:page\s+)?\d+)*\s*\]",
+    re.IGNORECASE,
+)
+_PAGE_NUMBER_RE = re.compile(r"\d+")
 _BULLET_RE = re.compile(r"^(?:[-*・]\s*)")
 
 
@@ -42,9 +46,15 @@ class FactRecord:
         }
 
 
-def hash_source_pages(pages: list[tuple[int, str]]) -> str:
-    """Return a stable hash for an ordered page block."""
+def hash_source_pages(
+    pages: list[tuple[int, str]],
+    *,
+    prompt_context: str = "",
+) -> str:
+    """Return a stable hash for an ordered page block and prompt context."""
     digest = hashlib.sha256()
+    digest.update(prompt_context.encode("utf-8"))
+    digest.update(b"\x1d")
     for page_no, text in pages:
         digest.update(str(page_no).encode("ascii"))
         digest.update(b"\x1f")
@@ -207,11 +217,12 @@ def _parse_fact_lines(
 
     records: list[FactRecord] = []
     for item in items:
-        pages = tuple(dict.fromkeys(int(page) for page in _PAGE_RE.findall(item)))
+        page_groups = _PAGE_GROUP_RE.findall(item)
+        pages = tuple(dict.fromkeys(int(page) for group in page_groups for page in _PAGE_NUMBER_RE.findall(group)))
         if not pages:
             label = character_name or kind
             raise ValueError(f"fact is missing page evidence ({label}): {item[:80]}")
-        text = re.sub(r"\s+", " ", _PAGE_RE.sub("", item)).strip(" -・*\t")
+        text = re.sub(r"\s+", " ", _PAGE_GROUP_RE.sub("", item)).strip(" -・*\t")
         if not text:
             raise ValueError("fact text is empty after removing page evidence")
         records.append(
