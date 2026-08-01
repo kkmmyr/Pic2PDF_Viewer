@@ -132,6 +132,11 @@ Mac 上でのローカル Surya / yomitoku 実行は標準運用ではなく、
 GPU・モデル互換性と推論時間を個別に検証する。通常の Mac 開発では
 OCR を実行しないか、既存の Windows OCR agent / 推論サーバーを利用する。
 
+OwlOCR、ABBYY FineReader、Prizmo 等を本番主系とは独立した第二 OCR・
+目視確認に利用する将来評価は
+[Mac OCR 補助確認設計](../詳細設計/機能別/Mac_OCR補助確認設計.md)に従う。
+これらの結果だけで `novel.db` へ公開・索引化しない。
+
 ### Linux 同期 / NSSM サービス
 
 `LINUX_SYNC_ENABLED` はデフォルト無効。`setup_service.bat` / NSSM は Windows 専用のため Mac では使用しない。

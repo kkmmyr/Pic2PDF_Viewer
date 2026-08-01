@@ -5,6 +5,7 @@
 縦書き小説を Surya OCR 2 でテキスト化し、ページ欠落検査と画像照合QAを経てから `novel.db` へ確定する設計。yomitoku は独立照合・比較・後方互換用エンジンとして残す。
 
 - 関連: [ADR-0003: image-only モード](../../基本設計/ADR/0003_generated-image-only-mode.md)（`generated` ソースは OCR 対象外）、[GPU環境セットアップ.md](../../環境構築/GPU環境セットアップ.md)（`uv` ベースに更新済み）
+- Mac専用アプリを第二 OCR・目視確認に利用する将来評価方針は [Mac OCR 補助確認設計](Mac_OCR補助確認設計.md) を参照。本番公開条件は本書を正本とする。
 - OCR結果の取り込み先（novel.db・検索・RAG）は [小説RAG パイプライン設計](小説RAG_パイプライン設計.md) / [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
 ---

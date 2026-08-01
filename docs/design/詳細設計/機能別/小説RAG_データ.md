@@ -19,11 +19,11 @@
 
 ### 1.1 SQLite テーブル（`novel.db`）
 
-現行 head は revision `0008`。OCRステージング・QA・正解コーパスを含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
+現行 head は revision `0011`。OCRステージング・QA・正解コーパス・事実抽出チェックポイント・生成品質監査を含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
 
 | テーブル | 用途 | 主なカラム | 定義元 |
 |---|---|---|---|
-| `books` | 書籍メタ（1 冊 = 1 PDF） | `name`(UNIQUE), `pdf_path`, `images_dir`, `page_count`, `indexed_at`, `summary`, `summary_generated_at`, `ocr_done_at` | 0003 |
+| `books` | 書籍メタ（1 冊 = 1 PDF） | `name`(UNIQUE), `pdf_path`, `images_dir`, `page_count`, `indexed_at`, 詳細版`summary`, 一覧用`catalog_summary`, 各生成日時, `ocr_done_at` | 0003, 0011 |
 | `ocr_runs` | OCR実行単位のステージング | `book_name`, `engine`, `model`, `source_page_count`, `state`, QA状態・承認情報 | 0004, 0005 |
 | `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, OCR結果・品質値、QA状態、`page_type`, `layout_type`, `primary_text`, `external_text`, `selected_engine`, `corrected_text`, `index_eligible` | 0004, 0005, 0007, 0008 |
 | `ocr_ground_truth_pages` | OCR正解コーパス | `run_id`+`page_no`(UNIQUE), `image_sha256`, `page_type`, `layout_type`, `reference_text`, `state`, `note`, 検証日時 | 0007, 0008 |
@@ -32,6 +32,8 @@
 | `chunks` | 埋め込み単位のチャンク | `page_id`(FK), `chunk_idx`, `text`, `char_count`, `contextual_text`, `contextual_generated_at`(B-9 Contextual Retrieval) | 0003 |
 | `qa_history` | 単発 QA の実行ログ | `scope_type`, `scope_id`, `question`, `answer`, `prompt`, `context_json`, `model`, `options_json`, `eval_count`, `done_reason`, `error_message` | 0003 |
 | `book_characters` | キャラ辞典（書籍 × キャラ, B-15） | `book_id`(FK), `name`, `summary`, `first_page`, `page_count`, `generated_at`; UNIQUE(book_id, name) | 0003 |
+| `fact_extraction_blocks` | 要約前の事実抽出チェックポイント | `book_id`(FK), `block_index`, `page_start`, `page_end`, `source_hash`, `model`, `schema_version`, `book_facts`, `character_facts_json`, `fact_records_json`, `generated_at`; UNIQUE(book_id, block_index) | 0009 |
+| `summary_grounding_reports` | 要約候補の双方向根拠検査ログ | `book_id`(FK), `content_type`, `candidate_sha256`, `writer_model`, `verifier_model`, `passed`, `report_json`, `checked_at` | 0010 |
 | `qa_sessions` | マルチターン QA のセッション | `scope_type`, `scope_id`, `title`, `started_at`, `last_message_at` | 0003 |
 | `qa_messages` | セッション内のメッセージ | `session_id`(FK), `role`, `content`, `eval_count`, `done_reason`, `created_at` | 0003 |
 | `rebuild_jobs` | 再構築ジョブキュー | `job_type`, `target_id`, `mode`, `state`, `enqueued_at`, `started_at`, `finished_at`, `progress_total`, `progress_done`, `error_message`, `current_step`, `current_detail` | 0003 |
@@ -42,6 +44,8 @@
 - `created_at` 等のタイムスタンプは JST 固定（`datetime('now', '+9 hours')`）。
 - FK は `PRAGMA foreign_keys = ON`（`connection.py`）で有効。`journal_mode = WAL`。
 - `pages.page_no` は `kindle_novel/images/{書籍名}/NNN.png` の連番に対応するキャプチャ画面番号であり、Kindleの紙面ページ番号ではない。リフロー表示では両者は1対1対応しない。
+- `fact_extraction_blocks`は公開データではなく再利用可能な中間成果である。本文ページ列から算出した`source_hash`、使用モデル、抽出スキーマ版がすべて一致するブロックだけを再利用する。事実は生の箇条書きに加えて、根拠ページ・人物名・本文を持つ`fact_records_json`へ正規化する。要約・人物生成が失敗しても完成済みブロックは保持するが、`books.summary`と`book_characters`の公開一括確定条件は変更しない。
+- `summary_grounding_reports`は候補要約ごとの監査履歴であり、合否にかかわらず削除せず保持する。`content_type=detailed`は主張根拠と重要事実の網羅性、`catalog`は短縮後に残した主張の根拠を検査する。`passed=0`または検証応答を解釈できない候補は公開用テーブルへ確定しない。候補本文そのものは重複保存せずSHA-256で識別し、主張、根拠ページ、判定理由、重要事実の欠落を`report_json`へ保存する。
 - `pages.index_eligible=1`は`page_type=narrative`だけである。非本文ページは正本ページとして保持するが、FTS検索、chunk、Embedding、full-book入力、サマリ・人物抽出から除外する。検索・QA本文取得はこの値を正本とし、文字数や先頭・末尾位置で短い本文を再除外しない。
 - 非本文ページの`pages.full_text`は空文字とし、画像だけを公開正本に残す。機械OCR候補は`ocr_page_results`に監査用として保持し、検索索引へ混入させない。
 - `ocr_page_results.layout_type`は意味上のページ種別とは独立したOCR選択軸である。`primary_text` / `external_text`は機械候補、`corrected_text`は原画像照合済み補正、`selected_engine`は公開時の採用元を表す。`corrected_text`が非空のQA更新は`selected_engine=codex`を必須とし、補正文だけが保存されて公開に使われない状態を許可しない。
@@ -90,6 +94,9 @@
 | `NOVEL_DB_CHAR_EXTRACT_MODEL` | `gemma4:12b` | 主要登場人物抽出（短答型） |
 | `NOVEL_DB_CONTEXT_MODEL` | `gemma4:12b` | B-9 チャンク文脈生成 |
 | `NOVEL_DB_GEMMA_BACKEND` | `ollama` | Gemma 系タスクの backend（`ollama` / `qwen`=QWEN backend 流用） |
+| `NOVEL_DB_VERIFIER_BACKEND` | `qwen` | 要約根拠検証のbackend（`qwen` / `ollama` / `llama_server`）。既定は執筆サーバーを直列再利用 |
+| `NOVEL_DB_VERIFIER_MODEL` | 空（`NOVEL_DB_LLM_MODEL`を継承） | 要約根拠検証モデル。独立批評モデルを使う場合だけ指定 |
+| `NOVEL_DB_VERIFIER_BASE_URL` | `http://127.0.0.1:11436` | `NOVEL_DB_VERIFIER_BACKEND=llama_server`時の独立サーバーURL |
 | `NOVEL_DB_QA_TOP_K` | `64` | RAG QA で LLM に渡すチャンク数（B-13 段階 B） |
 | `NOVEL_DB_QA_NUM_CTX` | `32768` | QA 時の num_ctx（llama-server は `-c 36864` 起動が前提） |
 | `NOVEL_DB_QA_EXPAND_ENABLED` | `True` | B-11 Query Expansion の有効化 |
@@ -123,7 +130,7 @@ RAG のコアロジック。主なモジュール:
 - **ジョブ**: `job_queue.py`, `job_worker.py`
 - **検索 / QA**: `search_scope.py`, `search.py`, `book_summary_search.py`, `retrieval.py`, `prompt_builder.py`, `query_expander.py`, `llm.py`, `qa_history.py`, `qa_sessions.py`, `discussion_service.py`
 - **サマリ / キャラ**: `summarizer.py`, `character_extractor.py`, `character_summarizer.py`, `character_db.py`, `extractor.py`, `relation_extractor.py`, `graph_query.py`
-- **LLM 配線**: `_llm_backend.py`（backend シングルトン）, `_prompts.py`, `_prompts` 系プロンプト, `library.py`
+- **LLM 配線**: `_llm_backend.py`（執筆・軽量処理・query expansion・根拠検証のbackendシングルトン）, `_prompts.py`, `_prompts` 系プロンプト, `library.py`
 
 ### 3.2 ルーター層 `backend/routers/novel_db/`
 

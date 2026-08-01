@@ -124,6 +124,9 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
     `is_indexed`は`indexed_at != null`と同義で、チャンク・Embedding構築完了を表す。
     OCR本文の公開完了は`ocr_done_at`で判定する。小説DBに書籍行が存在するだけでは
     `is_indexed=true`にしない。
+  - 両APIは書籍一覧の選書用に`catalog_summary`と
+    `catalog_summary_generated_at`を返す。書籍詳細APIの`summary`は従来どおり、
+    RAG・類似検索にも使う網羅性優先の詳細あらすじである。
 - **OCR正解コーパスAPI**:
   - `GET /api/ocr/ground-truth`: 登録標本、OCR本文、人手正解、状態、ページ種別、レイアウト種別、ページ別CER、全verified標本の加重CER、ページ種別・レイアウト種別ごとの件数・正解文字数・加重CERを返す。
   - `POST /api/ocr/ground-truth/seed`: 登録済みrun ID・画面番号の組だけを標本へ追加する。画像SHAとOCR本文はサーバー側正本から取得する。
