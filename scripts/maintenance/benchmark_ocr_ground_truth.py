@@ -8,6 +8,9 @@ Examples:
     uv run python scripts/maintenance/benchmark_ocr_ground_truth.py yomitoku \
         --ocr-python "D:/61.tool/common/ocr/venv/Scripts/python.exe" \
         --ocr-path "D:/61.tool/common/ocr"
+    uv run python scripts/maintenance/benchmark_ocr_ground_truth.py ndlocr \
+        --ndlocr-python "C:/path/to/ndlocr-lite/.venv/Scripts/python.exe" \
+        --ndlocr-script "C:/path/to/ndlocr-lite/src/ocr.py"
 """
 
 from __future__ import annotations
@@ -18,11 +21,15 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
+import time
+import unicodedata
 from collections import defaultdict
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
+from statistics import median
 from typing import Any
 from urllib.parse import urljoin
 from urllib.request import urlopen
@@ -39,8 +46,36 @@ LAYOUT_TYPE_ORDER = (
 DEFAULT_POLICY_PATH = Path(__file__).with_name("ocr_quality_policy.json")
 
 
+def filter_entries(
+    entries: list[dict[str, Any]],
+    *,
+    entry_ids: set[int] | None,
+    run_ids: set[int] | None,
+) -> list[dict[str, Any]]:
+    selected = entries
+    if entry_ids:
+        selected = [item for item in selected if int(item["id"]) in entry_ids]
+        missing = entry_ids - {int(item["id"]) for item in selected}
+        if missing:
+            raise ValueError(
+                f"verified ground-truth entries not found: {sorted(missing)}"
+            )
+    if run_ids:
+        selected = [item for item in selected if int(item["run_id"]) in run_ids]
+        missing = run_ids - {int(item["run_id"]) for item in selected}
+        if missing:
+            raise ValueError(f"verified ground-truth runs not found: {sorted(missing)}")
+    return selected
+
+
+NORMALIZATION_VERSION = "nfkc-whitespace-dash-v1"
+_DASH_TRANSLATION = str.maketrans({dash: "―" for dash in "‐‑‒–—―"})
+
+
 def _normalize_text(text: str) -> str:
-    return re.sub(r"\s+", "", text)
+    normalized = unicodedata.normalize("NFKC", text).translate(_DASH_TRANSLATION)
+    normalized = normalized.replace("...", "…")
+    return re.sub(r"\s+", "", normalized)
 
 
 def _edit_distance(reference: str, hypothesis: str) -> int:
@@ -136,9 +171,116 @@ def character_error_details(
     }
 
 
+def character_error_operations(reference: str, hypothesis: str) -> list[dict[str, Any]]:
+    """Return exact edit operations with normalized-text indexes and local context."""
+    normalized_reference = _normalize_text(reference)
+    normalized_hypothesis = _normalize_text(hypothesis)
+    row_count = len(normalized_reference)
+    column_count = len(normalized_hypothesis)
+    directions = [bytearray(column_count + 1) for _ in range(row_count + 1)]
+    for column_index in range(1, column_count + 1):
+        directions[0][column_index] = 3
+    previous = list(range(column_count + 1))
+    for row_index, reference_char in enumerate(normalized_reference, start=1):
+        current = [row_index]
+        directions[row_index][0] = 2
+        for column_index, hypothesis_char in enumerate(normalized_hypothesis, start=1):
+            substitution = previous[column_index - 1] + (
+                reference_char != hypothesis_char
+            )
+            deletion = previous[column_index] + 1
+            insertion = current[column_index - 1] + 1
+            if substitution <= deletion and substitution <= insertion:
+                current.append(substitution)
+                directions[row_index][column_index] = 1
+            elif deletion <= insertion:
+                current.append(deletion)
+                directions[row_index][column_index] = 2
+            else:
+                current.append(insertion)
+                directions[row_index][column_index] = 3
+        previous = current
+
+    operations = []
+    row_index = row_count
+    column_index = column_count
+    while row_index or column_index:
+        direction = directions[row_index][column_index]
+        if direction == 1:
+            reference_char = normalized_reference[row_index - 1]
+            hypothesis_char = normalized_hypothesis[column_index - 1]
+            if reference_char != hypothesis_char:
+                operations.append(
+                    {
+                        "operation": "substitution",
+                        "reference_index": row_index - 1,
+                        "hypothesis_index": column_index - 1,
+                        "reference_char": reference_char,
+                        "hypothesis_char": hypothesis_char,
+                    }
+                )
+            row_index -= 1
+            column_index -= 1
+        elif direction == 2:
+            operations.append(
+                {
+                    "operation": "deletion",
+                    "reference_index": row_index - 1,
+                    "hypothesis_index": column_index,
+                    "reference_char": normalized_reference[row_index - 1],
+                    "hypothesis_char": "",
+                }
+            )
+            row_index -= 1
+        else:
+            operations.append(
+                {
+                    "operation": "insertion",
+                    "reference_index": row_index,
+                    "hypothesis_index": column_index - 1,
+                    "reference_char": "",
+                    "hypothesis_char": normalized_hypothesis[column_index - 1],
+                }
+            )
+            column_index -= 1
+    operations.reverse()
+    for operation in operations:
+        reference_index = int(operation["reference_index"])
+        context_start = max(0, reference_index - 12)
+        context_end = min(len(normalized_reference), reference_index + 13)
+        operation["reference_context"] = normalized_reference[context_start:context_end]
+    return operations
+
+
 def _get_json(url: str) -> dict[str, Any]:
-    with urlopen(url, timeout=30) as response:  # noqa: S310 - operator supplied API URL
+    with urlopen(url, timeout=120) as response:  # noqa: S310 - operator supplied API URL
         return json.load(response)
+
+
+def _run_qa_candidate(
+    entries: list[dict[str, Any]], api_base: str, field: str
+) -> dict[int, str]:
+    """Load a frozen run/page candidate without using the corrected published text."""
+    if field not in {"primary_text", "external_text"}:
+        raise ValueError(f"unsupported QA candidate field: {field}")
+    run_details = {
+        run_id: _get_json(f"{api_base.rstrip('/')}/api/ocr/qa/runs/{run_id}")
+        for run_id in sorted({int(entry["run_id"]) for entry in entries})
+    }
+    pages_by_run = {
+        run_id: {int(page["page_no"]): page for page in detail["pages"]}
+        for run_id, detail in run_details.items()
+    }
+    hypotheses: dict[int, str] = {}
+    for entry in entries:
+        entry_id = int(entry["id"])
+        run_id = int(entry["run_id"])
+        page_no = int(entry["page_no"])
+        page = pages_by_run[run_id].get(page_no)
+        if page is None:
+            raise ValueError(f"OCR QA page not found: run={run_id}, page={page_no}")
+        hypotheses[entry_id] = str(page.get(field) or "")
+    return hypotheses
 
 
 def _download_images(
@@ -256,8 +398,359 @@ def _run_yomitoku(
     return hypotheses
 
 
+def _is_truthy(value: Any) -> bool:
+    return value is True or (isinstance(value, str) and value.lower() == "true")
+
+
+def _flatten_ndlocr_contents(value: Any) -> list[dict[str, Any]]:
+    if isinstance(value, dict):
+        return [value]
+    if isinstance(value, list):
+        flattened: list[dict[str, Any]] = []
+        for item in value:
+            flattened.extend(_flatten_ndlocr_contents(item))
+        return flattened
+    return []
+
+
+def parse_ndlocr_payload(payload: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    """Normalize NDLOCR-Lite lines and preserve bbox data for later column QA."""
+    segments: list[dict[str, Any]] = []
+    for line in _flatten_ndlocr_contents(payload.get("contents", [])):
+        text = str(line.get("text", "")).strip()
+        if not text or not _is_truthy(line.get("isTextline", True)):
+            continue
+        bbox = line.get("boundingBox")
+        if not isinstance(bbox, list) or not bbox:
+            continue
+        points = [
+            point
+            for point in bbox
+            if isinstance(point, list)
+            and len(point) >= 2
+            and all(isinstance(coordinate, (int, float)) for coordinate in point[:2])
+        ]
+        if not points:
+            continue
+        center_x = sum(float(point[0]) for point in points) / len(points)
+        center_y = sum(float(point[1]) for point in points) / len(points)
+        is_vertical = _is_truthy(line.get("isVertical"))
+        segments.append(
+            {
+                "text": text,
+                "bbox": bbox,
+                "confidence": line.get("confidence"),
+                "is_vertical": is_vertical,
+                "center_x": center_x,
+                "center_y": center_y,
+            }
+        )
+
+    vertical_count = sum(segment["is_vertical"] for segment in segments)
+    predominantly_vertical = vertical_count >= max(1, len(segments) - vertical_count)
+    if predominantly_vertical:
+        segments.sort(key=lambda segment: (-segment["center_x"], segment["center_y"]))
+    else:
+        segments.sort(key=lambda segment: (segment["center_y"], segment["center_x"]))
+    for segment in segments:
+        segment.pop("center_x")
+        segment.pop("center_y")
+    return "\n".join(str(segment["text"]) for segment in segments), segments
+
+
+def _run_ndlocr(
+    entries: list[dict[str, Any]],
+    image_paths: dict[int, Path],
+    ndlocr_python: Path,
+    ndlocr_script: Path,
+    work_dir: Path,
+    rec_weights: Path | None = None,
+) -> tuple[dict[int, str], dict[int, list[dict[str, Any]]]]:
+    hypotheses: dict[int, str] = {}
+    segments_by_entry: dict[int, list[dict[str, Any]]] = {}
+    output_dir = work_dir / "ndlocr-batch"
+    output_dir.mkdir()
+    command = [
+        str(ndlocr_python),
+        str(ndlocr_script),
+        "--sourcedir",
+        str(work_dir),
+        "--output",
+        str(output_dir),
+        "--json-only",
+    ]
+    if rec_weights is not None:
+        command.extend(["--rec-weights", str(rec_weights)])
+    result = subprocess.run(
+        command,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=ndlocr_script.parent.parent,
+    )
+    for entry in entries:
+        entry_id = int(entry["id"])
+        json_path = output_dir / f"{image_paths[entry_id].stem}.json"
+        if not json_path.is_file():
+            raise RuntimeError(
+                f"NDLOCR-Lite produced no JSON file for entry "
+                f"{entry_id}: stdout={result.stdout!r}, stderr={result.stderr!r}"
+            )
+        payload = json.loads(json_path.read_text(encoding="utf-8"))
+        hypothesis, segments = parse_ndlocr_payload(payload)
+        hypotheses[entry_id] = hypothesis
+        segments_by_entry[entry_id] = segments
+    return hypotheses, segments_by_entry
+
+
+def _run_paddle(
+    entries: list[dict[str, Any]],
+    image_paths: dict[int, Path],
+    paddle_python: Path,
+    paddle_worker: Path,
+    paddle_device: str,
+    paddle_det_limit_side_len: int,
+    work_dir: Path,
+) -> tuple[dict[int, str], dict[int, list[dict[str, Any]]]]:
+    manifest_path = work_dir / "paddle-manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "tasks": [
+                    {
+                        "entry_id": int(entry["id"]),
+                        "image_path": str(image_paths[int(entry["id"])]),
+                    }
+                    for entry in entries
+                ]
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [
+            str(paddle_python),
+            str(paddle_worker),
+            "--manifest",
+            str(manifest_path),
+            "--device",
+            paddle_device,
+            "--det-limit-side-len",
+            str(paddle_det_limit_side_len),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"PaddleOCR worker failed with exit code {result.returncode}: "
+            f"stdout={result.stdout!r}, stderr={result.stderr!r}"
+        )
+    hypotheses: dict[int, str] = {}
+    segments_by_entry: dict[int, list[dict[str, Any]]] = {}
+    for line in result.stdout.splitlines():
+        if not line.startswith("{"):
+            continue
+        event = json.loads(line)
+        entry_id = int(event["entry_id"])
+        hypotheses[entry_id] = str(event["text"])
+        segments_by_entry[entry_id] = list(event["segments"])
+    missing = sorted(set(image_paths) - set(hypotheses))
+    if missing:
+        raise RuntimeError(
+            f"PaddleOCR returned no result for entries {missing}: stderr={result.stderr!r}"
+        )
+    return hypotheses, segments_by_entry
+
+
+def _run_paddle_columns(
+    entries: list[dict[str, Any]],
+    image_paths: dict[int, Path],
+    segment_report_path: Path,
+    paddle_python: Path,
+    paddle_column_worker: Path,
+    paddle_device: str,
+    paddle_column_margin: int,
+    paddle_column_scale: float,
+    work_dir: Path,
+) -> tuple[dict[int, str], dict[int, list[dict[str, Any]]]]:
+    segment_report = json.loads(segment_report_path.read_text(encoding="utf-8"))
+    source_pages = {int(page["entry_id"]): page for page in segment_report["pages"]}
+    tasks = []
+    for entry in entries:
+        entry_id = int(entry["id"])
+        source_page = source_pages.get(entry_id)
+        if source_page is None or "segments" not in source_page:
+            raise ValueError(f"segment report has no bbox data for entry {entry_id}")
+        if str(source_page["image_sha256"]) != str(entry["image_sha256"]):
+            raise ValueError(
+                f"segment report image SHA-256 mismatch for entry {entry_id}"
+            )
+        tasks.append(
+            {
+                "entry_id": entry_id,
+                "image_path": str(image_paths[entry_id]),
+                "segments": source_page["segments"],
+            }
+        )
+    manifest_path = work_dir / "paddle-column-manifest.json"
+    manifest_path.write_text(
+        json.dumps({"tasks": tasks}, ensure_ascii=False), encoding="utf-8"
+    )
+    result = subprocess.run(
+        [
+            str(paddle_python),
+            str(paddle_column_worker),
+            "--manifest",
+            str(manifest_path),
+            "--device",
+            paddle_device,
+            "--margin",
+            str(paddle_column_margin),
+            "--scale",
+            str(paddle_column_scale),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"PP-OCRv5 column worker failed with exit code {result.returncode}: "
+            f"stdout={result.stdout!r}, stderr={result.stderr!r}"
+        )
+    hypotheses: dict[int, str] = {}
+    segments_by_entry: dict[int, list[dict[str, Any]]] = {}
+    for line in result.stdout.splitlines():
+        if not line.startswith("{"):
+            continue
+        event = json.loads(line)
+        entry_id = int(event["entry_id"])
+        hypotheses[entry_id] = str(event["text"])
+        segments_by_entry[entry_id] = list(event["segments"])
+    missing = sorted(set(image_paths) - set(hypotheses))
+    if missing:
+        raise RuntimeError(
+            f"PP-OCRv5 column worker returned no result for entries {missing}: "
+            f"stderr={result.stderr!r}"
+        )
+    return hypotheses, segments_by_entry
+
+
+def _run_surya_columns(
+    entries: list[dict[str, Any]],
+    image_paths: dict[int, Path],
+    segment_report_path: Path,
+    surya_worker: Path,
+    surya_server: Path,
+    surya_model_path: Path,
+    surya_mmproj_path: Path,
+    surya_group_size: int,
+    surya_column_margin: int,
+    work_dir: Path,
+) -> tuple[dict[int, str], dict[int, list[dict[str, Any]]]]:
+    segment_report = json.loads(segment_report_path.read_text(encoding="utf-8"))
+    source_pages = {int(page["entry_id"]): page for page in segment_report["pages"]}
+    tasks = []
+    for entry in entries:
+        entry_id = int(entry["id"])
+        source_page = source_pages.get(entry_id)
+        if source_page is None or "segments" not in source_page:
+            raise ValueError(f"segment report has no bbox data for entry {entry_id}")
+        if str(source_page["image_sha256"]) != str(entry["image_sha256"]):
+            raise ValueError(
+                f"segment report image SHA-256 mismatch for entry {entry_id}"
+            )
+        tasks.append(
+            {
+                "entry_id": entry_id,
+                "image_path": str(image_paths[entry_id]),
+                "segments": source_page["segments"],
+            }
+        )
+    manifest_path = work_dir / "surya-column-manifest.json"
+    manifest_path.write_text(
+        json.dumps({"tasks": tasks}, ensure_ascii=False), encoding="utf-8"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(surya_worker),
+            "--manifest",
+            str(manifest_path),
+            "--server",
+            str(surya_server),
+            "--model-path",
+            str(surya_model_path),
+            "--mmproj-path",
+            str(surya_mmproj_path),
+            "--group-size",
+            str(surya_group_size),
+            "--margin",
+            str(surya_column_margin),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=Path(__file__).resolve().parents[2],
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Surya column worker failed with exit code {result.returncode}: "
+            f"stdout={result.stdout!r}, stderr={result.stderr!r}"
+        )
+    hypotheses: dict[int, str] = {}
+    segments_by_entry: dict[int, list[dict[str, Any]]] = {}
+    for line in result.stdout.splitlines():
+        if not line.startswith("{"):
+            continue
+        event = json.loads(line)
+        entry_id = int(event["entry_id"])
+        hypotheses[entry_id] = str(event["text"])
+        segments_by_entry[entry_id] = list(event["segments"])
+    missing = sorted(set(image_paths) - set(hypotheses))
+    if missing:
+        raise RuntimeError(
+            f"Surya column worker returned no result for entries {missing}: "
+            f"stderr={result.stderr!r}"
+        )
+    return hypotheses, segments_by_entry
+
+
+def _load_hypotheses_from_report(
+    entries: list[dict[str, Any]], source_report_path: Path
+) -> dict[int, str]:
+    source_report = json.loads(source_report_path.read_text(encoding="utf-8"))
+    source_pages = {int(page["entry_id"]): page for page in source_report["pages"]}
+    hypotheses: dict[int, str] = {}
+    for entry in entries:
+        entry_id = int(entry["id"])
+        page = source_pages.get(entry_id)
+        if page is None:
+            raise ValueError(f"source report has no hypothesis for entry {entry_id}")
+        if str(page["image_sha256"]) != str(entry["image_sha256"]):
+            raise ValueError(
+                f"source report image SHA-256 mismatch for entry {entry_id}"
+            )
+        hypotheses[entry_id] = str(page["hypothesis"])
+    return hypotheses
+
+
 def summarize(
-    entries: list[dict[str, Any]], hypotheses: dict[int, str], engine: str
+    entries: list[dict[str, Any]],
+    hypotheses: dict[int, str],
+    engine: str,
+    segments_by_entry: dict[int, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     totals: dict[str, dict[str, int]] = defaultdict(
         lambda: {"page_count": 0, "total_edit_distance": 0, "total_reference_chars": 0}
@@ -278,24 +771,25 @@ def summarize(
             totals[group]["page_count"] += 1
             totals[group]["total_edit_distance"] += distance
             totals[group]["total_reference_chars"] += reference_chars
-        pages.append(
-            {
-                "entry_id": entry_id,
-                "run_id": int(entry["run_id"]),
-                "page_no": int(entry["page_no"]),
-                "page_type": page_type,
-                "layout_type": layout_type,
-                "image_sha256": str(entry["image_sha256"]),
-                "edit_distance": distance,
-                "reference_chars": reference_chars,
-                "cer": cer,
-                "substitutions": error_details["substitutions"],
-                "deletions": error_details["deletions"],
-                "insertions": error_details["insertions"],
-                "deletion_rate": error_details["deletion_rate"],
-                "hypothesis": hypothesis,
-            }
-        )
+        page = {
+            "entry_id": entry_id,
+            "run_id": int(entry["run_id"]),
+            "page_no": int(entry["page_no"]),
+            "page_type": page_type,
+            "layout_type": layout_type,
+            "image_sha256": str(entry["image_sha256"]),
+            "edit_distance": distance,
+            "reference_chars": reference_chars,
+            "cer": cer,
+            "substitutions": error_details["substitutions"],
+            "deletions": error_details["deletions"],
+            "insertions": error_details["insertions"],
+            "deletion_rate": error_details["deletion_rate"],
+            "hypothesis": hypothesis,
+        }
+        if segments_by_entry is not None:
+            page["segments"] = segments_by_entry.get(entry_id, [])
+        pages.append(page)
 
     metrics = []
     ordered_groups = (
@@ -321,9 +815,66 @@ def summarize(
         )
     return {
         "engine": engine,
+        "normalization_version": NORMALIZATION_VERSION,
         "generated_at": datetime.now(UTC).isoformat(),
         "metrics": metrics,
         "pages": pages,
+    }
+
+
+def column_gap_diagnostic(
+    segments: Sequence[dict[str, Any]], policy: dict[str, Any]
+) -> dict[str, Any]:
+    """Detect an omitted interior vertical column from NDLOCR bbox spacing."""
+    columns: list[tuple[float, int]] = []
+    for segment in segments:
+        if not _is_truthy(segment.get("is_vertical")):
+            continue
+        bbox = segment.get("bbox")
+        if not isinstance(bbox, list):
+            continue
+        x_coordinates = [
+            float(point[0])
+            for point in bbox
+            if isinstance(point, list)
+            and point
+            and isinstance(point[0], (int, float))
+        ]
+        if not x_coordinates:
+            continue
+        columns.append(
+            (
+                sum(x_coordinates) / len(x_coordinates),
+                len(_normalize_text(str(segment.get("text", "")))),
+            )
+        )
+    columns.sort(reverse=True)
+    if len(columns) < 4:
+        return {"geometry_available": False, "vertical_columns": len(columns)}
+
+    gaps = [
+        columns[index][0] - columns[index + 1][0]
+        for index in range(len(columns) - 1)
+        if columns[index][0] > columns[index + 1][0]
+    ]
+    if len(gaps) < 3:
+        return {"geometry_available": False, "vertical_columns": len(columns)}
+
+    max_rightmost_header_chars = int(policy.get("max_rightmost_header_chars", 20))
+    candidate_gaps = gaps[1:] if columns[0][1] <= max_rightmost_header_chars else gaps
+    if not candidate_gaps:
+        return {"geometry_available": False, "vertical_columns": len(columns)}
+    median_gap = float(median(gaps))
+    if median_gap <= 0:
+        return {"geometry_available": False, "vertical_columns": len(columns)}
+    max_gap = max(candidate_gaps)
+    return {
+        "geometry_available": True,
+        "vertical_columns": len(columns),
+        "median_column_gap": median_gap,
+        "max_interior_column_gap": max_gap,
+        "max_interior_gap_ratio": max_gap / median_gap,
+        "ignored_rightmost_header_gap": len(candidate_gaps) != len(gaps),
     }
 
 
@@ -440,20 +991,33 @@ def evaluate_quality_gate(
         )
 
     omission_policy = quality_policy["column_omission"]
-    omission_suspects = [
-        {
-            "entry_id": int(page["entry_id"]),
-            "run_id": int(page["run_id"]),
-            "page_no": int(page["page_no"]),
-            "deletions": int(page["deletions"]),
-            "deletion_rate": page["deletion_rate"],
-        }
-        for page in pages
-        if page["page_type"] == omission_policy["page_type"]
-        and int(page["deletions"]) >= int(omission_policy["min_deleted_chars"])
-        and page["deletion_rate"] is not None
-        and float(page["deletion_rate"]) >= float(omission_policy["min_deletion_rate"])
-    ]
+    omission_suspects = []
+    min_gap_ratio = float(omission_policy.get("min_interior_column_gap_ratio", 1.6))
+    for page in pages:
+        deletion_suspect = (
+            page["page_type"] == omission_policy["page_type"]
+            and int(page["deletions"]) >= int(omission_policy["min_deleted_chars"])
+            and page["deletion_rate"] is not None
+            and float(page["deletion_rate"])
+            >= float(omission_policy["min_deletion_rate"])
+        )
+        if not deletion_suspect:
+            continue
+        geometry = column_gap_diagnostic(page.get("segments", []), omission_policy)
+        if geometry["geometry_available"] and (
+            float(geometry["max_interior_gap_ratio"]) < min_gap_ratio
+        ):
+            continue
+        omission_suspects.append(
+            {
+                "entry_id": int(page["entry_id"]),
+                "run_id": int(page["run_id"]),
+                "page_no": int(page["page_no"]),
+                "deletions": int(page["deletions"]),
+                "deletion_rate": page["deletion_rate"],
+                **geometry,
+            }
+        )
     checks.append(
         _check(
             "quality.column_omission.suspect_pages_max",
@@ -590,14 +1154,61 @@ def _print_summary(report: dict[str, Any]) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("engine", choices=("current", "tesseract", "yomitoku"))
+    parser.add_argument(
+        "engine",
+        choices=(
+            "current",
+            "qa-primary",
+            "qa-external",
+            "tesseract",
+            "yomitoku",
+            "ndlocr",
+            "paddle",
+            "paddle-columns",
+            "surya-columns",
+            "report",
+        ),
+    )
     parser.add_argument("--api-base", default="http://medaroserver:8090")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--tesseract", type=Path)
     parser.add_argument("--tessdata-dir", type=Path)
     parser.add_argument("--ocr-python", type=Path)
     parser.add_argument("--ocr-path", type=Path)
+    parser.add_argument("--ndlocr-python", type=Path)
+    parser.add_argument("--ndlocr-script", type=Path)
+    parser.add_argument("--ndlocr-rec-weights", type=Path)
+    parser.add_argument("--paddle-python", type=Path)
+    parser.add_argument(
+        "--paddle-worker",
+        type=Path,
+        default=Path(__file__).with_name("paddle_ocr_worker.py"),
+    )
+    parser.add_argument("--paddle-device", default="cpu")
+    parser.add_argument("--paddle-det-limit-side-len", type=int, default=960)
+    parser.add_argument(
+        "--paddle-column-worker",
+        type=Path,
+        default=Path(__file__).with_name("paddle_column_ocr_worker.py"),
+    )
+    parser.add_argument("--segment-report", type=Path)
+    parser.add_argument("--paddle-column-margin", type=int, default=8)
+    parser.add_argument("--paddle-column-scale", type=float, default=2.0)
+    parser.add_argument(
+        "--surya-column-worker",
+        type=Path,
+        default=Path(__file__).with_name("surya_column_ocr_worker.py"),
+    )
+    parser.add_argument("--surya-server", type=Path)
+    parser.add_argument("--surya-model-path", type=Path)
+    parser.add_argument("--surya-mmproj-path", type=Path)
+    parser.add_argument("--surya-group-size", type=int, default=4)
+    parser.add_argument("--surya-column-margin", type=int, default=12)
+    parser.add_argument("--engine-label")
+    parser.add_argument("--source-report", type=Path)
     parser.add_argument("--corpus-json", type=Path)
+    parser.add_argument("--entry-id", type=int, action="append")
+    parser.add_argument("--run-id", type=int, action="append")
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY_PATH)
     parser.add_argument("--fail-on-gate", action="store_true")
     args = parser.parse_args(argv)
@@ -607,15 +1218,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.corpus_json is not None
         else _get_json(f"{args.api_base.rstrip('/')}/api/ocr/ground-truth")
     )
-    entries = [entry for entry in corpus["entries"] if entry["state"] == "verified"]
+    entries = filter_entries(
+        [entry for entry in corpus["entries"] if entry["state"] == "verified"],
+        entry_ids=set(args.entry_id) if args.entry_id else None,
+        run_ids=set(args.run_id) if args.run_id else None,
+    )
     if not entries:
         raise RuntimeError("verified ground-truth corpus is empty")
 
     repo_root = Path(__file__).resolve().parents[2]
+    segments_by_entry: dict[int, list[dict[str, Any]]] | None = None
+    started_at = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix="pic2pdf-ocr-benchmark-") as temp_dir:
         work_dir = Path(temp_dir)
         if args.engine == "current":
             hypotheses = {int(entry["id"]): str(entry["ocr_text"]) for entry in entries}
+        elif args.engine in {"qa-primary", "qa-external"}:
+            field = "primary_text" if args.engine == "qa-primary" else "external_text"
+            hypotheses = _run_qa_candidate(entries, args.api_base, field)
+        elif args.engine == "report":
+            if args.source_report is None:
+                parser.error("report requires --source-report")
+            hypotheses = _load_hypotheses_from_report(entries, args.source_report)
         else:
             image_paths = _download_images(entries, args.api_base, work_dir)
             if args.engine == "tesseract":
@@ -624,7 +1248,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 hypotheses = _run_tesseract(
                     entries, image_paths, args.tesseract, args.tessdata_dir
                 )
-            else:
+            elif args.engine == "yomitoku":
                 if args.ocr_python is None or args.ocr_path is None:
                     parser.error("yomitoku requires --ocr-python and --ocr-path")
                 hypotheses = _run_yomitoku(
@@ -635,10 +1259,89 @@ def main(argv: Sequence[str] | None = None) -> int:
                     repo_root,
                     work_dir,
                 )
+            elif args.engine == "ndlocr":
+                if args.ndlocr_python is None or args.ndlocr_script is None:
+                    parser.error("ndlocr requires --ndlocr-python and --ndlocr-script")
+                if (
+                    args.ndlocr_rec_weights is not None
+                    and not args.ndlocr_rec_weights.is_file()
+                ):
+                    parser.error("--ndlocr-rec-weights must be an existing file")
+                if args.ndlocr_rec_weights is not None:
+                    args.ndlocr_rec_weights = args.ndlocr_rec_weights.resolve()
+                hypotheses, segments_by_entry = _run_ndlocr(
+                    entries,
+                    image_paths,
+                    args.ndlocr_python,
+                    args.ndlocr_script,
+                    work_dir,
+                    args.ndlocr_rec_weights,
+                )
+            elif args.engine == "paddle":
+                if args.paddle_python is None:
+                    parser.error("paddle requires --paddle-python")
+                hypotheses, segments_by_entry = _run_paddle(
+                    entries,
+                    image_paths,
+                    args.paddle_python,
+                    args.paddle_worker,
+                    args.paddle_device,
+                    args.paddle_det_limit_side_len,
+                    work_dir,
+                )
+            elif args.engine == "paddle-columns":
+                if args.paddle_python is None or args.segment_report is None:
+                    parser.error(
+                        "paddle-columns requires --paddle-python and --segment-report"
+                    )
+                hypotheses, segments_by_entry = _run_paddle_columns(
+                    entries,
+                    image_paths,
+                    args.segment_report,
+                    args.paddle_python,
+                    args.paddle_column_worker,
+                    args.paddle_device,
+                    args.paddle_column_margin,
+                    args.paddle_column_scale,
+                    work_dir,
+                )
+            else:
+                required = (
+                    args.segment_report,
+                    args.surya_server,
+                    args.surya_model_path,
+                    args.surya_mmproj_path,
+                )
+                if any(value is None for value in required):
+                    parser.error(
+                        "surya-columns requires --segment-report, --surya-server, "
+                        "--surya-model-path, and --surya-mmproj-path"
+                    )
+                hypotheses, segments_by_entry = _run_surya_columns(
+                    entries,
+                    image_paths,
+                    args.segment_report,
+                    args.surya_column_worker,
+                    args.surya_server,
+                    args.surya_model_path,
+                    args.surya_mmproj_path,
+                    args.surya_group_size,
+                    args.surya_column_margin,
+                    work_dir,
+                )
 
-    report = summarize(entries, hypotheses, args.engine)
+    report = summarize(
+        entries,
+        hypotheses,
+        args.engine_label or args.engine,
+        segments_by_entry,
+    )
+    report["engine_kind"] = args.engine
+    report["elapsed_seconds"] = time.perf_counter() - started_at
+    report["corpus_entry_ids"] = [int(entry["id"]) for entry in entries]
     policy = json.loads(args.policy.read_text(encoding="utf-8"))
-    report["quality_gate"] = evaluate_quality_gate(corpus, report, policy)
+    scoped_corpus = {**corpus, "entries": entries}
+    report["quality_gate"] = evaluate_quality_gate(scoped_corpus, report, policy)
     _print_summary(report)
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)

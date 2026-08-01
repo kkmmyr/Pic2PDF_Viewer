@@ -28,6 +28,8 @@
       "page_type": "narrative",
       "min_deleted_chars": 40,
       "min_deletion_rate": 0.05,
+      "min_interior_column_gap_ratio": 1.6,
+      "max_rightmost_header_chars": 20,
       "max_suspect_pages": 0
     },
     "proper_noun_recall_min": 1.0,
