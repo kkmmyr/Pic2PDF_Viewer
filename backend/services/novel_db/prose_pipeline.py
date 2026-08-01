@@ -7,6 +7,11 @@ from collections.abc import Callable
 
 from ._llm_backend import QWEN_BACKEND
 from ._prompts import (
+    CATALOG_SUMMARY_EDITOR_PROMPT,
+    CATALOG_SUMMARY_FROM_FACTS_PROMPT,
+    CATALOG_SUMMARY_MAX_CHARS,
+    CATALOG_SUMMARY_MIN_CHARS,
+    CATALOG_SUMMARY_OPTIONS,
     CHARACTER_FACT_EXTRACTION_PROMPT,
     FACT_CHUNK_MAX_CHARS,
     FACT_EXTRACTION_OPTIONS,
@@ -22,11 +27,19 @@ from .character_names import (
     normalize_character_entries,
 )
 from .character_summarizer import edit_character_summary, summarize_character
+from .fact_checkpoints import (
+    hash_source_pages,
+    load_fact_block,
+    prune_fact_blocks,
+    save_fact_block,
+    validate_and_structure_fact_sheet,
+)
 from .generation_quality import (
     BookFactSheet,
     choose_publishable_prose,
     chunk_pages_by_chars,
     format_page_blocks,
+    generated_prose_issues,
     merge_fact_sheets,
     parse_fact_sheet,
 )
@@ -35,6 +48,8 @@ ProgressCallback = Callable[[str], None]
 
 
 def extract_fact_sheet(
+    conn: sqlite3.Connection,
+    book_id: int,
     book_name: str,
     pages: list[tuple[int, str]],
     *,
@@ -49,6 +64,25 @@ def extract_fact_sheet(
     )
     sheets: list[BookFactSheet] = []
     for index, chunk in enumerate(chunks, 1):
+        source_hash = hash_source_pages(chunk)
+        allowed_pages = {page_no for page_no, _ in chunk}
+        cached = load_fact_block(
+            conn,
+            book_id=book_id,
+            block_index=index,
+            source_hash=source_hash,
+            model=model,
+        )
+        if cached is not None:
+            try:
+                validate_and_structure_fact_sheet(cached, allowed_pages=allowed_pages)
+            except ValueError:
+                _log(progress, f"  fact block {index}/{len(chunks)}: invalid cache, regenerating")
+            else:
+                sheets.append(cached)
+                _log(progress, f"  fact block {index}/{len(chunks)}: reused checkpoint")
+                continue
+
         prompt = FACT_EXTRACTION_PROMPT.format(
             book_name=book_name,
             part_index=index,
@@ -80,6 +114,20 @@ def extract_fact_sheet(
             book_facts=book_sheet.book_facts,
             character_facts=character_sheet.character_facts,
         )
+        records = validate_and_structure_fact_sheet(
+            sheet,
+            allowed_pages=allowed_pages,
+        )
+        save_fact_block(
+            conn,
+            book_id=book_id,
+            block_index=index,
+            pages=chunk,
+            source_hash=source_hash,
+            model=model,
+            sheet=sheet,
+            records=records,
+        )
         sheets.append(sheet)
         _log(
             progress,
@@ -87,6 +135,7 @@ def extract_fact_sheet(
             f"{len(sheet.book_facts)} chars, {len(sheet.character_facts)} characters",
         )
 
+    prune_fact_blocks(conn, book_id=book_id, block_count=len(chunks))
     merged = merge_fact_sheets(sheets)
     if not merged.character_facts:
         raise ValueError("fact extraction did not contain any named character facts")
@@ -126,6 +175,59 @@ def write_and_edit_summary(
         options=PROSE_EDITOR_OPTIONS,
     ).strip()
     return choose_publishable_prose(draft, edited)
+
+
+def write_and_edit_catalog_summary(
+    book_name: str,
+    fact_sheet: BookFactSheet,
+    detailed_summary: str,
+    *,
+    model: str,
+    progress: ProgressCallback | None,
+) -> str:
+    """Write the independently publishable 400–700 character catalog summary."""
+    facts = _render_fact_sheet(fact_sheet)
+    _log(progress, "  writing catalog summary from verified detailed summary")
+    draft = QWEN_BACKEND.ask(
+        CATALOG_SUMMARY_FROM_FACTS_PROMPT.format(
+            book_name=book_name,
+            facts=facts,
+            detailed_summary=detailed_summary,
+        ),
+        model=model,
+        options=CATALOG_SUMMARY_OPTIONS,
+    ).strip()
+
+    _log(progress, "  editing catalog summary")
+    edited = QWEN_BACKEND.ask(
+        CATALOG_SUMMARY_EDITOR_PROMPT.format(
+            book_name=book_name,
+            facts=facts,
+            draft=draft,
+        ),
+        model=model,
+        options=CATALOG_SUMMARY_OPTIONS,
+    ).strip()
+    return _choose_catalog_summary(draft, edited)
+
+
+def _choose_catalog_summary(draft: str, edited: str) -> str:
+    issues_by_candidate: list[tuple[str, list[str]]] = []
+    for candidate in (edited, draft):
+        issues = generated_prose_issues(candidate)
+        length = len(candidate.strip())
+        if not CATALOG_SUMMARY_MIN_CHARS <= length <= CATALOG_SUMMARY_MAX_CHARS:
+            issues.append(
+                f"catalog summary length must be {CATALOG_SUMMARY_MIN_CHARS}-{CATALOG_SUMMARY_MAX_CHARS}: {length}"
+            )
+        if not issues:
+            return candidate.strip()
+        issues_by_candidate.append((candidate, issues))
+    raise ValueError(
+        "no publishable catalog summary: "
+        f"edited={'; '.join(issues_by_candidate[0][1])}; "
+        f"draft={'; '.join(issues_by_candidate[1][1])}"
+    )
 
 
 def write_and_edit_characters(

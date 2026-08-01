@@ -2142,6 +2142,10 @@ export interface components {
             summary: string | null;
             /** Summary Generated At */
             summary_generated_at: string | null;
+            /** Catalog Summary */
+            catalog_summary?: string | null;
+            /** Catalog Summary Generated At */
+            catalog_summary_generated_at?: string | null;
             /** Character Count */
             character_count: number;
             /** Discussion Count */
@@ -2214,6 +2218,10 @@ export interface components {
             asin: string | null;
             /** Series Index */
             series_index: number | null;
+            /** Catalog Summary */
+            catalog_summary?: string | null;
+            /** Catalog Summary Generated At */
+            catalog_summary_generated_at?: string | null;
         };
         /** BuildEnqueueResponse */
         BuildEnqueueResponse: {

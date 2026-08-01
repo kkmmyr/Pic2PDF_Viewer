@@ -10,9 +10,11 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
+from ._prompts import CATALOG_SUMMARY_MAX_CHARS, CATALOG_SUMMARY_MIN_CHARS
 from .generation_quality import generated_prose_issues
 
-SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
+_SUPPORTED_SNAPSHOT_SCHEMAS = {1, SNAPSHOT_SCHEMA_VERSION}
 
 
 @dataclass(frozen=True)
@@ -35,6 +37,8 @@ class GeneratedContentSnapshot:
     book_name: str
     summary: str | None
     summary_generated_at: str | None
+    catalog_summary: str | None
+    catalog_summary_generated_at: str | None
     characters: tuple[CharacterSnapshot, ...]
 
     def to_dict(self) -> dict[str, Any]:
@@ -49,7 +53,11 @@ def capture_generated_content(
 ) -> GeneratedContentSnapshot:
     """Read the currently published generated prose without mutating the database."""
     book = conn.execute(
-        "SELECT id, name, summary, summary_generated_at FROM books WHERE name = ?",
+        """
+        SELECT id, name, summary, summary_generated_at,
+               catalog_summary, catalog_summary_generated_at
+        FROM books WHERE name = ?
+        """,
         (book_name,),
     ).fetchone()
     if book is None:
@@ -80,6 +88,8 @@ def capture_generated_content(
         book_name=str(book["name"]),
         summary=book["summary"],
         summary_generated_at=book["summary_generated_at"],
+        catalog_summary=book["catalog_summary"],
+        catalog_summary_generated_at=book["catalog_summary_generated_at"],
         characters=characters,
     )
 
@@ -94,7 +104,8 @@ def read_snapshot(path: Path) -> GeneratedContentSnapshot:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("snapshot root must be an object")
-    if data.get("schema_version") != SNAPSHOT_SCHEMA_VERSION:
+    source_schema = data.get("schema_version")
+    if source_schema not in _SUPPORTED_SNAPSHOT_SCHEMAS:
         raise ValueError(f"unsupported snapshot schema: {data.get('schema_version')}")
 
     character_rows = data.get("characters")
@@ -102,11 +113,13 @@ def read_snapshot(path: Path) -> GeneratedContentSnapshot:
         raise ValueError("snapshot characters must be an array")
     characters = tuple(_parse_character(row) for row in character_rows)
     return GeneratedContentSnapshot(
-        schema_version=SNAPSHOT_SCHEMA_VERSION,
+        schema_version=int(source_schema),
         captured_at=_required_string(data, "captured_at"),
         book_name=_required_string(data, "book_name"),
         summary=_optional_string(data, "summary"),
         summary_generated_at=_optional_string(data, "summary_generated_at"),
+        catalog_summary=_optional_string(data, "catalog_summary"),
+        catalog_summary_generated_at=_optional_string(data, "catalog_summary_generated_at"),
         characters=characters,
     )
 
@@ -131,6 +144,7 @@ def build_generated_content_diff(
     ]
 
     after_summary = after.summary or ""
+    after_catalog_summary = after.catalog_summary or ""
     character_issues = {
         character.name: generated_prose_issues(
             character.summary or "",
@@ -140,8 +154,16 @@ def build_generated_content_diff(
     }
     character_issues = {name: issues for name, issues in character_issues.items() if issues}
     summary_issues = generated_prose_issues(after_summary)
+    catalog_summary_issues = generated_prose_issues(after_catalog_summary)
+    catalog_length = len(after_catalog_summary)
+    if not CATALOG_SUMMARY_MIN_CHARS <= catalog_length <= CATALOG_SUMMARY_MAX_CHARS:
+        catalog_summary_issues.append(
+            f"catalog summary length must be {CATALOG_SUMMARY_MIN_CHARS}-{CATALOG_SUMMARY_MAX_CHARS}: "
+            f"{catalog_length}"
+        )
     summary_changed = before.summary != after.summary
-    review_required = summary_changed or bool(added or removed or changed)
+    catalog_summary_changed = before.catalog_summary != after.catalog_summary
+    review_required = summary_changed or catalog_summary_changed or bool(added or removed or changed)
 
     return {
         "schema_version": SNAPSHOT_SCHEMA_VERSION,
@@ -156,6 +178,15 @@ def build_generated_content_diff(
             "similarity": _similarity(before.summary, after.summary),
             "generated_at_changed": before.summary_generated_at != after.summary_generated_at,
         },
+        "catalog_summary_change": {
+            "changed": catalog_summary_changed,
+            "before_chars": len(before.catalog_summary or ""),
+            "after_chars": catalog_length,
+            "similarity": _similarity(before.catalog_summary, after.catalog_summary),
+            "generated_at_changed": (
+                before.catalog_summary_generated_at != after.catalog_summary_generated_at
+            ),
+        },
         "character_changes": {
             "added": added,
             "removed": removed,
@@ -164,8 +195,14 @@ def build_generated_content_diff(
             "after_count": len(after.characters),
         },
         "quality": {
-            "passed": not summary_issues and not character_issues and bool(after.characters),
+            "passed": (
+                not summary_issues
+                and not catalog_summary_issues
+                and not character_issues
+                and bool(after.characters)
+            ),
             "summary_issues": summary_issues,
+            "catalog_summary_issues": catalog_summary_issues,
             "character_issues": character_issues,
             "no_characters": not after.characters,
         },
@@ -173,6 +210,7 @@ def build_generated_content_diff(
             "required": review_required,
             "targets": [
                 *(["summary"] if summary_changed else []),
+                *(["catalog_summary"] if catalog_summary_changed else []),
                 *[f"character:{name}" for name in added],
                 *[f"character:{name}" for name in removed],
                 *[f"character:{item['name']}" for item in changed],
@@ -186,6 +224,7 @@ def render_diff_markdown(report: dict[str, Any]) -> str:
     before = report["before"]
     after = report["after"]
     summary_change = report["summary_change"]
+    catalog_summary_change = report["catalog_summary_change"]
     character_changes = report["character_changes"]
     quality = report["quality"]
 
@@ -196,6 +235,9 @@ def render_diff_markdown(report: dict[str, Any]) -> str:
         f"- 要約変更: `{summary_change['changed']}` "
         f"（{summary_change['before_chars']} → {summary_change['after_chars']}文字、"
         f"類似度 {summary_change['similarity']:.3f}）",
+        f"- 一覧向け短縮要約変更: `{catalog_summary_change['changed']}` "
+        f"（{catalog_summary_change['before_chars']} → {catalog_summary_change['after_chars']}文字、"
+        f"類似度 {catalog_summary_change['similarity']:.3f}）",
         f"- 人物数: {character_changes['before_count']} → {character_changes['after_count']}",
         f"- 機械品質ゲート: `{'PASS' if quality['passed'] else 'FAIL'}`",
         f"- Codex補助QA: `{'required' if report['review']['required'] else 'not required'}`",
@@ -209,6 +251,7 @@ def render_diff_markdown(report: dict[str, Any]) -> str:
         "## 機械品質ゲート",
         "",
         f"- 要約: {_join_names(quality['summary_issues'])}",
+        f"- 一覧向け短縮要約: {_join_names(quality['catalog_summary_issues'])}",
         f"- 人物なし: `{quality['no_characters']}`",
     ]
     character_issues = quality["character_issues"]
@@ -228,6 +271,20 @@ def render_diff_markdown(report: dict[str, Any]) -> str:
                 "## 要約（変更後）",
                 "",
                 after["summary"] or "（なし）",
+            ]
+        )
+
+    if catalog_summary_change["changed"]:
+        lines.extend(
+            [
+                "",
+                "## 一覧向け短縮要約（変更前）",
+                "",
+                before["catalog_summary"] or "（なし）",
+                "",
+                "## 一覧向け短縮要約（変更後）",
+                "",
+                after["catalog_summary"] or "（なし）",
             ]
         )
 
@@ -277,10 +334,27 @@ def restore_generated_content(
 
     try:
         conn.execute("BEGIN IMMEDIATE")
-        conn.execute(
-            "UPDATE books SET summary = ?, summary_generated_at = ? WHERE id = ?",
-            (snapshot.summary, snapshot.summary_generated_at, book_id),
-        )
+        if snapshot.schema_version >= 2:
+            conn.execute(
+                """
+                UPDATE books
+                SET summary = ?, summary_generated_at = ?,
+                    catalog_summary = ?, catalog_summary_generated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    snapshot.summary,
+                    snapshot.summary_generated_at,
+                    snapshot.catalog_summary,
+                    snapshot.catalog_summary_generated_at,
+                    book_id,
+                ),
+            )
+        else:
+            conn.execute(
+                "UPDATE books SET summary = ?, summary_generated_at = ? WHERE id = ?",
+                (snapshot.summary, snapshot.summary_generated_at, book_id),
+            )
         conn.execute("DELETE FROM book_characters WHERE book_id = ?", (book_id,))
         conn.executemany(
             """

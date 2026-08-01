@@ -5,6 +5,7 @@
 - QWEN_BACKEND  : Qwen 重量モデル（QA / 書籍サマリ / キャラサマリ / 関係グラフ）
 - GEMMA_BACKEND : Gemma 軽量モデル（キャラ抽出 / チャンクコンテキスト生成）
 - QUERY_BACKEND : Query Expansion 専用（timeout 短め）
+- VERIFIER_BACKEND: 要約根拠検証（既定はQwen直列再利用、別backendへ切替可）
 """
 
 from __future__ import annotations
@@ -46,3 +47,29 @@ QUERY_BACKEND: Backend = OllamaBackend(
         timeout=60,
     )
 )
+
+if config.NOVEL_DB_VERIFIER_BACKEND == "qwen":
+    VERIFIER_BACKEND: Backend = QWEN_BACKEND
+elif config.NOVEL_DB_VERIFIER_BACKEND == "ollama":
+    if not config.NOVEL_DB_VERIFIER_MODEL:
+        raise LLMError("NOVEL_DB_VERIFIER_MODEL is required for verifier backend 'ollama'")
+    VERIFIER_BACKEND = OllamaBackend(
+        BackendConfig(
+            base_url=config.NOVEL_DB_OLLAMA_BASE_URL,
+            model=config.NOVEL_DB_VERIFIER_MODEL,
+        )
+    )
+elif config.NOVEL_DB_VERIFIER_BACKEND == "llama_server":
+    if not config.NOVEL_DB_VERIFIER_MODEL:
+        raise LLMError("NOVEL_DB_VERIFIER_MODEL is required for verifier backend 'llama_server'")
+    VERIFIER_BACKEND = LlamaServerBackend(
+        BackendConfig(
+            base_url=config.NOVEL_DB_VERIFIER_BASE_URL,
+            model=config.NOVEL_DB_VERIFIER_MODEL,
+        )
+    )
+else:
+    raise LLMError(
+        f"unknown NOVEL_DB_VERIFIER_BACKEND: {config.NOVEL_DB_VERIFIER_BACKEND} "
+        "(supported: 'qwen', 'ollama', 'llama_server')",
+    )

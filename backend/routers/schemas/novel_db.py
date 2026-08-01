@@ -128,6 +128,8 @@ class BookSummaryOut(BaseModel):
     publisher: str | None
     asin: str | None
     series_index: float | None
+    catalog_summary: str | None = None
+    catalog_summary_generated_at: str | None = None
 
 
 class SeriesSummaryOut(BaseModel):
@@ -160,6 +162,8 @@ class BookDetailOut(BaseModel):
     isbn: str | None
     summary: str | None
     summary_generated_at: str | None
+    catalog_summary: str | None = None
+    catalog_summary_generated_at: str | None = None
     character_count: int
     discussion_count: int
 

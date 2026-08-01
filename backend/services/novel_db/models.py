@@ -27,6 +27,8 @@ class Book(SQLModel, table=True):
     created_at: str | None = None
     summary: str | None = None
     summary_generated_at: str | None = None
+    catalog_summary: str | None = None
+    catalog_summary_generated_at: str | None = None
     ocr_done_at: str | None = None
 
 
@@ -87,6 +89,38 @@ class BookCharacter(SQLModel, table=True):
     first_page: int
     page_count: int
     generated_at: str | None = None
+
+
+class FactExtractionBlock(SQLModel, table=True):
+    __tablename__ = "fact_extraction_blocks"  # type: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("book_id", "block_index"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    book_id: int = Field(foreign_key="books.id")
+    block_index: int
+    page_start: int
+    page_end: int
+    source_hash: str
+    model: str
+    schema_version: int
+    book_facts: str
+    character_facts_json: str
+    fact_records_json: str
+    generated_at: str | None = None
+
+
+class SummaryGroundingReport(SQLModel, table=True):
+    __tablename__ = "summary_grounding_reports"  # type: ignore[reportAssignmentType]
+
+    id: int | None = Field(default=None, primary_key=True)
+    book_id: int = Field(foreign_key="books.id")
+    content_type: str
+    candidate_sha256: str
+    writer_model: str
+    verifier_model: str
+    passed: bool
+    report_json: str
+    checked_at: str | None = None
 
 
 class QASession(SQLModel, table=True):

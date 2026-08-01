@@ -25,9 +25,10 @@ from config import (
     NOVEL_DB_BODY_PAGE_MARGIN,
     NOVEL_DB_LLM_MODEL,
     NOVEL_DB_MIN_BODY_CHARS,
+    NOVEL_DB_VERIFIER_MODEL,
 )
 
-from ._llm_backend import QWEN_BACKEND
+from ._llm_backend import QWEN_BACKEND, VERIFIER_BACKEND
 from ._prompts import (
     COMBINED_MAX_CHARACTERS,
     MAP_CHUNK_TARGET_CHARS,
@@ -41,9 +42,11 @@ from .embedder import embed_batch
 from .lance_store import get_summaries_table
 from .prose_pipeline import (
     extract_fact_sheet,
+    write_and_edit_catalog_summary,
     write_and_edit_characters,
     write_and_edit_summary,
 )
+from .summary_grounding import verify_summary_grounding
 
 # ---------------------------------------------------------------------------
 # 公開 API
@@ -59,7 +62,10 @@ def summarize_book(
     body_page_margin: int = NOVEL_DB_BODY_PAGE_MARGIN,
     progress: Callable[[str], None] | None = None,
 ) -> str:
-    """1 冊の本文から書籍サマリを生成して返す（DB には書き込まない）。
+    """1 冊の本文から書籍サマリを生成して返す。
+
+    公開用の`books.summary`は更新しない。再実行用の事実抽出チェックポイントだけは
+    ブロックごとに`fact_extraction_blocks`へ保存する。
 
     Args:
         conn: novel.db の接続
@@ -95,17 +101,31 @@ def summarize_book(
         raise ValueError(f"book has no body content: {book_name}")
 
     fact_sheet = extract_fact_sheet(
+        conn,
+        book_id,
         book_name,
         body_pages,
         model=model,
         progress=progress,
     )
-    return write_and_edit_summary(
+    summary = write_and_edit_summary(
         book_name,
         fact_sheet,
         model=model,
         progress=progress,
     )
+    _log(progress, "  verifying summary grounding and fact coverage")
+    verify_summary_grounding(
+        conn,
+        book_id=book_id,
+        book_name=book_name,
+        summary=summary,
+        fact_sheet=fact_sheet,
+        writer_model=model,
+        verifier_backend=VERIFIER_BACKEND,
+        verifier_model=NOVEL_DB_VERIFIER_MODEL or model,
+    )
+    return summary
 
 
 def summarize_book_with_characters(
@@ -117,11 +137,13 @@ def summarize_book_with_characters(
     body_page_margin: int = NOVEL_DB_BODY_PAGE_MARGIN,
     max_characters: int = COMBINED_MAX_CHARACTERS,
     progress: Callable[[str], None] | None = None,
-) -> tuple[str, dict[str, str]]:
-    """書籍サマリと人物辞典を、事実抽出後に別々に生成する。
+) -> tuple[str, str, dict[str, str]]:
+    """詳細あらすじ、一覧向け短縮要約、人物辞典を別々に生成する。
+
+    公開用テーブルは更新せず、事実抽出チェックポイントだけを保存する。
 
     Returns:
-        (book_summary, {char_name: char_summary})
+        (detailed_summary, catalog_summary, {char_name: char_summary})
 
     Raises:
         ValueError: 書籍が DB に存在しない、または本文が空
@@ -146,6 +168,8 @@ def summarize_book_with_characters(
         raise ValueError(f"book has no body content: {book_name}")
 
     fact_sheet = extract_fact_sheet(
+        conn,
+        book_id,
         book_name,
         body_pages,
         model=model,
@@ -157,6 +181,39 @@ def summarize_book_with_characters(
         model=model,
         progress=progress,
     )
+    _log(progress, "  verifying summary grounding and fact coverage")
+    verify_summary_grounding(
+        conn,
+        book_id=book_id,
+        book_name=book_name,
+        summary=summary,
+        fact_sheet=fact_sheet,
+        writer_model=model,
+        verifier_backend=VERIFIER_BACKEND,
+        verifier_model=NOVEL_DB_VERIFIER_MODEL or model,
+        content_type="detailed",
+        coverage_required=True,
+    )
+    catalog_summary = write_and_edit_catalog_summary(
+        book_name,
+        fact_sheet,
+        summary,
+        model=model,
+        progress=progress,
+    )
+    _log(progress, "  verifying catalog summary claims")
+    verify_summary_grounding(
+        conn,
+        book_id=book_id,
+        book_name=book_name,
+        summary=catalog_summary,
+        fact_sheet=fact_sheet,
+        writer_model=model,
+        verifier_backend=VERIFIER_BACKEND,
+        verifier_model=NOVEL_DB_VERIFIER_MODEL or model,
+        content_type="catalog",
+        coverage_required=False,
+    )
     char_summaries = write_and_edit_characters(
         conn,
         book_id,
@@ -167,8 +224,12 @@ def summarize_book_with_characters(
         progress=progress,
     )
 
-    _log(progress, f"  done: summary={len(summary)} chars, {len(char_summaries)} characters")
-    return summary, char_summaries
+    _log(
+        progress,
+        f"  done: detailed={len(summary)} chars, catalog={len(catalog_summary)} chars, "
+        f"{len(char_summaries)} characters",
+    )
+    return summary, catalog_summary, char_summaries
 
 
 def update_book_summary(

@@ -18,6 +18,7 @@ from services.novel_db.full_builder import (
     build_book_full,
 )
 from services.novel_db.migrations import upgrade_head
+from services.novel_db.summary_grounding import GroundingError
 
 
 @pytest.fixture
@@ -27,11 +28,21 @@ def db_conn(tmp_data_dir):
         yield conn
 
 
-def _insert_book(conn, name: str, summary: str | None = None) -> int:
+def _insert_book(
+    conn,
+    name: str,
+    summary: str | None = None,
+    catalog_summary: str | None = None,
+) -> int:
+    if summary is not None and catalog_summary is None:
+        catalog_summary = "既存の一覧向け要約"
     cur = conn.execute(
-        "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at, summary) "
-        "VALUES (?, ?, ?, ?, datetime('now'), ?)",
-        (name, f"/{name}.pdf", "/imgs", 10, summary),
+        """
+        INSERT INTO books
+            (name, pdf_path, images_dir, page_count, indexed_at, summary, catalog_summary)
+        VALUES (?, ?, ?, ?, datetime('now'), ?, ?)
+        """,
+        (name, f"/{name}.pdf", "/imgs", 10, summary, catalog_summary),
     )
     conn.commit()
     return cur.lastrowid
@@ -90,7 +101,9 @@ class TestRunCombinedStep:
         db_conn.commit()
 
         logs = []
-        mock_summarize = MagicMock(return_value=("新サマリ", {"キャラ": "キャラは行動した。"}))
+        mock_summarize = MagicMock(
+            return_value=("新サマリ", "新しい一覧向け要約", {"キャラ": "キャラは行動した。"})
+        )
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
             patch("services.novel_db.full_builder.index_book_summary"),
@@ -99,10 +112,11 @@ class TestRunCombinedStep:
 
         mock_summarize.assert_called_once()
         row = db_conn.execute(
-            "SELECT summary FROM books WHERE id = ?",
+            "SELECT summary, catalog_summary FROM books WHERE id = ?",
             (book_id,),
         ).fetchone()
         assert row[0] == "新サマリ"
+        assert row[1] == "新しい一覧向け要約"
 
     def test_characters_are_inserted_to_db(self, db_conn):
         """summarize_book_with_characters が返したキャラクターが DB に INSERT される。"""
@@ -110,7 +124,7 @@ class TestRunCombinedStep:
         _insert_page(db_conn, book_id, 1, "アリスはふしぎの国の住人")
 
         char_summaries = {"アリス": "主人公の少女"}
-        mock_summarize = MagicMock(return_value=("本のサマリ", char_summaries))
+        mock_summarize = MagicMock(return_value=("本のサマリ", "一覧向け要約", char_summaries))
 
         with (
             patch("services.novel_db.full_builder.summarize_book_with_characters", mock_summarize),
@@ -132,7 +146,7 @@ class TestRunCombinedStep:
             "幻の人物": "本文には存在しない。",
             "国王陛下": "匿名の役職。",
         }
-        mock_summarize = MagicMock(return_value=("本のサマリ", char_summaries))
+        mock_summarize = MagicMock(return_value=("本のサマリ", "一覧向け要約", char_summaries))
         logs: list[str] = []
 
         with (
@@ -158,6 +172,7 @@ class TestRunCombinedStep:
         mock_summarize = MagicMock(
             return_value=(
                 "本のサマリ",
+                "一覧向け要約",
                 {
                     "皓茉莉花": "主人公。",
                     "ラーナシュ・ヴァルマ": "異国の人物。",
@@ -192,7 +207,7 @@ class TestRunCombinedStep:
 
         with patch(
             "services.novel_db.full_builder.summarize_book_with_characters",
-            return_value=("新サマリ", {"幻の人物": "本文に根拠がない。"}),
+            return_value=("新サマリ", "新しい一覧向け要約", {"幻の人物": "本文に根拠がない。"}),
         ):
             with pytest.raises(ValueError, match="existing generated content was preserved"):
                 _run_combined_step(
@@ -202,15 +217,47 @@ class TestRunCombinedStep:
                     log=lambda _: None,
                 )
 
-        summary = db_conn.execute(
-            "SELECT summary FROM books WHERE id = ?",
+        book = db_conn.execute(
+            "SELECT summary, catalog_summary FROM books WHERE id = ?",
             (book_id,),
-        ).fetchone()[0]
+        ).fetchone()
         characters = db_conn.execute(
             "SELECT name, summary FROM book_characters WHERE book_id = ?",
             (book_id,),
         ).fetchall()
-        assert summary == "旧サマリ"
+        assert tuple(book) == ("旧サマリ", "既存の一覧向け要約")
+        assert [tuple(row) for row in characters] == [("既存人物", "旧人物説明")]
+
+    def test_grounding_failure_preserves_existing_summary_and_dictionary(self, db_conn):
+        book_id = _insert_book(db_conn, "grounding-fail-book", summary="旧サマリ")
+        _insert_page(db_conn, book_id, 1, "既存人物は登場する。")
+        db_conn.execute(
+            "INSERT INTO book_characters (book_id, name, summary, first_page, page_count) VALUES (?, ?, ?, ?, ?)",
+            (book_id, "既存人物", "旧人物説明", 1, 1),
+        )
+        db_conn.commit()
+
+        with patch(
+            "services.novel_db.full_builder.summarize_book_with_characters",
+            side_effect=GroundingError("summary grounding failed"),
+        ):
+            with pytest.raises(GroundingError, match="grounding failed"):
+                _run_combined_step(
+                    db_conn,
+                    "grounding-fail-book",
+                    redo=True,
+                    log=lambda _: None,
+                )
+
+        book = db_conn.execute(
+            "SELECT summary, catalog_summary FROM books WHERE id = ?",
+            (book_id,),
+        ).fetchone()
+        characters = db_conn.execute(
+            "SELECT name, summary FROM book_characters WHERE book_id = ?",
+            (book_id,),
+        ).fetchall()
+        assert tuple(book) == ("旧サマリ", "既存の一覧向け要約")
         assert [tuple(row) for row in characters] == [("既存人物", "旧人物説明")]
 
 

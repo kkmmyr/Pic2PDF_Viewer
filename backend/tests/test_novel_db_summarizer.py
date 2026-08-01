@@ -8,6 +8,7 @@ Qwen 呼び出し（`ask`）はモックする。本テストは:
 を確認する。
 """
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -20,6 +21,7 @@ from services.novel_db.generation_quality import (
 )
 from services.novel_db.lance_store import get_summaries_table
 from services.novel_db.migrations import upgrade_head
+from services.novel_db.prose_pipeline import _choose_catalog_summary
 from services.novel_db.summarizer import (
     _chunk_for_map,
     _load_body_text,
@@ -29,6 +31,21 @@ from services.novel_db.summarizer import (
     summarize_book_with_characters,
     update_book_summary,
 )
+
+_CATALOG_SUMMARY = (
+    "レティは友人を助けるため事件の調査を引き受け、"
+    + "集めた手掛かりを照合しながら周囲との信頼を深め、真相へ近づいていく過程を描き、"
+    * 11
+    + "最後には事件を解決して新たな役割を担う。"
+)
+
+
+@pytest.fixture(autouse=True)
+def mock_summary_grounding():
+    """Grounding itself is covered separately; summarizer tests focus on orchestration."""
+    with patch("services.novel_db.summarizer.verify_summary_grounding") as mock_verify:
+        yield mock_verify
+
 
 # ---------------------------------------------------------------------------
 # _chunk_for_map
@@ -116,7 +133,7 @@ def test_load_body_text_returns_empty_when_all_filtered(db_with_book):
 # ---------------------------------------------------------------------------
 
 
-def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book):
+def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book, mock_summary_grounding):
     with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = [
             "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。",
@@ -138,6 +155,52 @@ def test_summarize_book_extracts_facts_then_writes_and_edits(db_with_book):
     assert "主要人物ごとの事実へ再編" in prompts[1]
     assert "ページ根拠付きで抽出した事実" in prompts[2]
     assert "意味を変えずに読みやすい完成文" in prompts[3]
+    mock_summary_grounding.assert_called_once()
+
+
+def test_summarize_book_reuses_completed_fact_checkpoint(db_with_book):
+    first_responses = [
+        "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。",
+        "[CHARACTER_FACT:主人公]\n- [page 3] 事件を解決した。",
+        "主人公が事件を解決した。",
+        "主人公は事件を解決した。",
+    ]
+    with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as first_ask:
+        first_ask.side_effect = first_responses
+        with with_db() as conn:
+            summarize_book(conn, "test-book", min_chars=100, body_page_margin=2)
+
+    with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as second_ask:
+        second_ask.side_effect = [
+            "主人公が事件を解決した。",
+            "主人公は事件を解決した。",
+        ]
+        with with_db() as conn:
+            summary = summarize_book(conn, "test-book", min_chars=100, body_page_margin=2)
+
+    assert summary == "主人公は事件を解決した。"
+    assert second_ask.call_count == 2
+    assert all("完成したあらすじを書く前の材料" not in call.args[0] for call in second_ask.call_args_list)
+
+
+def test_grounding_verifier_inherits_explicit_writer_model(db_with_book, mock_summary_grounding):
+    with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
+        mock_ask.side_effect = [
+            "[BOOK_FACTS]\n- [page 3] 主人公が事件を解決した。",
+            "[CHARACTER_FACT:主人公]\n- [page 3] 事件を解決した。",
+            "主人公が事件を解決した。",
+            "主人公は事件を解決した。",
+        ]
+        with with_db() as conn:
+            summarize_book(
+                conn,
+                "test-book",
+                model="custom-writer",
+                min_chars=100,
+                body_page_margin=2,
+            )
+
+    assert mock_summary_grounding.call_args.kwargs["verifier_model"] == "custom-writer"
 
 
 def test_summarize_book_long_input_extracts_every_page_block(tmp_data_dir):
@@ -158,13 +221,13 @@ def test_summarize_book_long_input_extracts_every_page_block(tmp_data_dir):
             )
         conn.commit()
 
-    fact_response = "[BOOK_FACTS]\n- [page 6] 出来事が進んだ。"
-
     def fake_ask(prompt, **_kwargs):
+        page_match = re.search(r"\[page (\d+)\]", prompt)
+        page_no = page_match.group(1) if page_match else "6"
         if "完成したあらすじを書く前の材料" in prompt:
-            return fact_response
+            return f"[BOOK_FACTS]\n- [page {page_no}] 出来事が進んだ。"
         if "主要人物ごとの事実へ再編" in prompt:
-            return "[CHARACTER_FACT:主人公]\n- [page 6] 主人公が行動した。"
+            return f"[CHARACTER_FACT:主人公]\n- [page {page_no}] 主人公が行動した。"
         if "ページ根拠付きで抽出した事実" in prompt:
             return "長編の初稿。"
         return "長編の最終要約。"
@@ -217,7 +280,10 @@ def test_summarize_book_raises_for_empty_body(tmp_data_dir):
             summarize_book(conn, "empty-book")
 
 
-def test_summary_and_characters_are_written_and_edited_separately(db_with_book):
+def test_summary_and_characters_are_written_and_edited_separately(
+    db_with_book,
+    mock_summary_grounding,
+):
     with with_db() as conn:
         conn.execute(
             "UPDATE pages SET full_text = ?, char_count = ? WHERE book_id = ? AND page_no = 3",
@@ -230,13 +296,15 @@ def test_summary_and_characters_are_written_and_edited_separately(db_with_book):
         "[CHARACTER_FACT:レティ]\n- [page 3] レティは主人公で、友人を助けた。",
         "レティが事件を解決した。",
         "レティは事件を調査し、友人を助けて解決へ導いた。",
+        _CATALOG_SUMMARY,
+        _CATALOG_SUMMARY,
         "レティは主人公である。",
         "レティは主人公として事件を調査し、友人を助けた。",
     ]
     with patch("services.novel_db._llm_backend.QWEN_BACKEND.ask") as mock_ask:
         mock_ask.side_effect = responses
         with with_db() as conn:
-            summary, characters = summarize_book_with_characters(
+            summary, catalog_summary, characters = summarize_book_with_characters(
                 conn,
                 "test-book",
                 min_chars=100,
@@ -244,10 +312,17 @@ def test_summary_and_characters_are_written_and_edited_separately(db_with_book):
             )
 
     assert summary == "レティは事件を調査し、友人を助けて解決へ導いた。"
+    assert catalog_summary == _CATALOG_SUMMARY
     assert characters == {"レティ": "レティは主人公として事件を調査し、友人を助けた。"}
     prompts = [call.args[0] for call in mock_ask.call_args_list]
     assert any("事実抽出工程の人物メモ" in prompt for prompt in prompts)
     assert any("人物説明の初稿" in prompt for prompt in prompts)
+    assert any("書籍一覧で作品を選ぶ人向け" in prompt for prompt in prompts)
+    assert [call.kwargs["content_type"] for call in mock_summary_grounding.call_args_list] == [
+        "detailed",
+        "catalog",
+    ]
+    assert mock_summary_grounding.call_args_list[1].kwargs["coverage_required"] is False
 
 
 def test_parse_combined_output_preserves_full_unmarked_summary():
@@ -298,6 +373,15 @@ def test_editor_failure_falls_back_to_valid_draft():
     edited = "[SUMMARY]\nレティは主人公である。"
 
     assert choose_publishable_prose(draft, edited, required_subject="レティ") == draft
+
+
+def test_catalog_editor_failure_falls_back_to_length_valid_draft():
+    assert _choose_catalog_summary(_CATALOG_SUMMARY, "短すぎる要約。") == _CATALOG_SUMMARY
+
+
+def test_catalog_summary_rejects_candidates_outside_length_range():
+    with pytest.raises(ValueError, match="catalog summary length"):
+        _choose_catalog_summary("短い初稿。", "短い校正版。")
 
 
 def test_update_and_load_summary_roundtrip(db_with_book):

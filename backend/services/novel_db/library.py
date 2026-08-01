@@ -32,6 +32,8 @@ class BookSummary:
     publisher: str | None = None
     asin: str | None = None
     series_index: float | None = None
+    catalog_summary: str | None = None
+    catalog_summary_generated_at: str | None = None
 
 
 @dataclass
@@ -54,6 +56,8 @@ class BookDetail:
     isbn: str | None
     summary: str | None
     summary_generated_at: str | None
+    catalog_summary: str | None
+    catalog_summary_generated_at: str | None
     character_count: int
     discussion_count: int
 
@@ -80,15 +84,30 @@ def _thumbnail_url(book_name: str) -> str:
 
 
 def _fetch_indexed_status(conn: sqlite3.Connection) -> dict[str, dict]:
-    """novel.db から書籍の {name: {page_count, indexed_at, ocr_done_at}} を返す。"""
-    rows = conn.execute("SELECT name, page_count, indexed_at, ocr_done_at FROM books").fetchall()
+    """novel.db から書籍一覧に必要な構築状態と短縮要約を返す。"""
+    rows = conn.execute(
+        """
+        SELECT name, page_count, indexed_at, ocr_done_at,
+               catalog_summary, catalog_summary_generated_at
+        FROM books
+        """
+    ).fetchall()
     return {
         name: {
             "page_count": page_count,
             "indexed_at": indexed_at,
             "ocr_done_at": ocr_done_at,
+            "catalog_summary": catalog_summary,
+            "catalog_summary_generated_at": catalog_summary_generated_at,
         }
-        for name, page_count, indexed_at, ocr_done_at in rows
+        for (
+            name,
+            page_count,
+            indexed_at,
+            ocr_done_at,
+            catalog_summary,
+            catalog_summary_generated_at,
+        ) in rows
     }
 
 
@@ -112,18 +131,31 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
     meta_entry = meta.get(_meta_key(safe_name), {})
 
     db_row = conn.execute(
-        "SELECT page_count, indexed_at, ocr_done_at, summary, summary_generated_at FROM books WHERE name = ?",
+        """
+        SELECT page_count, indexed_at, ocr_done_at, summary, summary_generated_at,
+               catalog_summary, catalog_summary_generated_at
+        FROM books WHERE name = ?
+        """,
         (safe_name,),
     ).fetchone()
 
     if db_row:
-        page_count, indexed_at, ocr_done_at, summary, summary_generated_at = db_row
+        (
+            page_count,
+            indexed_at,
+            ocr_done_at,
+            summary,
+            summary_generated_at,
+            catalog_summary,
+            catalog_summary_generated_at,
+        ) = db_row
         char_count = conn.execute(
             "SELECT COUNT(*) FROM book_characters bc JOIN books b ON bc.book_id = b.id WHERE b.name = ?",
             (safe_name,),
         ).fetchone()[0]
     else:
         page_count = indexed_at = ocr_done_at = summary = summary_generated_at = None
+        catalog_summary = catalog_summary_generated_at = None
         char_count = 0
 
     from services.novel_db.discussion_service import count_discussions
@@ -147,6 +179,8 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
         isbn=meta_entry.get("isbn"),
         summary=summary,
         summary_generated_at=summary_generated_at,
+        catalog_summary=catalog_summary,
+        catalog_summary_generated_at=catalog_summary_generated_at,
         character_count=char_count,
         discussion_count=discussion_count,
     )
@@ -181,6 +215,10 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
                 publisher=meta_entry.get("publisher"),
                 asin=meta_entry.get("asin"),
                 series_index=meta_entry.get("series_index"),
+                catalog_summary=info["catalog_summary"] if info else None,
+                catalog_summary_generated_at=(
+                    info["catalog_summary_generated_at"] if info else None
+                ),
             )
         )
     return summaries

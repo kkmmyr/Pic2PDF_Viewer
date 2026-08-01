@@ -54,6 +54,11 @@ class _NovelDbSettings(BaseSettings):
     # "ollama" (既定): Ollama 経由で gemma4:e4b を使用
     # "qwen"         : llama-server の Qwen に統一（thinking は _DEFAULT_THINK=False で自動抑制）
     NOVEL_DB_GEMMA_BACKEND: str = "ollama"
+    # 要約根拠検証。既定はQwenを直列再利用し、別モデルを常駐させない。
+    # 独立比較では "ollama" または "llama_server" とモデル名を指定する。
+    NOVEL_DB_VERIFIER_BACKEND: str = "qwen"
+    NOVEL_DB_VERIFIER_MODEL: str = ""
+    NOVEL_DB_VERIFIER_BASE_URL: str = "http://127.0.0.1:11436"
 
     # ---------------------------------------------------------------------------
     # 検索パラメータ
@@ -93,6 +98,9 @@ NOVEL_DB_LLAMA_SERVER_URL = _s.NOVEL_DB_LLAMA_SERVER_URL
 NOVEL_DB_CHAR_EXTRACT_MODEL = _s.NOVEL_DB_CHAR_EXTRACT_MODEL
 NOVEL_DB_CONTEXT_MODEL = _s.NOVEL_DB_CONTEXT_MODEL
 NOVEL_DB_GEMMA_BACKEND = _s.NOVEL_DB_GEMMA_BACKEND
+NOVEL_DB_VERIFIER_BACKEND = _s.NOVEL_DB_VERIFIER_BACKEND
+NOVEL_DB_VERIFIER_MODEL = _s.NOVEL_DB_VERIFIER_MODEL
+NOVEL_DB_VERIFIER_BASE_URL = _s.NOVEL_DB_VERIFIER_BASE_URL
 NOVEL_DB_MIN_BODY_CHARS = 300  # 固定値（薄いページ除外閾値）
 NOVEL_DB_QA_TOP_K = _s.NOVEL_DB_QA_TOP_K
 NOVEL_DB_QA_MAX_PER_BOOK = 5  # 固定値（書籍ごと取得上限）

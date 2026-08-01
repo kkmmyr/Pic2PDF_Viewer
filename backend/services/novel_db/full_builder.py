@@ -115,11 +115,14 @@ def _run_combined_step(
     detail: StepCallback | None = None,
 ) -> None:
     """Generate all prose first, then atomically replace published SQLite rows."""
-    row = conn.execute("SELECT id, summary FROM books WHERE name = ?", (book_name,)).fetchone()
+    row = conn.execute(
+        "SELECT id, summary, catalog_summary FROM books WHERE name = ?",
+        (book_name,),
+    ).fetchone()
     if row is None:
         log("  skip: book not found in DB")
         return
-    book_id, existing_summary = row
+    book_id, existing_summary, existing_catalog_summary = row
 
     has_chars = (
         conn.execute(
@@ -129,14 +132,18 @@ def _run_combined_step(
         > 0
     )
 
-    if existing_summary and has_chars and not redo:
-        log("  skip: summary and characters already exist")
+    if existing_summary and existing_catalog_summary and has_chars and not redo:
+        log("  skip: detailed summary, catalog summary, and characters already exist")
         return
 
     if detail:
         detail("サマリ生成中")
     try:
-        summary, char_summaries = summarize_book_with_characters(conn, book_name, progress=log)
+        summary, catalog_summary, char_summaries = summarize_book_with_characters(
+            conn,
+            book_name,
+            progress=log,
+        )
     except Exception as exc:
         log(f"  error: {exc}")
         logger.exception("[full_build:%s] combined_step failed", book_name)
@@ -155,8 +162,15 @@ def _run_combined_step(
 
     try:
         conn.execute(
-            "UPDATE books SET summary = ?, summary_generated_at = datetime('now', '+9 hours') WHERE id = ?",
-            (summary, book_id),
+            """
+            UPDATE books
+            SET summary = ?,
+                summary_generated_at = datetime('now', '+9 hours'),
+                catalog_summary = ?,
+                catalog_summary_generated_at = datetime('now', '+9 hours')
+            WHERE id = ?
+            """,
+            (summary, catalog_summary, book_id),
         )
         conn.execute("DELETE FROM book_characters WHERE book_id = ?", (book_id,))
         conn.executemany(
@@ -176,7 +190,10 @@ def _run_combined_step(
     index_book_summary(conn, book_id, summary)
     saved_count = len(prepared_characters)
 
-    log(f"  done: summary={len(summary)} chars, {saved_count} characters")
+    log(
+        f"  done: detailed={len(summary)} chars, catalog={len(catalog_summary)} chars, "
+        f"{saved_count} characters"
+    )
 
 
 def _prepare_character_rows(

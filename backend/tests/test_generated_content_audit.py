@@ -19,6 +19,15 @@ from services.novel_db.generated_content_audit import (
 from services.novel_db.migrations import upgrade_head
 
 
+def _catalog_summary(subject: str = "茉莉花") -> str:
+    return (
+        f"{subject}は官吏として難題の調査を引き受け、"
+        + "集めた手掛かりを一つずつ照合しながら周囲との信頼を深め、事件の背景へ近づく過程を描き、"
+        * 10
+        + "最後には真相を明らかにして新たな役割を担う。"
+    )
+
+
 @pytest.fixture
 def db_conn(tmp_data_dir):
     upgrade_head()
@@ -30,10 +39,12 @@ def _insert_generated_content(conn, *, summary: str, character_summary: str) -> 
     cursor = conn.execute(
         """
         INSERT INTO books
-            (name, pdf_path, images_dir, page_count, summary, summary_generated_at)
-        VALUES ('book-10', '/book-10.pdf', '/images', 100, ?, '2026-07-01 12:00:00')
+            (name, pdf_path, images_dir, page_count, summary, summary_generated_at,
+             catalog_summary, catalog_summary_generated_at)
+        VALUES ('book-10', '/book-10.pdf', '/images', 100, ?, '2026-07-01 12:00:00',
+                ?, '2026-07-01 12:00:00')
         """,
-        (summary,),
+        (summary, _catalog_summary()),
     )
     book_id = int(cursor.lastrowid)
     conn.execute(
@@ -159,8 +170,33 @@ def test_restore_requires_exact_confirmation_and_is_transactional(db_conn):
         book_name=before.book_name,
         summary=before.summary,
         summary_generated_at=before.summary_generated_at,
+        catalog_summary=before.catalog_summary,
+        catalog_summary_generated_at=before.catalog_summary_generated_at,
         characters=before.characters,
     )
+
+
+def test_read_snapshot_upgrades_schema_one_without_catalog_summary(tmp_path):
+    path = tmp_path / "v1.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "captured_at": "2026-07-28T00:00:00+00:00",
+                "book_name": "old-book",
+                "summary": "旧要約。",
+                "summary_generated_at": None,
+                "characters": [],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    snapshot = read_snapshot(path)
+
+    assert snapshot.schema_version == 1
+    assert snapshot.catalog_summary is None
 
 
 def test_read_snapshot_rejects_unknown_schema(tmp_path):
