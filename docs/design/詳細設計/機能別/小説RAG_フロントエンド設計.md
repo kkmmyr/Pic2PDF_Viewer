@@ -1,6 +1,6 @@
 # 小説RAG フロントエンド設計
 
-> status: living | last-verified: 2026-07-26
+> status: living | last-verified: 2026-08-01
 
 小説DBの検索、QA、chat、読書会、書誌管理、OCR管理に関するフロントエンド設計。
 backendの検索・QA契約は[小説RAG 検索QA設計](小説RAG_検索QA設計.md)、
@@ -14,8 +14,10 @@ backendの検索・QA契約は[小説RAG 検索QA設計](小説RAG_検索QA設�
 
 ## 1. 画面構成
 
-- `NovelDbPage`: 書籍一覧、series drilldown、検索、QA。
-- `NovelDetailPage`: 書誌、summary、character、類似書籍。
+- `NovelDbPage`: 書籍一覧、series drilldown、検索、QA。各`BookCard`は
+  `catalog_summary`がある場合だけ「短い要約」として最大4行表示する。
+- `NovelDetailPage`: 書誌、詳細あらすじ`summary`、character、類似書籍。
+  一覧向け`catalog_summary`で詳細あらすじを置き換えない。
 - `NovelDiscussionPage`: 読書会生成と履歴。
 - `NovelManagePage`: OCR / build job、Amazon情報取込、QA承認。
 - `NovelReaderPage`: Kindle撮影画像とOCR本文の参照。
@@ -91,6 +93,10 @@ session一覧、選択session、message一覧、入力を分離する。送信�
 ## 6. 書籍・series管理
 
 - books / series一覧は全Pageで共有するQuery cacheを使う。
+- 一覧カードは選書用の`catalog_summary`だけを表示し、400〜700文字の全文はDOMに保持したまま
+  CSSで最大4行に省略する。短縮要約が未生成の旧データでは要約欄自体を表示しない。
+- 書籍詳細画面は網羅性優先の`summary`を「詳細あらすじ」として表示する。
+  二つのフィールドをUI側で代替利用せず、用途を混同しない。
 - series drilldownの並び替えは楽観更新し、失敗時にrollbackする。
 - 書誌編集成功後は一覧と詳細の両keyを更新またはinvalidateする。
 - 一括操作は選択対象と変更内容を確認し、mutation中の再送信を禁止する。

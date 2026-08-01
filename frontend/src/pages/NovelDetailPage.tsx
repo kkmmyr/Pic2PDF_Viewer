@@ -202,7 +202,7 @@ export default function NovelDetailPage() {
             {/* 要約セクション */}
             <section className="space-y-2">
                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    あらすじ・要約
+                    詳細あらすじ
                 </h2>
                 {detail.summary ? (
                     <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
@@ -210,7 +210,7 @@ export default function NovelDetailPage() {
                     </p>
                 ) : (
                     <p className="text-sm text-gray-400 dark:text-gray-500 italic">
-                        要約は未生成です（Full Build を実行してください）
+                        詳細あらすじは未生成です（Full Build を実行してください）
                     </p>
                 )}
             </section>

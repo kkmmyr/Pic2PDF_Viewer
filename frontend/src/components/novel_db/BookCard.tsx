@@ -51,6 +51,16 @@ export default function BookCard({ book, onOpenDetail, onEdit }: Props) {
                     </button>
                 </div>
                 <BookMetaList book={book} variant="card" />
+                {book.catalog_summary && (
+                    <div className="border-t border-gray-100 dark:border-gray-700 pt-2">
+                        <p className="mb-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                            短い要約
+                        </p>
+                        <p className="text-xs leading-relaxed text-gray-700 dark:text-gray-300 line-clamp-4">
+                            {book.catalog_summary}
+                        </p>
+                    </div>
+                )}
                 <div className="flex items-center gap-1.5 text-xs">
                     {book.is_indexed ? (
                         <>
