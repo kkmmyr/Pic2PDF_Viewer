@@ -12,6 +12,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, Protocol
 
 DEFAULT_API_BASE = "http://medaroserver:8090"
@@ -59,6 +60,15 @@ class CaptureApi(Protocol):
     def create_job(self, book: SeriesBook) -> dict: ...
 
     def get_book(self, asin: str) -> dict: ...
+
+
+class FailureRecovery(Protocol):
+    def recover(
+        self,
+        api: CaptureApi,
+        book: SeriesBook,
+        failed_job: dict,
+    ) -> bool: ...
 
 
 class HttpCaptureApi:
@@ -317,6 +327,7 @@ def execute_series(
     apply: bool,
     poll_seconds: float = 10.0,
     timeout_seconds: float = 4 * 60 * 60,
+    failure_recovery: FailureRecovery | None = None,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
 ) -> int:
@@ -349,27 +360,47 @@ def execute_series(
         )
 
     for index, book in enumerate(remaining, start=1):
-        if _unfinished_jobs(api.list_jobs()):
-            raise SeriesCaptureError(
-                "An unfinished capture job exists before the next book"
+        recovery_used = False
+        while True:
+            if _unfinished_jobs(api.list_jobs()):
+                raise SeriesCaptureError(
+                    "An unfinished capture job exists before the next book"
+                )
+            print(
+                f"[{index}/{len(remaining)}] Creating job for {book.asin} ({book.title})",
+                flush=True,
             )
-        print(
-            f"[{index}/{len(remaining)}] Creating job for {book.asin} ({book.title})",
-            flush=True,
-        )
-        job = api.create_job(book)
-        job_id = str(job.get("id") or "")
-        if not job_id:
-            raise SeriesCaptureError(f"Create job response has no id for {book.asin}")
-        result = _wait_for_job(
-            api,
-            job_id,
-            poll_seconds=poll_seconds,
-            timeout_seconds=timeout_seconds,
-            sleep=sleep,
-            monotonic=monotonic,
-        )
-        if result.get("status") != "succeeded":
+            job = api.create_job(book)
+            job_id = str(job.get("id") or "")
+            if not job_id:
+                raise SeriesCaptureError(
+                    f"Create job response has no id for {book.asin}"
+                )
+            result = _wait_for_job(
+                api,
+                job_id,
+                poll_seconds=poll_seconds,
+                timeout_seconds=timeout_seconds,
+                sleep=sleep,
+                monotonic=monotonic,
+            )
+            if result.get("status") == "succeeded":
+                break
+            recovered = False
+            if failure_recovery is not None and not recovery_used:
+                try:
+                    recovered = failure_recovery.recover(api, book, result)
+                except Exception as exc:
+                    raise SeriesCaptureError(
+                        f"Capture recovery failed for {book.asin}: {exc}"
+                    ) from exc
+            if recovered:
+                recovery_used = True
+                print(
+                    f"  recovered Kindle; retrying the same ASIN {book.asin}",
+                    flush=True,
+                )
+                continue
             raise SeriesCaptureError(
                 f"Capture failed for {book.asin}: "
                 f"{result.get('error_code')} {result.get('error_message')}"
@@ -400,6 +431,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll-seconds", type=float, default=10.0)
     parser.add_argument("--job-timeout-hours", type=float, default=4.0)
     parser.add_argument(
+        "--recover-kindle-crash",
+        action="store_true",
+        help=(
+            "Restart a missing Kindle process and retry the same pre-capture job "
+            "only after exact ASIN verification."
+        ),
+    )
+    parser.add_argument("--kindle-startup-timeout-seconds", type=float, default=60.0)
+    parser.add_argument("--kindle-recovery-log", type=Path)
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="Create capture jobs. Without this option the command is a dry-run.",
@@ -417,6 +458,8 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit("--poll-seconds must be zero or greater")
     if args.job_timeout_hours <= 0:
         raise SystemExit("--job-timeout-hours must be greater than zero")
+    if args.kindle_startup_timeout_seconds <= 0:
+        raise SystemExit("--kindle-startup-timeout-seconds must be greater than zero")
     try:
         api = HttpCaptureApi(args.api_base)
         books = build_inventory(
@@ -424,12 +467,28 @@ def main(argv: list[str] | None = None) -> int:
             series_name=args.series,
             expected_total=args.expected_total,
         )
+        failure_recovery = None
+        if args.recover_kindle_crash:
+            kindle_pdf_dir = Path(__file__).resolve().parents[1] / "kindle-pdf"
+            sys.path.insert(0, str(kindle_pdf_dir))
+            from kindle_capture_recovery import (  # noqa: PLC0415
+                KindleCrashRecovery,
+                KindleRecoveryConfig,
+            )
+
+            failure_recovery = KindleCrashRecovery(
+                KindleRecoveryConfig(
+                    startup_timeout_seconds=args.kindle_startup_timeout_seconds,
+                    audit_log_path=args.kindle_recovery_log,
+                )
+            )
         return execute_series(
             api,
             books,
             apply=args.apply,
             poll_seconds=args.poll_seconds,
             timeout_seconds=args.job_timeout_hours * 60 * 60,
+            failure_recovery=failure_recovery,
         )
     except KeyboardInterrupt:
         print("\nInterrupted. No next capture job will be created.", file=sys.stderr)

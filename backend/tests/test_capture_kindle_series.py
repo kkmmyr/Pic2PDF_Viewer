@@ -62,6 +62,49 @@ class FakeApi:
         return {"asin": asin, "capture_state": "captured"}
 
 
+class RecoveringFakeApi(FakeApi):
+    def __init__(self, outcomes: dict[str, list[str]]) -> None:
+        super().__init__({})
+        self.remaining_outcomes = {asin: list(values) for asin, values in outcomes.items()}
+
+    def list_jobs(self) -> list[dict]:
+        for job in self.jobs:
+            if job["status"] != "queued":
+                continue
+            outcome = self.remaining_outcomes[job["asin"]].pop(0)
+            job["status"] = outcome
+            if outcome == "failed":
+                job["error_code"] = "kindle_app_exited"
+                job["error_message"] = "test crash"
+                job["started_at"] = None
+                job["captured_screens"] = None
+            else:
+                job["captured_screens"] = 10
+        return [dict(job) for job in self.jobs]
+
+    def create_job(self, book) -> dict:
+        self.created.append(book.asin)
+        attempt = sum(job["asin"] == book.asin for job in self.jobs) + 1
+        suffix = "" if attempt == 1 else f"-{attempt}"
+        job = {
+            "id": f"job-{book.asin}{suffix}",
+            "asin": book.asin,
+            "status": "queued",
+        }
+        self.jobs.append(job)
+        return dict(job)
+
+
+class FakeRecovery:
+    def __init__(self, decisions: list[bool]) -> None:
+        self.decisions = list(decisions)
+        self.calls: list[tuple[str, str]] = []
+
+    def recover(self, _api, book, failed_job: dict) -> bool:
+        self.calls.append((book.asin, failed_job["id"]))
+        return self.decisions.pop(0)
+
+
 def test_inventory_uses_label_source_and_sorts_novel_before_comic():
     books = series_capture.build_inventory(
         [
@@ -181,6 +224,81 @@ def test_apply_stops_before_next_job_when_a_book_fails():
         )
 
     assert api.created == ["NOVEL8"]
+
+
+def test_apply_retries_only_the_same_book_after_verified_recovery():
+    api = RecoveringFakeApi({"NOVEL8": ["failed", "succeeded"], "NOVEL9": ["succeeded"]})
+    recovery = FakeRecovery([True])
+    books = series_capture.build_inventory(
+        [
+            _item("NOVEL8", "茉莉花官吏伝 八 (ビーズログ文庫)", 8),
+            _item("NOVEL9", "茉莉花官吏伝 九 (ビーズログ文庫)", 9),
+        ],
+        series_name="茉莉花官吏伝",
+        expected_total=2,
+    )
+
+    result = series_capture.execute_series(
+        api,
+        books,
+        apply=True,
+        poll_seconds=0,
+        sleep=lambda _: None,
+        failure_recovery=recovery,
+    )
+
+    assert result == 0
+    assert api.created == ["NOVEL8", "NOVEL8", "NOVEL9"]
+    assert recovery.calls == [("NOVEL8", "job-NOVEL8")]
+
+
+def test_apply_does_not_create_next_job_when_recovery_rejects_failure():
+    api = RecoveringFakeApi({"NOVEL8": ["failed"], "NOVEL9": ["succeeded"]})
+    recovery = FakeRecovery([False])
+    books = series_capture.build_inventory(
+        [
+            _item("NOVEL8", "茉莉花官吏伝 八 (ビーズログ文庫)", 8),
+            _item("NOVEL9", "茉莉花官吏伝 九 (ビーズログ文庫)", 9),
+        ],
+        series_name="茉莉花官吏伝",
+        expected_total=2,
+    )
+
+    with pytest.raises(series_capture.SeriesCaptureError, match="Capture failed"):
+        series_capture.execute_series(
+            api,
+            books,
+            apply=True,
+            poll_seconds=0,
+            sleep=lambda _: None,
+            failure_recovery=recovery,
+        )
+
+    assert api.created == ["NOVEL8"]
+    assert recovery.calls == [("NOVEL8", "job-NOVEL8")]
+
+
+def test_apply_never_recovers_the_same_book_twice():
+    api = RecoveringFakeApi({"NOVEL8": ["failed", "failed"]})
+    recovery = FakeRecovery([True, True])
+    books = series_capture.build_inventory(
+        [_item("NOVEL8", "茉莉花官吏伝 八 (ビーズログ文庫)", 8)],
+        series_name="茉莉花官吏伝",
+        expected_total=1,
+    )
+
+    with pytest.raises(series_capture.SeriesCaptureError, match="Capture failed"):
+        series_capture.execute_series(
+            api,
+            books,
+            apply=True,
+            poll_seconds=0,
+            sleep=lambda _: None,
+            failure_recovery=recovery,
+        )
+
+    assert api.created == ["NOVEL8", "NOVEL8"]
+    assert recovery.calls == [("NOVEL8", "job-NOVEL8")]
 
 
 def test_apply_rejects_an_existing_unfinished_job():

@@ -19,6 +19,7 @@
   "backend/services/novel_db/query_expander.py:_parse_expansions": 15,
   "backend/services/novel_db/relation_extractor.py:extract_relations_with_qwen": 12,
   "backend/services/novel_db/search.py:hybrid_search": 11,
+  "backend/services/novel_db/summary_grounding.py:parse_grounding_response": 20,
   "backend/services/novel_db/surya_quality.py:evaluate_external_ocr": 11,
   "backend/services/novel_db/surya_quality.py:evaluate_page_quality": 12,
   "backend/services/novel_db/surya_runtime.py:recognize_with_quality": 15,

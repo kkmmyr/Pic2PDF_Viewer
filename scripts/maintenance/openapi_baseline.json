@@ -314,6 +314,28 @@
             "title": "Authors",
             "type": "array"
           },
+          "catalog_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Summary"
+          },
+          "catalog_summary_generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Summary Generated At"
+          },
           "character_count": {
             "title": "Character Count",
             "type": "integer"
@@ -686,6 +708,28 @@
             },
             "title": "Authors",
             "type": "array"
+          },
+          "catalog_summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Summary"
+          },
+          "catalog_summary_generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catalog Summary Generated At"
           },
           "indexed_at": {
             "anyOf": [

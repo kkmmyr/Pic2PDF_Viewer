@@ -159,7 +159,9 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   `ReadingArea` 全体、`novel` は `ReadingArea` の左右端と
   `TopChrome.bottom` / `Footer.top` を合成し、書名とページ・進捗表示を除外する。
   各矩形の包含関係を検証できない場合は撮影を開始しない。
-- Kindleの起動、ログイン、画面ロック解除は行わない。
+- 通常の単冊経路とcapture agentはKindleの起動、ログイン、画面ロック解除を行わない。
+  シリーズ直列実行のオプトイン復旧だけは、撮影開始前の失敗でKindleプロセスの消失を
+  確認した場合に限ってStoreアプリを再起動する。プロセスが残るUI不調は強制終了しない。
 - 候補なし・複数・UI取得不能・ダウンロード期限超過・先頭移動不能は工程別エラーとして終了し、capturerを起動しない。
 
 ### 1.8. `capture_agent.py`（ジョブ実行）
@@ -203,7 +205,9 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 ### 1.9. `scripts/capture_kindle_series.py`（シリーズ直列実行）
 
 購入カタログAPIを使い、シリーズの未撮影書籍を安全に1冊ずつcapture agentへ渡す
-運用補助スクリプトである。KindleウィンドウやUI Automationには接続しない。
+運用補助スクリプトである。通常時はKindleウィンドウやUI Automationへ接続しない。
+オプトインのクラッシュ復旧時だけ、新規起動したKindleのライブラリで同一ASINを
+再照合するために限定接続する。
 
 - 既定はdry-runとし、対象タイトル、ASIN、`source`、巻順、撮影状態だけを表示する。
 - 実行時はシリーズ検索結果、所有状態、レーベル別`source`、期待総冊数を検証する。
@@ -216,6 +220,13 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   次のjobを作成する。
 - `failed`、監視タイムアウト、API不整合、割り込み時は次のjobを作成しない。
   監視側の停止は実行中job自体を中断しない。
+- `--recover-kindle-crash`を指定した場合だけ、`kindle_capture_recovery.py`の
+  復旧判定を使う。対象は`started_at`なし・撮影枚数0・Kindleプロセス消失を
+  同時に満たす`kindle_not_running` / `kindle_app_exited` /
+  `kindle_ui_unavailable`である。Storeアプリ再起動後、同じASINをライブラリで
+  一意に再照合し、別の未完了jobがない場合に限り同じ書籍の新規jobを最大1回作る。
+- `download_failed`、書籍照合、位置決め、撮影、転送、登録の失敗、プロセスが
+  残ったUI不調、復旧上限超過では後続jobを作らずfail closedとする。
 
 ---
 

@@ -59,6 +59,22 @@ def test_code_size_rejects_new_and_growing_oversized_files() -> None:
     ]
 
 
+def test_code_size_prunes_excluded_directories_before_descent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "backend").mkdir()
+
+    def fake_walk(root: Path):
+        dirnames = ["data", "services"]
+        yield str(root), dirnames, []
+        assert dirnames == ["services"]
+
+    monkeypatch.setattr(code_size.os, "walk", fake_walk)
+
+    assert code_size.collect_line_counts(tmp_path) == {}
+
+
 def test_openapi_normalization_is_stable_and_drops_runtime_servers() -> None:
     first = {
         "servers": [{"url": "http://localhost:8766"}],

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -53,15 +54,18 @@ def collect_line_counts(project_root: Path = PROJECT_ROOT) -> dict[str, int]:
         absolute_root = project_root / source_root
         if not absolute_root.exists():
             continue
-        for path in absolute_root.rglob("*"):
-            if not path.is_file():
-                continue
-            relative = path.relative_to(project_root)
-            if not is_production_source(relative):
-                continue
-            counts[relative.as_posix()] = len(
-                path.read_text(encoding="utf-8", errors="replace").splitlines()
-            )
+        for current_dir, dirnames, filenames in os.walk(absolute_root):
+            dirnames[:] = [
+                dirname for dirname in dirnames if dirname not in EXCLUDED_PARTS
+            ]
+            for filename in filenames:
+                path = Path(current_dir) / filename
+                relative = path.relative_to(project_root)
+                if not is_production_source(relative):
+                    continue
+                counts[relative.as_posix()] = len(
+                    path.read_text(encoding="utf-8", errors="replace").splitlines()
+                )
     return dict(sorted(counts.items()))
 
 
