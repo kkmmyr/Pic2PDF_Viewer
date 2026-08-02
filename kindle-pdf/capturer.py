@@ -7,6 +7,7 @@ import pyautogui as pag
 from PIL import ImageGrab
 
 from capture_base import Config, KindleCapturer
+from capture_loop import CaptureReport, CaptureResult
 from capture_ui import BookInfoDialog
 from comic_capturer import AutoConfig, AutoKindleCapturer
 
@@ -17,5 +18,7 @@ __all__ = [
     "AutoKindleCapturer",
     "BookInfoDialog",
     "Config",
+    "CaptureReport",
+    "CaptureResult",
     "KindleCapturer",
 ]

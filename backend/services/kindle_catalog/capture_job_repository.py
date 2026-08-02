@@ -20,6 +20,7 @@ ACTIVE_STATUSES = (
     "capturing",
     "awaiting_files",
 )
+UNFINISHED_STATUSES = ("queued", *ACTIVE_STATUSES)
 AGENT_TRANSITIONS = {
     "claimed": {"locating_book", "waiting_user", "failed"},
     "locating_book": {"downloading", "positioning", "failed"},
@@ -125,27 +126,29 @@ def create(
     expected_screens: int | None,
     *,
     requested_at: datetime,
+    timeout_seconds: int,
 ) -> dict:
     if source not in {"comic", "novel"}:
         raise ValueError("source は comic または novel です")
     if direction not in {"left", "right"}:
         raise ValueError("direction は left または right です")
     with with_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        _recover_stale(
+            conn,
+            now=requested_at,
+            timeout_seconds=timeout_seconds,
+        )
         book = conn.execute("SELECT asin FROM books WHERE asin=?", (asin,)).fetchone()
         if book is None:
             raise ValueError("指定 ASIN は Kindle カタログに存在しません")
+        placeholders = ",".join("?" for _ in UNFINISHED_STATUSES)
         existing = conn.execute(
-            """
-            SELECT 1 FROM capture_jobs
-            WHERE asin=? AND status IN (
-                'queued','claimed','locating_book','downloading','positioning',
-                'waiting_user','capturing','awaiting_files'
-            )
-            """,
-            (asin,),
+            f"SELECT id,asin FROM capture_jobs WHERE status IN ({placeholders}) LIMIT 1",
+            UNFINISHED_STATUSES,
         ).fetchone()
         if existing:
-            raise ValueError("この書籍には未完了のキャプチャジョブがあります")
+            raise ValueError("別の未完了キャプチャジョブがあるため作成できません")
         job_id = str(uuid.uuid4())
         conn.execute(
             """

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
+from PIL import Image
 
 import capture_agent
 import capture_package
+from capture_loop import CaptureReport, CaptureResult
+from capture_quality import audit_capture_images
 from kindle_app_controller import BookCandidate, KindleControllerError
 
 
@@ -114,12 +118,27 @@ class _Controller:
         on_poll()
 
 
+def _fake_canary(_job, *, reading_area_bounds_provider):
+    assert reading_area_bounds_provider() == (0, 100, 1000, 728)
+    return {
+        "policy_version": "kindle-capture-canary-v1",
+        "passed": True,
+        "dimensions": [10, 10],
+        "crop_bounds": [0, 0, 10, 10],
+        "first_sha256": "a" * 64,
+        "second_sha256": "b" * 64,
+        "mean_difference": 1.0,
+        "changed_ratio": 0.1,
+    }
+
+
 @pytest.fixture(autouse=True)
-def _reset_controller() -> None:
+def _reset_controller(monkeypatch: pytest.MonkeyPatch) -> None:
     _Controller.needs_download_result = False
     _Controller.search_count = 0
     _Controller.layout_sources = []
     _Controller.start_sources = []
+    monkeypatch.setattr(capture_agent, "_run_canary", _fake_canary)
 
 
 def _fake_capture(
@@ -133,9 +152,31 @@ def _fake_capture(
     image_dir = output_root / "captured"
     image_dir.mkdir()
     for page in range(1, 6):
-        (image_dir / f"{page:03d}.png").write_bytes(f"page-{page}".encode())
+        Image.new("RGB", (10, 10), color=(page, page, page)).save(
+            image_dir / f"{page:03d}.png"
+        )
         on_page(page)
-    return 5, image_dir
+    report = CaptureReport(
+        policy_version="kindle-completeness-v1",
+        termination_reason="expected_screen_count_confirmed",
+        end_of_book_proven=True,
+        captured_screens=5,
+        expected_screens=5,
+        direction="left",
+        layout="single",
+        crop_bounds=(0, 0, 10, 10),
+        image_size=(10, 10),
+        last_saved_file="005.png",
+        unchanged_observation_windows=2,
+        termination_unchanged_windows=2,
+        observation_timeout_seconds=5.0,
+        retry_limit=1,
+        turn_commands=6,
+        successful_transitions=4,
+        retry_commands=1,
+        opposite_direction_commands=0,
+    )
+    return CaptureResult(5, str(image_dir), report)
 
 
 def test_run_once_executes_automatic_flow_and_reports_progress(
@@ -154,7 +195,7 @@ def test_run_once_executes_automatic_flow_and_reports_progress(
 
     assert handled
     assert _Controller.layout_sources == ["novel"]
-    assert _Controller.start_sources == ["novel"]
+    assert _Controller.start_sources == ["novel", "novel"]
     assert [state["state"] for state in api.states] == [
         "locating_book",
         "positioning",
@@ -163,6 +204,14 @@ def test_run_once_executes_automatic_flow_and_reports_progress(
         "capturing",
         "awaiting_files",
     ]
+    manifest = json.loads(
+        (_config(tmp_path).inbox / f"{_job()['id']}.ready" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert manifest["manifest_version"] == 2
+    assert manifest["capture"]["canary"]["passed"] is True
+    assert manifest["quality"]["outcome"] == "passed"
     assert api.states[3]["captured_screens"] == 1
     assert api.states[4]["captured_screens"] == 5
     assert any(path.endswith("/complete") for path, _body in api.calls)
@@ -234,6 +283,38 @@ def test_incomplete_novel_capture_is_not_published(
 
     assert api.states[-1]["state"] == "failed"
     assert api.states[-1]["error_code"] == "capture_incomplete"
+    assert not any(path.endswith("/complete") for path, _body in api.calls)
+
+
+def test_canary_failure_stops_before_formal_capture(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api = _Api(_job())
+    monkeypatch.setattr(capture_agent, "HeartbeatWorker", _Heartbeat)
+
+    def fail_canary(*_args, **_kwargs):
+        raise capture_agent.AgentExecutionError(
+            "capture_canary_failed",
+            "test canary failure",
+        )
+
+    monkeypatch.setattr(capture_agent, "_run_canary", fail_canary)
+    monkeypatch.setattr(
+        capture_agent,
+        "_capture",
+        lambda *_args, **_kwargs: pytest.fail("formal capture must not start"),
+    )
+
+    capture_agent.run_once(
+        _config(tmp_path),
+        api,
+        controller_factory=_Controller,
+    )
+
+    assert api.states[-1]["state"] == "failed"
+    assert api.states[-1]["error_code"] == "capture_canary_failed"
+    assert not any(state["state"] == "capturing" for state in api.states)
     assert not any(path.endswith("/complete") for path, _body in api.calls)
     assert not (_config(tmp_path).inbox / f"{_job()['id']}.ready").exists()
 
@@ -317,7 +398,32 @@ def test_publish_retries_transient_ready_rename(
     config = _config(tmp_path)
     images = tmp_path / "images"
     images.mkdir()
-    (images / "001.png").write_bytes(b"image")
+    Image.new("RGB", (10, 10), color=(1, 2, 3)).save(images / "001.png")
+    quality = audit_capture_images(images, expected_count=1)
+    capture_report = CaptureReport(
+        policy_version="kindle-completeness-v1",
+        termination_reason="visual_no_change_after_retries",
+        end_of_book_proven=True,
+        captured_screens=1,
+        expected_screens=None,
+        direction="left",
+        layout="single",
+        crop_bounds=(0, 0, 10, 10),
+        image_size=(10, 10),
+        last_saved_file="001.png",
+        unchanged_observation_windows=2,
+        termination_unchanged_windows=2,
+        observation_timeout_seconds=5.0,
+        retry_limit=1,
+        turn_commands=2,
+        successful_transitions=0,
+        retry_commands=1,
+        opposite_direction_commands=0,
+    ).to_manifest()
+    capture_report["canary"] = _fake_canary(
+        _job(),
+        reading_area_bounds_provider=lambda: (0, 100, 1000, 728),
+    )
     real_replace = capture_package.os.replace
     attempts = 0
 
@@ -331,7 +437,14 @@ def test_publish_retries_transient_ready_rename(
     monkeypatch.setattr(capture_package.os, "replace", transient_replace)
     monkeypatch.setattr(capture_package.time, "sleep", lambda _seconds: None)
 
-    ready = capture_agent._publish_package(config, _job(), images)
+    ready = capture_agent._publish_package(
+        config,
+        _job(),
+        images,
+        capture_report=capture_report,
+        quality_report=quality.to_manifest(),
+        audited_files=quality.files,
+    )
 
     assert attempts == 3
     assert ready.is_dir()

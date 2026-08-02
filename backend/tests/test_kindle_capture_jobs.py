@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 import config
 from services.kindle_catalog import capture_jobs as capture_jobs_service
@@ -22,6 +23,74 @@ from services.kindle_catalog.migrations import upgrade_head
 from services.kindle_catalog.repository import list_books
 from services.meta_store import load_meta, update_meta_locked
 from utils.dt import JST
+
+
+def _capture_manifest(job: dict, image_path: Path) -> dict:
+    digest = hashlib.sha256(image_path.read_bytes()).hexdigest()
+    with Image.open(image_path) as image:
+        image.load()
+        width, height = image.size
+    return {
+        "manifest_version": 2,
+        "job_id": job["id"],
+        "asin": job["asin"],
+        "source": job["source"],
+        "capture": {
+            "policy_version": "kindle-completeness-v1",
+            "termination_reason": "expected_screen_count_confirmed",
+            "end_of_book_proven": True,
+            "captured_screens": 1,
+            "expected_screens": 1,
+            "direction": "left",
+            "layout": "spread",
+            "crop_bounds": [0, 0, width, height],
+            "image_size": [width, height],
+            "last_saved_file": "001.png",
+            "unchanged_observation_windows": 2,
+            "termination_unchanged_windows": 2,
+            "observation_timeout_seconds": 5.0,
+            "retry_limit": 1,
+            "turn_commands": 2,
+            "successful_transitions": 0,
+            "retry_commands": 1,
+            "opposite_direction_commands": 0,
+            "canary": {
+                "policy_version": "kindle-capture-canary-v1",
+                "passed": True,
+                "dimensions": [width, height],
+                "crop_bounds": [0, 0, width, height],
+                "first_sha256": "a" * 64,
+                "second_sha256": "b" * 64,
+                "mean_difference": 1.0,
+                "changed_ratio": 0.1,
+            },
+        },
+        "quality": {
+            "schema_version": 1,
+            "policy_version": "kindle-image-qa-v1",
+            "warning_policy_version": "kindle-image-warning-v1",
+            "outcome": "passed",
+            "page_count": 1,
+            "dimensions": [width, height],
+            "findings": [],
+            "overlay_detector": {
+                "policy_version": "kindle-repeated-overlay-v1",
+                "passed": True,
+                "sampled_page_count": 1,
+                "candidate_count": 0,
+                "blocking_candidate_count": 0,
+            },
+        },
+        "files": [
+            {
+                "name": "001.png",
+                "sha256": digest,
+                "width": width,
+                "height": height,
+                "size": image_path.stat().st_size,
+            }
+        ],
+    }
 
 
 def _seed_book() -> None:
@@ -64,17 +133,8 @@ def _prepare_ready_job(inbox: Path, make_png) -> dict:
     ready = inbox / f"{job['id']}.ready"
     image_path = ready / "images" / "001.png"
     make_png(str(image_path))
-    digest = hashlib.sha256(image_path.read_bytes()).hexdigest()
     (ready / "manifest.json").write_text(
-        json.dumps(
-            {
-                "job_id": job["id"],
-                "asin": "B000CAPTURE",
-                "source": "comic",
-                "files": [{"name": "001.png", "sha256": digest}],
-            },
-            ensure_ascii=False,
-        ),
+        json.dumps(_capture_manifest(job, image_path), ensure_ascii=False),
         encoding="utf-8",
     )
     update_state(job["id"], "windows-1", "awaiting_files", captured_screens=1)
@@ -99,17 +159,8 @@ def test_capture_job_claim_and_ready_package_publish(tmp_data_dir, tmp_path, mon
     ready = inbox / f"{job['id']}.ready"
     image_path = ready / "images" / "001.png"
     make_png(str(image_path))
-    digest = hashlib.sha256(image_path.read_bytes()).hexdigest()
     (ready / "manifest.json").write_text(
-        json.dumps(
-            {
-                "job_id": job["id"],
-                "asin": "B000CAPTURE",
-                "source": "comic",
-                "files": [{"name": "001.png", "sha256": digest}],
-            },
-            ensure_ascii=False,
-        ),
+        json.dumps(_capture_manifest(job, image_path), ensure_ascii=False),
         encoding="utf-8",
     )
     update_state(job["id"], "windows-1", "awaiting_files", captured_screens=1)
@@ -200,15 +251,10 @@ def test_capture_package_rejects_path_traversal_filename(tmp_data_dir, tmp_path,
     update_state(job["id"], "windows-1", "awaiting_files")
     ready = inbox / f"{job['id']}.ready"
     make_png(str(ready / "images" / "001.png"))
+    manifest = _capture_manifest(job, ready / "images" / "001.png")
+    manifest["files"][0]["name"] = "../001.png"
     (ready / "manifest.json").write_text(
-        json.dumps(
-            {
-                "job_id": job["id"],
-                "asin": "B000CAPTURE",
-                "source": "comic",
-                "files": [{"name": "../001.png"}],
-            }
-        ),
+        json.dumps(manifest),
         encoding="utf-8",
     )
 
@@ -272,6 +318,22 @@ def test_claim_returns_identity_and_new_automatic_state_path(tmp_data_dir):
     assert awaiting["captured_screens"] == 12
 
 
+def test_create_rejects_second_unfinished_job_for_different_asin(tmp_data_dir):
+    upgrade_head()
+    _seed_book()
+    with with_db() as conn:
+        conn.execute(
+            "INSERT INTO books(asin,title,title_normalized,category,book_type) "
+            "VALUES ('B000OTHER','別作品','別作品','kindle','novel')"
+        )
+    first = create("B000CAPTURE", "comic", "left", None)
+
+    with pytest.raises(ValueError, match="別の未完了"):
+        create("B000OTHER", "novel", "left", None)
+
+    assert first["status"] == "queued"
+
+
 def test_heartbeat_requires_active_job_owner(tmp_data_dir):
     upgrade_head()
     _seed_book()
@@ -320,9 +382,9 @@ def test_claim_recovers_stale_job_before_claiming_next(
             ) VALUES ('B000NEXT','次の作品','次の作品','kindle','comic')
             """
         )
-    next_job = create("B000NEXT", "comic", "left", None)
     fixed_now = datetime(2026, 7, 25, 10, 10, tzinfo=JST)
     monkeypatch.setattr(capture_jobs_service, "jst_now", lambda: fixed_now)
+    next_job = create("B000NEXT", "comic", "left", None)
 
     claimed = claim("windows-next")
 

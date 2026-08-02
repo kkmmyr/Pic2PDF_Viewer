@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 
@@ -180,6 +181,11 @@ def test_apply_requires_expected_total_before_api_access():
         series_capture.main(["--apply"])
 
 
+def test_apply_requires_persistent_session_state_before_api_access():
+    with pytest.raises(SystemExit, match="--session-state is required"):
+        series_capture.main(["--apply", "--expected-total", "1"])
+
+
 def test_apply_creates_next_job_only_after_previous_success():
     api = FakeApi({"NOVEL8": "succeeded", "NOVEL9": "succeeded"})
     books = series_capture.build_inventory(
@@ -214,7 +220,7 @@ def test_apply_stops_before_next_job_when_a_book_fails():
         expected_total=2,
     )
 
-    with pytest.raises(series_capture.SeriesCaptureError, match="Capture failed"):
+    with pytest.raises(series_capture.SeriesCaptureError, match="breaker tripped"):
         series_capture.execute_series(
             api,
             books,
@@ -264,7 +270,7 @@ def test_apply_does_not_create_next_job_when_recovery_rejects_failure():
         expected_total=2,
     )
 
-    with pytest.raises(series_capture.SeriesCaptureError, match="Capture failed"):
+    with pytest.raises(series_capture.SeriesCaptureError, match="breaker tripped"):
         series_capture.execute_series(
             api,
             books,
@@ -287,7 +293,7 @@ def test_apply_never_recovers_the_same_book_twice():
         expected_total=1,
     )
 
-    with pytest.raises(series_capture.SeriesCaptureError, match="Capture failed"):
+    with pytest.raises(series_capture.SeriesCaptureError, match="breaker tripped"):
         series_capture.execute_series(
             api,
             books,
@@ -301,6 +307,56 @@ def test_apply_never_recovers_the_same_book_twice():
     assert recovery.calls == [("NOVEL8", "job-NOVEL8")]
 
 
+def test_session_breaker_limits_recovery_across_different_books():
+    api = RecoveringFakeApi({"NOVEL8": ["failed", "succeeded"], "NOVEL9": ["failed"]})
+    recovery = FakeRecovery([True, True])
+    books = series_capture.build_inventory(
+        [
+            _item("NOVEL8", "茉莉花官吏伝 八 (ビーズログ文庫)", 8),
+            _item("NOVEL9", "茉莉花官吏伝 九 (ビーズログ文庫)", 9),
+        ],
+        series_name="茉莉花官吏伝",
+        expected_total=2,
+    )
+
+    with pytest.raises(series_capture.SeriesCaptureError, match="recovery_limit"):
+        series_capture.execute_series(
+            api,
+            books,
+            apply=True,
+            poll_seconds=0,
+            sleep=lambda _: None,
+            failure_recovery=recovery,
+        )
+
+    assert api.created == ["NOVEL8", "NOVEL8", "NOVEL9"]
+    assert recovery.calls == [("NOVEL8", "job-NOVEL8")]
+
+
+def test_session_state_requires_explicit_matching_resume(tmp_path):
+    books = series_capture.build_inventory(
+        [_item("NOVEL8", "茉莉花官吏伝 八 (ビーズログ文庫)", 8)],
+        series_name="茉莉花官吏伝",
+        expected_total=1,
+    )
+    state_path = tmp_path / "session.json"
+    guard = series_capture.SessionSafetyGuard.open(books, state_path)
+    guard.record_recovery_attempt(books[0])
+
+    with pytest.raises(series_capture.SeriesCaptureError, match="explicit resume"):
+        series_capture.SessionSafetyGuard.open(books, state_path)
+
+    resumed = series_capture.SessionSafetyGuard.open(
+        books,
+        state_path,
+        resume=True,
+    )
+    assert resumed.kindle_recovery_attempts == 1
+    with pytest.raises(series_capture.SeriesCaptureError, match="recovery_limit"):
+        resumed.record_recovery_attempt(books[0])
+    assert json.loads(state_path.read_text(encoding="utf-8"))["state"] == "tripped"
+
+
 def test_apply_rejects_an_existing_unfinished_job():
     api = FakeApi({})
     api.jobs.append({"id": "other", "asin": "OTHER", "status": "capturing"})
@@ -310,7 +366,7 @@ def test_apply_rejects_an_existing_unfinished_job():
         expected_total=1,
     )
 
-    with pytest.raises(series_capture.SeriesCaptureError, match="already exists"):
+    with pytest.raises(series_capture.SeriesCaptureError, match="unfinished_job"):
         series_capture.execute_series(api, books, apply=True)
 
     assert api.created == []

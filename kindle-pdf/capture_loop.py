@@ -3,12 +3,58 @@ import os.path as osp
 import time
 from collections.abc import Callable
 from ctypes import windll
-from typing import Optional, Tuple
+from dataclasses import asdict, dataclass
+from typing import Iterator, Optional
 
 import cv2
 import numpy as np
 import pyautogui as pag
 from PIL import ImageGrab
+
+
+@dataclass(frozen=True)
+class CaptureReport:
+    policy_version: str
+    termination_reason: str
+    end_of_book_proven: bool
+    captured_screens: int
+    expected_screens: int | None
+    direction: str
+    layout: str
+    crop_bounds: tuple[int, int, int, int]
+    image_size: tuple[int, int]
+    last_saved_file: str
+    unchanged_observation_windows: int
+    termination_unchanged_windows: int
+    observation_timeout_seconds: float
+    retry_limit: int
+    turn_commands: int
+    successful_transitions: int
+    retry_commands: int
+    opposite_direction_commands: int
+
+    def to_manifest(self) -> dict:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class CaptureResult:
+    captured_screens: int
+    image_dir: str
+    report: CaptureReport
+
+    def __iter__(self) -> Iterator[int | str]:
+        """既存の ``count, dir = capture_loop()`` 呼び出しを維持する。"""
+        yield self.captured_screens
+        yield self.image_dir
+
+
+@dataclass
+class CaptureProgress:
+    turn_commands: int = 0
+    retry_commands: int = 0
+    opposite_direction_commands: int = 0
+    unchanged_observation_windows: int = 0
 
 
 class CaptureLoopMixin:
@@ -25,16 +71,15 @@ class CaptureLoopMixin:
         )
         return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-    def _save_image(self, image: np.ndarray, filepath: str):
+    def _save_image(self, image: np.ndarray, filepath: str) -> None:
         """画像を保存 (日本語パス対応)"""
         try:
             is_success, im_buf_arr = cv2.imencode(".png", image)
-            if is_success:
-                im_buf_arr.tofile(filepath)
-            else:
-                print(f"Failed to encode image: {filepath}")
+            if not is_success:
+                raise RuntimeError(f"Failed to encode image: {filepath}")
+            im_buf_arr.tofile(filepath)
         except Exception as e:
-            print(f"Failed to save image {filepath}: {e}")
+            raise RuntimeError(f"Failed to save image {filepath}: {e}") from e
 
     def _turn_page(self, key: str) -> None:
         """指定したキーでページめくり操作を行う。"""
@@ -148,11 +193,114 @@ class CaptureLoopMixin:
             )
         return None
 
+    def _wait_for_page_change(
+        self,
+        previous_image: Optional[np.ndarray],
+        page: int,
+        progress: CaptureProgress,
+    ) -> tuple[Optional[np.ndarray], int, bool]:
+        current_image = self._wait_for_stable_page(previous_image)
+        if current_image is None:
+            progress.unchanged_observation_windows += 1
+        retry_count = 0
+        while (
+            current_image is None and retry_count < self.config.PAGE_CHANGE_RETRY_COUNT
+        ):
+            retry_count += 1
+            print(
+                "Page did not change; retrying page turn "
+                f"({retry_count}/{self.config.PAGE_CHANGE_RETRY_COUNT})."
+            )
+            self._next_page_retry()
+            progress.turn_commands += 1
+            progress.retry_commands += 1
+            current_image = self._wait_for_stable_page(previous_image)
+            if current_image is None:
+                progress.unchanged_observation_windows += 1
+        opposite_attempted = current_image is None and page == 2
+        if opposite_attempted:
+            print(
+                "First page did not advance with the selected key; "
+                "trying the opposite key once."
+            )
+            self._next_page_opposite()
+            progress.turn_commands += 1
+            progress.opposite_direction_commands += 1
+            current_image = self._wait_for_stable_page(previous_image)
+            if current_image is None:
+                progress.unchanged_observation_windows += 1
+        return current_image, retry_count, opposite_attempted
+
+    def _confirm_expected_end(
+        self, current_image: np.ndarray, progress: CaptureProgress
+    ) -> int:
+        self._next_page()
+        progress.turn_commands += 1
+        following_image = self._wait_for_stable_page(current_image)
+        if following_image is None:
+            progress.unchanged_observation_windows += 1
+        retry_count = 0
+        while (
+            following_image is None
+            and retry_count < self.config.PAGE_CHANGE_RETRY_COUNT
+        ):
+            retry_count += 1
+            self._next_page_retry()
+            progress.turn_commands += 1
+            progress.retry_commands += 1
+            following_image = self._wait_for_stable_page(current_image)
+            if following_image is None:
+                progress.unchanged_observation_windows += 1
+        if following_image is not None:
+            raise RuntimeError(
+                "Expected capture count was reached, but another page exists."
+            )
+        return retry_count + 1
+
+    def _build_capture_result(
+        self,
+        save_dir: str,
+        captured_pages: int,
+        reason: str,
+        current_image: np.ndarray,
+        termination_windows: int,
+        progress: CaptureProgress,
+    ) -> CaptureResult:
+        height, width = current_image.shape[:2]
+        report = CaptureReport(
+            policy_version="kindle-completeness-v1",
+            termination_reason=reason,
+            end_of_book_proven=True,
+            captured_screens=captured_pages,
+            expected_screens=self.config.EXPECTED_PAGES,
+            direction=self.config.PAGE_CHANGE_KEY,
+            layout="spread"
+            if getattr(self.config, "CAPTURE_SPREAD", False)
+            else "single",
+            crop_bounds=(
+                int(self.config.CROP_X1),
+                int(self.config.CROP_Y1),
+                int(self.config.CROP_X2),
+                int(self.config.CROP_Y2),
+            ),
+            image_size=(width, height),
+            last_saved_file=f"{captured_pages:03d}.png",
+            unchanged_observation_windows=progress.unchanged_observation_windows,
+            termination_unchanged_windows=termination_windows,
+            observation_timeout_seconds=float(self.config.TIMEOUT_SEC),
+            retry_limit=int(self.config.PAGE_CHANGE_RETRY_COUNT),
+            turn_commands=progress.turn_commands,
+            successful_transitions=max(0, captured_pages - 1),
+            retry_commands=progress.retry_commands,
+            opposite_direction_commands=progress.opposite_direction_commands,
+        )
+        return CaptureResult(captured_pages, save_dir, report)
+
     def capture_loop(
         self,
         title: str,
         on_page: Callable[[int], None] | None = None,
-    ) -> Tuple[int, str]:
+    ) -> CaptureResult:
         """キャプチャのメインループ"""
         save_dir = osp.join(self.config.IMG_OUTPUT_DIR, title)
         if not osp.exists(save_dir):
@@ -165,32 +313,15 @@ class CaptureLoopMixin:
 
         page = 1
         old_image = None
+        progress = CaptureProgress()
 
         while True:
             filename = osp.join(save_dir, f"{page:03d}.png")
             start_time = time.perf_counter()
 
-            current_image = self._wait_for_stable_page(old_image)
-            retry_count = 0
-            while (
-                current_image is None
-                and retry_count < self.config.PAGE_CHANGE_RETRY_COUNT
-            ):
-                retry_count += 1
-                print(
-                    "Page did not change; retrying page turn "
-                    f"({retry_count}/{self.config.PAGE_CHANGE_RETRY_COUNT})."
-                )
-                self._next_page_retry()
-                current_image = self._wait_for_stable_page(old_image)
-
-            if current_image is None and page == 2:
-                print(
-                    "First page did not advance with the selected key; "
-                    "trying the opposite key once."
-                )
-                self._next_page_opposite()
-                current_image = self._wait_for_stable_page(old_image)
+            current_image, retry_count, opposite_attempted = self._wait_for_page_change(
+                old_image, page, progress
+            )
 
             if current_image is None:
                 captured_pages = page - 1
@@ -203,7 +334,18 @@ class CaptureLoopMixin:
                         f"{captured_pages}/{self.config.EXPECTED_PAGES}."
                     )
                 print("End of book: Page did not change.")
-                return captured_pages, save_dir
+                if old_image is None:
+                    raise RuntimeError(
+                        "Capture ended before the first image was saved."
+                    )
+                return self._build_capture_result(
+                    save_dir,
+                    captured_pages,
+                    "visual_no_change_after_retries",
+                    old_image,
+                    retry_count + 1 + int(opposite_attempted),
+                    progress,
+                )
 
             self._save_image(current_image, filename)
             if on_page is not None:
@@ -217,9 +359,22 @@ class CaptureLoopMixin:
                 self.config.EXPECTED_PAGES is not None
                 and page >= self.config.EXPECTED_PAGES
             ):
-                print(f"Reached expected capture count: {page}")
-                return page, save_dir
+                print(
+                    f"Reached expected capture count: {page}; confirming end of book."
+                )
+                termination_windows = self._confirm_expected_end(
+                    current_image, progress
+                )
+                return self._build_capture_result(
+                    save_dir,
+                    page,
+                    "expected_screen_count_confirmed",
+                    current_image,
+                    termination_windows,
+                    progress,
+                )
 
             old_image = current_image
             page += 1
             self._next_page()
+            progress.turn_commands += 1

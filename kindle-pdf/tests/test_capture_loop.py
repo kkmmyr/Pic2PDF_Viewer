@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 import capturer as capturer_module
+import capture_loop as capture_loop_module
 from capturer import AutoKindleCapturer, KindleCapturer
 
 
@@ -156,7 +157,7 @@ def test_capture_loop_stops_at_expected_count(tmp_path, monkeypatch):
     capturer.hwnd = 1
     capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
     capturer.config.EXPECTED_PAGES = 2
-    pages = iter([_image(1), _image(2)])
+    pages = iter([_image(1), _image(2), None, None])
     saved = []
     page_turns = []
 
@@ -170,14 +171,52 @@ def test_capture_loop_stops_at_expected_count(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(capturer, "_next_page", lambda: page_turns.append(True))
 
-    total, _save_dir = capturer.capture_loop("book")
+    result = capturer.capture_loop("book")
+    total, _save_dir = result
 
     assert total == 2
     assert [path.rsplit("\\", 1)[-1] for _image_value, path in saved] == [
         "001.png",
         "002.png",
     ]
-    assert len(page_turns) == 1
+    assert len(page_turns) == 3
+    assert result.report.termination_reason == "expected_screen_count_confirmed"
+    assert result.report.termination_unchanged_windows == 2
+
+
+def test_capture_loop_records_natural_end_evidence(tmp_path, monkeypatch):
+    capturer = KindleCapturer()
+    capturer.hwnd = 1
+    capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
+    capturer.config.EXPECTED_PAGES = None
+    pages = iter([_image(1), _image(2), None, None])
+
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
+    monkeypatch.setattr(capturer, "_save_image", lambda _image, _path: None)
+    monkeypatch.setattr(capturer, "_next_page", lambda: None)
+    monkeypatch.setattr(capturer, "_next_page_retry", lambda: None)
+
+    result = capturer.capture_loop("book")
+
+    assert result.captured_screens == 2
+    assert result.report.termination_reason == "visual_no_change_after_retries"
+    assert result.report.termination_unchanged_windows == 2
+
+
+def test_save_image_fails_closed_when_png_encoding_fails(tmp_path, monkeypatch):
+    capturer = KindleCapturer()
+    monkeypatch.setattr(
+        capture_loop_module.cv2,
+        "imencode",
+        lambda _extension, _image_value: (False, None),
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to encode"):
+        capturer._save_image(_image(1), str(tmp_path / "001.png"))
 
 
 def test_capture_loop_reports_saved_page_progress(tmp_path, monkeypatch):
@@ -185,7 +224,7 @@ def test_capture_loop_reports_saved_page_progress(tmp_path, monkeypatch):
     capturer.hwnd = 1
     capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
     capturer.config.EXPECTED_PAGES = 2
-    pages = iter([_image(1), _image(2)])
+    pages = iter([_image(1), _image(2), None, None])
     progress = []
 
     monkeypatch.setattr(
@@ -231,7 +270,7 @@ def test_capture_loop_tries_opposite_key_only_for_first_transition(
     capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
     capturer.config.EXPECTED_PAGES = 2
     capturer.config.PAGE_CHANGE_RETRY_COUNT = 0
-    pages = iter([_image(1), None, _image(2)])
+    pages = iter([_image(1), None, _image(2), None])
     page_turns = []
 
     monkeypatch.setattr(
@@ -250,7 +289,28 @@ def test_capture_loop_tries_opposite_key_only_for_first_transition(
     total, _save_dir = capturer.capture_loop("book")
 
     assert total == 2
-    assert page_turns == ["selected", "opposite"]
+    assert page_turns == ["selected", "opposite", "selected"]
+
+
+def test_capture_loop_rejects_expected_count_when_another_page_exists(
+    tmp_path, monkeypatch
+):
+    capturer = KindleCapturer()
+    capturer.hwnd = 1
+    capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
+    capturer.config.EXPECTED_PAGES = 2
+    pages = iter([_image(1), _image(2), _image(3)])
+
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
+    monkeypatch.setattr(capturer, "_save_image", lambda _image, _path: None)
+    monkeypatch.setattr(capturer, "_next_page", lambda: None)
+
+    with pytest.raises(RuntimeError, match="another page exists"):
+        capturer.capture_loop("book")
 
 
 def test_new_kindle_restores_preexisting_fullscreen_on_cleanup(monkeypatch):

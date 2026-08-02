@@ -34,7 +34,7 @@
 - **`find_window()`**: `EnumWindows` API で Kindle ウィンドウを検索しハンドル取得。
 - **`setup_window()`**: ウィンドウ最前面化・フォーカス確保。
 - **`get_book_title()`**: ウィンドウタイトルから書籍名を抽出し、ダイアログで確認。
-- **`capture_loop(title)`**: メインキャプチャループ（安定画像取得→保存→ページめくり→変化・再安定待ち）。期待枚数指定時に途中で画面が変化しなければ異常終了し、期待枚数に達した時点で正常終了する。表紙から2画面目へ進む最初の遷移に限り、選択済みキーで無変化なら反対キーを1回だけ試し、本文開始後と終端では方向を切り替えない。
+- **`capture_loop(title)`**: メインキャプチャループ（安定画像取得→保存→ページめくり→変化・再安定待ち）。`CaptureResult`へ画面数、保存先、終了理由、無変化観測回数、遷移集計、撮影矩形を記録する。期待枚数へ達した場合も追加のページ送りで無変化を確認し、次画面が存在すれば期待値不一致として失敗する。表紙から2画面目へ進む最初の遷移に限り、選択済みキーで無変化なら反対キーを1回だけ試し、本文開始後と終端では方向を切り替えない。
 - **`_next_page()`**: Kindle の世代にかかわらず、利用者が確定した方向の矢印キーを送る。
 - **`_wait_for_stable_page()`**: 直前ページとの平均画素差を検出した後、同等画像が `PAGE_STABLE_SEC` 継続するまで待ち、白い遷移フレームやhover表示等を保存対象から除外する。
 - **`create_pdf(title, image_dir)`**: 連番 PNG から PDF を生成。
@@ -168,8 +168,24 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 
 バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、source別ページレイアウトの明示選択、既存capturerによる全ページ撮影、Samba上の論理専用inboxへの原子的公開、完了APIを直列実行する。既存環境では `pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視は隠しディレクトリを除外する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
 
-`capture_agent_transport.py`は設定・API・heartbeat、`capture_package.py`はmanifestと
+`capture_agent_transport.py`は設定・API・heartbeat、`capture_quality.py`は連番・復号・
+寸法・hash検査と警告候補集計、`capture_package.py`はversion 2 manifestと
 `.partial → .ready`公開、`capture_agent.py`は工程制御とエラー変換を担当する。
+
+- 撮影完了後は、連番、全画像の復号、寸法一貫性、SHA-256、画面数と終了証跡を
+  fail-closedで検査する。完全重複、低容量、白紙・疎な画面は閾値校正中のため
+  warningとしてmanifestへ残し、自動削除や登録拒否には使わない。
+- 警告専用検査として、隣接ページのdHash距離による近似重複候補と、小説ページの
+  上下端における暗画素密度による端切れ候補を記録する。閾値はpolicy versionへ固定し、
+  未調整の実画像shadow評価が終わるまではblockingへ昇格しない。
+- 画面オーバーレイ検出は、最大32ページの外周を同一座標の小タイルで比較する。
+  無地タイルを除外し、完全画像hashが異なる3ページ以上に同一の構造化タイルが残り、
+  さらに隣接タイル群が標本の50%以上で反復した場合だけ高信頼としてfail closedにする。
+  20%以上50%未満は`repeated_screen_overlay_candidate` warningとする。これにより、
+  ページ全体の重複や白余白だけでは発火せず、通知文言やOS種類に依存しない。
+  標本画像の縮小・エッジ抽出だけを最大4 workerで並列化し、候補集約は決定的な順序で行う。
+- ページ単位の復号・寸法・hash・統計計算だけを少数workerで並列化できる。
+  Kindle UI操作、ページ送り、package確定、正式登録は常に1件ずつ直列実行する。
 
 - Sambaの一時的な共有違反・アクセス拒否により`.partial → .ready`の同一共有内renameが
   失敗した場合は、コピーやmanifest生成をやり直さず、renameだけを短いバックオフ付きで
@@ -227,6 +243,22 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   一意に再照合し、別の未完了jobがない場合に限り同じ書籍の新規jobを最大1回作る。
 - `download_failed`、書籍照合、位置決め、撮影、転送、登録の失敗、プロセスが
   残ったUI不調、復旧上限超過では後続jobを作らずfail closedとする。
+- API側もjob作成transaction内で全ASINの未完了jobが0件であることを強制し、
+  runnerのlist→create間に別操作が入っても2件目を作成しない。
+- セッションサーキットブレーカーは全冊を通じてKindle復旧回数を最大1回、連続
+  `download_failed`を最大2回に制限する。その他の失敗は即時にtripし、一度tripした
+  セッションは自動解除しない。
+- `--apply`では`--session-state`を必須とし、manifest digest、完了ASIN、復旧回数、
+  連続download失敗、trip理由をatomic置換JSONへ保存する。既存stateは暗黙再開せず、
+  内容確認後の`--resume-session`指定時だけ、同じmanifestかつrunning状態を再開する。
+
+### 1.10. 撮影前カナリア
+
+`positioning`中に正式capturerと同じsource、方向、撮影矩形で先頭2画面をメモリ取得する。
+復号済み配列の寸法一致と視覚差分を確認し、SHA-256と差分指標を証跡化する。カナリア後は
+`go_to_start()`を再実行し、開始位置の再検証に成功してから`capturing`へ遷移する。
+無変化、寸法不一致、撮影矩形不正、先頭復帰失敗は`capture_canary_failed`として停止し、
+正式撮影、package公開、登録を行わない。
 
 ---
 

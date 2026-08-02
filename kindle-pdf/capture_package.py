@@ -43,11 +43,7 @@ def _promote_ready(partial: Path, ready: Path) -> None:
                 raise
 
 
-def publish_package(config: AgentConfig, job: dict, image_dir: Path) -> Path:
-    job_id = job["id"]
-    partial = package_path(config.inbox, job_id, "partial")
-    ready = package_path(config.inbox, job_id, "ready")
-    config.inbox.mkdir(parents=True, exist_ok=True)
+def _prepare_partial(partial: Path, ready: Path) -> Path:
     if partial.exists():
         if partial.is_symlink() or not partial.is_dir():
             raise AgentExecutionError(
@@ -60,30 +56,75 @@ def publish_package(config: AgentConfig, job: dict, image_dir: Path) -> Path:
             "transfer_failed",
             "同じジョブの.ready packageが既にあります",
         )
-    try:
-        images = partial / "images"
-        images.mkdir(parents=True)
-        manifest_files: list[dict[str, str]] = []
-        for source in sorted(
-            image_dir.iterdir(),
-            key=lambda path: path.name.casefold(),
-        ):
-            if source.suffix.casefold() not in {".png", ".jpg", ".jpeg", ".webp"}:
-                continue
-            target = images / source.name
-            shutil.copy2(source, target)
-            manifest_files.append(
-                {
-                    "name": source.name,
-                    "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
-                }
+    images = partial / "images"
+    images.mkdir(parents=True)
+    return images
+
+
+def _copy_audited_images(
+    image_dir: Path, images: Path, audited_files: tuple[dict, ...]
+) -> list[dict]:
+    manifest_files: list[dict] = []
+    audited_by_name = {item["name"]: item for item in audited_files}
+    for name in sorted(audited_by_name, key=lambda value: int(Path(value).stem)):
+        source = image_dir / name
+        audited = audited_by_name[name]
+        target = images / source.name
+        shutil.copy2(source, target)
+        actual_hash = hashlib.sha256(target.read_bytes()).hexdigest()
+        if actual_hash != audited["sha256"]:
+            raise AgentExecutionError(
+                "transfer_failed",
+                f"QA後に撮影画像が変化しました: {source.name}",
             )
-        if not manifest_files:
-            raise AgentExecutionError("transfer_failed", "キャプチャ画像がありません")
+        manifest_files.append(
+            {
+                "name": source.name,
+                "sha256": actual_hash,
+                "width": audited["width"],
+                "height": audited["height"],
+                "size": audited["size"],
+            }
+        )
+    if not manifest_files:
+        raise AgentExecutionError("transfer_failed", "キャプチャ画像がありません")
+    return manifest_files
+
+
+def publish_package(
+    config: AgentConfig,
+    job: dict,
+    image_dir: Path,
+    *,
+    capture_report: dict | None = None,
+    quality_report: dict | None = None,
+    audited_files: tuple[dict, ...] | None = None,
+) -> Path:
+    if capture_report is None or quality_report is None or audited_files is None:
+        raise AgentExecutionError(
+            "transfer_failed",
+            "撮影完了証跡または登録前画像QAがありません",
+        )
+    canary = capture_report.get("canary")
+    if not isinstance(canary, dict) or canary.get("passed") is not True:
+        raise AgentExecutionError(
+            "transfer_failed",
+            "合格した撮影前カナリア証跡がありません",
+        )
+    job_id = job["id"]
+    partial = package_path(config.inbox, job_id, "partial")
+    ready = package_path(config.inbox, job_id, "ready")
+    config.inbox.mkdir(parents=True, exist_ok=True)
+    try:
+        images = _prepare_partial(partial, ready)
+        manifest_files = _copy_audited_images(image_dir, images, audited_files)
         manifest = {
+            "manifest_version": 2,
             "job_id": job_id,
             "asin": job["asin"],
             "source": job["source"],
+            "capture": capture_report,
+            "quality": quality_report,
             "files": manifest_files,
         }
         (partial / "manifest.json").write_text(

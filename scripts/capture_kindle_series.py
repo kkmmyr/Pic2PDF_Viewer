@@ -11,9 +11,12 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
-from typing import Callable, Protocol
+from typing import Protocol
 
 DEFAULT_API_BASE = "http://medaroserver:8090"
 DEFAULT_SERIES = "茉莉花官吏伝"
@@ -71,6 +74,148 @@ class FailureRecovery(Protocol):
     ) -> bool: ...
 
 
+@dataclass
+class SessionSafetyGuard:
+    """シリーズ全体の失敗回数を保持し、trip後の次job作成を拒否する。"""
+
+    manifest_digest: str
+    state_path: Path | None = None
+    state: str = "running"
+    trip_reason: str | None = None
+    kindle_recovery_attempts: int = 0
+    consecutive_download_failures: int = 0
+    completed_asins: list[str] = field(default_factory=list)
+
+    @staticmethod
+    def digest_books(books: list[SeriesBook]) -> str:
+        payload = [
+            {
+                "asin": book.asin,
+                "title": book.title,
+                "source": book.source,
+                "volume_number": book.volume_number,
+            }
+            for book in books
+        ]
+        canonical = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return sha256(canonical).hexdigest()
+
+    @classmethod
+    def open(
+        cls,
+        books: list[SeriesBook],
+        state_path: Path | None,
+        *,
+        resume: bool = False,
+    ) -> SessionSafetyGuard:
+        digest = cls.digest_books(books)
+        if state_path is None:
+            return cls(manifest_digest=digest)
+        if state_path.exists():
+            if not resume:
+                raise SeriesCaptureError("Session state already exists; use explicit resume after inspection")
+            try:
+                data = json.loads(state_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                raise SeriesCaptureError("Session state is unreadable") from exc
+            if data.get("schema_version") != 1 or data.get("manifest_digest") != digest:
+                raise SeriesCaptureError("Session state does not match this inventory")
+            if data.get("state") != "running":
+                raise SeriesCaptureError("Tripped or completed session cannot be resumed")
+            try:
+                recovery_attempts = int(data.get("kindle_recovery_attempts", 0))
+                download_failures = int(data.get("consecutive_download_failures", 0))
+                completed_asins = data.get("completed_asins") or []
+                if (
+                    recovery_attempts < 0
+                    or download_failures < 0
+                    or not isinstance(completed_asins, list)
+                    or not all(isinstance(asin, str) for asin in completed_asins)
+                ):
+                    raise ValueError
+            except (TypeError, ValueError) as exc:
+                raise SeriesCaptureError("Session state counters are invalid") from exc
+            guard = cls(
+                manifest_digest=digest,
+                state_path=state_path,
+                state=data["state"],
+                trip_reason=data.get("trip_reason"),
+                kindle_recovery_attempts=recovery_attempts,
+                consecutive_download_failures=download_failures,
+                completed_asins=completed_asins,
+            )
+            return guard
+        if resume:
+            raise SeriesCaptureError("Session state does not exist for resume")
+        guard = cls(manifest_digest=digest, state_path=state_path)
+        guard._persist()
+        return guard
+
+    def _persist(self) -> None:
+        if self.state_path is None:
+            return
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "schema_version": 1,
+            "manifest_digest": self.manifest_digest,
+            "state": self.state,
+            "trip_reason": self.trip_reason,
+            "kindle_recovery_attempts": self.kindle_recovery_attempts,
+            "consecutive_download_failures": self.consecutive_download_failures,
+            "completed_asins": self.completed_asins,
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+        temporary = self.state_path.with_name(f"{self.state_path.name}.tmp")
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(temporary, self.state_path)
+
+    def before_create(self, book: SeriesBook) -> None:
+        if self.state != "running":
+            raise SeriesCaptureError(f"Session safety breaker is {self.state}: {self.trip_reason}")
+        if book.asin in self.completed_asins:
+            self.trip(f"duplicate_completed_asin:{book.asin}")
+
+    def record_recovery_attempt(self, book: SeriesBook) -> None:
+        self.kindle_recovery_attempts += 1
+        if self.kindle_recovery_attempts > 1:
+            self.trip(f"kindle_recovery_limit:{book.asin}")
+        self._persist()
+
+    def record_failure(self, book: SeriesBook, result: dict) -> None:
+        error_code = str(result.get("error_code") or "unknown")
+        if error_code == "download_failed":
+            self.consecutive_download_failures += 1
+            if self.consecutive_download_failures >= 3:
+                self.trip(f"consecutive_download_failed:{book.asin}")
+            self._persist()
+            return
+        self.trip(f"{error_code}:{book.asin}")
+
+    def record_success(self, book: SeriesBook) -> None:
+        self.consecutive_download_failures = 0
+        if book.asin not in self.completed_asins:
+            self.completed_asins.append(book.asin)
+        self._persist()
+
+    def trip(self, reason: str) -> None:
+        self.state = "tripped"
+        self.trip_reason = reason
+        self._persist()
+        raise SeriesCaptureError(f"Session safety breaker tripped: {reason}")
+
+    def complete(self) -> None:
+        self.state = "completed"
+        self._persist()
+
+
 class HttpCaptureApi:
     def __init__(self, api_base: str, timeout_seconds: float = 30.0) -> None:
         self.api_base = api_base.rstrip("/")
@@ -94,14 +239,10 @@ class HttpCaptureApi:
             headers["Content-Type"] = "application/json"
         request = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(
-                request, timeout=self.timeout_seconds
-            ) as response:
+            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                 return json.loads(response.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
-            raise SeriesCaptureError(
-                f"API request failed: {method} {path}: {exc}"
-            ) from exc
+            raise SeriesCaptureError(f"API request failed: {method} {path}: {exc}") from exc
 
     def list_books(self, query: str) -> list[dict]:
         response = self._request(
@@ -113,9 +254,7 @@ class HttpCaptureApi:
         if not isinstance(items, list):
             raise SeriesCaptureError("Catalog response does not contain an items list")
         if response.get("total") != len(items):
-            raise SeriesCaptureError(
-                "Series search exceeded the supported 200-book inventory"
-            )
+            raise SeriesCaptureError("Series search exceeded the supported 200-book inventory")
         return items
 
     def list_jobs(self) -> list[dict]:
@@ -126,9 +265,7 @@ class HttpCaptureApi:
         )
         items = response.get("items")
         if not isinstance(items, list):
-            raise SeriesCaptureError(
-                "Capture job response does not contain an items list"
-            )
+            raise SeriesCaptureError("Capture job response does not contain an items list")
         return items
 
     def create_job(self, book: SeriesBook) -> dict:
@@ -149,13 +286,9 @@ class HttpCaptureApi:
             "/api/kindle-catalog/books",
             query={"q": asin, "page": 1, "page_size": 50},
         )
-        matches = [
-            item for item in response.get("items", []) if item.get("asin") == asin
-        ]
+        matches = [item for item in response.get("items", []) if item.get("asin") == asin]
         if len(matches) != 1:
-            raise SeriesCaptureError(
-                f"Catalog did not return exactly one book for ASIN {asin}"
-            )
+            raise SeriesCaptureError(f"Catalog did not return exactly one book for ASIN {asin}")
         return matches[0]
 
 
@@ -220,14 +353,10 @@ def build_inventory(
         if series_name not in title and catalog_series != series_name:
             continue
         if item.get("ownership") != "purchased":
-            raise SeriesCaptureError(
-                f"Series item is not a purchased book: {item.get('asin')} {title}"
-            )
+            raise SeriesCaptureError(f"Series item is not a purchased book: {item.get('asin')} {title}")
         asin = str(item.get("asin") or "")
         if not asin or asin in seen_asins:
-            raise SeriesCaptureError(
-                f"Missing or duplicate ASIN in series inventory: {asin}"
-            )
+            raise SeriesCaptureError(f"Missing or duplicate ASIN in series inventory: {asin}")
         source = _source_from_title(title)
         volume_number = item.get("volume_number")
         if not isinstance(volume_number, (int, float)):
@@ -237,9 +366,7 @@ def build_inventory(
                 source=source,
             )
         if volume_number is None:
-            raise SeriesCaptureError(
-                f"Cannot safely determine volume number: {asin} {title}"
-            )
+            raise SeriesCaptureError(f"Cannot safely determine volume number: {asin} {title}")
         capture_state = str(item.get("capture_state") or "")
         if capture_state not in {
             "not_captured",
@@ -247,9 +374,7 @@ def build_inventory(
             "capture_pending",
             "multiple_links",
         }:
-            raise SeriesCaptureError(
-                f"Unknown capture state for {asin}: {capture_state}"
-            )
+            raise SeriesCaptureError(f"Unknown capture state for {asin}: {capture_state}")
         books.append(
             SeriesBook(
                 asin=asin,
@@ -263,22 +388,14 @@ def build_inventory(
 
     books.sort(key=lambda book: book.sort_key)
     if expected_total is not None and len(books) != expected_total:
-        raise SeriesCaptureError(
-            f"Expected {expected_total} series books, but catalog returned {len(books)}"
-        )
+        raise SeriesCaptureError(f"Expected {expected_total} series books, but catalog returned {len(books)}")
     if not books:
         raise SeriesCaptureError(f"No purchased books found for series: {series_name}")
     return books
 
 
-def _unfinished_jobs(
-    jobs: list[dict], *, except_job_id: str | None = None
-) -> list[dict]:
-    return [
-        job
-        for job in jobs
-        if job.get("status") in UNFINISHED_STATUSES and job.get("id") != except_job_id
-    ]
+def _unfinished_jobs(jobs: list[dict], *, except_job_id: str | None = None) -> list[dict]:
+    return [job for job in jobs if job.get("status") in UNFINISHED_STATUSES and job.get("id") != except_job_id]
 
 
 def _wait_for_job(
@@ -296,14 +413,10 @@ def _wait_for_job(
         jobs = api.list_jobs()
         others = _unfinished_jobs(jobs, except_job_id=job_id)
         if others:
-            raise SeriesCaptureError(
-                f"Another unfinished capture job appeared while monitoring {job_id}"
-            )
+            raise SeriesCaptureError(f"Another unfinished capture job appeared while monitoring {job_id}")
         matches = [job for job in jobs if job.get("id") == job_id]
         if len(matches) != 1:
-            raise SeriesCaptureError(
-                f"Capture job disappeared from API history: {job_id}"
-            )
+            raise SeriesCaptureError(f"Capture job disappeared from API history: {job_id}")
         job = matches[0]
         status = str(job.get("status") or "")
         if status != last_status:
@@ -315,9 +428,7 @@ def _wait_for_job(
         if status in TERMINAL_STATUSES:
             return job
         sleep(poll_seconds)
-    raise SeriesCaptureError(
-        f"Timed out while monitoring {job_id}; the active job was not cancelled"
-    )
+    raise SeriesCaptureError(f"Timed out while monitoring {job_id}; the active job was not cancelled")
 
 
 def execute_series(
@@ -328,19 +439,17 @@ def execute_series(
     poll_seconds: float = 10.0,
     timeout_seconds: float = 4 * 60 * 60,
     failure_recovery: FailureRecovery | None = None,
+    safety_guard: SessionSafetyGuard | None = None,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
 ) -> int:
-    invalid = [
-        book
-        for book in books
-        if book.capture_state in {"capture_pending", "multiple_links"}
-    ]
+    invalid = [book for book in books if book.capture_state in {"capture_pending", "multiple_links"}]
     if invalid:
         detail = ", ".join(f"{book.asin}:{book.capture_state}" for book in invalid)
         raise SeriesCaptureError(f"Inventory contains unsafe capture states: {detail}")
 
     remaining = [book for book in books if book.capture_state == "not_captured"]
+    guard = safety_guard or SessionSafetyGuard.open(books, None)
     captured = len(books) - len(remaining)
     print(
         f"Inventory: total={len(books)} captured={captured} remaining={len(remaining)}",
@@ -355,45 +464,50 @@ def execute_series(
         print("Dry-run only. Pass --apply to create capture jobs.", flush=True)
         return 0
     if _unfinished_jobs(api.list_jobs()):
-        raise SeriesCaptureError(
-            "An unfinished capture job already exists; nothing was created"
-        )
+        guard.trip("unfinished_job_before_session")
 
     for index, book in enumerate(remaining, start=1):
         recovery_used = False
         while True:
+            guard.before_create(book)
             if _unfinished_jobs(api.list_jobs()):
-                raise SeriesCaptureError(
-                    "An unfinished capture job exists before the next book"
-                )
+                guard.trip(f"unfinished_job_before_create:{book.asin}")
             print(
                 f"[{index}/{len(remaining)}] Creating job for {book.asin} ({book.title})",
                 flush=True,
             )
-            job = api.create_job(book)
+            try:
+                job = api.create_job(book)
+            except Exception:
+                guard.trip(f"job_create_failed:{book.asin}")
             job_id = str(job.get("id") or "")
             if not job_id:
-                raise SeriesCaptureError(
-                    f"Create job response has no id for {book.asin}"
+                guard.trip(f"job_create_missing_id:{book.asin}")
+            try:
+                result = _wait_for_job(
+                    api,
+                    job_id,
+                    poll_seconds=poll_seconds,
+                    timeout_seconds=timeout_seconds,
+                    sleep=sleep,
+                    monotonic=monotonic,
                 )
-            result = _wait_for_job(
-                api,
-                job_id,
-                poll_seconds=poll_seconds,
-                timeout_seconds=timeout_seconds,
-                sleep=sleep,
-                monotonic=monotonic,
-            )
+            except SeriesCaptureError:
+                guard.trip(f"job_monitor_failed:{book.asin}")
             if result.get("status") == "succeeded":
                 break
             recovered = False
-            if failure_recovery is not None and not recovery_used:
+            recovery_candidate = (
+                result.get("error_code") in {"kindle_not_running", "kindle_app_exited", "kindle_ui_unavailable"}
+                and result.get("started_at") is None
+                and int(result.get("captured_screens") or 0) == 0
+            )
+            if failure_recovery is not None and not recovery_used and recovery_candidate:
+                guard.record_recovery_attempt(book)
                 try:
                     recovered = failure_recovery.recover(api, book, result)
                 except Exception as exc:
-                    raise SeriesCaptureError(
-                        f"Capture recovery failed for {book.asin}: {exc}"
-                    ) from exc
+                    guard.trip(f"kindle_recovery_failed:{book.asin}:{type(exc).__name__}")
             if recovered:
                 recovery_used = True
                 print(
@@ -401,27 +515,28 @@ def execute_series(
                     flush=True,
                 )
                 continue
+            guard.record_failure(book, result)
             raise SeriesCaptureError(
-                f"Capture failed for {book.asin}: "
-                f"{result.get('error_code')} {result.get('error_message')}"
+                f"Capture failed for {book.asin}: {result.get('error_code')} {result.get('error_message')}"
             )
-        registered = api.get_book(book.asin)
+        try:
+            registered = api.get_book(book.asin)
+        except Exception:
+            guard.trip(f"registration_lookup_failed:{book.asin}")
         if registered.get("capture_state") != "captured":
-            raise SeriesCaptureError(
-                f"Job succeeded but formal registration is not confirmed for {book.asin}"
-            )
+            guard.trip(f"registration_unconfirmed:{book.asin}")
+        guard.record_success(book)
         print(
             f"  registered screens={result.get('captured_screens') or 0}",
             flush=True,
         )
     print(f"Series capture completed: {len(remaining)} book(s)", flush=True)
+    guard.complete()
     return 0
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Safely create one Kindle capture job at a time for a series."
-    )
+    parser = argparse.ArgumentParser(description="Safely create one Kindle capture job at a time for a series.")
     parser.add_argument("--series", default=DEFAULT_SERIES)
     parser.add_argument("--expected-total", type=int)
     parser.add_argument(
@@ -434,12 +549,21 @@ def _parser() -> argparse.ArgumentParser:
         "--recover-kindle-crash",
         action="store_true",
         help=(
-            "Restart a missing Kindle process and retry the same pre-capture job "
-            "only after exact ASIN verification."
+            "Restart a missing Kindle process and retry the same pre-capture job only after exact ASIN verification."
         ),
     )
     parser.add_argument("--kindle-startup-timeout-seconds", type=float, default=60.0)
     parser.add_argument("--kindle-recovery-log", type=Path)
+    parser.add_argument(
+        "--session-state",
+        type=Path,
+        help="Persistent fail-closed session state JSON (required with --apply).",
+    )
+    parser.add_argument(
+        "--resume-session",
+        action="store_true",
+        help="Explicitly resume an inspected running session state.",
+    )
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -452,6 +576,10 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.apply and args.expected_total is None:
         raise SystemExit("--expected-total is required with --apply")
+    if args.apply and args.session_state is None:
+        raise SystemExit("--session-state is required with --apply")
+    if args.resume_session and not args.apply:
+        raise SystemExit("--resume-session requires --apply")
     if args.expected_total is not None and args.expected_total <= 0:
         raise SystemExit("--expected-total must be greater than zero")
     if args.poll_seconds < 0:
@@ -468,10 +596,15 @@ def main(argv: list[str] | None = None) -> int:
             expected_total=args.expected_total,
         )
         failure_recovery = None
+        safety_guard = SessionSafetyGuard.open(
+            books,
+            args.session_state if args.apply else None,
+            resume=args.resume_session,
+        )
         if args.recover_kindle_crash:
             kindle_pdf_dir = Path(__file__).resolve().parents[1] / "kindle-pdf"
             sys.path.insert(0, str(kindle_pdf_dir))
-            from kindle_capture_recovery import (  # noqa: PLC0415
+            from kindle_capture_recovery import (
                 KindleCrashRecovery,
                 KindleRecoveryConfig,
             )
@@ -489,6 +622,7 @@ def main(argv: list[str] | None = None) -> int:
             poll_seconds=args.poll_seconds,
             timeout_seconds=args.job_timeout_hours * 60 * 60,
             failure_recovery=failure_recovery,
+            safety_guard=safety_guard,
         )
     except KeyboardInterrupt:
         print("\nInterrupted. No next capture job will be created.", file=sys.stderr)

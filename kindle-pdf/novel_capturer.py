@@ -1,11 +1,11 @@
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Tuple
 
 import numpy as np
 
 from capturer import AutoConfig, AutoKindleCapturer
+from capture_loop import CaptureResult
 
 # プロジェクトルートの .env を読み込む（存在しない場合・dotenv 未インストール時は無視）
 try:
@@ -154,6 +154,6 @@ class NovelKindleCapturer(AutoKindleCapturer):
         self,
         title: str,
         on_page: Callable[[int], None] | None = None,
-    ) -> Tuple[int, str]:
+    ) -> CaptureResult:
         """OCRを実行せず、連番画像だけを保存するキャプチャループ。"""
         return super().capture_loop(title, on_page=on_page)

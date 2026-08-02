@@ -12,6 +12,7 @@ from services.kindle_catalog.capture_package_validator import (
 from utils.dt import jst_now
 
 ACTIVE_STATUSES = repository.ACTIVE_STATUSES
+UNFINISHED_STATUSES = repository.UNFINISHED_STATUSES
 _AGENT_TRANSITIONS = repository.AGENT_TRANSITIONS
 _row_dict = repository.row_dict
 _recover_stale = repository._recover_stale
@@ -37,6 +38,7 @@ def create(
         direction,
         expected_screens,
         requested_at=jst_now(),
+        timeout_seconds=config.KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC,
     )
 
 

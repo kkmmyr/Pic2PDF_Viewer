@@ -12,11 +12,13 @@ from capture_agent_transport import (
     ApiClient,
     HeartbeatWorker,
 )
+from capture_canary import CaptureCanaryError, run_capture_canary
 from capture_package import (
     package_path as _package_path,
     publish_package as _publish_package,
     safe_capture_title as _safe_capture_title,
 )
+from capture_quality import CaptureQualityError, audit_capture_images
 from capturer import AutoKindleCapturer
 from kindle_app_controller import (
     BookIdentity,
@@ -57,7 +59,30 @@ def _capture(
     on_page,
     *,
     reading_area_bounds_provider,
-) -> tuple[int, Path]:
+):
+    capturer = _configured_capturer(
+        job,
+        output_root,
+        reading_area_bounds_provider=reading_area_bounds_provider,
+    )
+    try:
+        result = capturer.capture_loop(
+            _safe_capture_title(job),
+            on_page=on_page,
+        )
+        if result.captured_screens <= 0:
+            raise AgentExecutionError("capture_failed", "キャプチャ画像がありません")
+        return result
+    finally:
+        capturer.cleanup()
+
+
+def _configured_capturer(
+    job: dict,
+    output_root: Path,
+    *,
+    reading_area_bounds_provider,
+):
     capturer = (
         NovelKindleCapturer() if job["source"] == "novel" else AutoKindleCapturer()
     )
@@ -74,13 +99,29 @@ def _capture(
         capturer.setup_window(
             reading_area_bounds_provider=reading_area_bounds_provider,
         )
-        page_count, image_dir = capturer.capture_loop(
-            _safe_capture_title(job),
-            on_page=on_page,
-        )
-        if page_count <= 0:
-            raise AgentExecutionError("capture_failed", "キャプチャ画像がありません")
-        return page_count, Path(image_dir)
+    except Exception:
+        capturer.cleanup()
+        raise
+    return capturer
+
+
+def _run_canary(
+    job: dict,
+    *,
+    reading_area_bounds_provider,
+) -> dict:
+    capturer = _configured_capturer(
+        job,
+        Path(tempfile.gettempdir()),
+        reading_area_bounds_provider=reading_area_bounds_provider,
+    )
+    try:
+        return run_capture_canary(capturer).to_manifest()
+    except CaptureCanaryError as exc:
+        raise AgentExecutionError(
+            "capture_canary_failed",
+            f"撮影前カナリアに失敗しました: {exc}",
+        ) from exc
     finally:
         capturer.cleanup()
 
@@ -161,6 +202,20 @@ def _run_claimed_job(
     )
     heartbeat.raise_if_failed()
 
+    def bounds_provider():
+        return controller.capture_area_bounds(job["source"])
+
+    canary_report = _run_canary(
+        job,
+        reading_area_bounds_provider=bounds_provider,
+    )
+    controller.go_to_start(
+        source=job["source"],
+        direction=job["direction"],
+        on_poll=heartbeat.raise_if_failed,
+    )
+    heartbeat.raise_if_failed()
+
     _state(api, job_id, config.agent_id, "capturing")
 
     def on_page(page: int) -> None:
@@ -176,18 +231,38 @@ def _run_claimed_job(
 
     try:
         with tempfile.TemporaryDirectory(prefix=f"kindle-{job_id}-") as temp:
-            page_count, image_dir = _capture(
+            capture_result = _capture(
                 job,
                 Path(temp),
                 on_page,
-                reading_area_bounds_provider=lambda: controller.capture_area_bounds(
-                    job["source"]
-                ),
+                reading_area_bounds_provider=bounds_provider,
             )
+            page_count = capture_result.captured_screens
+            image_dir = Path(capture_result.image_dir)
             heartbeat.raise_if_failed()
             _validate_capture_count(job, page_count)
             try:
-                _publish_package(config, job, image_dir)
+                quality_result = audit_capture_images(
+                    image_dir,
+                    expected_count=page_count,
+                    source=job["source"],
+                )
+            except CaptureQualityError as exc:
+                raise AgentExecutionError(
+                    "capture_incomplete",
+                    f"登録前画像QAに失敗しました: {exc}",
+                ) from exc
+            try:
+                capture_manifest = capture_result.report.to_manifest()
+                capture_manifest["canary"] = canary_report
+                _publish_package(
+                    config,
+                    job,
+                    image_dir,
+                    capture_report=capture_manifest,
+                    quality_report=quality_result.to_manifest(),
+                    audited_files=quality_result.files,
+                )
             except AgentExecutionError:
                 raise
             except Exception as exc:
