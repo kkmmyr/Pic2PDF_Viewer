@@ -63,6 +63,12 @@ kindle-pdf\run_novel.bat   # 小説キャプチャ（main_novel.py を起動）
 kindle-pdf/
 ├── capturer.py           # 基底クラス (Config, KindleCapturer, AutoConfig, AutoKindleCapturer)
 ├── capture_agent.py      # Linuxのcapture jobを自動実行
+├── capture_agent_transport.py # agent設定・API client・heartbeat
+├── capture_loop.py       # ページ安定待ち・終端証跡付き撮影ループ
+├── capture_canary.py     # 正式撮影前の2画面カナリア
+├── capture_quality.py    # 連番・復号・寸法・hash・warning候補の登録前QA
+├── capture_overlay.py    # 複数ページ間の反復画面オーバーレイ検出
+├── capture_package.py    # version 2 manifestと.partial→.ready公開
 ├── kindle_app_controller.py # Kindle検索・照合・ダウンロード・先頭移動
 ├── main_manual.py        # 固定クロップモード（旧 main.py）
 ├── main_auto.py          # 漫画用フルスクリーン・自動検出モード

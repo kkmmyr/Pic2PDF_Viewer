@@ -555,6 +555,24 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
 - この方式は一度だけ現れる短時間通知を保証できない。単発混入はOCR側の
   `ui_overlay_text_detected`と原画像QAを併用し、撮影ゲート単独で完全検出を主張しない。
 
+### 8.7 設計・実装横断監査で確定した検証境界（2026-08-02）
+
+- Linux側は正式画像の連番、復号、寸法、SHA-256、件数を実ファイルから再計算する。
+  一方、終端観測フレームとカナリア2画像はpackageへ転送しないため、最終ページ到達、
+  無変化回数、カナリアSHA・差分指標そのものは再計算できない。Linux側の責務は、
+  これらのpolicy version、型、範囲、件数、最終画像、正式撮影との矩形・寸法一致を
+  fail closedで検査することであり、Windows側の意味判定を再実行することではない。
+- 反復オーバーレイもWindows側で画像から検出し、Linux側は画像SHA-256でpackage内容を固定した上で、
+  `kindle-repeated-overlay-v1`の合格、標本数、候補数、blocking候補0件を検証する。
+  Linux側で検出器を再実行する二重実装ではない。
+- `SessionSafetyGuard`は連続`download_failed`を記録し上限3冊を持つが、現行
+  `execute_series()`は`record_failure()`直後に全エラーで停止する。このため実運用は
+  1冊目の`download_failed`で後続jobを作らない、設計値より厳しいfail closedである。
+  隔離・間隔付き継続を導入するまでは、上限3冊を「2冊目まで自動継続済み」と解釈しない。
+- 全source・全ASINで未完了job最大1件の制約はbackend transactionが最終防衛線として強制する。
+  現行の書籍詳細UIは同一ASINのactive jobだけを事前判定するため、他ASINが実行中の場合は
+  ボタン押下後に400で拒否される。データ整合は保たれるが、事前表示は後続UI課題である。
+
 ## 9. Kindle 更新時の再検証
 
 Kindle 更新後は、いきなり正式撮影せず `diagnose_new_kindle.py` と短い書籍で次を確認する。

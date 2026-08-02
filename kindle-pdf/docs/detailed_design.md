@@ -169,8 +169,9 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
 バックエンドから1件ずつjobをclaimし、`KindleAppController`による準備、source別ページレイアウトの明示選択、既存capturerによる全ページ撮影、Samba上の論理専用inboxへの原子的公開、完了APIを直列実行する。既存環境では `pic2pdf-input/.kindle-capture-inbox` を利用し、同人誌監視は隠しディレクトリを除外する。処理中は独立threadでheartbeatを定期送信し、状態を `locating_book → downloading（必要時）→ positioning → capturing → awaiting_files` として通知する。
 
 `capture_agent_transport.py`は設定・API・heartbeat、`capture_quality.py`は連番・復号・
-寸法・hash検査と警告候補集計、`capture_package.py`はversion 2 manifestと
-`.partial → .ready`公開、`capture_agent.py`は工程制御とエラー変換を担当する。
+寸法・hash検査と警告候補集計、`capture_overlay.py`は複数ページ間の反復オーバーレイ検出、
+`capture_package.py`はversion 2 manifestと`.partial → .ready`公開、`capture_agent.py`は
+工程制御とエラー変換を担当する。
 
 - 撮影完了後は、連番、全画像の復号、寸法一貫性、SHA-256、画面数と終了証跡を
   fail-closedで検査する。完全重複、低容量、白紙・疎な画面は閾値校正中のため
@@ -245,9 +246,10 @@ Kindle 関連のトップレベルウィンドウを列挙し、キャプチャ�
   残ったUI不調、復旧上限超過では後続jobを作らずfail closedとする。
 - API側もjob作成transaction内で全ASINの未完了jobが0件であることを強制し、
   runnerのlist→create間に別操作が入っても2件目を作成しない。
-- セッションサーキットブレーカーは全冊を通じてKindle復旧回数を最大1回、連続
-  `download_failed`を最大2回に制限する。その他の失敗は即時にtripし、一度tripした
-  セッションは自動解除しない。
+- セッションサーキットブレーカーは全冊を通じてKindle復旧回数を最大1回に制限し、
+  連続`download_failed`回数と上限3冊をstateへ記録する。ただし現行`execute_series()`は
+  `record_failure()`直後に全エラーで停止するため、`download_failed`も1回目で後続jobを
+  作成しない。2冊目までの自動継続は未実装であり、一度停止したセッションは自動解除しない。
 - `--apply`では`--session-state`を必須とし、manifest digest、完了ASIN、復旧回数、
   連続download失敗、trip理由をatomic置換JSONへ保存する。既存stateは暗黙再開せず、
   内容確認後の`--resume-session`指定時だけ、同じmanifestかつrunning状態を再開する。
