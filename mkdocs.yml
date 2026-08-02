@@ -123,6 +123,7 @@ nav:
           - 基本設計書: design/基本設計/基本設計書.md
           - ADR 一覧: design/基本設計/ADR/README.md
           - ADR-0017 Kindle runtime sqlite3: design/基本設計/ADR/0017_kindle-catalog-runtime-sqlite3.md
+          - ADR-0018 Sol OCR後生成: design/基本設計/ADR/0018_sol-primary-post-ocr-generation.md
       - 詳細設計:
           - 共通: design/詳細設計/詳細設計書_共通.md
           - バックエンド編: design/詳細設計/詳細設計書_バックエンド編.md
@@ -137,6 +138,7 @@ nav:
           - hitomi 新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
           - 小説 RAG データ設計: design/詳細設計/機能別/小説RAG_データ.md
           - 小説 RAG パイプライン設計: design/詳細設計/機能別/小説RAG_パイプライン設計.md
+          - 小説 RAG Sol生成・評価設計: design/詳細設計/機能別/小説RAG_Sol生成・評価設計.md
           - 小説 RAG 検索QA設計: design/詳細設計/機能別/小説RAG_検索QA設計.md
           - Kindle 購入カタログ設計: design/詳細設計/機能別/Kindle購入カタログ設計.md
           - セキュリティ設計書: design/詳細設計/セキュリティ設計書.md

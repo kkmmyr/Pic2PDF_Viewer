@@ -5,6 +5,7 @@
 - **決定者**: プロジェクトオーナー
 - **関連**: [小説RAG バックエンド 設計過程（凍結）](../../../archive/小説RAG_設計過程.md)（旧設計書 §1.2 / §2.2 / §7 の設計判断を凍結） / `D:\61.tool\common\Qwen` / commit 履歴 2026-05-09 〜 2026-05-10
 - **追補**: 2026-05-11 に [ADR-0009](0009_llm-backend-llama-server.md) で「Qwen の実行バックエンドを Ollama → llama-server に変更」を決定。モデル選定（Qwen3.6-35B-A3B IQ4_XS）の判断は本 ADR で維持されている
+- **追補**: 2026-08-02 に [ADR-0018](0018_sol-primary-post-ocr-generation.md) で、OCR後の公開成果物はSol主生成・選択的独立評価へ段階移行する方針を決定。Qwenは対話QAとオフライン代替として維持する
 - **パス更新注記**: 2026-05-11 の A-0（[LLM 層リファクタリング_完了記録](../../../archive/LLM層リファクタリング_完了記録.md)）で共通モジュールを `D:\61.tool\common\Qwen\` → `D:\61.tool\common\llm\` にリネーム、`qwen_client.py` → `local_llm/` パッケージに再構成。本 ADR 内のパス・API 名は決定時の歴史的記録としてそのまま残置
 
 ## コンテキスト

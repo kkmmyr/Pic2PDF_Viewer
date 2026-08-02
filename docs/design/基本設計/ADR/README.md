@@ -29,6 +29,7 @@
 | [0015](0015_sqlite-runtime-queries.md) | SQLite実行時クエリとSQLModelスキーマ定義を分離 | Accepted | 2026-07-19 |
 | [0016](0016_kindle-catalog-sqlite.md) | Kindle 購入カタログの初期データストアに SQLite を採用 | Accepted（runtimeはADR-0017） | 2026-07-25 |
 | [0017](0017_kindle-catalog-runtime-sqlite3.md) | Kindleカタログの実行時アクセスにsqlite3を使用 | Accepted | 2026-07-26 |
+| [0018](0018_sol-primary-post-ocr-generation.md) | OCR後の公開成果物をSol主生成・選択的独立評価へ段階移行 | Accepted | 2026-08-02 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順
