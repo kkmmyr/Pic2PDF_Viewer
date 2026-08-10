@@ -350,3 +350,97 @@ def test_main_returns_zero_for_quality_pass(tmp_path: Path) -> None:
     )
 
     assert exit_code == 0
+
+
+def test_cli_engine_choices_and_defaults_remain_stable() -> None:
+    parser = benchmark.build_parser()
+    engine_action = next(action for action in parser._actions if action.dest == "engine")
+
+    assert engine_action.choices == (
+        "current",
+        "qa-primary",
+        "qa-external",
+        "tesseract",
+        "yomitoku",
+        "ndlocr",
+        "paddle",
+        "paddle-columns",
+        "surya-columns",
+        "report",
+    )
+    args = parser.parse_args(["current"])
+    assert args.api_base == "http://medaroserver:8090"
+    assert args.policy == benchmark.DEFAULT_POLICY_PATH
+    assert args.fail_on_gate is False
+
+
+def test_main_preserves_report_and_gate_order(tmp_path: Path) -> None:
+    entry = _entry()
+    corpus_path = tmp_path / "corpus.json"
+    policy_path = tmp_path / "policy.json"
+    output_path = tmp_path / "report.json"
+    corpus_path.write_text(json.dumps({"entries": [entry]}, ensure_ascii=False), encoding="utf-8")
+    policy_path.write_text(json.dumps(_policy(), ensure_ascii=False), encoding="utf-8")
+
+    exit_code = benchmark.main(
+        [
+            "current",
+            "--corpus-json",
+            str(corpus_path),
+            "--policy",
+            str(policy_path),
+            "--output",
+            str(output_path),
+            "--fail-on-gate",
+        ]
+    )
+
+    report = json.loads(output_path.read_text(encoding="utf-8"))
+    assert exit_code == 0
+    assert list(report) == [
+        "engine",
+        "normalization_version",
+        "generated_at",
+        "metrics",
+        "pages",
+        "engine_kind",
+        "elapsed_seconds",
+        "corpus_entry_ids",
+        "quality_gate",
+    ]
+    assert [metric["group"] for metric in report["metrics"]] == [
+        "overall",
+        "narrative",
+        "layout:normal_prose",
+    ]
+    assert list(report["pages"][0]) == [
+        "entry_id",
+        "run_id",
+        "page_no",
+        "page_type",
+        "layout_type",
+        "image_sha256",
+        "edit_distance",
+        "reference_chars",
+        "cer",
+        "substitutions",
+        "deletions",
+        "insertions",
+        "deletion_rate",
+        "hypothesis",
+    ]
+    assert [check["name"] for check in report["quality_gate"]["checks"]] == [
+        "corpus.verified_pages_min",
+        "corpus.total_reference_chars_min",
+        "corpus.page_type.narrative_min",
+        "corpus.layout_type.normal_prose_pages_min",
+        "corpus.layout_type.normal_prose_reference_chars_min",
+        "quality.layout:normal_prose.aggregate_cer_max",
+        "quality.layout:normal_prose.page_cer_max",
+        "quality.column_omission.suspect_pages_max",
+        "corpus.proper_noun_annotations_resolved",
+        "corpus.proper_noun_distinct_terms_min",
+        "corpus.proper_noun_expected_occurrences_min",
+        "quality.proper_noun.recall_min",
+        "quality.proper_noun.missing_occurrences_max",
+    ]
