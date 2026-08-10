@@ -403,6 +403,8 @@ def test_claim_recovers_stale_job_before_claiming_next(
 @pytest.mark.parametrize(
     "failure_point",
     [
+        "after_ready_validation",
+        "after_staging_copy",
         "after_existing_backup",
         "after_target_publish",
         "after_meta_update",
@@ -458,10 +460,54 @@ def test_complete_rolls_back_each_publish_boundary(
         assert "キャプチャ作品.pdf" not in load_meta("comic")
     assert Path(inbox, f"{job['id']}.ready", "manifest.json").is_file()
     assert not Path(inbox, "processed", job["id"]).exists()
+    assert not Path(target.parent, f".{job['id']}.partial").exists()
     with with_db() as conn:
         row = conn.execute(
             "SELECT status,book_id FROM capture_jobs WHERE id=?",
             (job["id"],),
         ).fetchone()
     assert row["status"] == "awaiting_files"
+    assert row["book_id"] is None
+
+
+def test_complete_compensates_when_conditional_job_update_matches_zero_rows(
+    tmp_data_dir,
+    tmp_path,
+    monkeypatch,
+    make_png,
+):
+    inbox = tmp_path / "capture-inbox"
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_INBOX_DIR", str(inbox))
+    job = _prepare_ready_job(inbox, make_png)
+    target = Path(tmp_data_dir["COMIC_IMAGES_DIR"], "キャプチャ作品")
+
+    def change_job_before_update(point: str) -> None:
+        if point != "before_job_update":
+            return
+        with with_db() as conn:
+            conn.execute(
+                "UPDATE capture_jobs SET status='failed' WHERE id=?",
+                (job["id"],),
+            )
+
+    monkeypatch.setattr(
+        capture_registration,
+        "_inject_failure",
+        change_job_before_update,
+    )
+
+    with pytest.raises(ValueError, match="完了更新に失敗"):
+        complete(job["id"], "windows-1")
+
+    assert not target.exists()
+    assert "キャプチャ作品.pdf" not in load_meta("comic")
+    assert Path(inbox, f"{job['id']}.ready", "manifest.json").is_file()
+    assert not Path(inbox, "processed", job["id"]).exists()
+    assert not Path(target.parent, f".{job['id']}.partial").exists()
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT status,book_id FROM capture_jobs WHERE id=?",
+            (job["id"],),
+        ).fetchone()
+    assert row["status"] == "failed"
     assert row["book_id"] is None

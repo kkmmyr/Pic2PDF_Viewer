@@ -390,11 +390,9 @@ def commit(confirmation_token: str) -> dict:
 
 
 def source_status() -> dict:
-    raw = config.KINDLE_LEGACY_DB_PATH
-    path = Path(raw) if raw else None
-    return {
-        "legacy_db_configured": path is not None,
-        "legacy_db_available": bool(path and path.is_file()),
-        "legacy_db_name": path.name if path else None,
-        "amazon_data_configured": bool(config.AMAZON_DATA_DIR),
-    }
+    """既存import互換。通常経路はlegacy_source_statusを直接参照する。"""
+    from services.kindle_catalog.legacy_source_status import (
+        source_status as current_source_status,
+    )
+
+    return current_source_status()

@@ -13,6 +13,11 @@ from pathlib import Path
 import config
 from services._title_normalizer import normalize_title
 from services.kindle_catalog.connection import with_db
+from services.kindle_catalog.import_run_lifecycle import (
+    fail_import_run,
+    finish_import_run,
+    start_import_run,
+)
 from utils.dt import jst_now
 
 _FILENAMES = {
@@ -299,16 +304,7 @@ def _import_returns(conn, rows: list[dict[str, str]], source_file_id: int) -> in
 def run_orders_import() -> dict:
     """設定済みルートの対応 CSV を SHA-256 差分で取り込む。"""
     files = _files()
-    started_at = jst_now().isoformat()
-    with with_db() as conn:
-        run_id = conn.execute(
-            """
-            INSERT INTO import_runs(
-                source_kind,status,started_at,files_processed,records_processed,records_skipped
-            ) VALUES ('amazon_orders','running',?,0,0,0)
-            """,
-            (started_at,),
-        ).lastrowid
+    run_id = start_import_run("amazon_orders")
 
     processed_files = 0
     skipped_files = 0
@@ -348,23 +344,16 @@ def run_orders_import() -> dict:
                 records += count
                 results.append({"filename": path.name, "kind": kind, "status": "success", "records": count})
     except Exception as exc:
-        with with_db() as conn:
-            conn.execute(
-                "UPDATE import_runs SET status='failed',finished_at=?,error_message=? WHERE id=?",
-                (jst_now().isoformat(), str(exc), run_id),
-            )
+        fail_import_run(run_id, exc)
         raise
 
-    with with_db() as conn:
-        conn.execute(
-            """
-            UPDATE import_runs SET
-                status='succeeded',finished_at=?,files_processed=?,
-                records_processed=?,records_skipped=?
-            WHERE id=?
-            """,
-            (jst_now().isoformat(), processed_files, records, skipped_files, run_id),
-        )
+    finish_import_run(
+        run_id,
+        status="succeeded",
+        files=processed_files,
+        records=records,
+        skipped=skipped_files,
+    )
     return {
         "run_id": run_id,
         "status": "succeeded",

@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 import config
 from services.kindle_catalog.connection import with_db
 from services.kindle_catalog.enrichment_imports import (
@@ -129,3 +131,40 @@ def test_autobuy_replaces_subscriptions_and_skips_unchanged_file(tmp_path, monke
     with with_db() as conn:
         row = conn.execute("SELECT title,resolution_method FROM series_subscriptions").fetchone()
         assert dict(row) == {"title": "作品", "resolution_method": "collection_rights"}
+
+
+def test_autobuy_parse_failure_records_failed_run_without_replacing_data(
+    tmp_path,
+    monkeypatch,
+):
+    source = _prepare(tmp_path, monkeypatch)
+    payload_path = source / "kindle-series-autobuy.json"
+    payload_path.write_text('{"items":"invalid"}', encoding="utf-8")
+    with with_db() as conn:
+        conn.execute(
+            """
+            INSERT INTO series_subscriptions(
+                series_asin,subscription_id,title,series_id,
+                resolution_method,imported_at
+            ) VALUES ('B000OLD','SUB-OLD','既存購読',NULL,NULL,'2026-08-10')
+            """
+        )
+
+    with pytest.raises(ValueError, match="items が配列"):
+        run_autobuy_import()
+
+    with with_db() as conn:
+        subscription = conn.execute("SELECT series_asin,title FROM series_subscriptions").fetchone()
+        run = conn.execute(
+            """
+            SELECT status,files_processed,records_processed,
+                   records_skipped,error_message
+            FROM import_runs ORDER BY id DESC LIMIT 1
+            """
+        ).fetchone()
+    assert dict(subscription) == {"series_asin": "B000OLD", "title": "既存購読"}
+    assert run["status"] == "failed"
+    assert run["files_processed"] == 0
+    assert run["records_processed"] == 0
+    assert run["records_skipped"] == 0
+    assert "items が配列" in run["error_message"]

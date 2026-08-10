@@ -5,6 +5,56 @@ from typing import Literal
 from pydantic import BaseModel
 
 
+class MigrationCommitRequest(BaseModel):
+    confirmation_token: str
+
+
+class LinkRequest(BaseModel):
+    source: Literal["comic", "novel"]
+    book_id: str
+    asin: str
+
+
+class UnlinkRequest(BaseModel):
+    source: Literal["comic", "novel"]
+    book_id: str
+
+
+class CaptureJobCreateRequest(BaseModel):
+    asin: str
+    source: Literal["comic", "novel"]
+    direction: Literal["left", "right"] = "left"
+    expected_screens: int | None = None
+
+
+class AgentClaimRequest(BaseModel):
+    agent_id: str
+
+
+class AgentStateRequest(BaseModel):
+    agent_id: str
+    state: Literal[
+        "locating_book",
+        "downloading",
+        "positioning",
+        "waiting_user",
+        "capturing",
+        "awaiting_files",
+        "failed",
+    ]
+    captured_screens: int | None = None
+    error_code: str | None = None
+    error_message: str | None = None
+
+
+class AgentCompleteRequest(BaseModel):
+    agent_id: str
+
+
+class AgentHeartbeatRequest(BaseModel):
+    agent_id: str
+
+
 class KindleCatalogBookOut(BaseModel):
     asin: str
     title: str

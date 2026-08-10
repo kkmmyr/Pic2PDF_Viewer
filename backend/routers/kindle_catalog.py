@@ -5,7 +5,6 @@ import secrets
 from typing import Literal
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from pydantic import BaseModel
 
 import config
 from routers.api_schemas import (
@@ -26,66 +25,26 @@ from routers.api_schemas import (
     KindleUnlinkedBooksResponse,
     KindleUnlinkResponse,
 )
+from routers.schemas.kindle_catalog import (
+    AgentClaimRequest,
+    AgentCompleteRequest,
+    AgentHeartbeatRequest,
+    AgentStateRequest,
+    CaptureJobCreateRequest,
+    LinkRequest,
+    MigrationCommitRequest,
+    UnlinkRequest,
+)
 from services.kindle_catalog import (
     capture_jobs,
     enrichment_imports,
     imports,
-    legacy_migration,
+    legacy_source_status,
     links,
     repository,
 )
 
 router = APIRouter(prefix="/kindle-catalog")
-
-
-class MigrationCommitRequest(BaseModel):
-    confirmation_token: str
-
-
-class LinkRequest(BaseModel):
-    source: Literal["comic", "novel"]
-    book_id: str
-    asin: str
-
-
-class UnlinkRequest(BaseModel):
-    source: Literal["comic", "novel"]
-    book_id: str
-
-
-class CaptureJobCreateRequest(BaseModel):
-    asin: str
-    source: Literal["comic", "novel"]
-    direction: Literal["left", "right"] = "left"
-    expected_screens: int | None = None
-
-
-class AgentClaimRequest(BaseModel):
-    agent_id: str
-
-
-class AgentStateRequest(BaseModel):
-    agent_id: str
-    state: Literal[
-        "locating_book",
-        "downloading",
-        "positioning",
-        "waiting_user",
-        "capturing",
-        "awaiting_files",
-        "failed",
-    ]
-    captured_screens: int | None = None
-    error_code: str | None = None
-    error_message: str | None = None
-
-
-class AgentCompleteRequest(BaseModel):
-    agent_id: str
-
-
-class AgentHeartbeatRequest(BaseModel):
-    agent_id: str
 
 
 def _require_agent_token(x_capture_agent_token: str | None = Header(default=None)) -> None:
@@ -122,7 +81,7 @@ def get_stats():
 
 @router.get("/imports/sources", response_model=KindleCatalogSourceStatusResponse)
 def get_import_sources():
-    return legacy_migration.source_status()
+    return legacy_source_status.source_status()
 
 
 @router.get("/imports/runs", response_model=KindleImportRunsResponse)
@@ -156,6 +115,8 @@ def import_autobuy():
 
 @router.post("/migration/preview", response_model=KindleMigrationPreviewResponse)
 def preview_legacy_migration():
+    from services.kindle_catalog import legacy_migration
+
     try:
         return legacy_migration.preview()
     except ValueError as exc:
@@ -164,6 +125,8 @@ def preview_legacy_migration():
 
 @router.post("/migration/commit", response_model=KindleMigrationCommitResponse)
 def commit_legacy_migration(request: MigrationCommitRequest):
+    from services.kindle_catalog import legacy_migration
+
     try:
         return legacy_migration.commit(request.confirmation_token)
     except ValueError as exc:
