@@ -5,8 +5,6 @@
   "backend/scripts/build_chunk_contexts.py:_process_book": 11,
   "backend/services/amazon_csv_importer.py:_parse_digital_orders": 11,
   "backend/services/file_manager.py:rename_with_assets": 12,
-  "backend/services/kindle_catalog/capture_package_validator.py:validate_ready_dir": 17,
-  "backend/services/kindle_catalog/capture_registration.py:complete": 21,
   "backend/services/novel_db/builder.py:rebuild_from_pages": 12,
   "backend/services/novel_db/chunker.py:chunk_book": 11,
   "backend/services/novel_db/discussion_service.py:stream_discussion_turns": 16,
@@ -22,10 +20,7 @@
   "backend/services/novel_db/summary_grounding.py:parse_grounding_response": 20,
   "backend/services/novel_db/surya_quality.py:evaluate_external_ocr": 11,
   "backend/services/novel_db/surya_quality.py:evaluate_page_quality": 12,
-  "backend/services/novel_db/surya_runtime.py:recognize_with_quality": 15,
   "backend/services/series_suggester.py:suggest_series": 12,
   "backend/tools/hitomi_monitor.py:main": 12,
-  "kindle-pdf/kindle_controller/library.py:wait_for_download": 12,
-  "kindle-pdf/kindle_controller/reader.py:_try_go_to_location_start": 24,
-  "kindle-pdf/kindle_controller/reader.py:set_page_layout": 14
+  "kindle-pdf/kindle_controller/library.py:wait_for_download": 12
 }
