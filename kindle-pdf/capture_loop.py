@@ -1,85 +1,38 @@
-import os
 import os.path as osp
 import time
 from collections.abc import Callable
 from ctypes import windll
-from dataclasses import asdict, dataclass
-from typing import Iterator, Optional
 
 import cv2
 import numpy as np
 import pyautogui as pag
 from PIL import ImageGrab
 
+from capture_loop_io import capture_screen, prepare_image_dir, save_png
+from capture_loop_models import (
+    CaptureProgress,
+    CaptureReport,
+    CaptureResult,
+    build_capture_result,
+)
+from capture_loop_policy import (
+    PageChangeAction,
+    capture_stopped_too_early,
+    expected_count_reached,
+    page_change_recovery_actions,
+)
 
-@dataclass(frozen=True)
-class CaptureReport:
-    policy_version: str
-    termination_reason: str
-    end_of_book_proven: bool
-    captured_screens: int
-    expected_screens: int | None
-    direction: str
-    layout: str
-    crop_bounds: tuple[int, int, int, int]
-    image_size: tuple[int, int]
-    last_saved_file: str
-    unchanged_observation_windows: int
-    termination_unchanged_windows: int
-    observation_timeout_seconds: float
-    retry_limit: int
-    turn_commands: int
-    successful_transitions: int
-    retry_commands: int
-    opposite_direction_commands: int
-
-    def to_manifest(self) -> dict:
-        return asdict(self)
-
-
-@dataclass(frozen=True)
-class CaptureResult:
-    captured_screens: int
-    image_dir: str
-    report: CaptureReport
-
-    def __iter__(self) -> Iterator[int | str]:
-        """既存の ``count, dir = capture_loop()`` 呼び出しを維持する。"""
-        yield self.captured_screens
-        yield self.image_dir
-
-
-@dataclass
-class CaptureProgress:
-    turn_commands: int = 0
-    retry_commands: int = 0
-    opposite_direction_commands: int = 0
-    unchanged_observation_windows: int = 0
+_COMPATIBILITY_EXPORTS = (cv2, ImageGrab, CaptureReport, CaptureResult)
 
 
 class CaptureLoopMixin:
     def _capture_screen(self) -> np.ndarray:
         """現在の設定範囲でスクリーンショットを取得"""
-        capture_left = self.rect.left + self.config.CROP_X1
-        capture_top = self.rect.top + self.config.CROP_Y1
-        capture_right = self.rect.left + self.config.CROP_X2
-        capture_bottom = self.rect.top + self.config.CROP_Y2
-
-        image = ImageGrab.grab(
-            bbox=(capture_left, capture_top, capture_right, capture_bottom),
-            all_screens=True,
-        )
-        return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        return capture_screen(self.rect, self.config)
 
     def _save_image(self, image: np.ndarray, filepath: str) -> None:
         """画像を保存 (日本語パス対応)"""
-        try:
-            is_success, im_buf_arr = cv2.imencode(".png", image)
-            if not is_success:
-                raise RuntimeError(f"Failed to encode image: {filepath}")
-            im_buf_arr.tofile(filepath)
-        except Exception as e:
-            raise RuntimeError(f"Failed to save image {filepath}: {e}") from e
+        save_png(image, filepath)
 
     def _turn_page(self, key: str) -> None:
         """指定したキーでページめくり操作を行う。"""
@@ -152,8 +105,8 @@ class CaptureLoopMixin:
         return changed_ratio < self.config.PAGE_VISUAL_CHANGED_RATIO_THRESHOLD
 
     def _wait_for_stable_page(
-        self, previous_image: Optional[np.ndarray]
-    ) -> Optional[np.ndarray]:
+        self, previous_image: np.ndarray | None
+    ) -> np.ndarray | None:
         """ページ変化後、画像が一定時間同一になるまで待つ。"""
         start_time = time.perf_counter()
         candidate = None
@@ -195,37 +148,39 @@ class CaptureLoopMixin:
 
     def _wait_for_page_change(
         self,
-        previous_image: Optional[np.ndarray],
+        previous_image: np.ndarray | None,
         page: int,
         progress: CaptureProgress,
-    ) -> tuple[Optional[np.ndarray], int, bool]:
+    ) -> tuple[np.ndarray | None, int, bool]:
         current_image = self._wait_for_stable_page(previous_image)
         if current_image is None:
             progress.unchanged_observation_windows += 1
         retry_count = 0
-        while (
-            current_image is None and retry_count < self.config.PAGE_CHANGE_RETRY_COUNT
-        ):
-            retry_count += 1
-            print(
-                "Page did not change; retrying page turn "
-                f"({retry_count}/{self.config.PAGE_CHANGE_RETRY_COUNT})."
-            )
-            self._next_page_retry()
+        opposite_attempted = False
+        actions = page_change_recovery_actions(
+            page=page,
+            retry_limit=self.config.PAGE_CHANGE_RETRY_COUNT,
+        )
+        for action in actions:
+            if current_image is not None:
+                break
+            if action is PageChangeAction.RETRY_SELECTED:
+                retry_count += 1
+                print(
+                    "Page did not change; retrying page turn "
+                    f"({retry_count}/{self.config.PAGE_CHANGE_RETRY_COUNT})."
+                )
+                self._next_page_retry()
+                progress.retry_commands += 1
+            else:
+                opposite_attempted = True
+                print(
+                    "First page did not advance with the selected key; "
+                    "trying the opposite key once."
+                )
+                self._next_page_opposite()
+                progress.opposite_direction_commands += 1
             progress.turn_commands += 1
-            progress.retry_commands += 1
-            current_image = self._wait_for_stable_page(previous_image)
-            if current_image is None:
-                progress.unchanged_observation_windows += 1
-        opposite_attempted = current_image is None and page == 2
-        if opposite_attempted:
-            print(
-                "First page did not advance with the selected key; "
-                "trying the opposite key once."
-            )
-            self._next_page_opposite()
-            progress.turn_commands += 1
-            progress.opposite_direction_commands += 1
             current_image = self._wait_for_stable_page(previous_image)
             if current_image is None:
                 progress.unchanged_observation_windows += 1
@@ -267,34 +222,15 @@ class CaptureLoopMixin:
         progress: CaptureProgress,
     ) -> CaptureResult:
         height, width = current_image.shape[:2]
-        report = CaptureReport(
-            policy_version="kindle-completeness-v1",
-            termination_reason=reason,
-            end_of_book_proven=True,
-            captured_screens=captured_pages,
-            expected_screens=self.config.EXPECTED_PAGES,
-            direction=self.config.PAGE_CHANGE_KEY,
-            layout="spread"
-            if getattr(self.config, "CAPTURE_SPREAD", False)
-            else "single",
-            crop_bounds=(
-                int(self.config.CROP_X1),
-                int(self.config.CROP_Y1),
-                int(self.config.CROP_X2),
-                int(self.config.CROP_Y2),
-            ),
+        return build_capture_result(
+            config=self.config,
+            save_dir=save_dir,
+            captured_pages=captured_pages,
+            reason=reason,
             image_size=(width, height),
-            last_saved_file=f"{captured_pages:03d}.png",
-            unchanged_observation_windows=progress.unchanged_observation_windows,
-            termination_unchanged_windows=termination_windows,
-            observation_timeout_seconds=float(self.config.TIMEOUT_SEC),
-            retry_limit=int(self.config.PAGE_CHANGE_RETRY_COUNT),
-            turn_commands=progress.turn_commands,
-            successful_transitions=max(0, captured_pages - 1),
-            retry_commands=progress.retry_commands,
-            opposite_direction_commands=progress.opposite_direction_commands,
+            termination_windows=termination_windows,
+            progress=progress,
         )
-        return CaptureResult(captured_pages, save_dir, report)
 
     def capture_loop(
         self,
@@ -302,9 +238,7 @@ class CaptureLoopMixin:
         on_page: Callable[[int], None] | None = None,
     ) -> CaptureResult:
         """キャプチャのメインループ"""
-        save_dir = osp.join(self.config.IMG_OUTPUT_DIR, title)
-        if not osp.exists(save_dir):
-            os.makedirs(save_dir)
+        save_dir = prepare_image_dir(self.config.IMG_OUTPUT_DIR, title)
 
         print(f"Saving images to: {save_dir}")
 
@@ -325,9 +259,9 @@ class CaptureLoopMixin:
 
             if current_image is None:
                 captured_pages = page - 1
-                if (
-                    self.config.EXPECTED_PAGES is not None
-                    and captured_pages < self.config.EXPECTED_PAGES
+                if capture_stopped_too_early(
+                    captured_pages,
+                    self.config.EXPECTED_PAGES,
                 ):
                     raise RuntimeError(
                         "Capture stopped before the expected count: "
@@ -355,10 +289,7 @@ class CaptureLoopMixin:
                 f"{time.perf_counter() - start_time:.2f} sec"
             )
 
-            if (
-                self.config.EXPECTED_PAGES is not None
-                and page >= self.config.EXPECTED_PAGES
-            ):
+            if expected_count_reached(page, self.config.EXPECTED_PAGES):
                 print(
                     f"Reached expected capture count: {page}; confirming end of book."
                 )

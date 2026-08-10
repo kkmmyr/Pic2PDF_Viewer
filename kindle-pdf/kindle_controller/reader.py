@@ -10,8 +10,9 @@ from .models import (
     KindleControllerError,
     footer_indicates_cover,
     footer_indicates_start,
-    novel_footer_indicates_first_page,
 )
+from .reader_policy import needs_cover_step, page_layout_policy, previous_page_key
+from .reader_ui import ReaderUIAdapter
 from .window import WindowController
 
 logger = logging.getLogger(__name__)
@@ -83,79 +84,13 @@ class ReaderControllerMixin(WindowController):
 
     def set_page_layout(self, source: str) -> None:
         """comicは2ページ、novelは1ページを選択して状態を検証する。"""
-        option_ids = {
-            "comic": "aaOption-Split",
-            "novel": "aaOption-Single",
-        }
-        option_id = option_ids.get(source)
-        if option_id is None:
+        policy = page_layout_policy(source)
+        if policy is None:
             raise KindleControllerError(
                 "positioning_failed",
                 "Kindleのページレイアウト種別が不正です",
             )
-
-        reading_area = self._control_by_id("ReadingArea", timeout=2.0)
-        if reading_area is None:
-            raise KindleControllerError(
-                "positioning_failed",
-                "Kindleの読書領域を取得できませんでした",
-            )
-        page_settings = self._control_by_id("aaMenuButton", timeout=0.5)
-        if page_settings is None:
-            self._click_control(reading_area)
-            time.sleep(0.5)
-            page_settings = self._control_by_id("aaMenuButton", timeout=2.0)
-        if page_settings is None:
-            raise KindleControllerError(
-                "positioning_failed",
-                "Kindleのページ設定を開けませんでした",
-            )
-
-        menu_opened = False
-        try:
-            self._click_control(page_settings)
-            menu_opened = True
-            time.sleep(0.5)
-            option = self._control_by_id(option_id, timeout=2.0)
-            if option is None:
-                if (
-                    source == "novel"
-                    and self._control_by_id("フォント-item", timeout=1.0) is not None
-                ):
-                    return
-                raise KindleControllerError(
-                    "positioning_failed",
-                    "Kindleのページレイアウトを取得できませんでした",
-                )
-            if not self._toggle_is_on(option):
-                self._click_control(option)
-
-            deadline = time.monotonic() + self.config.control_timeout_seconds
-            while time.monotonic() < deadline:
-                option = self._control_by_id(option_id, timeout=0.5)
-                if option is not None and self._toggle_is_on(option):
-                    return
-                time.sleep(0.25)
-            raise KindleControllerError(
-                "positioning_failed",
-                "Kindleのページレイアウトを確認できませんでした",
-            )
-        finally:
-            if menu_opened:
-                close_button = self._control_by_id(
-                    "CloseSideMenuHeaderButton",
-                    timeout=1.0,
-                )
-                if close_button is not None:
-                    self._click_control(close_button)
-                else:
-                    pyautogui.press("esc")
-                time.sleep(0.25)
-            if self._control_by_id("aaMenuButton", timeout=0.5) is not None:
-                reading_area = self._control_by_id("ReadingArea", timeout=1.0)
-                if reading_area is not None:
-                    self._click_control(reading_area)
-                    time.sleep(0.25)
+        ReaderUIAdapter(self).apply_page_layout(policy)
 
     def _reading_area_image(self, *, timeout: float = 1.0) -> Image.Image | None:
         reading_area = self._control_by_id("ReadingArea", timeout=timeout)
@@ -182,98 +117,12 @@ class ReaderControllerMixin(WindowController):
         on_poll: Callable[[], None] | None = None,
     ) -> bool:
         """「位置に移動」で先頭へ移動し、source別フッターで検証する。"""
-        ui_opened = False
-        verified = False
         try:
-            self._ensure_process_running()
-            if on_poll:
-                on_poll()
-
-            reading_area = self._control_by_id("ReadingArea", timeout=1.0)
-            if reading_area is None:
-                return False
-            more_menu = self._button_by_id("moreMenuButton", timeout=0.5)
-            if more_menu is None:
-                self._click_control(reading_area)
-                time.sleep(0.25)
-                more_menu = self._button_by_id("moreMenuButton", timeout=1.0)
-            if more_menu is None:
-                return False
-
-            self._click_control(more_menu)
-            ui_opened = True
-            time.sleep(0.25)
-            # The Store app exposes this popover through a separate UIA root and
-            # its item rectangle is intermittent. The first item stays anchored
-            # to the verified menu button; the typed edit appearing afterwards
-            # is the safety proof that the intended item was selected.
-            if not self._click_relative_to_control(
-                more_menu,
-                x_offset=-30,
-                y_offset=45,
-            ):
-                return False
-            time.sleep(0.25)
-
-            location_input = self._edit_by_id(
-                "go-to-page-input",
-                timeout=1.0,
-            )
-            if location_input is None:
-                return False
-            try:
-                value_pattern = location_input.GetValuePattern()
-                value_pattern.SetValue("1")
-                time.sleep(0.1)
-                raw_input_value = value_pattern.Value
-                input_value = None if raw_input_value is None else str(raw_input_value)
-            except (AttributeError, COMError, TypeError, ValueError):
-                input_value = None
-            if input_value != "1":
-                return False
-
-            confirm = self._button_by_id("modal-confirm", timeout=1.0)
-            if confirm is None:
-                return False
-            self._click_control(confirm)
-            for _attempt in range(20):
-                if self._edit_by_id("go-to-page-input", timeout=0.25) is None:
-                    break
-                time.sleep(0.1)
-            else:
-                return False
-            ui_opened = False
-            if on_poll:
-                on_poll()
-            self.wait_for_reader_stable()
-
-            footer_name = self._wait_for_start_footer(
-                source,
-                cover_only=False,
+            return self._run_location_start_workflow(
+                source=source,
+                direction=direction,
                 on_poll=on_poll,
             )
-            if footer_name is None:
-                return False
-            if source == "novel" and novel_footer_indicates_first_page(footer_name):
-                reading_area = self._control_by_id("ReadingArea", timeout=1.0)
-                if reading_area is None:
-                    return False
-                self._click_control(reading_area)
-                time.sleep(0.25)
-                previous_page_key = "right" if direction == "left" else "left"
-                pyautogui.press(previous_page_key)
-                self.wait_for_reader_stable()
-                footer_name = self._wait_for_start_footer(
-                    source,
-                    cover_only=True,
-                    on_poll=on_poll,
-                )
-                if footer_name is None:
-                    return False
-            verified = True
-            if on_poll:
-                on_poll()
-            return verified
         except KindleControllerError as exc:
             if exc.error_code == "kindle_app_exited":
                 raise
@@ -288,10 +137,66 @@ class ReaderControllerMixin(WindowController):
                 exc_info=True,
             )
             return False
+
+    def _run_location_start_workflow(
+        self,
+        *,
+        source: str,
+        direction: str,
+        on_poll: Callable[[], None] | None,
+    ) -> bool:
+        adapter = ReaderUIAdapter(self)
+        try:
+            self._ensure_process_running()
+            if on_poll:
+                on_poll()
+            if not adapter.open_location_dialog():
+                return False
+            if not adapter.set_location_value("1") or not adapter.confirm_location():
+                return False
+            if on_poll:
+                on_poll()
+            self.wait_for_reader_stable()
+            footer_name = self._wait_for_start_footer(
+                source,
+                cover_only=False,
+                on_poll=on_poll,
+            )
+            if footer_name is None:
+                return False
+            if needs_cover_step(source, footer_name) and not self._step_back_to_cover(
+                source=source,
+                direction=direction,
+                on_poll=on_poll,
+                adapter=adapter,
+            ):
+                return False
+            if on_poll:
+                on_poll()
+            return True
         finally:
-            if ui_opened and not verified:
-                pyautogui.press("esc")
-                time.sleep(0.1)
+            adapter.dismiss_location_dialog()
+
+    def _step_back_to_cover(
+        self,
+        *,
+        source: str,
+        direction: str,
+        on_poll: Callable[[], None] | None,
+        adapter: ReaderUIAdapter,
+    ) -> bool:
+        if not adapter.show_chrome():
+            return False
+        adapter.press_key(previous_page_key(direction))
+        self.wait_for_reader_stable()
+        return (
+            self._wait_for_start_footer(
+                source,
+                cover_only=True,
+                on_poll=on_poll,
+            )
+            is not None
+        )
 
     def _wait_for_start_footer(
         self,
@@ -337,15 +242,14 @@ class ReaderControllerMixin(WindowController):
         footer_name = None if footer is None else str(footer.Name)
         if footer_indicates_cover(source, footer_name):
             return True
-        if source != "novel" or not novel_footer_indicates_first_page(footer_name):
+        if not needs_cover_step(source, footer_name or ""):
             return False
         reading_area = self._control_by_id("ReadingArea", timeout=1.0)
         if reading_area is None:
             return False
         self._click_control(reading_area)
         time.sleep(0.25)
-        previous_page_key = "right" if direction == "left" else "left"
-        pyautogui.press(previous_page_key)
+        pyautogui.press(previous_page_key(direction))
         self.wait_for_reader_stable()
         return (
             self._wait_for_start_footer(
