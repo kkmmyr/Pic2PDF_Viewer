@@ -41,9 +41,48 @@ schema管理と実行時accessの分離を採用する。
 
 `AMAZON_DATA_DIR` 配下を、許可した正確なファイル名だけで再帰探索する。ファイルは SHA-256 と取り込み種別で冪等管理し、任意のリクエストパスは受け付けない。
 
+medaroserver では `AMAZON_DATA_DIR=/opt/pic2pdf-viewer/import/kindle/files` を維持し、
+同パスを `/opt/pic2pdf-viewer/data/doujin/input/.kindle-import` へのシンボリックリンク
+とする。実ディレクトリは認証済みの既存 Samba 共有から
+`\\medaroserver\pic2pdf-input\.kindle-import` として Windows に公開する。
+先頭が `.` のため同人誌監視から除外され、Samba の `valid users = amashio` により
+匿名アクセスを許可しない。ZIP はサーバー側で展開せず、Windows で展開した
+許可対象 CSV / JSON だけを配置する。
+
 - 注文、KU 借用、返品
 - Kindle Info（書誌、ジャンル、著者、読書状態）
 - シリーズ自動購入 JSON
+
+### 4.1 Amazon エクスポートのバージョン選択
+
+Amazon の Kindle エクスポートでは、従来の `_FE.csv` 名に代わり、同じ論理データが
+`.1.1` / `.2.2` / `.3.1` などのバージョン付きファイルとして同梱される場合がある。
+medaroserver へ配置する前に、列構成とデータ件数を確認し、書籍本体を含む完全な
+バージョンを1つだけ選択して、バックエンドが認識する正規名へコピーする。
+複数バージョンを結合・同時配置しない。
+
+2026-07-30 生成データでは次を確認した。
+
+| 論理データ | 採用元 | 配置時の正規名 |
+|---|---|---|
+| 取得日・所有関係 | `Kindle.UnifiedLibraryIndex.CustomerRelationshipIndex.3.1.csv` | `Kindle.UnifiedLibraryIndex.CustomerRelationshipIndex_FE.csv` |
+| ジャンル | `Kindle.UnifiedLibraryIndex.CustomerGenres.3.1.csv` | `Kindle.UnifiedLibraryIndex.CustomerGenres_FE.csv` |
+| 著者 | `Kindle.UnifiedLibraryIndex.CustomerAuthorNameRelationship.3.1.csv` | `Kindle.UnifiedLibraryIndex.CustomerAuthorNameRelationship_FE.csv` |
+
+`CustomerRelationshipIndex.3.1` は11,727行・有効ASIN 11,700件超を持つ本体データで、
+`1.1` は11行・有効ASIN 3件、`2.2` は8行・有効ASIN 0件だった。`1.1` の有効ASINは
+すべて `3.1` に含まれ、旧版は Collection Follow / Customer Metadata / Sample Owner
+中心であるため取り込まない。3系列のCSVヘッダーは従来 `_FE` ファイルと一致する。
+
+バージョン番号だけを根拠に将来のファイルを自動採用しない。列構成、ASIN件数、
+`Item Owner` の有無、旧版にしか存在しない有効ASINがないことを確認してから正規化する。
+
+### 4.2 シリーズ自動購入データ
+
+`kindle-series-autobuy.json` は今回の Kindle / Your Orders エクスポートには含まれない。
+新しいエクスポートに存在しない場合は既存ファイルを維持する。
+`Digital.SeriesContent.Relation.1/SeriesRelation.csv` はシリーズ関係データであり、
+購読ID・購読状態を持たないため、自動購入 JSON の代替として使用しない。
 
 Kindle Info はカタログに存在する ASIN だけを更新し、Info 側だけに存在する ASIN から書籍を新規作成しない。ジャンルは対象 ASIN 単位で置換し、著者・取得日・巻数は既存値を優先して補完する。シリーズ自動購入 JSON は Amazon 側で解除された購読を残さないよう、ファイル変更時に全量置換する。
 
@@ -143,6 +182,7 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
 ## 8. セキュリティ・障害時挙動
 
 - Amazon 生データ、購入履歴、画像を外部サービスへ送信しない。
+- Amazon データ入力ディレクトリの Samba アクセスは `amashio` に限定し、匿名アクセスを許可しない。
 - API から任意絶対パスを指定できない。
 - 注文番号と書籍タイトルを大量にログへ出さない。
 - capture job の状態遷移は条件付き更新し、二重 claim を防ぐ。

@@ -1,6 +1,6 @@
 # Linux サーバー Samba セットアップ
 
-> status: living | last-verified: 2026-07-25
+> status: living | last-verified: 2026-08-02
 
 同人誌の画像ファイル（WebP / ZIP）を Windows からネットワークドライブ経由でサーバーに置けるようにする。
 配置後、ブラウザの「PDF 生成」ページからワンクリックで変換できる。
@@ -26,6 +26,32 @@ Kindle キャプチャ成果物は同人誌入力と混在させず、専用の�
 | Linux 側の Kindle 受信箱 | `/opt/pic2pdf-viewer/data/doujin/input/.kindle-capture-inbox/` |
 | Samba 共有名 | `pic2pdf-input`（既存共有を再利用） |
 | Windows からのアクセス | `\\medaroserver\pic2pdf-input\.kindle-capture-inbox` |
+
+Amazon の `Kindle.zip` / `Your Orders.zip` から展開した CSV / JSON は、
+同じ共有直下の隠しディレクトリ `.kindle-import` へ配置する。
+Linux 側の `AMAZON_DATA_DIR` は従来パスを維持し、そのパスをこの実ディレクトリへ
+向けるシンボリックリンクとする。
+先頭が `.` のトップレベルディレクトリは `DoujinWatcher` の対象外なので、
+Amazon CSV が同人誌入力として処理されることはない。
+
+| 役割 | パス |
+|------|------|
+| Linux 側の Amazon データ入力 | `/opt/pic2pdf-viewer/data/doujin/input/.kindle-import/` |
+| Samba 共有名 | `pic2pdf-input`（既存共有を再利用） |
+| Windows からのアクセス | `\\medaroserver\pic2pdf-input\.kindle-import` |
+| Linux 環境変数 | `AMAZON_DATA_DIR=/opt/pic2pdf-viewer/import/kindle/files` |
+| Linux 側の参照リンク | `/opt/pic2pdf-viewer/import/kindle/files` → `/opt/pic2pdf-viewer/data/doujin/input/.kindle-import` |
+
+ZIP 自体はバックエンドの取込対象ではない。Windows 側で ZIP を展開し、
+次の手順で CSV / JSON を配置してから、Web UI の
+`Kindle` → `取込・管理` → `すべて差分取込` を実行する。
+
+1. 注文・借用・返品など従来名のファイルは、名前を変えずに上書きする。
+2. `Kindle.UnifiedLibraryIndex` のバージョン付きファイルは、
+   [Kindle 購入カタログ設計 §4.1](../詳細設計/機能別/Kindle購入カタログ設計.md#41-amazon-エクスポートのバージョン選択)
+   に従って完全な版を選び、バックエンド用の正規名へコピーする。
+3. `1.1` / `2.2` などの旧版や未知のデータセットを一緒に配置しない。
+4. 新しいエクスポートに `kindle-series-autobuy.json` がない場合は、共有上の既存版を削除・置換しない。
 
 ---
 
@@ -57,6 +83,13 @@ EOF
 # Kindle キャプチャ専用の論理受信箱（正式な画像領域は共有しない）
 mkdir -p /opt/pic2pdf-viewer/data/doujin/input/.kindle-capture-inbox
 
+# Amazon CSV / JSON の Windows 配置先
+mkdir -p /opt/pic2pdf-viewer/data/doujin/input/.kindle-import
+
+# AMAZON_DATA_DIR の従来パスから共有内の実ディレクトリを参照する
+ln -s /opt/pic2pdf-viewer/data/doujin/input/.kindle-import \
+  /opt/pic2pdf-viewer/import/kindle/files
+
 # 5. 設定確認
 testparm
 
@@ -72,6 +105,10 @@ sudo systemctl enable smbd nmbd
 1. エクスプローラーを開き、アドレスバーに `\\medaroserver\pic2pdf-input` を入力
 2. 認証を求められたら Samba パスワードを入力
 3. 「ネットワークドライブの割り当て」で `Z:` などに固定すると便利
+
+Amazon データを更新するときは、アドレスバーへ
+`\\medaroserver\pic2pdf-input\.kindle-import` を直接入力する。
+隠しディレクトリのため、通常の一覧に表示されない場合がある。
 
 > **前提**: Tailscale が起動していること、`medaroserver` の名前解決ができること。
 > 解決しない場合は `\\100.76.210.48\pic2pdf-input` などの IP で試す。
@@ -115,3 +152,4 @@ OCRをWindows GPUへ委譲する場合は、Linux側で`OCR_AGENT_ENABLED=true`�
 | 接続できない | `sudo systemctl status smbd` でサービス確認 |
 | 認証エラー | `sudo smbpasswd -a amashio` でパスワード再設定 |
 | 生成ページが 503 を返す | 入力ディレクトリが存在するか確認: `ls /opt/pic2pdf-viewer/data/doujin/input/` |
+| Amazon データが取り込まれない | ZIP が展開済みか、`AMAZON_DATA_DIR` と `.kindle-import` が一致するか、対象 CSV / JSON のファイル名が変更されていないか確認 |
