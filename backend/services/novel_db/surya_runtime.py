@@ -2,22 +2,10 @@
 
 from __future__ import annotations
 
-import base64
-import io
-import json
-import os
 import re
-import subprocess
-import sys
-import time
-import urllib.error
-import urllib.request
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 from html import escape
-from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse
 
 import numpy as np
 from PIL import Image, ImageEnhance
@@ -38,6 +26,8 @@ try:
         evaluate_page_quality,
         is_valid_bbox,
     )
+    from .surya_server import SuryaServer as SuryaServer
+    from .surya_transport import SuryaTransport
     from .surya_types import SuryaBlock, SuryaLayoutBlock, SuryaPageResult
 except ImportError:  # Standalone ``python ocr_worker.py`` execution.
     from surya_parsing import (
@@ -55,6 +45,8 @@ except ImportError:  # Standalone ``python ocr_worker.py`` execution.
         evaluate_page_quality,
         is_valid_bbox,
     )
+    from surya_server import SuryaServer as SuryaServer
+    from surya_transport import SuryaTransport
     from surya_types import SuryaBlock, SuryaLayoutBlock, SuryaPageResult
 
 _SKIP_BLOCK_OCR_LABELS = {
@@ -69,108 +61,11 @@ _BLOCK_MAX_TOKENS = 8192
 _FULL_PAGE_MAX_TOKENS = 12288
 
 
-class SuryaServer:
-    """既存llama-serverへ接続するか、worker lifetimeで所有する。"""
-
-    def __init__(
-        self,
-        base_url: str,
-        *,
-        executable: str | None = None,
-        model_path: str | None = None,
-        mmproj_path: str | None = None,
-    ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.executable = executable
-        self.model_path = model_path
-        self.mmproj_path = mmproj_path
-        self._process: subprocess.Popen[bytes] | None = None
-
-    def __enter__(self) -> SuryaServer:
-        if self._healthy():
-            return self
-        self._start_owned_server()
-        deadline = time.monotonic() + 120
-        while time.monotonic() < deadline:
-            if self._process is not None and self._process.poll() is not None:
-                raise RuntimeError(f"llama-server exited with code {self._process.returncode}")
-            if self._healthy():
-                return self
-            time.sleep(1)
-        self.close()
-        raise TimeoutError("llama-server did not become ready within 120 seconds")
-
-    @property
-    def owns_process(self) -> bool:
-        return self._process is not None
-
-    def __exit__(self, _exc_type: object, _exc: object, _tb: object) -> None:
-        self.close()
-
-    def close(self) -> None:
-        if self._process is None:
-            return
-        self._process.terminate()
-        try:
-            self._process.wait(timeout=15)
-        except subprocess.TimeoutExpired:
-            self._process.kill()
-            self._process.wait(timeout=5)
-        self._process = None
-
-    def _healthy(self) -> bool:
-        try:
-            with urllib.request.urlopen(
-                f"{self.base_url}/models",
-                timeout=2,
-            ) as response:
-                return response.status == 200
-        except (OSError, urllib.error.URLError):
-            return False
-
-    def _start_owned_server(self) -> None:
-        paths = [self.executable, self.model_path, self.mmproj_path]
-        if not all(paths):
-            raise RuntimeError(
-                "Surya server is unavailable. Set SURYA_LLAMA_SERVER_PATH, "
-                "SURYA_MODEL_PATH, and SURYA_MMPROJ_PATH for automatic startup."
-            )
-        assert self.executable and self.model_path and self.mmproj_path
-        for path in paths:
-            if not Path(str(path)).is_file():
-                raise FileNotFoundError(f"Surya runtime file not found: {path}")
-
-        parsed = urlparse(self.base_url)
-        if parsed.hostname not in {"127.0.0.1", "localhost"}:
-            raise ValueError("automatic llama-server startup requires a localhost SURYA_INFERENCE_URL")
-        port = parsed.port or 8768
-        cmd = [
-            self.executable,
-            "--model",
-            self.model_path,
-            "--mmproj",
-            self.mmproj_path,
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(port),
-            "--ctx-size",
-            "16384",
-            "--parallel",
-            "1",
-            "--gpu-layers",
-            "99",
-            "--image-min-tokens",
-            "1024",
-            "--jinja",
-        ]
-        creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        self._process = subprocess.Popen(
-            cmd,
-            stdout=sys.stderr,
-            stderr=sys.stderr,
-            creationflags=creationflags,
-        )
+@dataclass
+class _VariantOutcome:
+    candidates: list[SuryaPageResult]
+    last_error: Exception | None = None
+    terminal: SuryaPageResult | None = None
 
 
 class SuryaClient:
@@ -185,6 +80,7 @@ class SuryaClient:
         self.model = model
         self.timeout_sec = timeout_sec
         self.min_ink_coverage = min_ink_coverage
+        self._transport = SuryaTransport(self.base_url, self.model, timeout_sec)
 
     def recognize_with_quality(
         self,
@@ -192,8 +88,35 @@ class SuryaClient:
         max_attempts: int,
     ) -> SuryaPageResult:
         variants = self._variants(image)
-        candidates: list[SuryaPageResult] = []
-        last_error: Exception | None = None
+        outcome = self._recognize_variants(
+            variants,
+            max_attempts=max_attempts,
+        )
+        if outcome.terminal is not None:
+            return outcome.terminal
+        fallback_attempt = min(max(1, max_attempts), len(variants)) + 1
+        self._recognize_fallback(
+            image,
+            outcome,
+            fallback_attempt=fallback_attempt,
+        )
+        if outcome.terminal is not None:
+            return outcome.terminal
+        if outcome.candidates:
+            return self._select_best_candidate(outcome.candidates)
+        return self._request_failure(
+            outcome.last_error,
+            max_attempts=max_attempts,
+            variant_count=len(variants),
+        )
+
+    def _recognize_variants(
+        self,
+        variants: list[Image.Image],
+        *,
+        max_attempts: int,
+    ) -> _VariantOutcome:
+        outcome = _VariantOutcome(candidates=[])
         for attempt, candidate_image in enumerate(
             variants[: max(1, max_attempts)],
             start=1,
@@ -218,19 +141,28 @@ class SuryaClient:
                         result,
                         "layout_block_fallback",
                     )
-                candidates.append(result)
+                outcome.candidates.append(result)
                 if result.state == "passed":
-                    return result
+                    outcome.terminal = result
+                    return outcome
                 if {
                     "malformed_output",
                     "repeated_text",
                     "excessive_text",
                 }.intersection(result.quality_flags):
-                    return result
+                    outcome.terminal = result
+                    return outcome
             except Exception as exc:
-                last_error = exc
+                outcome.last_error = exc
+        return outcome
 
-        fallback_attempt = min(max(1, max_attempts), len(variants)) + 1
+    def _recognize_fallback(
+        self,
+        image: Image.Image,
+        outcome: _VariantOutcome,
+        *,
+        fallback_attempt: int,
+    ) -> None:
         try:
             layout_raw = self._recognize(
                 image,
@@ -240,9 +172,9 @@ class SuryaClient:
             layout = parse_surya_layout(layout_raw)
             if not layout:
                 layout = self._layout_from_ocr_blocks(parse_surya_html(layout_raw))
-            if not layout and candidates:
+            if not layout and outcome.candidates:
                 best_candidate = max(
-                    candidates,
+                    outcome.candidates,
                     key=lambda item: (
                         item.ink_coverage or 0.0,
                         item.char_count,
@@ -261,24 +193,33 @@ class SuryaClient:
                     result,
                     "layout_block_fallback",
                 )
-                candidates.append(result)
+                outcome.candidates.append(result)
                 if result.state == "passed":
-                    return result
+                    outcome.terminal = result
         except Exception as exc:
-            last_error = exc
+            outcome.last_error = exc
 
-        if candidates:
-            best = max(candidates, key=self._candidate_score)
-            structured = self._accept_structured_coverage(best)
-            if structured.state == "passed":
-                return structured
-            sparse = self._accept_sparse_page(best, candidates)
-            if sparse.state == "passed" and any("duplicate_text_block" in item.quality_flags for item in candidates):
-                sparse = self._add_quality_flag(
-                    sparse,
-                    "duplicate_text_recovery",
-                )
-            return sparse
+    def _select_best_candidate(
+        self,
+        candidates: list[SuryaPageResult],
+    ) -> SuryaPageResult:
+        best = max(candidates, key=self._candidate_score)
+        structured = self._accept_structured_coverage(best)
+        if structured.state == "passed":
+            return structured
+        sparse = self._accept_sparse_page(best, candidates)
+        has_duplicate = any("duplicate_text_block" in item.quality_flags for item in candidates)
+        if sparse.state == "passed" and has_duplicate:
+            return self._add_quality_flag(sparse, "duplicate_text_recovery")
+        return sparse
+
+    @staticmethod
+    def _request_failure(
+        last_error: Exception | None,
+        *,
+        max_attempts: int,
+        variant_count: int,
+    ) -> SuryaPageResult:
         message = str(last_error) if last_error else "Surya OCR returned no result"
         return SuryaPageResult(
             full_text="",
@@ -287,7 +228,7 @@ class SuryaClient:
             state="failed",
             quality_flags=["request_error"],
             ink_coverage=None,
-            attempt_count=min(max_attempts, len(variants)),
+            attempt_count=min(max_attempts, variant_count),
             error_message=message,
         )
 
@@ -298,44 +239,11 @@ class SuryaClient:
         prompt: str = SURYA_PROMPT,
         max_tokens: int = _FULL_PAGE_MAX_TOKENS,
     ) -> str:
-        image_bytes = io.BytesIO()
-        image.convert("RGB").save(image_bytes, format="PNG")
-        encoded = base64.b64encode(image_bytes.getvalue()).decode("ascii")
-        payload = {
-            "model": self.model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {"url": f"data:image/png;base64,{encoded}"},
-                        },
-                        {"type": "text", "text": prompt},
-                    ],
-                }
-            ],
-            "temperature": 0,
-            "top_p": 0.1,
-            "max_tokens": max_tokens,
-        }
-        request = urllib.request.Request(
-            f"{self.base_url}/chat/completions",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
+        return self._transport.recognize(
+            image,
+            prompt=prompt,
+            max_tokens=max_tokens,
         )
-        with urllib.request.urlopen(
-            request,
-            timeout=self.timeout_sec,
-        ) as response:
-            data: dict[str, Any] = json.loads(response.read().decode("utf-8"))
-        content = data["choices"][0]["message"]["content"]
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            return "".join(str(part.get("text", "")) for part in content if isinstance(part, dict))
-        raise ValueError("Surya response content is not text")
 
     def _recognize_layout_blocks(
         self,

@@ -16,6 +16,7 @@ from services.novel_db.surya_ocr import (
     SuryaBlock,
     SuryaClient,
     SuryaPageResult,
+    SuryaServer,
     crosscheck_ocr_results,
     evaluate_external_ocr,
     evaluate_page_quality,
@@ -25,6 +26,9 @@ from services.novel_db.surya_ocr import (
 from services.novel_db.surya_parsing import parse_surya_html as parsing_parse_surya_html
 from services.novel_db.surya_quality import evaluate_page_quality as quality_evaluate_page_quality
 from services.novel_db.surya_runtime import SuryaClient as RuntimeSuryaClient
+from services.novel_db.surya_runtime import SuryaServer as RuntimeSuryaServer
+from services.novel_db.surya_server import SuryaServer as ServerSuryaServer
+from services.novel_db.surya_transport import SuryaTransport
 from services.novel_db.surya_types import SuryaPageResult as TypesSuryaPageResult
 
 
@@ -32,6 +36,8 @@ def test_facade_preserves_public_symbol_identity() -> None:
     assert parse_surya_html is parsing_parse_surya_html
     assert evaluate_page_quality is quality_evaluate_page_quality
     assert SuryaClient is RuntimeSuryaClient
+    assert SuryaServer is RuntimeSuryaServer
+    assert SuryaServer is ServerSuryaServer
     assert SuryaPageResult is TypesSuryaPageResult
 
 
@@ -327,6 +333,30 @@ def test_openai_payload_places_image_before_prompt(monkeypatch) -> None:
     content = captured["messages"][0]["content"]
     assert [part["type"] for part in content] == ["image_url", "text"]
     assert captured["top_p"] == 0.1
+
+
+def test_transport_joins_openai_list_content() -> None:
+    data = {
+        "choices": [
+            {
+                "message": {
+                    "content": [
+                        {"type": "text", "text": "first"},
+                        {"type": "text", "text": " second"},
+                    ]
+                }
+            }
+        ]
+    }
+
+    assert SuryaTransport._content(data) == "first second"
+
+
+def test_transport_rejects_non_text_content() -> None:
+    data = {"choices": [{"message": {"content": 42}}]}
+
+    with pytest.raises(ValueError, match="response content is not text"):
+        SuryaTransport._content(data)
 
 
 def test_block_fallback_rejects_nested_layout_json(monkeypatch) -> None:
