@@ -1,800 +1,242 @@
-# OCR設計・改善記録
+# OCR設計書
 
-> status: living | last-verified: 2026-08-01
+> status: living | last-verified: 2026-08-10
 
-縦書き小説を Surya OCR 2 でテキスト化し、ページ欠落検査と画像照合QAを経てから `novel.db` へ確定する設計。yomitoku は独立照合・比較・後方互換用エンジンとして残す。
+縦書き小説をSurya OCR 2でテキスト化し、入力完全性検査、ページ品質検査、画像照合QAを
+通過した結果だけを `novel.db` へ公開する設計である。yomitokuは独立照合・比較・
+後方互換用エンジンとして残す。
 
-- 関連: [ADR-0003: image-only モード](../../基本設計/ADR/0003_generated-image-only-mode.md)（`generated` ソースは OCR 対象外）、[GPU環境セットアップ.md](../../環境構築/GPU環境セットアップ.md)（`uv` ベースに更新済み）
-- Mac専用アプリを第二 OCR・目視確認に利用する将来評価方針は [Mac OCR 補助確認設計](Mac_OCR補助確認設計.md) を参照。本番公開条件は本書を正本とする。
-- OCR結果の取り込み先（novel.db・検索・RAG）は [小説RAG パイプライン設計](小説RAG_パイプライン設計.md) / [検索QA設計](小説RAG_検索QA設計.md) を参照。
+- 現在の公開条件と運用上の意味は本書を正本とする。
+- 機械判定値は `scripts/maintenance/ocr_quality_policy.json` を正本とし、本書へ複製しない。
+- 未完了作業は [小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md)、
+  実測経緯は [OCR品質改善 技術知見](../../../log/技術知見/OCR品質改善_技術知見.md) を参照する。
+- OCR結果の取り込み先は [小説RAG パイプライン設計](小説RAG_パイプライン設計.md) と
+  [検索QA設計](小説RAG_検索QA設計.md) を参照する。
+- `generated` sourceは [ADR-0003](../../基本設計/ADR/0003_generated-image-only-mode.md) により
+  OCR対象外である。
 
----
+## 1. アーキテクチャ
 
-## アーキテクチャ概要
-
-**現在の OCR フロー**（管理画面「OCR」タブ経由。旧 `ocr_service.py`・スレッド常駐方式は撤去済み）:
+```text
+kindle-pdf/main_novel.py
+  -> kindle_novel/images/{書籍名}/*.png
+  -> POST /api/ocr/run
+  -> rebuild_jobs / job_state.py / job_targets.py / job_executor.py
+  -> ocr_run_store.py（入力SHA固定・未完了ページ再開）
+  -> extractor.py -> $OCR_PYTHON ocr_worker.py --manifest <一時JSON>
+  -> Surya OCR 2 + yomitoku独立照合
+  -> ocr_page_resultsへページ単位チェックポイント
+  -> awaiting_qa
+  -> 必須ページの画像照合・補正・run承認
+  -> pages / pages_fts / books.ocr_done_atを同一公開処理で更新
 ```
-kindle-pdf/main_novel.py  →  kindle_novel/images/{書籍名}/*.png  (キャプチャのみ)
-                                          ↓
-POST /api/ocr/run（routers/ocr.py）→ job_queue に enqueue（rebuild_jobs テーブル）
-  → job_worker.py（queue loopの互換facade）
-  → job_state.py / job_targets.py / job_executor.py（状態 / 対象選択 / 工程実行）
-  → ocr_run_store.py（実行開始 / 前回の未完了ページを再開）
-  → extractor.py (iter_ocr_pages)
-  → $OCR_PYTHON ocr_worker.py --manifest <一時JSON>
-  → Surya OCR 2（OpenAI互換 llama-server。Windows CUDA）
-  → ページ単位の構造・文字領域カバレッジ検査
-  → ocr_page_results へページごとにチェックポイント保存
-  → 全ページ処理後に awaiting_qa へ遷移（公開テーブルは未変更）
-  → 必須ページQA + run承認
-  → pages / pages_fts / books.ocr_done_at を一括更新
-                                          ↓
-                              novel.db (books / pages テーブル)
-                              ← FTS5 + LanceDB でテキスト検索・RAG に利用
-```
-ジョブキュー管理・スキップロジック・API 詳細は [詳細設計書_バックエンド編](../詳細設計書_バックエンド編.md) が正。
 
-**Windows OCR agentモード**:
+旧 `ocr_service.py` とスレッド常駐方式は撤去済みである。ジョブキュー、スキップ条件、
+API契約は [詳細設計書_バックエンド編](../詳細設計書_バックエンド編.md) を正とする。
 
-`OCR_AGENT_ENABLED=true`の本番Linuxでは、通常workerは`mode=ocr`のジョブをclaimせず、
-Windows agentが共有トークンで1件ずつclaimする。claim時にLinux側が入力連番・SHA-256を確定し、
-`ocr_runs`とjob/run対応を作る。Windowsは登録済み画像URLだけを取得し、
-ページ結果・heartbeat・完了または失敗をAPIへ返す。Windowsから`novel.db`を直接開かない。
+### Windows OCR agent
 
-**OCR 環境変数**（`.env` で設定）:
+`OCR_AGENT_ENABLED=true` のLinux本番では通常workerは `mode=ocr` をclaimせず、Windows agentが
+共有トークンで1件ずつclaimする。Linux側が入力連番・SHA-256、`ocr_runs`、job/run対応を固定し、
+Windows側は登録済み画像URLだけを取得してページ結果・heartbeat・完了状態をAPIへ返す。
+Windowsから本番SQLiteを直接開かない。
 
-| 変数名 | 既定値 | 説明 |
+### 主要環境変数
+
+| 変数 | 既定値 | 意味 |
 |---|---|---|
-| `OCR_PYTHON` | Windows: `D:\61.tool\common\ocr\venv\Scripts\python.exe` / Mac: `~/.venv/ocr/bin/python` | OCR venv の Python 実行ファイルパス |
-| `OCR_PACKAGE_PATH` | `D:\61.tool\common\ocr` | backend設定名。subprocess起動時に `OCR_PATH` として渡し、ocr_worker.py が `sys.path` に追加するパッケージディレクトリ |
-| `OCR_ENGINE` | `surya2` | `surya2` / `yomitoku`。本番既定は Surya OCR 2 |
-| `SURYA_INFERENCE_URL` | `http://127.0.0.1:8768/v1` | OpenAI互換 llama-server のベースURL |
-| `SURYA_MODEL` | `surya-ocr-2` | APIへ渡すモデル名 |
-| `SURYA_MODEL_REVISION` | `unversioned` | model/mmproj/llama.cpp固定版の監査文字列。`ocr_runs.model`へ保存 |
-| `SURYA_LLAMA_SERVER_PATH` | 未設定 | 自動起動する `llama-server.exe`。URL到達済みなら不要 |
-| `SURYA_MODEL_PATH` | 未設定 | 固定した公式 Surya OCR 2 GGUF |
-| `SURYA_MMPROJ_PATH` | 未設定 | 固定した公式 mmproj GGUF |
-| `SURYA_REQUEST_TIMEOUT_SEC` | `600` | 1ページの推論タイムアウト |
-| `SURYA_MAX_ATTEMPTS` | `3` | ページ全体OCRで比較する画像候補の最大試行数 |
-| `OCR_QUALITY_MIN_INK_COVERAGE` | `0.85` | OCR bbox が覆う文字候補成分の最低比率 |
-| `OCR_CROSSCHECK_ALL_PAGES` | `true` | Surya合格ページもyomitokuで独立再読する |
-| `OCR_CROSS_ENGINE_MIN_SIMILARITY` | `0.85` | 正規化本文のエンジン間最低一致率 |
-| `OCR_EXTERNAL_CONFIDENCE_MEDIAN` | `0.85` | 補助OCRのblock confidence中央値下限 |
-| `OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN` | `0.75` | 補助OCRの文字数加重confidence平均下限 |
-| `OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO` | `0.25` | confidence 0.5未満の文字数比率上限 |
-| `OCR_AGENT_ENABLED` | `false` | OCRジョブをWindows agentへ委譲する。本番Linuxだけで有効化する |
-| `OCR_AGENT_HEARTBEAT_TIMEOUT_SEC` | `300` | agent heartbeat期限。次回claim時に期限切れjobを失敗回収する |
+| `OCR_PYTHON` | OS別OCR venv | OCR workerを実行するPython |
+| `OCR_PACKAGE_PATH` | `D:\61.tool\common\ocr` | subprocessへ `OCR_PATH` として渡すパッケージパス |
+| `OCR_ENGINE` | `surya2` | `surya2` / `yomitoku` |
+| `SURYA_INFERENCE_URL` | `http://127.0.0.1:8768/v1` | OpenAI互換推論URL |
+| `SURYA_MODEL` | `surya-ocr-2` | 推論モデル名 |
+| `SURYA_MODEL_REVISION` | `unversioned` | `ocr_runs.model`へ保存する固定版識別子 |
+| `SURYA_REQUEST_TIMEOUT_SEC` | `600` | 1ページのタイムアウト |
+| `SURYA_MAX_ATTEMPTS` | `3` | 画像候補の最大試行数 |
+| `OCR_QUALITY_MIN_INK_COVERAGE` | `0.85` | OCR bboxの文字候補成分最低coverage |
+| `OCR_CROSSCHECK_ALL_PAGES` | `true` | Surya合格ページもyomitokuで再読する |
+| `OCR_CROSS_ENGINE_MIN_SIMILARITY` | `0.85` | エンジン間の最低一致率 |
+| `OCR_AGENT_ENABLED` | `false` | Windows agentへOCRを委譲する |
+| `OCR_AGENT_HEARTBEAT_TIMEOUT_SEC` | `300` | agent heartbeat期限 |
 
-### 関連ファイル
+### 責務境界
 
-| ファイル | 役割 |
+| ファイル | 責務 |
 |---|---|
-| `backend/routers/ocr.py` | `/api/ocr/run` `/api/ocr/stop` `/api/ocr/status` — job_queue ベースの OCR ジョブ API。`stop` は待機中ジョブだけをキャンセルする |
-| `backend/services/novel_db/extractor.py` | `run_ocr_subprocess` — common/ocr venv を呼び出して画像からテキストを取得 |
-| `backend/services/novel_db/surya_ocr.py` | 既存importを維持する互換facade |
-| `backend/services/novel_db/surya_types.py` | OCR block・layout・page結果とserver再起動policyのデータ型 |
-| `backend/services/novel_db/surya_parsing.py` | 公式promptとHTML/layout/bbox解析 |
-| `backend/services/novel_db/surya_quality.py` | coverage・品質flag・補助OCR照合 |
-| `backend/services/novel_db/surya_runtime.py` | llama-server寿命管理とOpenAI互換HTTP client |
-| `backend/services/novel_db/ocr_staging.py` | 既存importを維持する互換facade |
-| `backend/services/novel_db/ocr_run_store.py` | 入力画像SHA検証、run再開、ページ結果チェックポイント |
-| `backend/services/novel_db/ocr_page_classification.py` | ページ種別・layout種別の安全側提案 |
-| `backend/services/novel_db/ocr_qa.py` | QA対象選定・レビュー・原子的な正式公開 |
-| `backend/services/novel_db/job_worker.py` | queue loopと既存テスト拡張点を維持するfacade |
-| `backend/services/novel_db/job_state.py` / `job_targets.py` / `job_executor.py` | ジョブ状態永続化、対象解決、mode別工程 |
-| `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー。テキスト抽出・フリガナ除去・正規化 |
-| `D:\61.tool\common\ocr\debug_yomitoku.py` | yomitoku出力構造の診断ツール |
+| `backend/routers/ocr.py` | run / stop / status / QA API |
+| `backend/services/novel_db/extractor.py` | OCR subprocess呼び出し |
+| `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
+| `backend/services/novel_db/surya_parsing.py` | 公式prompt、HTML/layout/bbox解析 |
+| `backend/services/novel_db/surya_quality.py` | coverage、品質flag、補助OCR照合 |
+| `backend/services/novel_db/surya_server.py` | llama-serverのhealth check・起動・終了 |
+| `backend/services/novel_db/surya_transport.py` | OpenAI互換HTTP payload・response decode |
+| `backend/services/novel_db/surya_runtime.py` | variant・layout fallback・品質選択workflow |
+| `backend/services/novel_db/ocr_run_store.py` | SHA検証、run再開、チェックポイント |
+| `backend/services/novel_db/ocr_page_classification.py` | ページ種別・layout候補 |
+| `backend/services/novel_db/ocr_qa.py` | QA対象、レビュー、原子的な正式公開 |
+| `backend/services/novel_db/job_state.py` / `job_targets.py` / `job_executor.py` | 状態、対象解決、工程実行 |
+| `backend/services/novel_db/surya_ocr.py` / `ocr_staging.py` / `job_worker.py` | 既存import契約を保つfacade |
+| `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー |
 
----
+## 2. Surya OCR 2実行契約
 
-## Surya OCR 2 実行設計
-
-上記分割は責務境界だけを変更する。prompt、閾値、品質flag、ページ分類、
-QA必須条件、正式公開トランザクションは分割前と同一である。
-`surya_ocr.py`と`ocr_staging.py`は公開symbolを同一objectのまま再exportし、
-既存worker・router・テストのimport契約を維持する。
-
-- **固定資材**: 公式GGUF、mmproj、`llama-server.exe` のパスとSHA-256を運用時に固定し、自動更新しない。
-- **サーバー寿命**: OCR worker 起動時に `/v1/models` を確認する。到達不能かつ3パスが設定済みなら `llama-server` をCUDA全層オフロード・parallel=1で起動する。worker所有serverは有限ページ数、連続Surya不合格、または移動窓の不合格率超過で停止し、次のページを新規server世代で再開する。既存の外部管理serverへ接続した場合はworkerから停止しない。server世代、開始ページ、終了理由をstderr監査ログへ残す。
-- **プロンプト**: 公式Surya OCR 2の学習時契約であるHTML+bbox・layout JSON・block HTMLの3プロンプトを改変せず固定する。OpenAI互換APIのマルチモーダルcontentも公式クライアントと同じ**画像→指示文**の順で送る。逆順では各タスクがlayout JSONへドリフトする実測がある。通常はtemperature=0のページ全体OCRを使い、ページ全体OCRが不成立のときだけ公式のlayout→block経路へ切り替える。
-- **推論予算**: llama-serverは1並列・context 16,384を基準とし、ページ全体12,288、layout 3,072、blockはlayoutの`count + 100`（64〜8,192）の出力トークン枠を使う。長い縦書き本文を4,096トークンで途中打ち切りしない。
-- **原本保持**: キャプチャPNGを加工・上書きしない。再試行用の縮小・コントラスト調整画像はメモリ上だけで生成する。
-- **出力保持**: `raw_output`（HTML）、タグとルビ読みを除いた検索用 `full_text`、bbox・品質指標を別々に保存する。
-- **独立補助系**: 列単位の欠落をSurya単独のbbox coverageだけで見逃さないため、既定ではSurya合格ページもyomitokuで再読する。補助結果はblock confidenceの中央値、文字数加重平均、confidence 0.5未満の文字比率、構造・重複検査で判定する。両方が合格でも正規化本文の一致率が0.85未満なら`cross_engine_disagreement`として不合格にし、一致する補助結果が2%以上長い場合は`external_ocr_more_complete`付きで補助結果を採用する。補助結果が不合格でSuryaだけが合格した場合は`external_crosscheck_unavailable`を残す。256文字以下の疎ページは分布判定合格を前提にcoverage不足だけを限定免除できる。日本語文字間に混入した単独ASCII空白は除去し、日本語とラテン文字間の意図的な空白は保持する。
+- 公式GGUF、mmproj、`llama-server.exe` のパスとSHA-256を固定し、自動更新しない。
+- worker所有serverは有限ページ数、連続不合格、移動窓の不合格率超過で再起動する。
+  外部管理serverはworkerから停止しない。世代、開始ページ、終了理由を監査ログへ残す。
+- 公式のHTML+bbox、layout JSON、block HTMLの各promptを改変せず、画像→指示文の順で送る。
+- 1並列・context 16,384を基準とし、長い本文を4,096 tokenで打ち切らない。
+- キャプチャPNGを加工・上書きしない。再試行画像はメモリ上だけで生成する。
+- `raw_output`、検索用 `full_text`、bbox、品質指標を分離して保存する。
+- Surya合格ページも既定でyomitokuが独立再読する。候補一致は正解保証に使わない。
 
 ### ページ品質ゲート
 
-1. 入力PNGが復号でき、ファイル名が `001.png` から欠番のない連番であること。ここでのページ番号はキャプチャ画面番号であり、Kindleが表示する紙面ページ番号ではない。
-2. Surya出力に解析可能な `div[data-label][data-bbox]` があり、bboxが正規化座標0〜1000内であること。
-3. ページ全体OCRへlayout JSON（`label` / `bbox` / `count`）が返った場合は、文字なしページとして扱わず**タスク種別ドリフト**として検出する。JSONの順序・bboxを使って各blockを切り出し、公式block OCRを実行してHTML+bboxへ再構成する。block OCRが再びlayout JSONを返した場合は本文として保存せず、その候補を不合格にする。
-4. 背景色に依存しない局所エッジを文字候補とし、OCR bboxによる coverage が設定値以上であること。単純な暗画素数は黒背景全体を文字と誤認するため使わない。挿絵・飾り枠があるページを一律に閾値緩和せず、全ページOCRが不合格なら検出済みbboxまたはlayout→block経路で再OCRする。
-5. 20文字以上の正規化済みblock本文がページ内で完全重複した場合は、別列への幻覚コピーとして不合格にし、bbox単位で再OCRする。
-6. 12〜80文字の同一列が4回以上連続する、または1画面の本文が6,000文字を超える場合は反復暴走として不合格にする。
-7. 非空の出力に解析可能なblockが1件もない場合は`malformed_output`として、その画像候補の追加Surya再試行を打ち切り、yomitoku補助系へ移す。
-8. 空白ページ、または `Image` / `Figure` / `Diagram` / `Blank-Page` 等の非本文ブロックだけのページは本文ゼロを許容し、理由を品質フラグへ残す。
-9. ページ全体OCRの不合格時は公式の画素数上限に収めた正規化画像、原画像、コントラスト調整画像を比較する。全候補が不合格なら原画像でbbox単位のblock OCRを1回実行する。layout専用出力が得られない場合も、不合格HTMLのbboxを再利用する。
-10. layout→block経路を含む全候補が不合格ならページ状態を `failed` とし、`pages` へ公開しない。fallback採用時は`layout_block_fallback`を品質フラグへ残す。ただし次の限定例外は監査フラグ付きで許容する。
-   - 画像・表・目次等が明示された構造化ページで、構造・本文・bboxが正常かつcoverageだけが装飾領域により不足する場合: `structured_page_coverage_exempt`
-   - 256文字以下の疎なページで、bbox単位のblock再OCRが成功した場合、または独立画像候補2件の本文が98%以上一致した場合: `sparse_page_block_fallback` / `sparse_page_variant_consensus` を補助照合のトリガーにする。yomitoku補助照合がconfidence 0.9以上で合格して初めて公開可とする。
-
-限定例外では`duplicate_text_block`、不正bbox、空本文等を許容しない。全run完了後は例外フラグのページを原画像と突き合わせてスポット確認する。
-
-Suryaのblock OCRは、極端に細い日本語縦列の切り出しで中国語混入・幻覚を生じた実測があるため、それ単独では公開可にしない。`sparse_page_block_fallback` / `duplicate_text_recovery`が生じたページはyomitoku補助照合を必須とし、補助照合が不合格ならページも不合格のままとする。
-
-confidence は補助情報であり、列・文章欠落を直接表さないため単独の合格条件にはしない。
-yomitoku判定は全blockの最小confidenceだけに依存せず、中央値、文字数加重平均、
-低confidence blockの文字比率、構造検査、他エンジンとの一致率を併用する。
-低confidence blockを含んでも、独立した品質根拠が揃う場合は監査フラグ付き候補として保持する。
-既知の十三歳46画面は最低confidence 0.184、中央値0.907、文字数加重平均0.78、
-confidence 0.5未満の文字比率約19%で、短い独立列を含む338文字を取得した。
-旧最小値判定では不合格、新分布判定では`external_ocr_distribution_accepted`付き合格となる。
-
-構造・coverage・反復検査の合格は、文字単位の完全一致を保証しない。実測では表紙・挿絵入りページ・目次・通常本文の一部に、助詞、小書き仮名、濁点、固有名詞の誤読や読み順のずれが残った。そのため全ページの機械処理後も`pages`へ自動確定せず、runを`awaiting_qa`へ置く。前付け全画面、限定例外フラグ付き画面、通常本文の標本など必須ページを原画像と照合し、補正または非索引承認を行ったうえでrunを承認する。このQAはDB上の公開をブロックする。
-
-2026-07-26の新規小説2冊・全183画面の実測では、単独実行と全冊実行で
-同一SHA-256画像の文字数が952文字から860文字へ変化し、双方がフラグなし合格になった。
-人物名の誤読と短い縦列の全欠落もカバレッジ99%以上で合格した。
-したがってFull Build前のQA承認をDB上の明示状態として追加し、
-QA未承認runは公開・索引生成しない方式へ移行した。
-段階実装と受入条件は
-[小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md)を正本とする。
-
-以下はPhase 5c導入前の初回本番再実行結果である。茉莉花官吏伝は91/91画面が機械合格したが、
-69画面が`external_crosscheck_unavailable`となり、QA必須は73画面だった。
-通常本文8画面目の原画像照合で、Suryaの人物名誤読「暗菜莉花」と、
-yomitokuの複数の固有名詞誤読を確認した。両者の正規化一致率は0.820であり、
-一致閾値0.85未満として停止させる現行判定は妥当だった。
-
-十三歳10巻は88/92画面まで合格し、画像目次、リンク目次、
-漢文と書き下しの併記、販促ページの4画面が3回の再試行後も
-`cross_engine_disagreement`だった。このため両書籍とも未公開のまま保持する。
-`external_crosscheck_unavailable`は、通常本文で補助系が品質根拠を提供できなかった
-ことを示すため、QA必須対象から除外しない。
-
-Phase 5cではページ種別分類とレイアウト別候補選択を実装済みである。
-2026-07-26の最終再処理では、茉莉花91画面を本文81・画像のみ10、
-十三歳92画面を本文81・画像のみ11として全画面承認した。
-機械候補147画面、Codex補正文15画面、画像のみ21画面を公開し、
-非本文の公開本文混入0件、QA採用本文との不一致0件を確認した。
-固定20画面の機械CERは全体16.42%、通常散文1.82%であるため、
-機械OCR単独の目標0.5%は未達と明記する。公開品質は機械CERではなく、
-固定正解と難ページの原画像照合済み補正、および機械品質ゲート通過候補の
-リスクベースQAによって確保する。
-
-2026-07-29の『ふつつかな悪女ではございますが』1巻（120画面）の実測では、
-主系Suryaが合格して補助yomitokuが不合格となった通常本文8画面で、
-主系だけが縦書き本文の1列を丸ごと欠落し、未採用の補助候補には欠落列が残っていた。
-このとき主系のbbox coverage、ページ状態、`external_crosscheck_unavailable`だけでは
-欠落箇所を特定できなかった。そこで、通常本文かつ主系が採用されているページについて、
-空白除去後の補助候補が主系より2%以上かつ30文字以上長く、主系が256文字以上ある場合は
-`unselected_external_candidate_more_complete`を付けてQA必須とする。
-このフラグは補助候補の自動採用を意味しない。補助候補が不合格でも比較材料として保持し、
-原画像との照合で欠落列だけを補正する。
-
-同じrunでは人物名`堯明`が、主系・補助系をまたいで`苑明`、`亮明`、`尭明`、
-`莞明`、`発明`、`荒明`へ揺れた。候補間で1文字違う場合の
-`named_entity_candidate_disagreement`は有効だが、両候補が同じ誤字になる場合を
-完全には検出できない。シリーズ固有名詞台帳は自動置換には使わず、
-同一run・シリーズ内の表記揺れ検出とQA優先順位付けに使用する。
-
-2026-07-29〜31には4小説シリーズ46冊・5,585画面を1冊ずつ処理し、全runを
-`completed / approved`まで確定した。内訳は本文4,625画面、挿絵等801画面、
-目次59画面、奥付・広告等100画面である。Codex補正文は1,354画面へ保存した。
-この実測では、候補間の文字量差が小さい画面にも列欠落、段落欠落、同一文反復、
-隣接列混入、固有名詞誤読が残った。したがって、文字量差の閾値だけでQA対象を
-限定せず、全画面の接触シートで連続性とページ種別を確認し、疑義画面は
-原解像度画像・主系・補助系・採用本文を比較する。
-
-薬屋11〜16巻では、`corrected_text`を保存した308画面で
-`selected_engine=primary / external`のまま承認する運用ミスが発生し、
-補正文ではなく機械候補が公開された。`corrected_text`は監査用の予備欄ではなく、
-`selected_engine=codex`のときだけ公開本文として解決される。このため、
-非空の`corrected_text`を送るQA更新は`selected_engine=codex`を必須とし、
-組み合わせが不整合なら公開前に拒否する。既存の不整合runはDBバックアップ後に
-採用元と公開本文を補正文へ再同期し、FTSを再構築する。
-
-2026-08-01の再監査では、グリムコネクト1〜3巻の旧入力が20・18・14画面で
-途中終了していたにもかかわらず、その入力範囲内の全画面QAを完了したことで
-`completed / approved`になっていた。3冊は固定レイアウトではなく通常の縦書き
-リフロー小説である。修正後の再撮影は168・168・141画面で、連番、復号、寸法、
-完全重複、白紙候補、先頭・中間・末尾を原画像で確認した。旧runの承認は
-「与えられた入力内のOCR判断」を保証するだけで、書籍全体の撮影完了を保証しない。
-以後はOCR投入前の画像QAを独立した受入条件とし、Kindle終端までの到達、先頭・末尾、
-画面数の妥当性を確認できない入力をOCRへ渡さない。
-
-グリムコネクト1〜3巻の再OCRはrun 67・68・69として公開し、3巻は141画面のうち
-本文112画面、目次1画面、表紙・扉・挿絵・前付・奥付・広告等28画面に確定した。
-`layout_type=image_only`はページ単位のOCR候補分類であり、書籍全体のKindleレイアウト種別を
-表さない。通常本文だった3巻93・106・129画面は原画像を正本として
-`page_type=narrative / layout_type=normal_prose`へ修正した。書籍全体が固定レイアウトか
-リフローかは、連続した原画像、文字サイズ変更可能性、位置・ページ表示、ページ送りの
-挙動から判定し、単一ページの`image_only`だけでは判定しない。
-
-同runの105画面では、主系候補の文字数が長くても黒四角55文字と本文欠落・崩れを含み、
-補助候補も一部の行末を欠いていた。候補の文字数、エンジンの合否、候補間一致のいずれも
-単独では採用根拠にせず、原画像を正本として列・段落・固有名詞・反復を照合し、必要なら
-両候補を材料に`selected_engine=codex`の補正文を作成する。
-
-同じ監査で、『ふつつかな悪女ではございますが』2巻の撮影画面47〜49に
-Codex / ChatGPTの通知UIが重なり、47・48画面の公開本文へ通知文字列が混入していた。
-一般語の「通知」や「完了しました」だけでは小説本文を誤検知するため、`ChatGPT`、
-または`Kindleカタログ`と`UI改善` / `要件整理`の組み合わせのような強い識別子だけを
-`ui_overlay_text_detected`としてQA必須にする。検出は採用候補だけでなく主系・補助系の
-各候補にも適用し、公開前に原画像を確認してUI文字列だけを除去する。
-
-### キャプチャ画面番号と紙面ページ番号
-
-- `ocr_page_results.page_no` / `pages.page_no` / 検索結果のページ番号は、PNGファイル名由来の**キャプチャ画面番号**を正とする。
-- Kindleの紙面ページ番号はフォント・ウィンドウ幅・リフローの影響を受け、1回の画面送りと1対1対応しない。現状は紙面ページ番号をDBへ別保存しない。
-- 2026-07-19の実測書籍では紙面1〜265ページと表紙が97画面へレイアウトされ、`001=表紙`、`002=紙面1`、`097=紙面265の最終画面`だった。
-- OCR引用から元画像を開く場合はキャプチャ画面番号で `NNN.png` を参照する。紙面ページ番号として利用者へ表示してはならない。
-
-### OCR投入前の画像QA
-
-1. 正式な書籍フォルダだけを `kindle_novel/images/{書籍名}/` に置く。予備撮影・中断データ・診断画像は `kindle_novel/capture_diagnostics/` 等、`images/` の外へ移す。
-2. 数値PNGが1から欠番なく連続していることを確認する。この連番検査はジョブ開始時にも自動実行する。全件復号可能・同一解像度であることは投入前に運用確認する（復号は各ページ処理時にも検査する）。
-3. SHA-256完全重複と全面白画像が0件であることを投入前に運用確認する。ジョブは各画像のSHA-256を再開判定に保存するが、書籍内重複・全面白の一括事前検査は自動化していない。
-4. 先頭が意図した表紙、末尾がKindleの100%地点であることを目視確認してからOCRジョブを投入する。
-5. 先頭・中間・末尾と、完全重複・白紙候補を原画像で確認する。白地の扉・章間・著作権表記は正当な重複または疎画面になり得るため、数値だけで削除しない。
-6. 過去runの画面数やKindleの紙面ページ数を期待撮影画面数として流用しない。リフロー小説では紙面ページ数と撮影画面数が一致しないため、Kindle終端到達とsource別最低件数を優先する。
-
-### 撮影完了からOCR投入への引継ぎ
-
-- Kindle購入カタログの`capture_state=captured`は正式画像の登録完了を表し、
-  OCR・索引の完了を表さない。OCR状態は`GET /api/novel_db/books`の
-  `ocr_done_at`、チャンク・Embedding構築状態は`indexed_at`、実行状態は
-  `GET /api/ocr/status`と
-  `GET /api/ocr/qa/runs`で別々に確認する。
-- `is_indexed`は`indexed_at IS NOT NULL`と同義とし、チャンク・Embedding構築の
-  完了状態だけを表す。OCR公開済みかつFull Build前の書籍は、
-  `ocr_done_at != null` / `is_indexed=false` / `indexed_at=null`となる。
-- 複数冊を撮影した運用では、撮影jobの成功時点でOCR対象の書籍名を固定する。
-  `POST /api/ocr/run`を対象指定なしで呼ぶと、今回の撮影対象以外の未OCR書籍も
-  対象になり得るため、範囲を限定する作業では使用しない。
-- OCRは`target_dir`へ書籍名を指定し、1冊ずつキューへ入れる。Windows OCR agentと
-  GPU推論を直列利用し、失敗時に後続冊を無条件で進めない。再実行時は同一runの
-  ページSHAチェックポイントを利用する。
-- OCRの全ページ処理が終わっても、runはまず`awaiting_qa`となる。ページ種別分類、
-  必須ページの画像照合・補正、run承認を終えるまで`books` / `pages` / FTSへ
-  新しい本文を公開しない。
-- 既存のASINなしOCR書籍と、新規ASINへ紐付いた再撮影書籍が同一巻として
-  併存する場合は、旧画像・旧OCR・DBを先に検証付きバックアップへ退避し、
-  新ASIN版を運用上の正本とする。旧版は削除せず復旧専用の読み取り対象として保持し、
-  検索・再処理・派生データ生成の対象を指定する運用では新ASIN版だけを選ぶ。
-- 『ふつつかな悪女ではございますが』1・2巻では、旧画像316画面と`novel.db` /
-  `meta2.db`を`/opt/pic2pdf-viewer/backups/kindle-four-series-pre-ocr-20260729-0442/`
-  へ保存し、SHA-256付きmanifestとSQLite整合性検査を完了した。新ASIN版
-  `B08R5QJSZ3` / `B095YPRX3G`を正本とし、旧ASINなし版は復旧用に残す。
-- 2026-07-27の茉莉花官吏伝シリーズでは、新規撮影した小説8〜17巻の10冊だけを
-  OCR対象とする。既存の1〜3巻・18巻の承認済み本文は再処理せず、今回の対象外である
-  4〜7巻の未OCR状態も暗黙に巻き込まない。
-
-### 2026-07-27 茉莉花官吏伝8〜17巻の実行結果
-
-- 10冊914ページを直列処理し、全runが`completed / approved`となった。
-  806ページを本文として公開し、表紙・目次・人物紹介・挿絵・奥付・広告など
-  108ページは画像のみ保持した。全ページの`page_type` / `layout_type`を確定し、
-  `unknown`は0件とした。
-- 機械OCRの品質判定に失敗した本文15ページは、Codexが原画像で本文範囲と段組みを
-  照合し、補助OCR候補を公開正本として採用した。これは文字単位の完全一致を保証する
-  ものではなく、固有名詞・ルビ・小書き文字を含む検索結果では原画像確認を残す。
-- 自動ページ分類には、14巻p79の本文を目次とする誤判定と、16巻p95・17巻p97の
-  あとがき／終章相当を終端位置だけで奥付・広告へ寄せる誤判定があった。終端付近でも
-  連続した本文や著者あとがきは索引対象とし、文字量がある非本文候補は画像で再確認する。
-- run承認により`books` / `pages` / FTSへの文字起こし公開と`ocr_done_at`更新は完了した。
-  8巻を対象とした書籍内検索で「赤奏国 コウマツリカ」がp80ほかへ命中することを
-  APIで確認した。
-- 8〜17巻はチャンク・Embeddingの`rebuild`を完了し、10冊すべての
-  `indexed_at`が非NULLであることを確認した。8巻の上記検索に加え、17巻の
-  「茉莉花」がp12ほかへ命中することをAPIで確認した。
-- Embedding構築は、サーバーCPUでは8巻が約8分14秒、Windows CPUでは9巻が
-  約1分32秒、Windows RTX 5070では10巻が約12秒、11〜17巻が各約6〜8秒だった。
-  GPU利用時は`NOVEL_DB_OLLAMA_BASE_URL`だけでなく
-  `NOVEL_DB_EMBED_NUM_GPU=99`も必要である。リモートGPUは処理中だけ使用し、
-  完了後は本番設定をサーバー内Ollamaへ戻す。
-- `full_build`にはチャンク・Embedding以外にQwenによる要約・人物抽出等が含まれる。
-  本番のQwen llama-serverが未起動の状態で`full_build`を投入すると失敗するため、
-  今回は成功条件を満たす`rebuild`だけを実行した。要約・人物抽出は本文・索引公開を
-  ブロックしない独立工程として扱う。
-
-### チェックポイントと確定
-
-- `ocr_runs`: 書籍・エンジン・モデル・入力ページ数・状態・エラーを記録する。
-- `ocr_agent_job_runs`: `rebuild_jobs.id`と書籍別`ocr_runs.id`を対応付け、再claim・再開時に同じrunを返す。
-- `ocr_runs.qa_state`: `pending` / `approved` / `rejected`。承認者、承認日時、QAメモを同じrunへ保存する。
-- `ocr_page_results`: ページ番号、画像SHA-256、採用本文、raw出力、品質フラグ、coverage、試行回数を `UNIQUE(run_id, page_no)` で保存する。`qa_state`は`not_required` / `required` / `approved` / `rejected`、`qa_note`と`reviewed_at`を保持する。ページ種別`page_type`は`unknown` / `narrative` / `toc` / `illustration` / `colophon_or_ad`、`index_eligible`は`narrative`だけ1とする。
-- 意味上の`page_type`とは別に、OCR選択用の`layout_type`を`unknown` / `normal_prose` / `full_width` / `mixed_illustration` / `structured` / `image_only`で保持する。Surya候補とyomitoku候補を`primary_text` / `external_text`へ保存し、`selected_engine`は`primary` / `external` / `codex`のいずれを公開正本に採用したかを記録する。Codexまたは人が原画像と照合した補正文は`corrected_text`へ保存し、機械OCRの原文を上書きしない。非空の`corrected_text`を公開に使う場合は`selected_engine=codex`を必須とし、QA APIは不整合な組み合わせを拒否する。
-- 同じ書籍・エンジン・モデル・入力ページ数で状態が `running` または `failed` のrunがある場合は、その最新runを再利用する。各 `passed` ページは、そのページ番号の画像SHA-256が現在の入力と一致する場合だけスキップする。変更されたページ、不合格ページ、未処理ページは再実行する。
-- ページ番号と画像SHAが入力manifestに一致し、全ページのOCR結果（`passed`または`failed`）が保存された場合、runを`awaiting_qa`へ進める。この時点では`books` / `pages` / `pages_fts`を更新しない。`failed`ページは必ずQA対象とし、本文なら画像照合済み補正文、非本文なら画像のみ公開の明示承認が必要である。
-- 全ページへ決定論的なページ種別候補を設定する。目次は前付け位置と複数章見出しを
-  組み合わせ、長い本文中に現れた単独の「目次」だけでは確定しない。`終章`、
-  `エピローグ`、`あとがき`等で始まる長文は終端付近でも本文を優先する。
-  奥付・広告は複数の発行語、または終端位置・発行語・短い文字量が揃った場合に限って
-  確定する。安全に決まらない場合は`unknown`のまま残す。自動判定は既に手動設定された
-  種別を上書きしない。
-- ページ単位の種別提案後に、run全体を`ocr_content_guards`で検査する。本の後半50%以後に
-  `電子特別お試し版`・`試し読み版`等の明示標識が現れた場合、その画面を別作品境界とする。
-  明示標識がない場合も、後半の`あとがき`または奥付候補より後に、章見出しを3件以上含む
-  第2目次が現れた場合はその第2目次を境界とする。前付けに記載された
-  「本編終了後に試し読みを収録」の案内は境界にしない。
-- 確定境界以後は`colophon_or_ad`・`index_eligible=0`へ安全側に分類し、
-  境界画面へ`sample_content_boundary`、後続画面へ`sample_content_excluded`を付ける。
-  原画像とOCR候補は保持する。境界画面はQA必須であり、run承認前に誤検出でないことを
-  確認できる。後続画面は監査フラグだけを保持し、各画面の確認は要求しない。
-  茉莉花官吏伝3・5・6・7巻で確認した4種類の後付けを回帰標本とする。
-- `primary_text`・`external_text`・採用候補の各本文について、空白・記号だけの行を除いた
-  有意行を検査する。本文文字10文字以上の同一行が3回以上、本文文字40文字以上の
-  同一行が2回以上、または本文文字合計40文字以上の隣接する有意2行が2回以上現れた場合は
-  反復異常とする。空行を挟む同一ブロックや短い擬音・相づちだけでは異常としない。
-  `primary_text_repetition`・`external_text_repetition`・`selected_text_repetition`を
-  品質フラグへ保存する。採用本文の反復だけをQA必須とし、未採用候補の反復は監査情報として
-  保持する。採用本文は`selected_engine`に従ってprimary・external・Codex補正文の
-  いずれかを解決し、未採用候補を採用本文として誤判定しない。
-- 2026-07-28の茉莉花官吏伝1〜18巻dry-runでは、境界を3・5・6・7巻の4件だけで検出した。
-  初期規則が採用本文11ページを検出したため全件を画像照合したところ、実際の反復は
-  **run ID 5・8・9・17・18**に属する5ページだった。これは巻番号ではなく、対応する書籍は
-  **9・12・13・4・5巻**である。残る6ページは空行配置または短い擬音による誤検出だった。
-  改訂規則で追加検出した**run ID 7（11巻）**の1ページを含め、最終的に
-  **4・5・9・11・12・13巻**の計6ページを画像照合済み補正文へ置換して
-  索引を再構築し、改訂規則では採用本文0ページ、
-  未採用primary候補20ページ、未採用external候補0ページとなった。未採用候補は
-  raw OCRの監査情報として保持し、公開本文をブロックしない。
-- 同日のページ単位再構築実装後に、本番のrun 17 p12、18 p14、5 p42、7 p60、
-  8 p18、9 p11を再処理した。6件とも対象外ページのchunk件数・ID合計を維持し、
-  書籍全体のchunk総数も不変、`indexed_at`は有効だった。現在公開中runだけの再監査でも
-  採用本文反復0ページ、未採用primary候補20ページを維持した。
-- 公開本文の監査対象は、単なる`state='completed' AND qa_state='approved'`の全履歴ではなく、
-  **書籍ごとの現在公開中run**に限定する。現在公開中runは承認済みrunのうち
-  `COALESCE(qa_reviewed_at, finished_at, started_at)`が最新のものとし、同時刻は`id`が
-  大きいものを採用する。`pending` / `awaiting_qa` / `failed` / `canceled`と、
-  同じ書籍の旧承認runは公開監査から除外する。raw候補の履歴監査では全runを別途参照できる。
-- OCR時はraw出力のbboxラベル、本文量、非文字領域の有無から`layout_type`を安全側に提案する。`mixed_illustration`ではyomitoku候補を必ず比較し、機械選択後もQA必須とする。`full_width` / `structured` / `unknown`も自動確定せずQAへ送る。通常散文を含め、機械候補に固有名詞・列欠落の疑いがあればCodexが原画像と照合し、`corrected_text`を保存する。
-- ページ種別分類は`primary_text` / `external_text` / `selected_engine`を変更しない。
-  意味上の索引可否と、レイアウトに基づくOCR候補選択を別々の判断として監査可能にする。
-- 先頭7画面、先頭本文・中間・最終画面、OCR失敗、`unknown`または通常散文以外の
-  レイアウト、および異常・限定例外を示す品質フラグ付き全画面を`required`とする。
-  さらに、300文字以上ある非本文候補を`page_type_text_conflict`、Suryaとyomitokuで
-  敬称付き人名・4文字以上のカタカナ語候補に同じ文字数の1文字違いがあるページを
-  `named_entity_candidate_disagreement`としてQA必須にする。
-  一方の候補にだけ語が存在する場合や、文字数・形が大きく異なる候補はこの規則だけでは
-  必須化しない。実データで単純な語集合不一致は過剰検知になるためである。
-  `cross_engine_consensus`と`yomitoku_adjudication`は、通常の2エンジン照合を実施した
-  監査記録であり、それ単独ではQA必須ページを増やさない。QA画面で原画像・両OCR候補・
-  採用本文・フラグ・ページ種別・レイアウト種別を比較し、ページ単位で承認または却下する。
-- 公開前の本文監査では、同一行4回以上の連続反復、同一ブロック反復、JSON・生成マーカー、
-  候補間の大幅な文字量差も確認する。主・補助OCRは独立した完全な正解系ではなく、
-  両方が同じ固有名詞を誤る場合があるため、候補一致だけで固有名詞を正解とみなさない。
-  反復を除去・候補を結合した場合は`selected_engine=codex`と画像照合済み
-  `corrected_text`を保存し、raw候補を残す。
-- 公開後は対象集合を固定した横断監査を実施し、DB整合性、ページ件数、公開runとFTSの同期、
-  ページ種別・索引可否、補正文採用元、UI重なり、完全重複、反復、疎な本文、候補欠落リスクを
-  再検査する。機械flagは欠陥件数ではなく目視対象であるため、原画像で意図的な反復、短い
-  章末、前付・奥付等と確認したものは理由を監査記録へ残す。2026-08-01の46冊再監査では、
-  原画像確認済み41画面とグリムコネクト3巻105画面を修復後、DB整合性`ok`、ページ件数不一致、
-  公開本文不一致、種別・索引矛盾、補正文採用元矛盾、UI混入、隣接完全重複を各0件とした。
-- `ChatGPT`、または`Kindleカタログ`と`UI改善` / `要件整理`の組み合わせを主系・補助系・
-  採用本文のいずれかで検出した場合は`ui_overlay_text_detected`を付けてQA必須とする。
-  「通知」「完了しました」等の一般語だけでは検出しない。通知UIが画像へ重なったページは、
-  原画像で本文との境界を確認し、本文だけを`corrected_text`へ保存する。
-- フロントエンドは`useOCRQaController`がQA run/page選択、TanStack Query、
-  承認mutation、候補・補正入力を所有し、`OCRQaPanel`は表示へ限定する。
-  API、QA必須条件、候補選択、公開可否は分割前から変更しない。
-- `required`ページがすべて`approved`、`rejected`ページ、`unknown`ページ種別、`unknown`レイアウトが各0件で、再度画像SHAが一致した場合だけ、run承認APIが1トランザクションで`books` / `pages` / `pages_fts`を更新し、runを`completed`・`qa_state=approved`にする。`narrative`は機械合格した採用候補または非空の画像照合済み補正文を必須とする。
-- 公開後の`pages.page_type`と`pages.index_eligible`はQA確定値を保持する。`toc` / `illustration` / `colophon_or_ad`は画像パスを正本ページとして保持するが、公開本文は空文字にしてFTS検索、chunk、Embedding、全文読込、サマリ、人物・関係抽出の入力から除外する。OCR候補は`ocr_page_results`に監査用として残す。
-- 中断・失敗時は既存の公開済み本文を保持する。新規書籍では中途半端な本文を公開しない。
-- `POST /api/ocr/stop` は `rebuild_jobs` の待機中（`queued`）OCRジョブだけを `canceled` にする。実行中ジョブ・OCR worker・llama-serverは停止しない。待機中ジョブがなければ400を返す。実行中の安全な停止とserver更新の自動制御は未実装であり、手動中断時はrunとジョブを理由付きの `failed` として閉じ、ページチェックポイントを次回再開へ残す。
-
-### 2026-07-19 実書籍runの停止時点
-
-- 対象は97画面。run 5を81画面目の永続チェックポイントでユーザー指示により停止した。
-- 保存済み結果は合格67、不合格14（画面番号 `4, 39, 58, 60〜69, 74`）。82〜97画面は未処理である。
-- 全画面合格条件を満たさないため、`books` / `pages` / FTS / `ocr_done_at` への確定公開は行われていない。
-- 次回は同一書籍・エンジン・モデル識別子・入力97件を指定し、各ページの画像SHA-256が一致する合格67件を再利用して、不合格14件と未処理16件だけを新しいserverセッションで処理する。
-- server再起動後の再試行では、少なくとも画面4・25・26・39・44・50・52・53・55・56が合格へ回復した。一方、画面4・39・58・60〜69・74は停止時点でも不合格であり、server更新は品質ゲートの代替ではなく回復試行として扱う。
-- 全画面yomitoku比較は通常本文で低confidence（実測最小0.06）、誤字、列欠落、隣接画面の混入があり主系にはできない。一方、3画面目の細い縦列は3列ともconfidence 0.993以上で正読したため、現行どおりSurya不合格ページに限定した補助判定に用いる。
-
-### 正解コーパス
-
-- `ocr_ground_truth_pages`はrun・画面番号・画像SHA-256を一意キー相当として保持し、OCR結果の変更や画像差し替えを追跡可能にする。
-- `reference_text`は原画像と照合した人手確定文字列だけを保存する。OCR本文から初期化した文字列は`draft`であり、評価の正解には数えない。
-- 状態は`draft` / `verified`。`verified`への変更は非空の`reference_text`、確定ページ種別、現在画像SHA一致を必須とする。
-- 評価は空白を正規化した文字列のLevenshtein距離からCERを計算し、ページ別、
-  全`verified`ページの加重CER、ページ種別別の件数・文字数・加重CERを返す。
-  全体CERは表紙・目次・挿絵混在・広告の難度に強く影響されるため、
-  通常本文の受入可否は`narrative`集計と個別の列欠落を併記して判断する。
-- 初期20画面は、通常本文だけでなく表紙、目次、挿絵・章扉、漢文併記、奥付・広告、既知不一致ページを含める。20件を登録しただけでは受入完了とせず、`verified`件数を別表示する。
-- コーパスの画像は複製せず正式画像を参照する。画像SHAが変わった項目は検証済み扱いを解除し、再確認する。
-
-#### 固定20画面の実測基準（2026-07-26）
-
-全20画面を原画像と照合して`verified`にした。同じ画像SHA-256と正解本文に対し、
-現行Surya系、yomitoku、Tesseract `jpn_vert`を再実行した加重CERは次のとおり。
-CERは挿入が正解文字数を超える場合に100%を超え得る。
-
-| 評価範囲 | 画面数 | 現行Surya系 | yomitoku | Tesseract |
-|---|---:|---:|---:|---:|
-| 全体 | 20 | 16.42% | **11.51%** | 57.20% |
-| 通常散文 | 4 | **1.82%** | 4.55% | 8.46% |
-| 全幅要約 | 1 | 19.19% | 11.22% | **8.03%** |
-| 本文＋挿絵 | 3 | 38.28% | **10.71%** | 151.74% |
-| 漢文・書き下し | 1 | **22.64%** | 57.23% | 67.30% |
-| 目次 | 4 | 70.00% | **50.00%** | 141.54% |
-| 挿絵・表紙 | 4 | **61.24%** | 64.61% | 340.45% |
-| 奥付・広告 | 3 | **0.87%** | 21.68% | 65.32% |
-
-- 全体CERだけではyomitokuが最良だが、通常散文と漢文は現行Surya系が優位である。
-  主エンジンをyomitokuへ一律置換しない。
-- yomitokuの改善は本文＋挿絵に集中した。意味上の`page_type`とは別に
-  `layout_type`を保存し、両候補を失わずQAで選択・補正する。
-- Tesseractは挿絵の網点・輪郭を大量の文字として誤認した。
-  全画面OCRには採用せず、将来文字領域を限定できた場合の列欠落・文字数確認候補に留める。
-- 現在の`metrics_by_page_type`は意味上のページ種別を集計する。
-  `narrative`には通常散文、全幅要約、本文＋挿絵、漢文が含まれるため、
-  受入判断では個別画面と実装計画のレイアウト別集計を併記する。
-
-#### B-35 定量品質ゲート（2026-08-01）
-
-品質ポリシーの正本は`scripts/maintenance/ocr_quality_policy.json`とし、
-`scripts/maintenance/benchmark_ocr_ground_truth.py`がベンチマークJSONへ
-`quality_gate`を追加して合否を判定する。`--fail-on-gate`指定時は全ゲート合格で終了コード0、
-品質未達で1、引数・ポリシー不正等の実行不能で2以上を返す。
-
-| ゲート | 初期基準 | 判定範囲 |
-|---|---:|---|
-| verified標本 | 20画面以上 | コーパス |
-| 正解文字数 | 全体9,000字以上、通常散文4,000字以上 | コーパス |
-| ページ構成 | 本文9、通常散文4、目次4、挿絵4、奥付・広告3画面以上 | コーパス |
-| 通常散文の加重CER | 0.5%以下 | 機械OCR候補 |
-| 通常散文のページ最大CER | 1.0%以下 | 機械OCR候補 |
-| 列欠落疑い | 0画面 | `narrative` |
-| 指定固有名詞の完全一致 | 出現回数再現率100%、欠落0件 | 通常散文4画面 |
-
-- CERはUnicode NFKCを適用後に全空白を除去し、横棒の字形差 `‐‑‒–—―` を `―` へ
-  統一した文字列のLevenshtein距離 ÷ 正解文字数とする。意味と読みが同じ全角 / 半角の
-  ASCII記号・英数字・互換文字は同一視するが、日本語の句読点、括弧種別、三点リーダーの
-  有無、長音、仮名大小は同一視しない。正規化版を評価レポートへ保存し、異なる版のCERを
-  直接比較しない。これは検索本文を書き換える処理ではなく評価時だけの同値規約である。
-  NFKCが三点リーダーを3個のピリオドへ展開するため、評価正規化では直後に3個単位を
-  三点リーダー1文字へ戻し、元のリーダー個数と正解文字数を保持する。
-  加重CERはページCERの単純平均ではなく、
-  対象ページの編集距離合計 ÷ 正解文字数合計で求める。
-- 通常散文のページ最大CERを別ゲートにし、長いページの良好値で短い不良ページが
-  平均化されることを防ぐ。
-- 列欠落疑いは、最小編集経路で正解側の削除が40文字以上かつ正解文字数の5%以上となる
-  `narrative`画面として機械計数する。これはQA優先度の定量指標であり、列欠落の最終確定は
-  原画像で行う。閾値未満の短い列、主・補助候補双方の同一欠落は別途目視対象に残る。
-- 固有名詞はポリシーに画像SHA-256と表記を固定し、正解本文中の出現回数を分母、
-  OCR候補の完全一致出現回数を分子として、ページ・語ごとに`min(候補, 正解)`で数える。
-  部分一致、読み、別字への自動正規化は合格に数えない。
-- コーパス構成、CER、列欠落疑い、固有名詞は相互に代替しない。1項目でも未達なら
-  機械OCR単独の自動公開は不合格とし、Codex原画像QAを継続する。
-- `current`は`ocr_page_results.full_text`に保存された機械候補を測る。
-  Codex補正文や公開正本の品質と混同せず、公開後監査は別途、公開本文・FTS・索引可否・
-  原画像照合で判定する。
-
-2026-08-01の現行機械候補に対する初回ゲート結果は`FAIL`である。コーパス20画面・9,429字、
-通常散文4画面・4,680字は構成基準を満たし、指定固有名詞10表記・121出現は121/121で
-再現した。一方、通常散文の加重CERは1.82%、ページ最大CERは2.07%で、通常散文4画面
-すべてがページ上限1.0%を超えた。列欠落疑いはrun 1の8画面（削除316字、18.65%）と
-38画面（削除775字、94.40%）の2件である。したがって機械OCR単独の自動公開は引き続き
-不可とし、結果JSONを
-`backend/data/kindle_capture/audits/2026-07-28-four-novel-series/b35-ocr-quality-baseline-2026-08-01.json`
-へ保存する。
-
-#### 第三OCR比較とoracle評価（B-35 Phase 5f、2026-08-01）
-
-0.5%到達可否は、単一エンジンの平均CERだけで判断しない。固定コーパスへ同じ画像SHAと
-同じ正解文字列を使い、各候補の単体値、候補集合の理論下限、実装可能な選択単位を順に測る。
-比較のために本番OCR依存を直接更新せず、NDLOCR-Lite、YomiToku更新版、PP-OCRv5は
-それぞれ隔離環境で実行する。モデル、パッケージ版、実行コマンド、入力画像SHA、処理時間、
-raw出力を監査成果物へ保存する。
-
-評価順序は次を正本とする。
-
-1. 現行機械候補、保存済みprimary / external、NDLOCR-Lite、隔離YomiToku更新版を
-   固定20画面で比較する。PP-OCRv5は先行候補で理論下限が不足した場合、または列存在確認が
-   必要な場合だけ追加する。Tesseractは精度候補ではなく、列数・文字量の独立検査に限定する。
-2. ページ単位oracleは、同一画面について最小編集距離の候補を選べた場合の加重CERとする。
-   これはground truthを参照する評価専用値であり、公開時の自動選択には使わない。
-3. 参照位置oracleは、各候補を正解文字列へ整列し、正解側の各位置を少なくとも1候補が
-   正読できた割合を測る。候補集合そのものが不足しているかを早期判定する理論値であり、
-   文章生成や自動補正文には使わない。
-4. 参照位置oracleが0.5%以下へ到達した画面だけ、bbox付きraw出力を用いて縦列候補を
-   右から左へ整列し、列単位oracleを測る。列境界が不一致またはbboxがない候補は
-   無理に結合せずQAへ送る。
-5. B-35は調整未使用の3シリーズ以上・通常散文20画面以上で再実行する。汎用品質policyは現在
-   `normal_prose`最低4画面だけを機械検査し、シリーズ数を強制しないため、B-35では選択manifestを
-   別途監査する。holdoutを見て条件を変えた場合は固定評価から外し、新しい未調整標本を用意する。
-
-通常散文4画面は正解4,680字に対して編集距離85（置換68、削除14、挿入3）である。
-0.5%以下には編集距離23以下、すなわち62文字以上の追加改善が必要となる。候補集合の
-参照位置oracleが0.5%を超える場合、選択器だけでは完了条件へ到達できないため、縦列の
-切り出し・2〜3倍拡大による部分再OCR、新しい認識器、または縦書き合成データによる
-追加学習へ進む。0.3%以下なら選択誤差の余裕があるため列単位アンサンブルを実装し、
-0.3〜0.5%は自動確定せずCodex確認を残したまま評価する。
-
-oracleは達成可能性を測る診断値であり、機械候補の公開合格値ではない。B-35を完了するには、
-実際の選択器出力が固定・holdout双方で通常散文加重CER 0.5%以下、ページ最大1.0%以下、
-列欠落0、固有名詞100%を満たす必要がある。Codex補正文は引き続き機械CERへ混ぜない。
-
-2026-08-01の固定20画面実測では、NDLOCR-Lite `7fd36cd` は通常散文CER 4.00%、
-固有名詞recall 93.39%で単独採用条件を満たさなかった。現行、YomiToku 0.12.0、
-NDLOCR-Liteの候補集合でも、通常散文のページ単位oracleは1.816%、参照位置oracleの
-miss rateは1.218%である。Tesseractを追加しても通常散文値は変わらなかったため、
-この候補集合だけを選択・投票する方式では0.5%へ到達できない。次は隔離YomiToku更新版を
-同じ固定画像で測り、なお不足する場合はPP-OCRv5と縦列切り出し・拡大再OCRへ進む。
-再現用のraw bbox、処理時間、候補別距離、oracle結果は
-`backend/data/kindle_capture/audits/2026-07-28-four-novel-series/b35-*.json` を正本とする。
-
-隔離YomiToku 0.14.0は20画面245.4秒、通常散文CER 3.74%、固有名詞recall 100%で、
-0.12.0より改善したが現行候補を上回らなかった。候補集合へ追加後も通常散文のページ単位
-oracle 1.816%、参照位置miss rate 1.218%は変わらない。PP-OCRv5 serverはWindows CPUで
-oneDNNを無効化して実行し、通常散文1画面で検出上限960 / 1920ともCER 59.04%、
-削除510字、約197秒で同一だった。この構成の全画面評価は停止し、PP-OCRv5は列存在の
-補助診断候補にも採用しない。以降は現行bboxから疑わしい縦列だけを切り出し、余白付き
-2〜3倍拡大で再OCRする局所方式を評価する。
-
-誤り操作の再分類では、通常散文85編集のうち59件が記号、うち56置換が全角 / 半角の
-`！ ? ( )` とダッシュ字形だけの差だった。上記評価正規化後の残差は29文字、約0.62%相当と
-なる。14削除は同一画面の連続した `！素晴らしい組み合わせですな` で、単一列または列断片の
-欠落と判断できる。この欠落を画像から回復した場合の残差は15文字、約0.32%となるため、
-B-35の次の主対象は全ページ再OCRではなく、文字量・列間隔・候補差分から連続欠落を検知して
-原画像の該当列を再認識する処理とする。正規化と欠落回復の寄与は別々に報告する。
-
-固定20画面では、primaryに対する`insert`差分のうち、4〜80文字、前後8文字以上の完全一致
-アンカー、独立候補2件以上の完全一致をすべて満たすgapだけを補う評価器を実装した。
-対象を`normal_prose`へ限定すると提案はページ60の1件だけとなり、3候補一致で
-`素晴らしい組み合わせですな!」`を補完した。通常散文の加重CERは0.342%、ページ最大は
-0.443%、固有名詞recallは100%となり、固定標本の通常散文ゲートを通過した。
-同じ規則を画像主体ページへ適用すると漢文の誤挿入が5件生じたため、`structured`、
-`image_only`、`mixed_illustration`、`full_width`へ自動適用してはならない。次の合格条件は、
-規則を変更せず3シリーズ以上・通常散文20画面以上の未調整holdoutで同じ閾値を満たすこと、
-および候補OCRがない場合は補完せずprimaryを保持することである。
-
-2026-08-01に調整前の既存Codex補正済みページから、4シリーズ・通常散文20画面・
-29,509字のholdoutを固定した。補正前primaryはCER 10.40%、external 5.05%、
-NDLOCR-Lite 3.61%、YomiToku 0.14.0 4.23%だった。固定標本で採用したgap consensusを
-無変更で適用しても9.80%であり、難例への汎化は確認できなかった。4候補のページ単位
-oracleは1.484%で0.5%を超える一方、参照文字位置の未回収率は0.285%だった。
-
-したがって、単一候補・ページ単位選択・primaryへの欠落挿入では完了不可だが、候補集合には
-目標達成に必要な文字の大半が存在する。次工程は列または文節単位の整列合議を評価し、
-ground truthを使わない選択器の実出力を測る。holdoutを参照して規則や閾値を変更した場合、
-この20画面は検証用から調整用へ移し、新たな3シリーズ以上・20画面以上を最終holdoutとして
-固定する。評価CLIはレポート先頭候補の`entry_id`集合へコーパスを限定し、固定標本と
-holdoutの混在を禁止する。保存済みQA候補は`qa-primary` / `qa-external`として読み出すが、
-`corrected_text`や公開正本を候補へ混入させない。
-
-候補本文だけでmedoidを選び、4候補を文字位置へ完全整列して、文字変更は2候補以上、削除は
-3候補以上、gap挿入は2候補以上を要求する保守的合議も評価した。固定20画面の通常散文は
-0.94%、holdoutは2.49%で、固定標本0.342% / holdout単体最良3.61%の中間に留まった。
-候補間で同じ系統誤りが多数派になるため、ground truth非参照の全文多数決を採用しない。
-次はページ全体ではなく、候補差が大きい列・文節だけを画像から再認識する。部分再OCRでも
-固定・調整用の双方で0.5%へ届かなければ、既存モデルの組合せによる自動確定を停止し、
-縦書き追加学習またはCodex画像QAを残す。
-
-Surya OCR 2の部分再OCRは、holdoutでページ単位oracleが最悪だったentry 32を対象に、
-NDLOCRの縦列bboxを4列・2列・1列単位で切り出して比較した。CERは順に31.69%、16.74%、
-17.49%で、ページ全体のSurya primary 27.58%や同ページ最良候補5.68%を安定して上回らない。
-4列では後半列、2列・1列でも一部列の出力切れが発生したため、Suryaへの列再入力を
-全件実行しない。PP-OCRv5とSuryaの双方で部分再OCRが不採用となったため、既存モデルの
-推論時加工だけによるB-35達成経路は閉じ、追加学習の実現性評価へ進む。
-
-#### PARSeq追加学習の安全境界（B-35 Phase 5g、2026-08-01）
-
-追加学習は、公式にLMDB学習・ONNX変換・`--rec-weights`差し替え手順がある
-NDLOCR-Lite PARSeqを対象とする。Surya OCR 2の旧fine-tune手順は流用せず、縦列bboxを
-検出できているDEIMv2も先に再学習しない。実測経緯と監査値の詳細は
-[小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md)を正本とする。
-
-学習データと実行には次のfail-closed規則を適用する。
-
-1. 学習用行画像は画像SHA、run、page、series、正解本文の出所を保持し、列境界に1字でも
-   挿入・欠落がある標本、対応が一意でない標本、5〜100字外の標本を除外する。
-2. train / validation / final holdoutはページでなくrun単位で分離する。同一画像SHAをsplit間へ
-   跨がせず、同一画像の異ラベル競合は原画像確認後にSHA全体を除外する。
-3. 最終holdoutは生成・学習・調整・選択から除外し、最終判定時に一度だけ開封する。現CLIは再開封を
-   機械拒否しないため、監査台帳と運用で強制し、監査JSONへ補正文・画像を保存しない。
-4. 配布ONNXからPyTorch重みを復元する場合、入力・ソース・文字集合・設定のSHAを固定し、全tensorの
-   一意対応、形状、有限値を検査する。ランダム入力と実画像で全位置top-1一致、最大logits誤差
-   `2.5e-2`以下、平均`1.25e-3`以下を満たさなければcheckpointを書き出さない。
-5. 全量学習は復元checkpointを初期値にし、別run validationのNEDが改善し完全一致率が非劣化の
-   checkpointだけをONNX変換へ渡す。LMDB容量は入力実バイト数から1.5倍以上、256 MiB以上、
-   64 MiB単位で算出する。
-6. ONNX変換はEOS早期終了をtraceへ固定せず、`max_length=100`の101 token固定wrapperを使う。
-   PyTorchとのtop-1同値性に合格するまで本番ONNXを変更しない。
-7. final holdout不合格時は同じholdoutで再調整せず、Codex画像QAと新しい未調整holdoutを残す。
-   `seed` / `benchmark`の再実行拒否は未実装なので、B-35完了前にfail closed化する。
-8. 列欠落はLevenshtein削除率だけで確定しない。bbox付き縦列候補が4列以上ある場合は、隣接列の
-   中央x間隔中央値に対する最大内部間隔が1.6倍以上であることも要求する。右端候補が20字以下なら
-   章見出しと本文の意図的な空白を避けるため最初の間隔を判定対象外にする。bboxがない候補は
-   fail closedで削除率だけの疑いを残す。
-9. 欠落列の再OCR候補は、既存bbox間隔から推定した列cropを診断用manifestへ出力する。画像内の
-   濃色画素が200未満のcropは白紙・罫線・UI片として除外し、自動で公開本文へ結合しない。
-   この閾値を開封済みholdoutで決めた結果は診断値とし、新しい未調整holdoutで再検証する。
-   `scripts/maintenance/generate_ndlocr_gap_crops.py`はground truth画像をSHA照合付きで取得できるが、
-   OCR QA・DB・公開本文は変更しない。
-
-2026-08-01の確定データは49,741行（train 45,861、validation 3,880）、禁止run・split間SHA重複
-0件である。全量学習は完全一致率67.2680%→89.4072%、NED 97.9581%→99.4649%へ改善した。
-checkpointとONNXのSHA、変換同値性監査は実装計画を正本とする。
-
-| 候補 | 通常散文加重CER | ページ最大CER | 列欠落疑い（bbox併用） | 判定 |
-|---|---:|---:|---:|---|
-| NDLOCR-Lite配布ONNX | 3.2843% | 38.5246% | 7画面 | 不合格 |
-| 追加学習ONNX | 2.6682% | 39.3443% | 4画面 | 不合格 |
-| 2候補ページ単位oracle | 2.6471% | - | - | 診断値のみ |
-
-追加学習は223画面中182画面を改善したが、参照文字位置oracleも未回収4,976字・1.5941%で、
-0.5%には少なくとも3,416字の新規回収が必要なため本番へ差し替えない。実欠落4画面と章見出し
-誤検知1画面を分離し、最悪の疎ページは5列検出済みの文字認識誤りと確定した。
-開封済みholdoutの診断では172 crop中36列・32画面を回復し、全画面改善・悪化0、CER
-2.6682%→2.2758%だった。再生成件数も一致したが、濃色画素200条件は同じholdoutで定めたため
-本番採用しない。残差は挿入3,158、置換2,238、削除1,708で、約物・仮名・漢字も改善対象とする。
-
-学習・評価未使用run 4 / 8 / 13の60画面を系列内事前検証へ予約し、候補差分が大きい19画面をCodex画像QA優先対象とするが、候補長や単一候補で自動確定しない。
-`--verify-queue`は優先集合だけを検査するため全60画面digestの不一致はSolへ戻す。正式判定では3シリーズ以上、固有名詞10語・50出現以上を画像SHAへ注釈する。
-未学習のrun 70 / 71は候補品質によらず各10画面を固定し、文字単位QA前のground truth登録・run承認・公開を禁止する。両候補が別々の列を欠落し得るため一致を正解保証にしない。
-
-固定20画面は原画像QA後にverified ground truthとし、候補支持付き固有名詞補正後もCER 0.398%、ページ最大1.647%、固有名詞277/278のため機械単独は`FAIL`とする。
-台帳は事前固定し、独立候補が支持する同長1文字置換だけを自動補正する。未解決近似等を原画像QAした補助込み候補は2シリーズ用ゲートに合格した。
-
-講談社タイガ版『虚構推理短編集』を加えた3シリーズ30画面・48,296字では、機械合議がCER 0.474%でもページ最大3.470%・固有名詞529/536で`FAIL`となった。候補距離6.04%の共通誤りを15%閾値が見逃したためSol省略条件から外し、原画像QA済み運用候補だけを0.000%・536/536の`PASS`として機械性能と分離する。詳細は技術知見9.21を正本とする。
-#### Codexモデル委任境界（Luna / Sol、2026-08-01）
-
-Codex補助QAは、低コスト・高スループット側の`gpt-5.6-luna`と、高精度側の
-`gpt-5.6-sol`を同じ権限で扱わない。モデル名や価格だけで委任先を決めず、
-**その出力が公開本文を確定・変更できるか**を境界にする。現時点ではLunaを
-主OCR、最終承認者、自動公開者にしない。
-
-| 作業 | Lunaへ委任 | Solへ昇格 | 自動確定 |
-|---|---|---|---|
-| 機械指標・候補差分の要約、QA優先順位付け | 可 | 形式不正・説明不能時 | 可。ただし原データは変更しない |
-| OCR候補と原画像の比較、修正案作成 | 可 | 1文字でも修正案あり、判読不能、候補間不一致時 | 不可 |
-| `page_type` / `layout_type`候補の説明 | 可 | `normal_prose`以外、または既存分類と不一致時 | 不可 |
-| 通常散文のゼロからの全文転記 | 予備候補のみ可 | 常に必要 | 不可 |
-| 全幅、本文＋挿絵、目次、漢文、広告等の難レイアウト | リスク列挙のみ可 | 常に必要 | 不可 |
-| 固有名詞・括弧・約物・心内語の確定 | 不可 | 常に必要 | 不可 |
-| `corrected_text`保存、run承認、FTS同期、公開 | 不可 | Solまたは人が原画像確認 | 不可 |
-
-Lunaが完結してよいのは、失敗しても公開本文・ページ種別・索引可否・承認状態を
-変更しない可逆的な補助作業だけである。Lunaの`no_change`判定も正解保証には使わず、
-現段階ではSol省略条件にしない。Lunaの提案は`selected_engine`や`corrected_text`へ
-直接書かず、入力画像SHA-256、候補本文SHA-256、モデル、reasoning effort、処理時間、
-提案差分、昇格理由を持つ監査用成果物として保存する。
-
-##### 代表画面での予備実測
-
-B-35の通常散文entry 9（正解918字、現行候補CER 1.96%）を使い、APIキーを設定せず
-ChatGPT認証の`codex exec --ephemeral --sandbox read-only`でLunaを評価した。
-
-| 条件 | CER | 削除 | 補足 |
-|---|---:|---:|---|
-| 低推論・原画像 | 8.39% | 53字 | 冒頭列を含む本文欠落 |
-| 中推論・本文領域切り出し | 1.63% | 4字 | 定型前置きを除外後。固有名詞は全件一致 |
-| 中推論・機械候補併用 | 1.20% | 2字 | 改善したが0.5%未達 |
-| 高推論・本文領域切り出し | 測定不能 | — | 4分でタイムアウトし、完成本文なし |
-
-これは固定20画面全体の比較ではなく、委任境界を決めるための代表1画面の予備試験である。
-最良条件でもB-35の通常散文0.5%とページ最大1.0%を満たさず、括弧を誤って変更する提案や、
-本文だけを要求しても説明を返す出力契約違反を確認した。したがって「現行OCRより改善する
-場合がある」ことは、Solまたは人の最終確認を省く根拠にならない。
-
-##### Luna実行の安全条件
-
-- `codex login status`が`Logged in using ChatGPT`であることを開始前に確認する。
-  `CODEX_API_KEY`、`OPENAI_API_KEY`、`CODEX_ACCESS_TOKEN`のいずれかが存在する場合は
-  fail closedとし、API課金へ自動フォールバックしない。
-- `gpt-5.6-luna`、`medium`、`--ephemeral`、`--sandbox read-only`を既定とする。
-  高推論は予備試験で4分を超えたため通常バッチに使わない。
-- 原画像全体をそのまま渡さず、原画像SHAを保持したまま本文領域を切り出す。
-  切り出し画像だけを監査正本にしない。
-- API応答はバイト列からUTF-8 JSONとして明示的に復号する。PowerShell
-  `Invoke-RestMethod`の既定復号へ依存すると、日本語候補をUTF-8として再保存した際に
-  二重文字化し得る。モデル投入前に候補文字列とSHAの往復一致を検査する。
-- 出力は構造化し、`no_change` / `propose_patch` / `escalate`、差分、根拠、入力SHAを必須にする。
-  自由文、前置き、入力SHA不一致、タイムアウト、終了コード非0、空出力はすべてSolへ昇格する。
-- 1冊あたりのLuna投入上限は初期5画面とし、対象は既存リスクフラグで絞る。
-  サブスクリプション利用枠はAPIトークン単価と同一視せず、CLIのreported tokens、処理時間、
-  成功率を監査記録へ残して上限を調整する。
-
-##### Sol省略を将来解禁する昇格ゲート
-
-Lunaの`no_change`だけでSolを省略してはならない。次の全条件を満たした版に限り、
-`normal_prose`かつ既存リスクフラグ0のページで、Sol確認を段階的に標本監査へ縮小できる。
-
-1. 固定20画面全体と、プロンプト調整に使わない3シリーズ以上・通常散文20画面以上の
-   holdoutで、通常散文加重CER 0.5%以下、ページ最大CER 1.0%以下を満たす。
-2. 列欠落疑い0、指定固有名詞再現率100%、無断の校正・要約・括弧変更0を満たす。
-3. 同一画面3回の反復試験で判定と差分が一致し、100画面連続試験で出力契約成功率99%以上、
-   タイムアウトと未回収プロセス0を満たす。
-4. 解禁初期はLuna完結ページの10%をSolで無作為監査する。重大な本文欠落、意味変更、
-   ページ種別誤りを1件でも検出したら、その版のSol省略を即時停止して全件昇格へ戻す。
-
-モデル更新、プロンプト変更、画像切り出し変更、CLI更新は別版として上記ゲートを再実行する。
-
----
-
-## OCRエンジン設計 (`YomitokuEngine`)
-
-**ファイル**: `D:\61.tool\common\ocr\ocr_engine.py`
-
-### yomitokuが返す構造（実測値）
-
-通常の縦書き小説ページでは `paragraphs` / `lines` は返らず、`words` のみ返る。
-
-```
-paragraphs: 0件
-lines:      0件
-words:     52件（本文列 約30件 + ルビ 約22件）
-```
-
-### wordsの分類
-
-| 種別 | width | height | aspect | 例 |
-|------|-------|--------|--------|-----|
-| 本文列 | 38-48px | 数百〜2000px超 | >10 | 「レティは礼を言い捨て...」（1列全体） |
-| ルビ/ふりがな | 18-33px | 27-152px | <6 | 「ぬし」「おおまた」 |
-
-- 本文の各列は**1つのwordとして丸ごと認識**される（断片化は通常起きない）
-- ルビ(18-33px)と本文(38-48px)の間に**明確なギャップ（34-37px）**が存在
-
-### フリガナ除去 (`filter_ruby_text`)
-
-ヒストグラムの「谷（valley）」を自動検出して閾値を決定する。
-
-```python
-# thickness = width（縦書きドキュメント前提で全word統一）
-# ヒストグラムの投票数0のビンを谷として検出
-threshold = _detect_valley_threshold(thicknesses)
-# 谷が検出できない場合は median * 0.88 にフォールバック
-```
-
-**実データでの効果**: ルビ(18-33px)と本文(38-48px)の間のギャップ(34-37px)を自動検出し、ルビを確実に除去。
-
-### テキスト断片化対策 (`_merge_text_fragments`)
-
-通常は断片化が起きないため、aspect比で判定してからマージを実行する。
-
-```python
-long_col_count = sum(1 for w in filtered if w['aspect'] > 10)  # 本文列
-fragment_count = sum(1 for w in filtered if w['aspect'] < 8)   # 断片
-if fragment_count > long_col_count:
-    filtered = self._merge_text_fragments(filtered)  # Xビン分割方式
-```
-
-### テキスト正規化 (`normalize_text`)
-
-OCR出力に含まれる記号を日本語の正式な記号に変換する。
-
-| 入力 | 変換後 |
+1. PNGが復号でき、`001.png`から欠番のない連番であること。
+2. `div[data-label][data-bbox]` が解析でき、bboxが正規化座標0〜1000内であること。
+3. ページOCRがlayout JSONを返した場合はタスク種別ドリフトとして検出し、layout→block経路へ
+   切り替える。block OCRが再びlayout JSONを返す候補は本文として保存しない。
+4. 局所エッジから得た文字候補をbboxが既定割合以上覆うこと。暗画素数だけでは判定しない。
+5. 20文字以上の正規化block完全重複、12〜80文字の同一列4回以上連続、本文6,000文字超を
+   反復・幻覚候補として不合格にする。
+6. 非空出力に解析可能blockがなければ `malformed_output` とし、その候補のSurya再試行を止める。
+7. 空白または非本文blockだけのページは本文ゼロを許容し、理由をflagへ残す。
+8. 全候補不合格なら原画像のbbox単位block OCRを1回行う。最終不合格は `failed` とし公開しない。
+9. 構造化ページの装飾coverage不足と、256文字以下の疎ページには限定例外を認めるが、
+   監査flagとyomitoku照合を必須にする。不正bbox、重複、空本文は例外にしない。
+
+confidenceは補助情報であり、列・文章欠落を直接表さない。yomitokuは最低値だけでなく中央値、
+文字数加重平均、低confidence文字比率、構造、候補一致率を併用する。
+
+## 3. 入力完全性と画面番号
+
+- `ocr_page_results.page_no`、`pages.page_no`、検索結果はPNG由来のキャプチャ画面番号を正とする。
+- Kindle紙面ページ番号はリフローにより画面送りと一致しない。紙面ページ番号として表示しない。
+- 正式書籍だけを `kindle_novel/images/{書籍名}/` に置き、診断・中断画像は外へ分離する。
+- OCR投入前に連番、復号、同一解像度、SHA完全重複、白紙候補、先頭・中間・末尾、Kindle終端を
+  確認する。重複・白紙候補は数値だけで削除しない。
+- 過去runの画面数や紙面ページ数を期待撮影画面数へ流用しない。
+- `capture_state=captured`、`ocr_done_at`、`indexed_at`、OCR run状態は別の完了条件である。
+- 範囲限定作業では `POST /api/ocr/run` に対象を明示し、1冊ずつ直列投入する。
+- 既存版と再撮影版が併存する場合、旧画像・旧OCR・DBを検証付きバックアップへ退避し、
+  新版だけを運用対象にする。旧版は復旧専用で保持する。
+
+## 4. ステージング、QA、公開
+
+OCR完了と公開承認を分離する。全ページ処理後はまず `awaiting_qa` へ遷移し、次を確認する。
+
+- 前付、品質flag付きページ、各書籍の先頭・中間・終盤本文、挿絵混在、固有名詞を含むページ
+- ページ種別 `narrative` / `toc` / `illustration` / `colophon_or_ad`
+- layout種別 `normal_prose` / `structured` / `mixed_illustration` / `full_width` / `image_only`
+- 本編後の第2書名・目次・人物紹介・試し読み境界、反復、UI混入、候補間の大幅な文字量差
+
+公開時の不変条件は次のとおり。
+
+1. QA未承認runは `books` / `pages` / `pages_fts` / LanceDBを変更しない。
+2. `corrected_text`が非空なら `selected_engine=codex` を同じQA更新で保存する。
+3. `required` / `rejected` / 未知のQA状態が残るrunは公開しない。
+4. 公開本文、FTS、`books.ocr_done_at` は同一公開処理で整合させる。
+5. 公開修復前にSQLite Online Backupを取得し、失敗時は旧公開本文と索引を保持する。
+6. raw候補、補正文、入力画像SHA、model revision、承認者・日時を監査可能に保つ。
+
+## 5. 正解コーパスとB-35品質ゲート
+
+正解コーパスは原画像から人手または画像照合担当が転記し、`draft` と `verified` を分ける。
+OCR候補のコピー、公開本文、`corrected_text`自身を独立した機械性能の正解として扱わない。
+画像SHAが一致しないentryは評価対象にしない。
+
+### 機械ゲートの意味
+
+| ゲート | 意味 |
 |---|---|
-| `......` `........` (ASCII `.` 連続) | `……` `………` |
-| `·····` (中黒 U+00B7 連続) | `……` |
-| `--` `––` (ハイフン連続) | `——` |
+| コーパス構成 | 最低entry数、文字数、ページ種別・layout別標本が揃っている |
+| 加重CER | 通常散文全体の文字誤り率が基準以内 |
+| ページ最大CER | 一部ページの大幅劣化が平均に隠れていない |
+| 列欠落疑い | 削除量・削除率・bbox列間隔の複合判定で疑いが0 |
+| 固有名詞 | 画像SHAへ固定した語と出現回数が完全再現される |
 
----
+閾値は `scripts/maintenance/ocr_quality_policy.json` だけから読み込む。
+`benchmark_ocr_ground_truth.py --fail-on-gate` は項目別実測・閾値・未達entryをJSONへ保存し、
+全合格0、品質未達1を返す。機械候補とCodex補助後の運用品質は別レポートにする。
 
-## 既知の制限・残課題
+比較器は次の責務へ分割する。旧 `benchmark_ocr_ground_truth.py` はCLIと既存の動的importを
+維持するfacadeであり、引数、JSON schemaとキー順、stdout、終了コードを変更しない。
 
-### 認識精度起因の問題（後処理では解決困難）
+| module | 責務 |
+|---|---|
+| `ocr_benchmark_cli.py` | 引数解析、engine dispatch、report保存、終了コード |
+| `ocr_benchmark_engines.py` | corpus/QA I/O、Tesseract、yomitoku、NDLOCR adapter |
+| `ocr_benchmark_columns.py` | Paddle・Suryaの列単位adapter |
+| `ocr_benchmark_text.py` | NFKC等の評価正規化、CER、編集操作 |
+| `ocr_benchmark_report.py` | corpus選択、ページ・group集計、stdout summary |
+| `ocr_benchmark_gate.py` | policy schema検査、複合gate、列欠落、固有名詞判定 |
 
-- `score=0.00〜0.07` の低信頼度列は文字化けが発生する → yomitokuモデル自体の認識限界
-- GPU環境での再処理で改善する可能性あり
-- イタリック体・心内語の認識精度が低い
+### B-35固有の正式holdout
 
-### 未検証: 他書籍でのルビ除去精度
+B-35の完了判定には、調整に使わない3シリーズ以上・通常散文20画面以上、固有名詞10語・
+50出現以上、候補品質を見ない事前選定、全画像SHA・選定manifest・QAパッケージdigest固定、
+一度だけの開封を要求する。holdoutを見て規則や閾値を変えた場合は調整用へ降格し、新しい
+未調整holdoutを用意する。
 
-- ルビと本文の幅差が小さい書籍
-- ルビなしのページ（全件が本文 → フィルタで誤除去されないか）
+ただし2026-08-10時点で、汎用品質policyはシリーズ数を持たず、`seed` / `benchmark` は
+開封済みholdoutの再利用を拒否せず、`--verify-queue`も全パッケージdigestを常に検査しない。
+したがって上記はまだ完全な機械強制契約ではない。実装計画のfail-closed化が完了するまで、
+B-35、自動公開、Codex最終確認省略を完了扱いにしない。
 
----
+### 評価値の非代替性
 
-## GPU環境について
+- oracleは候補集合の到達可能性を測る診断値で、実際の選択器や公開候補の合格値ではない。
+- 行認識モデルのvalidation、ONNX同値性、候補間一致、候補距離はページ品質を代替しない。
+- Codex画像QA済み本文を同じground truthと比較した0%は正解化実績で、未知ページ性能ではない。
+- QA・公開不変条件の検査はB-35のCERゲートで代替できず、逆も同様である。
 
-GPU（CUDA）を使用するとOCR処理速度が大幅に向上する。
-セットアップ手順: [GPU環境セットアップ.md](../../環境構築/GPU環境セットアップ.md)
+## 6. Codex補助QAの委任境界
 
----
+Lunaは公開状態を変えない読み取り専用補助に限定する。モデル名や速度ではなく、出力が
+公開本文を確定・変更できるかで境界を決める。
 
-設計過程・削除済み SearchablePDF 設計は [凍結記録](../../../archive/OCR_旧SearchablePDF設計.md) を参照。
+| 作業 | Luna | Solまたは人 | 自動確定 |
+|---|---|---|---|
+| 指標・候補差分の要約、QA優先順位 | 可 | 形式不正・説明不能時 | 原データ非変更なら可 |
+| OCR候補と原画像の比較、修正案 | 提案のみ | 修正案・不一致があれば必須 | 不可 |
+| ページ・layout分類候補 | 説明のみ | 非通常散文・不一致時に必須 | 不可 |
+| 全文転記、難layout、固有名詞・約物確定 | 不可または予備候補のみ | 必須 | 不可 |
+| `corrected_text`、run承認、FTS同期、公開 | 不可 | 原画像確認後のみ | 不可 |
+
+Luna出力は入力画像SHA、候補本文SHA、モデル、推論設定、処理時間、差分、昇格理由を持つ
+監査成果物として保存し、本文DBへ直接書かない。自由文、SHA不一致、timeout、非0終了、空出力は
+Solへ昇格する。モデル・prompt・画像切り出し・CLIが変われば別版として再評価する。
+
+Sol確認の縮小は、固定コーパスと正式holdoutの全ゲート、同一画面3回の反復、100画面の
+出力契約成功率99%以上を満たした版だけで検討する。解禁初期は10%を無作為監査し、重大な
+欠落・意味変更・分類誤り1件で全件確認へ戻す。
+
+## 7. `YomitokuEngine`
+
+通常の縦書き小説ページでは `paragraphs` / `lines` ではなく `words` が返り、本文列は
+幅38〜48pxの長いword、ルビは幅18〜33pxの短いwordになる実測がある。
+
+### ルビ除去
+
+word幅ヒストグラムの谷を自動検出し、谷がない場合はmedian比へfallbackする。
+本文とルビの幅分布が近い書籍では誤除去の可能性があるため、他書籍での回帰を残す。
+
+### 断片結合
+
+長い本文列より短い断片が多い場合だけ、X位置のbinへ分けて断片を結合する。
+通常ページで無条件に結合しない。
+
+### 正規化
+
+ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフンをダッシュへ正規化する。
+評価用正規化と公開本文の校正を混同せず、意味や括弧種別を自動変更しない。
+
+## 8. 既知の制限
+
+- 低confidence列、イタリック、心内語は認識精度が低い。
+- ルビと本文の幅差が小さい書籍、ルビなしページの除去精度は未検証である。
+- 両候補が同じ列・固有名詞を誤る場合、候補比較だけでは検出できない。
+- B-35正式holdoutのfail-closed強制が未実装である。
+
+GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
+Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は
+[凍結記録](../../../archive/OCR_旧SearchablePDF設計.md) を参照する。

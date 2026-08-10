@@ -1,6 +1,6 @@
 # Kindle 購入カタログ設計
 
-> status: living | last-verified: 2026-07-31
+> status: living | last-verified: 2026-08-10
 
 ## 1. 目的と境界
 
@@ -47,6 +47,19 @@ schema管理と実行時accessの分離を採用する。
 
 Kindle Info はカタログに存在する ASIN だけを更新し、Info 側だけに存在する ASIN から書籍を新規作成しない。ジャンルは対象 ASIN 単位で置換し、著者・取得日・巻数は既存値を優先して補完する。シリーズ自動購入 JSON は Amazon 側で解除された購読を残さないよう、ファイル変更時に全量置換する。
 
+注文、Kindle Info、自動購入の各取込は`import_run_lifecycle.py`を共通のrun履歴境界とする。
+開始時に`running`行を作成し、成功時はfiles/records/skippedを同じcolumnへ確定する。
+例外時は元の例外を再送出する前に`failed`、終了時刻、error messageを記録する。
+各parserとupsertはrun lifecycleを直接更新せず、取込結果の件数だけを返す。
+Kindle Infoのsource発見・CSV decode・digest・取込済み判定は`enrichment_files.py`、
+既存ASINだけを対象とするsource別upsertは`kindle_info_importer.py`、自動購入のparse・
+series解決・全量置換は`autobuy_importer.py`が所有する。`enrichment_imports.py`は既存API用facadeとする。
+
+旧DB移行は通常の注文・Kindle Info・自動購入importerから参照しない。
+設定有無の表示は軽量な`legacy_source_status.py`が担当し、破壊的なpreview/commit実装は
+専用API呼び出し時だけ`legacy_migration.py`を遅延importする。撤去判断までは同moduleと
+既存APIを読み取り可能に維持する。
+
 パーサは未知列を無視し、注文系 CSV の必須列欠落時はファイル全体を失敗にする。カード番号や支払手段は保存しない。
 
 ## 5. 一覧・検索
@@ -61,6 +74,14 @@ Kindle Info はカタログに存在する ASIN だけを更新し、Info 側だ
 
 ## 7. キャプチャ連携
 
+本節をLinux backend、Windows capture agent、シリーズ実行scriptをまたぐjob契約の正本とする。
+Windows UI Automation、撮影矩形、ページ送り、package生成の内部設計は
+[`kindle-pdf/docs/detailed_design.md`](../../../../kindle-pdf/docs/detailed_design.md)を参照する。
+利用者から見た開始・停止・再実行条件は
+[Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)を正とする。
+
+### 7.1 job状態と所有権
+
 画面から作成した `capture_jobs` は Linux DB が正本となる。Windows エージェントは 1 件ずつ claim し、claim 応答の `identity`（ASIN、正式・正規化タイトル、著者、シリーズ、巻）を使って対象書籍を照合する。
 
 状態遷移は `queued → claimed → locating_book → downloading（必要時）→ positioning → capturing → awaiting_files → succeeded` とし、各実行状態から `failed` へ遷移できる。既存 Windows エージェントとの段階導入互換性のため、`claimed → waiting_user → capturing` も読み書き可能な旧経路として維持する。
@@ -74,9 +95,9 @@ Linux は `.ready` だけを検証し、安全な相対パス、許可拡張子�
 version 2 manifest のjob identity、SHA-256、画像復号・寸法・連番を実ファイルから再計算し、
 撮影完了証跡、撮影前カナリア、登録前画像QAは形式と内部整合を検証してから正式配置する。
 終端観測フレームとカナリア画像はpackageに含めないため、意味判定はWindows側で行う。
-Windows側の合否だけを信用せず、証跡欠落・不一致・blocking候補ありの場合は正式画像領域とDBを更新しない。
+Windows側の合否だけを信用せず、証跡欠落・不一致・blocking候補ありの場合は正式画像領域とDBを更新しない。登録は `awaiting_files` かつclaimしたagent所有のjobだけに許可し、正式画像の置換と `succeeded` 更新を同じ完了処理で確定する。失敗時は既存の正式画像とDBを保持する。
 
-現行 Windows agent は自動工程を使用し、起動済み Kindle アプリへの接続、ASIN付きカードの一意照合、未ダウンロード待機、先頭移動、全画面撮影、Samba転送、正式登録までを 1 冊ずつ直列実行する。検索欄はIME依存のキーボード入力を使わず、UI Automationの`ValuePattern.SetValue`で半角ASINへ全置換し、読み戻し完全一致後だけASIN付きカードを探索する。旧 `waiting_user` は後方互換契約として残すが、現行 agent は使用しない。詳細は [Kindle 自動撮影取込 要件](../../要件定義/Kindle自動撮影取込_要件.md)と[完了記録](../../../archive/Kindle自動撮影取込_実装計画.md)を参照する。
+現行Windows agentは、起動済みKindleへの接続、ASINの一意照合、必要時のdownload、位置決め、撮影、転送、登録を1冊ずつ直列実行する。旧 `waiting_user` は後方互換契約として読み書き可能に残すが、現行agentは使用しない。内部の入力方式やUI control識別を横断契約に含めない。
 
 撮影後・共有前に件数を検証し、`expected_screens`指定時は指定件数、未指定時は
 小説50画面・漫画10画面を最低件数とする。未満なら`capture_incomplete`として
@@ -89,6 +110,35 @@ Windows側の合否だけを信用せず、証跡欠落・不一致・blocking�
 `repeated_screen_overlay_candidate` warningとしてversion 2 manifestへ残す。
 完全重複、低容量、白紙・疎な画面、隣接dHash近似重複、小説上下端の内容密度は
 誤検知校正中のためwarningに留め、自動削除や登録拒否には使用しない。
+
+### 7.2 シリーズ直列実行
+
+`scripts/capture_kindle_series.py` は購入カタログAPIだけを正本として、対象を巻順に並べ、
+常に1冊分のjobだけを作成する。APIもjob作成transaction内で全source・全ASINの未完了jobを
+最大1件に制限する。jobが `succeeded` になり、対象ASINの `capture_state=captured` を
+再取得できた場合だけ次へ進む。`failed`、監視timeout、API不整合、割り込み、登録状態不一致では
+後続jobを作成しない。監視側の停止は実行中jobを暗黙にcancelしない。
+
+`capture_kindle_series.py`は旧CLI・import pathを保つfacadeとし、実装責務を次へ分ける。
+
+- `kindle_series_inventory.py`: catalog itemの絞り込み、source・巻数決定、並び順。
+- `kindle_series_session.py`: manifest digest、session state、atomic永続化、breaker。
+- `kindle_series_orchestrator.py`: 1冊ずつのjob作成・監視・限定復旧・登録確認。
+- `kindle_series_http.py`: 購入カタログAPI transport。
+- `kindle_series_cli.py`: 引数検証、依存組み立て、exit code変換。
+
+orchestratorはHTTP実装へ依存せず`CaptureApi` protocolだけを参照する。session breakerは
+job作成前に検査し、inventory・CLI・HTTP adapterからKindle UIを直接操作しない。
+
+既定はdry-runで、実行には `--apply` とsession stateを要求する。stateは対象manifest digest、
+完了ASIN、復旧回数、停止理由をatomic置換JSONへ保存し、既存stateは `--resume-session` を
+明示した場合だけ、同じmanifestかつrunning状態で再開する。
+
+Kindle processの自動復旧は `--recover-kindle-crash` 指定時だけ許可する。撮影開始前・撮影枚数0・
+process消失・許可error codeを同時に満たし、再起動後に同一ASINを一意照合でき、他の未完了jobが
+ない場合だけ、新しいjobを最大1回作る。processが残るUI不調、download・位置決め・撮影・転送・
+登録失敗では復旧せずfail closedとする。現行runnerはerror種別にかかわらず1冊目の失敗で停止し、
+連続download失敗を跨いだ自動継続は行わない。
 
 ## 8. セキュリティ・障害時挙動
 
