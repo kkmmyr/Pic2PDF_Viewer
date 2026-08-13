@@ -1,6 +1,6 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-07-28
+> status: living | last-verified: 2026-08-13
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
@@ -145,13 +145,18 @@ OwlOCR、ABBYY FineReader、Prizmo 等を本番主系とは独立した第二 OC
 
 ## 将来のローカルLLM推論ホスト利用
 
-M1 Max 64GBを小説RAGのLLM推論ホストとして使う案は計画中であり、
-現時点の本番構成ではない。採否は、現行Qwen3.6-35B-A3B、Qwen3.6-27B Dense、
-Gemma 4-31Bを同じ10巻入力で比較して決める。
+M1 Max 64GBを小説RAGのLLM推論ホストとして使う案は比較中であり、現時点の本番構成ではない。
+候補は現行Qwen3.6-35B-A3B、Qwen3.6-27B Dense、Gemma 4-31B、Muse Glimmer 30Bである。
+2026-08-13の初回比較では、Qwenをローカル系統の主生成器として維持し、Museを短い根拠窓の
+高リスク主張に対する任意の第二検証候補とした。公開成果物の主生成はADR-0018のSol段階移行を優先する。
 
 - Macから本番DBを直接開かない。
 - 推論APIをLANへ無認証公開しない。Linux本番へのSSH reverse tunnelを使う。
 - 比較中の生成物は公開せず、監査スナップショットと全文差分を保存する。
+- QwenとMuseは64GBへ同時常駐できても同時生成しない。Qwenを停止してからMuseを起動し、
+  Muse検証後に停止する。131,072 contextの同時常駐は空き約7%のため通常運用にしない。
+- MuseのOllama登録は残すが、Ollama 0.30.11はvision projector非対応で推論できない。
+  比較時だけ言語GGUFをHomebrew版`llama-server`へ渡し、`127.0.0.1`限定で起動する。
 - Mac停止やモデル不採用時はWindowsの現行推論環境へ戻す。
 - Kindle撮影、OCR、検索索引構築はMac移行と独立して継続する。
 
