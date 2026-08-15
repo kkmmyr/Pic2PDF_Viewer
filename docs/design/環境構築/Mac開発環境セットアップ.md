@@ -1,6 +1,6 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-08-13
+> status: living | last-verified: 2026-08-15
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
@@ -146,17 +146,30 @@ OwlOCR、ABBYY FineReader、Prizmo 等を本番主系とは独立した第二 OC
 ## 将来のローカルLLM推論ホスト利用
 
 M1 Max 64GBを小説RAGのLLM推論ホストとして使う案は比較中であり、現時点の本番構成ではない。
-候補は現行Qwen3.6-35B-A3B、Qwen3.6-27B Dense、Gemma 4-31B、Muse Glimmer 30Bである。
-2026-08-13の初回比較では、Qwenをローカル系統の主生成器として維持し、Museを短い根拠窓の
-高リスク主張に対する任意の第二検証候補とした。公開成果物の主生成はADR-0018のSol段階移行を優先する。
+候補はQwen3.8-27B Dense、現行Qwen3.6-35B-A3B、Qwen3.6-27B Dense、Gemma 4-31B、
+Muse Glimmer 30B、Nemotron 3.5 Lightning 30B-A3Bである。2026-08-15までの初回比較では、
+Qwen3.8を現行Qwen3.6の自動置換にせず、Qwen3.6をローカル系統の主生成器として維持する。
+Museは短い根拠窓の高リスク主張に対する任意の第二検証候補とする。
+Nemotronは短窓thinkingだけ合格したが、長文事実抽出の話者・場面・ページ根拠・人物名で不合格となり、
+巻全体へ拡大していない。公開成果物の主生成はADR-0018のSol段階移行を優先する。
 
 - Macから本番DBを直接開かない。
 - 推論APIをLANへ無認証公開しない。Linux本番へのSSH reverse tunnelを使う。
 - 比較中の生成物は公開せず、監査スナップショットと全文差分を保存する。
 - QwenとMuseは64GBへ同時常駐できても同時生成しない。Qwenを停止してからMuseを起動し、
   Muse検証後に停止する。131,072 contextの同時常駐は空き約7%のため通常運用にしない。
-- MuseのOllama登録は残すが、Ollama 0.30.11はvision projector非対応で推論できない。
+- Museの初回試験時のOllama 0.30.11はvision projector非対応で推論できなかった。
   比較時だけ言語GGUFをHomebrew版`llama-server`へ渡し、`127.0.0.1`限定で起動する。
+- Nemotron導入時にHomebrew Ollamaを0.32.9へ更新し、Qwen3.8の必須runtimeに合わせて
+  0.32.12へ更新済みである。Nemotronの公式Q4_K_Mは25GB、
+  32,768 contextで空きメモリ54%、swap 0だったが、比較用登録に留め、本番設定へ配線しない。
+  Muse projectorの更新後runtime上の再試験は未実施なので、Museの運用経路は変更しない。
+- Qwen3.8は`qwen3.8:27b`、Q4_K_M、17GB、context 262,144で追加登録済みである。
+  10巻の同一プロンプトと`think=false`でQwen3.6と比較したが、完成要約に主体誤り、
+  最終合意の欠落、途中切れが残った。人物事実抽出の反復崩壊は減ったが、巻全体は
+  Qwen3.6の約31分22秒に対し約97分12秒だった。比較用登録に留め、本番既定値へ配線しない。
+  途中切れに出力・context上限到達が含まれるため、完全不採用ではなく設定再評価待ちとする。
+  保存済み事実表に対する局所A/Bのみ実行し、合格条件だけを巻全体へ拡大する。
 - Mac停止やモデル不採用時はWindowsの現行推論環境へ戻す。
 - Kindle撮影、OCR、検索索引構築はMac移行と独立して継続する。
 
