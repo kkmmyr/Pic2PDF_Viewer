@@ -34,9 +34,9 @@ export function BookCardShell({
             className={`relative flex h-full flex-col overflow-hidden rounded-lg border-2 shadow-md transition-shadow hover:shadow-lg ${TONE_CLASS[tone]}`}
         >
             {cover}
-            <div className="flex flex-1 flex-col gap-2 p-3">
+            <div className="flex flex-1 flex-col gap-1.5 p-2.5">
                 <h3
-                    className={`line-clamp-2 text-sm font-semibold ${tone === 'group' ? 'text-accent-700 dark:text-accent-300' : 'text-gray-900 dark:text-gray-100'}`}
+                    className={`line-clamp-2 text-sm font-semibold leading-snug ${tone === 'group' ? 'text-accent-700 dark:text-accent-300' : 'text-gray-900 dark:text-gray-100'}`}
                     title={displayTitle}
                 >
                     {displayTitle}
@@ -45,7 +45,7 @@ export function BookCardShell({
                 {meta}
                 {summary}
                 {footer && (
-                    <div className="mt-auto flex min-h-11 items-center border-t border-gray-200 pt-2 dark:border-gray-700">
+                    <div className="mt-auto flex min-h-11 items-center border-t border-gray-200 pt-1 dark:border-gray-700">
                         {footer}
                     </div>
                 )}

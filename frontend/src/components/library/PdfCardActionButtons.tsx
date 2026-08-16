@@ -4,6 +4,7 @@ import { PdfCardActionsMenu } from '@/components/library/PdfCardActionsMenu';
 
 interface PdfCardActionButtonsProps {
     name: string;
+    createdAtLabel: string;
     isSelectionMode: boolean;
     showHidden: boolean;
     isGroup: boolean;
@@ -16,6 +17,7 @@ interface PdfCardActionButtonsProps {
 
 export function PdfCardActionButtons({
     name,
+    createdAtLabel,
     isSelectionMode,
     showHidden,
     isGroup,
@@ -26,8 +28,15 @@ export function PdfCardActionButtons({
     onEditSeries,
 }: PdfCardActionButtonsProps) {
     return (
-        <div className="flex w-full flex-wrap items-center justify-between gap-2">
-            <div>{!isGroup && readState && <ReadStatePill state={readState} />}</div>
+        <div
+            role="group"
+            aria-label={`${name.replace(/\.pdf$/i, '')} の補助情報と操作`}
+            className="flex w-full min-w-0 flex-nowrap items-center gap-1.5"
+        >
+            <span className="min-w-0 flex-1 truncate text-[11px] text-gray-500 dark:text-gray-400">
+                {createdAtLabel}
+            </span>
+            {!isGroup && readState && <ReadStatePill state={readState} />}
             {!isSelectionMode && (
                 <PdfCardActionsMenu
                     name={name}

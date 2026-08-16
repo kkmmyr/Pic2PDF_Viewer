@@ -49,18 +49,18 @@ export default function BookCard({ book, onOpenDetail, onEdit }: Props) {
             meta={<BookMetaList book={book} variant="card" />}
             summary={
                 book.catalog_summary ? (
-                    <div className="border-t border-gray-100 dark:border-gray-700 pt-2">
-                        <p className="mb-1 text-[11px] font-semibold text-gray-600 dark:text-gray-300">
+                    <div className="border-t border-gray-100 pt-1.5 dark:border-gray-700">
+                        <p className="mb-0.5 text-[11px] font-semibold text-gray-600 dark:text-gray-300">
                             短い要約
                         </p>
-                        <p className="line-clamp-4 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
+                        <p className="line-clamp-4 text-xs leading-normal text-gray-700 dark:text-gray-300">
                             {book.catalog_summary}
                         </p>
                     </div>
                 ) : undefined
             }
             footer={
-                <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <div className="flex w-full flex-nowrap items-center gap-1.5">
                     <ReadStatePill state={book.read_state} />
                     <div className="ml-auto flex items-center gap-1">
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-700 dark:text-gray-300">

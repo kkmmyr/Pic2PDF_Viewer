@@ -21,13 +21,13 @@ export default function BookMetaList({ book, variant = 'detail' }: BookMetaListP
         return (
             <>
                 {(book.series_id || book.volume != null) && (
-                    <p className="line-clamp-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+                    <p className="line-clamp-1 text-xs font-medium leading-tight text-gray-600 dark:text-gray-300">
                         {book.series_title ?? book.series_id}
                         {book.volume != null ? ` ${book.volume}巻` : ''}
                     </p>
                 )}
                 {book.publisher && (
-                    <p className="line-clamp-1 text-xs text-gray-600 dark:text-gray-300">
+                    <p className="line-clamp-1 text-xs leading-tight text-gray-600 dark:text-gray-300">
                         {book.publisher}
                     </p>
                 )}

@@ -50,10 +50,10 @@ describe('BookCard', () => {
     });
 
     it('読書状態を日本語で表示する', () => {
-        const { getByText, rerender } = render(
+        const { getByLabelText, rerender } = render(
             <BookCard book={BASE_BOOK} onOpenDetail={vi.fn()} onEdit={vi.fn()} />,
         );
-        expect(getByText('未読')).toBeInTheDocument();
+        expect(getByLabelText('未読')).toBeInTheDocument();
 
         rerender(
             <BookCard
@@ -62,7 +62,7 @@ describe('BookCard', () => {
                 onEdit={vi.fn()}
             />,
         );
-        expect(getByText('読書中')).toBeInTheDocument();
+        expect(getByLabelText('読書中')).toBeInTheDocument();
     });
 
     it('編集ボタンは書籍名を含む名前を持ち、クリックで対象書籍を渡す', () => {

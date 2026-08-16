@@ -102,7 +102,7 @@ export function PdfCard({
                                 <button
                                     key={author}
                                     type="button"
-                                    className="inline-flex min-h-11 max-w-full items-center rounded-md bg-primary-50 px-2 text-left text-xs font-medium text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 dark:bg-primary-900/30 dark:text-primary-200 dark:hover:bg-primary-800/50"
+                                    className="inline-flex min-h-8 max-w-full items-center rounded-md bg-primary-50 px-2 text-left text-xs font-medium text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 dark:bg-primary-900/30 dark:text-primary-200 dark:hover:bg-primary-800/50"
                                     onClick={() => onAuthorClick(author)}
                                     title={`「${author}」で絞り込む`}
                                     aria-label={`作者「${author}」で絞り込む`}
@@ -121,14 +121,10 @@ export function PdfCard({
                     </div>
                 ) : undefined
             }
-            meta={
-                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                    {formatTimestampJa(pdf.created_at)}
-                </p>
-            }
             footer={
                 <PdfCardActionButtons
                     name={pdf.name}
+                    createdAtLabel={formatTimestampJa(pdf.created_at)}
                     isSelectionMode={isSelectionMode}
                     showHidden={showHidden}
                     isGroup={isGroup}

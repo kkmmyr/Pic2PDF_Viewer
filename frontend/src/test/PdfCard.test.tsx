@@ -64,27 +64,27 @@ describe('PdfCard', () => {
     });
 
     it('readState="unread" で 未読バッジを表示', () => {
-        const { getByText } = render(<PdfCard {...baseProps} readState="unread" />);
-        expect(getByText('未読')).toBeInTheDocument();
+        const { getByLabelText } = render(<PdfCard {...baseProps} readState="unread" />);
+        expect(getByLabelText('未読')).toBeInTheDocument();
     });
 
     it('readState="reading" で 読書中 バッジを表示', () => {
-        const { getByText } = render(<PdfCard {...baseProps} readState="reading" />);
-        expect(getByText('読書中')).toBeInTheDocument();
+        const { getByLabelText } = render(<PdfCard {...baseProps} readState="reading" />);
+        expect(getByLabelText('読書中')).toHaveClass('bg-accent-100');
     });
 
     it('readState="done" で 読了 バッジを表示', () => {
-        const { getByText } = render(<PdfCard {...baseProps} readState="done" />);
-        expect(getByText('読了')).toBeInTheDocument();
+        const { getByLabelText } = render(<PdfCard {...baseProps} readState="done" />);
+        expect(getByLabelText('読了')).toBeInTheDocument();
     });
 
     it('集約カード (isGroup=true) では readState バッジは表示されない', () => {
         const badge: PdfCardBadge = { count: 3, kind: 'series', displayTitle: 'シリーズX' };
-        const { queryByText } = render(
+        const { queryByLabelText } = render(
             <PdfCard {...baseProps} isGroup badge={badge} readState="unread" />,
         );
-        expect(queryByText('未読')).toBeNull();
-        expect(queryByText('読書中')).toBeNull();
+        expect(queryByLabelText('未読')).toBeNull();
+        expect(queryByLabelText('読書中')).toBeNull();
     });
 
     it('isSelected で amber の枠線スタイルが付く', () => {
@@ -110,6 +110,19 @@ describe('PdfCard', () => {
         const { container } = render(<PdfCard {...baseProps} pdf={pdfWithDate} />);
         // formatTimestampJa の出力は OS ロケール依存だが、'2023' を含む可能性が高い
         expect(container.textContent).toMatch(/2023|2024/);
+    });
+
+    it('登録日・読書状態・操作を折り返さない同じ行に表示する', () => {
+        const pdfWithDate: PdfFile = { name: 'a.pdf', thumbnail: null, created_at: 1700000000 };
+        const { getByLabelText, getByRole } = render(
+            <PdfCard {...baseProps} pdf={pdfWithDate} readState="reading" onRename={vi.fn()} />,
+        );
+
+        const footerRow = getByRole('group', { name: 'a の補助情報と操作' });
+        expect(footerRow.className).toContain('flex-nowrap');
+        expect(footerRow.textContent).toMatch(/2023|2024/);
+        expect(footerRow).toContainElement(getByLabelText('読書中'));
+        expect(getByRole('button', { name: 'a の操作を開く' })).toBeInTheDocument();
     });
 
     it('表紙は書籍名を含むアクセシブルなボタンとして開ける', () => {
