@@ -14,8 +14,19 @@ import {
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import type { PdfFile, ReadState } from '@/types';
+import { BookOpen, Loader2 } from 'lucide-react';
 import { PdfCard, type PdfCardProps, type PdfCardBadge } from './PdfCard';
 import { SortablePdfCard } from './SortablePdfCard';
+
+const GRID_CLASS = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4';
+const SKELETON_VISIBILITY = [
+    '',
+    '',
+    'hidden md:block',
+    'hidden md:block',
+    'hidden lg:block',
+    'hidden lg:block',
+];
 
 interface PdfGridProps {
     pdfs: PdfFile[];
@@ -55,6 +66,60 @@ interface PdfGridProps {
     dndEnabled?: boolean;
     /** DnD ドロップ時に呼ばれる。`newOrder` は並べ替え後の `pdf.name` 配列。 */
     onReorder?: (newOrder: string[]) => void;
+    /** PDF 一覧の初回取得中。空状態と区別してスケルトンを表示する。 */
+    isLoading?: boolean;
+}
+
+function LibraryLoadingState() {
+    return (
+        <div aria-busy="true">
+            <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300">書籍</h2>
+            <div className={GRID_CLASS} aria-hidden="true">
+                {SKELETON_VISIBILITY.map((visibility, index) => (
+                    <div
+                        key={index}
+                        className={`${visibility} animate-pulse overflow-hidden rounded-lg border-2 border-transparent bg-white shadow-md dark:bg-gray-800`}
+                    >
+                        <div className="aspect-[3/4] bg-gray-200 dark:bg-gray-700" />
+                        <div className="space-y-2 p-3">
+                            <div className="h-4 w-4/5 rounded bg-gray-200 dark:bg-gray-700" />
+                            <div className="h-3 w-2/5 rounded bg-gray-100 dark:bg-gray-700/70" />
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <div
+                role="status"
+                aria-live="polite"
+                className="mt-6 flex flex-col items-center justify-center text-center"
+            >
+                <div className="flex items-center gap-2 font-medium text-gray-700 dark:text-gray-300">
+                    <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
+                    ライブラリを読み込み中…
+                </div>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    初回の読み込みには時間がかかる場合があります
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function LibraryEmptyState() {
+    return (
+        <div>
+            <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300">書籍</h2>
+            <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white/60 px-6 text-center dark:border-gray-700 dark:bg-gray-900/60">
+                <BookOpen className="h-9 w-9 text-gray-400 dark:text-gray-500" />
+                <p className="mt-3 font-medium text-gray-700 dark:text-gray-300">
+                    書籍がありません
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    取り込み画面から書籍を追加できます
+                </p>
+            </div>
+        </div>
+    );
 }
 
 /**
@@ -83,6 +148,7 @@ export function PdfGrid({
     dndEnabled = false,
     onReorder,
     getReadState,
+    isLoading = false,
 }: PdfGridProps) {
     const sensors = useSensors(
         // 8px 以上ドラッグしないと開始しない（ボタンクリックの誤検知を防ぐ）
@@ -90,16 +156,9 @@ export function PdfGrid({
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
     );
 
-    if (pdfs.length === 0) {
-        return (
-            <div>
-                <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">
-                    PDFs
-                </h2>
-                <p className="text-gray-500 dark:text-gray-400">No PDFs found.</p>
-            </div>
-        );
-    }
+    if (isLoading) return <LibraryLoadingState />;
+
+    if (pdfs.length === 0) return <LibraryEmptyState />;
 
     const buildCardProps = (pdf: PdfFile): PdfCardProps => {
         const isFav = favorites.has(pdf.name);
@@ -138,14 +197,13 @@ export function PdfGrid({
         onReorder(reordered.map((p) => p.name));
     };
 
-    const gridClass = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4';
     const useDnd = dndEnabled && !isSelectionMode;
 
     if (useDnd) {
         return (
             <div>
-                <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">
-                    PDFs
+                <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300">
+                    書籍
                 </h2>
                 <DndContext
                     sensors={sensors}
@@ -153,7 +211,7 @@ export function PdfGrid({
                     onDragEnd={handleDragEnd}
                 >
                     <SortableContext items={pdfs.map((p) => p.name)} strategy={rectSortingStrategy}>
-                        <div className={gridClass}>
+                        <div className={GRID_CLASS}>
                             {pdfs.map((pdf) => (
                                 <SortablePdfCard key={pdf.name} {...buildCardProps(pdf)} />
                             ))}
@@ -166,8 +224,8 @@ export function PdfGrid({
 
     return (
         <div>
-            <h2 className="text-lg font-semibold mb-4 text-gray-700 dark:text-gray-300">PDFs</h2>
-            <div className={gridClass}>
+            <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300">書籍</h2>
+            <div className={GRID_CLASS}>
                 {pdfs.map((pdf) => (
                     <div key={pdf.name}>
                         <PdfCard {...buildCardProps(pdf)} />

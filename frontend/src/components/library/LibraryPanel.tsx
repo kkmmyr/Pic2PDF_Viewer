@@ -42,6 +42,7 @@ function LibraryPdfGrid() {
         seriesEdit,
         showHidden,
         getReadState,
+        isPdfsLoading,
     } = useLibraryPanelContext();
 
     return (
@@ -70,6 +71,7 @@ function LibraryPdfGrid() {
             onEditSeries={seriesEdit.open}
             dndEnabled={!!seriesFilter}
             onReorder={bulkActions.handleSeriesReorder}
+            isLoading={isPdfsLoading}
         />
     );
 }

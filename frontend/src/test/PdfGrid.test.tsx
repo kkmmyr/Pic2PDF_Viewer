@@ -6,14 +6,25 @@ import type { PdfFile } from '@/types';
 const pdf = (name: string): PdfFile => ({ name, thumbnail: null, created_at: 0 });
 
 describe('PdfGrid', () => {
-    it('pdfs が空なら "No PDFs found." が表示される', () => {
-        const { getByText } = render(<PdfGrid pdfs={[]} onPdfClick={vi.fn()} />);
-        expect(getByText('No PDFs found.')).toBeInTheDocument();
+    it('読み込み中はスケルトン用の案内を表示し、空状態を表示しない', () => {
+        const { getByText, queryByText } = render(
+            <PdfGrid pdfs={[]} onPdfClick={vi.fn()} isLoading />,
+        );
+        expect(getByText('ライブラリを読み込み中…')).toBeInTheDocument();
+        expect(getByText('初回の読み込みには時間がかかる場合があります')).toBeInTheDocument();
+        expect(queryByText('書籍がありません')).not.toBeInTheDocument();
     });
 
-    it('見出し "PDFs" は常に表示される', () => {
+    it('取得完了後に pdfs が空なら日本語の空状態を表示する', () => {
+        const { getByText, queryByText } = render(<PdfGrid pdfs={[]} onPdfClick={vi.fn()} />);
+        expect(getByText('書籍がありません')).toBeInTheDocument();
+        expect(getByText('取り込み画面から書籍を追加できます')).toBeInTheDocument();
+        expect(queryByText('ライブラリを読み込み中…')).not.toBeInTheDocument();
+    });
+
+    it('見出し "書籍" は常に表示される', () => {
         const { getByText } = render(<PdfGrid pdfs={[pdf('a.pdf')]} onPdfClick={vi.fn()} />);
-        expect(getByText('PDFs')).toBeInTheDocument();
+        expect(getByText('書籍')).toBeInTheDocument();
     });
 
     it('各 pdf がカードとして描画される（タイトルから .pdf を除いた名前）', () => {

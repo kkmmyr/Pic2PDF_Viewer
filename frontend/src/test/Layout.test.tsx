@@ -17,9 +17,13 @@ describe('Layout', () => {
 
         expect(screen.getByText('Pic2PDF Viewer').closest('a')).toBeNull();
 
-        const libraryLink = screen.getByRole('link', { name: 'ライブラリ' });
+        const libraryLink = screen.getByRole('link', { name: '同人誌ライブラリ' });
         expect(libraryLink).toHaveAttribute('href', '/doujin');
         expect(libraryLink.closest('nav')).toHaveClass('justify-start', 'overflow-x-auto');
         expect(libraryLink.closest('nav')).not.toHaveClass('justify-end', 'xl:justify-end');
+        expect(screen.getByRole('link', { name: '漫画ライブラリ' })).toHaveAttribute(
+            'href',
+            '/comic',
+        );
     });
 });

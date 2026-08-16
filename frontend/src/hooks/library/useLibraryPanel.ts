@@ -44,6 +44,7 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
 
     const {
         data: pdfs = [],
+        isLoading: isPdfsLoading,
         isError: isPdfsError,
         refetch: refetchPdfs,
     } = useLibraryPdfs(currentPath, currentSource);
@@ -336,6 +337,7 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         addGenre,
         removeGenre,
         reorderGenres,
+        isPdfsLoading,
         hasLibraryLoadError,
         retryLibraryData,
         // display

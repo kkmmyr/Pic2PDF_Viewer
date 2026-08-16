@@ -21,6 +21,7 @@ import { useDarkMode } from '@/hooks';
 interface NavItem {
     to: string;
     label: string;
+    ariaLabel?: string;
     icon: ComponentType<{ className?: string }>;
     activePrefix?: string;
 }
@@ -34,14 +35,26 @@ const NAV_GROUPS: NavGroup[] = [
     {
         label: '同人誌',
         items: [
-            { to: '/doujin', icon: Library, label: 'ライブラリ' },
+            {
+                to: '/doujin',
+                icon: Library,
+                label: 'ライブラリ',
+                ariaLabel: '同人誌ライブラリ',
+            },
             { to: '/doujin/generator', icon: Settings, label: '取り込み' },
             { to: '/doujin/hitomi', icon: Sparkles, label: '新着' },
         ],
     },
     {
         label: '漫画',
-        items: [{ to: '/comic', icon: Library, label: 'Library' }],
+        items: [
+            {
+                to: '/comic',
+                icon: Library,
+                label: 'ライブラリ',
+                ariaLabel: '漫画ライブラリ',
+            },
+        ],
     },
     {
         label: '小説',
@@ -109,6 +122,7 @@ export default function Layout() {
                                             <Link
                                                 key={item.to}
                                                 to={item.to}
+                                                aria-label={item.ariaLabel}
                                                 className={`${LINK_CLASS} ${isActive(item)}`}
                                             >
                                                 <item.icon className="w-4 h-4" />

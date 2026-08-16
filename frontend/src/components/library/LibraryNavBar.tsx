@@ -26,7 +26,7 @@ export function LibraryNavBar({ currentPath, breadcrumbs, onUpClick }: LibraryNa
                     </button>
                 )}
                 <h1 className="font-semibold truncate text-gray-900 dark:text-gray-100 shrink-0">
-                    {currentPath ? currentPath.split('/').pop() : 'Library'}
+                    {currentPath ? currentPath.split('/').pop() : 'ライブラリ'}
                 </h1>
                 {breadcrumbs.length > 0 && (
                     <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300 min-w-0 overflow-hidden">

@@ -1,6 +1,6 @@
 # ライブラリ・リーダーUI設計
 
-> status: living | last-verified: 2026-07-26
+> status: living | last-verified: 2026-08-16
 
 `doujin` / `comic` / `novel`のライブラリ表示と、画像・PDF readerの現行設計を定める。
 ファイルの所在は
@@ -39,6 +39,7 @@ URL / libraryStore
 
 - PDF一覧、meta、genre、設定はTanStack Queryで取得する。
 - `libraryStore`はcurrent path、選択mode、選択項目などUI状態だけを保持する。
+- `useLibraryPdfs` の `isLoading` を `LibraryPanelContext` 経由で `PdfGrid` へ渡す。取得中はレスポンシブなカード型スケルトンと進捗文言を表示し、空状態は取得完了後にだけ判定する。
 - 取得失敗を空配列へ変換せず、error alertと再試行を表示する。
 - sort、filter、groupingは入力値から導出し、保存しない。
 
