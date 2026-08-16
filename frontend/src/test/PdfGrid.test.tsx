@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { PdfGrid } from '@/components/library/PdfGrid';
 import type { PdfFile } from '@/types';
 
@@ -20,6 +20,47 @@ describe('PdfGrid', () => {
         expect(getByText('書籍がありません')).toBeInTheDocument();
         expect(getByText('取り込み画面から書籍を追加できます')).toBeInTheDocument();
         expect(queryByText('ライブラリを読み込み中…')).not.toBeInTheDocument();
+    });
+
+    it('登録書籍があり filter 結果だけが空なら条件不一致と解除操作を表示する', () => {
+        const onClearFilters = vi.fn();
+        const { getByRole, getByText, queryByText } = render(
+            <PdfGrid
+                pdfs={[]}
+                onPdfClick={vi.fn()}
+                isLibraryEmpty={false}
+                onClearFilters={onClearFilters}
+            />,
+        );
+
+        expect(getByText('条件に一致する書籍がありません')).toBeInTheDocument();
+        expect(getByText('検索条件や絞り込みを変更してください')).toBeInTheDocument();
+        expect(queryByText('書籍がありません')).not.toBeInTheDocument();
+
+        fireEvent.click(getByRole('button', { name: '条件をクリア' }));
+        expect(onClearFilters).toHaveBeenCalledTimes(1);
+    });
+
+    it('一覧取得失敗は空状態を表示せず再試行できる', () => {
+        const onRetry = vi.fn();
+        const { getByRole, getByText, queryByText } = render(
+            <PdfGrid pdfs={[]} onPdfClick={vi.fn()} isError onRetry={onRetry} />,
+        );
+
+        expect(getByText('ライブラリ情報を取得できませんでした')).toBeInTheDocument();
+        expect(queryByText('書籍がありません')).not.toBeInTheDocument();
+        expect(queryByText('条件に一致する書籍がありません')).not.toBeInTheDocument();
+
+        fireEvent.click(getByRole('button', { name: '再試行' }));
+        expect(onRetry).toHaveBeenCalledTimes(1);
+    });
+
+    it('読み込み中は取得失敗より優先して表示する', () => {
+        const { getByText, queryByText } = render(
+            <PdfGrid pdfs={[]} onPdfClick={vi.fn()} isLoading isError />,
+        );
+        expect(getByText('ライブラリを読み込み中…')).toBeInTheDocument();
+        expect(queryByText('ライブラリ情報を取得できませんでした')).not.toBeInTheDocument();
     });
 
     it('見出し "書籍" は常に表示される', () => {

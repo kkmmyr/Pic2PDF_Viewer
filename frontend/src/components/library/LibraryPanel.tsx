@@ -43,6 +43,10 @@ function LibraryPdfGrid() {
         showHidden,
         getReadState,
         isPdfsLoading,
+        isPdfsError,
+        retryLibraryData,
+        clearLibraryFilters,
+        isLibraryEmpty,
     } = useLibraryPanelContext();
 
     return (
@@ -72,12 +76,16 @@ function LibraryPdfGrid() {
             dndEnabled={!!seriesFilter}
             onReorder={bulkActions.handleSeriesReorder}
             isLoading={isPdfsLoading}
+            isError={isPdfsError}
+            isLibraryEmpty={isLibraryEmpty}
+            onRetry={() => void retryLibraryData()}
+            onClearFilters={clearLibraryFilters}
         />
     );
 }
 
 function LibraryPanelContent() {
-    const { hasLibraryLoadError, retryLibraryData } = useLibraryPanelContext();
+    const { hasSupportingDataError, retryLibraryData } = useLibraryPanelContext();
 
     return (
         <>
@@ -86,7 +94,7 @@ function LibraryPanelContent() {
             <GenreFilterBar />
             <div className="flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto">
                 <div className="w-full h-full p-6 overflow-y-auto">
-                    {hasLibraryLoadError && (
+                    {hasSupportingDataError && (
                         <Alert variant="error" className="mb-4">
                             <div className="flex items-center justify-between gap-4">
                                 <span>ライブラリ情報の取得に失敗しました。</span>

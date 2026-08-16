@@ -14,9 +14,10 @@ import {
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import type { PdfFile, ReadState } from '@/types';
-import { BookOpen, Loader2 } from 'lucide-react';
+import { AlertCircle, BookOpen, Loader2, RefreshCw, SearchX } from 'lucide-react';
 import { PdfCard, type PdfCardProps, type PdfCardBadge } from './PdfCard';
 import { SortablePdfCard } from './SortablePdfCard';
+import { Button } from '@/components/ui/button';
 
 const GRID_CLASS = 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4';
 const SKELETON_VISIBILITY = [
@@ -68,6 +69,14 @@ interface PdfGridProps {
     onReorder?: (newOrder: string[]) => void;
     /** PDF 一覧の初回取得中。空状態と区別してスケルトンを表示する。 */
     isLoading?: boolean;
+    /** PDF 一覧の取得失敗。空状態と区別して再試行を表示する。 */
+    isError?: boolean;
+    /** filter 前の PDF 一覧自体が空かどうか。 */
+    isLibraryEmpty?: boolean;
+    /** PDF 一覧取得を再試行する。 */
+    onRetry?: () => void;
+    /** 検索・絞り込み条件を既定値へ戻す。 */
+    onClearFilters?: () => void;
 }
 
 function LibraryLoadingState() {
@@ -122,6 +131,58 @@ function LibraryEmptyState() {
     );
 }
 
+function LibraryNoResultsState({ onClearFilters }: { onClearFilters?: () => void }) {
+    return (
+        <div>
+            <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300">書籍</h2>
+            <div className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-white/60 px-6 py-8 text-center dark:border-gray-700 dark:bg-gray-900/60">
+                <SearchX className="h-9 w-9 text-gray-400 dark:text-gray-500" />
+                <p className="mt-3 font-medium text-gray-700 dark:text-gray-300">
+                    条件に一致する書籍がありません
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    検索条件や絞り込みを変更してください
+                </p>
+                {onClearFilters && (
+                    <Button
+                        variant="secondary"
+                        className="mt-4 w-full sm:w-auto"
+                        onClick={onClearFilters}
+                    >
+                        条件をクリア
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function LibraryErrorState({ onRetry }: { onRetry?: () => void }) {
+    return (
+        <div>
+            <h2 className="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300">書籍</h2>
+            <div
+                role="alert"
+                className="flex min-h-56 flex-col items-center justify-center rounded-xl border border-red-200 bg-red-50/60 px-6 py-8 text-center dark:border-red-800 dark:bg-red-950/20"
+            >
+                <AlertCircle className="h-9 w-9 text-red-500 dark:text-red-400" />
+                <p className="mt-3 font-medium text-red-700 dark:text-red-300">
+                    ライブラリ情報を取得できませんでした
+                </p>
+                <p className="mt-1 text-sm text-red-600/80 dark:text-red-400">
+                    通信状態を確認して、もう一度お試しください
+                </p>
+                {onRetry && (
+                    <Button className="mt-4 w-full sm:w-auto" onClick={onRetry}>
+                        <RefreshCw className="h-4 w-4" />
+                        再試行
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+}
+
 /**
  * PDF一覧のグリッド表示コンポーネント。
  * - サムネイルは LazyThumbnail により Intersection Observer で遅延読み込み
@@ -149,6 +210,10 @@ export function PdfGrid({
     onReorder,
     getReadState,
     isLoading = false,
+    isError = false,
+    isLibraryEmpty = pdfs.length === 0,
+    onRetry,
+    onClearFilters,
 }: PdfGridProps) {
     const sensors = useSensors(
         // 8px 以上ドラッグしないと開始しない（ボタンクリックの誤検知を防ぐ）
@@ -158,7 +223,11 @@ export function PdfGrid({
 
     if (isLoading) return <LibraryLoadingState />;
 
-    if (pdfs.length === 0) return <LibraryEmptyState />;
+    if (isError) return <LibraryErrorState onRetry={onRetry} />;
+
+    if (isLibraryEmpty) return <LibraryEmptyState />;
+
+    if (pdfs.length === 0) return <LibraryNoResultsState onClearFilters={onClearFilters} />;
 
     const buildCardProps = (pdf: PdfFile): PdfCardProps => {
         const isFav = favorites.has(pdf.name);

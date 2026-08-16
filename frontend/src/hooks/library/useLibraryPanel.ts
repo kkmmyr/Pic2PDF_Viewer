@@ -141,10 +141,32 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
     } = useGenres(currentSource);
     const runAsync = useAsyncToast();
 
-    const hasLibraryLoadError = isPdfsError || isMetaError || isGenresError;
+    const hasSupportingDataError = !isPdfsError && (isMetaError || isGenresError);
     const retryLibraryData = useCallback(async () => {
         await Promise.all([refetchPdfs(), refreshMeta(), refetchGenres()]);
     }, [refetchPdfs, refreshMeta, refetchGenres]);
+
+    const clearLibraryFilters = useCallback(() => {
+        setSearchText('');
+        clearAllDrilldown();
+        setReadStateFilter('');
+        setGenreFilter('');
+
+        const allBooksAreHidden =
+            pdfs.length > 0 && pdfs.every((pdf) => isHidden(currentPath, pdf.name));
+        if (showHidden || (!showHidden && allBooksAreHidden)) {
+            toggleShowHidden();
+        }
+    }, [
+        clearAllDrilldown,
+        currentPath,
+        isHidden,
+        pdfs,
+        setGenreFilter,
+        setReadStateFilter,
+        showHidden,
+        toggleShowHidden,
+    ]);
 
     const { pinnedBooks, contextualFavorites } = usePinnedBookSets({
         meta,
@@ -338,8 +360,11 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         removeGenre,
         reorderGenres,
         isPdfsLoading,
-        hasLibraryLoadError,
+        isPdfsError,
+        hasSupportingDataError,
         retryLibraryData,
+        clearLibraryFilters,
+        isLibraryEmpty: pdfs.length === 0,
         // display
         grouped,
         displayPdfs,

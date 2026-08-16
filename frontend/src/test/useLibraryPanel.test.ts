@@ -22,6 +22,11 @@ const mockCloseRenameDialog = vi.fn();
 const mockRefetchPdfs = vi.fn();
 const mockRefreshMeta = vi.fn();
 const mockRefetchGenres = vi.fn();
+const mockClearAllDrilldown = vi.fn();
+const mockSetReadStateFilter = vi.fn();
+const mockSetGenreFilter = vi.fn();
+const mockToggleShowHidden = vi.fn();
+const mockIsHidden = vi.fn(() => false);
 
 const mockMembersByRep = new Map<string, { name: string }[]>();
 const mockSelectedItems = new Set<string>();
@@ -34,6 +39,12 @@ let mockRenameTarget: { name: string; isFolder: boolean } | null = null;
 let mockPdfsError = false;
 let mockMetaError = false;
 let mockGenresError = false;
+let mockPdfs: { name: string; thumbnail: null; created_at: number }[] = [];
+let mockAuthorFilter = '';
+let mockSeriesFilter = '';
+let mockReadStateFilter = '';
+let mockGenreFilter = '';
+let mockShowHidden = false;
 
 vi.mock('../stores/libraryStore', () => ({
     useLibraryStore: () => ({
@@ -52,7 +63,12 @@ vi.mock('../stores/libraryStore', () => ({
 }));
 
 vi.mock('../hooks/library/useLibraryPdfs', () => ({
-    useLibraryPdfs: () => ({ data: [], isError: mockPdfsError, refetch: mockRefetchPdfs }),
+    useLibraryPdfs: () => ({
+        data: mockPdfs,
+        isLoading: false,
+        isError: mockPdfsError,
+        refetch: mockRefetchPdfs,
+    }),
     pdfQueryKey: () => ['pdfs'],
 }));
 
@@ -81,7 +97,7 @@ vi.mock('../hooks/library/useBookMeta', () => ({
         getViewCount: vi.fn(() => 0),
         getLastViewedAt: vi.fn(() => null),
         getReadState: vi.fn(),
-        isHidden: vi.fn(() => false),
+        isHidden: mockIsHidden,
         recordView: mockRecordView,
         updateAuthors: vi.fn(),
         updateGenre: vi.fn(),
@@ -103,11 +119,11 @@ vi.mock('../hooks/library/useLibraryFilter', () => ({
 
 vi.mock('../hooks/library/useUrlFilters', () => ({
     useUrlFilters: () => ({
-        authorFilter: '',
-        seriesFilter: '',
+        authorFilter: mockAuthorFilter,
+        seriesFilter: mockSeriesFilter,
         setAuthorFilter: vi.fn(),
         setSeriesFilter: mockSetSeriesFilter,
-        clearAllDrilldown: vi.fn(),
+        clearAllDrilldown: mockClearAllDrilldown,
     }),
 }));
 
@@ -117,12 +133,12 @@ vi.mock('../hooks/library/useLibrarySettings', () => ({
         setSortOrder: vi.fn(),
         groupMode: 'none' as const,
         setGroupMode: mockSetGroupMode,
-        showHidden: false,
-        toggleShowHidden: vi.fn(),
-        readStateFilter: 'all' as const,
-        setReadStateFilter: vi.fn(),
-        genreFilter: '',
-        setGenreFilter: vi.fn(),
+        showHidden: mockShowHidden,
+        toggleShowHidden: mockToggleShowHidden,
+        readStateFilter: mockReadStateFilter,
+        setReadStateFilter: mockSetReadStateFilter,
+        genreFilter: mockGenreFilter,
+        setGenreFilter: mockSetGenreFilter,
     }),
 }));
 
@@ -224,6 +240,13 @@ describe('useLibraryPanel', () => {
         mockPdfsError = false;
         mockMetaError = false;
         mockGenresError = false;
+        mockPdfs = [];
+        mockAuthorFilter = '';
+        mockSeriesFilter = '';
+        mockReadStateFilter = '';
+        mockGenreFilter = '';
+        mockShowHidden = false;
+        mockIsHidden.mockReturnValue(false);
     });
 
     it('スモークテスト: hook が正常にレンダーされる', () => {
@@ -232,7 +255,7 @@ describe('useLibraryPanel', () => {
         expect(result.current.searchText).toBe('');
     });
 
-    it('取得エラーを公開し、再試行で一覧・メタ・ジャンルを再取得する', async () => {
+    it('PDF一覧取得エラーを空状態と分離し、再試行で全データを再取得する', async () => {
         mockPdfsError = true;
         mockRefetchPdfs.mockResolvedValue(undefined);
         mockRefreshMeta.mockResolvedValue(undefined);
@@ -241,11 +264,64 @@ describe('useLibraryPanel', () => {
             wrapper: createWrapper(),
         });
 
-        expect(result.current.hasLibraryLoadError).toBe(true);
+        expect(result.current.isPdfsError).toBe(true);
+        expect(result.current.hasSupportingDataError).toBe(false);
         await act(async () => result.current.retryLibraryData());
         expect(mockRefetchPdfs).toHaveBeenCalledTimes(1);
         expect(mockRefreshMeta).toHaveBeenCalledTimes(1);
         expect(mockRefetchGenres).toHaveBeenCalledTimes(1);
+    });
+
+    it('メタ情報またはジャンル情報だけの失敗を補助データ警告として公開する', () => {
+        mockMetaError = true;
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+            wrapper: createWrapper(),
+        });
+
+        expect(result.current.isPdfsError).toBe(false);
+        expect(result.current.hasSupportingDataError).toBe(true);
+    });
+
+    it('PDF一覧と補助情報が同時に失敗した場合は補助データ警告を重ねない', () => {
+        mockPdfsError = true;
+        mockGenresError = true;
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+            wrapper: createWrapper(),
+        });
+
+        expect(result.current.isPdfsError).toBe(true);
+        expect(result.current.hasSupportingDataError).toBe(false);
+    });
+
+    it('clearLibraryFilters は検索・ドリルダウン・読書状態・ジャンルを解除する', () => {
+        mockAuthorFilter = '作者A';
+        mockSeriesFilter = 'series-a';
+        mockReadStateFilter = 'done';
+        mockGenreFilter = 'ジャンルA';
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+            wrapper: createWrapper(),
+        });
+
+        act(() => result.current.setSearchText('検索語'));
+        act(() => result.current.clearLibraryFilters());
+
+        expect(result.current.searchText).toBe('');
+        expect(mockClearAllDrilldown).toHaveBeenCalledTimes(1);
+        expect(mockSetReadStateFilter).toHaveBeenCalledWith('');
+        expect(mockSetGenreFilter).toHaveBeenCalledWith('');
+        expect(mockToggleShowHidden).not.toHaveBeenCalled();
+    });
+
+    it('通常表示で全書籍が非表示なら条件解除時に非表示表示へ切り替える', () => {
+        mockPdfs = [{ name: 'hidden.pdf', thumbnail: null, created_at: 0 }];
+        mockIsHidden.mockReturnValue(true);
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+            wrapper: createWrapper(),
+        });
+
+        act(() => result.current.clearLibraryFilters());
+
+        expect(mockToggleShowHidden).toHaveBeenCalledTimes(1);
     });
 
     it('handleGroupModeChange: setGroupMode と seriesFilter クリアを同時に呼ぶ', () => {

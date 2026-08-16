@@ -39,8 +39,10 @@ URL / libraryStore
 
 - PDF一覧、meta、genre、設定はTanStack Queryで取得する。
 - `libraryStore`はcurrent path、選択mode、選択項目などUI状態だけを保持する。
-- `useLibraryPdfs` の `isLoading` を `LibraryPanelContext` 経由で `PdfGrid` へ渡す。取得中はレスポンシブなカード型スケルトンと進捗文言を表示し、空状態は取得完了後にだけ判定する。
-- 取得失敗を空配列へ変換せず、error alertと再試行を表示する。
+- `useLibraryPdfs` の `isLoading` / `isError` と取得前の全書籍件数を `LibraryPanelContext` 経由で `PdfGrid` へ渡す。表示状態は「読み込み中 → PDF一覧取得失敗 → 全書籍0件 → filter結果0件 → grid」の優先順で排他的に判定する。
+- 取得中はレスポンシブなカード型スケルトンと進捗文言を表示する。PDF一覧取得失敗時はerror panelと全ライブラリデータの再試行操作、全書籍0件では未登録の空状態、filter結果0件では検索アイコン・条件不一致文言・filter解除操作を表示する。
+- filter解除は検索文字列、作者・series drilldown、read state、genreを既定値へ戻す。全書籍がhiddenで通常表示が0件になる場合はhidden表示へ切り替え、1回の操作で書籍へ到達できるようにする。
+- metaまたはgenreだけの取得失敗は補助情報の警告としてgrid上部に表示し、PDF一覧取得済みなら書籍cardを隠さない。
 - sort、filter、groupingは入力値から導出し、保存しない。
 
 ### フィルターとsort
