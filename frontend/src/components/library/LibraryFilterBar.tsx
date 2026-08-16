@@ -32,7 +32,6 @@ interface LibraryFilterBarProps {
     onReadStateFilterChange: (value: ReadStateFilter) => void;
     onToggleShowHidden: () => void;
     onSortChange: (order: SortOrder) => void;
-    onMetaRefresh: () => void;
     onToggleSelectionMode: () => void;
     onClearFilters: () => void;
 }
@@ -84,7 +83,6 @@ export function LibraryFilterBar({
     onReadStateFilterChange,
     onToggleShowHidden,
     onSortChange,
-    onMetaRefresh,
     onToggleSelectionMode,
     onClearFilters,
 }: LibraryFilterBarProps) {
@@ -124,7 +122,7 @@ export function LibraryFilterBar({
                         compact
                         className="min-w-0 flex-1"
                     />
-                    <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
+                    <ToolsMenu source={currentSource} />
                 </div>
                 <div className="flex min-h-6 items-center justify-between gap-3">
                     <ResultSummary
@@ -196,7 +194,7 @@ export function LibraryFilterBar({
                             選択
                         </Button>
                     )}
-                    <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
+                    <ToolsMenu source={currentSource} />
                 </div>
             </div>
 

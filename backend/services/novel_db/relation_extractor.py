@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
 from collections import Counter
 from collections.abc import Callable
@@ -20,9 +19,10 @@ from local_llm import LLMError
 from config import NOVEL_DB_LLM_MODEL
 from utils.dt import JST
 
-from ._llm_backend import QWEN_BACKEND
 from .character_names import parse_character_names
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider, get_llm_provider
+from .relation_parser import parse_relation_response
 
 _RELATION_PROMPT = """以下は小説『{book_name}』のキャラクター辞典サマリのリストです。
 各キャラクターのサマリを読み、登場人物間の関係タイプを抽出してください。
@@ -70,6 +70,7 @@ def extract_relations_with_qwen(
     character_summaries: list[tuple[str, str]],
     *,
     model: str = NOVEL_DB_LLM_MODEL,
+    provider: NovelLlmProvider | None = None,
 ) -> list[tuple[str, str, str]]:
     """Qwen でキャラサマリから関係タイプを抽出する。
 
@@ -88,38 +89,11 @@ def extract_relations_with_qwen(
 
     prompt = _RELATION_PROMPT.format(book_name=book_name, characters=chars_text)
     try:
-        raw = QWEN_BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
+        raw = (provider or get_llm_provider()).qwen.ask(prompt, model=model, options=_OPTIONS).strip()
     except LLMError:
         return []
 
-    # JSON ブロックを抽出（```json ... ``` ラッパーに対応）
-    if "```" in raw:
-        lines = raw.splitlines()
-        inside = False
-        json_lines: list[str] = []
-        for line in lines:
-            if line.startswith("```"):
-                inside = not inside
-                continue
-            if inside:
-                json_lines.append(line)
-        raw = "\n".join(json_lines)
-
-    try:
-        items = json.loads(raw)
-        if not isinstance(items, list):
-            return []
-    except json.JSONDecodeError:
-        return []
-
-    results: list[tuple[str, str, str]] = []
-    for item in items:
-        a = str(item.get("char_a", "")).strip()
-        b = str(item.get("char_b", "")).strip()
-        rel = str(item.get("relation", "")).strip()[:20]
-        if a and b and rel and a != b:
-            results.append((a, b, rel))
-    return results
+    return parse_relation_response(raw)
 
 
 def store_relations(
@@ -181,6 +155,7 @@ def generate_book_relations(
     series_id: str,
     *,
     detail_callback: Callable[[str], None] | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> int:
     """1 冊分の character_relations を生成する。
 
@@ -207,7 +182,7 @@ def generate_book_relations(
         (book_id,),
     ).fetchall()
     _detail(f"Qwen 関係抽出（キャラ {len(char_rows)} 件）...")
-    qwen_rels = extract_relations_with_qwen(book_name, char_rows)
+    qwen_rels = extract_relations_with_qwen(book_name, char_rows, provider=provider)
     _detail(f"Qwen 抽出ペア {len(qwen_rels)} 件")
 
     count = store_relations(conn, book_id, series_id, cooc, qwen_rels)

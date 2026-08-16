@@ -2,7 +2,7 @@ import type { Scope, ScopeType } from './types';
 
 /**
  * スコープ種別 + ID から表示ラベルを生成する（例: 全件 / シリーズ: xxx / 単冊: xxx）。
- * 「単冊」表記は ScopeSelector.tsx の optgroup ラベルに合わせて統一している。
+ * scope種別の表示名を画面間で統一する。
  */
 export function formatScopeLabel(type: ScopeType, id?: string | null): string {
     if (type === 'series') return `シリーズ: ${id ?? ''}`;

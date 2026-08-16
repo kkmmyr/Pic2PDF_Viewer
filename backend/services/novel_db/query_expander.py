@@ -24,8 +24,9 @@ from config import (
     NOVEL_DB_QA_EXPAND_N,
 )
 
-from ._llm_backend import QUERY_BACKEND
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider, get_llm_provider
+from .query_expansion_parser import parse_expansions
 
 _EXPAND_PROMPT = """次の質問に対し、小説の本文を全文検索 / 意味検索するための短い検索クエリを {n} 個生成してください。
 
@@ -49,6 +50,7 @@ def expand_query(
     *,
     n: int = NOVEL_DB_QA_EXPAND_N,
     model: str = NOVEL_DB_QA_EXPAND_MODEL,
+    provider: NovelLlmProvider | None = None,
 ) -> list[str]:
     """ユーザーの質問を `n` 個の検索クエリに展開して返す。
 
@@ -71,11 +73,12 @@ def expand_query(
 
     prompt = _EXPAND_PROMPT.format(question=question.strip(), n=n - 1)
     try:
-        response = QUERY_BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
+        backend = (provider or get_llm_provider()).query
+        response = backend.ask(prompt, model=model, options=_OPTIONS).strip()
     except LLMError:
         return [question]
 
-    expansions = _parse_expansions(response, target_n=n - 1)
+    expansions = parse_expansions(response, target_n=n - 1)
     # 元の質問を先頭に置き、展開クエリを後ろに追加。重複は除く
     result: list[str] = [question.strip()]
     for q in expansions:
@@ -87,57 +90,5 @@ def expand_query(
 
 
 def _parse_expansions(response: str, *, target_n: int) -> list[str]:
-    """LLM の応答テキストから検索クエリリストを抽出する。
-
-    想定形式:
-        ベルナード 弁護士 法廷
-        ソレス王子 裁判編 真犯人
-        ベルナード レティ 連携 推理
-
-    各行のノイズ（番号付け「1.」「・」「-」、前置き「検索クエリ:」など）は除去する。
-    """
-    if not response:
-        return []
-    out: list[str] = []
-    for raw_line in response.split("\n"):
-        line = raw_line.strip()
-        if not line:
-            continue
-        # 番号付け / 箇条書き記号を除去
-        for prefix_pattern in (
-            ".",
-            "．",
-            ":",
-            "：",
-            "、",
-            " ",
-        ):
-            # "1." / "1．" / "1:" / "1：" / "1、" などを剥がす
-            if line and len(line) >= 2 and line[0].isdigit() and line[1] in prefix_pattern:
-                line = line[2:].lstrip()
-                break
-        # 番号 + 空白（"1 ..."）も剥がす
-        if line and line[0].isdigit():
-            for i, c in enumerate(line):
-                if not (c.isdigit() or c in ".．:：、 "):
-                    line = line[i:].lstrip()
-                    break
-        # 「-」「・」「*」「>」 などの先頭記号を除去
-        while line and line[0] in "-・*>＞→»→ 　":
-            line = line[1:].lstrip()
-        # 前置きラベルを除去
-        for label in ("検索クエリ", "クエリ", "Query", "query"):
-            for sep in (":", "：", " "):
-                lab_sep = label + sep
-                if line.startswith(lab_sep):
-                    line = line[len(lab_sep) :].lstrip()
-                    break
-        # 引用符類を剥がす
-        line = line.strip("「」『』\"'")
-        # 長すぎる行（説明文っぽい）はスキップ
-        if not line or len(line) > 60:
-            continue
-        out.append(line)
-        if len(out) >= target_n:
-            break
-    return out
+    """既存import向けfacade。新規コードは ``parse_expansions`` を参照する。"""
+    return parse_expansions(response, target_n=target_n)

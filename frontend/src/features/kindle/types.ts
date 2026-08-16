@@ -16,6 +16,9 @@ export type KindleImportRun = components['schemas']['KindleImportRunOut'];
 export type KindleImportRunsResponse = components['schemas']['KindleImportRunsResponse'];
 export type KindleCaptureJob = components['schemas']['KindleCaptureJobOut'];
 export type KindleCaptureJobsResponse = components['schemas']['KindleCaptureJobsResponse'];
+export type KindleLinkRequest = components['schemas']['LinkRequest'];
+export type KindleCaptureJobCreateRequest = components['schemas']['CaptureJobCreateRequest'];
+export type KindleMigrationCommitRequest = components['schemas']['MigrationCommitRequest'];
 
 export type KindleBookType = 'comic' | 'novel' | 'other' | 'unknown' | '';
 export type KindleOwnership =

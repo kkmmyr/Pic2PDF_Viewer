@@ -6,6 +6,7 @@ A-6 で旧 test_qwen_client.py から移行。テスト対象を BackendConfig d
 実 HTTP は urllib (sync) / httpx (async) を mock してリクエストボディと URL を
 検証する。
 """
+
 from __future__ import annotations
 
 import json
@@ -19,13 +20,13 @@ from local_llm import (
     LlamaServerBackend,
     LLMError,
     OllamaBackend,
-    backend_from_env,
 )
 from local_llm._sse import convert_openai_chunk, fallback_done_event
 
 # ---------------------------------------------------------------------------
 # fixtures / helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def clear_env(monkeypatch):
@@ -77,6 +78,7 @@ _LLAMA_CFG = BackendConfig(base_url="http://test-llama:11435")
 # BackendConfig
 # ---------------------------------------------------------------------------
 
+
 class TestBackendConfig:
     def test_defaults(self):
         cfg = BackendConfig(base_url="http://x")
@@ -96,6 +98,7 @@ class TestBackendConfig:
 # Backend ABC
 # ---------------------------------------------------------------------------
 
+
 class TestBackendABC:
     def test_cannot_instantiate_abstract(self):
         with pytest.raises(TypeError):
@@ -110,6 +113,7 @@ class TestBackendABC:
 # ---------------------------------------------------------------------------
 # SSE 純関数
 # ---------------------------------------------------------------------------
+
 
 class TestConvertOpenAIChunk:
     def test_normal_token_delta(self):
@@ -156,10 +160,16 @@ class TestFallbackDoneEvent:
 # OllamaBackend
 # ---------------------------------------------------------------------------
 
+
 class TestOllamaBackendBody:
     def test_default_think_false(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "hello", system=None, model=None, options=None, think=None, context=None,
+            "hello",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
+            context=None,
         )
         assert body["think"] is False
         assert body["stream"] is True
@@ -168,15 +178,23 @@ class TestOllamaBackendBody:
 
     def test_explicit_think_true(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "hello", system=None, model=None, options=None, think=True, context=None,
+            "hello",
+            system=None,
+            model=None,
+            options=None,
+            think=True,
+            context=None,
         )
         assert body["think"] is True
 
     def test_options_merge_overrides_defaults(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "x", system=None, model=None,
+            "x",
+            system=None,
+            model=None,
             options={"temperature": 0.9, "num_ctx": 32768},
-            think=None, context=None,
+            think=None,
+            context=None,
         )
         assert body["options"]["temperature"] == 0.9
         assert body["options"]["num_ctx"] == 32768
@@ -185,7 +203,11 @@ class TestOllamaBackendBody:
 
     def test_system_and_context_optional(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "x", system="sys", model=None, options=None, think=None,
+            "x",
+            system="sys",
+            model=None,
+            options=None,
+            think=None,
             context=[1, 2, 3],
         )
         assert body["system"] == "sys"
@@ -193,13 +215,23 @@ class TestOllamaBackendBody:
 
     def test_explicit_model_overrides_config(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "x", system=None, model="custom-model", options=None, think=None, context=None,
+            "x",
+            system=None,
+            model="custom-model",
+            options=None,
+            think=None,
+            context=None,
         )
         assert body["model"] == "custom-model"
 
     def test_format_json_sets_top_level_key(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "x", system=None, model=None, options=None, think=None, context=None,
+            "x",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
+            context=None,
             format="json",
         )
         # Ollama API 仕様: format は body トップレベル (options の中ではない)
@@ -208,7 +240,12 @@ class TestOllamaBackendBody:
 
     def test_format_none_omits_key(self):
         body = OllamaBackend(_OLLAMA_CFG)._build_body(
-            "x", system=None, model=None, options=None, think=None, context=None,
+            "x",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
+            context=None,
         )
         assert "format" not in body
 
@@ -220,10 +257,12 @@ class TestOllamaBackendStreamAsk:
         def fake_urlopen(req, timeout=None):
             captured["url"] = req.full_url
             captured["body"] = json.loads(req.data)
-            return _ollama_ndjson_response([
-                {"response": "Hi", "done": False},
-                {"response": "", "done": True, "eval_count": 1},
-            ])
+            return _ollama_ndjson_response(
+                [
+                    {"response": "Hi", "done": False},
+                    {"response": "", "done": True, "eval_count": 1},
+                ]
+            )
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             events = list(OllamaBackend(_OLLAMA_CFG).stream_ask("hello"))
@@ -249,10 +288,15 @@ class TestOllamaBackendStreamAsk:
 # LlamaServerBackend
 # ---------------------------------------------------------------------------
 
+
 class TestLlamaServerBackendBody:
     def test_uses_messages_format(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "hello", system=None, model=None, options=None, think=None,
+            "hello",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
         )
         assert body["messages"] == [{"role": "user", "content": "hello"}]
         assert body["stream"] is True
@@ -260,56 +304,94 @@ class TestLlamaServerBackendBody:
 
     def test_system_message_prepended(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system="you are helpful", model=None, options=None, think=None,
+            "q",
+            system="you are helpful",
+            model=None,
+            options=None,
+            think=None,
         )
         assert body["messages"][0] == {"role": "system", "content": "you are helpful"}
         assert body["messages"][1] == {"role": "user", "content": "q"}
 
     def test_chat_template_kwargs_enable_thinking_default_false(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options=None, think=None,
+            "q",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
         )
         assert body["chat_template_kwargs"]["enable_thinking"] is False
 
     def test_chat_template_kwargs_enable_thinking_explicit_true(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options=None, think=True,
+            "q",
+            system=None,
+            model=None,
+            options=None,
+            think=True,
         )
         assert body["chat_template_kwargs"]["enable_thinking"] is True
 
     def test_max_tokens_from_num_predict(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options={"num_predict": 1024}, think=None,
+            "q",
+            system=None,
+            model=None,
+            options={"num_predict": 1024},
+            think=None,
         )
         assert body["max_tokens"] == 1024
 
     def test_top_p_only_if_provided(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options=None, think=None,
+            "q",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
         )
         assert "top_p" not in body
         body2 = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options={"top_p": 0.95}, think=None,
+            "q",
+            system=None,
+            model=None,
+            options={"top_p": 0.95},
+            think=None,
         )
         assert body2["top_p"] == 0.95
 
     def test_format_json_sets_response_format(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options=None, think=None, format="json",
+            "q",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
+            format="json",
         )
         # OpenAI 互換: response_format={"type": "json_object"}
         assert body["response_format"] == {"type": "json_object"}
 
     def test_format_none_omits_response_format(self):
         body = LlamaServerBackend(_LLAMA_CFG)._build_body(
-            "q", system=None, model=None, options=None, think=None,
+            "q",
+            system=None,
+            model=None,
+            options=None,
+            think=None,
         )
         assert "response_format" not in body
 
     def test_format_unsupported_raises_llm_error(self):
         with pytest.raises(LLMError, match="not supported"):
             LlamaServerBackend(_LLAMA_CFG)._build_body(
-                "q", system=None, model=None, options=None, think=None, format="yaml",
+                "q",
+                system=None,
+                model=None,
+                options=None,
+                think=None,
+                format="yaml",
             )
 
 
@@ -321,13 +403,30 @@ class TestLlamaServerBackendStreamAsk:
         def fake_urlopen(req, timeout=None):
             captured["url"] = req.full_url
             captured["body"] = json.loads(req.data)
-            return _openai_sse_response([
-                {"choices": [{"delta": {"role": "assistant"}, "finish_reason": None}]},
-                {"choices": [{"delta": {"content": "Hello"}, "finish_reason": None}]},
-                {"choices": [{"delta": {"content": " world"}, "finish_reason": "stop"}]},
-                {"choices": [], "usage": {"prompt_tokens": 5, "completion_tokens": 2}},
-                "[DONE]",
-            ])
+            return _openai_sse_response(
+                [
+                    {
+                        "choices": [
+                            {"delta": {"role": "assistant"}, "finish_reason": None}
+                        ]
+                    },
+                    {
+                        "choices": [
+                            {"delta": {"content": "Hello"}, "finish_reason": None}
+                        ]
+                    },
+                    {
+                        "choices": [
+                            {"delta": {"content": " world"}, "finish_reason": "stop"}
+                        ]
+                    },
+                    {
+                        "choices": [],
+                        "usage": {"prompt_tokens": 5, "completion_tokens": 2},
+                    },
+                    "[DONE]",
+                ]
+            )
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             events = list(LlamaServerBackend(_LLAMA_CFG).stream_ask("hi"))
@@ -350,11 +449,14 @@ class TestLlamaServerBackendStreamAsk:
 
     def test_fallback_done_when_usage_chunk_missing(self):
         """include_usage=true でも usage チャンクが届かない場合のフォールバック。"""
+
         def fake_urlopen(req, timeout=None):
-            return _openai_sse_response([
-                {"choices": [{"delta": {"content": "x"}, "finish_reason": "stop"}]},
-                "[DONE]",
-            ])
+            return _openai_sse_response(
+                [
+                    {"choices": [{"delta": {"content": "x"}, "finish_reason": "stop"}]},
+                    "[DONE]",
+                ]
+            )
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             events = list(LlamaServerBackend(_LLAMA_CFG).stream_ask("hi"))
@@ -374,11 +476,20 @@ class TestLlamaServerBackendStreamAsk:
 
         def fake_urlopen(req, timeout=None):
             captured["body"] = json.loads(req.data)
-            return _openai_sse_response([
-                {"choices": [{"delta": {"content": "OK"}, "finish_reason": "stop"}]},
-                {"choices": [], "usage": {"prompt_tokens": 10, "completion_tokens": 1}},
-                "[DONE]",
-            ])
+            return _openai_sse_response(
+                [
+                    {
+                        "choices": [
+                            {"delta": {"content": "OK"}, "finish_reason": "stop"}
+                        ]
+                    },
+                    {
+                        "choices": [],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 1},
+                    },
+                    "[DONE]",
+                ]
+            )
 
         messages = [
             {"role": "system", "content": "あなたはアシスタント"},
@@ -399,7 +510,11 @@ class TestLlamaServerBackendStreamAsk:
 class TestStreamChatDefaultNotImplemented:
     def test_ollama_chat_raises_not_implemented(self):
         with pytest.raises(NotImplementedError, match="multi-turn chat"):
-            list(OllamaBackend(_OLLAMA_CFG).stream_chat([{"role": "user", "content": "x"}]))
+            list(
+                OllamaBackend(_OLLAMA_CFG).stream_chat(
+                    [{"role": "user", "content": "x"}]
+                )
+            )
 
     def test_url_error_wrapped_in_llm_error(self):
         import urllib.error
@@ -416,185 +531,26 @@ class TestStreamChatDefaultNotImplemented:
 # Backend.ask（同期、集約）
 # ---------------------------------------------------------------------------
 
+
 class TestAskAggregation:
     def test_concatenates_response_tokens(self):
         def fake_urlopen(req, timeout=None):
-            return _openai_sse_response([
-                {"choices": [{"delta": {"content": "ABC"}, "finish_reason": None}]},
-                {"choices": [{"delta": {"content": "DEF"}, "finish_reason": "stop"}]},
-                {"choices": [], "usage": {"prompt_tokens": 1, "completion_tokens": 2}},
-                "[DONE]",
-            ])
+            return _openai_sse_response(
+                [
+                    {"choices": [{"delta": {"content": "ABC"}, "finish_reason": None}]},
+                    {
+                        "choices": [
+                            {"delta": {"content": "DEF"}, "finish_reason": "stop"}
+                        ]
+                    },
+                    {
+                        "choices": [],
+                        "usage": {"prompt_tokens": 1, "completion_tokens": 2},
+                    },
+                    "[DONE]",
+                ]
+            )
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             text = LlamaServerBackend(_LLAMA_CFG).ask("hi")
         assert text == "ABCDEF"
-
-
-# ---------------------------------------------------------------------------
-# async — httpx をライブラリレベルで mock
-# ---------------------------------------------------------------------------
-
-class _FakeStreamCtx:
-    """httpx の `client.stream(...)` が返す async context manager を模倣。"""
-    def __init__(self, lines: list[str]):
-        self._lines = lines
-
-    async def __aenter__(self):
-        async def aiter_lines():
-            for line in self._lines:
-                yield line
-
-        resp = MagicMock()
-        resp.raise_for_status = MagicMock()
-        resp.aiter_lines = aiter_lines
-        return resp
-
-    async def __aexit__(self, *args):
-        return False
-
-
-class _FakeAsyncClient:
-    """httpx.AsyncClient の最低限のスタブ。"""
-    captured: dict[str, Any] = {}
-    response_lines: list[str] = []
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, *args):
-        return False
-
-    def stream(self, method, url, json=None, headers=None):
-        _FakeAsyncClient.captured["method"] = method
-        _FakeAsyncClient.captured["url"] = url
-        _FakeAsyncClient.captured["json"] = json
-        return _FakeStreamCtx(_FakeAsyncClient.response_lines)
-
-
-def _patch_httpx() -> dict:
-    """httpx を _FakeAsyncClient で差し替えるパッチを作る。"""
-    fake_httpx = MagicMock()
-    fake_httpx.AsyncClient = _FakeAsyncClient
-    fake_httpx.Timeout = lambda x: x
-    return {"httpx": fake_httpx}
-
-
-class TestAstreamAsk:
-    @pytest.mark.asyncio
-    async def test_llama_server_async_path(self):
-        _FakeAsyncClient.captured = {}
-        _FakeAsyncClient.response_lines = [
-            "data: " + json.dumps(
-                {"choices": [{"delta": {"content": "Hi"}, "finish_reason": None}]},
-            ),
-            "",
-            "data: " + json.dumps(
-                {"choices": [{"delta": {"content": "!"}, "finish_reason": "stop"}]},
-            ),
-            "",
-            "data: " + json.dumps(
-                {"choices": [], "usage": {"prompt_tokens": 3, "completion_tokens": 2}},
-            ),
-            "",
-            "data: [DONE]",
-        ]
-
-        with patch.dict("sys.modules", _patch_httpx()):
-            events = []
-            async for event in LlamaServerBackend(_LLAMA_CFG).astream_ask("q"):
-                events.append(event)
-
-        assert _FakeAsyncClient.captured["url"] == "http://test-llama:11435/v1/chat/completions"
-        assert _FakeAsyncClient.captured["json"]["chat_template_kwargs"]["enable_thinking"] is False
-        text = "".join(e.get("response", "") for e in events)
-        assert text == "Hi!"
-        assert events[-1]["done"] is True
-
-    @pytest.mark.asyncio
-    async def test_ollama_async_path(self):
-        _FakeAsyncClient.captured = {}
-        _FakeAsyncClient.response_lines = [
-            json.dumps({"response": "Hi", "done": False}),
-            json.dumps({"response": "", "done": True, "eval_count": 1}),
-        ]
-
-        with patch.dict("sys.modules", _patch_httpx()):
-            events = []
-            async for event in OllamaBackend(_OLLAMA_CFG).astream_ask("q"):
-                events.append(event)
-
-        assert _FakeAsyncClient.captured["url"] == "http://test-ollama:11434/api/generate"
-        assert _FakeAsyncClient.captured["json"]["think"] is False
-        assert events[0]["response"] == "Hi"
-        assert events[-1]["done"] is True
-
-    @pytest.mark.asyncio
-    async def test_llama_server_astream_chat(self):
-        """astream_chat も messages をそのまま OpenAI body に載せる。"""
-        _FakeAsyncClient.captured = {}
-        _FakeAsyncClient.response_lines = [
-            "data: " + json.dumps(
-                {"choices": [{"delta": {"content": "Yes"}, "finish_reason": "stop"}]},
-            ),
-            "",
-            "data: " + json.dumps(
-                {"choices": [], "usage": {"prompt_tokens": 4, "completion_tokens": 1}},
-            ),
-            "",
-            "data: [DONE]",
-        ]
-        messages = [
-            {"role": "user", "content": "Q1"},
-            {"role": "assistant", "content": "A1"},
-            {"role": "user", "content": "Q2"},
-        ]
-
-        with patch.dict("sys.modules", _patch_httpx()):
-            events = []
-            async for event in LlamaServerBackend(_LLAMA_CFG).astream_chat(messages):
-                events.append(event)
-
-        assert _FakeAsyncClient.captured["json"]["messages"] == messages
-        text = "".join(e.get("response", "") for e in events)
-        assert text == "Yes"
-        assert events[-1]["done"] is True
-
-    @pytest.mark.asyncio
-    async def test_llama_server_async_context_raises(self):
-        with pytest.raises(LLMError, match="context resume"):
-            async for _ in LlamaServerBackend(_LLAMA_CFG).astream_ask("x", context=[1]):
-                pass
-
-
-# ---------------------------------------------------------------------------
-# backend_from_env
-# ---------------------------------------------------------------------------
-
-class TestBackendFromEnv:
-    def test_default_is_llama_server(self):
-        backend = backend_from_env()
-        assert isinstance(backend, LlamaServerBackend)
-        assert backend.config.base_url == "http://127.0.0.1:11435"
-        assert backend.config.model == "qwen3.6:35b-a3b"
-        assert backend.config.timeout == 600
-
-    def test_ollama_via_env(self, monkeypatch):
-        monkeypatch.setenv("QWEN_BACKEND", "ollama")
-        monkeypatch.setenv("QWEN_OLLAMA_BASE_URL", "http://custom-ollama:11434")
-        monkeypatch.setenv("QWEN_MODEL", "qwen3.6:14b")
-        monkeypatch.setenv("QWEN_TIMEOUT_SEC", "300")
-
-        backend = backend_from_env()
-        assert isinstance(backend, OllamaBackend)
-        assert backend.config.base_url == "http://custom-ollama:11434"
-        assert backend.config.model == "qwen3.6:14b"
-        assert backend.config.timeout == 300
-
-    def test_unknown_backend_raises(self, monkeypatch):
-        monkeypatch.setenv("QWEN_BACKEND", "vllm")
-        with pytest.raises(LLMError, match="unknown QWEN_BACKEND"):
-            backend_from_env()

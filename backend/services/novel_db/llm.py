@@ -13,8 +13,8 @@ from collections.abc import AsyncIterator
 
 from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_NUM_CTX
 
-from ._llm_backend import QWEN_BACKEND
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider, get_llm_provider
 
 # PoC で確定した QA 用 LLM パラメータ。num_ctx は config 化されており、B-13 段階 A〜C で
 # 段階拡大（既定 32768）。
@@ -35,13 +35,14 @@ async def _astream_ask(
     model: str | None = None,
     options: dict | None = None,
     timeout: float | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> AsyncIterator[dict]:
     """共通 Backend に委譲する thin wrapper。テストでは monkeypatch で差し替え可能。
 
     `stream_qa` から呼ばれる単一の入口。利用側は `_astream_ask` を直接 mock
     することで、Backend 実体（HTTP）を介さずにテストできる。
     """
-    async for event in QWEN_BACKEND.astream_ask(
+    async for event in (provider or get_llm_provider()).qwen.astream_ask(
         prompt,
         model=model,
         options=options,
@@ -56,19 +57,18 @@ async def stream_qa(
     model: str = NOVEL_DB_LLM_MODEL,
     options: dict | None = None,
     timeout: float = 600.0,
+    provider: NovelLlmProvider | None = None,
 ) -> AsyncIterator[dict]:
     """Qwen に stream=True で投げ、各イベントを yield する。
 
-    実体は `_llm_backend.QWEN_BACKEND.astream_ask` を呼ぶだけ。
+    実体は`llm_provider`から取得したQwen backendの`astream_ask`を呼ぶだけ。
     バックエンド分岐（Ollama / llama-server）、thinking 抑制、SSE→Ollama 形式の
     正規化はすべて共通モジュール (`local_llm`) 側に集約している。
     """
-    async for event in _astream_ask(
-        prompt,
-        model=model,
-        options=options or LLM_OPTIONS,
-        timeout=timeout,
-    ):
+    kwargs = {"model": model, "options": options or LLM_OPTIONS, "timeout": timeout}
+    if provider is not None:
+        kwargs["provider"] = provider
+    async for event in _astream_ask(prompt, **kwargs):
         yield event
 
 
@@ -78,9 +78,10 @@ async def astream_chat(
     model: str | None = None,
     options: dict | None = None,
     timeout: float | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> AsyncIterator[dict]:
     """共通 Backend.astream_chat への thin wrapper。テストでは monkeypatch で差替可能。"""
-    async for event in QWEN_BACKEND.astream_chat(
+    async for event in (provider or get_llm_provider()).qwen.astream_chat(
         messages,  # type: ignore[arg-type]
         model=model,
         options=options,
@@ -95,6 +96,7 @@ async def stream_chat(
     model: str = NOVEL_DB_LLM_MODEL,
     options: dict | None = None,
     timeout: float = 600.0,
+    provider: NovelLlmProvider | None = None,
 ) -> AsyncIterator[dict]:
     """OpenAI 互換 messages を直接 LLM に流す（multi-turn）。
 
@@ -102,10 +104,8 @@ async def stream_chat(
     NotImplementedError）。バックエンド側の thinking 抑制 + SSE 正規化は
     `local_llm` に委譲する。
     """
-    async for event in astream_chat(
-        messages,
-        model=model,
-        options=options or LLM_OPTIONS,
-        timeout=timeout,
-    ):
+    kwargs = {"model": model, "options": options or LLM_OPTIONS, "timeout": timeout}
+    if provider is not None:
+        kwargs["provider"] = provider
+    async for event in astream_chat(messages, **kwargs):
         yield event

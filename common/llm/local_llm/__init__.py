@@ -16,7 +16,6 @@ MCP サーバー）。
 
 利用方法（アプリ側、設定を明示渡し）:
 
-    sys.path.insert(0, r"D:\\61.tool\\common\\llm")
     from local_llm import BackendConfig, LlamaServerBackend
     backend = LlamaServerBackend(BackendConfig(
         base_url="http://127.0.0.1:11435",
@@ -27,10 +26,10 @@ MCP サーバー）。
 
 利用方法（CLI / MCP、環境変数経由）:
 
-    sys.path.insert(0, r"D:\\61.tool\\common\\llm")
     from local_llm import backend_from_env
     backend = backend_from_env()
 """
+
 from ._backend import Backend, BackendConfig, LLMError
 from ._factory import backend_from_env
 from ._llama_server import LlamaServerBackend

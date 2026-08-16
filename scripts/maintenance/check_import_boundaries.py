@@ -16,6 +16,13 @@ KINDLE_FORBIDDEN_PREFIXES = (
     "capture_agent_transport",
     "routers",
 )
+NOVEL_RAG_COMPAT_MODULES = {"_llm_backend", "_prompts"}
+NOVEL_OCR_COMPAT_MODULES = {"ocr_qa", "ocr_staging", "surya_ocr"}
+FRONTEND_REMOVED_MODULES = {
+    "@/features/novel_db/sse",
+    "@/hooks/useKindleCatalog",
+    "@/types/kindleCatalog",
+}
 
 
 def _python_imports(path: Path) -> list[tuple[int, str]]:
@@ -24,8 +31,15 @@ def _python_imports(path: Path) -> list[tuple[int, str]]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             imports.extend((node.lineno, alias.name) for alias in node.names)
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            imports.append((node.lineno, node.module))
+        elif isinstance(node, ast.ImportFrom):
+            module = "." * node.level + (node.module or "")
+            imports.append((node.lineno, module))
+            compat_names = NOVEL_RAG_COMPAT_MODULES | NOVEL_OCR_COMPAT_MODULES
+            imports.extend(
+                (node.lineno, f"{module.rstrip('.')}.{alias.name}")
+                for alias in node.names
+                if alias.name in compat_names
+            )
     return sorted(imports)
 
 
@@ -64,25 +78,58 @@ def _frontend_imports_page(path: Path, module: str, project_root: Path) -> bool:
     return resolved == pages_root or pages_root in resolved.parents
 
 
-def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
+def _matches_compat_module(module: str, names: set[str]) -> bool:
+    normalized = module.lstrip(".")
+    return normalized in names or any(normalized.endswith(f".{name}") for name in names)
+
+
+def _backend_violations(project_root: Path) -> list[str]:
     violations: list[str] = []
-
     services_root = project_root / "backend" / "services"
-    if services_root.exists():
-        for path in sorted(services_root.rglob("*.py")):
-            relative = path.relative_to(project_root)
-            for line, module in _python_imports(path):
-                if (
-                    module == "routers"
-                    or module.startswith("routers.")
-                    or module == "backend.routers"
-                    or module.startswith("backend.routers.")
-                ):
-                    violations.append(
-                        f"{relative.as_posix()}:{line}: backend service must not import "
-                        f"routers ({module})"
-                    )
+    if not services_root.exists():
+        return violations
+    for path in sorted(services_root.rglob("*.py")):
+        relative = path.relative_to(project_root)
+        is_novel = relative.parts[:3] == ("backend", "services", "novel_db")
+        for line, module in _python_imports(path):
+            if module == "routers" or module.startswith(
+                ("routers.", "backend.routers.")
+            ):
+                violations.append(
+                    f"{relative.as_posix()}:{line}: backend service must not import "
+                    f"routers ({module})"
+                )
+            if is_novel and _matches_compat_module(module, NOVEL_RAG_COMPAT_MODULES):
+                violations.append(
+                    f"{relative.as_posix()}:{line}: Novel RAG production must not import "
+                    f"compatibility facade ({module})"
+                )
+            if is_novel and _matches_compat_module(module, NOVEL_OCR_COMPAT_MODULES):
+                violations.append(
+                    f"{relative.as_posix()}:{line}: Novel OCR production must not import "
+                    f"compatibility facade ({module})"
+                )
+    return violations
 
+
+def _backend_script_violations(project_root: Path) -> list[str]:
+    violations: list[str] = []
+    scripts_root = project_root / "backend" / "scripts"
+    if not scripts_root.exists():
+        return violations
+    for path in sorted(scripts_root.rglob("*.py")):
+        relative = path.relative_to(project_root)
+        for line, module in _python_imports(path):
+            if _matches_compat_module(module, NOVEL_RAG_COMPAT_MODULES):
+                violations.append(
+                    f"{relative.as_posix()}:{line}: Novel RAG script must not import "
+                    f"compatibility facade ({module})"
+                )
+    return violations
+
+
+def _frontend_violations(project_root: Path) -> list[str]:
+    violations: list[str] = []
     frontend_root = project_root / "frontend" / "src"
     lower_layers = (
         "components",
@@ -111,20 +158,37 @@ def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
                         f"{relative.as_posix()}:{line}: frontend lower layer must not "
                         f"import pages ({module})"
                     )
-
-    kindle_root = project_root / "kindle-pdf"
-    if kindle_root.exists():
-        for path in sorted(kindle_root.rglob("*.py")):
-            relative = path.relative_to(project_root)
-            if not _is_kindle_controller_or_capturer(relative):
-                continue
-            for line, module in _python_imports(path):
-                if module.startswith(KINDLE_FORBIDDEN_PREFIXES):
+                if module in FRONTEND_REMOVED_MODULES:
                     violations.append(
-                        f"{relative.as_posix()}:{line}: Kindle controller/capturer must "
-                        f"not import agent/backend layer ({module})"
+                        f"{relative.as_posix()}:{line}: frontend production must not import "
+                        f"removed compatibility facade ({module})"
                     )
+    return violations
 
+
+def _kindle_violations(project_root: Path) -> list[str]:
+    violations: list[str] = []
+    kindle_root = project_root / "kindle-pdf"
+    if not kindle_root.exists():
+        return violations
+    for path in sorted(kindle_root.rglob("*.py")):
+        relative = path.relative_to(project_root)
+        if not _is_kindle_controller_or_capturer(relative):
+            continue
+        for line, module in _python_imports(path):
+            if module.startswith(KINDLE_FORBIDDEN_PREFIXES):
+                violations.append(
+                    f"{relative.as_posix()}:{line}: Kindle controller/capturer must "
+                    f"not import agent/backend layer ({module})"
+                )
+    return violations
+
+
+def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
+    violations = _backend_violations(project_root)
+    violations.extend(_backend_script_violations(project_root))
+    violations.extend(_frontend_violations(project_root))
+    violations.extend(_kindle_violations(project_root))
     return sorted(violations)
 
 

@@ -2,6 +2,8 @@
 
 > status: living | last-verified: 2026-07-27
 
+<!-- contract-owner: openapi-design -->
+
 バックエンド (FastAPI) が提供する API のリファレンス方針と、OpenAPI では表現できない設計意図をまとめる。
 
 ## この文書の位置づけ

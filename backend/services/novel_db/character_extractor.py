@@ -17,9 +17,9 @@ from local_llm import LLMError
 
 from config import NOVEL_DB_CHAR_EXTRACT_MODEL
 
-from ._llm_backend import GEMMA_BACKEND
 from .character_names import parse_character_names
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider, get_llm_provider
 
 EXTRACT_PROMPT = """次の小説のページから、主要登場人物を最大 3 名挙げてください。
 判断基準:
@@ -48,6 +48,7 @@ def extract_main_characters(
     text: str,
     *,
     model: str = NOVEL_DB_CHAR_EXTRACT_MODEL,
+    provider: NovelLlmProvider | None = None,
 ) -> list[str]:
     """ページテキストから主要登場人物のリストを返す（同期）。
 
@@ -59,7 +60,7 @@ def extract_main_characters(
 
     prompt = EXTRACT_PROMPT.format(text=text[:_TEXT_HEAD_LIMIT])
     try:
-        answer = GEMMA_BACKEND.ask(prompt, model=model, options=_OPTIONS)
+        answer = (provider or get_llm_provider()).gemma.ask(prompt, model=model, options=_OPTIONS)
     except LLMError:
         return []
 

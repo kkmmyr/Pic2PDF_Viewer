@@ -194,6 +194,11 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
 
 初回移行完了後の通常運用 UI は [Kindle 購入カタログ画面 UI/UX 改善 要件](../../要件定義/Kindle購入カタログ画面_UI改善_要件.md) に従い、購入書籍、画像紐付け、キャプチャ、取込・管理の 4 ページへ分離する。各ページは Kindle 領域内の共通サブナビゲーションと固有 URL を持ち、購入書籍を初期ページとする。
 
+フロントエンド実装は`features/kindle/`を所有境界とする。`api.ts`はHTTP、`queries.ts`は
+TanStack Queryとinvalidate、`types.ts`はOpenAPI生成型alias、各`*Screen.tsx`は表示と
+操作controllerを所有する。route pageはscreenを配置するだけとし、URL、query key、
+invalidate範囲、toast文言、responsive layoutをこの再配置では変更しない。
+
 - 購入書籍は検索中心の高密度テーブルとし、行から書籍詳細パネルを開く。
 - 画像紐付けは Pic2PDFViewer の既存画像と Kindle カタログ候補を 2 カラムで比較し、最終確認後だけ ASIN を設定する。
 - 購入書籍の詳細から対象、source、ページ送り方向、運用前提を確認して新規 job を作成する。同一 ASIN の active job または取込済み書籍では開始操作を無効化する。

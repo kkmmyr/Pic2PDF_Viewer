@@ -6,8 +6,6 @@ import type { LibrarySource } from '@/types';
 
 interface ToolsMenuProps {
     source: LibrarySource;
-    /** 後方互換のため受け取るが現状は未使用（ジョブ系撤去後に残置） */
-    onComplete?: () => void;
 }
 
 /**

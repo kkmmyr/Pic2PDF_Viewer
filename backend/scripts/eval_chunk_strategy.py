@@ -46,9 +46,9 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 from services.novel_db import with_db
-from services.novel_db._llm_backend import build_qwen_backend
 from services.novel_db.chunker import chunk_book, chunk_page
 from services.novel_db.embedder import embed_batch
+from services.novel_db.llm_provider import build_llm_provider
 from services.novel_db.migrations import upgrade_head
 
 _MIN_PAGE_CHARS = 30
@@ -217,7 +217,7 @@ def _segment_by_qwen(pages: list[dict]) -> list[int]:
     print("  （応答まで数十秒〜数分かかります）", flush=True)
 
     try:
-        backend = build_qwen_backend()
+        backend = build_llm_provider().qwen
         response = backend.ask(
             _QWEN_PROMPT_TMPL.format(text=full_text),
             options={"num_predict": 1024, "temperature": 0.1},

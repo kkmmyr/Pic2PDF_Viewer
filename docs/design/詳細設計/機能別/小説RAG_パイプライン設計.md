@@ -86,7 +86,7 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 > 人手承認後の一括確定を採用する。固定パイロット合格までは本節のQwen経路を既定として維持し、
 > Sol候補を公開DBへ書き込まない。
 
-LLM呼び出しごとのtemperature・出力長・context長は用途別定数として各機能側に残す。一方、Ollama互換options辞書のキー組み立ては`llm_options.make_llm_options()`に集約し、キー名の表記揺れや型なし辞書の複製を避ける。
+LLM呼び出しごとのtemperature・出力長・context長は用途別prompt moduleに残す。一方、Ollama互換options辞書のキー組み立ては`llm_options.make_llm_options()`に集約し、キー名の表記揺れや型なし辞書の複製を避ける。既定backendの構築は`llm_provider`、本文読込と公開用SQLite更新は`summary_repository`、map-reduceと生成は`summary_generation`、LanceDB更新は`summary_index`が所有し、`summarizer`はこれらを調停するapplication serviceとする。
 
 - **Step 1**: `rebuild_from_pages`（§3、常実行）。
 - **Step 2a 事実抽出**: `summarizer`が採用本文を`[page N]`付きでQwenへ渡し、
@@ -121,7 +121,7 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別定数�
   人物ごとに関連ページと事実メモを渡して、他人物と混在させず個別に説明を生成する。
 - **全巻を覆う人物入力**: 関連本文が入力上限を超える場合、先頭からの単純切り捨ては禁止する。初出と最終出現を必ず含め、全登場範囲を時間帯に分けて各区間から情報量の多いページを選び、その後に残容量を埋める。終盤の選択や関係変化を入力から落とさない。
 - **編集校正**: 詳細あらすじ、短縮要約、人物説明を用途別の編集プロンプトへ渡し、主語不明、因果の飛躍、曖昧な代名詞、電文調、重複、名詞句の連結を修正する。校正は事実表にない設定や心理を追加してはならない。校正版が品質ゲートを通らない場合は、合格している初稿へ戻す。
-- **Step 2e 双方向RAG検証**: 校正後の詳細あらすじを句点単位の主張へ分解する。各主張について、
+- **Step 2e 双方向RAG検証**: 校正後の詳細あらすじを句点単位の主張へ分解する。検証応答のJSON正規化・schema検証はI/Oを持たない`summary_grounding_parser`が担当する。各主張について、
   FTS5 + bge-m3 + RRFの書籍内ハイブリッド検索上位ページと、構造化事実表から文字bigramが
   近い事実の根拠ページを候補にする。要約自体が構造化事実表から執筆されるため、候補順は
   事実表の直接根拠を先、ハイブリッド検索による補完を後とし、各主張の上位2候補は全体の

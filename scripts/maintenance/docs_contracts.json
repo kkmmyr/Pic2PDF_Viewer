@@ -1,0 +1,20 @@
+{
+  "contracts": [
+    {
+      "id": "quality-guardrails",
+      "owner": "docs/design/詳細設計/品質ガードレール.md"
+    },
+    {
+      "id": "maintenance-assets",
+      "owner": "docs/design/環境構築/保守資産・互換層台帳.md"
+    },
+    {
+      "id": "openapi-design",
+      "owner": "docs/design/詳細設計/API.md"
+    },
+    {
+      "id": "ocr-publication",
+      "owner": "docs/design/詳細設計/機能別/OCR設計書.md"
+    }
+  ]
+}

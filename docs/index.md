@@ -35,6 +35,8 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 | API エンドポイント一覧・リクエスト/レスポンススキーマ | FastAPI `/openapi.json`・Swagger UI `/docs`（**手書きしない**）。OpenAPI で表せない設計意図のみ [API.md](design/詳細設計/API.md) |
 | セキュリティ規約（`validate_safe_path` 等） | [セキュリティ設計書.md](design/詳細設計/セキュリティ設計書.md) |
 | 品質ゲート・baseline・例外・月次監査のルール | [品質ガードレール.md](design/詳細設計/品質ガードレール.md) |
+| 互換facade・legacy migration・保守scriptの状態と再評価条件 | [保守資産・互換層台帳.md](design/環境構築/保守資産・互換層台帳.md) |
+| 完了済みリファクタリングPhaseと検証実績 | [リファクタリング履歴.md](archive/リファクタリング履歴.md) |
 | 日常運用・本番デプロイの判定基準・障害対応 | [運用ガイド.md](design/環境構築/運用ガイド.md) |
 | サーバー操作のコピー用コマンド | [サーバー連携コマンド](design/環境構築/サーバー連携よく利用するコマンド.md) |
 | Kindle自動撮影の利用者要件・受入条件 | [Kindle自動撮影取込_要件.md](design/要件定義/Kindle自動撮影取込_要件.md) |
@@ -66,7 +68,7 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 ## 整合性の自動チェック（ガバナンス）
 
 `docs/**/*.md`または`mkdocs.yml`を変更するコミットは、pre-commitフック経由で
-`scripts/maintenance/check_docs.py`が検査する。次のRule 1〜6はすべてblockingである。
+`scripts/maintenance/check_docs.py`が検査する。次のRule 1〜8はすべてblockingである。
 
 1. **リンク切れ**（ブロック） — living 文書の相対 Markdown リンクが実在ファイルを指しているか（`archive/` と週次変更履歴アーカイブの歴史的リンク切れは非ブロックの info 扱い — 過去の記録を doc 再編のたびに書き換えないため）
 2. **変更履歴の肥大化**（ブロック） — `log/変更履歴.md` が上限 800 行を超えていないか（超過時は週次ローテーションを促す）
@@ -74,6 +76,8 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 4. **サイズ上限**（ブロック） — `design/`各設計書が800行を超えていないか（超過時は設計過程・歴史の混在と責務境界を確認する）
 5. **status ヘッダ**（ブロック） — `design/` 各設計書の冒頭 10 行に `> status: living｜absorption-pending | last-verified: YYYY-MM-DD` があるか
 6. **ファイルマップ注釈**（ブロック） — 自動生成ファイルマップの「主要ファイル補足」が実在パスを参照しているか
+7. **正本マップリンク**（ブロック） — 登録した横断契約のowner文書へ正本マップから到達できるか
+8. **契約owner重複**（ブロック） — owner markerの欠落・未登録・別文書への重複がないか
 
 詳細な基準、baseline、例外管理は
 [品質ガードレール](design/詳細設計/品質ガードレール.md)を正本とする。

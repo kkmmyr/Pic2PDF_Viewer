@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { streamQa } from '@/features/novel_db/sse';
+import { streamQa } from '@/features/novel_db/qa-sse';
 
 function streamResponse(chunks: string[]): Response {
     const encoder = new TextEncoder();

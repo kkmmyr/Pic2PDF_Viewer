@@ -2,6 +2,8 @@
 
 > status: living | last-verified: 2026-08-16
 
+<!-- contract-owner: ocr-publication -->
+
 縦書き小説をSurya OCR 2でテキスト化し、入力完全性検査、ページ品質検査、画像照合QAを
 通過した結果だけを `novel.db` へ公開する設計である。yomitokuは独立照合・比較・
 後方互換用エンジンとして残す。
@@ -88,6 +90,10 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_staging.py` | run store・classification・QAの既存import契約を保つ期限付きfacade |
 | `backend/services/novel_db/job_worker.py` | queue workerと既存monkeypatch pointを保つfacade |
 | `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー |
+
+フロントエンドは`features/ocr/api.ts`をHTTP境界、`useOCRQaController`と
+`useOCRGroundTruthController`をQuery/mutation/input状態の所有者とし、各Panelは表示と
+event配線だけを行う。OpenAPI生成型を`features/ocr/types.ts`から参照する。
 
 ### 互換facadeとテスト所有
 

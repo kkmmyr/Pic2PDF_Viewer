@@ -24,8 +24,8 @@ from local_llm import LLMError
 
 from config import NOVEL_DB_BODY_PAGE_MARGIN, NOVEL_DB_CONTEXT_MODEL, NOVEL_DB_MIN_BODY_CHARS
 
-from ._llm_backend import GEMMA_BACKEND
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider, get_llm_provider
 
 # Anthropic 流のプロンプト。書名・俯瞰サマリ・チャンク本文を与えて
 # 「retrieval のための簡潔な位置説明」を返してもらう。
@@ -70,6 +70,7 @@ def generate_chunk_context(
     chunk_text: str,
     *,
     model: str = NOVEL_DB_CONTEXT_MODEL,
+    provider: NovelLlmProvider | None = None,
 ) -> str:
     """1 チャンクの位置説明を生成して返す（同期）。
 
@@ -97,7 +98,7 @@ def generate_chunk_context(
         chunk_text=chunk_text[:_MAX_CHUNK_CHARS],
     )
     try:
-        answer = GEMMA_BACKEND.ask(prompt, model=model, options=_OPTIONS)
+        answer = (provider or get_llm_provider()).gemma.ask(prompt, model=model, options=_OPTIONS)
     except LLMError:
         return ""
 

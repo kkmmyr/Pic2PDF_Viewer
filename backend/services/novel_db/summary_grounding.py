@@ -2,26 +2,31 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 import re
 import sqlite3
 from collections import Counter
-from dataclasses import asdict, dataclass
-from typing import Any, Literal
 
 from local_llm import Backend
 
-from ._prompts import GROUNDING_OPTIONS, SUMMARY_GROUNDING_PROMPT, SUMMARY_GROUNDING_REPAIR_PROMPT
 from .fact_checkpoints import FactRecord, validate_and_structure_fact_sheet
 from .generation_quality import BookFactSheet
+from .grounding_prompts import GROUNDING_OPTIONS, SUMMARY_GROUNDING_PROMPT, SUMMARY_GROUNDING_REPAIR_PROMPT
 from .search import Scope, hybrid_search
+from .summary_grounding_parser import (
+    ClaimAssessment as ClaimAssessment,
+)
+from .summary_grounding_parser import (
+    GroundingError,
+    GroundingReport,
+    SummaryContentType,
+    parse_grounding_response,
+    split_summary_claims,
+)
+from .summary_grounding_parser import (
+    MissingFact as MissingFact,
+)
+from .summary_grounding_repository import save_grounding_report
 
-ClaimVerdict = Literal["supported", "contradicted", "unsupported"]
-CoverageVerdict = Literal["pass", "fail"]
-SummaryContentType = Literal["detailed", "catalog"]
-
-_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[。！？!?])")
 _NON_CONTENT_RE = re.compile(r"[\s、。！？!?「」『』（）()・：:―—…]+")
 _MAX_CLAIMS = 64
 _RAG_TOP_PER_CLAIM = 4
@@ -29,50 +34,6 @@ _FACT_TOP_PER_CLAIM = 2
 _MANDATORY_PAGES_PER_CLAIM = 2
 _MAX_EVIDENCE_PAGES = 64
 _MAX_EVIDENCE_CHARS = 90_000
-
-
-class GroundingError(ValueError):
-    """Raised when a summary cannot pass the grounding gate."""
-
-
-@dataclass(frozen=True)
-class ClaimAssessment:
-    claim_id: int
-    text: str
-    verdict: ClaimVerdict
-    evidence_pages: tuple[int, ...]
-    reason: str
-
-
-@dataclass(frozen=True)
-class MissingFact:
-    pages: tuple[int, ...]
-    fact: str
-
-
-@dataclass(frozen=True)
-class GroundingReport:
-    claims: tuple[ClaimAssessment, ...]
-    coverage_verdict: CoverageVerdict
-    missing_facts: tuple[MissingFact, ...]
-    coverage_required: bool = True
-
-    @property
-    def passed(self) -> bool:
-        return all(claim.verdict == "supported" for claim in self.claims) and (
-            not self.coverage_required or (self.coverage_verdict == "pass" and not self.missing_facts)
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "passed": self.passed,
-            "coverage_required": self.coverage_required,
-            "claims": [asdict(claim) for claim in self.claims],
-            "coverage": {
-                "verdict": self.coverage_verdict,
-                "missing_facts": [asdict(fact) for fact in self.missing_facts],
-            },
-        }
 
 
 def verify_summary_grounding(
@@ -94,7 +55,7 @@ def verify_summary_grounding(
         raise GroundingError("summary grounding requires at least one claim")
     if len(claims) > _MAX_CLAIMS:
         error = f"summary grounding claim limit exceeded: {len(claims)}"
-        _save_report(
+        save_grounding_report(
             conn,
             book_id=book_id,
             summary=summary,
@@ -106,10 +67,7 @@ def verify_summary_grounding(
                 "passed": False,
                 "error": error,
                 "claim_limit": _MAX_CLAIMS,
-                "claims": [
-                    {"id": claim_id, "text": claim}
-                    for claim_id, claim in enumerate(claims, 1)
-                ],
+                "claims": [{"id": claim_id, "text": claim} for claim_id, claim in enumerate(claims, 1)],
             },
         )
         raise GroundingError(error)
@@ -200,7 +158,7 @@ def verify_summary_grounding(
                 }
                 for claim_id, claim in enumerate(claims, 1)
             ]
-            _save_report(
+            save_grounding_report(
                 conn,
                 book_id=book_id,
                 summary=summary,
@@ -228,7 +186,7 @@ def verify_summary_grounding(
             "initial_raw_response": initial_raw_response,
         }
 
-    _save_report(
+    save_grounding_report(
         conn,
         book_id=book_id,
         summary=summary,
@@ -247,109 +205,6 @@ def verify_summary_grounding(
             details.append(f"missing facts={len(report.missing_facts)}")
         raise GroundingError("summary grounding failed: " + "; ".join(details))
     return report
-
-
-def split_summary_claims(summary: str) -> list[str]:
-    """Split prose into stable sentence-level claims without an LLM call."""
-    claims: list[str] = []
-    for paragraph in summary.splitlines():
-        value = paragraph.strip()
-        if not value:
-            continue
-        claims.extend(part.strip() for part in _SENTENCE_BOUNDARY_RE.split(value) if part.strip())
-    return claims
-
-
-def parse_grounding_response(
-    response: str,
-    *,
-    claims: list[str],
-    candidate_pages: dict[int, tuple[int, ...]],
-    coverage_required: bool = True,
-    allowed_evidence_pages: set[int] | None = None,
-) -> GroundingReport:
-    """Parse and strictly validate the verifier's JSON contract."""
-    try:
-        payload = json.loads(response.strip())
-    except json.JSONDecodeError as exc:
-        raise GroundingError(f"grounding verifier returned invalid JSON: {exc.msg}") from exc
-    if not isinstance(payload, dict):
-        raise GroundingError("grounding response root must be an object")
-
-    raw_claims = payload.get("claims")
-    if not isinstance(raw_claims, list):
-        raise GroundingError("grounding response claims must be an array")
-    expected_ids = set(range(1, len(claims) + 1))
-    seen_ids: set[int] = set()
-    assessments: list[ClaimAssessment] = []
-    for item in raw_claims:
-        if not isinstance(item, dict):
-            raise GroundingError("grounding claim result must be an object")
-        claim_id = item.get("id")
-        if not isinstance(claim_id, int) or claim_id not in expected_ids or claim_id in seen_ids:
-            raise GroundingError(f"invalid or duplicate grounding claim id: {claim_id}")
-        seen_ids.add(claim_id)
-
-        verdict = item.get("verdict")
-        if verdict not in {"supported", "contradicted", "unsupported"}:
-            raise GroundingError(f"invalid grounding verdict for claim {claim_id}: {verdict}")
-        evidence_pages = _integer_tuple(item.get("evidence_pages"), label=f"claim {claim_id} evidence_pages")
-        allowed = (
-            allowed_evidence_pages
-            if allowed_evidence_pages is not None
-            else set(candidate_pages.get(claim_id, ()))
-        )
-        if set(evidence_pages) - allowed:
-            label = "provided evidence pages" if allowed_evidence_pages is not None else "candidates"
-            raise GroundingError(f"claim {claim_id} cited a page outside its {label}")
-        if verdict == "supported" and not evidence_pages:
-            raise GroundingError(f"supported claim {claim_id} has no evidence page")
-        reason = item.get("reason")
-        if not isinstance(reason, str) or not reason.strip():
-            raise GroundingError(f"claim {claim_id} has no reason")
-        assessments.append(
-            ClaimAssessment(
-                claim_id=claim_id,
-                text=claims[claim_id - 1],
-                verdict=verdict,
-                evidence_pages=evidence_pages,
-                reason=reason.strip(),
-            )
-        )
-    if seen_ids != expected_ids:
-        missing = sorted(expected_ids - seen_ids)
-        raise GroundingError(f"grounding response omitted claim ids: {missing}")
-
-    raw_coverage = payload.get("coverage")
-    if not isinstance(raw_coverage, dict):
-        raise GroundingError("grounding response coverage must be an object")
-    coverage_verdict = raw_coverage.get("verdict")
-    if coverage_verdict not in {"pass", "fail"}:
-        raise GroundingError(f"invalid coverage verdict: {coverage_verdict}")
-    raw_missing = raw_coverage.get("missing_facts")
-    if not isinstance(raw_missing, list):
-        raise GroundingError("coverage missing_facts must be an array")
-    missing_facts: list[MissingFact] = []
-    for item in raw_missing:
-        if not isinstance(item, dict):
-            raise GroundingError("missing fact must be an object")
-        pages = _integer_tuple(item.get("pages"), label="missing fact pages")
-        fact = item.get("fact")
-        if not isinstance(fact, str) or not fact.strip():
-            raise GroundingError("missing fact text is required")
-        missing_facts.append(MissingFact(pages=pages, fact=fact.strip()))
-    if coverage_verdict == "pass" and missing_facts:
-        raise GroundingError("coverage cannot pass with missing facts")
-    if coverage_verdict == "fail" and not missing_facts:
-        raise GroundingError("coverage cannot fail without missing facts")
-
-    assessments.sort(key=lambda item: item.claim_id)
-    return GroundingReport(
-        claims=tuple(assessments),
-        coverage_verdict=coverage_verdict,
-        missing_facts=tuple(missing_facts),
-        coverage_required=coverage_required,
-    )
 
 
 def _candidate_pages_by_claim(
@@ -390,10 +245,7 @@ def _select_evidence_pages(
     counts = Counter(page for pages in candidates.values() for page in pages if page in page_texts)
     mandatory = list(
         dict.fromkeys(
-            page
-            for pages in candidates.values()
-            for page in pages[:_MANDATORY_PAGES_PER_CLAIM]
-            if page in page_texts
+            page for pages in candidates.values() for page in pages[:_MANDATORY_PAGES_PER_CLAIM] if page in page_texts
         )
     )
     remaining = sorted(
@@ -421,12 +273,7 @@ def _expand_candidate_neighbors(
 ) -> tuple[int, ...]:
     """Keep direct candidates first, then add existing adjacent pages."""
     direct = [page for page in pages if page in available_pages]
-    adjacent = [
-        neighbor
-        for page in direct
-        for neighbor in (page - 1, page + 1)
-        if neighbor in available_pages
-    ]
+    adjacent = [neighbor for page in direct for neighbor in (page - 1, page + 1) if neighbor in available_pages]
     return tuple(dict.fromkeys([*direct, *adjacent]))
 
 
@@ -444,37 +291,6 @@ def _render_evidence(selected_pages: list[int], page_texts: dict[int, str]) -> s
     return "\n\n".join(f"[page {page}]\n{page_texts[page]}" for page in selected_pages)
 
 
-def _save_report(
-    conn: sqlite3.Connection,
-    *,
-    book_id: int,
-    summary: str,
-    writer_model: str,
-    verifier_model: str,
-    content_type: SummaryContentType,
-    passed: bool,
-    payload: dict[str, Any],
-) -> None:
-    conn.execute(
-        """
-        INSERT INTO summary_grounding_reports
-            (book_id, content_type, candidate_sha256, writer_model, verifier_model, passed,
-             report_json, checked_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now', '+9 hours'))
-        """,
-        (
-            book_id,
-            content_type,
-            hashlib.sha256(summary.encode("utf-8")).hexdigest(),
-            writer_model,
-            verifier_model,
-            int(passed),
-            json.dumps(payload, ensure_ascii=False, sort_keys=True),
-        ),
-    )
-    conn.commit()
-
-
 def _bigram_overlap(left: str, right: str) -> int:
     left_units = _bigrams(left)
     right_units = _bigrams(right)
@@ -484,9 +300,3 @@ def _bigram_overlap(left: str, right: str) -> int:
 def _bigrams(value: str) -> set[str]:
     compact = _NON_CONTENT_RE.sub("", value)
     return {compact[index : index + 2] for index in range(max(0, len(compact) - 1))}
-
-
-def _integer_tuple(value: object, *, label: str) -> tuple[int, ...]:
-    if not isinstance(value, list) or not all(isinstance(item, int) and item > 0 for item in value):
-        raise GroundingError(f"{label} must be an array of positive integers")
-    return tuple(dict.fromkeys(value))

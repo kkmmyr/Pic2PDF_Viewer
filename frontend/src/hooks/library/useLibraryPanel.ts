@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { useLibraryPins } from '@/hooks/library/useLibraryPins';
 import { useSortedPdfs } from '@/hooks/library/useSortedPdfs';
 import { useBookMeta } from '@/hooks/library/useBookMeta';
@@ -14,20 +13,17 @@ import { useLibrarySelectionShortcut } from '@/hooks/library/useLibrarySelection
 import { useSeriesEditDialog } from '@/hooks/library/useSeriesEditDialog';
 import { useAsyncToast } from '@/hooks/useAsyncToast';
 import { useUrlState } from './useUrlState';
-import { useLibraryPdfs, pdfQueryKey } from './useLibraryPdfs';
+import { useLibraryPdfs } from './useLibraryPdfs';
+import { useLibraryBookActions } from './useLibraryBookActions';
 import { usePinnedBookSets } from './usePinnedBookSets';
 import { useSeriesAuthorFilter } from './useSeriesAuthorFilter';
 import { useDialogToggles } from './useDialogToggles';
 import { useLibraryStore } from '@/stores/libraryStore';
-import { API_ENDPOINTS } from '@/config/api';
 import { authorsKey } from '@/utils/authors';
-import apiClient from '@/config/api_client';
 
 type BulkDialogKey = 'bulkAuthor' | 'merge' | 'bulkSeries' | 'bulkGenre';
 
 export function useLibraryPanel(onPdfClick: (name: string) => void) {
-    const queryClient = useQueryClient();
-
     const {
         currentPath,
         currentSource,
@@ -49,25 +45,12 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         refetch: refetchPdfs,
     } = useLibraryPdfs(currentPath, currentSource);
 
-    const invalidatePdfs = useCallback(() => {
-        void queryClient.invalidateQueries({ queryKey: pdfQueryKey(currentPath, currentSource) });
-    }, [queryClient, currentPath, currentSource]);
-
-    const handleRename = useCallback(
-        async (newName: string) => {
-            if (!renameTarget) return;
-            await apiClient.patch(API_ENDPOINTS.RENAME, {
-                path: currentPath,
-                old_name: renameTarget.name,
-                new_name: newName,
-                source: currentSource,
-                is_folder: renameTarget.isFolder,
-            });
-            closeRenameDialog();
-            invalidatePdfs();
-        },
-        [renameTarget, currentPath, currentSource, closeRenameDialog, invalidatePdfs],
-    );
+    const { handleRename, handleRegenThumb, invalidatePdfs } = useLibraryBookActions({
+        currentPath,
+        currentSource,
+        renameTarget,
+        closeRenameDialog,
+    });
 
     const { selectedPdf } = useUrlState();
 
@@ -198,18 +181,6 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
             onPdfClick(name);
         },
         [recordView, currentPath, onPdfClick],
-    );
-
-    const handleRegenThumb = useCallback(
-        async (name: string) => {
-            await apiClient.post(API_ENDPOINTS.REGENERATE_THUMBNAIL, {
-                path: currentPath,
-                name,
-                source: currentSource,
-            });
-            invalidatePdfs();
-        },
-        [currentPath, currentSource, invalidatePdfs],
     );
 
     const { filteredPdfs } = useLibraryFilter({

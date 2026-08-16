@@ -1,45 +1,41 @@
-"""B-28 読書会ロングフォーム生成サービス（B-20 を置き換え）。
-
-固定ホストキャラ 2 人（discussion_cast）による番組台本を 2 段の LLM 呼び出しで生成する:
-①構成ステップ（generate_plan: 対立する主張・テーマ・脱線ネタカードを JSON で取得）
-②台本ステップ（stream_discussion_turns: セグメント境界マーカー付き台本を SSE ストリーミング）
-
-ターン境界は `[A]:` / `[B]:`（表記揺れ許容）、セグメント境界は `[S:segment_id]` を
-逐次検出することで、1 ターン完結ごとにイベントを yield するリアルタイム SSE を実現している。
-"""
+"""読書会plan生成とstream変換を調停するapplication service。"""
 
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import AsyncIterator
-from datetime import datetime
 from pathlib import Path
 
-from fastapi import HTTPException
-
-from config import (
-    KINDLE_NOVEL_DIR,
-    NOVEL_DB_LLM_MODEL,
-    NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
-)
-from utils.dt import JST
+from config import KINDLE_NOVEL_DIR, NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_FULL_BOOK_NUM_CTX
 from utils.logger import get_logger
-from utils.path_utils import resolve_under_base, validate_safe_name
 
+from .discussion_parser import extract_plan_json, parse_turns_from_text, validate_plan
+from .discussion_repository import (
+    count_discussions as count_discussions_from,
+)
+from .discussion_repository import (
+    delete_discussion as delete_discussion_from,
+)
+from .discussion_repository import (
+    discussion_book_dir,
+)
+from .discussion_repository import (
+    list_discussions as list_discussions_from,
+)
+from .discussion_repository import (
+    save_discussion as save_discussion_to,
+)
+from .discussion_stream import stream_discussion_events
 from .llm import astream_chat as _astream_chat
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider
 from .search import SearchHit
 
 logger = get_logger(__name__)
-
-# ディスカッション JSON 保存先
 DISCUSSIONS_DIR = Path(KINDLE_NOVEL_DIR) / "discussions"
-
-# 1 トークン ≈ 1.5 日本語文字として推定
 _CHARS_PER_TOKEN = 1.5
-# 131072 ctx から出力 8192 + プロンプト構造オーバーヘッドを引いた入力上限
 MAX_INPUT_TOKENS = 112_000
+_PLAN_MAX_ATTEMPTS = 3
 
 LLM_OPTIONS = make_llm_options(
     temperature=0.7,
@@ -47,8 +43,6 @@ LLM_OPTIONS = make_llm_options(
     num_predict=8192,
     num_ctx=NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
 )
-
-# 構成ステップ用: JSON 出力なので温度を下げ、出力上限も台本より小さくてよい
 PLAN_LLM_OPTIONS = make_llm_options(
     temperature=0.4,
     repeat_penalty=1.1,
@@ -56,75 +50,17 @@ PLAN_LLM_OPTIONS = make_llm_options(
     num_ctx=NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
 )
 
-# 保存ファイル名のバリデーション（delete 用）
-_FILENAME_RE = re.compile(r"^[\w+\-]+\.json$")
-
-# ターンマーカー: [A]: の表記揺れ（[A>: / [A]： / [A): 等）を許容する寛容パーサ
-_TURN_RE = re.compile(r"\[([AB])[\]\>）\)]?\s*[:：]")
-
-# セグメントマーカー: [S:segment_id]（閉じ括弧の揺れ・欠落を許容）
-_SEG_RE = re.compile(r"\[S[:：]\s*([a-z0-9_]+)\s*[\]\>]?")
-
-
-def _parse_turns_from_text(text: str) -> list[tuple[str, str]]:
-    """完全なテキストを `[A]:` / `[B]:` マーカーで分割し (speaker, text) リストを返す。
-
-    セグメントマーカー `[S:...]` は除去する。
-    ストリーミング時のインクリメンタル解析とは別に、テストや後処理用に提供する。
-    """
-    cleaned = _SEG_RE.sub("", text)
-    parts = _TURN_RE.split(cleaned)
-    # parts = [prefix, speaker, text, speaker, text, ...]
-    turns = []
-    for i in range(1, len(parts) - 1, 2):
-        speaker = parts[i]
-        turn_text = parts[i + 1] if i + 1 < len(parts) else ""
-        stripped = turn_text.strip()
-        if stripped:
-            turns.append((speaker, stripped))
-    return turns
+_parse_turns_from_text = parse_turns_from_text
+_extract_json_object = extract_plan_json
+_validate_plan = validate_plan
 
 
 def estimate_book_tokens(hits: list[SearchHit]) -> int:
-    """書籍全ページの文字数から推定トークン数を返す。"""
-    total_chars = sum(len(h.snippet) for h in hits)
-    return int(total_chars / _CHARS_PER_TOKEN)
+    return int(sum(len(hit.snippet) for hit in hits) / _CHARS_PER_TOKEN)
 
 
 def format_book_text(hits: list[SearchHit]) -> str:
-    """書籍全ページをプロンプト差し込み用の 1 文字列に整形する。"""
-    lines = [f"[page {h.page_no}]\n{h.snippet}" for h in hits]
-    return "\n\n".join(lines)
-
-
-def _extract_json_object(text: str) -> dict:
-    """LLM 出力からコードフェンス・前置きを取り除いて JSON オブジェクトを抽出する。"""
-    cleaned = re.sub(r"```(?:json)?", "", text)
-    start = cleaned.find("{")
-    end = cleaned.rfind("}")
-    if start == -1 or end == -1 or end <= start:
-        raise ValueError("構成メモの JSON が見つかりません")
-    return json.loads(cleaned[start : end + 1])
-
-
-def _validate_plan(plan: dict) -> None:
-    themes = plan.get("themes")
-    if not isinstance(themes, list) or len(themes) != 2:
-        raise ValueError("構成メモの themes は 2 件必要です")
-    for theme in themes:
-        if not isinstance(theme, dict) or not theme.get("title") or not theme.get("question"):
-            raise ValueError("構成メモの themes に title / question がありません")
-    stances = plan.get("stances")
-    if not isinstance(stances, dict) or not stances.get("a") or not stances.get("b"):
-        raise ValueError("構成メモの stances に a / b がありません")
-    cards = plan.get("cards")
-    if not isinstance(cards, list) or len(cards) < 1:
-        raise ValueError("構成メモの cards は 1 件以上必要です")
-
-
-# 構成メモの JSON 崩れ・バリデーション不合格時のリトライ上限。
-# system 先頭（書籍本文）の KV cache が効いているため再試行は安価
-_PLAN_MAX_ATTEMPTS = 3
+    return "\n\n".join(f"[page {hit.page_no}]\n{hit.snippet}" for hit in hits)
 
 
 async def generate_plan(
@@ -132,39 +68,34 @@ async def generate_plan(
     *,
     model: str = NOVEL_DB_LLM_MODEL,
     options: dict | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> dict:
-    """構成ステップ（Call 1）を実行し、バリデーション済み構成メモ dict を返す。
-
-    LLM の JSON 出力は確率的に崩れるため、抽出・パース・バリデーション失敗時は
-    同一プロンプトで最大 _PLAN_MAX_ATTEMPTS 回まで再試行する。
-    全滅時は最後の ValueError（呼び出し側で SSE error に変換する）。
-    """
-    opts = options or PLAN_LLM_OPTIONS
+    selected_options = options or PLAN_LLM_OPTIONS
     last_error: ValueError | None = None
     for attempt in range(1, _PLAN_MAX_ATTEMPTS + 1):
-        chunks: list[str] = []
-        async for event in _astream_chat(messages, model=model, options=opts):
-            if event.get("response"):
-                chunks.append(event["response"])
-            if event.get("done"):
-                break
-        full_text = "".join(chunks)
+        text = await _collect_response(
+            messages,
+            model=model,
+            options=selected_options,
+            provider=provider,
+        )
         try:
-            plan = _extract_json_object(full_text)
-            _validate_plan(plan)
+            plan = extract_plan_json(text)
+            validate_plan(plan)
             return plan
-        except json.JSONDecodeError as e:
-            last_error = ValueError(f"構成メモの JSON パースに失敗しました: {e}")
-            last_error.__cause__ = e
-        except ValueError as e:
-            last_error = e
+        except json.JSONDecodeError as exc:
+            last_error = ValueError(f"構成メモの JSON パースに失敗しました: {exc}")
+            last_error.__cause__ = exc
+        except ValueError as exc:
+            last_error = exc
         logger.warning(
             "generate_plan attempt %d/%d failed: %s",
             attempt,
             _PLAN_MAX_ATTEMPTS,
             last_error,
         )
-    assert last_error is not None
+    if last_error is None:
+        raise RuntimeError("generate_plan failed without validation error")
     raise last_error
 
 
@@ -173,84 +104,45 @@ async def stream_discussion_turns(
     *,
     model: str = NOVEL_DB_LLM_MODEL,
     options: dict | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> AsyncIterator[dict]:
-    """台本ステップ（Call 2）のイベントを逐次 yield する。
+    async def chat_stream(*args, **kwargs):
+        if provider is not None:
+            kwargs["provider"] = provider
+        async for event in _astream_chat(*args, **kwargs):
+            yield event
 
-    - {"type": "segment", "id": "<segment_id>"} — セグメント境界検出時
-    - {"type": "turn", "speaker": "A"|"B", "text": "...", "segment": <現在のセグメントID|None>}
+    async for event in stream_discussion_events(
+        messages,
+        chat_stream=chat_stream,
+        model=model,
+        options=options or LLM_OPTIONS,
+    ):
+        yield event
 
-    LLM 出力をトークン単位で受け取りながらターン / セグメントマーカーを検出し、
-    1 ターン完了のタイミングで yield する。最後のターンはストリーム終端で yield。
-    セグメントマーカーは turn text に含めない。
-    """
-    opts = options or LLM_OPTIONS
-    buffer = ""
-    current_speaker: str | None = None
-    current_segment: str | None = None
 
-    def _flush_turn(text: str) -> dict | None:
-        stripped = text.strip()
-        if current_speaker is None or not stripped:
-            return None
-        return {
-            "type": "turn",
-            "speaker": current_speaker,
-            "text": stripped,
-            "segment": current_segment,
-        }
-
-    def _drain(at_end: bool):
-        """buffer からマーカーを検出できる限りイベントを取り出す（1 イベント複数マーカー対応）。"""
-        nonlocal buffer, current_speaker, current_segment
-        while True:
-            turn_m = _TURN_RE.search(buffer)
-            seg_m = _SEG_RE.search(buffer)
-            if turn_m is None and seg_m is None:
-                return
-            # 先に出現した方を処理する
-            if seg_m is not None and (turn_m is None or seg_m.start() < turn_m.start()):
-                # 閉じ括弧が省略可能なため、マッチが buffer 終端に達していて閉じ括弧を
-                # 消費していない場合はセグメント ID が途中の可能性がある → 次チャンクを待つ
-                if not at_end and seg_m.end() == len(buffer) and buffer[-1] not in "]>":
-                    return
-                turn = _flush_turn(buffer[: seg_m.start()])
-                if turn:
-                    yield turn
-                current_speaker = None
-                current_segment = seg_m.group(1)
-                yield {"type": "segment", "id": current_segment}
-                buffer = buffer[seg_m.end() :]
-            else:
-                assert turn_m is not None
-                turn = _flush_turn(buffer[: turn_m.start()])
-                if turn:
-                    yield turn
-                current_speaker = turn_m.group(1)
-                buffer = buffer[turn_m.end() :]
-
-    async for event in _astream_chat(messages, model=model, options=opts):
-        if event.get("response"):
-            buffer += event["response"]
-            for ev in _drain(at_end=False):
-                yield ev
-
+async def _collect_response(
+    messages: list[dict],
+    *,
+    model: str,
+    options: dict,
+    provider: NovelLlmProvider | None,
+) -> str:
+    chunks: list[str] = []
+    kwargs = {"model": model, "options": options}
+    if provider is not None:
+        kwargs["provider"] = provider
+    async for event in _astream_chat(messages, **kwargs):
+        response = event.get("response")
+        if isinstance(response, str) and response:
+            chunks.append(response)
         if event.get("done"):
-            for ev in _drain(at_end=True):
-                yield ev
-            # 最後のターンをフラッシュ
-            turn = _flush_turn(buffer)
-            if turn:
-                yield turn
-            return
+            break
+    return "".join(chunks)
 
 
 def _discussion_book_dir(book_name: str) -> Path:
-    """書籍別ディスカッションディレクトリをroot配下へ安全に解決する。"""
-    try:
-        validate_safe_name(book_name, param_name="book_name")
-        return Path(resolve_under_base(DISCUSSIONS_DIR, book_name, param_name="book_name"))
-    except HTTPException as exc:
-        raise ValueError(f"不正な書籍名です: {book_name}") from exc
+    return discussion_book_dir(DISCUSSIONS_DIR, book_name)
 
 
 def save_discussion(
@@ -261,84 +153,24 @@ def save_discussion(
     turns: list[dict],
     checks: dict,
 ) -> str:
-    """ディスカッション結果を format_version 2 の JSON で保存し、保存先パス文字列を返す。
-
-    ファイル名は JST タイムスタンプ + UTC オフセット（例: 20260707T123456+0900.json）。
-    """
-    book_dir = _discussion_book_dir(book_name)
-    book_dir.mkdir(parents=True, exist_ok=True)
-    ts = datetime.now(JST).strftime("%Y%m%dT%H%M%S%z")
-    out_path = book_dir / f"{ts}.json"
-    data = {
-        "format_version": 2,
-        "book": book_name,
-        "cast": cast_snapshot,
-        "segments": segments,
-        "cards": cards,
-        "turns": turns,
-        "checks": checks,
-        "partial": False,
-        "created_at": datetime.now(JST).isoformat(),
-    }
-    out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    return str(out_path)
+    return save_discussion_to(
+        DISCUSSIONS_DIR,
+        book_name,
+        cast_snapshot,
+        segments,
+        cards,
+        turns,
+        checks,
+    )
 
 
 def count_discussions(book_name: str) -> int:
-    """指定書籍のディスカッション数を返す（ファイル数カウントのみ、JSON ロードなし）。"""
-    book_dir = _discussion_book_dir(book_name)
-    if not book_dir.exists():
-        return 0
-    return sum(1 for _ in book_dir.glob("*.json"))
+    return count_discussions_from(DISCUSSIONS_DIR, book_name)
 
 
 def list_discussions(book_name: str) -> list[dict]:
-    """指定書籍のディスカッション一覧を新しい順で返す（turns 含む全データ）。
-
-    v1（format_version なし・自由ペルソナ）と v2（固定キャスト + segments + checks）の
-    両形式を読める。v2 では personas をキャストから合成する（name + stance）。
-    """
-    book_dir = _discussion_book_dir(book_name)
-    if not book_dir.exists():
-        return []
-    results = []
-    for f in sorted(book_dir.glob("*.json"), reverse=True):
-        try:
-            data = json.loads(f.read_text(encoding="utf-8"))
-            version = data.get("format_version", 1)
-            if version >= 2:
-                personas = [
-                    {"name": c.get("name", ""), "style_description": c.get("stance", "")} for c in data.get("cast", [])
-                ]
-            else:
-                personas = data.get("personas", [])
-            results.append(
-                {
-                    "filename": f.name,
-                    "created_at": data.get("created_at"),
-                    "personas": personas,
-                    "turn_count": len(data.get("turns", [])),
-                    "turns": data.get("turns", []),
-                    "format_version": version,
-                    "segments": data.get("segments"),
-                    "checks": data.get("checks"),
-                }
-            )
-        except Exception:
-            logger.warning("discussion JSON parse failed: %s", f.name, exc_info=True)
-    return results
+    return list_discussions_from(DISCUSSIONS_DIR, book_name)
 
 
 def delete_discussion(book_name: str, filename: str) -> bool:
-    """指定ディスカッション JSON を削除する。
-
-    filename 不正・パストラバーサルは ValueError。
-    ファイルが存在しなければ False、削除成功で True。
-    """
-    if not _FILENAME_RE.match(filename):
-        raise ValueError(f"不正なファイル名です: {filename}")
-    target = Path(resolve_under_base(_discussion_book_dir(book_name), filename, param_name="filename"))
-    if not target.exists():
-        return False
-    target.unlink()
-    return True
+    return delete_discussion_from(DISCUSSIONS_DIR, book_name, filename)

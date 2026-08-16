@@ -11,6 +11,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = Path(__file__).with_name("c901_baseline.json")
+ASSET_INVENTORY_PATH = Path(__file__).with_name("maintenance_assets.json")
 MESSAGE_RE = re.compile(
     r"`(?P<symbol>[^`]+)` is too complex \((?P<complexity>\d+) > \d+\)"
 )
@@ -20,6 +21,19 @@ MESSAGE_RE = re.compile(
 class ComplexityViolation:
     key: str
     complexity: int
+
+
+def _temporary_script_patterns() -> tuple[str, ...]:
+    inventory = json.loads(ASSET_INVENTORY_PATH.read_text(encoding="utf-8"))
+    return tuple(
+        pattern
+        for group in inventory.get("script_groups", [])
+        if group.get("classification") in {"temporary", "frozen"}
+        for pattern in group.get("patterns", [])
+    )
+
+
+TEMPORARY_SCRIPT_PATTERNS = _temporary_script_patterns()
 
 
 def parse_ruff_output(
@@ -39,6 +53,8 @@ def parse_ruff_output(
             .relative_to(project_root.resolve())
             .as_posix()
         )
+        if any(Path(path).match(pattern) for pattern in TEMPORARY_SCRIPT_PATTERNS):
+            continue
         violations.append(
             ComplexityViolation(
                 key=f"{path}:{match.group('symbol')}",
@@ -74,6 +90,8 @@ def main() -> int:
             "check",
             "backend",
             "kindle-pdf",
+            "common/llm",
+            "scripts",
             "--select",
             "C901",
             "--output-format",

@@ -2,12 +2,12 @@
  * マルチターン会話 QA セクション（B-16）。
  *
  * ChatGPT 風 UI: 左にセッション一覧、右に現セッションのメッセージスレッド + 入力欄。
- * 新規セッションは現在の scope（NovelDbHeader のスコープセレクタ）で開始。
+ * 新規セッションは画面controllerから渡された現在のscopeで開始。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare } from 'lucide-react';
 
-import { streamChatSession } from '@/features/novel_db/sse';
+import { streamChatSession } from '@/features/novel_db/chat-sse';
 import type { Scope } from '@/features/novel_db/types';
 import { useChatSessionDetail, useChatSessions } from '@/hooks/novel_db';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';

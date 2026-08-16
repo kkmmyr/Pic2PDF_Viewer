@@ -65,6 +65,9 @@ jobs:
       - name: Import boundaries
         run: uv run python scripts/maintenance/check_import_boundaries.py
 
+      - name: Maintenance asset deadlines
+        run: uv run python scripts/maintenance/check_maintenance_assets.py
+
       - name: Format check (ruff format)
         working-directory: backend
         run: uv run ruff format --check .
@@ -76,6 +79,14 @@ jobs:
       - name: Test (pytest + coverage)
         working-directory: backend
         run: uv run pytest -q --cov --cov-fail-under=65
+
+      - name: Test Kindle controller package
+        working-directory: kindle-pdf
+        run: uv run pytest -q
+
+      - name: Test common LLM package
+        working-directory: common/llm
+        run: uv run pytest -q
 
   # ---------------------------------------------------------------------------
   # Frontend: eslint + tsc + vitest
@@ -104,9 +115,17 @@ jobs:
         working-directory: frontend
         run: npm run lint
 
+      - name: Unused dependency check
+        working-directory: frontend
+        run: npm run lint:deps
+
       - name: Test (tsc + vitest)
         working-directory: frontend
         run: npm run test:ci
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build
 
   # ---------------------------------------------------------------------------
   # Docs: check_docs.py（リンク切れ・変更履歴肥大化・nav 孤児）+ mkdocs build --strict

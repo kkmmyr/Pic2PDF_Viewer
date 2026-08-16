@@ -1,41 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { API_ENDPOINTS } from '@/config/api';
-import apiClient from '@/config/api_client';
-import type {
-    KindleCatalogBooksResponse,
-    KindleCatalogFilters,
-    KindleCatalogSourceStatus,
-    KindleCatalogStats,
-    KindleCaptureJob,
-    KindleCaptureJobsResponse,
-    KindleImportRunsResponse,
-    KindleLinkCandidatesResponse,
-    KindleLinkResponse,
-    KindleMigrationCommit,
-    KindleMigrationPreview,
-    KindleOrdersImport,
-    KindleUnlinkedBooksResponse,
-} from '@/types/kindleCatalog';
+import {
+    commitMigration,
+    createCaptureJob,
+    fetchCaptureJobs,
+    fetchCatalogStats,
+    fetchImportRuns,
+    fetchImportSources,
+    fetchKindleBooks,
+    fetchLinkCandidates,
+    fetchUnlinkedBooks,
+    importAutobuy,
+    importKindleInfo,
+    importOrders,
+    linkKindleBook,
+    previewMigration,
+} from '@/features/kindle/api';
+import type { KindleCatalogFilters } from '@/features/kindle/types';
 
 const QUERY_ROOT = ['kindleCatalog'] as const;
-
-function booksEndpoint(filters: KindleCatalogFilters): string {
-    const params = new URLSearchParams({
-        page: String(filters.page),
-        page_size: String(filters.pageSize),
-    });
-    if (filters.q.trim()) params.set('q', filters.q.trim());
-    if (filters.bookType) params.set('book_type', filters.bookType);
-    if (filters.ownership) params.set('ownership', filters.ownership);
-    if (filters.captureState) params.set('capture_state', filters.captureState);
-    return `${API_ENDPOINTS.KINDLE_CATALOG_BOOKS}?${params.toString()}`;
-}
 
 export function useKindleBooks(filters: KindleCatalogFilters) {
     return useQuery({
         queryKey: [...QUERY_ROOT, 'books', filters],
-        queryFn: () => apiClient.get<unknown, KindleCatalogBooksResponse>(booksEndpoint(filters)),
+        queryFn: () => fetchKindleBooks(filters),
         placeholderData: (previous) => previous,
     });
 }
@@ -44,14 +32,11 @@ export function useKindleLinking() {
     const queryClient = useQueryClient();
     const unlinked = useQuery({
         queryKey: [...QUERY_ROOT, 'unlinked'],
-        queryFn: () =>
-            apiClient.get<unknown, KindleUnlinkedBooksResponse>(
-                API_ENDPOINTS.KINDLE_CATALOG_UNLINKED,
-            ),
+        queryFn: fetchUnlinkedBooks,
     });
     const linkMutation = useMutation({
         mutationFn: (request: { source: 'comic' | 'novel'; bookId: string; asin: string }) =>
-            apiClient.put<unknown, KindleLinkResponse>(API_ENDPOINTS.KINDLE_CATALOG_LINKS, {
+            linkKindleBook({
                 source: request.source,
                 book_id: request.bookId,
                 asin: request.asin,
@@ -74,8 +59,7 @@ export function useKindleCaptureJobs(options: { enabled?: boolean } = {}) {
     const queryClient = useQueryClient();
     const captureJobs = useQuery({
         queryKey: [...QUERY_ROOT, 'captureJobs'],
-        queryFn: () =>
-            apiClient.get<unknown, KindleCaptureJobsResponse>(API_ENDPOINTS.KINDLE_CAPTURE_JOBS),
+        queryFn: fetchCaptureJobs,
         enabled: options.enabled ?? true,
         refetchInterval: 5000,
     });
@@ -86,7 +70,7 @@ export function useKindleCaptureJobs(options: { enabled?: boolean } = {}) {
             direction?: 'left' | 'right';
             expectedScreens?: number;
         }) =>
-            apiClient.post<unknown, KindleCaptureJob>(API_ENDPOINTS.KINDLE_CAPTURE_JOBS, {
+            createCaptureJob({
                 asin: request.asin,
                 source: request.source,
                 direction: request.direction ?? 'left',
@@ -110,60 +94,40 @@ export function useKindleImports() {
     const queryClient = useQueryClient();
     const stats = useQuery({
         queryKey: [...QUERY_ROOT, 'stats'],
-        queryFn: () =>
-            apiClient.get<unknown, KindleCatalogStats>(API_ENDPOINTS.KINDLE_CATALOG_STATS),
+        queryFn: fetchCatalogStats,
     });
     const sources = useQuery({
         queryKey: [...QUERY_ROOT, 'sources'],
-        queryFn: () =>
-            apiClient.get<unknown, KindleCatalogSourceStatus>(
-                API_ENDPOINTS.KINDLE_CATALOG_IMPORT_SOURCES,
-            ),
+        queryFn: fetchImportSources,
     });
     const runs = useQuery({
         queryKey: [...QUERY_ROOT, 'importRuns'],
-        queryFn: () =>
-            apiClient.get<unknown, KindleImportRunsResponse>(
-                `${API_ENDPOINTS.KINDLE_CATALOG_IMPORT_RUNS}?limit=10`,
-            ),
+        queryFn: fetchImportRuns,
     });
     const previewMutation = useMutation({
-        mutationFn: () =>
-            apiClient.post<unknown, KindleMigrationPreview>(
-                API_ENDPOINTS.KINDLE_CATALOG_MIGRATION_PREVIEW,
-            ),
+        mutationFn: previewMigration,
     });
     const commitMutation = useMutation({
         mutationFn: (confirmationToken: string) =>
-            apiClient.post<unknown, KindleMigrationCommit>(
-                API_ENDPOINTS.KINDLE_CATALOG_MIGRATION_COMMIT,
-                { confirmation_token: confirmationToken },
-            ),
+            commitMigration({ confirmation_token: confirmationToken }),
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: QUERY_ROOT });
         },
     });
     const ordersImportMutation = useMutation({
-        mutationFn: () =>
-            apiClient.post<unknown, KindleOrdersImport>(API_ENDPOINTS.KINDLE_CATALOG_IMPORT_ORDERS),
+        mutationFn: importOrders,
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: QUERY_ROOT });
         },
     });
     const kindleInfoImportMutation = useMutation({
-        mutationFn: () =>
-            apiClient.post<unknown, KindleOrdersImport>(
-                API_ENDPOINTS.KINDLE_CATALOG_IMPORT_KINDLE_INFO,
-            ),
+        mutationFn: importKindleInfo,
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: QUERY_ROOT });
         },
     });
     const autobuyImportMutation = useMutation({
-        mutationFn: () =>
-            apiClient.post<unknown, KindleOrdersImport>(
-                API_ENDPOINTS.KINDLE_CATALOG_IMPORT_AUTOBUY,
-            ),
+        mutationFn: importAutobuy,
         onSuccess: () => {
             void queryClient.invalidateQueries({ queryKey: QUERY_ROOT });
         },
@@ -191,13 +155,7 @@ export function useKindleLinkCandidates(source: 'comic' | 'novel' | null, bookId
     return useQuery({
         queryKey: [...QUERY_ROOT, 'linkCandidates', source, bookId],
         queryFn: () => {
-            const params = new URLSearchParams({
-                source: source ?? '',
-                book_id: bookId ?? '',
-            });
-            return apiClient.get<unknown, KindleLinkCandidatesResponse>(
-                `${API_ENDPOINTS.KINDLE_CATALOG_LINK_CANDIDATES}?${params.toString()}`,
-            );
+            return fetchLinkCandidates(source ?? 'comic', bookId ?? '');
         },
         enabled: source !== null && bookId !== null,
     });

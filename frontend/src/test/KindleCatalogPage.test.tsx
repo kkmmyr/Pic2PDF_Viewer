@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/hooks/useKindleCatalog', () => ({
+vi.mock('@/features/kindle/queries', () => ({
     useKindleBooks: vi.fn(),
     useKindleLinking: vi.fn(),
     useKindleLinkCandidates: vi.fn(),
@@ -16,7 +16,7 @@ import {
     useKindleImports,
     useKindleLinkCandidates,
     useKindleLinking,
-} from '@/hooks/useKindleCatalog';
+} from '@/features/kindle/queries';
 import KindleCapturePage from '@/pages/KindleCapturePage';
 import KindleCatalogPage from '@/pages/KindleCatalogPage';
 import KindleImportsPage from '@/pages/KindleImportsPage';

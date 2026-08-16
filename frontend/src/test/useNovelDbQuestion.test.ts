@@ -7,11 +7,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useNovelDbQuestion } from '@/hooks/novel_db/useNovelDbQuestion';
 import type { Scope } from '@/features/novel_db/types';
 
-vi.mock('../features/novel_db/sse', () => ({
+vi.mock('../features/novel_db/qa-sse', () => ({
     streamQa: vi.fn(),
 }));
 
-import { streamQa } from '@/features/novel_db/sse';
+import { streamQa } from '@/features/novel_db/qa-sse';
 
 const SCOPE: Scope = { type: 'all' };
 

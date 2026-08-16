@@ -9,9 +9,9 @@ from collections.abc import Callable
 
 from config import NOVEL_DB_LLM_MODEL
 
-from ._llm_backend import QWEN_BACKEND
 from .generation_quality import format_page_blocks, select_pages_across_book
 from .llm_options import make_llm_options
+from .llm_provider import NovelLlmProvider, get_llm_provider
 
 _PROMPT = """次は小説『{book_name}』から「{char_name}」が登場するページを page_no 順に集めた本文です。
 この本（1 冊）における「{char_name}」の人物像を、初めて読む人にも分かる
@@ -84,6 +84,7 @@ def summarize_character(
     model: str = NOVEL_DB_LLM_MODEL,
     fact_notes: str = "",
     progress: Callable[[str], None] | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> str:
     """1 キャラ × 1 書籍の人物像サマリを Qwen で生成して返す（DB には書き込まない）。
 
@@ -107,7 +108,7 @@ def summarize_character(
         fact_notes=fact_notes or "本文から抽出した追加メモなし。",
         body=body,
     )
-    return QWEN_BACKEND.ask(prompt, model=model, options=_OPTIONS).strip()
+    return (provider or get_llm_provider()).qwen.ask(prompt, model=model, options=_OPTIONS).strip()
 
 
 def edit_character_summary(
@@ -117,6 +118,7 @@ def edit_character_summary(
     *,
     fact_notes: str,
     model: str = NOVEL_DB_LLM_MODEL,
+    provider: NovelLlmProvider | None = None,
 ) -> str:
     """Run a separate editorial pass without adding unsupported facts."""
     prompt = _EDITOR_PROMPT.format(
@@ -125,4 +127,4 @@ def edit_character_summary(
         fact_notes=fact_notes,
         draft=draft,
     )
-    return QWEN_BACKEND.ask(prompt, model=model, options=_EDITOR_OPTIONS).strip()
+    return (provider or get_llm_provider()).qwen.ask(prompt, model=model, options=_EDITOR_OPTIONS).strip()

@@ -7,27 +7,21 @@ Gemma 4:e4b より重い分、長文の検証・複雑な分析・難しいコ�
 起動方法:  python mcp_server.py
 登録方法:  ~/.mcp.json の mcpServers に "qwen-local" を追加（README 参照）
 """
+
 from __future__ import annotations
 
 import json
 import os
-import sys
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
 from urllib.parse import quote
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import Completion
 
-# 共通 LLM パッケージ (local_llm) を import 可能にする
-_PKG_PARENT = str(Path(__file__).parent)
-if _PKG_PARENT not in sys.path:
-    sys.path.insert(0, _PKG_PARENT)
-
-from local_llm import LLMError, backend_from_env  # noqa: E402
-from local_llm.logger import log_interaction  # noqa: E402
+from local_llm import LLMError, backend_from_env
+from local_llm.logger import log_interaction
 
 # 環境変数 (QWEN_BACKEND / QWEN_OLLAMA_BASE_URL / ...) から Backend を 1 つ作る
 _BACKEND = backend_from_env()
@@ -44,6 +38,7 @@ def _fetch_json(path: str) -> list | dict | None:
             return json.loads(resp.read())
     except (urllib.error.URLError, OSError, json.JSONDecodeError):
         return None
+
 
 mcp = FastMCP(
     "qwen-local",
@@ -91,7 +86,9 @@ def ask_qwen(prompt: str, system: str | None = None) -> str:
 
 
 @mcp.tool()
-def analyze_code(code: str, question: str = "このコードの問題点と改善案を指摘してください") -> str:
+def analyze_code(
+    code: str, question: str = "このコードの問題点と改善案を指摘してください"
+) -> str:
     """Qwen3.6 にコードの分析・レビューを依頼する。
 
     Gemma の explain_code よりも踏み込んだ分析（バグ発見・代替実装の提案・
@@ -191,6 +188,7 @@ def novel_characters(book_name: str) -> str:
 # Prompts: 書籍名補完付きスラッシュコマンド
 # ---------------------------------------------------------------------------
 
+
 @mcp.prompt(
     name="novel-qa",
     description=(
@@ -207,7 +205,11 @@ def novel_qa_prompt(book_name: str, question: str) -> list[dict]:
         context = _BACKEND_UNAVAILABLE
     else:
         authors = "、".join(detail.get("authors") or []) or "著者不明"
-        series = f"シリーズ: {detail['series_title']}  " if detail.get("series_title") else ""
+        series = (
+            f"シリーズ: {detail['series_title']}  "
+            if detail.get("series_title")
+            else ""
+        )
         page_count = detail.get("page_count") or "不明"
         char_count = detail.get("character_count", 0)
         summary = detail.get("summary") or "（書籍サマリ未生成）"
@@ -241,7 +243,9 @@ def summarize_book_prompt(book_name: str) -> list[dict]:
         return [{"role": "user", "content": _BACKEND_UNAVAILABLE}]
 
     authors = "、".join(detail.get("authors") or []) or "著者不明"
-    series = f"\nシリーズ: {detail['series_title']}" if detail.get("series_title") else ""
+    series = (
+        f"\nシリーズ: {detail['series_title']}" if detail.get("series_title") else ""
+    )
     page_count = detail.get("page_count") or "不明"
     char_count = detail.get("character_count", 0)
     summary = detail.get("summary") or "まだ書籍サマリが生成されていません。"

@@ -128,9 +128,15 @@ RAG のコアロジック。主なモジュール:
 - **接続 / スキーマ**: `connection.py`（sqlite3 接続）, `migrations.py`（Alembic 実行）, `models.py`（SQLModel）, `lance_store.py`（LanceDB）
 - **構築パイプライン**: `builder.py`, `full_builder.py`, `extractor.py`, `ocr_worker.py`, `chunker.py`, `embedder.py`, `contextualizer.py`
 - **ジョブ**: `job_queue.py`, `job_worker.py`
-- **検索 / QA**: `search_scope.py`, `search.py`, `book_summary_search.py`, `retrieval.py`, `prompt_builder.py`, `query_expander.py`, `llm.py`, `qa_history.py`, `qa_sessions.py`, `discussion_service.py`
-- **サマリ / キャラ**: `summarizer.py`, `character_extractor.py`, `character_summarizer.py`, `character_db.py`, `extractor.py`, `relation_extractor.py`, `graph_query.py`
-- **LLM 配線**: `_llm_backend.py`（執筆・軽量処理・query expansion・根拠検証のbackendシングルトン）, `_prompts.py`, `_prompts` 系プロンプト, `library.py`
+- **検索 / QA application**: `retrieval.py`, `query_expander.py`, `llm.py`, `qa_history.py`, `qa_sessions.py`, `discussion_service.py`
+- **検索 / QA domain**: `search_scope.py`, `search.py`, `book_summary_search.py`, `prompt_builder.py`, `query_expansion_parser.py`, `discussion_parser.py`, `discussion_stream.py`, `discussion_repository.py`
+- **サマリ / キャラ application**: `summarizer.py`, `character_extractor.py`, `character_summarizer.py`, `relation_extractor.py`
+- **サマリ / キャラ domain・repository**: `summary_generation.py`, `summary_repository.py`, `summary_index.py`, `summary_grounding_parser.py`, `generated_content_snapshot.py`, `generated_content_diff.py`, `generated_content_restore.py`, `character_db.py`, `graph_query.py`
+- **LLM provider / prompt**: `llm_provider.py` が用途別 backend の構築と lifecycle を所有する。`summary_prompts.py`、`character_prompts.py`、`grounding_prompts.py` が domain 別 template と option を所有する。`_llm_backend.py` と `_prompts.py` は既存 import 用の期限付き facade とし、application code は所有モジュールを直接参照する。
+
+application service は provider を省略可能な明示引数として受け取り、省略時だけ既定 provider を
+解決する。テストは module global backend の method を patch せず fake provider を渡せる。
+SQLite/LanceDB の read/write は repository module に限定し、parser/validator は I/O を持たない。
 
 ### 3.2 ルーター層 `backend/routers/novel_db/`
 

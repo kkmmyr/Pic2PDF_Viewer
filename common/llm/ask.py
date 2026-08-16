@@ -12,26 +12,21 @@ Gemma 4 の ask.py に対応する Qwen 版。Qwen は thinking モデルで応�
   python ask.py --session                       # 会話履歴を引き継ぐセッション
   echo "長い文章" | python ask.py "論点を整理して"
 """
+
 from __future__ import annotations
 
 import argparse
 import io
 import sys
 import time
-from pathlib import Path
 
 if sys.stdout.encoding != "utf-8":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 if sys.stderr.encoding != "utf-8":
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
-# 共通 LLM パッケージ (local_llm) を import 可能にする
-_PKG_PARENT = str(Path(__file__).parent)
-if _PKG_PARENT not in sys.path:
-    sys.path.insert(0, _PKG_PARENT)
-
-from local_llm import LLMError, backend_from_env  # noqa: E402
-from local_llm.logger import log_interaction  # noqa: E402
+from local_llm import LLMError, backend_from_env
+from local_llm.logger import log_interaction
 
 # 環境変数 (QWEN_BACKEND / QWEN_OLLAMA_BASE_URL / ...) から Backend を 1 つ作る
 _BACKEND = backend_from_env()
@@ -40,6 +35,7 @@ _BACKEND = backend_from_env()
 # ---------------------------------------------------------------------------
 # ストリーミング呼び出し
 # ---------------------------------------------------------------------------
+
 
 def _stream_and_print(
     prompt: str,
@@ -63,7 +59,11 @@ def _stream_and_print(
 
     try:
         for event in _BACKEND.stream_ask(
-            prompt, system=system, model=model, think=think, context=context,
+            prompt,
+            system=system,
+            model=model,
+            think=think,
+            context=context,
         ):
             think_token = event.get("thinking", "")
             resp_token = event.get("response", "")
@@ -99,6 +99,7 @@ def _stream_and_print(
 # モード別エントリポイント
 # ---------------------------------------------------------------------------
 
+
 def ask_once(
     prompt: str,
     *,
@@ -108,8 +109,12 @@ def ask_once(
 ) -> None:
     _stream_and_print(
         prompt,
-        system=system, model=model, think=think, context=None,
-        print_output=True, source="cli",
+        system=system,
+        model=model,
+        think=think,
+        context=None,
+        print_output=True,
+        source="cli",
     )
     print()
 
@@ -136,8 +141,12 @@ def ask_session(
         print("Qwen: ", end="", flush=True)
         _, context = _stream_and_print(
             user_input,
-            system=system, model=model, think=think, context=context,
-            print_output=True, source="cli_session",
+            system=system,
+            model=model,
+            think=think,
+            context=context,
+            print_output=True,
+            source="cli_session",
         )
         print()
 
@@ -145,6 +154,7 @@ def ask_session(
 # ---------------------------------------------------------------------------
 # プロンプト構築
 # ---------------------------------------------------------------------------
+
 
 def build_prompt(
     user_prompt: str,
@@ -169,14 +179,32 @@ def build_prompt(
 # argparse エントリポイント
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Qwen3.6:35b-a3b CLI ツール")
     parser.add_argument("prompt", nargs="?", help="質問またはタスク")
-    parser.add_argument("-f", "--file", metavar="FILE", help="コンテキストとして読み込むファイル")
-    parser.add_argument("-m", "--model", default=None, help="使用するモデル (デフォルト: $QWEN_MODEL または qwen3.6:35b-a3b)")
-    parser.add_argument("--system", metavar="TEXT", help="システムプロンプト（役割設定など）")
-    parser.add_argument("--think", action="store_true", help="thinking 過程も表示する（Qwen のデフォルトは think=False）")
-    parser.add_argument("--session", action="store_true", help="会話履歴を引き継ぐセッションモードで起動")
+    parser.add_argument(
+        "-f", "--file", metavar="FILE", help="コンテキストとして読み込むファイル"
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        default=None,
+        help="使用するモデル (デフォルト: $QWEN_MODEL または qwen3.6:35b-a3b)",
+    )
+    parser.add_argument(
+        "--system", metavar="TEXT", help="システムプロンプト（役割設定など）"
+    )
+    parser.add_argument(
+        "--think",
+        action="store_true",
+        help="thinking 過程も表示する（Qwen のデフォルトは think=False）",
+    )
+    parser.add_argument(
+        "--session",
+        action="store_true",
+        help="会話履歴を引き継ぐセッションモードで起動",
+    )
     args = parser.parse_args()
 
     if args.session:

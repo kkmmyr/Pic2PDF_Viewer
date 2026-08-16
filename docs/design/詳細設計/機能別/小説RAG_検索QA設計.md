@@ -51,7 +51,7 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 抽象質問・関係質問の retrieval recall を上げるため、軽量 Gemma（`QUERY_BACKEND`、`NOVEL_DB_QA_EXPAND_MODEL`）で「異なる切り口（場面 / キャラ / 行動 / 関係性 / 時期）の検索クエリ」を生成する。
 
 - `expand_query(question, n)` は**元の質問を必ず先頭に**置き、展開クエリを重複除去して後続に追加、計 N 個を返す。
-- 応答パース（`_parse_expansions`）は番号付け・箇条書き記号・前置きラベル・引用符を剥がし、60 字超の説明文行を除外。
+- 応答パース（`query_expansion_parser.parse_expansions`）は番号付け・箇条書き記号・前置きラベル・引用符を剥がし、60 字超の説明文行を除外する純粋関数。`query_expander._parse_expansions` は既存 import 用 facade とする。
 - LLM 失敗（接続エラー / 空応答）や `n<=1` 時は `[question]` にフォールバック（通常検索に縮退）。B-9 が chunk 側、B-11 が query 側を強化する直交関係。
 
 ## 4. プロンプト構築（`prompt_builder.py`）
@@ -62,9 +62,9 @@ LLM 呼び出しとは独立した純関数群。
 - **書籍俯瞰サマリブロック（`_build_summaries_block`）**: `book_summaries` があり scope が book 以外のとき、`【書籍俯瞰サマリ】` セクションを先頭に埋め込む（背景知識、根拠はページ抜粋を主とするよう指示）。scope=book では付与しない。
 - **チャット用（`build_chat_context_block` + `build_chat_system_message`）B-16**: 本文抜粋 + サマリブロックを 1 文字列にまとめ、`CHAT_SYSTEM_TEMPLATE`（読書補助アシスタント、スコープ説明 + 参照本文）の system メッセージに埋める。質問・回答ルールは system 側に持たせる。
 
-## 5. LLM 呼び出し層（`llm.py` / `_llm_backend.py`）
+## 5. LLM 呼び出し層（`llm.py` / `llm_provider.py`）
 
-- **backend シングルトン（`_llm_backend`）**: `QWEN_BACKEND`（LlamaServer, 11435）/ `GEMMA_BACKEND`（Ollama 11434、`NOVEL_DB_GEMMA_BACKEND=qwen` 時は QWEN 流用）/ `QUERY_BACKEND`（Ollama, timeout 60）。`NOVEL_DB_LLM_BACKEND` が `llama_server` 以外だと import 時に `LLMError` で即失敗（Ollama 分岐は Phase C で撤去）。詳細は [データ設計 §5](小説RAG_データ.md)。
+- **provider（`llm_provider`）**: `NovelLlmProvider` が `qwen`（LlamaServer, 11435）/ `gemma`（Ollama 11434、`NOVEL_DB_GEMMA_BACKEND=qwen` 時は Qwen 流用）/ `query`（Ollama, timeout 60）/ `verifier` を束ねる。`get_llm_provider()` は設定から遅延構築した既定 provider を返し、application service は省略可能な provider 引数で fake を注入できる。`_llm_backend` は既存 import 用 facade で、新規コードの依存先にはしない。詳細は [データ設計 §5](小説RAG_データ.md)。
 - **`LLM_OPTIONS`**: `temperature=0.2 / repeat_penalty=1.2 / num_predict=4096 / num_ctx=NOVEL_DB_QA_NUM_CTX`。**注意: llama-server では `num_ctx` は起動時 `-c` で決まり、ここで渡しても無視される**（実効値の変更は `start-qwen-server.bat` の `-c` を編集）。
 - **ストリーミング**: `stream_qa(prompt)` は `QWEN_BACKEND.astream_ask`、`stream_chat(messages)` は `QWEN_BACKEND.astream_chat`（LlamaServer 専用、Ollama は `NotImplementedError`）に委譲。バックエンド分岐・thinking 抑制（`enable_thinking=False`）・SSE→Ollama 形式正規化はすべて共通モジュール `local_llm` 側。`_astream_ask` / `astream_chat` の薄いラッパはテストの monkeypatch 点。イベントは `{response, done, done_reason, eval_count, …}` の Ollama 互換 dict。
 
@@ -93,7 +93,7 @@ LLM 呼び出しとは独立した純関数群。
 
 書籍全文を Qwen 131k コンテキストに投入し、固定ホストキャラ 2 人（レイ＆ミオ）による番組台本を 2 段の LLM 呼び出しで SSE 生成する。B-20（自由ペルソナ 2 人の読書会対話）を置き換えた（要件と設計判断の経緯は [読書会ロングフォーム拡張_要件.md](../../要件定義/読書会ロングフォーム拡張_要件.md)）。
 
-- **モジュール構成**: `discussion_cast.py`（ホスト人格核の定数。レイ=分析派/丁寧語、ミオ=感情派/くだけた口調）/ `discussion_prompts.py`（構成・台本プロンプトビルダー + `SEGMENTS` / `SEGMENT_TURNS` 定数）/ `discussion_checks.py`（DoD 機械チェック M1〜M5）/ `discussion_service.py`（パーサ・生成・保存・削除）。
+- **モジュール構成**: `discussion_cast.py`（ホスト人格核）/ `discussion_prompts.py`（構成・台本prompt）/ `discussion_parser.py`（plan・turnの純粋parse/validate）/ `discussion_stream.py`（segment/turn event生成）/ `discussion_checks.py`（DoD機械チェック）/ `discussion_repository.py`（history保存・一覧・削除）/ `discussion_service.py`（application orchestrationと互換公開面）。
 - **2 段パイプライン**:
     1. **構成ステップ** (`generate_plan`): 書籍を読ませて構成メモ JSON（対立する 2 つの推し解釈 `stances`・テーマ 2 件・脱線ネタカード 2〜3 枚 [facts=正確な固有情報 / keywords=言及判定用]）を生成。`temperature=0.4 / num_predict=2048`。LLM の JSON 出力は確率的に崩れるため、パース・バリデーション失敗時は同一プロンプトで最大 3 回まで自動リトライする（`_PLAN_MAX_ATTEMPTS`。KV cache が効くため再試行は安価）。
     2. **台本ステップ** (`stream_discussion_turns`): 番組構成（OPフック→テーマ1→テーマ2→脱線→締め、セグメント別ターン数指定）で台本を SSE ストリーミング。`temperature=0.7 / num_predict=8192`。

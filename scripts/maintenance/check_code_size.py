@@ -10,11 +10,14 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_PATH = Path(__file__).with_name("code_size_baseline.json")
+ASSET_INVENTORY_PATH = Path(__file__).with_name("maintenance_assets.json")
 LINE_LIMIT = 400
 SOURCE_ROOTS = (
     Path("backend"),
     Path("kindle-pdf"),
     Path("frontend/src"),
+    Path("scripts"),
+    Path("common/llm"),
 )
 SOURCE_SUFFIXES = {".py", ".ts", ".tsx"}
 EXCLUDED_PARTS = {
@@ -28,6 +31,19 @@ EXCLUDED_PARTS = {
     "node_modules",
     "tests",
 }
+
+
+def _temporary_script_patterns() -> tuple[str, ...]:
+    inventory = json.loads(ASSET_INVENTORY_PATH.read_text(encoding="utf-8"))
+    return tuple(
+        pattern
+        for group in inventory.get("script_groups", [])
+        if group.get("classification") in {"temporary", "frozen"}
+        for pattern in group.get("patterns", [])
+    )
+
+
+TEMPORARY_SCRIPT_PATTERNS = _temporary_script_patterns()
 
 
 def is_production_source(path: Path) -> bool:
@@ -44,6 +60,8 @@ def is_production_source(path: Path) -> bool:
     if name == "api.d.ts" or name == "vite-env.d.ts":
         return False
     if ".test." in name or ".spec." in name or name.startswith("test_"):
+        return False
+    if any(normalized.match(pattern) for pattern in TEMPORARY_SCRIPT_PATTERNS):
         return False
     return any(normalized.is_relative_to(root) for root in SOURCE_ROOTS)
 

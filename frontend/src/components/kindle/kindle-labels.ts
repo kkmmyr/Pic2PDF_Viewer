@@ -1,4 +1,4 @@
-import type { KindleCatalogBook } from '@/types/kindleCatalog';
+import type { KindleCatalogBook } from '@/features/kindle/types';
 
 export const OWNERSHIP_LABELS: Record<KindleCatalogBook['ownership'], string> = {
     purchased: '購入',

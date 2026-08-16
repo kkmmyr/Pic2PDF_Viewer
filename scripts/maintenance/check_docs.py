@@ -1,7 +1,7 @@
 """`docs/**/*.md` の整合性を検査する（pre-commit フックからコミットをブロックする）。
 
 check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツール）とは異なり、
-本スクリプトは違反があれば **exit 1** する。以下 6 ルールを検査する。
+本スクリプトは違反があれば **exit 1** する。以下 8 ルールを検査する。
 
   Rule 1: docs 間の相対 Markdown リンク切れ
   Rule 2: メインの変更履歴.md の行数肥大化（週次ローテーション漏れ）
@@ -9,6 +9,8 @@ check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツー�
   Rule 4: design/ 各 spec 文書のサイズ超過（ブロッキング）
   Rule 5: design/ 各 spec 文書の status ヘッダ欠落（ブロッキング）
   Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ（ブロッキング）
+  Rule 7: 登録済み横断契約の正本マップリンク欠落（ブロッキング）
+  Rule 8: 登録済み横断契約のowner marker欠落・重複（ブロッキング）
 
 usage:
     uv run python scripts/maintenance/check_docs.py
@@ -24,6 +26,9 @@ import sys
 from pathlib import Path
 
 import yaml
+
+from check_docs_contracts import find_violations as find_contract_violations
+from check_docs_file_map import find_violations as find_file_map_violations
 
 # Windows 環境で日本語ファイルパスが文字化けしないよう UTF-8 出力を強制
 if hasattr(sys.stdout, "reconfigure"):
@@ -304,76 +309,26 @@ def check_design_headers() -> list[str]:
     return violations
 
 
-# ---------------------------------------------------------------------------
-# Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ
-# ---------------------------------------------------------------------------
-
-# generate_file_map.py（scripts/maintenance/generate_file_map.py）が
-# ディレクトリツリーを自動生成する 2 文書。手書きの「## 2. 主要ファイル補足」
-# 表はスクリプト管理外のため、ここで実在チェックする。config ファイルなし・
-# パス直書きの慣習は DESIGN_DIR / MKDOCS_YML と同様。
-FILE_MAP_DOCS = [
-    DESIGN_DIR / "詳細設計" / "詳細設計書_フロントエンド_ファイルマップ.md",
-    DESIGN_DIR / "詳細設計" / "詳細設計書_バックエンド_ファイルマップ.md",
-]
-
-FILE_MAP_SECTION_HEADING = "## 2. 主要ファイル補足"
-
-
 def check_file_map_annotations() -> list[str]:
-    """Rule 6（fail・ブロッキング）: FILE_MAP_DOCS の「主要ファイル補足」表の
-    第一列（Markdown リンク）が実在するファイルを指しているか検査する。
+    """Rule 6: ファイルマップの手書き注釈を検査する。"""
+    return find_file_map_violations(PROJECT_ROOT)
 
-    セクション自体（`## 2. 主要ファイル補足`）が見つからない場合も違反とする。
-    """
-    violations: list[str] = []
-    for md_file in FILE_MAP_DOCS:
-        rel_file = md_file.relative_to(PROJECT_ROOT)
-        if not md_file.exists():
-            violations.append(f"{rel_file}: ファイルが存在しません")
-            continue
 
-        lines = md_file.read_text(encoding="utf-8", errors="replace").splitlines()
-        section_start = next(
-            (
-                i
-                for i, line in enumerate(lines)
-                if line.strip() == FILE_MAP_SECTION_HEADING
-            ),
-            None,
-        )
-        if section_start is None:
-            violations.append(
-                f"{rel_file}: 「{FILE_MAP_SECTION_HEADING}」セクションが見つかりません"
-            )
-            continue
-
-        # 次の `## ` 見出し（なければ末尾）までがセクション範囲
-        section_end = len(lines)
-        for i in range(section_start + 1, len(lines)):
-            if lines[i].startswith("## "):
-                section_end = i
-                break
-
-        for offset, line in enumerate(lines[section_start:section_end]):
-            if not line.strip().startswith("|"):
-                continue
-            m = MD_LINK_RE.search(line)
-            if not m:
-                continue
-            lineno = section_start + offset + 1
-            target = m.group(1).strip()
-            if target.lower().startswith(("http://", "https://")):
-                continue
-            resolved = (md_file.parent / target).resolve()
-            if not resolved.exists():
-                violations.append(f"{rel_file}:{lineno} -> {target}（実在しません）")
-    return violations
+def check_canonical_contracts() -> tuple[list[str], list[str]]:
+    """Rule 7/8: 正本マップリンクとowner markerを検査する。"""
+    return find_contract_violations(PROJECT_ROOT)
 
 
 # ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
+
+
+def _print_violations(label: str, violations: list[str]) -> None:
+    print(f"{label}: {len(violations)} 件")
+    for line in violations:
+        print(f"  {line}")
+    print()
 
 
 def main() -> None:
@@ -383,51 +338,33 @@ def main() -> None:
     size_violations = check_design_doc_size()
     header_missing = check_design_headers()
     file_map_violations = check_file_map_annotations()
+    contract_links, contract_markers = check_canonical_contracts()
 
     print("=== check_docs: docs/ 整合性チェック ===\n")
 
-    print(f"[Rule 1] docs 間リンク切れ（living）: {len(broken_links)} 件")
-    for line in broken_links:
-        print(f"  {line}")
+    _print_violations("[Rule 1] docs 間リンク切れ（living）", broken_links)
     if frozen_link_info:
         print(
             f"  （凍結記録内のリンク切れ {len(frozen_link_info)} 件 = 歴史記録につき非ブロック・情報のみ）"
         )
         for line in frozen_link_info:
             print(f"  [info] {line}")
-    print()
-
-    print(
-        f"[Rule 2] 変更履歴.md 行数超過 (> {CHANGELOG_LINE_LIMIT} 行): {len(changelog_over)} 件"
+        print()
+    _print_violations(
+        f"[Rule 2] 変更履歴.md 行数超過 (> {CHANGELOG_LINE_LIMIT} 行)",
+        changelog_over,
     )
-    for line in changelog_over:
-        print(f"  {line}")
-    print()
-
-    print(
-        f"[Rule 3] mkdocs.yml nav 同期 (dead entry / orphan): {len(nav_violations)} 件"
+    _print_violations(
+        "[Rule 3] mkdocs.yml nav 同期 (dead entry / orphan)", nav_violations
     )
-    for line in nav_violations:
-        print(f"  {line}")
-    print()
-
-    print(
-        f"[Rule 4] design/ 文書サイズ (> {DESIGN_DOC_LINE_LIMIT} 行): "
-        f"{len(size_violations)} 件 [blocking]"
+    _print_violations(
+        f"[Rule 4] design/ 文書サイズ (> {DESIGN_DOC_LINE_LIMIT} 行) [blocking]",
+        size_violations,
     )
-    for line in size_violations:
-        print(f"  {line}")
-    print()
-
-    print(f"[Rule 5] design/ status ヘッダ欠落: {len(header_missing)} 件")
-    for line in header_missing:
-        print(f"  {line}")
-    print()
-
-    print(f"[Rule 6] ファイルマップ注釈の参照切れ: {len(file_map_violations)} 件")
-    for line in file_map_violations:
-        print(f"  {line}")
-    print()
+    _print_violations("[Rule 5] design/ status ヘッダ欠落", header_missing)
+    _print_violations("[Rule 6] ファイルマップ注釈の参照切れ", file_map_violations)
+    _print_violations("[Rule 7] 横断契約の正本マップリンク", contract_links)
+    _print_violations("[Rule 8] 横断契約のowner marker", contract_markers)
 
     total = (
         len(broken_links)
@@ -436,6 +373,8 @@ def main() -> None:
         + len(size_violations)
         + len(header_missing)
         + len(file_map_violations)
+        + len(contract_links)
+        + len(contract_markers)
     )
     if total == 0:
         print("違反なし。")

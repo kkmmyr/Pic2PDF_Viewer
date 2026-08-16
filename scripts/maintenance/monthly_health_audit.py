@@ -51,6 +51,10 @@ def audit_commands(python: str = sys.executable) -> tuple[AuditCommand, ...]:
             (python, str(script / "check_import_boundaries.py")),
         ),
         AuditCommand(
+            "maintenance-assets",
+            (python, str(script / "check_maintenance_assets.py")),
+        ),
+        AuditCommand(
             "frontend-unused",
             (npm, "run", "lint:deps"),
             PROJECT_ROOT / "frontend",

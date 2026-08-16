@@ -23,7 +23,6 @@ const baseProps: Parameters<typeof LibraryFilterBar>[0] = {
     onReadStateFilterChange: vi.fn(),
     onToggleShowHidden: vi.fn(),
     onSortChange: vi.fn(),
-    onMetaRefresh: vi.fn(),
     onToggleSelectionMode: vi.fn(),
     onClearFilters: vi.fn(),
 };

@@ -1,8 +1,6 @@
 {
-  "backend/services/novel_db/_prompts.py": 435,
   "backend/services/novel_db/full_builder.py": 409,
-  "backend/services/novel_db/generated_content_audit.py": 462,
-  "backend/services/novel_db/summarizer.py": 427,
-  "backend/services/novel_db/summary_grounding.py": 492,
-  "backend/services/novel_db/surya_runtime.py": 440
+  "backend/services/novel_db/surya_runtime.py": 440,
+  "scripts/maintenance/check_claude_drift.py": 433,
+  "scripts/maintenance/ensemble_ocr_candidates.py": 553
 }

@@ -7,6 +7,9 @@ from pathlib import Path
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+MAINTENANCE_DIR = PROJECT_ROOT / "scripts" / "maintenance"
+if str(MAINTENANCE_DIR) not in sys.path:
+    sys.path.insert(0, str(MAINTENANCE_DIR))
 
 
 def _load_script(name: str):
@@ -23,6 +26,7 @@ code_size = _load_script("check_code_size")
 openapi_contract = _load_script("check_openapi_contract")
 import_boundaries = _load_script("check_import_boundaries")
 monthly_audit = _load_script("monthly_health_audit")
+docs_contracts = _load_script("check_docs_contracts")
 check_docs = _load_script("check_docs")
 
 
@@ -111,6 +115,38 @@ def test_import_boundaries_detect_all_three_layer_violations(tmp_path: Path) -> 
     ]
 
 
+def test_import_boundaries_reject_reviewed_compatibility_facades(tmp_path: Path) -> None:
+    files = {
+        "backend/services/novel_db/rag_bad.py": "from ._llm_backend import QWEN_BACKEND\n",
+        "backend/services/novel_db/ocr_bad.py": "from services.novel_db import ocr_staging\n",
+        "backend/scripts/bad.py": "from services.novel_db._prompts import MAP_PROMPT\n",
+        "frontend/src/features/bad.ts": ("import { streamQa } from '@/features/novel_db/sse';\n"),
+    }
+    for relative, content in files.items():
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+
+    assert import_boundaries.find_violations(tmp_path) == [
+        (
+            "backend/scripts/bad.py:1: Novel RAG script must not import compatibility "
+            "facade (services.novel_db._prompts)"
+        ),
+        (
+            "backend/services/novel_db/ocr_bad.py:1: Novel OCR production must not import "
+            "compatibility facade (services.novel_db.ocr_staging)"
+        ),
+        (
+            "backend/services/novel_db/rag_bad.py:1: Novel RAG production must not import "
+            "compatibility facade (._llm_backend)"
+        ),
+        (
+            "frontend/src/features/bad.ts:1: frontend production must not import removed "
+            "compatibility facade (@/features/novel_db/sse)"
+        ),
+    ]
+
+
 def test_monthly_audit_detects_completed_plan_outside_coordinators(
     tmp_path: Path,
 ) -> None:
@@ -154,8 +190,55 @@ def test_docs_size_violation_is_blocking(monkeypatch) -> None:
     )
     monkeypatch.setattr(check_docs, "check_design_headers", lambda: [])
     monkeypatch.setattr(check_docs, "check_file_map_annotations", lambda: [])
+    monkeypatch.setattr(check_docs, "check_canonical_contracts", lambda: ([], []))
 
     with pytest.raises(SystemExit) as exc_info:
         check_docs.main()
 
     assert exc_info.value.code == 1
+
+
+def _write_contract_fixture(tmp_path: Path, *, canonical_link: bool = True) -> Path:
+    owner = tmp_path / "docs" / "design" / "owner.md"
+    owner.parent.mkdir(parents=True)
+    owner.write_text(
+        "# Owner\n\n<!-- contract-owner: example-contract -->\n",
+        encoding="utf-8",
+    )
+    index = tmp_path / "docs" / "index.md"
+    link = "[Owner](design/owner.md)" if canonical_link else "Owner"
+    index.write_text(
+        f'<a id="canonical-map"></a>\n## 正本マップ\n\n{link}\n\n## Next\n',
+        encoding="utf-8",
+    )
+    registry = tmp_path / "scripts" / "maintenance" / "docs_contracts.json"
+    registry.parent.mkdir(parents=True)
+    registry.write_text(
+        '{"contracts":[{"id":"example-contract","owner":"docs/design/owner.md"}]}',
+        encoding="utf-8",
+    )
+    return owner
+
+
+def test_docs_contracts_accepts_unique_linked_owner(tmp_path: Path) -> None:
+    _write_contract_fixture(tmp_path)
+
+    assert docs_contracts.find_violations(tmp_path) == ([], [])
+
+
+def test_docs_contracts_rejects_missing_map_link_and_duplicate_owner(
+    tmp_path: Path,
+) -> None:
+    _write_contract_fixture(tmp_path, canonical_link=False)
+    duplicate = tmp_path / "docs" / "design" / "duplicate.md"
+    duplicate.write_text(
+        "<!-- contract-owner: example-contract -->\n",
+        encoding="utf-8",
+    )
+
+    link_violations, marker_violations = docs_contracts.find_violations(tmp_path)
+
+    assert link_violations == ["example-contract: 正本マップにownerリンクがありません (docs/design/owner.md)"]
+    assert marker_violations == [
+        "example-contract: owner markerが正本以外または重複です (docs/design/duplicate.md, docs/design/owner.md)"
+    ]

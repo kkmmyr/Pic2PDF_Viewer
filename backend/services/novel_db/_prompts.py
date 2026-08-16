@@ -1,435 +1,61 @@
-"""書籍サマリ生成用プロンプトテンプレート・LLM オプション・定数。
-
-summarizer.py が使うすべてのプロンプト文字列と設定値をここに一元管理する。
-プロンプトを修正する場合はこのファイルだけ変更すればよい。
-"""
-
-from __future__ import annotations
-
-import re
-
-from .llm_options import make_llm_options
-
-# ---------------------------------------------------------------------------
-# 閾値・サイズ定数
-# ---------------------------------------------------------------------------
-
-# 1-shot 経路で許容する最大本文文字数。超えたら map-reduce にフォールバック。
-# Qwen は ~1.6 chars/token なので 200,000 字 ≒ 125k tokens。num_ctx=131072 でぎりぎり。
-ONE_SHOT_MAX_BODY_CHARS = 200_000
-
-# map フェーズの 1 チャンクあたりの目標文字数
-MAP_CHUNK_TARGET_CHARS = 20_000
-
-# map フェーズの最大チャンク数（過大な書籍でも 8 チャンク以内に抑える）
-MAP_MAX_CHUNKS = 8
-
-# 一括生成（書籍サマリ + キャラクター辞典）の定数
-COMBINED_MAX_CHARACTERS = 20
-
-# 長文中央の取りこぼしを抑えるため、事実抽出はcontext上限まで詰めない。
-# 分割はページ境界で行い、全ブロックを時系列順に処理する。
-FACT_CHUNK_MAX_CHARS = 30_000
-
-# 書籍一覧や書籍選択時に読む短縮要約。詳細要約とは別成果物として保存する。
-CATALOG_SUMMARY_MIN_CHARS = 400
-CATALOG_SUMMARY_MAX_CHARS = 700
-
-# ---------------------------------------------------------------------------
-# LLM オプション
-# ---------------------------------------------------------------------------
-
-ONE_SHOT_OPTIONS = make_llm_options(
-    temperature=0.2,
-    repeat_penalty=1.15,
-    num_predict=4096,  # 品質優先の可変長サマリに十分な出力余地
-    num_ctx=131072,  # B-6 検証で 70k tokens 完走を確認（2026-05-10）
-)
-
-MAP_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.15, num_predict=1024, num_ctx=16384)
-
-REDUCE_OPTIONS = make_llm_options(temperature=0.2, repeat_penalty=1.15, num_predict=4096, num_ctx=16384)
-
-# 最大20名の人物説明を含むため広い出力枠を確保する。文字数目標ではなく技術上限。
-COMBINED_OPTIONS = make_llm_options(
-    temperature=0.2,
-    repeat_penalty=1.15,
-    num_predict=16384,
-    num_ctx=131072,
-)
-
-FACT_EXTRACTION_OPTIONS = make_llm_options(
-    temperature=0.1,
-    repeat_penalty=1.15,
-    num_predict=8192,
-    num_ctx=131072,
-)
-
-PROSE_EDITOR_OPTIONS = make_llm_options(
-    temperature=0.15,
-    repeat_penalty=1.15,
-    num_predict=4096,
-    num_ctx=32768,
-)
-
-CATALOG_SUMMARY_OPTIONS = make_llm_options(
-    temperature=0.15,
-    repeat_penalty=1.15,
-    num_predict=1024,
-    num_ctx=32768,
-)
-
-GROUNDING_OPTIONS = make_llm_options(
-    temperature=0.0,
-    repeat_penalty=1.05,
-    num_predict=4096,
-    num_ctx=131072,
-)
-
-# ---------------------------------------------------------------------------
-# プロンプトテンプレート
-# ---------------------------------------------------------------------------
-
-MAP_PROMPT = """次は小説『{book_name}』の本文の一部（{n} 分割の {i} 番目）です。
-後段で書籍全体の要約へ統合できるよう、この部分の出来事を過不足なく整理してください。
-
-要約に含めること:
-- 誰が、何をしたか（主要キャラの発言・行動）
-- 出来事の流れ（背景 → 主要な動き → 結果）
-- 関係性の変化があれば明記
-- 固有名詞、行動の理由、結果を省略せず、主語の分かる自然な文章にする
-
-避けること:
-- 描写の引用そのまま
-- 全キャラを羅列するだけのもの
-- 文字数に合わせるための電文調、名詞句の連結、因果関係の省略
-
-本文:
-{text}
-
-分割要約:"""
-
-REDUCE_PROMPT = """次は小説『{book_name}』の本文を時系列に分割要約したものです。
-これを統合し、シリーズ俯瞰にも使える読みやすい最終要約を書いてください。
-
-最終要約に含めるべき内容:
-- 主人公とその周囲の主要登場人物（誰が中心か）
-- 物語の発端と、各出来事が次の展開へつながる因果
-- この巻における主要な出来事・対立・転機
-- キャラクター関係性の変化（誰と誰の関係が動いたか）
-- 主要な対立や事件がどのような状態に至ったか
-- この巻のテーマや物語上の意味
-
-避けること:
-- 単なる場面の羅列
-- 巻末の解説 / あとがきの引用
-- 文字数を先に決め、主語・理由・関係性を削って短くすること
-- 名詞句や短文を不自然につないだ文章
-
-長さは指定しません。必要な情報を分かりやすく伝えることを最優先にし、
-話題や時間軸が変わる箇所では段落を分けてください。
-
-分割要約（時系列順に並んでいる）:
-{summaries}
-
-最終要約:"""
-
-SINGLE_PROMPT = """次は小説『{book_name}』の本文（連結ページ）です。
-シリーズ俯瞰にも使える読みやすいあらすじ・要約を書いてください。
-
-要約に含めるべき内容:
-- 主人公とその周囲の主要登場人物（誰が中心か）
-- 物語の発端と、各出来事が次の展開へつながる因果
-- この巻における主要な出来事・対立・転機
-- キャラクター関係性の変化
-- 主要な対立や事件がどのような状態に至ったか
-- この巻のテーマや物語上の意味
-
-避けること:
-- 単なる場面の羅列
-- 巻末の解説 / あとがきの引用
-- 文字数を先に決め、主語・理由・関係性を削って短くすること
-- 名詞句や短文を不自然につないだ文章
-
-長さは指定しません。必要な情報を分かりやすく伝えることを最優先にし、
-話題や時間軸が変わる箇所では段落を分けてください。
-
-本文:
-{text}
-
-あらすじ・要約:"""
-
-COMBINED_PROMPT = """次は小説『{book_name}』の本文（連結ページ）です。
-以下の 3 セクションを指定のマーカー形式で出力してください。
-
-[SUMMARY]
-含めること: 主人公と主要登場人物 / この巻の主要な出来事・対立・転機 /
-            出来事の因果と結果 / キャラクター関係性の変化 /
-            この巻のテーマや物語上の意味
-書き方: 長さを先に決めず、必要情報を分かりやすく伝える自然な文章にする。
-        主語・理由・時系列を省略せず、話題の切れ目では段落を分ける。
-避けること: 単なる場面の羅列 / 巻末解説・あとがきの引用 /
-            文字数合わせの電文調や名詞句の連結
-
-[CHARACTERS]
-（重要度順に最大 {max_chars} 名、キャラ名のみ 1 行 1 名）
-
-[CHARACTER_DETAIL:キャラ名]
-含めること: 最初に誰でどの立場か、他キャラとどう関係するかを明示 /
-            この巻での主要な行動・選択とその理由・心情 /
-            関係性の変化 / 物語上の役割 /
-            本文で確認できる場合だけ印象的な台詞
-書き方: 重要人物は必要に応じて複数段落に分け、登場量が少ない人物は
-        情報を水増ししない。名前と主語を明示し、初見でも理解できる文章にする。
-避けること: 場面の単純な羅列 / 本文の長い引用 / 曖昧な代名詞 /
-            文字数合わせの圧縮 / 根拠のない設定や心情の補完
-
-（[CHARACTER_DETAIL:キャラ名] を登場人物ぶんだけ繰り返す）
-
-本文:
-{text}
-
-出力（マーカー [SUMMARY] / [CHARACTERS] / [CHARACTER_DETAIL:名前] から始めること）:"""
-
-FACT_EXTRACTION_PROMPT = """次は小説『{book_name}』の本文の一部
-（全 {part_count} ブロック中 {part_index} 番目）です。
-完成したあらすじを書く前の材料として、本文で確認できる出来事の事実を抽出してください。
-
-出力形式:
-[BOOK_FACTS]
-- [page N] 誰が何をし、その理由・結果・次の出来事とのつながりが何か
-
-規則:
-- 各事実には根拠となるpage番号を必ず付ける。
-- 主語、行動、理由、結果を省略しない。
-- 公開版人物名台帳の人物がこの本文に登場する場合は、その正規名で具体的な事実を残す。
-- 台帳名だけを根拠に人物や出来事を補完せず、本文に登場しない台帳名は無視する。
-- 本文にない設定や心情を推測しない。
-- 完成した要約文にはせず、後段で文章化できる具体的な事実を残す。
-- コードフェンスや前置き・後書きを出力しない。
-
-公開版人物名台帳（名前だけ。人物説明や事実ではない）:
-{character_ledger}
-
-本文:
-{text}
-
-出力（[BOOK_FACTS]から開始）:"""
-
-CHARACTER_FACT_EXTRACTION_PROMPT = """次は小説『{book_name}』から抽出した、
-ページ根拠付きの書籍事実です。後段で人物説明を個別に執筆できるよう、
-主要人物ごとの事実へ再編してください。
-
-出力形式:
-[CHARACTER_FACT:人物名]
-- [page N] その人物の立場、他人物との関係、行動、選択理由、心情、関係や立場の変化
-
-規則:
-- 書籍事実に明記された人物と情報だけを使う。
-- 公開版人物名台帳に同一人物の表記がある場合は、その正規名を見出しに使う。
-- 各人物について、初期状態、主要な選択、終盤の結果や関係変化を可能な範囲で残す。
-- 同じ人物でも敬称や役職付き表記を別人にしない。
-- 匿名の役職、集団、人物ではない固有名詞を人物として出さない。
-- 各事実には、入力にあるpage番号を保持する。
-- 完成した人物紹介文にはせず、具体的な事実の箇条書きにする。
-- コードフェンスや前置き・後書きを出力しない。
-
-公開版人物名台帳（名前だけ。人物説明や事実ではない）:
-{character_ledger}
-
-ページ根拠付き書籍事実:
-{book_facts}
-
-出力（[CHARACTER_FACT:人物名]から開始）:"""
-
-SUMMARY_FROM_FACTS_PROMPT = """次は小説『{book_name}』からページ根拠付きで抽出した事実です。
-事実に含まれる情報だけを使い、初めて読む人にも流れが分かるあらすじ・要約を書いてください。
-
-含めること:
-- 中心人物とその立場
-- 物語の発端
-- 出来事が次の出来事を引き起こす因果
-- 主要な対立、転機、結果
-- 人物関係や立場の変化
-- この巻のテーマまたはシリーズ上の意味
-
-書き方:
-- 長さや段落数を先に決めず、理解に必要な情報を残す。
-- 主語と固有名詞を明示し、曖昧な代名詞を避ける。
-- 時間軸や話題が変わる箇所で段落を分ける。
-- 事実の箇条書きを並べ直すだけでなく、因果の通った自然な文章にする。
-- ページ番号、マーカー、コードフェンス、作業説明は完成文へ出さない。
-
-ページ根拠付き事実:
-{facts}
-
-あらすじ・要約:"""
-
-CATALOG_SUMMARY_FROM_FACTS_PROMPT = """次は小説『{book_name}』のページ根拠付き事実と、
-根拠検査に合格した詳細あらすじです。書籍一覧で作品を選ぶ人向けに、400〜700文字の短縮要約を書いてください。
-
-必ず残すこと:
-- 中心人物とその立場
-- 物語の発端と中心課題
-- 主要な対立または転機
-- この巻で到達する結果
-- 重要な人物関係または立場の変化
-
-規則:
-- ページ根拠付き事実にない内容を追加しない。
-- 詳細あらすじの全情報を網羅する必要はないが、選書判断に必要な物語の芯を残す。
-- 400文字未満や700文字超にしない。文字数合わせの重複、電文調、曖昧な代名詞を避ける。
-- ページ番号、マーカー、コードフェンス、作業説明、文字数報告を出さない。
-
-ページ根拠付き事実:
-{facts}
-
-根拠検査済み詳細あらすじ:
-{detailed_summary}
-
-短縮要約:"""
-
-CATALOG_SUMMARY_EDITOR_PROMPT = """次の文章は小説『{book_name}』の書籍一覧向け短縮要約の初稿です。
-ページ根拠付き事実と照合し、内容を捏造せず400〜700文字の完成文へ校正してください。
-
-修正すること:
-- 主語不明、曖昧な代名詞、因果や時系列の飛躍
-- 同じ内容の反復、電文調、不自然な圧縮
-- 中心人物、発端、中心課題、主要な転機または対立、結果、重要な関係変化の不足
-
-禁止:
-- 根拠事実にない設定、行動、関係、心理の追加
-- 400文字未満または700文字超の出力
-- ページ番号、生成マーカー、コードフェンス、前置き、ラベル、文字数報告
-
-ページ根拠付き事実:
-{facts}
-
-初稿:
-{draft}
-
-完成文だけを出力してください:"""
-
-PROSE_EDITOR_PROMPT = """次の文章は小説『{book_name}』の{document_type}の初稿です。
-根拠事実と照合し、意味を変えずに読みやすい完成文へ校正してください。
-
-修正すること:
-- 主語不明、曖昧な代名詞、因果や時系列の飛躍
-- 電文調、名詞句の連結、同じ内容の反復
-- 初めて読む人には分からない立場・関係の省略
-- 不自然に短く圧縮された箇所
-
-禁止:
-- 根拠事実にない設定、行動、関係、心理の追加
-- 必要な出来事、理由、関係変化の削除
-- ページ番号、生成マーカー、コードフェンス、前置き、「修正版」等のラベル
-- 文字数や段落数を目標にした圧縮
-
-根拠事実:
-{facts}
-
-初稿:
-{draft}
-
-完成文だけを出力してください:"""
-
-SUMMARY_GROUNDING_PROMPT = """小説『{book_name}』の{content_type}候補を、本文根拠だけで厳密に検査してください。
-
-判定規則:
-- supported: 主張の人物、行動、理由、結果、時系列、因果が候補ページ本文で確認できる。
-- contradicted: 候補ページ本文と明確に矛盾する。似た出来事や別時点との混同も含む。
-- unsupported: 候補ページだけでは主張の一部または全部を確認できない。
-- supportedには候補ページ本文として全文提示された根拠ページを1件以上必ず付ける。
-- candidate_pagesは主張ごとの検索優先ページである。別主張のcandidate_pagesであっても、
-  候補ページ本文へ全文が提示され、当該主張を直接裏付けるページなら引用してよい。
-- ページ番号付き書籍事実にだけ現れ、候補ページ本文へ全文が提示されていないページは引用しない。
-- 本文にない一般知識、シリーズ後続巻、推測で補完しない。
-{coverage_instruction}
-
-検査対象の主張:
-{claims}
-
-候補ページ本文:
-{evidence}
-
-ページ根拠付き書籍事実:
-{book_facts}
-
-次のJSONオブジェクトだけを出力してください。コードフェンスや前置きは禁止です。
-{{
-  "claims": [
-    {{
-      "id": 1,
-      "verdict": "supported",
-      "evidence_pages": [12],
-      "reason": "本文に基づく簡潔な判定理由"
-    }}
-  ],
-  "coverage": {{
-    "verdict": "pass",
-    "missing_facts": [
-      {{"pages": [30], "fact": "要約から欠落した主要事実"}}
-    ]
-  }}
-}}
-
-claimsには入力された全IDを昇順でちょうど1回ずつ含めてください。
-coverage.verdictはpassまたはfail、missing_factsが空でなければ必ずfailにしてください。"""
-
-SUMMARY_GROUNDING_REPAIR_PROMPT = """直前の小説要約根拠検査の応答は、次の出力契約エラーで受理できませんでした。
-
-検証エラー:
-{validation_error}
-
-元の検査指示と入力:
-{original_prompt}
-
-受理できなかった応答:
-{previous_response}
-
-判定内容を推測で変更せず、元の検査指示に従う完全なJSONオブジェクトをもう一度出力してください。
-- claimsには入力された全IDを昇順でちょうど1回ずつ含める。
-- supportedのevidence_pagesは、元の候補ページ本文へ全文提示されたページだけから選ぶ。
-- candidate_pagesは検索優先度であり、別主張の候補でも本文が全文提示されていれば引用してよい。
-- 提示本文内で根拠を確認できなければ、書籍事実にあるだけの未提示ページを引用せずunsupportedにする。
-- JSON以外の前置き、説明、コードフェンスは禁止する。"""
-
-# ---------------------------------------------------------------------------
-# 一括出力パーサ
-# ---------------------------------------------------------------------------
-
-
-def parse_combined_output(text: str) -> tuple[str, dict[str, str]]:
-    """COMBINED_PROMPT への Qwen 応答から (書籍サマリ, {キャラ名: サマリ}) を抽出する。"""
-    summary = ""
-    char_summaries: dict[str, str] = {}
-
-    m = re.search(
-        r"\[SUMMARY\](.*?)(?=\[CHARACTERS\]|\[CHARACTER_DETAIL:|$)",
-        text,
-        re.DOTALL,
-    )
-    if m:
-        summary = m.group(1).strip()
-    else:
-        # マーカーだけが欠け、先頭に自然文のサマリがある応答は全文を保持する。
-        # 後続セクション以降は人物情報なのでサマリへ混ぜない。
-        unmarked = re.split(
-            r"\[CHARACTERS\]|\[CHARACTER_DETAIL:",
-            text,
-            maxsplit=1,
-        )[0].strip()
-        if unmarked and not unmarked.startswith("["):
-            summary = unmarked
-
-    for m in re.finditer(
-        r"\[CHARACTER_DETAIL:([^\]]+)\](.*?)(?=\[CHARACTER_DETAIL:|$)",
-        text,
-        re.DOTALL,
-    ):
-        name = m.group(1).strip()
-        detail = m.group(2).strip()
-        if name and detail:
-            char_summaries[name] = detail
-
-    return summary, char_summaries
+"""既存importを維持するprompt互換facade。"""
+
+from .character_prompts import CHARACTER_FACT_EXTRACTION_PROMPT as CHARACTER_FACT_EXTRACTION_PROMPT
+from .grounding_prompts import GROUNDING_OPTIONS as GROUNDING_OPTIONS
+from .grounding_prompts import SUMMARY_GROUNDING_PROMPT as SUMMARY_GROUNDING_PROMPT
+from .grounding_prompts import SUMMARY_GROUNDING_REPAIR_PROMPT as SUMMARY_GROUNDING_REPAIR_PROMPT
+from .summary_prompts import CATALOG_SUMMARY_EDITOR_PROMPT as CATALOG_SUMMARY_EDITOR_PROMPT
+from .summary_prompts import CATALOG_SUMMARY_FROM_FACTS_PROMPT as CATALOG_SUMMARY_FROM_FACTS_PROMPT
+from .summary_prompts import CATALOG_SUMMARY_MAX_CHARS as CATALOG_SUMMARY_MAX_CHARS
+from .summary_prompts import CATALOG_SUMMARY_MIN_CHARS as CATALOG_SUMMARY_MIN_CHARS
+from .summary_prompts import CATALOG_SUMMARY_OPTIONS as CATALOG_SUMMARY_OPTIONS
+from .summary_prompts import COMBINED_MAX_CHARACTERS as COMBINED_MAX_CHARACTERS
+from .summary_prompts import COMBINED_OPTIONS as COMBINED_OPTIONS
+from .summary_prompts import COMBINED_PROMPT as COMBINED_PROMPT
+from .summary_prompts import FACT_CHUNK_MAX_CHARS as FACT_CHUNK_MAX_CHARS
+from .summary_prompts import FACT_EXTRACTION_OPTIONS as FACT_EXTRACTION_OPTIONS
+from .summary_prompts import FACT_EXTRACTION_PROMPT as FACT_EXTRACTION_PROMPT
+from .summary_prompts import MAP_CHUNK_TARGET_CHARS as MAP_CHUNK_TARGET_CHARS
+from .summary_prompts import MAP_MAX_CHUNKS as MAP_MAX_CHUNKS
+from .summary_prompts import MAP_OPTIONS as MAP_OPTIONS
+from .summary_prompts import MAP_PROMPT as MAP_PROMPT
+from .summary_prompts import ONE_SHOT_MAX_BODY_CHARS as ONE_SHOT_MAX_BODY_CHARS
+from .summary_prompts import ONE_SHOT_OPTIONS as ONE_SHOT_OPTIONS
+from .summary_prompts import PROSE_EDITOR_OPTIONS as PROSE_EDITOR_OPTIONS
+from .summary_prompts import PROSE_EDITOR_PROMPT as PROSE_EDITOR_PROMPT
+from .summary_prompts import REDUCE_OPTIONS as REDUCE_OPTIONS
+from .summary_prompts import REDUCE_PROMPT as REDUCE_PROMPT
+from .summary_prompts import SINGLE_PROMPT as SINGLE_PROMPT
+from .summary_prompts import SUMMARY_FROM_FACTS_PROMPT as SUMMARY_FROM_FACTS_PROMPT
+from .summary_prompts import parse_combined_output as parse_combined_output
+
+__all__ = [
+    "CATALOG_SUMMARY_EDITOR_PROMPT",
+    "CATALOG_SUMMARY_FROM_FACTS_PROMPT",
+    "CATALOG_SUMMARY_MAX_CHARS",
+    "CATALOG_SUMMARY_MIN_CHARS",
+    "CATALOG_SUMMARY_OPTIONS",
+    "CHARACTER_FACT_EXTRACTION_PROMPT",
+    "COMBINED_MAX_CHARACTERS",
+    "COMBINED_OPTIONS",
+    "COMBINED_PROMPT",
+    "FACT_CHUNK_MAX_CHARS",
+    "FACT_EXTRACTION_OPTIONS",
+    "FACT_EXTRACTION_PROMPT",
+    "GROUNDING_OPTIONS",
+    "MAP_CHUNK_TARGET_CHARS",
+    "MAP_MAX_CHUNKS",
+    "MAP_OPTIONS",
+    "MAP_PROMPT",
+    "ONE_SHOT_MAX_BODY_CHARS",
+    "ONE_SHOT_OPTIONS",
+    "PROSE_EDITOR_OPTIONS",
+    "PROSE_EDITOR_PROMPT",
+    "REDUCE_OPTIONS",
+    "REDUCE_PROMPT",
+    "SINGLE_PROMPT",
+    "SUMMARY_FROM_FACTS_PROMPT",
+    "SUMMARY_GROUNDING_PROMPT",
+    "SUMMARY_GROUNDING_REPAIR_PROMPT",
+    "parse_combined_output",
+]

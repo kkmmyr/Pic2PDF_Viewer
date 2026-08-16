@@ -18,8 +18,8 @@ import {
     DialogCancelButton,
     DialogPrimaryButton,
 } from '@/components/ui/dialog';
-import { useKindleCaptureJobs } from '@/hooks/useKindleCatalog';
-import type { KindleCatalogBook } from '@/types/kindleCatalog';
+import { useKindleCaptureJobs } from '@/features/kindle/queries';
+import type { KindleCatalogBook } from '@/features/kindle/types';
 import { formatDateJa } from '@/utils/date';
 import { errorMessage } from '@/utils/error';
 

@@ -30,7 +30,6 @@ export function LibraryHeader() {
         dialogs,
         bulkActions,
         isMixedAuthors,
-        refreshMeta,
         isPdfsLoading,
         activeFilterCount,
         resultBookCount,
@@ -67,7 +66,6 @@ export function LibraryHeader() {
                 onReadStateFilterChange={setReadStateFilter}
                 onToggleShowHidden={toggleShowHidden}
                 onSortChange={setSortOrder}
-                onMetaRefresh={refreshMeta}
                 onToggleSelectionMode={toggleSelectionMode}
                 onClearFilters={clearLibraryFilters}
             />

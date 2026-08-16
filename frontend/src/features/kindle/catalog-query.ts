@@ -3,7 +3,7 @@ import type {
     KindleCatalogFilters,
     KindleCaptureState,
     KindleOwnership,
-} from '@/types/kindleCatalog';
+} from '@/features/kindle/types';
 
 export const DEFAULT_KINDLE_CATALOG_PAGE_SIZE = 25;
 export const KINDLE_CATALOG_PAGE_SIZE_OPTIONS = [25, 50, 100] as const;

@@ -1,9 +1,9 @@
 # プロジェクト概要
 
 ローカル Ollama / llama-server 上の LLM（主に Qwen3.x の thinking モデル）を
-複数プロジェクトから呼び出すための共通ヘルパー。利用側は `sys.path.insert` で
-取り込み、`from local_llm import BackendConfig, LlamaServerBackend, ...` のように
-パッケージ経由で参照する。
+複数プロジェクトから呼び出すための共通ヘルパー。Pic2PDF workspaceでは
+`qwen-common`依存、外部projectではeditable package依存として取り込み、
+`from local_llm import BackendConfig, LlamaServerBackend, ...`の公開APIだけを参照する。
 
 ## 最初に読む
 
@@ -24,7 +24,7 @@ cd D:\61.tool\common\llm
 uv run pytest -q
 
 # 同期 API のスモーク（llama-server が :11435 で稼働している前提）
-python -c "import sys; sys.path.insert(0, r'D:\61.tool\common\llm'); from local_llm import backend_from_env; print(backend_from_env().ask('1+1の答えを数字だけで答えて'))"
+uv run --project common/llm python -c "from local_llm import backend_from_env; print(backend_from_env().ask('1+1の答えを数字だけで答えて'))"
 ```
 
 ## 非自明ルール

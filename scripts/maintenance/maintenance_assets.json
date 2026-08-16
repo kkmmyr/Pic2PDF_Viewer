@@ -1,0 +1,337 @@
+{
+  "compatibility": [
+    {
+      "path": "kindle-pdf/kindle_app_controller.py",
+      "status": "maintain",
+      "owner": "kindle-capture",
+      "evidence": "capture_agent.py and kindle_capture_recovery.py import the public controller facade",
+      "recheck_after": null,
+      "removal_condition": "all capture and recovery entry points import the owned controller modules directly",
+      "rollback": "restore the facade from Git and rerun kindle-pdf controller/capture tests"
+    },
+    {
+      "path": "kindle-pdf/capturer.py",
+      "status": "maintain",
+      "owner": "kindle-capture",
+      "evidence": "capture_agent.py, main_auto.py, main_manual.py, and novel_capturer.py import this facade",
+      "recheck_after": null,
+      "removal_condition": "all runtime entry points move to a replacement public capture API",
+      "rollback": "restore the facade from Git and rerun kindle-pdf capture tests"
+    },
+    {
+      "path": "backend/services/novel_db/job_worker.py",
+      "status": "maintain",
+      "owner": "novel-ocr",
+      "evidence": "job_queue.py imports NovelDbJobWorker and tests patch its operational seams",
+      "recheck_after": null,
+      "removal_condition": "the queue owns a different stable worker application boundary",
+      "rollback": "restore the worker facade from Git and rerun novel job queue tests"
+    },
+    {
+      "path": "backend/services/novel_db/generated_content_audit.py",
+      "status": "maintain",
+      "owner": "novel-rag",
+      "evidence": "backend/scripts/audit_generated_content.py uses it as the public application facade",
+      "recheck_after": null,
+      "removal_condition": "the operational CLI adopts a versioned replacement public API",
+      "rollback": "restore the facade from Git and rerun generated content audit tests"
+    },
+    {
+      "path": "scripts/maintenance/benchmark_ocr_ground_truth.py",
+      "status": "maintain",
+      "owner": "novel-ocr",
+      "evidence": "comparison and analysis scripts dynamically load its stable CLI seam",
+      "recheck_after": null,
+      "removal_condition": "all benchmark callers and subprocess tests migrate to a versioned CLI",
+      "rollback": "restore the CLI facade from Git and rerun OCR benchmark tests"
+    },
+    {
+      "path": "backend/services/novel_db/surya_ocr.py",
+      "status": "timeboxed",
+      "owner": "novel-ocr",
+      "evidence": "production imports are zero; compatibility tests still protect the external symbol surface",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "no external extension or operational script imports it at the recheck",
+      "rollback": "restore the re-export facade from Git and rerun test_surya_ocr.py"
+    },
+    {
+      "path": "backend/services/novel_db/ocr_staging.py",
+      "status": "timeboxed",
+      "owner": "novel-ocr",
+      "evidence": "production imports are zero after router and worker ownership migration",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "no external extension imports the legacy staging symbols",
+      "rollback": "restore the re-export facade from Git and rerun OCR staging/publication tests"
+    },
+    {
+      "path": "backend/services/novel_db/ocr_qa.py",
+      "status": "timeboxed",
+      "owner": "novel-ocr",
+      "evidence": "production imports owned OCR QA modules directly; only compatibility tests use the facade",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "no external extension imports the combined OCR QA module",
+      "rollback": "restore the re-export facade from Git and rerun OCR QA tests"
+    },
+    {
+      "path": "backend/services/novel_db/_llm_backend.py",
+      "status": "timeboxed",
+      "owner": "novel-rag",
+      "evidence": "production imports use llm_provider; legacy tests and possible extensions retain patch compatibility",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "remaining tests use fake providers and no external patch path is reported",
+      "rollback": "restore the provider alias facade from Git and rerun Novel RAG tests"
+    },
+    {
+      "path": "backend/services/novel_db/_prompts.py",
+      "status": "timeboxed",
+      "owner": "novel-rag",
+      "evidence": "production imports domain prompt modules directly; one compatibility parser import remains in tests",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "tests and extensions import domain prompt modules directly",
+      "rollback": "restore the prompt re-export facade from Git and rerun summarizer tests"
+    },
+    {
+      "path": "backend/services/kindle_catalog/capture_jobs.py",
+      "status": "timeboxed",
+      "owner": "kindle-catalog",
+      "evidence": "runtime routers use owned modules; compatibility tests import the former service surface",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "tests and external maintenance code no longer import the facade",
+      "rollback": "restore the service facade from Git and rerun Kindle capture job tests"
+    },
+    {
+      "path": "backend/services/kindle_catalog/enrichment_imports.py",
+      "status": "timeboxed",
+      "owner": "kindle-catalog",
+      "evidence": "runtime code uses owned enrichment modules; compatibility tests retain the former import surface",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "tests and external maintenance code no longer import the facade",
+      "rollback": "restore the service facade from Git and rerun Kindle enrichment tests"
+    },
+    {
+      "path": "frontend/src/hooks/useKindleCatalog.ts",
+      "status": "removed",
+      "owner": "frontend-kindle",
+      "evidence": "Knip and import search reported zero references after feature ownership migration",
+      "recheck_after": null,
+      "removal_condition": "already satisfied",
+      "rollback": "restore the re-export file from Git and rerun Kindle Vitest/Knip"
+    },
+    {
+      "path": "frontend/src/types/kindleCatalog.ts",
+      "status": "removed",
+      "owner": "frontend-kindle",
+      "evidence": "Knip and import search reported zero references after generated-type alias migration",
+      "recheck_after": null,
+      "removal_condition": "already satisfied",
+      "rollback": "restore the type re-export file from Git and rerun Kindle Vitest/Knip"
+    },
+    {
+      "path": "frontend/src/features/novel_db/sse.ts",
+      "status": "removed",
+      "owner": "frontend-novel-db",
+      "evidence": "production and tests import qa/chat/discussion SSE modules directly",
+      "recheck_after": null,
+      "removal_condition": "already satisfied",
+      "rollback": "restore the re-export file from Git and rerun Novel DB SSE Vitest"
+    }
+  ],
+  "migrations": [
+    {
+      "id": "kindle-legacy-db",
+      "path": "backend/services/kindle_catalog/legacy_migration.py",
+      "status": "timeboxed",
+      "owner": "kindle-catalog",
+      "evidence": "local audit: configured=false and available=false; server environments remain unverified",
+      "last_observed_use": null,
+      "recheck_after": "2026-11-16",
+      "removal_condition": "all supported environments report unconfigured and unavailable for 90 days",
+      "rollback": "restore the migration router/service and rerun preview before commit"
+    },
+    {
+      "id": "hitomi-new-arrivals-json",
+      "path": "backend/services/hitomi/arrival_store.py",
+      "status": "timeboxed",
+      "owner": "hitomi",
+      "evidence": "legacy JSON exists; one import record; source mtime 2026-05-25",
+      "last_observed_use": "2026-07-25",
+      "recheck_after": "2026-11-16",
+      "removal_condition": "legacy file is archived and unchanged after the recheck window",
+      "rollback": "restore the idempotent importer and re-import the preserved JSON"
+    },
+    {
+      "id": "library-local-storage",
+      "path": "frontend/src/hooks/library/useLibrarySettings.ts",
+      "status": "timeboxed",
+      "owner": "frontend-library",
+      "evidence": "residual values are browser-local and cannot be centrally counted",
+      "last_observed_use": null,
+      "recheck_after": "2027-02-16",
+      "removal_condition": "supported browser installations have passed the migration support window",
+      "rollback": "restore the read-once migration and reload with preserved localStorage keys"
+    },
+    {
+      "id": "library-pin-local-storage",
+      "path": "frontend/src/hooks/library/useLibraryPins.ts",
+      "status": "timeboxed",
+      "owner": "frontend-library",
+      "evidence": "residual values are browser-local and cannot be centrally counted",
+      "last_observed_use": null,
+      "recheck_after": "2027-02-16",
+      "removal_condition": "supported browser installations have passed the migration support window",
+      "rollback": "restore the read-once pin migration and reload with preserved localStorage keys"
+    }
+  ],
+  "ratchet_exceptions": [
+    {
+      "rule": "code-size",
+      "key": "scripts/maintenance/check_claude_drift.py",
+      "owner": "quality",
+      "reason": "Claude configuration, registry, and README drift checks remain one operational command",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "code-size",
+      "key": "scripts/maintenance/ensemble_ocr_candidates.py",
+      "owner": "novel-ocr",
+      "reason": "candidate ledger parsing and ensemble reporting still share the reviewed OCR report schema",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "common/llm/local_llm/_llama_server.py:_stream_body_sync",
+      "owner": "local-llm",
+      "reason": "sync stream state machine preserves the public Ollama-compatible event contract",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/check_claude_drift.py:_resolve",
+      "owner": "quality",
+      "reason": "path and registry resolution handles reviewed compatibility branches",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/check_claude_drift.py:check_drift",
+      "owner": "quality",
+      "reason": "one report preserves deterministic ordering across configuration drift categories",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/check_claude_drift.py:check_readme_registry_drift",
+      "owner": "quality",
+      "reason": "README registry comparison is a single compatibility check",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/compare_ocr_benchmarks.py:compare_reports",
+      "owner": "novel-ocr",
+      "reason": "benchmark comparison preserves one versioned report contract",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/ensemble_ocr_candidates.py:load_proper_noun_ledger",
+      "owner": "novel-ocr",
+      "reason": "ledger compatibility parsing remains centralized",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/ensemble_ocr_candidates.py:ensemble_reports",
+      "owner": "novel-ocr",
+      "reason": "candidate selection and report emission must remain transactionally consistent",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/generate_file_map.py:run",
+      "owner": "quality",
+      "reason": "frontend and backend maps are generated and checked by one atomic command",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/seed_ocr_holdout_from_qa.py:main",
+      "owner": "novel-ocr",
+      "reason": "holdout validation and manifest commit are one fail-closed operation",
+      "recheck_after": "2026-11-16"
+    }
+  ],
+  "script_groups": [
+    {
+      "id": "root-python",
+      "patterns": ["scripts/*.py"],
+      "classification": "continuous",
+      "owner": "platform",
+      "reason": "repository and Kindle-series operational entry points",
+      "recheck_after": null
+    },
+    {
+      "id": "root-shell",
+      "patterns": ["scripts/*.bat", "scripts/*.ps1", "scripts/*.sh"],
+      "classification": "continuous",
+      "owner": "platform",
+      "reason": "release, deployment, service, restore, and agent launch wrappers",
+      "recheck_after": null
+    },
+    {
+      "id": "maintenance-core",
+      "patterns": [
+        "scripts/maintenance/check_*.py",
+        "scripts/maintenance/generate_file_map.py",
+        "scripts/maintenance/monthly_health_audit.py",
+        "scripts/maintenance/benchmark_ocr_ground_truth.py",
+        "scripts/maintenance/ocr_benchmark_*.py",
+        "scripts/maintenance/compare_ocr_benchmarks.py",
+        "scripts/maintenance/analyze_ocr_error_patterns.py",
+        "scripts/maintenance/merge_ocr_consensus_gaps.py",
+        "scripts/maintenance/seed_ocr_holdout_from_qa.py",
+        "scripts/maintenance/ensemble_ocr_candidates.py",
+        "scripts/maintenance/prepare_ocr_prevalidation_qa.py",
+        "scripts/maintenance/paddle_ocr_worker.py",
+        "scripts/maintenance/paddle_column_ocr_worker.py",
+        "scripts/maintenance/surya_column_ocr_worker.py"
+      ],
+      "classification": "continuous",
+      "owner": "quality",
+      "reason": "quality gates, benchmark comparison, and reproducible OCR evaluation",
+      "recheck_after": null
+    },
+    {
+      "id": "maintenance-data",
+      "patterns": [
+        "scripts/maintenance/__init__.py",
+        "scripts/maintenance/*_baseline.json",
+        "scripts/maintenance/openapi_baseline.json",
+        "scripts/maintenance/ocr_quality_policy.json",
+        "scripts/maintenance/docs_contracts.json",
+        "scripts/maintenance/maintenance_assets.json"
+      ],
+      "classification": "continuous",
+      "owner": "quality",
+      "reason": "reviewed baselines, policy, and machine-readable maintenance inventory",
+      "recheck_after": null
+    },
+    {
+      "id": "ocr-training-pilots",
+      "patterns": [
+        "scripts/maintenance/audit_ocr_finetune_corpus.py",
+        "scripts/maintenance/prepare_ndlocr_finetune_pilot.py",
+        "scripts/maintenance/build_parseq_lmdb.py",
+        "scripts/maintenance/recover_parseq_checkpoint_from_onnx.py",
+        "scripts/maintenance/train_parseq_recovered_pilot.py",
+        "scripts/maintenance/audit_parseq_training_manifest.py",
+        "scripts/maintenance/export_parseq_checkpoint_to_onnx.py",
+        "scripts/maintenance/generate_ndlocr_gap_crops.py"
+      ],
+      "classification": "temporary",
+      "owner": "novel-ocr",
+      "reason": "timeboxed NDL OCR and Parseq training/recovery experiments",
+      "recheck_after": "2026-11-16"
+    }
+  ]
+}

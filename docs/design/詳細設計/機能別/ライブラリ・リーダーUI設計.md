@@ -32,6 +32,10 @@ URL / libraryStore
       ├─ useBookMeta / useGenres（server state）
       ├─ filter / sort / grouping（derived state）
       └─ LibraryPanelContext
+
+`useLibraryPanel`は画面向けの公開facadeであり、API副作用を直接増やさない。rename、
+thumbnail再生成、PDF一覧invalidateは`useLibraryBookActions`、filter・selection・dialog・
+displayは責務別hookが所有する。facadeはこれらを合成して既存context契約を維持する。
           ├─ LibraryHeader
           ├─ PdfGrid
           └─ LibraryDialogs

@@ -10,7 +10,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
-vi.mock('../features/novel_db/sse', () => ({
+vi.mock('../features/novel_db/discussion-sse', () => ({
     streamDiscussion: vi.fn(),
 }));
 vi.mock('../features/novel_db/api', () => ({
@@ -21,7 +21,7 @@ vi.mock('../features/novel_db/api', () => ({
 import { toast } from 'sonner';
 
 import { deleteDiscussion, fetchDiscussionHistory } from '@/features/novel_db/api';
-import { streamDiscussion } from '@/features/novel_db/sse';
+import { streamDiscussion } from '@/features/novel_db/discussion-sse';
 import { useDiscussion } from '@/hooks/novel_db/useDiscussion';
 
 function makeWrapper(initialEntry = '/novel/discussion?book=テスト本') {

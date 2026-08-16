@@ -5,27 +5,12 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 
-from ._llm_backend import QWEN_BACKEND
-from ._prompts import (
-    CATALOG_SUMMARY_EDITOR_PROMPT,
-    CATALOG_SUMMARY_FROM_FACTS_PROMPT,
-    CATALOG_SUMMARY_MAX_CHARS,
-    CATALOG_SUMMARY_MIN_CHARS,
-    CATALOG_SUMMARY_OPTIONS,
-    CHARACTER_FACT_EXTRACTION_PROMPT,
-    FACT_CHUNK_MAX_CHARS,
-    FACT_EXTRACTION_OPTIONS,
-    FACT_EXTRACTION_PROMPT,
-    ONE_SHOT_OPTIONS,
-    PROSE_EDITOR_OPTIONS,
-    PROSE_EDITOR_PROMPT,
-    SUMMARY_FROM_FACTS_PROMPT,
-)
 from .character_names import (
     NormalizedCharacter,
     derive_character_evidence_aliases,
     normalize_character_entries,
 )
+from .character_prompts import CHARACTER_FACT_EXTRACTION_PROMPT
 from .character_summarizer import edit_character_summary, summarize_character
 from .fact_checkpoints import (
     hash_source_pages,
@@ -43,6 +28,21 @@ from .generation_quality import (
     merge_fact_sheets,
     parse_fact_sheet,
 )
+from .llm_provider import NovelLlmProvider, get_llm_provider
+from .summary_prompts import (
+    CATALOG_SUMMARY_EDITOR_PROMPT,
+    CATALOG_SUMMARY_FROM_FACTS_PROMPT,
+    CATALOG_SUMMARY_MAX_CHARS,
+    CATALOG_SUMMARY_MIN_CHARS,
+    CATALOG_SUMMARY_OPTIONS,
+    FACT_CHUNK_MAX_CHARS,
+    FACT_EXTRACTION_OPTIONS,
+    FACT_EXTRACTION_PROMPT,
+    ONE_SHOT_OPTIONS,
+    PROSE_EDITOR_OPTIONS,
+    PROSE_EDITOR_PROMPT,
+    SUMMARY_FROM_FACTS_PROMPT,
+)
 
 ProgressCallback = Callable[[str], None]
 
@@ -56,8 +56,10 @@ def extract_fact_sheet(
     model: str,
     progress: ProgressCallback | None,
     canonical_character_names: list[str] | None = None,
+    provider: NovelLlmProvider | None = None,
 ) -> BookFactSheet:
     """Extract page-grounded book and character facts from every body block."""
+    backend = (provider or get_llm_provider()).qwen
     canonical_names = canonical_character_names or []
     character_ledger = _render_character_ledger(canonical_names)
     chunks = chunk_pages_by_chars(pages, max_chars=FACT_CHUNK_MAX_CHARS)
@@ -93,7 +95,7 @@ def extract_fact_sheet(
             character_ledger=character_ledger,
             text=format_page_blocks(chunk),
         )
-        book_response = QWEN_BACKEND.ask(
+        book_response = backend.ask(
             prompt,
             model=model,
             options=FACT_EXTRACTION_OPTIONS,
@@ -107,7 +109,7 @@ def extract_fact_sheet(
             character_ledger=character_ledger,
             book_facts=book_sheet.book_facts,
         )
-        character_response = QWEN_BACKEND.ask(
+        character_response = backend.ask(
             character_prompt,
             model=model,
             options=FACT_EXTRACTION_OPTIONS,
@@ -160,6 +162,7 @@ def write_and_edit_summary(
     *,
     model: str,
     progress: ProgressCallback | None,
+    provider: NovelLlmProvider | None = None,
 ) -> str:
     """Write a book summary from facts, then run a separate editorial pass."""
     facts = _render_fact_sheet(fact_sheet)
@@ -168,7 +171,8 @@ def write_and_edit_summary(
         book_name=book_name,
         facts=facts,
     )
-    draft = QWEN_BACKEND.ask(
+    backend = (provider or get_llm_provider()).qwen
+    draft = backend.ask(
         draft_prompt,
         model=model,
         options=ONE_SHOT_OPTIONS,
@@ -181,7 +185,7 @@ def write_and_edit_summary(
         facts=facts,
         draft=draft,
     )
-    edited = QWEN_BACKEND.ask(
+    edited = backend.ask(
         editor_prompt,
         model=model,
         options=PROSE_EDITOR_OPTIONS,
@@ -196,11 +200,13 @@ def write_and_edit_catalog_summary(
     *,
     model: str,
     progress: ProgressCallback | None,
+    provider: NovelLlmProvider | None = None,
 ) -> str:
     """Write the independently publishable 400–700 character catalog summary."""
     facts = _render_fact_sheet(fact_sheet)
     _log(progress, "  writing catalog summary from verified detailed summary")
-    draft = QWEN_BACKEND.ask(
+    backend = (provider or get_llm_provider()).qwen
+    draft = backend.ask(
         CATALOG_SUMMARY_FROM_FACTS_PROMPT.format(
             book_name=book_name,
             facts=facts,
@@ -211,7 +217,7 @@ def write_and_edit_catalog_summary(
     ).strip()
 
     _log(progress, "  editing catalog summary")
-    edited = QWEN_BACKEND.ask(
+    edited = backend.ask(
         CATALOG_SUMMARY_EDITOR_PROMPT.format(
             book_name=book_name,
             facts=facts,
@@ -251,6 +257,7 @@ def write_and_edit_characters(
     model: str,
     max_characters: int,
     progress: ProgressCallback | None,
+    provider: NovelLlmProvider | None = None,
 ) -> dict[str, str]:
     """Write and edit each evidenced character independently."""
     page_rows = [
@@ -299,6 +306,7 @@ def write_and_edit_characters(
             model=model,
             fact_notes=entry.summary,
             progress=progress,
+            provider=provider,
         )
         edited = edit_character_summary(
             book_name,
@@ -306,6 +314,7 @@ def write_and_edit_characters(
             draft,
             fact_notes=entry.summary,
             model=model,
+            provider=provider,
         )
         result[entry.name] = choose_publishable_prose(
             draft,

@@ -13,7 +13,7 @@ import {
     type DiscussionStage,
     type DiscussionTurnEvent,
     streamDiscussion,
-} from '@/features/novel_db/sse';
+} from '@/features/novel_db/discussion-sse';
 import type { DiscussionChecks } from '@/features/novel_db/types';
 import { errorMessage } from '@/utils/error';
 

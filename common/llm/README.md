@@ -2,7 +2,7 @@
 
 ローカル Ollama / llama-server 上の LLM（主に Qwen3.x の thinking モデル）を
 **複数プロジェクトから安全に呼び出す** ための共通ヘルパー。
-`D:\61.tool\Gemma 4` と同じ流儀で `sys.path.insert` 経由の利用を想定する。
+Pic2PDF workspace内では`qwen-common`依存、外部projectではeditable package依存として利用する。
 
 ## なぜ共通化するのか
 
@@ -37,8 +37,6 @@
 `config.py` 等の値から `BackendConfig` を作って具象 Backend を instantiate。
 
 ```python
-import sys
-sys.path.insert(0, r"D:\61.tool\common\llm")
 from local_llm import BackendConfig, LlamaServerBackend
 
 backend = LlamaServerBackend(BackendConfig(
@@ -65,12 +63,13 @@ async for event in backend.astream_ask("..."):
 ### パターン B: CLI / MCP（環境変数経由）
 
 ```python
-import sys
-sys.path.insert(0, r"D:\61.tool\common\llm")
 from local_llm import backend_from_env
 
 backend = backend_from_env()  # QWEN_BACKEND を見て LlamaServerBackend / OllamaBackend を返す
 ```
+
+外部projectへ組み込む場合は、対象projectで
+`uv add --editable D:\61.tool\Pic2PDF_Viewer\common\llm`を実行して依存を宣言する。
 
 ## 環境変数（`backend_from_env` 専用）
 
@@ -100,6 +99,7 @@ backend = backend_from_env()  # QWEN_BACKEND を見て LlamaServerBackend / Olla
 
 - 同期版 (`stream_ask` / `ask`): 標準ライブラリのみ (`urllib`)
 - 非同期版 (`astream_ask` / `aask`): `httpx>=0.27`（**lazy import**）
+- MCP server (`mcp_server.py`): `mcp>=1,<2`
 
 httpx は `pyproject.toml` の dependency に入っているが、同期版しか使わない
 プロジェクトでは httpx をインストールしなくても動作する。
