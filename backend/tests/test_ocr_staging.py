@@ -1,33 +1,43 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pytest
 from PIL import Image
 
+from services.novel_db import ocr_qa as qa_facade
+from services.novel_db import ocr_staging as staging_facade
 from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
 from services.novel_db.migrations import upgrade_head
-from services.novel_db.ocr_page_classification import classify_run_pages as classification_classify_run_pages
+from services.novel_db.ocr_page_classification import classify_run_pages
 from services.novel_db.ocr_page_types import suggest_page_type
-from services.novel_db.ocr_qa import stage_run_for_qa as qa_stage_run_for_qa
+from services.novel_db.ocr_qa_publication import approve_and_publish_run
+from services.novel_db.ocr_qa_queries import get_qa_image_path, get_qa_run, list_qa_runs
+from services.novel_db.ocr_qa_review import review_qa_page
 from services.novel_db.ocr_qa_risk import annotate_run_qa_risks, detect_qa_risk_flags
-from services.novel_db.ocr_run_store import collect_input_pages as store_collect_input_pages
-from services.novel_db.ocr_staging import (
-    approve_and_publish_run,
-    classify_run_pages,
-    collect_input_pages,
-    prepare_run,
-    review_qa_page,
-    save_page_result,
-    stage_run_for_qa,
-)
+from services.novel_db.ocr_qa_staging import stage_run_for_qa
+from services.novel_db.ocr_run_store import collect_input_pages, prepare_run, save_page_result
 
 
 def test_facade_preserves_public_symbol_identity() -> None:
-    assert collect_input_pages is store_collect_input_pages
-    assert classify_run_pages is classification_classify_run_pages
-    assert stage_run_for_qa is qa_stage_run_for_qa
+    assert staging_facade.collect_input_pages is collect_input_pages
+    assert staging_facade.prepare_run is prepare_run
+    assert staging_facade.save_page_result is save_page_result
+    assert staging_facade.classify_run_pages is classify_run_pages
+    assert staging_facade.stage_run_for_qa is stage_run_for_qa
+    assert staging_facade.review_qa_page is review_qa_page
+    assert staging_facade.approve_and_publish_run is approve_and_publish_run
+    assert staging_facade.get_qa_image_path is get_qa_image_path
+    assert staging_facade.get_qa_run is get_qa_run
+    assert staging_facade.list_qa_runs is list_qa_runs
+    assert qa_facade.stage_run_for_qa is stage_run_for_qa
+    assert qa_facade.review_qa_page is review_qa_page
+    assert qa_facade.approve_and_publish_run is approve_and_publish_run
+    assert qa_facade.get_qa_image_path is get_qa_image_path
+    assert qa_facade.get_qa_run is get_qa_run
+    assert qa_facade.list_qa_runs is list_qa_runs
 
 
 @pytest.fixture
@@ -141,6 +151,129 @@ def test_run_approval_rejects_unreviewed_required_pages(staged_book) -> None:
 
     with pytest.raises(ValueError, match="required QA pages remain"):
         approve_and_publish_run(run_id, "tester")
+
+
+def test_run_approval_rejects_rejected_pages(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, "本文"))
+    stage_run_for_qa(run_id, input_pages)
+    review_qa_page(run_id, 1, "rejected", "再確認", "narrative", "normal_prose", "primary", None)
+    review_qa_page(run_id, 2, "approved", None, "narrative", "normal_prose", "primary", None)
+
+    with pytest.raises(ValueError, match="rejected QA pages remain"):
+        approve_and_publish_run(run_id, "tester")
+
+
+@pytest.mark.parametrize(
+    ("column", "message"),
+    [
+        ("page_type", "unclassified OCR pages remain"),
+        ("layout_type", "unclassified OCR layouts remain"),
+    ],
+)
+def test_run_approval_rejects_unclassified_results(staged_book, column: str, message: str) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, "本文"))
+    stage_run_for_qa(run_id, input_pages)
+    for page in input_pages:
+        review_qa_page(
+            run_id,
+            page.page_no,
+            "approved",
+            None,
+            "narrative",
+            "normal_prose",
+            "primary",
+            None,
+        )
+    with with_db() as conn:
+        conn.execute(
+            f"UPDATE ocr_page_results SET {column}='unknown' WHERE run_id=? AND page_no=1",
+            (run_id,),
+        )
+        conn.commit()
+
+    with pytest.raises(ValueError, match=message):
+        approve_and_publish_run(run_id, "tester")
+
+
+def test_publication_rolls_back_book_pages_fts_and_run_state(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, "本文"))
+    stage_run_for_qa(run_id, input_pages)
+    for page in input_pages:
+        review_qa_page(
+            run_id,
+            page.page_no,
+            "approved",
+            None,
+            "narrative",
+            "normal_prose",
+            "primary",
+            None,
+        )
+    with with_db() as conn:
+        conn.execute(
+            "CREATE TRIGGER fail_ocr_run_completion BEFORE UPDATE OF state ON ocr_runs "
+            "WHEN NEW.state='completed' BEGIN SELECT RAISE(ABORT, 'forced publication failure'); END"
+        )
+        conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError, match="forced publication failure"):
+        approve_and_publish_run(run_id, "tester")
+
+    with with_db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM pages").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM pages_fts").fetchone()[0] == 0
+        run = conn.execute("SELECT state, qa_state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
+    assert tuple(run) == ("awaiting_qa", "pending")
+
+
+def test_publication_uses_reviewed_text_deletes_stale_pages_and_rebuilds_fts(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    first = _passed_page(1, input_pages[0].image_sha256, "主系候補本文")
+    first["external_text"] = "外部採用本文"
+    save_page_result(run_id, first)
+    save_page_result(run_id, _passed_page(2, input_pages[1].image_sha256, "補正前本文"))
+    stage_run_for_qa(run_id, input_pages)
+    review_qa_page(run_id, 1, "approved", None, "narrative", "normal_prose", "external", None)
+    review_qa_page(run_id, 2, "approved", None, "narrative", "normal_prose", "codex", "補正採用本文")
+    with with_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO books (name, pdf_path, images_dir, page_count) VALUES (?, '', 'old', 3)",
+            (book_name,),
+        )
+        book_id = int(cursor.lastrowid)
+        conn.executemany(
+            "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count, page_type, index_eligible) "
+            "VALUES (?, ?, '', ?, ?, 'narrative', 1)",
+            [
+                (book_id, 1, "旧本文一", 4),
+                (book_id, 2, "旧本文二", 4),
+                (book_id, 3, "削除対象本文", 6),
+            ],
+        )
+        conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
+        conn.commit()
+
+    approve_and_publish_run(run_id, "tester")
+
+    with with_db() as conn:
+        pages = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id=? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        fts_texts = conn.execute("SELECT full_text FROM pages_fts ORDER BY rowid").fetchall()
+    assert [tuple(row) for row in pages] == [(1, "外部採用本文"), (2, "補正採用本文")]
+    assert [row[0] for row in fts_texts] == ["外部採用本文", "補正採用本文"]
 
 
 def test_page_approval_requires_classification(staged_book) -> None:

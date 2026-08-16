@@ -1,6 +1,6 @@
 # OCR設計書
 
-> status: living | last-verified: 2026-08-10
+> status: living | last-verified: 2026-08-16
 
 縦書き小説をSurya OCR 2でテキスト化し、入力完全性検査、ページ品質検査、画像照合QAを
 通過した結果だけを `novel.db` へ公開する設計である。yomitokuは独立照合・比較・
@@ -69,6 +69,7 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
 | `backend/services/novel_db/ocr_worker_engines.py` | 画像読込、Surya/yomitokuのページ処理、候補選択 |
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
+| `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
 | `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
 | `backend/services/novel_db/surya_parsing.py` | 公式prompt、HTML/layout/bbox解析 |
 | `backend/services/novel_db/surya_quality.py` | coverage、品質flag、補助OCR照合 |
@@ -77,13 +78,49 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/surya_runtime.py` | variant・layout fallback・品質選択workflow |
 | `backend/services/novel_db/ocr_run_store.py` | SHA検証、run再開、チェックポイント |
 | `backend/services/novel_db/ocr_page_classification.py` | ページ種別・layout候補 |
-| `backend/services/novel_db/ocr_qa.py` | QA対象、レビュー、原子的な正式公開 |
-| `backend/services/novel_db/job_state.py` / `job_targets.py` / `job_executor.py` | 状態、対象解決、工程実行 |
-| `backend/services/novel_db/surya_ocr.py` / `ocr_staging.py` / `job_worker.py` | 既存import契約を保つfacade |
+| `backend/services/novel_db/ocr_qa_staging.py` | 完全性検証、page分類、risk反映、必須QA page選定、`awaiting_qa`遷移 |
+| `backend/services/novel_db/ocr_qa_review.py` | page review入力検証、採用候補検証、page単位のQA状態遷移 |
+| `backend/services/novel_db/ocr_qa_queries.py` | QA run一覧・詳細、SHA照合付き画像path解決 |
+| `backend/services/novel_db/ocr_qa_publication.py` | run承認条件、採用本文検証、books・pages・FTS・runの原子的な正式公開 |
+| `backend/services/novel_db/ocr_qa.py` | QA公開関数のimport互換facade |
+| `backend/services/novel_db/job_state.py` / `job_targets.py` / `job_executor.py` | job状態、対象解決、mode別application serviceへのdispatch |
+| `backend/services/novel_db/surya_ocr.py` | package・standaloneの既存Surya import契約を保つ期限付きfacade |
+| `backend/services/novel_db/ocr_staging.py` | run store・classification・QAの既存import契約を保つ期限付きfacade |
+| `backend/services/novel_db/job_worker.py` | queue workerと既存monkeypatch pointを保つfacade |
 | `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー |
+
+### 互換facadeとテスト所有
+
+- application codeは`surya_ocr.py` / `ocr_staging.py`を経由せず、責務所有moduleから直接importする。
+- `surya_ocr.py`は`python ocr_worker.py`と同じdirectoryをimport rootにするstandalone利用、
+  `ocr_staging.py`は既存拡張・保守コードのimport互換のためR3では残す。両facadeとも公開symbol identityを
+  testで固定し、内部利用ゼロを維持したままR6で外部利用・rollback手順を再確認して撤去判断する。
+- test所有は`test_surya_parsing.py`（prompt・HTML/layout解析）、`test_surya_quality.py`
+  （coverage・外部OCR・crosscheck）、`test_surya_runtime.py`（session policy・fallback・transport）、
+  `test_ocr_worker.py`（JSONL worker）、`test_ocr_staging.py` / `test_ocr_publication.py`
+  （QA・原子的公開）とする。`test_surya_ocr.py`はfacade契約だけを検証する。
 
 ## 2. Surya OCR 2実行契約
 
+- OCR jobは対象冊子ごとにrunと未処理taskを準備し、全冊分のtaskを1回のworker processへ渡す。
+  workerから返るpageはbook名でrunへ対応付け、未知のbook名を受理しない。
+- worker processまたはpage保存で例外が発生した場合は、準備済みの全runを同じ理由で`failed`にし、
+  job失敗として再送出する。run準備前の失敗を未準備runへ波及させない。
+- worker完了後は対象冊子ごとに入力SHAとpage完全性を検証して`awaiting_qa`へ進める。
+  1冊のQA準備失敗はそのrunだけを`failed`にして後続冊を継続し、全冊の進捗更新後に
+  `OCR quality gate failed: ...`として集約する。この段階ではcanonical `pages`へ公開しない。
+- jobの`current_detail`に出すstage、book、page、attempt、server generation、detailの順序と
+  区切りを維持し、workerのprogress eventをjob進捗へ写像する。
+- QA開始は入力画像SHA・page数・page結果の完全性を再検証し、分類・risk flag反映後に
+  必須pageを`required`、その他を`not_required`としてrunを`awaiting_qa / pending`へ遷移させる。
+  canonical `books` / `pages`は変更しない。
+- page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
+  検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
+- run承認は`required`・`rejected`・未分類page/layoutが0件であること、入力SHAが不変であること、
+  narrativeの採用本文が空でないことを正式公開前に検証する。非narrative pageは画像を保持し、
+  canonical本文を空文字として公開する。
+- 正式公開ではbook作成または更新、全page upsert、余剰page削除、FTS rebuild、runの
+  `completed / approved`遷移を単一SQLite transactionで行い、途中失敗時は全変更をrollbackする。
 - workerのstdoutは1行1JSONの`page` / `progress` / `fatal` event専用とし、
   server・modelのlogはstderrへ分離する。field、event順序、終了codeを内部分割で変更しない。
 - `ocr_worker.py`はpackage importと`python ocr_worker.py --manifest ...`のstandalone実行を

@@ -1,6 +1,6 @@
 from services.novel_db.ocr_layout_types import suggest_layout_type, validate_layout_type
 from services.novel_db.ocr_worker import select_layout_ocr_result
-from services.novel_db.surya_ocr import SuryaPageResult
+from services.novel_db.surya_types import SuryaPageResult
 
 
 def test_mixed_illustration_is_detected_from_non_text_block() -> None:

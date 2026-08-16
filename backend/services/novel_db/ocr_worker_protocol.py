@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
 
 if TYPE_CHECKING:
     try:
-        from .surya_ocr import SuryaPageResult
+        from .surya_types import SuryaPageResult
     except ImportError:
-        from surya_ocr import SuryaPageResult
+        from surya_types import SuryaPageResult
 
 
 class OcrWorkerTask(TypedDict):

@@ -13,11 +13,7 @@ from services.novel_db.ocr_ground_truth import (
     seed_ground_truth,
     update_ground_truth,
 )
-from services.novel_db.ocr_staging import (
-    collect_input_pages,
-    prepare_run,
-    save_page_result,
-)
+from services.novel_db.ocr_run_store import collect_input_pages, prepare_run, save_page_result
 
 
 def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:

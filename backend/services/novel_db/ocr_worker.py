@@ -21,14 +21,16 @@ try:
     from .ocr_worker_protocol import OcrWorkerTask, load_tasks
     from .ocr_worker_protocol import emit as _emit
     from .ocr_worker_session import run_surya
-    from .surya_ocr import SuryaClient, SuryaServer
+    from .surya_runtime import SuryaClient
+    from .surya_server import SuryaServer
 except ImportError:
     from ocr_worker_engines import read_image as _read_image
     from ocr_worker_engines import run_yomitoku, select_layout_ocr_result
     from ocr_worker_protocol import OcrWorkerTask, load_tasks
     from ocr_worker_protocol import emit as _emit
     from ocr_worker_session import run_surya
-    from surya_ocr import SuryaClient, SuryaServer
+    from surya_runtime import SuryaClient
+    from surya_server import SuryaServer
 
 __all__ = ["main", "select_layout_ocr_result"]
 

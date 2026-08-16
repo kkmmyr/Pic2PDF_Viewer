@@ -9,6 +9,7 @@ GET  /ocr/status  — OCR ジョブの状態（フロントエンド互換形式
 """
 
 import secrets
+from typing import cast
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import FileResponse
@@ -37,6 +38,7 @@ from routers.api_schemas import (
 )
 from services.novel_db import ocr_agent_jobs
 from services.novel_db.connection import with_db
+from services.novel_db.extractor import OcrPageResult
 from services.novel_db.job_queue import job_queue
 from services.novel_db.ocr_ground_truth import (
     get_ground_truth_image_path,
@@ -44,14 +46,10 @@ from services.novel_db.ocr_ground_truth import (
     seed_ground_truth,
     update_ground_truth,
 )
-from services.novel_db.ocr_staging import (
-    approve_and_publish_run,
-    classify_run_pages,
-    get_qa_image_path,
-    get_qa_run,
-    list_qa_runs,
-    review_qa_page,
-)
+from services.novel_db.ocr_page_classification import classify_run_pages
+from services.novel_db.ocr_qa_publication import approve_and_publish_run
+from services.novel_db.ocr_qa_queries import get_qa_image_path, get_qa_run, list_qa_runs
+from services.novel_db.ocr_qa_review import review_qa_page
 from utils.path_utils import validate_safe_name
 
 router = APIRouter()
@@ -194,7 +192,7 @@ def submit_ocr_agent_page(
             job_id,
             request.agent_id,
             request.book_name,
-            request.page.model_dump(),
+            cast(OcrPageResult, request.page.model_dump()),
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

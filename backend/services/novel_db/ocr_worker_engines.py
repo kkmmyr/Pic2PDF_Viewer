@@ -15,21 +15,15 @@ from PIL import Image
 try:
     from .ocr_layout_types import suggest_layout_type
     from .ocr_worker_protocol import OcrWorkerTask, emit, failed_payload, page_payload
-    from .surya_ocr import (
-        SuryaClient,
-        SuryaPageResult,
-        crosscheck_ocr_results,
-        evaluate_external_ocr,
-    )
+    from .surya_quality import crosscheck_ocr_results, evaluate_external_ocr
+    from .surya_runtime import SuryaClient
+    from .surya_types import SuryaPageResult
 except ImportError:
     from ocr_layout_types import suggest_layout_type
     from ocr_worker_protocol import OcrWorkerTask, emit, failed_payload, page_payload
-    from surya_ocr import (
-        SuryaClient,
-        SuryaPageResult,
-        crosscheck_ocr_results,
-        evaluate_external_ocr,
-    )
+    from surya_quality import crosscheck_ocr_results, evaluate_external_ocr
+    from surya_runtime import SuryaClient
+    from surya_types import SuryaPageResult
 
 _YOMITOKU_ADJUDICATION_FLAGS = {
     "duplicate_text_recovery",

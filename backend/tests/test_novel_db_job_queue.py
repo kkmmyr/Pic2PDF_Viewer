@@ -1,6 +1,6 @@
 """services/novel_db/job_queue.py の単体テスト（worker は起動しない）。"""
 
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, call, patch
 
 import pytest
 
@@ -187,8 +187,8 @@ def test_generate_relations_loads_series_index_once(queue):
     assert mock_generate.call_count == 2
 
 
-def test_ocr_combines_pending_pages_and_publishes_each_book(queue):
-    """複数冊でもworkerは1回だけ起動し、ページ保存後に冊単位で確定する。"""
+def test_ocr_combines_pending_pages_and_stages_each_book_for_qa(queue):
+    """複数冊でもworkerは1回だけ起動し、ページ保存後に冊単位でQA準備する。"""
     worker = queue._worker
     job = {"id": 1, "job_type": "all", "target_id": None, "mode": "ocr"}
     input_a = [object()]
@@ -221,3 +221,161 @@ def test_ocr_combines_pending_pages_and_publishes_each_book(queue):
     assert mock_save.call_args_list[1].args == (12, page_b)
     assert mock_stage.call_args_list[0].args == (11, input_a)
     assert mock_stage.call_args_list[1].args == (12, input_b)
+
+
+def test_ocr_process_failure_marks_every_prepared_run_failed(queue):
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": "ocr"}
+    input_a = [object()]
+    input_b = [object()]
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a", "book-b"]),
+        patch.object(worker, "_update_progress"),
+        patch.object(worker, "_update_detail"),
+        patch("services.novel_db.job_worker.collect_input_pages", side_effect=[input_a, input_b]),
+        patch(
+            "services.novel_db.job_worker.prepare_run",
+            side_effect=[(11, []), (12, [])],
+        ),
+        patch(
+            "services.novel_db.job_worker.iter_ocr_pages",
+            side_effect=RuntimeError("worker exploded"),
+        ),
+        patch("services.novel_db.job_worker.mark_run_failed") as mock_failed,
+        patch("services.novel_db.job_worker.stage_run_for_qa") as mock_stage,
+    ):
+        with pytest.raises(RuntimeError, match="worker exploded"):
+            worker._execute_job(job)
+
+    assert mock_failed.call_args_list == [
+        call(11, "worker exploded"),
+        call(12, "worker exploded"),
+    ]
+    mock_stage.assert_not_called()
+
+
+def test_ocr_worker_progress_preserves_job_detail_format(queue):
+    worker = queue._worker
+    job = {"id": 1, "job_type": "book", "target_id": "book-a", "mode": "ocr"}
+
+    def _iter_pages(_tasks, *, progress_callback):
+        progress_callback(
+            {
+                "stage": "page_started",
+                "book_name": "book-a",
+                "page_no": 2,
+                "total_pages": 9,
+                "attempt_count": 3,
+                "server_generation": 4,
+                "detail": "worker_owned",
+            }
+        )
+        return iter([])
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a"]),
+        patch.object(worker, "_update_progress"),
+        patch.object(worker, "_update_detail") as mock_detail,
+        patch("services.novel_db.job_worker.collect_input_pages", return_value=[object()]),
+        patch("services.novel_db.job_worker.prepare_run", return_value=(11, [])),
+        patch("services.novel_db.job_worker.iter_ocr_pages", side_effect=_iter_pages),
+        patch("services.novel_db.job_worker.stage_run_for_qa"),
+    ):
+        worker._execute_job(job)
+
+    mock_detail.assert_called_once_with(
+        1,
+        "page_started | book-a | page 2/9 | attempt 3 | server 4 | worker_owned",
+    )
+
+
+def test_ocr_page_save_failure_marks_every_prepared_run_failed(queue):
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": "ocr"}
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a", "book-b"]),
+        patch.object(worker, "_update_progress"),
+        patch.object(worker, "_update_detail"),
+        patch("services.novel_db.job_worker.collect_input_pages", side_effect=[[object()], [object()]]),
+        patch(
+            "services.novel_db.job_worker.prepare_run",
+            side_effect=[(11, []), (12, [])],
+        ),
+        patch(
+            "services.novel_db.job_worker.iter_ocr_pages",
+            return_value=iter([("book-a", {"page_no": 1})]),
+        ),
+        patch(
+            "services.novel_db.job_worker.save_page_result",
+            side_effect=OSError("database write failed"),
+        ),
+        patch("services.novel_db.job_worker.mark_run_failed") as mock_failed,
+        patch("services.novel_db.job_worker.stage_run_for_qa") as mock_stage,
+    ):
+        with pytest.raises(OSError, match="database write failed"):
+            worker._execute_job(job)
+
+    assert mock_failed.call_args_list == [
+        call(11, "database write failed"),
+        call(12, "database write failed"),
+    ]
+    mock_stage.assert_not_called()
+
+
+def test_ocr_unknown_worker_book_marks_every_prepared_run_failed(queue):
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": "ocr"}
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a"]),
+        patch.object(worker, "_update_progress"),
+        patch.object(worker, "_update_detail"),
+        patch("services.novel_db.job_worker.collect_input_pages", return_value=[object()]),
+        patch("services.novel_db.job_worker.prepare_run", return_value=(11, [])),
+        patch(
+            "services.novel_db.job_worker.iter_ocr_pages",
+            return_value=iter([("unknown-book", {"page_no": 1})]),
+        ),
+        patch("services.novel_db.job_worker.mark_run_failed") as mock_failed,
+        patch("services.novel_db.job_worker.stage_run_for_qa") as mock_stage,
+    ):
+        with pytest.raises(RuntimeError, match="OCR worker returned unknown book: unknown-book"):
+            worker._execute_job(job)
+
+    mock_failed.assert_called_once_with(11, "OCR worker returned unknown book: unknown-book")
+    mock_stage.assert_not_called()
+
+
+def test_ocr_qa_staging_continues_then_raises_aggregated_failures(queue):
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": "ocr"}
+    input_a = [object()]
+    input_b = [object()]
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=["book-a", "book-b"]),
+        patch.object(worker, "_update_progress") as mock_progress,
+        patch.object(worker, "_update_detail"),
+        patch("services.novel_db.job_worker.collect_input_pages", side_effect=[input_a, input_b]),
+        patch(
+            "services.novel_db.job_worker.prepare_run",
+            side_effect=[(11, []), (12, [])],
+        ),
+        patch("services.novel_db.job_worker.iter_ocr_pages", return_value=iter([])),
+        patch("services.novel_db.job_worker.mark_run_failed") as mock_failed,
+        patch(
+            "services.novel_db.job_worker.stage_run_for_qa",
+            side_effect=[ValueError("source changed"), None],
+        ) as mock_stage,
+    ):
+        with pytest.raises(
+            RuntimeError,
+            match="OCR quality gate failed: book-a: source changed",
+        ):
+            worker._execute_job(job)
+
+    assert mock_stage.call_args_list == [call(11, input_a), call(12, input_b)]
+    mock_failed.assert_called_once_with(11, "source changed")
+    assert mock_progress.call_args_list == [call(1, 0, 2), call(1, 1, 2), call(1, 2, 2)]

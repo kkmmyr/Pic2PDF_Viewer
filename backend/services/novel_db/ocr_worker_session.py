@@ -17,11 +17,15 @@ try:
         read_image,
     )
     from .ocr_worker_protocol import OcrWorkerTask, emit, emit_progress, failed_payload, page_payload
-    from .surya_ocr import OcrSessionPolicy, SuryaClient, SuryaServer
+    from .surya_runtime import SuryaClient
+    from .surya_server import SuryaServer
+    from .surya_types import OcrSessionPolicy
 except ImportError:
     from ocr_worker_engines import YomitokuAdjudicator, process_surya_task, read_image
     from ocr_worker_protocol import OcrWorkerTask, emit, emit_progress, failed_payload, page_payload
-    from surya_ocr import OcrSessionPolicy, SuryaClient, SuryaServer
+    from surya_runtime import SuryaClient
+    from surya_server import SuryaServer
+    from surya_types import OcrSessionPolicy
 
 
 @dataclass(frozen=True)

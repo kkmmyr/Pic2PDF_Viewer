@@ -8,7 +8,7 @@ from typing import TypedDict
 from .connection import with_db
 from .ocr_layout_types import validate_layout_type
 from .ocr_page_types import validate_page_type
-from .ocr_staging import collect_input_pages
+from .ocr_run_store import collect_input_pages
 
 _METRIC_PAGE_TYPE_ORDER = (
     "narrative",
@@ -277,6 +277,6 @@ def get_ground_truth_image_path(entry_id: int):
         ).fetchone()
     if row is None:
         raise LookupError(f"ground-truth entry not found: {entry_id}")
-    from .ocr_staging import get_qa_image_path
+    from .ocr_qa_queries import get_qa_image_path
 
     return get_qa_image_path(int(row[0]), int(row[1]))

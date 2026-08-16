@@ -14,7 +14,9 @@ from .full_builder import build_book_contexts, build_book_full
 from .job_executor import JobExecutionDependencies, execute_job
 from .job_state import claim_next_job, mark_finished, update_detail, update_progress, update_step
 from .job_targets import resolve_targets
-from .ocr_staging import collect_input_pages, mark_run_failed, prepare_run, save_page_result, stage_run_for_qa
+from .ocr_job_application import OcrJobDependencies
+from .ocr_qa_staging import stage_run_for_qa
+from .ocr_run_store import collect_input_pages, mark_run_failed, prepare_run, save_page_result
 from .relation_extractor import generate_book_relations
 from .series_meta import load_book_series_ids
 
@@ -83,12 +85,14 @@ class NovelDbJobWorker:
         # Dependencies are assembled here to preserve established monkeypatch
         # points on this facade for tests and operational extensions.
         dependencies = JobExecutionDependencies(
-            collect_input_pages=collect_input_pages,
-            prepare_run=prepare_run,
-            iter_ocr_pages=iter_ocr_pages,
-            save_page_result=save_page_result,
-            mark_run_failed=mark_run_failed,
-            stage_run_for_qa=stage_run_for_qa,
+            ocr=OcrJobDependencies(
+                collect_input_pages=collect_input_pages,
+                prepare_run=prepare_run,
+                iter_ocr_pages=iter_ocr_pages,
+                save_page_result=save_page_result,
+                mark_run_failed=mark_run_failed,
+                stage_run_for_qa=stage_run_for_qa,
+            ),
             build_book_full=build_book_full,
             build_book_contexts=build_book_contexts,
             load_book_series_ids=load_book_series_ids,

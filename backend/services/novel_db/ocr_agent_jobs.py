@@ -9,13 +9,8 @@ import config
 
 from .connection import with_db
 from .extractor import OcrPageResult
-from .ocr_staging import (
-    collect_input_pages,
-    mark_run_failed,
-    prepare_run,
-    save_page_result,
-    stage_run_for_qa,
-)
+from .ocr_qa_staging import stage_run_for_qa
+from .ocr_run_store import collect_input_pages, mark_run_failed, prepare_run, save_page_result
 
 
 def _require_owned_job(job_id: int, agent_id: str) -> None:

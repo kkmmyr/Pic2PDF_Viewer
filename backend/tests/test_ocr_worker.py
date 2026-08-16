@@ -9,7 +9,7 @@ from pathlib import Path
 from PIL import Image
 
 from services.novel_db import ocr_worker
-from services.novel_db.surya_ocr import SuryaBlock, SuryaPageResult
+from services.novel_db.surya_types import SuryaBlock, SuryaPageResult
 
 
 def _passed_result() -> SuryaPageResult:
