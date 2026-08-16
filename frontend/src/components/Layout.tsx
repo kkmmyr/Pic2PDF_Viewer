@@ -98,7 +98,7 @@ export default function Layout() {
                                 </div>
                             </div>
 
-                            <nav className="ml-3 flex min-w-0 flex-1 items-center justify-start gap-0.5 overflow-x-auto xl:justify-end">
+                            <nav className="ml-3 flex min-w-0 flex-1 items-center justify-start gap-0.5 overflow-x-auto">
                                 {NAV_GROUPS.map((group, gi) => (
                                     <Fragment key={group.label}>
                                         {gi > 0 && DIVIDER}

@@ -16,6 +16,10 @@ describe('Layout', () => {
         );
 
         expect(screen.getByText('Pic2PDF Viewer').closest('a')).toBeNull();
-        expect(screen.getByRole('link', { name: 'ライブラリ' })).toHaveAttribute('href', '/doujin');
+
+        const libraryLink = screen.getByRole('link', { name: 'ライブラリ' });
+        expect(libraryLink).toHaveAttribute('href', '/doujin');
+        expect(libraryLink.closest('nav')).toHaveClass('justify-start', 'overflow-x-auto');
+        expect(libraryLink.closest('nav')).not.toHaveClass('justify-end', 'xl:justify-end');
     });
 });
