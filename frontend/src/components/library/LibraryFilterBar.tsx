@@ -1,9 +1,12 @@
-import { Library, BookOpen, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, EyeOff, ListChecks, SlidersHorizontal, X } from 'lucide-react';
 import type { LibrarySource, ReadState, SortOrder } from '@/types';
 import type { GroupMode } from '@/hooks/library/useLibraryGrouping';
-import { HeaderSearchBar } from './HeaderSearchBar';
-import { HeaderSortSelect } from './HeaderSortSelect';
-import { ToolsMenu } from './ToolsMenu';
+import { HeaderSearchBar } from '@/components/library/HeaderSearchBar';
+import { HeaderSortSelect } from '@/components/library/HeaderSortSelect';
+import { LibraryDetailFilters } from '@/components/library/LibraryDetailFilters';
+import { LibraryFilterDialog } from '@/components/library/LibraryFilterDialog';
+import { ToolsMenu } from '@/components/library/ToolsMenu';
 import { Button } from '@/components/ui/button';
 
 type ReadStateFilter = '' | ReadState;
@@ -19,6 +22,10 @@ interface LibraryFilterBarProps {
     currentSource: LibrarySource;
     hideAuthorSelect: boolean;
     isSelectionMode: boolean;
+    isLoading: boolean;
+    activeFilterCount: number;
+    resultBookCount: number;
+    totalBookCount: number;
     onSearchChange: (text: string) => void;
     onAuthorFilterChange: (author: string) => void;
     onGroupModeChange: (mode: GroupMode) => void;
@@ -27,6 +34,33 @@ interface LibraryFilterBarProps {
     onSortChange: (order: SortOrder) => void;
     onMetaRefresh: () => void;
     onToggleSelectionMode: () => void;
+    onClearFilters: () => void;
+}
+
+function ResultSummary({
+    isLoading,
+    activeFilterCount,
+    resultBookCount,
+    totalBookCount,
+}: Pick<
+    LibraryFilterBarProps,
+    'isLoading' | 'activeFilterCount' | 'resultBookCount' | 'totalBookCount'
+>) {
+    return (
+        <div
+            className="flex min-w-0 items-center gap-2 text-xs text-gray-600 dark:text-gray-300"
+            aria-live="polite"
+        >
+            <span className="whitespace-nowrap font-medium">
+                {isLoading ? '読み込み中…' : `${resultBookCount} / ${totalBookCount}冊`}
+            </span>
+            {activeFilterCount > 0 && (
+                <span className="whitespace-nowrap rounded-full bg-primary-100 px-2 py-1 font-medium text-primary-700 dark:bg-primary-900/50 dark:text-primary-200">
+                    {activeFilterCount}条件
+                </span>
+            )}
+        </div>
+    );
 }
 
 export function LibraryFilterBar({
@@ -40,6 +74,10 @@ export function LibraryFilterBar({
     currentSource,
     hideAuthorSelect,
     isSelectionMode,
+    isLoading,
+    activeFilterCount,
+    resultBookCount,
+    totalBookCount,
     onSearchChange,
     onAuthorFilterChange,
     onGroupModeChange,
@@ -48,86 +86,139 @@ export function LibraryFilterBar({
     onSortChange,
     onMetaRefresh,
     onToggleSelectionMode,
+    onClearFilters,
 }: LibraryFilterBarProps) {
+    const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+
     return (
-        <div className="h-12 flex items-center px-4 gap-3 border-t border-gray-100 dark:border-gray-800">
-            <HeaderSearchBar
-                searchText={searchText}
+        <div className="border-t border-gray-100 dark:border-gray-800">
+            <div className="space-y-3 px-4 py-3 lg:hidden" data-testid="mobile-library-controls">
+                <HeaderSearchBar
+                    searchText={searchText}
+                    onSearchChange={onSearchChange}
+                    className="w-full"
+                />
+                <div className="flex min-w-0 items-center gap-2">
+                    <Button
+                        variant="secondary"
+                        active={activeFilterCount > 0}
+                        className="relative min-h-11 shrink-0 px-3"
+                        aria-label={
+                            activeFilterCount > 0
+                                ? `絞り込み、${activeFilterCount}件の条件を適用中`
+                                : '絞り込み'
+                        }
+                        onClick={() => setFilterDialogOpen(true)}
+                    >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        絞り込み
+                        {activeFilterCount > 0 && (
+                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-gray-800 dark:bg-gray-100">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                    </Button>
+                    <HeaderSortSelect
+                        sortOrder={sortOrder}
+                        onSortChange={onSortChange}
+                        compact
+                        className="min-w-0 flex-1"
+                    />
+                    <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
+                </div>
+                <div className="flex min-h-6 items-center justify-between gap-3">
+                    <ResultSummary
+                        isLoading={isLoading}
+                        activeFilterCount={activeFilterCount}
+                        resultBookCount={resultBookCount}
+                        totalBookCount={totalBookCount}
+                    />
+                    {activeFilterCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={onClearFilters}
+                            className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-medium text-gray-600 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-300 dark:hover:bg-gray-800"
+                        >
+                            <X className="h-3.5 w-3.5" />
+                            条件解除
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div
+                className="hidden flex-wrap items-center gap-3 px-4 py-2.5 lg:flex"
+                data-testid="desktop-library-controls"
+            >
+                <HeaderSearchBar
+                    searchText={searchText}
+                    onSearchChange={onSearchChange}
+                    className="min-w-56 flex-1 xl:max-w-xs"
+                />
+                <LibraryDetailFilters
+                    authorFilter={authorFilter}
+                    allAuthors={allAuthors}
+                    groupMode={groupMode}
+                    readStateFilter={readStateFilter}
+                    hideAuthorSelect={hideAuthorSelect}
+                    layout="inline"
+                    onAuthorFilterChange={onAuthorFilterChange}
+                    onGroupModeChange={onGroupModeChange}
+                    onReadStateFilterChange={onReadStateFilterChange}
+                />
+                <HeaderSortSelect sortOrder={sortOrder} onSortChange={onSortChange} />
+                <ResultSummary
+                    isLoading={isLoading}
+                    activeFilterCount={activeFilterCount}
+                    resultBookCount={resultBookCount}
+                    totalBookCount={totalBookCount}
+                />
+
+                <div className="ml-auto flex items-center gap-2 border-l border-gray-200 pl-3 dark:border-gray-700">
+                    <Button
+                        variant="secondary"
+                        active={showHidden}
+                        className="min-h-9 px-3"
+                        aria-pressed={showHidden}
+                        onClick={onToggleShowHidden}
+                        title={showHidden ? '通常の書籍を表示' : '非表示の書籍を表示'}
+                    >
+                        {showHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                        {showHidden ? '通常表示' : '非表示一覧'}
+                    </Button>
+                    {!isSelectionMode && (
+                        <Button
+                            variant="ghost"
+                            className="min-h-9 px-3"
+                            onClick={onToggleSelectionMode}
+                        >
+                            <ListChecks className="h-4 w-4" />
+                            選択
+                        </Button>
+                    )}
+                    <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
+                </div>
+            </div>
+
+            <LibraryFilterDialog
+                open={filterDialogOpen}
+                activeFilterCount={activeFilterCount}
                 authorFilter={authorFilter}
                 allAuthors={allAuthors}
+                groupMode={groupMode}
+                readStateFilter={readStateFilter}
+                showHidden={showHidden}
+                currentSource={currentSource}
                 hideAuthorSelect={hideAuthorSelect}
-                onSearchChange={onSearchChange}
+                isSelectionMode={isSelectionMode}
                 onAuthorFilterChange={onAuthorFilterChange}
+                onGroupModeChange={onGroupModeChange}
+                onReadStateFilterChange={onReadStateFilterChange}
+                onToggleShowHidden={onToggleShowHidden}
+                onToggleSelectionMode={onToggleSelectionMode}
+                onClearFilters={onClearFilters}
+                onClose={() => setFilterDialogOpen(false)}
             />
-
-            <div className="flex-1" />
-
-            {/* グループ化 select（ネイティブ select、色は中立） */}
-            <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                <Library className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                <select
-                    value={groupMode}
-                    onChange={(e) => onGroupModeChange(e.target.value as GroupMode)}
-                    title="ライブラリの集約表示"
-                    /*
-                     * select 自身の背景は常に bg-white / dark:bg-gray-800 に固定する。
-                     * Chromium では <option> の背景色が <select> の bg を継承し、
-                     * かつ CSS で <option> 個別に上書きできないため、<select> 側で
-                     * 紫背景にすると <option> がダークモードで読めなくなる。
-                     * 紫強調は border + ring + 文字色で表現する。
-                     */
-                    className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-accent-400 max-w-[140px] truncate ${
-                        groupMode !== 'none'
-                            ? 'text-accent-700 dark:text-accent-300 border-accent-400 dark:border-accent-600 ring-1 ring-accent-200 dark:ring-accent-800'
-                            : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
-                    }`}
-                >
-                    <option value="none">グループ化なし</option>
-                    <option value="series">シリーズで</option>
-                    <option value="author">作者で</option>
-                    <option value="author-then-series">作者 → シリーズで</option>
-                </select>
-            </div>
-
-            {/* 読書状態フィルタ。空文字 = 全件表示 / unread = 未読 / reading = 読書中 / done = 読了。 */}
-            <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-                <BookOpen className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                <select
-                    value={readStateFilter}
-                    onChange={(e) => onReadStateFilterChange(e.target.value as ReadStateFilter)}
-                    title="読書状態で絞り込む"
-                    className={`border rounded-md px-2 py-1 text-sm bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-accent-400 ${
-                        readStateFilter
-                            ? 'text-accent-700 dark:text-accent-300 border-accent-400 dark:border-accent-600 ring-1 ring-accent-200 dark:ring-accent-800'
-                            : 'text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
-                    }`}
-                >
-                    <option value="">読書状態すべて</option>
-                    <option value="unread">未読のみ</option>
-                    <option value="reading">読書中のみ</option>
-                    <option value="done">読了のみ</option>
-                </select>
-            </div>
-
-            <Button
-                variant="secondary"
-                active={showHidden}
-                onClick={onToggleShowHidden}
-                title={showHidden ? '通常モードに戻る' : '非表示書籍を表示する（ゴミ箱）'}
-            >
-                {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                {showHidden ? '通常表示' : '非表示を表示'}
-            </Button>
-
-            <HeaderSortSelect sortOrder={sortOrder} onSortChange={onSortChange} />
-
-            <ToolsMenu source={currentSource} onComplete={onMetaRefresh} />
-
-            {!isSelectionMode && (
-                <Button variant="secondary" onClick={onToggleSelectionMode}>
-                    選択
-                </Button>
-            )}
         </div>
     );
 }

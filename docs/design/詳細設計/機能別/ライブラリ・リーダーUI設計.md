@@ -48,6 +48,10 @@ URL / libraryStore
 ### フィルターとsort
 
 - タイトル・作者検索、作者、genre、series、read state、hiddenを組み合わせる。
+- 適用中条件数は、検索文字列、作者、series drilldown、read state、genre、hidden表示を
+  それぞれ1条件として数える。groupingとsortは表示方法なので条件数へ含めない。
+- 結果件数はgrouping前の書籍数を使い、`表示書籍数 / 全書籍数`として表示する。
+  これにより集約カード数と実際の対象書籍数を混同しない。
 - `view_desc`は閲覧回数降順、`recent_view`は最終閲覧日時降順。
 - 検索中はgroupingを無効化し、hitした個別書籍を直接表示する。
 - series drilldown中は`series_index`昇順を優先する。
@@ -78,14 +82,23 @@ series / authorの代表書籍は`meta2.db.group_pins`を`/api/prefs`経由で�
 
 ## 3. LibraryHeader
 
-Headerは次の3段構成とする。
+Headerは次の3領域で構成する。
 
 1. 現在地、breadcrumbs、source selector。
-2. 検索、filter、grouping、read state、hidden、sort、tools、選択mode。
-3. 選択mode中だけ表示する件数と一括操作。
+2. 検索・filter・sortを中心とする通常操作と、結果件数・適用中条件数。
+3. 選択mode中だけ表示する選択件数と一括操作。
 
-通常操作と一括操作を同じ段へ混在させない。狭幅では折り返しを許容し、
-操作を端末種別で禁止しない。
+通常操作と一括操作を同じ領域へ混在させない。画面幅ごとの配置は次のとおりとする。
+
+- PC（`lg`以上）は検索、作者、grouping、read state、sortを展開表示する。結果件数と
+  適用中条件数を同じ領域に表示し、選択mode、hidden表示、toolsは区切りを付けた
+  二次操作として配置する。狭いPC幅では領域内の折り返しを許容し、横スクロールさせない。
+- モバイル（`lg`未満）は検索欄を全幅で表示し、その下に「絞り込み」button、sort、toolsを
+  配置する。「絞り込み」buttonには適用中条件数badgeを付け、author、grouping、read state、
+  hidden表示、選択modeを共通`Dialog`内へ収める。Dialogには全条件解除と閉じる操作を置く。
+- genreはheader直下の専用barに残し、genre pill部分だけ横スクロールを許可する。
+- モバイルでも結果件数と適用中条件数を常時表示し、Dialogを開かずに現在の状態を把握できるようにする。
+- 入力・button・selectはkeyboard focusを明示し、モバイル主要操作は44px以上の高さを確保する。
 
 ---
 

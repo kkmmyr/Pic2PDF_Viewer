@@ -1,5 +1,6 @@
 import { ArrowUpDown } from 'lucide-react';
 import type { SortOrder } from '@/types';
+import { cn } from '@/lib/utils';
 
 const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
     { value: 'name_asc', label: '名前 (A→Z)' },
@@ -14,16 +15,31 @@ const SORT_OPTIONS: { value: SortOrder; label: string }[] = [
 interface HeaderSortSelectProps {
     sortOrder: SortOrder;
     onSortChange: (order: SortOrder) => void;
+    className?: string;
+    compact?: boolean;
 }
 
-export function HeaderSortSelect({ sortOrder, onSortChange }: HeaderSortSelectProps) {
+export function HeaderSortSelect({
+    sortOrder,
+    onSortChange,
+    className,
+    compact = false,
+}: HeaderSortSelectProps) {
     return (
-        <div className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400">
-            <ArrowUpDown className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" />
+        <div
+            className={cn(
+                'flex min-w-0 items-center gap-1 text-sm text-gray-700 dark:text-gray-300',
+                className,
+            )}
+        >
+            {!compact && (
+                <ArrowUpDown className="h-4 w-4 shrink-0 text-gray-500 dark:text-gray-400" />
+            )}
             <select
                 value={sortOrder}
                 onChange={(e) => onSortChange(e.target.value as SortOrder)}
-                className="border border-gray-200 dark:border-gray-600 rounded-md px-2 py-1 text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                aria-label="並び替え"
+                className="min-h-11 min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 lg:min-h-9 lg:py-1.5"
             >
                 {SORT_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>

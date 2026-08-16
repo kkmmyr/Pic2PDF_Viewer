@@ -62,7 +62,8 @@ export function ToolsMenu({ source }: ToolsMenuProps) {
             <button
                 onClick={() => setOpen((o) => !o)}
                 title="メタデータのエクスポート"
-                className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1.5"
+                aria-expanded={open}
+                className="flex min-h-11 items-center gap-1.5 rounded-md bg-gray-100 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 lg:min-h-9 lg:py-1.5"
             >
                 <Settings className="w-4 h-4" />
                 ツール
@@ -71,7 +72,7 @@ export function ToolsMenu({ source }: ToolsMenuProps) {
                 />
             </button>
             {open && (
-                <div className="absolute right-0 top-full mt-1 w-[520px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg overflow-hidden">
+                <div className="absolute right-0 top-full z-header mt-1 w-[min(32rem,calc(100vw-2rem))] overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-800">
                     <div className="flex items-center justify-between gap-3 px-4 py-2.5">
                         <span className="text-sm text-gray-600 dark:text-gray-400">
                             メタデータ（著者・シリーズ等）をバックアップ

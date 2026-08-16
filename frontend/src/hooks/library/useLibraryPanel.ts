@@ -224,6 +224,15 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         meta,
     });
 
+    const activeFilterCount = [
+        searchText.trim(),
+        authorFilter,
+        seriesFilter,
+        readStateFilter,
+        genreFilter,
+        showHidden,
+    ].filter(Boolean).length;
+
     const { grouped, displayPdfs, breadcrumbs } = useLibraryDisplay({
         filteredPdfs,
         meta,
@@ -365,6 +374,9 @@ export function useLibraryPanel(onPdfClick: (name: string) => void) {
         retryLibraryData,
         clearLibraryFilters,
         isLibraryEmpty: pdfs.length === 0,
+        activeFilterCount,
+        resultBookCount: filteredPdfs.length,
+        totalBookCount: pdfs.length,
         // display
         grouped,
         displayPdfs,

@@ -31,6 +31,11 @@ export function LibraryHeader() {
         bulkActions,
         isMixedAuthors,
         refreshMeta,
+        isPdfsLoading,
+        activeFilterCount,
+        resultBookCount,
+        totalBookCount,
+        clearLibraryFilters,
         onUpClick,
     } = useLibraryPanelContext();
 
@@ -52,6 +57,10 @@ export function LibraryHeader() {
                 currentSource={currentSource}
                 hideAuthorSelect={breadcrumbs.length > 0}
                 isSelectionMode={isSelectionMode}
+                isLoading={isPdfsLoading}
+                activeFilterCount={activeFilterCount}
+                resultBookCount={resultBookCount}
+                totalBookCount={totalBookCount}
                 onSearchChange={setSearchText}
                 onAuthorFilterChange={setAuthorFilter}
                 onGroupModeChange={handleGroupModeChange}
@@ -60,6 +69,7 @@ export function LibraryHeader() {
                 onSortChange={setSortOrder}
                 onMetaRefresh={refreshMeta}
                 onToggleSelectionMode={toggleSelectionMode}
+                onClearFilters={clearLibraryFilters}
             />
             {isSelectionMode && (
                 <LibraryBulkActionBar

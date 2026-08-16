@@ -39,7 +39,7 @@ function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps)
     };
 
     const btnBase =
-        'px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border select-none';
+        'min-h-11 lg:min-h-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border select-none';
     const btnActive = 'bg-indigo-600 text-white border-indigo-600';
     const btnInactive =
         'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
@@ -80,11 +80,12 @@ export function GenreFilterBar() {
 
     if (genres.length === 0) {
         return (
-            <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2 overflow-hidden border-b border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
                 <button
                     onClick={() => setIsManagerOpen(true)}
                     title="ジャンルを管理"
-                    className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500"
+                    aria-label="ジャンルを管理"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:bg-gray-800 lg:min-h-8 lg:min-w-8"
                 >
                     <Settings2 className="w-4 h-4" />
                 </button>
@@ -100,11 +101,12 @@ export function GenreFilterBar() {
     }
 
     return (
-        <div className="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-2 flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 overflow-hidden border-b border-gray-200 bg-white px-4 py-2 dark:border-gray-700 dark:bg-gray-900">
             <button
                 onClick={() => setIsManagerOpen(true)}
                 title="ジャンルを管理"
-                className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 shrink-0"
+                aria-label="ジャンルを管理"
+                className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-gray-500 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-gray-400 dark:hover:bg-gray-800 lg:min-h-8 lg:min-w-8"
             >
                 <Settings2 className="w-4 h-4" />
             </button>
@@ -112,7 +114,7 @@ export function GenreFilterBar() {
             {/* すべて */}
             <button
                 onClick={() => setGenreFilter('')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border shrink-0 ${
+                className={`min-h-11 lg:min-h-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap border shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${
                     !genreFilter
                         ? 'bg-indigo-600 text-white border-indigo-600'
                         : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -127,7 +129,7 @@ export function GenreFilterBar() {
                 onDragEnd={handleDragEnd}
             >
                 <SortableContext items={genres} strategy={horizontalListSortingStrategy}>
-                    <div className="flex items-center gap-2 overflow-x-auto">
+                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto overscroll-x-contain">
                         {genres.map((genre) => (
                             <SortableGenrePill
                                 key={genre}

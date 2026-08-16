@@ -40,6 +40,7 @@ let mockPdfsError = false;
 let mockMetaError = false;
 let mockGenresError = false;
 let mockPdfs: { name: string; thumbnail: null; created_at: number }[] = [];
+let mockFilteredPdfs: { name: string; thumbnail: null; created_at: number }[] = [];
 let mockAuthorFilter = '';
 let mockSeriesFilter = '';
 let mockReadStateFilter = '';
@@ -114,7 +115,7 @@ vi.mock('../hooks/library/useBookMeta', () => ({
 }));
 
 vi.mock('../hooks/library/useLibraryFilter', () => ({
-    useLibraryFilter: () => ({ filteredPdfs: [] }),
+    useLibraryFilter: () => ({ filteredPdfs: mockFilteredPdfs }),
 }));
 
 vi.mock('../hooks/library/useUrlFilters', () => ({
@@ -241,6 +242,7 @@ describe('useLibraryPanel', () => {
         mockMetaError = false;
         mockGenresError = false;
         mockPdfs = [];
+        mockFilteredPdfs = [];
         mockAuthorFilter = '';
         mockSeriesFilter = '';
         mockReadStateFilter = '';
@@ -310,6 +312,27 @@ describe('useLibraryPanel', () => {
         expect(mockSetReadStateFilter).toHaveBeenCalledWith('');
         expect(mockSetGenreFilter).toHaveBeenCalledWith('');
         expect(mockToggleShowHidden).not.toHaveBeenCalled();
+    });
+
+    it('検索・絞り込み条件数とgrouping前の結果件数を公開する', () => {
+        mockPdfs = [
+            { name: 'a.pdf', thumbnail: null, created_at: 0 },
+            { name: 'b.pdf', thumbnail: null, created_at: 0 },
+        ];
+        mockFilteredPdfs = [{ name: 'a.pdf', thumbnail: null, created_at: 0 }];
+        mockAuthorFilter = '作者A';
+        mockReadStateFilter = 'done';
+        mockGenreFilter = 'ジャンルA';
+        mockShowHidden = true;
+        const { result } = renderHook(() => useLibraryPanel(vi.fn()), {
+            wrapper: createWrapper(),
+        });
+
+        act(() => result.current.setSearchText('検索語'));
+
+        expect(result.current.activeFilterCount).toBe(5);
+        expect(result.current.resultBookCount).toBe(1);
+        expect(result.current.totalBookCount).toBe(2);
     });
 
     it('通常表示で全書籍が非表示なら条件解除時に非表示表示へ切り替える', () => {
