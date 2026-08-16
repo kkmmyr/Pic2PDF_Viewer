@@ -123,6 +123,7 @@
     --z-floating-action: 30;
     --z-overlay-bar: 40;
     --z-header: 50;
+    --z-global-navigation: 55;
     --z-toast: 60;
     --z-dialog: 100;
     --z-dialog-nested: 200;
@@ -157,6 +158,9 @@
     }
     .z-header {
         z-index: var(--z-header);
+    }
+    .z-global-navigation {
+        z-index: var(--z-global-navigation);
     }
     .z-toast {
         z-index: var(--z-toast);
