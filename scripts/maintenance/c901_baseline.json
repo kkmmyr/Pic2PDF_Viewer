@@ -13,7 +13,6 @@
   "backend/services/novel_db/ocr_ground_truth.py:update_ground_truth": 11,
   "backend/services/novel_db/ocr_qa.py:approve_and_publish_run": 11,
   "backend/services/novel_db/ocr_qa.py:review_qa_page": 12,
-  "backend/services/novel_db/ocr_worker.py:_run_surya": 11,
   "backend/services/novel_db/query_expander.py:_parse_expansions": 15,
   "backend/services/novel_db/relation_extractor.py:extract_relations_with_qwen": 12,
   "backend/services/novel_db/search.py:hybrid_search": 11,

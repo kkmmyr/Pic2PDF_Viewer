@@ -20,6 +20,9 @@ from typing import NotRequired, TypedDict
 
 import fitz
 
+from .ocr_worker_protocol import OcrProgressPayload as OcrProgressEvent
+from .ocr_worker_protocol import OcrWorkerTask as OcrTask
+
 _NEWLINE_RE = re.compile(r"\n+")
 
 
@@ -46,12 +49,6 @@ class PageText(TypedDict):
     char_count: int
 
 
-class OcrTask(TypedDict):
-    book_name: str
-    page_no: int
-    image_path: str
-
-
 class OcrPageResult(PageText):
     image_sha256: str
     state: str
@@ -66,16 +63,6 @@ class OcrPageResult(PageText):
     primary_text: NotRequired[str | None]
     external_text: NotRequired[str | None]
     selected_engine: NotRequired[str]
-
-
-class OcrProgressEvent(TypedDict):
-    stage: str
-    book_name: NotRequired[str]
-    page_no: NotRequired[int]
-    total_pages: NotRequired[int]
-    attempt_count: NotRequired[int]
-    server_generation: NotRequired[int]
-    detail: NotRequired[str]
 
 
 def _ocr_worker_env() -> dict[str, str]:

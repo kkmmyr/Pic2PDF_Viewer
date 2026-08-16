@@ -65,6 +65,10 @@ Windowsから本番SQLiteを直接開かない。
 |---|---|
 | `backend/routers/ocr.py` | run / stop / status / QA API |
 | `backend/services/novel_db/extractor.py` | OCR subprocess呼び出し |
+| `backend/services/novel_db/ocr_worker.py` | standalone CLI、manifest読込、engine選択のprotocol shell |
+| `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
+| `backend/services/novel_db/ocr_worker_engines.py` | 画像読込、Surya/yomitokuのページ処理、候補選択 |
+| `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
 | `backend/services/novel_db/surya_parsing.py` | 公式prompt、HTML/layout/bbox解析 |
 | `backend/services/novel_db/surya_quality.py` | coverage、品質flag、補助OCR照合 |
@@ -80,6 +84,15 @@ Windowsから本番SQLiteを直接開かない。
 
 ## 2. Surya OCR 2実行契約
 
+- workerのstdoutは1行1JSONの`page` / `progress` / `fatal` event専用とし、
+  server・modelのlogはstderrへ分離する。field、event順序、終了codeを内部分割で変更しない。
+- `ocr_worker.py`はpackage importと`python ocr_worker.py --manifest ...`のstandalone実行を
+  両方維持し、手動診断用の画像directory引数も互換経路として残す。
+- worker所有serverだけをsession policyに従って再起動する。外部管理serverでは再起動を
+  `server_restart_skipped`として通知し、workerから停止しない。
+- server世代を切り替えてもtask indexを巻き戻さず、page eventの重複・欠落を許可しない。
+- 1pageの画像復号・OCR・外部照合が失敗しても、そのpageを`worker_error`として出力し、
+  manifest内の後続pageを継続する。manifest不正や未対応engineだけを`fatal`とする。
 - 公式GGUF、mmproj、`llama-server.exe` のパスとSHA-256を固定し、自動更新しない。
 - worker所有serverは有限ページ数、連続不合格、移動窓の不合格率超過で再起動する。
   外部管理serverはworkerから停止しない。世代、開始ページ、終了理由を監査ログへ残す。
