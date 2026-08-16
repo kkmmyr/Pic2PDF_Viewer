@@ -407,6 +407,15 @@
             ],
             "title": "Publisher"
           },
+          "read_state": {
+            "enum": [
+              "unread",
+              "reading",
+              "done"
+            ],
+            "title": "Read State",
+            "type": "string"
+          },
           "series_id": {
             "anyOf": [
               {
@@ -503,7 +512,8 @@
           "summary",
           "summary_generated_at",
           "character_count",
-          "discussion_count"
+          "discussion_count",
+          "read_state"
         ],
         "title": "BookDetailOut",
         "type": "object"
@@ -783,6 +793,15 @@
             ],
             "title": "Publisher"
           },
+          "read_state": {
+            "enum": [
+              "unread",
+              "reading",
+              "done"
+            ],
+            "title": "Read State",
+            "type": "string"
+          },
           "series_id": {
             "anyOf": [
               {
@@ -852,7 +871,8 @@
           "volume",
           "publisher",
           "asin",
-          "series_index"
+          "series_index",
+          "read_state"
         ],
         "title": "BookSummaryOut",
         "type": "object"

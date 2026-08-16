@@ -20,19 +20,14 @@ export default function BookMetaList({ book, variant = 'detail' }: BookMetaListP
     if (variant === 'card') {
         return (
             <>
-                {book.authors.length > 0 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
-                        {book.authors.join(' / ')}
-                    </p>
-                )}
                 {(book.series_id || book.volume != null) && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">
-                        {book.series_id}
+                    <p className="line-clamp-1 text-xs font-medium text-gray-600 dark:text-gray-300">
+                        {book.series_title ?? book.series_id}
                         {book.volume != null ? ` ${book.volume}巻` : ''}
                     </p>
                 )}
                 {book.publisher && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 line-clamp-1">
+                    <p className="line-clamp-1 text-xs text-gray-600 dark:text-gray-300">
                         {book.publisher}
                     </p>
                 )}

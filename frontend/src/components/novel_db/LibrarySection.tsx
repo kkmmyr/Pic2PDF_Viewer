@@ -173,7 +173,8 @@ export default function LibrarySection({
                 </div>
                 {isSelecting && (
                     <button
-                        className="absolute inset-0 z-card-badge rounded-lg"
+                        type="button"
+                        className="absolute inset-0 z-card-badge rounded-lg focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-inset focus-visible:ring-accent-500"
                         onClick={() => toggleSelect(book.name)}
                         aria-label={selected ? `${book.name} の選択を解除` : `${book.name} を選択`}
                     >

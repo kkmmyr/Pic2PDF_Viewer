@@ -130,6 +130,7 @@ class BookSummaryOut(BaseModel):
     series_index: float | None
     catalog_summary: str | None = None
     catalog_summary_generated_at: str | None = None
+    read_state: Literal["unread", "reading", "done"]
 
 
 class SeriesSummaryOut(BaseModel):
@@ -166,6 +167,7 @@ class BookDetailOut(BaseModel):
     catalog_summary_generated_at: str | None = None
     character_count: int
     discussion_count: int
+    read_state: Literal["unread", "reading", "done"]
 
 
 class RebuildEnqueueResponse(BaseModel):

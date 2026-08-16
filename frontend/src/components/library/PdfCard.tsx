@@ -1,7 +1,8 @@
 import { type ReactNode } from 'react';
 import type { PdfFile, ReadState } from '@/types';
-import { PdfCardThumbnail } from './PdfCardThumbnail';
-import { PdfCardActionButtons } from './PdfCardActionButtons';
+import { PdfCardThumbnail } from '@/components/library/PdfCardThumbnail';
+import { PdfCardActionButtons } from '@/components/library/PdfCardActionButtons';
+import { BookCardShell } from '@/components/ui/book-card-shell';
 import { formatTimestampJa } from '@/utils/date';
 
 /** 集約カードのバッジ情報（PdfGrid から PdfFile.name で引く想定） */
@@ -71,80 +72,73 @@ export function PdfCard({
         }
     };
 
-    return (
-        <div
-            className={`rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow flex flex-col border-2 ${
-                isSelected
-                    ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20'
-                    : isGroup
-                      ? 'border-accent-300 dark:border-accent-700 bg-white dark:bg-gray-800'
-                      : 'border-transparent bg-white dark:bg-gray-800'
-            }`}
-        >
-            <PdfCardThumbnail
-                name={pdf.name}
-                thumbnail={pdf.thumbnail}
-                isFav={isFav}
-                isSelected={isSelected}
-                isGroup={isGroup}
-                badge={badge}
-                isSelectionMode={isSelectionMode}
-                onClick={handleThumbnailClick}
-                onToggleFavorite={onToggleFavorite}
-                dragHandle={dragHandle}
-            />
+    const title = isGroup && badge ? badge.displayTitle : pdf.name.replace(/\.pdf$/i, '');
+    const authors = getAuthors?.(pdf.name) ?? [];
 
-            <div
-                className={`p-3 flex-1 flex flex-col justify-between ${isSelected ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-white dark:bg-gray-800'}`}
-            >
-                <span
-                    className={`font-medium text-sm line-clamp-2 ${isGroup ? 'text-accent-700 dark:text-accent-300' : 'text-gray-800 dark:text-gray-200'}`}
-                    title={isGroup && badge ? badge.displayTitle : pdf.name}
-                >
-                    {isGroup && badge ? badge.displayTitle : pdf.name.replace('.pdf', '')}
-                </span>
-                {getAuthors &&
-                    (() => {
-                        const authors = getAuthors(pdf.name);
-                        return authors.length > 0 ? (
-                            <div className="mt-1 flex flex-wrap gap-1">
-                                {authors.map((a) => (
-                                    <span
-                                        key={a}
-                                        className={`text-xs px-1.5 py-0.5 rounded bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 truncate max-w-full ${onAuthorClick ? 'cursor-pointer hover:bg-primary-100 dark:hover:bg-primary-800/50' : ''}`}
-                                        onClick={
-                                            onAuthorClick
-                                                ? (e) => {
-                                                      e.stopPropagation();
-                                                      onAuthorClick(a);
-                                                  }
-                                                : undefined
-                                        }
-                                        title={onAuthorClick ? `"${a}" で絞り込む` : undefined}
-                                    >
-                                        {a}
-                                    </span>
-                                ))}
-                            </div>
-                        ) : null;
-                    })()}
-                <div className="mt-2 flex items-center justify-between">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatTimestampJa(pdf.created_at)}
-                    </span>
-                    <PdfCardActionButtons
-                        name={pdf.name}
-                        isSelectionMode={isSelectionMode}
-                        showHidden={showHidden}
-                        isGroup={isGroup}
-                        readState={readState}
-                        onRename={onRename}
-                        onRegenThumb={onRegenThumb}
-                        onToggleHidden={onToggleHidden}
-                        onEditSeries={onEditSeries}
-                    />
-                </div>
-            </div>
-        </div>
+    return (
+        <BookCardShell
+            title={pdf.name}
+            displayTitle={title}
+            tone={isSelected ? 'selected' : isGroup ? 'group' : 'default'}
+            cover={
+                <PdfCardThumbnail
+                    name={pdf.name}
+                    thumbnail={pdf.thumbnail}
+                    isFav={isFav}
+                    isSelected={isSelected}
+                    isGroup={isGroup}
+                    badge={badge}
+                    isSelectionMode={isSelectionMode}
+                    onClick={handleThumbnailClick}
+                    onToggleFavorite={onToggleFavorite}
+                    dragHandle={dragHandle}
+                />
+            }
+            authors={
+                authors.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                        {authors.map((author) =>
+                            onAuthorClick ? (
+                                <button
+                                    key={author}
+                                    type="button"
+                                    className="inline-flex min-h-11 max-w-full items-center rounded-md bg-primary-50 px-2 text-left text-xs font-medium text-primary-800 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 dark:bg-primary-900/30 dark:text-primary-200 dark:hover:bg-primary-800/50"
+                                    onClick={() => onAuthorClick(author)}
+                                    title={`「${author}」で絞り込む`}
+                                    aria-label={`作者「${author}」で絞り込む`}
+                                >
+                                    <span className="truncate">{author}</span>
+                                </button>
+                            ) : (
+                                <span
+                                    key={author}
+                                    className="truncate text-xs font-medium text-gray-700 dark:text-gray-300"
+                                >
+                                    {author}
+                                </span>
+                            ),
+                        )}
+                    </div>
+                ) : undefined
+            }
+            meta={
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                    {formatTimestampJa(pdf.created_at)}
+                </p>
+            }
+            footer={
+                <PdfCardActionButtons
+                    name={pdf.name}
+                    isSelectionMode={isSelectionMode}
+                    showHidden={showHidden}
+                    isGroup={isGroup}
+                    readState={readState}
+                    onRename={onRename}
+                    onRegenThumb={onRegenThumb}
+                    onToggleHidden={onToggleHidden}
+                    onEditSeries={onEditSeries}
+                />
+            }
+        />
     );
 }

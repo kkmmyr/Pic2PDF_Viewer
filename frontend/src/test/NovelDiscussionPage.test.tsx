@@ -32,6 +32,7 @@ const BOOKS = [
         publisher: null,
         asin: null,
         series_index: null,
+        read_state: 'unread' as const,
     },
 ];
 

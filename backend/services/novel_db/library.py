@@ -13,7 +13,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 import config
-from services.meta_store import load_meta
+from services.meta_store import MetaEntry, ReadState, load_meta
 from utils.path_utils import resolve_under_base, validate_safe_name
 
 
@@ -34,6 +34,7 @@ class BookSummary:
     series_index: float | None = None
     catalog_summary: str | None = None
     catalog_summary_generated_at: str | None = None
+    read_state: ReadState = "unread"
 
 
 @dataclass
@@ -60,6 +61,7 @@ class BookDetail:
     catalog_summary_generated_at: str | None
     character_count: int
     discussion_count: int
+    read_state: ReadState = "unread"
 
 
 @dataclass
@@ -72,6 +74,13 @@ class SeriesSummary:
 def _meta_key(book_name: str) -> str:
     """書籍 stem (= books.name) を meta.json のキー (= "{stem}.pdf") に変換する。"""
     return f"{book_name}.pdf"
+
+
+def _read_state(meta_entry: MetaEntry) -> ReadState:
+    explicit = meta_entry.get("read_state")
+    if explicit in {"unread", "reading", "done"}:
+        return explicit
+    return "reading" if int(meta_entry.get("view_count", 0)) > 0 else "unread"
 
 
 def _thumbnail_url(book_name: str) -> str:
@@ -183,6 +192,7 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
         catalog_summary_generated_at=catalog_summary_generated_at,
         character_count=char_count,
         discussion_count=discussion_count,
+        read_state=_read_state(meta_entry),
     )
 
 
@@ -216,9 +226,8 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
                 asin=meta_entry.get("asin"),
                 series_index=meta_entry.get("series_index"),
                 catalog_summary=info["catalog_summary"] if info else None,
-                catalog_summary_generated_at=(
-                    info["catalog_summary_generated_at"] if info else None
-                ),
+                catalog_summary_generated_at=(info["catalog_summary_generated_at"] if info else None),
+                read_state=_read_state(meta_entry),
             )
         )
     return summaries

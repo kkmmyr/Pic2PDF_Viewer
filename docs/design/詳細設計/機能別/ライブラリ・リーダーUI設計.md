@@ -66,6 +66,23 @@ URL / libraryStore
 - 1冊だけのgroupは集約しない。
 - group cardの選択は全memberを1回のstate更新で選択・解除する。
 
+### 書籍cardの情報階層と操作
+
+- 通常書籍cardは、表紙、タイトル、作者、source固有の補助情報、状態・操作行の順で構成する。
+  同人誌・漫画では作成日、小説DBではseries・短い要約・OCR / RAG構築状態を補助情報として残す。
+- 読書状態は同人誌・漫画・小説DBともcard下端の状態・操作行へ置き、
+  `未読 | 読書中 | 読了`を文字と色の両方で判別できるpillとして表示する。
+- 小説DBの書籍一覧は`GET /api/novel_db/books`が返す`read_state`を使う。
+  明示値がない既存書籍は`view_count > 0`を`reading`、それ以外を`unread`として扱う。
+- card全体をclick targetにせず、表紙を明示的なbuttonとして書籍を開く。
+  作者でfilterできる場合も`span`ではなくbuttonを使い、Enter / Spaceで実行できるようにする。
+- 同人誌・漫画のrename、thumbnail再生成、hidden、series編集は、card下端の44px操作buttonから
+  開くmenuへ集約する。小説DBのmeta編集も同じ位置・44px操作buttonとする。
+- iconのみのbuttonには内容を含む`aria-label`と補助tooltipを付ける。
+  すべてのcard内buttonへ`focus-visible` ringを表示し、意味のある文字・iconは
+  light modeで`gray-600`相当以上、dark modeで`gray-300`相当以上のcontrastを持たせる。
+- series / authorの集約cardは現行のdrilldown表現を維持し、通常書籍cardと混同させない。
+
 ### 代表pin
 
 series / authorの代表書籍は`meta2.db.group_pins`を`/api/prefs`経由で保存する。
@@ -223,5 +240,7 @@ contentを左右・中央の3zoneへ分ける。
 - LTR/RTL、single/spread、先頭/末尾でpageを飛ばさない。
 - 検索中のgrouping抑制とbreadcrumbsを維持する。
 - mutation失敗時に選択、並び順、metaを失わない。
+- 書籍cardの表紙、作者、管理操作をTab / Shift+Tabで移動し、Enter / Spaceで実行できる。
+- 390px幅でもcard内操作が横にはみ出さず、44pxの操作領域と読書状態の文字表示を維持する。
 - 同名画像置換後に旧画像と新画像を混在させない。
 - desktop、iPad相当幅、light/dark、keyboard、touchで主要閲覧操作を確認する。

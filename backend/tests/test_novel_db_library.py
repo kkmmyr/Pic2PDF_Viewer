@@ -46,6 +46,17 @@ def test_get_book_detail_rejects_unsafe_name_at_service_boundary(setup_db):
             get_book_detail(conn, "folder/book")
 
 
+def test_get_book_detail_returns_derived_read_state(setup_db):
+    _put_image_dir(setup_db, "started")
+    _put_meta({"started.pdf": {"authors": [], "view_count": 1}})
+
+    with with_db() as conn:
+        detail = get_book_detail(conn, "started")
+
+    assert detail is not None
+    assert detail.read_state == "reading"
+
+
 def test_list_books_returns_images_dirs_with_unindexed_status(setup_db):
     _put_image_dir(setup_db, "book-1")
     _put_image_dir(setup_db, "book-2")
@@ -112,6 +123,33 @@ def test_list_books_merges_meta_authors_and_series(setup_db):
     assert books[0].authors == ["田中啓子"]
     assert books[0].series_id == "oko-kishi"
     assert books[0].series_title == "おこぼれ姫"
+
+
+def test_list_books_returns_explicit_and_derived_read_state(setup_db):
+    for name in ["done", "fresh", "started", "explicit-unread"]:
+        _put_image_dir(setup_db, name)
+    _put_meta(
+        {
+            "done.pdf": {"authors": [], "read_state": "done"},
+            "started.pdf": {"authors": [], "view_count": 2},
+            "explicit-unread.pdf": {
+                "authors": [],
+                "view_count": 3,
+                "read_state": "unread",
+            },
+        }
+    )
+
+    with with_db() as conn:
+        books = list_books(conn)
+
+    states = {book.name: book.read_state for book in books}
+    assert states == {
+        "done": "done",
+        "explicit-unread": "unread",
+        "fresh": "unread",
+        "started": "reading",
+    }
 
 
 def test_list_books_thumbnail_url_uses_first_image(setup_db):

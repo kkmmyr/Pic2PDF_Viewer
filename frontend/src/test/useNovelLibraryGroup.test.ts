@@ -24,6 +24,7 @@ const book = (
     publisher: null,
     asin: null,
     series_index: null,
+    read_state: 'unread',
 });
 
 const A = book('bookA', ['作者A'], 's1', 'シリーズ1', 1);

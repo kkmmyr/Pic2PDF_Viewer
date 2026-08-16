@@ -14,6 +14,7 @@ from config import get_dirs_by_source
 from routers._deps import assert_valid_source, validate_request_targets, validated_source
 from routers.api_schemas import RegenerateThumbnailBulkResponse, RegenerateThumbnailResponse
 from services.image_service import list_book_images
+from services.library_listing import invalidate_library_listing
 from services.pdf_generator import generate_thumbnail as generate_thumbnail_from_image
 from services.thumbnail_service import ThumbnailService
 from utils.file_naming import get_thumbnail_name
@@ -131,6 +132,7 @@ def regenerate_thumbnail(request: RegenerateThumbnailRequest):
     dirs = get_dirs_by_source(request.source)
     if not _regenerate_one(dirs["pdf"], dirs["thumb"], request.path, request.name, dirs["img"]):
         raise HTTPException(status_code=404, detail="Source image not found")
+    invalidate_library_listing(request.source, request.path)
 
     return {"message": "Thumbnail regenerated"}
 
@@ -152,5 +154,8 @@ def regenerate_thumbnail_bulk(request: RegenerateThumbnailBulkRequest):
         else:
             failed.append(name)
             logger.warning("Failed to regenerate thumbnail: %s", name)
+
+    if succeeded:
+        invalidate_library_listing(request.source, request.path)
 
     return {"message": "Bulk thumbnail regeneration complete", "succeeded": succeeded, "failed": failed}

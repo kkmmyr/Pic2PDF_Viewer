@@ -2150,6 +2150,11 @@ export interface components {
             character_count: number;
             /** Discussion Count */
             discussion_count: number;
+            /**
+             * Read State
+             * @enum {string}
+             */
+            read_state: 'unread' | 'reading' | 'done';
         };
         /** BookImagesResponse */
         BookImagesResponse: {
@@ -2222,6 +2227,11 @@ export interface components {
             catalog_summary?: string | null;
             /** Catalog Summary Generated At */
             catalog_summary_generated_at?: string | null;
+            /**
+             * Read State
+             * @enum {string}
+             */
+            read_state: 'unread' | 'reading' | 'done';
         };
         /** BuildEnqueueResponse */
         BuildEnqueueResponse: {

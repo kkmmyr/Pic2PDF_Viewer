@@ -95,6 +95,32 @@ class TestListPdfsGenerated:
         res = client.get("/api/pdfs?path=../etc&source=doujin")
         assert res.status_code == 400
 
+    def test_repeated_request_uses_cached_directory_scan(self, client, tmp_data_dir, make_webp, monkeypatch):
+        img_dir = tmp_data_dir["IMAGES_DIR"]
+        thumb_dir = tmp_data_dir["THUMBNAIL_DIR"]
+        make_webp(os.path.join(img_dir, "cached", "1.webp"))
+        os.makedirs(thumb_dir, exist_ok=True)
+        with open(os.path.join(thumb_dir, "cached.jpg"), "wb") as file:
+            file.write(b"\xff\xd8\xff\xe0")
+
+        import services.library_listing as listing_module
+
+        real_listdir = listing_module.os.listdir
+        calls: list[str] = []
+
+        def counted_listdir(path: str):
+            calls.append(path)
+            return real_listdir(path)
+
+        monkeypatch.setattr(listing_module.os, "listdir", counted_listdir)
+
+        assert client.get("/api/pdfs?source=doujin").status_code == 200
+        assert calls
+        calls.clear()
+
+        assert client.get("/api/pdfs?source=doujin").status_code == 200
+        assert calls == []
+
 
 # ---------------------------------------------------------------------------
 # GET /api/pdfs (comic/novel: images/ サブディレクトリ走査)

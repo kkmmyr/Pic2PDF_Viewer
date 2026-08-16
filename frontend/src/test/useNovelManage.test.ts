@@ -54,6 +54,7 @@ function makeBook(overrides: Partial<BookSummary> = {}): BookSummary {
         publisher: null,
         asin: null,
         series_index: null,
+        read_state: 'unread',
         ...overrides,
     };
 }

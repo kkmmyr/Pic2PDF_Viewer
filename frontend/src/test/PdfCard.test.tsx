@@ -63,28 +63,28 @@ describe('PdfCard', () => {
         expect(onPdfClick).not.toHaveBeenCalled();
     });
 
-    it('readState="unread" で NEW バッジを表示', () => {
+    it('readState="unread" で 未読バッジを表示', () => {
         const { getByText } = render(<PdfCard {...baseProps} readState="unread" />);
-        expect(getByText('NEW')).toBeInTheDocument();
+        expect(getByText('未読')).toBeInTheDocument();
     });
 
-    it('readState="reading" で 読書中 バッジを表示（aria-label）', () => {
-        const { getByLabelText } = render(<PdfCard {...baseProps} readState="reading" />);
-        expect(getByLabelText('読書中')).toBeInTheDocument();
+    it('readState="reading" で 読書中 バッジを表示', () => {
+        const { getByText } = render(<PdfCard {...baseProps} readState="reading" />);
+        expect(getByText('読書中')).toBeInTheDocument();
     });
 
-    it('readState="done" で 読了 バッジを表示（aria-label）', () => {
-        const { getByLabelText } = render(<PdfCard {...baseProps} readState="done" />);
-        expect(getByLabelText('読了')).toBeInTheDocument();
+    it('readState="done" で 読了 バッジを表示', () => {
+        const { getByText } = render(<PdfCard {...baseProps} readState="done" />);
+        expect(getByText('読了')).toBeInTheDocument();
     });
 
     it('集約カード (isGroup=true) では readState バッジは表示されない', () => {
         const badge: PdfCardBadge = { count: 3, kind: 'series', displayTitle: 'シリーズX' };
-        const { queryByText, queryByLabelText } = render(
+        const { queryByText } = render(
             <PdfCard {...baseProps} isGroup badge={badge} readState="unread" />,
         );
-        expect(queryByText('NEW')).toBeNull();
-        expect(queryByLabelText('読書中')).toBeNull();
+        expect(queryByText('未読')).toBeNull();
+        expect(queryByText('読書中')).toBeNull();
     });
 
     it('isSelected で amber の枠線スタイルが付く', () => {
@@ -110,5 +110,38 @@ describe('PdfCard', () => {
         const { container } = render(<PdfCard {...baseProps} pdf={pdfWithDate} />);
         // formatTimestampJa の出力は OS ロケール依存だが、'2023' を含む可能性が高い
         expect(container.textContent).toMatch(/2023|2024/);
+    });
+
+    it('表紙は書籍名を含むアクセシブルなボタンとして開ける', () => {
+        const onPdfClick = vi.fn();
+        const { getByRole } = render(<PdfCard {...baseProps} onPdfClick={onPdfClick} />);
+
+        fireEvent.click(getByRole('button', { name: 'book を読む' }));
+        expect(onPdfClick).toHaveBeenCalledWith('book.pdf');
+    });
+
+    it('その他の操作を開き、ラベル付き操作を実行できる', () => {
+        const onRename = vi.fn();
+        const { getByRole } = render(<PdfCard {...baseProps} onRename={onRename} />);
+
+        const trigger = getByRole('button', { name: 'book の操作を開く' });
+        fireEvent.click(trigger);
+        const rename = getByRole('button', { name: 'bookの名前を変更' });
+        expect(rename).toHaveFocus();
+        fireEvent.click(rename);
+        expect(onRename).toHaveBeenCalledWith('book.pdf');
+    });
+
+    it('その他の操作は Escape で閉じてトリガーへフォーカスを戻す', () => {
+        const { getByRole, queryByRole } = render(<PdfCard {...baseProps} onRename={vi.fn()} />);
+
+        const trigger = getByRole('button', { name: 'book の操作を開く' });
+        fireEvent.click(trigger);
+        fireEvent.keyDown(getByRole('button', { name: 'bookの名前を変更' }), {
+            key: 'Escape',
+        });
+
+        expect(queryByRole('button', { name: 'bookの名前を変更' })).not.toBeInTheDocument();
+        expect(trigger).toHaveFocus();
     });
 });

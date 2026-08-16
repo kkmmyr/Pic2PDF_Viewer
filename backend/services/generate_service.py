@@ -11,6 +11,7 @@ from typing import Literal
 
 import config
 from services.job_manager import GenerateJob, JobStatus, JobStore
+from services.library_listing import invalidate_library_listing
 from services.meta_store import update_meta_locked
 from services.pdf_generator import scan_and_generate
 from utils.logger import get_logger
@@ -49,6 +50,7 @@ def _run_generate_job(job: GenerateJob) -> None:
             config.COMPLETE_DIR,
             progress_callback=progress_callback,
         )
+        invalidate_library_listing("doujin")
 
         # 新規生成ファイルにのみ genre: "オリジナル" を初期書き込み（再生成時は保持）
         if result.generated:

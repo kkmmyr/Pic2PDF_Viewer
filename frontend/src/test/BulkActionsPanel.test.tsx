@@ -17,6 +17,7 @@ const makeBook = (name: string): BookSummary => ({
     publisher: null,
     asin: null,
     series_index: null,
+    read_state: 'unread',
 });
 
 const books = [makeBook('book-a'), makeBook('book-b'), makeBook('book-c')];

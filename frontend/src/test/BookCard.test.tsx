@@ -18,6 +18,7 @@ const BASE_BOOK: BookSummary = {
     publisher: null,
     asin: null,
     series_index: 1,
+    read_state: 'unread',
 };
 
 describe('BookCard', () => {
@@ -46,5 +47,31 @@ describe('BookCard', () => {
         );
 
         expect(queryByText('短い要約')).not.toBeInTheDocument();
+    });
+
+    it('読書状態を日本語で表示する', () => {
+        const { getByText, rerender } = render(
+            <BookCard book={BASE_BOOK} onOpenDetail={vi.fn()} onEdit={vi.fn()} />,
+        );
+        expect(getByText('未読')).toBeInTheDocument();
+
+        rerender(
+            <BookCard
+                book={{ ...BASE_BOOK, read_state: 'reading' }}
+                onOpenDetail={vi.fn()}
+                onEdit={vi.fn()}
+            />,
+        );
+        expect(getByText('読書中')).toBeInTheDocument();
+    });
+
+    it('編集ボタンは書籍名を含む名前を持ち、クリックで対象書籍を渡す', () => {
+        const onEdit = vi.fn();
+        const { getByRole } = render(
+            <BookCard book={BASE_BOOK} onOpenDetail={vi.fn()} onEdit={onEdit} />,
+        );
+
+        fireEvent.click(getByRole('button', { name: '茉莉花官吏伝 一 のメタデータを編集' }));
+        expect(onEdit).toHaveBeenCalledWith(BASE_BOOK);
     });
 });

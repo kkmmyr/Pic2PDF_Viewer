@@ -22,6 +22,7 @@ const BOOKS: BookSummary[] = [
         publisher: null,
         asin: null,
         series_index: null,
+        read_state: 'unread',
     },
     {
         name: 'book-2',
@@ -37,6 +38,7 @@ const BOOKS: BookSummary[] = [
         publisher: null,
         asin: null,
         series_index: null,
+        read_state: 'unread',
     },
 ];
 
