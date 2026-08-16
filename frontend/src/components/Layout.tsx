@@ -34,7 +34,7 @@ const NAV_GROUPS: NavGroup[] = [
     {
         label: '同人誌',
         items: [
-            { to: '/doujin', icon: Library, label: 'Library' },
+            { to: '/doujin', icon: Library, label: 'ライブラリ' },
             { to: '/doujin/generator', icon: Settings, label: '取り込み' },
             { to: '/doujin/hitomi', icon: Sparkles, label: '新着' },
         ],
@@ -88,17 +88,17 @@ export default function Layout() {
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex h-16 min-w-0 justify-between">
                             <div className="flex shrink-0 items-center">
-                                <Link to="/" className="flex items-center gap-2">
+                                <div className="flex items-center gap-2">
                                     <div className="bg-primary-600 p-1.5 rounded-lg">
                                         <FileText className="w-6 h-6 text-white" />
                                     </div>
                                     <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-500 to-primary-700">
                                         Pic2PDF Viewer
                                     </span>
-                                </Link>
+                                </div>
                             </div>
 
-                            <nav className="ml-3 flex min-w-0 flex-1 items-center justify-end gap-0.5 overflow-x-auto">
+                            <nav className="ml-3 flex min-w-0 flex-1 items-center justify-start gap-0.5 overflow-x-auto xl:justify-end">
                                 {NAV_GROUPS.map((group, gi) => (
                                     <Fragment key={group.label}>
                                         {gi > 0 && DIVIDER}
