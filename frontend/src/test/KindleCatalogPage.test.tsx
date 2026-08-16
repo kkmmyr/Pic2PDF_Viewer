@@ -222,6 +222,7 @@ describe('Kindle catalog pages', () => {
 
         expect(screen.getByText('テスト作品 1巻')).toBeInTheDocument();
         expect(screen.getByText('著者A')).toBeInTheDocument();
+        expect(screen.getByText('著者：著者A')).toHaveClass('lg:hidden');
         expect(screen.getAllByText('漫画').length).toBeGreaterThan(0);
         expect(screen.queryByRole('button', { name: '漫画撮影' })).not.toBeInTheDocument();
 

@@ -1,14 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Layout from '@/components/Layout';
 
+const darkModeMocks = vi.hoisted(() => ({ toggle: vi.fn() }));
+
 vi.mock('@/hooks', () => ({
-    useDarkMode: () => ({ isDark: false, toggle: vi.fn() }),
+    useDarkMode: () => ({ isDark: false, toggle: darkModeMocks.toggle }),
 }));
 
 describe('Layout', () => {
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        darkModeMocks.toggle.mockReset();
+    });
 
     it('PCでは主要項目を表示し、カテゴリメニューから同人誌ライブラリへ遷移できる', () => {
         render(
@@ -74,9 +79,10 @@ describe('Layout', () => {
         const openButton = screen.getByRole('button', { name: 'メニューを開く' });
         fireEvent.click(openButton);
 
-        expect(
-            screen.getByRole('navigation', { name: 'モバイルナビゲーション' }),
-        ).toBeInTheDocument();
+        const mobileNavigation = screen.getByRole('navigation', {
+            name: 'モバイルナビゲーション',
+        });
+        expect(mobileNavigation).toBeInTheDocument();
         expect(screen.getByRole('link', { name: '同人誌ライブラリ' })).toHaveAttribute(
             'href',
             '/doujin',
@@ -86,6 +92,12 @@ describe('Layout', () => {
             'aria-current',
             'page',
         );
+        const themeButton = within(mobileNavigation).getByRole('button', {
+            name: 'ダークモードに切り替え',
+        });
+        fireEvent.click(themeButton);
+        expect(darkModeMocks.toggle).toHaveBeenCalledOnce();
+        expect(mobileNavigation).toBeInTheDocument();
 
         const drawerCloseButton = screen.getByRole('button', { name: 'メニューを閉じる' });
         expect(drawerCloseButton).toHaveFocus();

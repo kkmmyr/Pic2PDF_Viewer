@@ -33,6 +33,8 @@ function KindleBookRow({
     book: KindleCatalogBook;
     onOpen: (book: KindleCatalogBook) => void;
 }) {
+    const authorLabel = book.authors.join(' / ') || '—';
+
     return (
         <tr className="border-b border-gray-100 align-top last:border-0 dark:border-gray-800">
             <td className="px-4 py-3">
@@ -44,6 +46,12 @@ function KindleBookRow({
                     {book.title}
                 </button>
                 <div className="mt-1 font-mono text-xs text-gray-400">{book.asin}</div>
+                <div
+                    className="mt-1 truncate text-xs text-gray-500 dark:text-gray-400 lg:hidden"
+                    title={`著者：${authorLabel}`}
+                >
+                    著者：{authorLabel}
+                </div>
                 <div className="mt-2 flex flex-wrap gap-1.5 lg:hidden">
                     <StatusPill tone="blue">{bookTypeLabel(book.book_type)}</StatusPill>
                     <StatusPill>{OWNERSHIP_LABELS[book.ownership]}</StatusPill>
@@ -51,7 +59,7 @@ function KindleBookRow({
                 </div>
             </td>
             <td className="hidden px-4 py-3 text-sm text-gray-600 dark:text-gray-300 lg:table-cell">
-                {book.authors.join(' / ') || '—'}
+                {authorLabel}
             </td>
             <td className="hidden px-4 py-3 text-sm lg:table-cell">
                 {bookTypeLabel(book.book_type)}

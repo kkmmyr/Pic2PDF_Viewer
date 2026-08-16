@@ -83,10 +83,18 @@ function DesktopCategoryMenu({
 interface MobileDrawerProps {
     pathname: string;
     currentLocation: RouteLocation;
+    isDark: boolean;
+    onToggleDark: () => void;
     onClose: () => void;
 }
 
-function MobileDrawer({ pathname, currentLocation, onClose }: MobileDrawerProps) {
+function MobileDrawer({
+    pathname,
+    currentLocation,
+    isDark,
+    onToggleDark,
+    onClose,
+}: MobileDrawerProps) {
     const drawerRef = useRef<HTMLElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -180,7 +188,20 @@ function MobileDrawer({ pathname, currentLocation, onClose }: MobileDrawerProps)
                     ))}
                 </div>
 
-                <div className="border-t border-gray-200 p-3 dark:border-gray-700">
+                <div className="space-y-1 border-t border-gray-200 p-3 dark:border-gray-700">
+                    <button
+                        type="button"
+                        onClick={onToggleDark}
+                        aria-label={isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+                        className="flex min-h-11 w-full items-center gap-3 rounded-lg bg-gray-100 px-3 text-left text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                    >
+                        {isDark ? (
+                            <Sun className="h-4 w-4" aria-hidden="true" />
+                        ) : (
+                            <Moon className="h-4 w-4" aria-hidden="true" />
+                        )}
+                        {isDark ? 'ライトモードに切り替え' : 'ダークモードに切り替え'}
+                    </button>
                     <a
                         href="/site/index.html"
                         target="_blank"
@@ -334,7 +355,6 @@ export function GlobalNavigation() {
                         {currentLocation.screen}
                     </span>
                 </div>
-
                 <div className="flex min-h-16 items-center gap-3 lg:hidden">
                     <div className="flex min-w-0 items-center gap-2">
                         <span className="shrink-0 rounded-lg bg-primary-600 p-1.5">
@@ -370,6 +390,8 @@ export function GlobalNavigation() {
                 <MobileDrawer
                     pathname={location.pathname}
                     currentLocation={currentLocation}
+                    isDark={isDark}
+                    onToggleDark={toggleDark}
                     onClose={() => closeDrawer(true)}
                 />
             )}
