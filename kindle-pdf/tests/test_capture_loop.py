@@ -292,6 +292,78 @@ def test_capture_loop_tries_opposite_key_only_for_first_transition(
     assert page_turns == ["selected", "opposite", "selected"]
 
 
+def test_capture_loop_rejects_two_screen_cycle_before_fourth_save(
+    tmp_path, monkeypatch
+):
+    capturer = KindleCapturer()
+    capturer.hwnd = 1
+    capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
+    capturer.config.EXPECTED_PAGES = None
+    pages = iter([_image(1), _image(2), _image(1), _image(2)])
+    saved: list[str] = []
+
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
+    monkeypatch.setattr(
+        capturer,
+        "_save_image",
+        lambda _image_value, path: saved.append(path),
+    )
+    monkeypatch.setattr(capturer, "_next_page", lambda: None)
+
+    with pytest.raises(RuntimeError, match="two-screen cycle"):
+        capturer.capture_loop("book")
+
+    assert [path.rsplit("\\", 1)[-1] for path in saved] == [
+        "001.png",
+        "002.png",
+        "003.png",
+    ]
+
+
+def test_capture_loop_treats_late_two_screen_cycle_as_end_and_discards_duplicate(
+    tmp_path, monkeypatch
+):
+    capturer = KindleCapturer()
+    capturer.hwnd = 1
+    capturer.config.IMG_OUTPUT_DIR = str(tmp_path)
+    capturer.config.EXPECTED_PAGES = None
+    capturer.config.CAPTURE_SPREAD = True
+    unique_pages = [_image(value) for value in range(1, 13)]
+    pages = iter([*unique_pages, unique_pages[-2], unique_pages[-1]])
+    saved: list[str] = []
+    discarded: list[str] = []
+
+    monkeypatch.setattr(
+        capturer_module.windll.user32, "SetForegroundWindow", lambda _hwnd: 1
+    )
+    monkeypatch.setattr(capturer_module.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(capturer, "_wait_for_stable_page", lambda _old: next(pages))
+    monkeypatch.setattr(
+        capturer,
+        "_save_image",
+        lambda _image_value, path: saved.append(path),
+    )
+    monkeypatch.setattr(
+        capturer,
+        "_discard_image",
+        lambda path: discarded.append(path),
+        raising=False,
+    )
+    monkeypatch.setattr(capturer, "_next_page", lambda: None)
+
+    result = capturer.capture_loop("book")
+
+    assert result.captured_screens == 12
+    assert result.report.last_saved_file == "012.png"
+    assert result.report.termination_reason == "visual_no_change_after_retries"
+    assert [path.rsplit("\\", 1)[-1] for path in discarded] == ["013.png"]
+    assert len(saved) == 13
+
+
 def test_capture_loop_rejects_expected_count_when_another_page_exists(
     tmp_path, monkeypatch
 ):

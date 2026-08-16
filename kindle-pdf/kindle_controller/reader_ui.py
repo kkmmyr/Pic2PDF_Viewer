@@ -36,6 +36,9 @@ class ReaderControlHost(Protocol):
 class ReaderUIAdapter:
     """Reader workflow から UIA/キーボード操作の詳細を隔離する。"""
 
+    _PAGE_SETTINGS_REVEAL_ATTEMPTS = 2
+    _PAGE_SETTINGS_POLL_SECONDS = 0.25
+
     def __init__(self, host: ReaderControlHost) -> None:
         self._host = host
         self._location_dialog_open = False
@@ -55,10 +58,21 @@ class ReaderUIAdapter:
 
     def _open_page_settings(self, reading_area: object) -> object:
         page_settings = self._host._control_by_id("aaMenuButton", timeout=0.5)
-        if page_settings is None:
-            self._host._click_control(reading_area)
-            time.sleep(0.5)
-            page_settings = self._host._control_by_id("aaMenuButton", timeout=2.0)
+        for attempt in range(self._PAGE_SETTINGS_REVEAL_ATTEMPTS):
+            if page_settings is not None:
+                break
+            visible_reading_area = self._host._control_by_id(
+                "ReadingArea",
+                timeout=1.0,
+            )
+            self._host._click_control(visible_reading_area or reading_area)
+            page_settings = self._wait_for_page_settings_control()
+            if (
+                page_settings is None
+                and attempt + 1 < self._PAGE_SETTINGS_REVEAL_ATTEMPTS
+            ):
+                pyautogui.press("esc")
+                time.sleep(self._PAGE_SETTINGS_POLL_SECONDS)
         if page_settings is None:
             raise KindleControllerError(
                 "positioning_failed",
@@ -67,6 +81,20 @@ class ReaderUIAdapter:
         self._host._click_control(page_settings)
         time.sleep(0.5)
         return page_settings
+
+    def _wait_for_page_settings_control(self) -> object | None:
+        deadline = time.monotonic() + self._host.config.control_timeout_seconds
+        while True:
+            remaining = deadline - time.monotonic()
+            page_settings = self._host._control_by_id(
+                "aaMenuButton",
+                timeout=max(0.01, min(0.5, remaining)),
+            )
+            if page_settings is not None:
+                return page_settings
+            if remaining <= 0:
+                return None
+            time.sleep(min(self._PAGE_SETTINGS_POLL_SECONDS, remaining))
 
     def _select_and_verify_layout(self, policy: PageLayoutPolicy) -> None:
         option = self._host._control_by_id(policy.option_id, timeout=2.0)
@@ -83,10 +111,14 @@ class ReaderUIAdapter:
 
     def _compatible_without_layout_option(self, policy: PageLayoutPolicy) -> bool:
         fallback_id = policy.compatible_without_option_id
-        return fallback_id is not None and self._host._control_by_id(
-            fallback_id,
-            timeout=1.0,
-        ) is not None
+        return (
+            fallback_id is not None
+            and self._host._control_by_id(
+                fallback_id,
+                timeout=1.0,
+            )
+            is not None
+        )
 
     def _wait_for_selected_layout(self, option_id: str) -> None:
         deadline = time.monotonic() + self._host.config.control_timeout_seconds

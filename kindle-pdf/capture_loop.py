@@ -1,3 +1,4 @@
+import os
 import os.path as osp
 import time
 from collections.abc import Callable
@@ -33,6 +34,10 @@ class CaptureLoopMixin:
     def _save_image(self, image: np.ndarray, filepath: str) -> None:
         """画像を保存 (日本語パス対応)"""
         save_png(image, filepath)
+
+    def _discard_image(self, filepath: str) -> None:
+        """終端周期で保存済みと判明した一時重複画像を破棄する。"""
+        os.remove(filepath)
 
     def _turn_page(self, key: str) -> None:
         """指定したキーでページめくり操作を行う。"""
@@ -247,6 +252,8 @@ class CaptureLoopMixin:
 
         page = 1
         old_image = None
+        two_pages_back = None
+        two_screen_cycle_matches = 0
         progress = CaptureProgress()
 
         while True:
@@ -281,6 +288,48 @@ class CaptureLoopMixin:
                     progress,
                 )
 
+            if two_pages_back is not None and self._images_visually_equal(
+                two_pages_back,
+                current_image,
+            ):
+                two_screen_cycle_matches += 1
+            else:
+                two_screen_cycle_matches = 0
+            if two_screen_cycle_matches >= 2:
+                captured_pages = page - 2
+                minimum_capture_screens = (
+                    10 if getattr(self.config, "CAPTURE_SPREAD", False) else 50
+                )
+                if (
+                    captured_pages >= minimum_capture_screens
+                    and not capture_stopped_too_early(
+                        captured_pages,
+                        self.config.EXPECTED_PAGES,
+                    )
+                ):
+                    duplicate_filename = osp.join(
+                        save_dir,
+                        f"{page - 1:03d}.png",
+                    )
+                    self._discard_image(duplicate_filename)
+                    progress.unchanged_observation_windows += 2
+                    print(
+                        "End of book: Kindle repeated the final two screens; "
+                        f"discarded {osp.basename(duplicate_filename)}."
+                    )
+                    return self._build_capture_result(
+                        save_dir,
+                        captured_pages,
+                        "visual_no_change_after_retries",
+                        current_image,
+                        2,
+                        progress,
+                    )
+                raise RuntimeError(
+                    "Capture entered a two-screen cycle; "
+                    "check the selected page direction."
+                )
+
             self._save_image(current_image, filename)
             if on_page is not None:
                 on_page(page)
@@ -305,6 +354,7 @@ class CaptureLoopMixin:
                     progress,
                 )
 
+            two_pages_back = old_image
             old_image = current_image
             page += 1
             self._next_page()

@@ -96,6 +96,64 @@ def test_layout_adapter_fails_closed_when_option_is_missing(
     assert host.clicked == ["aaMenuButton", "CloseSideMenuHeaderButton", "ReadingArea"]
 
 
+def test_layout_adapter_waits_for_delayed_page_settings_control(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host = _Host()
+    page_settings = host.controls.pop("aaMenuButton")
+    host.controls["aaOption-Split"] = _Control("aaOption-Split", selected=True)
+    lookup_count = 0
+
+    def delayed_control(
+        automation_id: str,
+        **_kwargs: object,
+    ) -> object | None:
+        nonlocal lookup_count
+        if automation_id == "aaMenuButton":
+            lookup_count += 1
+            if lookup_count >= 3:
+                return page_settings
+            return None
+        return host.controls.get(automation_id)
+
+    monkeypatch.setattr(host, "_control_by_id", delayed_control)
+    monkeypatch.setattr("kindle_controller.reader_ui.time.sleep", lambda _value: None)
+
+    ReaderUIAdapter(host).apply_page_layout(
+        PageLayoutPolicy(option_id="aaOption-Split")
+    )
+
+    assert lookup_count >= 3
+    assert host.clicked == [
+        "ReadingArea",
+        "aaMenuButton",
+        "CloseSideMenuHeaderButton",
+        "ReadingArea",
+    ]
+
+
+def test_layout_adapter_bounds_page_settings_reveal_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    host = _Host()
+    host.controls.pop("aaMenuButton")
+    escape_presses: list[str] = []
+    monkeypatch.setattr("kindle_controller.reader_ui.time.sleep", lambda _value: None)
+    monkeypatch.setattr(
+        "kindle_controller.reader_ui.pyautogui.press",
+        escape_presses.append,
+    )
+
+    with pytest.raises(KindleControllerError) as exc:
+        ReaderUIAdapter(host).apply_page_layout(
+            PageLayoutPolicy(option_id="aaOption-Split")
+        )
+
+    assert exc.value.error_code == "positioning_failed"
+    assert host.clicked.count("ReadingArea") == 2
+    assert escape_presses == ["esc"]
+
+
 def test_location_value_requires_value_pattern_readback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
