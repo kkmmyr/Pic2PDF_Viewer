@@ -13,12 +13,22 @@ from typing import Any
 from PIL import Image
 
 try:
+    from .ocr_candidate_selection import (
+        is_external_materially_more_complete,
+        is_external_safe_repetition_fallback,
+    )
+    from .ocr_content_guards import has_suspicious_repetition
     from .ocr_layout_types import suggest_layout_type
     from .ocr_worker_protocol import OcrWorkerTask, emit, failed_payload, page_payload
     from .surya_quality import crosscheck_ocr_results, evaluate_external_ocr
     from .surya_runtime import SuryaClient
     from .surya_types import SuryaPageResult
 except ImportError:
+    from ocr_candidate_selection import (
+        is_external_materially_more_complete,
+        is_external_safe_repetition_fallback,
+    )
+    from ocr_content_guards import has_suspicious_repetition
     from ocr_layout_types import suggest_layout_type
     from ocr_worker_protocol import OcrWorkerTask, emit, failed_payload, page_payload
     from surya_quality import crosscheck_ocr_results, evaluate_external_ocr
@@ -63,6 +73,44 @@ def select_layout_ocr_result(
             replace(
                 external,
                 quality_flags=[*external.quality_flags, "layout_selected_external"],
+                error_message=None,
+            ),
+            "external",
+        )
+    if layout_type == "normal_prose" and is_external_safe_repetition_fallback(
+        primary.full_text,
+        external.full_text,
+    ):
+        return (
+            replace(
+                external,
+                state="passed",
+                quality_flags=[
+                    *external.quality_flags,
+                    "external_recovered_primary_repetition",
+                ],
+                error_message=None,
+            ),
+            "external",
+        )
+    if (
+        layout_type == "normal_prose"
+        and primary.state == "passed"
+        and external.state != "passed"
+        and is_external_materially_more_complete(
+            primary.full_text,
+            external.full_text,
+        )
+        and not has_suspicious_repetition(external.full_text)
+    ):
+        return (
+            replace(
+                external,
+                state="passed",
+                quality_flags=[
+                    *external.quality_flags,
+                    "external_low_confidence_more_complete_candidate",
+                ],
                 error_message=None,
             ),
             "external",

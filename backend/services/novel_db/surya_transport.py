@@ -61,6 +61,7 @@ class SuryaTransport:
             ],
             "temperature": 0,
             "top_p": 0.1,
+            "seed": 0,
             "max_tokens": max_tokens,
         }
 

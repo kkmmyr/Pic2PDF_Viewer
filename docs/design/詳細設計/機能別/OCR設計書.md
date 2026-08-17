@@ -70,6 +70,7 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_worker.py` | standalone CLI、manifest読込、engine選択のprotocol shell |
 | `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
 | `backend/services/novel_db/ocr_worker_engines.py` | 画像読込、Surya/yomitokuのページ処理、候補選択 |
+| `backend/services/novel_db/ocr_candidate_selection.py` | primary/externalの文字量差をQAリスクとworkerで共有する純関数 |
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
 | `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
@@ -140,10 +141,19 @@ event配線だけを行う。OpenAPI生成型を`features/ocr/types.ts`から参
 - worker所有serverは有限ページ数、連続不合格、移動窓の不合格率超過で再起動する。
   外部管理serverはworkerから停止しない。世代、開始ページ、終了理由を監査ログへ残す。
 - 公式のHTML+bbox、layout JSON、block HTMLの各promptを改変せず、画像→指示文の順で送る。
+- OpenAI互換payloadは`temperature=0`、`top_p=0.1`に加えて`seed=0`を固定し、
+  全画面・block・部分再OCRで同じ画像とpromptの候補を再現可能にする。
 - 1並列・context 16,384を基準とし、長い本文を4,096 tokenで打ち切らない。
 - キャプチャPNGを加工・上書きしない。再試行画像はメモリ上だけで生成する。
 - `raw_output`、検索用 `full_text`、bbox、品質指標を分離して保存する。
 - Surya合格ページも既定でyomitokuが独立再読する。候補一致は正解保証に使わない。
+- normal proseでprimaryに異常反復があり、externalが256文字以上かつ反復なしの場合は、
+  externalのconfidence合否にかかわらずレビュー候補へ切り替える。採用結果には
+  `external_recovered_primary_repetition` flagを残して必須QAへ送り、自動公開へ昇格させない。
+- normal proseでprimaryが合格し、externalがconfidence等で不合格でも、primaryが256文字以上かつ
+  externalが30文字・2%以上長く、externalに反復がない場合はexternal本文をレビュー候補として採用する。
+  この判定値はQAリスク検出と同じ純関数を使用し、`external_low_confidence_more_complete_candidate`
+  flagを保持して必須QAへ送る。候補採用だけでconfidence不合格を品質合格・自動公開へ昇格させない。
 
 ### ページ品質ゲート
 
@@ -233,10 +243,39 @@ B-35の完了判定には、調整に使わない3シリーズ以上・通常散
 一度だけの開封を要求する。holdoutを見て規則や閾値を変えた場合は調整用へ降格し、新しい
 未調整holdoutを用意する。
 
-ただし2026-08-10時点で、汎用品質policyはシリーズ数を持たず、`seed` / `benchmark` は
-開封済みholdoutの再利用を拒否せず、`--verify-queue`も全パッケージdigestを常に検査しない。
-したがって上記はまだ完全な機械強制契約ではない。実装計画のfail-closed化が完了するまで、
+正式holdoutは `b35-holdout-v1` manifestを正本とする。manifestは用途、封印日時、
+品質を参照しない選定入力・出力digest、policy digest、entryごとのrun・画面・series ID・
+画像SHA・QA package SHA、固有名詞注釈を持ち、manifest自身のcanonical JSON SHAで封印する。
+`b35-holdout-ledger-v1`台帳はmanifest SHAごとに `sealed → opened → retired_to_tuning` の
+単方向eventを保持する。benchmarkは全entry、全package、policy、ground truthを先に照合し、
+評価engineを起動する前に`opened`をatomic記録する。開封記録後は処理失敗時も未開封へ戻さず、
+同じmanifestの再評価を既定拒否する。品質ゲートが不合格ならレポート確定時に
+`retired_to_tuning`を追記し、同じholdoutを次の正式判定へ使用しない。overrideは通常benchmark経路へ設けない。
+
+汎用corpus benchmarkはformal manifestなしでも従来どおり実行できる。正式holdoutを指定した
+場合だけ、3シリーズ以上、normal prose 20画面以上、固有名詞10語・50出現以上、SHA差替え、
+package欠落、開封済み再利用をfail closedで検査する。manifestと台帳の検査・更新は
+ground truth、OCR QA、公開本文を変更しない。正式holdoutの機械単独品質が全policyへ合格するまで、
 B-35、自動公開、Codex最終確認省略を完了扱いにしない。
+
+正式holdoutの品質評価では、固有名詞注釈はpolicy JSONに残る汎用corpus用注釈ではなく、
+封印済みmanifestの画像SHA・語集合を使用する。コーパス構成もmanifestで検証済みの3シリーズ・
+normal prose 20画面を正本とし、汎用corpus向けのページ種別・layout別件数を二重適用しない。
+最低entry数・総正解文字数・layout別正解文字数と、CER・ページ最大値・列欠落・固有名詞再現率の
+品質閾値は引き続き封印時のpolicy JSONを使用する。これにより、候補品質と無関係な別コーパスの
+注釈・構成で一度限りのholdoutを消費することを防ぐ。
+
+### API表示用CERの増分集計
+
+`GET /api/ocr/ground-truth`のCERは空白だけを除去する既存契約を維持し、NFKC等を行う
+B-35 benchmark比較器とは共有しない。verified entryごとに正解本文・OCR本文の正規化後SHA、
+編集距離、正解文字数を`ocr_ground_truth_pages`へ保存する。一覧はSHAが一致する保存値を合算し、
+正解本文またはOCR本文が変わったentryだけを再計算する。cache欠落・不一致時は古い値を返さず、
+同じ要求内で再計算・保存してから応答する。draft化では保存指標を消去する。
+
+DB移行直後のcache未設定entryにも同じ経路を適用する。初回計算はUnicode対応のbit-parallel
+Levenshteinで既存の編集距離と完全一致させ、以後はページ単位cacheを使用する。API schema、
+集計順序、空文字・改行・約物の扱いは変更しない。
 
 ### 評価値の非代替性
 
@@ -291,7 +330,8 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
 - 低confidence列、イタリック、心内語は認識精度が低い。
 - ルビと本文の幅差が小さい書籍、ルビなしページの除去精度は未検証である。
 - 両候補が同じ列・固有名詞を誤る場合、候補比較だけでは検出できない。
-- B-35正式holdoutのfail-closed強制が未実装である。
+- B-35正式holdoutの封印・一度だけ開封は機械強制するが、新しい未調整holdoutでの
+  機械単独総合合格は未達である。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

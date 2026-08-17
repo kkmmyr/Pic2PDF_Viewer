@@ -212,6 +212,13 @@ adapterからcapture agentやHTTP transportを参照しない。
 - ページ単位の復号・寸法・hash・統計計算だけを少数workerで並列化できる。
   Kindle UI操作、ページ送り、package確定、正式登録は常に1件ずつ直列実行する。
 
+- 警告候補の未調整holdout評価は`capture_quality_holdout.py`を使い、画像directoryと
+  人手確定labelを持つprivate manifestを読み取り専用で評価する。検出器本体と同じ
+  `audit_capture_images()`を呼び、完全重複、低容量、白紙・疎、隣接dHash近似重複、
+  小説上下端、反復overlayについてcode別のTP/FP/FN、precision、recallをJSONへ保存する。
+  manifest digest、画像SHA、検出policy versionをレポートへ固定し、同じ入力で決定的に
+  再生成できるようにする。評価器は画像削除、package生成、登録、警告のblocking昇格を行わない。
+
 - Sambaの一時的な共有違反・アクセス拒否により`.partial → .ready`の同一共有内renameが
   失敗した場合は、コピーやmanifest生成をやり直さず、renameだけを短いバックオフ付きで
   有界回数再試行する。恒常的に失敗する場合は`.partial`を削除して`transfer_failed`とする。

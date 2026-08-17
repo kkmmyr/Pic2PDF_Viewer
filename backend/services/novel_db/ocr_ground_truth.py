@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import TypedDict
 
@@ -33,27 +34,73 @@ class GroundTruthSample(TypedDict):
 
 
 def _edit_distance(reference: str, hypothesis: str) -> int:
-    previous = list(range(len(hypothesis) + 1))
-    for row_index, reference_char in enumerate(reference, start=1):
-        current = [row_index]
-        for column_index, hypothesis_char in enumerate(hypothesis, start=1):
-            current.append(
-                min(
-                    current[-1] + 1,
-                    previous[column_index] + 1,
-                    previous[column_index - 1] + (reference_char != hypothesis_char),
-                )
-            )
-        previous = current
-    return previous[-1]
+    """Return exact Levenshtein distance using Python's arbitrary-width bitsets."""
+    if not reference:
+        return len(hypothesis)
+    if not hypothesis:
+        return len(reference)
+    if len(reference) > len(hypothesis):
+        reference, hypothesis = hypothesis, reference
+
+    width = len(reference)
+    mask = (1 << width) - 1
+    highest_bit = 1 << (width - 1)
+    character_masks: dict[str, int] = {}
+    for index, character in enumerate(reference):
+        character_masks[character] = character_masks.get(character, 0) | (1 << index)
+
+    positive = mask
+    negative = 0
+    distance = width
+    for character in hypothesis:
+        equal = character_masks.get(character, 0)
+        vertical = equal | negative
+        horizontal = (((equal & positive) + positive) ^ positive) | equal
+        positive_horizontal = negative | ~(horizontal | positive)
+        negative_horizontal = positive & horizontal
+        if positive_horizontal & highest_bit:
+            distance += 1
+        elif negative_horizontal & highest_bit:
+            distance -= 1
+        positive_horizontal = ((positive_horizontal << 1) | 1) & mask
+        negative_horizontal = (negative_horizontal << 1) & mask
+        positive = (negative_horizontal | ~(vertical | positive_horizontal)) & mask
+        negative = positive_horizontal & vertical
+    return distance
+
+
+def _normalize_metric_text(value: str) -> str:
+    return re.sub(r"\s+", "", value)
+
+
+def _metric_sha256(normalized_text: str) -> str:
+    return hashlib.sha256(normalized_text.encode("utf-8")).hexdigest()
+
+
+def _metric_fingerprints(reference: str, hypothesis: str) -> tuple[str, str]:
+    return (
+        _metric_sha256(_normalize_metric_text(reference)),
+        _metric_sha256(_normalize_metric_text(hypothesis)),
+    )
+
+
+def _cached_metric_values(reference: str, hypothesis: str) -> tuple[str, str, int, int, float | None]:
+    normalized_reference = _normalize_metric_text(reference)
+    normalized_hypothesis = _normalize_metric_text(hypothesis)
+    distance = _edit_distance(normalized_reference, normalized_hypothesis)
+    reference_chars = len(normalized_reference)
+    return (
+        _metric_sha256(normalized_reference),
+        _metric_sha256(normalized_hypothesis),
+        distance,
+        reference_chars,
+        distance / reference_chars if reference_chars else None,
+    )
 
 
 def character_error_rate(reference: str, hypothesis: str) -> tuple[int, int, float | None]:
-    normalized_reference = re.sub(r"\s+", "", reference)
-    normalized_hypothesis = re.sub(r"\s+", "", hypothesis)
-    distance = _edit_distance(normalized_reference, normalized_hypothesis)
-    reference_chars = len(normalized_reference)
-    return distance, reference_chars, distance / reference_chars if reference_chars else None
+    _reference_sha, _hypothesis_sha, distance, reference_chars, cer = _cached_metric_values(reference, hypothesis)
+    return distance, reference_chars, cer
 
 
 def seed_ground_truth(samples: list[GroundTruthSample]) -> int:
@@ -114,8 +161,9 @@ def update_ground_truth(
 
     with with_db() as conn:
         row = conn.execute(
-            "SELECT g.run_id, g.page_no, g.image_sha256, r.book_name "
+            "SELECT g.run_id, g.page_no, g.image_sha256, r.book_name, p.full_text "
             "FROM ocr_ground_truth_pages g JOIN ocr_runs r ON r.id=g.run_id "
+            "JOIN ocr_page_results p ON p.run_id=g.run_id AND p.page_no=g.page_no "
             "WHERE g.id=?",
             (entry_id,),
         ).fetchone()
@@ -128,22 +176,40 @@ def update_ground_truth(
         if input_pages[page_no - 1].image_sha256 != row[2]:
             raise ValueError(f"source image changed after corpus entry creation: page {page_no}")
         if state == "verified":
+            reference_sha, hypothesis_sha, distance, reference_chars, _cer = _cached_metric_values(
+                str(reference_text or ""), str(row[4] or "")
+            )
             cursor = conn.execute(
                 """
                 UPDATE ocr_ground_truth_pages
                 SET reference_text=?, page_type=?, layout_type=?, state=?, note=?,
                     updated_at=datetime('now', '+9 hours'),
-                    verified_at=datetime('now', '+9 hours')
+                    verified_at=datetime('now', '+9 hours'),
+                    cer_reference_sha256=?, cer_hypothesis_sha256=?,
+                    cer_edit_distance=?, cer_reference_chars=?
                 WHERE id=?
                 """,
-                (reference_text, page_type, layout_type, state, note, entry_id),
+                (
+                    reference_text,
+                    page_type,
+                    layout_type,
+                    state,
+                    note,
+                    reference_sha,
+                    hypothesis_sha,
+                    distance,
+                    reference_chars,
+                    entry_id,
+                ),
             )
         else:
             cursor = conn.execute(
                 """
                 UPDATE ocr_ground_truth_pages
                 SET reference_text=?, page_type=?, layout_type=?, state=?, note=?,
-                    updated_at=datetime('now', '+9 hours'), verified_at=NULL
+                    updated_at=datetime('now', '+9 hours'), verified_at=NULL,
+                    cer_reference_sha256=NULL, cer_hypothesis_sha256=NULL,
+                    cer_edit_distance=NULL, cer_reference_chars=NULL
                 WHERE id=?
                 """,
                 (reference_text, page_type, layout_type, state, note, entry_id),
@@ -159,7 +225,9 @@ def list_ground_truth() -> dict:
             """
             SELECT g.id, g.run_id, g.page_no, g.image_sha256, g.page_type,
                    g.layout_type, g.reference_text, g.state, g.note, g.created_at,
-                   g.updated_at, g.verified_at, r.book_name, p.full_text
+                   g.updated_at, g.verified_at, r.book_name, p.full_text,
+                   g.cer_reference_sha256, g.cer_hypothesis_sha256,
+                   g.cer_edit_distance, g.cer_reference_chars
             FROM ocr_ground_truth_pages g
             JOIN ocr_runs r ON r.id=g.run_id
             JOIN ocr_page_results p ON p.run_id=g.run_id AND p.page_no=g.page_no
@@ -168,6 +236,7 @@ def list_ground_truth() -> dict:
         ).fetchall()
 
     entries = []
+    stale_metrics: list[tuple[str, str, int, int, int]] = []
     total_distance = 0
     total_reference_chars = 0
     verified_count = 0
@@ -205,7 +274,14 @@ def list_ground_truth() -> dict:
         cer = None
         if row[7] == "verified":
             verified_count += 1
-            distance, reference_chars, cer = character_error_rate(reference_text, ocr_text)
+            reference_sha, hypothesis_sha = _metric_fingerprints(reference_text, ocr_text)
+            if row[14] == reference_sha and row[15] == hypothesis_sha and row[16] is not None and row[17] is not None:
+                distance = int(row[16])
+                reference_chars = int(row[17])
+                cer = distance / reference_chars if reference_chars else None
+            else:
+                distance, reference_chars, cer = character_error_rate(reference_text, ocr_text)
+                stale_metrics.append((reference_sha, hypothesis_sha, distance, reference_chars, int(row[0])))
             total_distance += distance
             total_reference_chars += reference_chars
             page_type_metrics["verified_count"] += 1
@@ -236,6 +312,19 @@ def list_ground_truth() -> dict:
                 "image_url": f"/api/ocr/ground-truth/{int(row[0])}/image",
             }
         )
+    if stale_metrics:
+        with with_db() as conn:
+            with conn:
+                conn.executemany(
+                    """
+                    UPDATE ocr_ground_truth_pages
+                    SET cer_reference_sha256=?, cer_hypothesis_sha256=?,
+                        cer_edit_distance=?, cer_reference_chars=?
+                    WHERE id=? AND state='verified'
+                    """,
+                    stale_metrics,
+                )
+
     aggregate_cer = total_distance / total_reference_chars if total_reference_chars else None
     page_type_metrics_list = []
     for page_type in _METRIC_PAGE_TYPE_ORDER:

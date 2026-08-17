@@ -13,6 +13,8 @@ from typing import Any
 import ocr_benchmark_columns as column_engines
 import ocr_benchmark_engines as engines
 from ocr_benchmark_gate import evaluate_quality_gate
+from ocr_holdout_ledger import retire_formal_holdout_to_tuning
+from ocr_holdout_manifest import authorize_formal_holdout_open, build_formal_gate_policy
 from ocr_benchmark_report import (
     _print_summary,
     filter_entries,
@@ -81,6 +83,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--run-id", type=int, action="append")
     parser.add_argument("--policy", type=Path, default=DEFAULT_POLICY_PATH)
     parser.add_argument("--fail-on-gate", action="store_true")
+    parser.add_argument("--formal-holdout-manifest", type=Path)
+    parser.add_argument("--holdout-package-root", type=Path)
+    parser.add_argument("--holdout-ledger", type=Path)
+    parser.add_argument("--holdout-operator")
+    parser.add_argument("--holdout-reason")
     return parser
 
 
@@ -261,6 +268,47 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not entries:
         raise RuntimeError("verified ground-truth corpus is empty")
 
+    policy = json.loads(args.policy.read_text(encoding="utf-8"))
+    gate_policy = policy
+    formal_holdout = None
+    if args.formal_holdout_manifest is not None:
+        _require(
+            parser,
+            not args.entry_id and not args.run_id,
+            "formal holdout cannot be combined with entry/run filters",
+        )
+        _require(
+            parser,
+            args.holdout_ledger is not None,
+            "formal holdout requires --holdout-ledger",
+        )
+        _require(
+            parser,
+            bool(args.holdout_operator),
+            "formal holdout requires --holdout-operator",
+        )
+        _require(
+            parser,
+            bool(args.holdout_reason),
+            "formal holdout requires --holdout-reason",
+        )
+        manifest = json.loads(args.formal_holdout_manifest.read_text(encoding="utf-8"))
+        manifest_ids = [int(item["entry_id"]) for item in manifest.get("entries", [])]
+        entries = filter_entries(entries, entry_ids=set(manifest_ids), run_ids=None)
+        if len(entries) != len(manifest_ids):
+            raise ValueError("formal holdout manifest contains duplicate entry IDs")
+        formal_holdout = authorize_formal_holdout_open(
+            manifest,
+            {**corpus, "entries": entries},
+            policy,
+            package_root=args.holdout_package_root
+            or args.formal_holdout_manifest.parent,
+            ledger_path=args.holdout_ledger,
+            operator=args.holdout_operator,
+            reason=args.holdout_reason,
+        )
+        gate_policy = build_formal_gate_policy(manifest, policy)
+
     repo_root = Path(__file__).resolve().parents[2]
     started_at = time.perf_counter()
     with tempfile.TemporaryDirectory(prefix="pic2pdf-ocr-benchmark-") as temp_dir:
@@ -277,15 +325,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     report["engine_kind"] = args.engine
     report["elapsed_seconds"] = time.perf_counter() - started_at
     report["corpus_entry_ids"] = [int(entry["id"]) for entry in entries]
-    policy = json.loads(args.policy.read_text(encoding="utf-8"))
     report["quality_gate"] = evaluate_quality_gate(
-        {**corpus, "entries": entries}, report, policy
+        {**corpus, "entries": entries}, report, gate_policy
     )
+    if formal_holdout is not None:
+        report["formal_holdout"] = formal_holdout
     _print_summary(report)
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(
             json.dumps(report, ensure_ascii=False, indent=2),
             encoding="utf-8",
+        )
+    if formal_holdout is not None and not report["quality_gate"]["passed"]:
+        retire_formal_holdout_to_tuning(
+            args.holdout_ledger,
+            manifest,
+            operator=args.holdout_operator,
+            reason="one-time formal benchmark quality gate failed",
         )
     return 1 if args.fail_on_gate and not report["quality_gate"]["passed"] else 0

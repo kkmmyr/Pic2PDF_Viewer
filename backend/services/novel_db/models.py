@@ -243,3 +243,7 @@ class OcrGroundTruthPage(SQLModel, table=True):
     created_at: str | None = None
     updated_at: str | None = None
     verified_at: str | None = None
+    cer_reference_sha256: str | None = None
+    cer_hypothesis_sha256: str | None = None
+    cer_edit_distance: int | None = None
+    cer_reference_chars: int | None = None

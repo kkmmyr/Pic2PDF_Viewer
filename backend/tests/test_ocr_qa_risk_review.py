@@ -255,6 +255,10 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
             ]
         if page.page_no == 10:
             result["quality_flags"] = ["external_ocr_more_complete"]
+        if page.page_no == 11:
+            result["quality_flags"] = ["external_low_confidence_more_complete_candidate"]
+        if page.page_no == 12:
+            result["quality_flags"] = ["external_recovered_primary_repetition"]
         save_page_result(run_id, result)
 
     stage_run_for_qa(run_id, input_pages)
@@ -264,7 +268,7 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
             "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
             (run_id,),
         ).fetchall()
-    assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 12]
+    assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12]
 
 
 def test_stage_requires_content_risks(tmp_data_dir) -> None:

@@ -191,6 +191,7 @@ def test_openai_payload_places_image_before_prompt(monkeypatch) -> None:
     content = captured["messages"][0]["content"]
     assert [part["type"] for part in content] == ["image_url", "text"]
     assert captured["top_p"] == 0.1
+    assert captured["seed"] == 0
 
 
 def test_transport_joins_openai_list_content() -> None:

@@ -8,6 +8,7 @@ import sqlite3
 from dataclasses import dataclass
 
 from .connection import with_db
+from .ocr_candidate_selection import is_external_materially_more_complete
 from .ocr_content_guards import has_suspicious_repetition
 from .ocr_publication import list_current_published_runs, resolve_selected_text
 
@@ -15,9 +16,6 @@ _HONORIFIC_NAME_RE = re.compile(r"([\u3400-\u9fff々〆ヵヶ]{2,8})(?:さん|�
 _KATAKANA_TERM_RE = re.compile(r"[ァ-ヴー]{4,}")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LONG_NON_NARRATIVE_TEXT = 300
-_MIN_PRIMARY_LENGTH_FOR_CANDIDATE_COMPLETENESS = 256
-_MIN_EXTERNAL_LENGTH_ADVANTAGE = 30
-_MIN_EXTERNAL_LENGTH_RATIO = 1.02
 _UI_OVERLAY_STRONG_MARKERS = ("chatgpt",)
 _UI_OVERLAY_MARKER_COMBINATIONS = (
     ("Kindleカタログ", "UI改善"),
@@ -90,16 +88,9 @@ def detect_qa_risk_flags(
         if _has_single_character_variant(primary_terms, external_terms):
             flags.add("named_entity_candidate_disagreement")
 
-        primary_compact = _WHITESPACE_RE.sub("", primary_text)
         external_compact = _WHITESPACE_RE.sub("", external_text)
         selected_compact = _WHITESPACE_RE.sub("", full_text)
-        external_advantage = len(external_compact) - len(primary_compact)
-        if (
-            selected_compact != external_compact
-            and len(primary_compact) >= _MIN_PRIMARY_LENGTH_FOR_CANDIDATE_COMPLETENESS
-            and external_advantage >= _MIN_EXTERNAL_LENGTH_ADVANTAGE
-            and len(external_compact) >= len(primary_compact) * _MIN_EXTERNAL_LENGTH_RATIO
-        ):
+        if selected_compact != external_compact and is_external_materially_more_complete(primary_text, external_text):
             flags.add("unselected_external_candidate_more_complete")
 
     if has_suspicious_repetition(primary_text):

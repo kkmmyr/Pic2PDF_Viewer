@@ -107,3 +107,107 @@ def test_mixed_illustration_does_not_select_shorter_external_candidate() -> None
     )
     assert engine == "primary"
     assert selected.full_text == primary.full_text
+
+
+def test_normal_prose_selects_more_complete_low_confidence_external_for_qa() -> None:
+    primary = SuryaPageResult(
+        full_text="主" * 300,
+        raw_output="",
+        blocks=[],
+        state="passed",
+        quality_flags=[],
+        ink_coverage=1.0,
+        attempt_count=1,
+    )
+    external = SuryaPageResult(
+        full_text="主" * 300 + "外" * 40,
+        raw_output="",
+        blocks=[],
+        state="failed",
+        quality_flags=["yomitoku_adjudication", "external_ocr_low_confidence"],
+        ink_coverage=0.8,
+        attempt_count=2,
+        error_message="external_ocr_low_confidence",
+    )
+
+    selected, engine = select_layout_ocr_result(
+        primary,
+        external,
+        layout_type="normal_prose",
+        min_similarity=0.85,
+    )
+
+    assert engine == "external"
+    assert selected.full_text == external.full_text
+    assert selected.state == "passed"
+    assert selected.error_message is None
+    assert "external_low_confidence_more_complete_candidate" in selected.quality_flags
+
+
+def test_normal_prose_rejects_repeated_more_complete_external() -> None:
+    primary = SuryaPageResult(
+        full_text="主" * 300,
+        raw_output="",
+        blocks=[],
+        state="passed",
+        quality_flags=[],
+        ink_coverage=1.0,
+        attempt_count=1,
+    )
+    repeated_line = "外部OCRが誤って同じ長い文章を反復しています。" * 3
+    external = SuryaPageResult(
+        full_text="\n".join([repeated_line] * 3),
+        raw_output="",
+        blocks=[],
+        state="failed",
+        quality_flags=["external_ocr_low_confidence"],
+        ink_coverage=0.8,
+        attempt_count=2,
+        error_message="external_ocr_low_confidence",
+    )
+
+    selected, engine = select_layout_ocr_result(
+        primary,
+        external,
+        layout_type="normal_prose",
+        min_similarity=0.85,
+    )
+
+    assert engine == "primary"
+    assert selected.full_text == primary.full_text
+
+
+def test_normal_prose_recovers_repeated_primary_with_external_for_qa() -> None:
+    repeated_line = "主系OCRが同じ長い文章を異常に反復しています。" * 3
+    primary = SuryaPageResult(
+        full_text="\n".join([repeated_line] * 3),
+        raw_output="",
+        blocks=[],
+        state="passed",
+        quality_flags=["duplicate_text_recovery"],
+        ink_coverage=1.0,
+        attempt_count=3,
+    )
+    external = SuryaPageResult(
+        full_text="外" * 256,
+        raw_output="",
+        blocks=[],
+        state="failed",
+        quality_flags=["external_ocr_low_confidence"],
+        ink_coverage=0.8,
+        attempt_count=4,
+        error_message="external_ocr_low_confidence",
+    )
+
+    selected, engine = select_layout_ocr_result(
+        primary,
+        external,
+        layout_type="normal_prose",
+        min_similarity=0.85,
+    )
+
+    assert engine == "external"
+    assert selected.full_text == external.full_text
+    assert selected.state == "passed"
+    assert selected.error_message is None
+    assert "external_recovered_primary_repetition" in selected.quality_flags

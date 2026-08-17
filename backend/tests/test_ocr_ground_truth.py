@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
 from services.novel_db.migrations import upgrade_head
 from services.novel_db.ocr_ground_truth import (
@@ -101,6 +102,95 @@ def test_verified_entry_calculates_cer(corpus_run) -> None:
         metric for metric in result["metrics_by_layout_type"] if metric["layout_type"] == "normal_prose"
     )
     assert layout_metrics["aggregate_cer"] == pytest.approx(1 / 7)
+
+
+def test_verified_entry_reuses_cached_metric(corpus_run, monkeypatch) -> None:
+    run_id, _ = corpus_run
+    seed_ground_truth([{"run_id": run_id, "page_no": 1}])
+    entry_id = list_ground_truth()["entries"][0]["id"]
+    update_ground_truth(
+        entry_id,
+        reference_text="吾輩は犬である",
+        page_type="narrative",
+        layout_type="normal_prose",
+        state="verified",
+        note=None,
+    )
+    expected = list_ground_truth()
+
+    def fail_recalculation(*_args):
+        raise AssertionError("unchanged metric must be served from the page cache")
+
+    monkeypatch.setattr(
+        "services.novel_db.ocr_ground_truth.character_error_rate",
+        fail_recalculation,
+    )
+    assert list_ground_truth() == expected
+
+
+def test_changed_ocr_text_invalidates_only_affected_metric(corpus_run) -> None:
+    run_id, _ = corpus_run
+    seed_ground_truth([{"run_id": run_id, "page_no": 1}])
+    entry_id = list_ground_truth()["entries"][0]["id"]
+    update_ground_truth(
+        entry_id,
+        reference_text="吾輩は犬である",
+        page_type="narrative",
+        layout_type="normal_prose",
+        state="verified",
+        note=None,
+    )
+    before = list_ground_truth()
+    assert before["total_edit_distance"] == 1
+
+    with with_db() as conn:
+        conn.execute(
+            "UPDATE ocr_page_results SET full_text=? WHERE run_id=? AND page_no=1",
+            ("吾輩は鳥である", run_id),
+        )
+        conn.commit()
+
+    after = list_ground_truth()
+    assert after["total_edit_distance"] == 1
+    with with_db() as conn:
+        cached = conn.execute(
+            "SELECT cer_edit_distance, cer_reference_chars, "
+            "cer_reference_sha256, cer_hypothesis_sha256 "
+            "FROM ocr_ground_truth_pages WHERE id=?",
+            (entry_id,),
+        ).fetchone()
+    assert tuple(cached[:2]) == (1, 7)
+    assert all(len(str(value)) == 64 for value in cached[2:])
+
+
+def test_draft_transition_clears_cached_metric(corpus_run) -> None:
+    run_id, _ = corpus_run
+    seed_ground_truth([{"run_id": run_id, "page_no": 1}])
+    entry_id = list_ground_truth()["entries"][0]["id"]
+    update_ground_truth(
+        entry_id,
+        reference_text="吾輩は犬である",
+        page_type="narrative",
+        layout_type="normal_prose",
+        state="verified",
+        note=None,
+    )
+    update_ground_truth(
+        entry_id,
+        reference_text="吾輩は犬である",
+        page_type="narrative",
+        layout_type="normal_prose",
+        state="draft",
+        note=None,
+    )
+    with with_db() as conn:
+        cached = conn.execute(
+            "SELECT cer_edit_distance, cer_reference_chars, "
+            "cer_reference_sha256, cer_hypothesis_sha256 "
+            "FROM ocr_ground_truth_pages WHERE id=?",
+            (entry_id,),
+        ).fetchone()
+    assert tuple(cached) == (None, None, None, None)
 
 
 def test_verification_rejects_unknown_type_and_changed_image(corpus_run) -> None:
