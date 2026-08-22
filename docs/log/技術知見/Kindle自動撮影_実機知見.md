@@ -568,7 +568,8 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
 - `SessionSafetyGuard`は連続`download_failed`を記録し上限3冊を持つが、現行
   `execute_series()`は`record_failure()`直後に全エラーで停止する。このため実運用は
   1冊目の`download_failed`で後続jobを作らない、設計値より厳しいfail closedである。
-  隔離・間隔付き継続を導入するまでは、上限3冊を「2冊目まで自動継続済み」と解釈しない。
+  2026-08-22の運用判断でこの初回停止を当面の正式方針とした。隔離・間隔付き継続は将来候補であり、
+  導入するまでは上限3冊を「2冊目まで自動継続済み」と解釈しない。
 - 全source・全ASINで未完了job最大1件の制約はbackend transactionが最終防衛線として強制する。
   2026-08-22以降の書籍詳細UIはASINで絞らずactive jobを事前判定し、他ASINが実行中でも
   開始と確認ダイアログの確定を無効化する。同一ASIN・他ASINそれぞれの理由を表示し、
