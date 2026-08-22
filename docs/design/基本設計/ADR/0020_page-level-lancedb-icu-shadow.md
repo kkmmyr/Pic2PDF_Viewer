@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-22
-- **適用状態**: production stage 1 `shadow`適用済み（LanceDB 0.34.0 / 8,576ページ）。別3冊の未調整holdoutは採用ゲート合格。利用者への返却はFTS5を維持し、`lance_icu`昇格は未承認
+- **適用状態**: production stage 1 `shadow`適用済み（LanceDB 0.34.0 / 8,576ページ）。別3冊の未調整holdoutとroot所有backup unitの共通lock反映は完了。利用者への返却はFTS5を維持し、実利用shadow観測と`lance_icu`昇格承認は未完了
 - **決定者**: プロジェクトオーナー / Codex
 - **関連**: [小説RAG 検索・QA設計 §10](../../詳細設計/機能別/小説RAG_検索QA設計.md#10-日本語検索基盤の比較検証ゲート)、[小説RAG データ設計](../../詳細設計/機能別/小説RAG_データ.md)、バックログ B-37
 
@@ -91,7 +91,7 @@ dependency lock、writer停止確認、backup / restore検査、manifest検証�
 
 ## 将来の再評価条件
 
-- 未調整holdout品質ゲートは合格済み。root所有backup unitの共通lock反映と実運用shadowの
+- 未調整holdout品質ゲートとroot所有backup unitの共通lock反映は合格済み。実運用shadowの
   非0件観測を満たしたとき、既定値を`lance_icu`へ切り替えるか別承認で判断する。
 - LanceDB 0.35以降、tokenizer / score / prefilter semanticsが変わったとき。
 - 完全再構築時間または世代容量が運用上無視できなくなったとき、増分更新と安全な世代GCを検討する。

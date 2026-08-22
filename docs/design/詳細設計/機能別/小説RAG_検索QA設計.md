@@ -480,7 +480,8 @@ ICUは11問をFTS5の0-hitからtop 10へ救済した。残る
 `koukyuu_emperor_asks_winter_official`も正解pageは12位で、query・正解・grade・設定を開封後に
 調整しない。全queryが長い自然文のknown-item questionであるため、この結果は同形式の検索改善を強く
 支持する一方、短いkeyword query全般の優位を単独で証明するものではない。定義済み採用ゲートは合格したが、
-production昇格はroot所有backup unitの共通lock反映と実運用shadow観測、その後の別承認まで行わない。
+root所有backup unitの共通lock反映は2026-08-22に完了した。production昇格は実運用shadow観測と、
+その後の別承認まで行わない。
 
 評価後、本文snapshotと隔離LanceDB indexを含むremote scratch 396MBは削除した。開封済みholdoutは
 この結果の証跡に限って参照し、今後のtokenizer・query・閾値調整用fixtureとして再利用しない。
