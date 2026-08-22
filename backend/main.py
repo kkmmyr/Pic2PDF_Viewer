@@ -157,21 +157,25 @@ if os.path.isdir(_DOCS_HTML_DIR):
 # ---------------------------------------------------------------------------
 # フロントエンド SPA 配信（リリースモード）
 # ---------------------------------------------------------------------------
-# frontend/dist/ が存在する場合のみ有効化。dev モードでは無視される。
-# SPA catch-all は最後に登録し、/api・/pdfs 等の既存マウントが優先されるようにする。
+# SPA handlerはOpenAPI schemaをbuild成果物から独立させるため常時登録する。
+# 実ファイルがないdev / clean checkoutでは実行時に404を返す。
+# SPA catch-allは最後に登録し、/api・/pdfs等の既存マウントを優先する。
 
-if os.path.isdir(FRONTEND_DIST_DIR):
-    _ASSETS_DIR = os.path.join(FRONTEND_DIST_DIR, "assets")
-    if os.path.isdir(_ASSETS_DIR):
-        app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="frontend_assets")
+_ASSETS_DIR = os.path.join(FRONTEND_DIST_DIR, "assets")
+if os.path.isdir(_ASSETS_DIR):
+    app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="frontend_assets")
 
-    _INDEX_HTML = os.path.join(FRONTEND_DIST_DIR, "index.html")
+_INDEX_HTML = os.path.join(FRONTEND_DIST_DIR, "index.html")
 
-    @app.get("/")
+
+def _register_spa_routes(target_app: FastAPI) -> None:
+    @target_app.get("/")
     async def _serve_index():
+        if not os.path.isfile(_INDEX_HTML):
+            raise HTTPException(status_code=404)
         return FileResponse(_INDEX_HTML)
 
-    @app.get("/{full_path:path}")
+    @target_app.get("/{full_path:path}")
     async def _serve_spa(full_path: str):
         # API ルートは catch-all から除外（404 のまま）
         if full_path.startswith("api/"):
@@ -181,4 +185,9 @@ if os.path.isdir(FRONTEND_DIST_DIR):
         if os.path.isfile(candidate):
             return FileResponse(candidate)
         # それ以外は SPA ルーティング用に index.html を返す
+        if not os.path.isfile(_INDEX_HTML):
+            raise HTTPException(status_code=404)
         return FileResponse(_INDEX_HTML)
+
+
+_register_spa_routes(app)
