@@ -629,8 +629,9 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
   既知のOneDrive通知混入／正常再撮影pairは検出器の校正に使ったため、このholdoutから除外した。
 - Codexによる全画面の縮小画像QAでは、欠落、重複、白紙化、上下端切れ、Kindle / OS UI混入を
   0件とlabelした。章扉、表紙、挿絵、奥付、意図的な余白は正常とした。label digestは
-  `1f46d57bee94c395aab209a1603250a3b7935e1aee237817542fe737d8ebb4be`だが、
-  `human_confirmation=pending`であり、人手確定labelとは扱わない。
+  `1f46d57bee94c395aab209a1603250a3b7935e1aee237817542fe737d8ebb4be`である。
+  2026-08-22にプロジェクトオーナーがcontact sheet全35枚を独立確認し、欠陥なしと判断したため、
+  `human_confirmation=confirmed`へ更新して人手確定labelとした。
 - `kindle-image-warning-v1`の実測は近似重複5、白紙・疎6、低容量13、小説端密度2の計26件で、
   すべて正常画面への候補だった。完全重複と反復overlayは0件、構造監査errorも0件だった。
   欠陥label基準の暫定precisionは発火した4 codeすべて0、陽性0件のためrecallは`null`である。
@@ -643,7 +644,8 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
   登録成功後の「要確認候補」として書籍・code単位に集約し、ページを開ける補助導線に限定する。
   private artifact一式は
   `/opt/pic2pdf-viewer/data/.capture-quality-holdout/b32-20260822-v2/`へ保存し、
-  digestと全contact sheetを再照合済みである。
+  digestと全contact sheetを再照合済みである。実画像側は陽性0件のため、実機欠陥を含む
+  追加holdoutによる検出再現率の確認は引き続き残す。
 - warningの運用正本は成功jobごとの監査世代とし、同一codeを1候補へ集約する。再撮影または
   新policyでの再監査は旧世代を削除せずsupersedeし、新世代を未確認で開始する。warning 0件の
   新世代も保存することで、旧画像の候補を現在のreaderへ誤って残さない。
