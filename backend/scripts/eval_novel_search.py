@@ -266,7 +266,7 @@ def _sqlite_search(conn: sqlite3.Connection, case: EvalCase, limit: int) -> list
     if case.scope_book is not None:
         sql += " AND b.name = ?"
         params.append(case.scope_book)
-    sql += " ORDER BY score LIMIT ?"
+    sql += " ORDER BY score ASC, p.id ASC LIMIT ?"
     params.append(limit)
     try:
         rows = conn.execute(sql, params).fetchall()

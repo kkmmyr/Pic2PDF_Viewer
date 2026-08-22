@@ -12,6 +12,7 @@ from services.novel_db.search import (
     Scope,
     _resolve_book_names,
     build_fts5_or_query,
+    fts_search,
     hybrid_search,
     lexical_search,
     load_all_pages_of_book,
@@ -214,6 +215,34 @@ def _insert_chunk(conn, page_id: int, idx: int, text: str, vec: list[float]) -> 
         ]
     )
     return chunk_id
+
+
+def test_fts_search_uses_page_id_as_deterministic_score_tiebreaker(tmp_data_dir):
+    upgrade_head()
+    text = "同点検索のための同一本文"
+    with with_db() as conn:
+        _insert_book_with_pages(conn, "book-z", [text])
+        _insert_book_with_pages(conn, "book-a", [text])
+        expected = [
+            (str(book_name), int(page_no))
+            for book_name, page_no in conn.execute(
+                """
+                SELECT b.name, p.page_no
+                FROM pages p
+                JOIN books b ON b.id = p.book_id
+                ORDER BY p.id ASC
+                """
+            ).fetchall()
+        ]
+        first = fts_search(conn, "同点検索", Scope(type="all"), top=2)
+        conn.commit()
+
+    with with_db() as conn:
+        second = fts_search(conn, "同点検索", Scope(type="all"), top=2)
+
+    assert first[0][3] == first[1][3]
+    assert [(str(row[0]), int(row[1])) for row in first] == expected
+    assert second == first
 
 
 @pytest.fixture

@@ -343,8 +343,9 @@ ICUの両方に劣る。Harrier公式BF16は特定の複数入力batchで非有�
   これはholdout品質評価ではなく運用smokeであり、段階2の採否には使わない。
 - selectorをinstrumentした5/5 probeで、`shadow`が同じ呼出し内のFTS5 list objectをそのまま返すことを
   確認した。ICUを意図的に例外化した障害注入でも19件のFTS5結果を返し、service error logは0件だった。
-- 切替前後の別connection間ではFTS5 result digestが変化した。原因は`ORDER BY score`同点時に二次sortが
-  ない既存挙動であり、shadowによる順位変更ではない。厳密なcross-run top-k比較では既知課題として扱う。
+- FTS5の順位契約はBM25 score昇順を第一キー、canonical `pages.id`昇順を第二キーとする。
+  score同点時だけ一意なpage IDで順序を固定し、production検索と評価CLIで同じSQLを使う。これにより
+  別connection / restartを跨ぐtop-k比較を決定的にし、shadow overlapから順序noiseを除く。
 
 2026-08-22の実装後統合試験では、固定SQLiteのread-only原本から別scratchへ複製し、既存Alembic
 0013から0014へupgradeして8,576ページを構築した。固定20問のtop 30順位は旧隔離ICU評価と20/20で

@@ -148,7 +148,7 @@ def fts_search(
         placeholders = ",".join(["?"] * len(book_names))
         sql += f" AND b.name IN ({placeholders})"
         params.extend(book_names)
-    sql += " ORDER BY score LIMIT ?"
+    sql += " ORDER BY score ASC, p.id ASC LIMIT ?"
     params.append(top)
 
     try:
