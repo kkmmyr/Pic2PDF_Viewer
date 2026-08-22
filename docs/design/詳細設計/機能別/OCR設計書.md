@@ -359,6 +359,20 @@ Levenshteinで既存の編集距離と完全一致させ、以後はページ単
 - Codex画像QA済み本文を同じground truthと比較した0%は正解化実績で、未知ページ性能ではない。
 - QA・公開不変条件の検査はB-35のCERゲートで代替できず、逆も同様である。
 
+### 公開・rollbackの障害不変条件
+
+`approve_and_publish_run`と`activate_published_run`は、書籍metadata、canonical `pages`、
+`pages_fts`、`ocr_publications`のactive切替、run状態を同一SQLite transactionで更新する。
+既存canonical本文のsnapshot後、page置換後、FTS再構築後、active publicationのretire後を含む
+任意のDB例外ではtransaction全体をrollbackし、実行前の本文・FTS・`ocr_done_at`・active履歴を
+保持する。失敗した承認をapproved/completedとして記録せず、成功済みrunの再承認は
+公開transaction先頭の`state='awaiting_qa'`条件付きno-op updateでwrite lockを取得してから処理し、
+逐次・同時のどちらの再承認も拒否して二重publicationを作らない。
+
+OCR agentのheartbeat timeout、部分ページ、worker出力不正はstaging/runを失敗または未完了の
+状態へ留め、canonical本文へ到達しない。これらのDB不変条件は自動testで固定するが、backup失敗、
+実ディスク不足、実process hangは隔離環境の運用試験を別途必要とする。
+
 ## 6. Codex補助QAの委任境界
 
 Lunaは公開状態を変えない読み取り専用補助に限定する。モデル名や速度ではなく、出力が

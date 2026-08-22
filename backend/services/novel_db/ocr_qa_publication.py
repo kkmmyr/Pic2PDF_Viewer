@@ -21,6 +21,28 @@ def _validate_approval_counts(counts: sqlite3.Row) -> None:
         raise ValueError("unclassified OCR layouts remain")
 
 
+def _claim_run_for_publication(conn: sqlite3.Connection, run_id: int) -> None:
+    """Acquire the write transaction only while the run is still publishable."""
+    claimed = conn.execute(
+        "UPDATE ocr_runs SET state=state WHERE id=? AND state='awaiting_qa'",
+        (run_id,),
+    )
+    if claimed.rowcount != 1:
+        raise ValueError("OCR run is not awaiting QA")
+    counts = conn.execute(
+        "SELECT "
+        "SUM(CASE WHEN qa_state='required' THEN 1 ELSE 0 END), "
+        "SUM(CASE WHEN qa_state='rejected' THEN 1 ELSE 0 END), "
+        "SUM(CASE WHEN page_type='unknown' THEN 1 ELSE 0 END), "
+        "SUM(CASE WHEN layout_type='unknown' THEN 1 ELSE 0 END) "
+        "FROM ocr_page_results WHERE run_id=?",
+        (run_id,),
+    ).fetchone()
+    if counts is None:
+        raise RuntimeError(f"failed to count OCR pages: run={run_id}")
+    _validate_approval_counts(counts)
+
+
 def _load_approval_book_name(run_id: int) -> str:
     with with_db() as conn:
         run = conn.execute(
@@ -86,6 +108,7 @@ def _publish_rows(
     with with_db() as conn:
         images_dir = input_pages[0].image_path.parent
         with conn:
+            _claim_run_for_publication(conn, run_id)
             existing = conn.execute("SELECT id FROM books WHERE name = ?", (book_name,)).fetchone()
             if existing is None:
                 cursor = conn.execute(

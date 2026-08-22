@@ -1,7 +1,7 @@
 # 小説OCR品質改善 実装計画
 
 > 状態: 継続中 — B-35正式holdoutの機械強制は完了、機械単独品質が未達
-> 更新日: 2026-08-17
+> 更新日: 2026-08-22
 > 対象: Kindle小説画像のOCR、品質判定、Windows OCR agent、QA公開
 
 過去の完了工程と実測値は
@@ -133,6 +133,13 @@ PP-OCRv6 mediumも最大CER画面で全文33.6462%、NDLOCR行bbox再利用11.69
 拡大評価しない。次の未調整holdoutを消費する前に、固有名詞補正を維持しつつ、小書き文字・
 約物を保持してページ最大値を下げる独立候補がなお必要である。
 
+2026-08-22の公開情報再調査では、次の独立候補を`PaddleOCR-VL-1.6`、次点を`dots.mocr`とした。
+前者はPP-OCRv6認識器とは別系統の0.9B文書VLMで、後者は3Bの多言語文書VLMである。ただし両者の
+公開総合benchmarkはKindle縦書き日本語の小書き文字・約物精度を直接保証しない。新holdoutはまだ
+封印せず、まず公開の縦書き日本語JSSODa-test / VJRODaで方向・列順をscreeningし、通過版だけを
+開封済み30画面へ固定prompt・revision・seedで適用する。ページ最大CER 2.0%未満、列欠落疑い0、
+固有名詞・約物の非劣化を同時に満たした場合だけ、品質非参照の新holdoutを封印する。
+
 ## 7. Phase H4 — Codex確認縮小の段階評価
 
 H3の機械総合合格後にだけ着手する。
@@ -154,6 +161,15 @@ OCR品質が合格しても公開処理の安全性は別に検証する。
 各障害で、旧公開本文・FTS・`ocr_done_at`が保持され、runが説明可能な失敗状態になり、
 再試行が重複公開を起こさないことを確認する。共通の副作用契約は
 [R0〜R7 リファクタリング契約表](../../archive/リファクタリング契約表_R0-R7.md) を参照する。
+
+2026-08-22の監査では、未完走runの公開拒否、malformed Surya出力の品質不合格、workerの
+ページ単位失敗継続、新規書籍の公開transaction rollback、既存版への手動rollback、FTS再構築を
+既存testで確認した。一方、既存canonical本文を置換するtransactionの途中失敗、rollback操作自身の
+途中失敗、OCR agentのheartbeat timeoutについて、旧本文・FTS・active publicationを同時に保持する
+明示的な回帰testが不足していた。この3境界を追加し、公開transaction先頭で同一runを
+`state='awaiting_qa'`条件付きno-op updateにより原子的にclaimして、同時再承認が二重publicationを
+作らないことも固定する。backup失敗・実ディスク不足と実process hangは、mock DB例外だけで完了扱いにせず、
+隔離DBとserver運用試験を別途保存してH5を完了する。
 
 ## 9. 完了条件
 

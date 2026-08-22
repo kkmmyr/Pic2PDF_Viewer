@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 from PIL import Image
 
 from services.novel_db import ocr_qa as qa_facade
+from services.novel_db import ocr_qa_publication
 from services.novel_db import ocr_staging as staging_facade
 from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
@@ -68,6 +71,52 @@ def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
         "external_text": None,
         "selected_engine": "primary",
     }
+
+
+def _prepare_approved_run(staged_book, *, text_prefix: str = "新本文") -> tuple[int, str]:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        save_page_result(
+            run_id,
+            _passed_page(page.page_no, page.image_sha256, f"{text_prefix}{page.page_no}"),
+        )
+    stage_run_for_qa(run_id, input_pages)
+    for page in input_pages:
+        review_qa_page(
+            run_id,
+            page.page_no,
+            "approved",
+            None,
+            "narrative",
+            "normal_prose",
+            "primary",
+            None,
+        )
+    return run_id, book_name
+
+
+def _seed_existing_canonical(book_name: str) -> int:
+    with with_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO books "
+            "(name, pdf_path, images_dir, page_count, indexed_at, ocr_done_at) "
+            "VALUES (?, '', 'old-images', 2, 'old-index', 'old-ocr')",
+            (book_name,),
+        )
+        book_id = int(cursor.lastrowid)
+        conn.executemany(
+            "INSERT INTO pages "
+            "(book_id, page_no, image_path, full_text, char_count, page_type, index_eligible) "
+            "VALUES (?, ?, '', ?, ?, 'narrative', 1)",
+            [
+                (book_id, 1, "旧本文一", 4),
+                (book_id, 2, "旧本文二", 4),
+            ],
+        )
+        conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
+        conn.commit()
+    return book_id
 
 
 def test_run_resumes_then_requires_qa_before_publication(staged_book) -> None:
@@ -237,6 +286,138 @@ def test_publication_rolls_back_book_pages_fts_and_run_state(staged_book) -> Non
         assert conn.execute("SELECT COUNT(*) FROM pages_fts").fetchone()[0] == 0
         run = conn.execute("SELECT state, qa_state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
     assert tuple(run) == ("awaiting_qa", "pending")
+
+
+def test_existing_publication_failure_preserves_canonical_fts_and_history(staged_book) -> None:
+    run_id, book_name = _prepare_approved_run(staged_book)
+    book_id = _seed_existing_canonical(book_name)
+    with with_db() as conn:
+        conn.execute(
+            "CREATE TRIGGER fail_versioned_publication BEFORE INSERT ON ocr_publications "
+            "WHEN NEW.action='publish' BEGIN SELECT RAISE(ABORT, 'forced versioned publication failure'); END"
+        )
+        conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError, match="forced versioned publication failure"):
+        approve_and_publish_run(run_id, "tester")
+
+    with with_db() as conn:
+        book = conn.execute(
+            "SELECT images_dir, page_count, indexed_at, ocr_done_at FROM books WHERE id=?",
+            (book_id,),
+        ).fetchone()
+        pages = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id=? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        fts_texts = conn.execute("SELECT full_text FROM pages_fts ORDER BY rowid").fetchall()
+        publications = conn.execute("SELECT COUNT(*) FROM ocr_publications").fetchone()[0]
+        legacy_runs = conn.execute("SELECT COUNT(*) FROM ocr_runs WHERE engine='legacy'").fetchone()[0]
+        run = conn.execute(
+            "SELECT state, qa_state FROM ocr_runs WHERE id=?",
+            (run_id,),
+        ).fetchone()
+    assert tuple(book) == ("old-images", 2, "old-index", "old-ocr")
+    assert [tuple(row) for row in pages] == [(1, "旧本文一"), (2, "旧本文二")]
+    assert [row[0] for row in fts_texts] == ["旧本文一", "旧本文二"]
+    assert publications == 0
+    assert legacy_runs == 0
+    assert tuple(run) == ("awaiting_qa", "pending")
+
+
+def test_rollback_failure_preserves_current_pages_fts_and_active_publication(staged_book) -> None:
+    run_id, book_name = _prepare_approved_run(staged_book)
+    book_id = _seed_existing_canonical(book_name)
+    approve_and_publish_run(run_id, "tester")
+    with with_db() as conn:
+        publications = conn.execute(
+            "SELECT id, run_id, action, retired_at FROM ocr_publications WHERE book_id=? ORDER BY id",
+            (book_id,),
+        ).fetchall()
+        legacy_run_id = int(publications[0][1])
+        active_publication_id = int(publications[1][0])
+        ocr_done_at_before = conn.execute(
+            "SELECT ocr_done_at FROM books WHERE id=?",
+            (book_id,),
+        ).fetchone()[0]
+        conn.execute(
+            "CREATE TRIGGER fail_rollback_publication BEFORE INSERT ON ocr_publications "
+            "WHEN NEW.action='rollback' BEGIN SELECT RAISE(ABORT, 'forced rollback failure'); END"
+        )
+        conn.commit()
+
+    with pytest.raises(sqlite3.IntegrityError, match="forced rollback failure"):
+        activate_published_run(legacy_run_id, "tester", "failure injection")
+
+    with with_db() as conn:
+        pages = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id=? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        fts_texts = conn.execute("SELECT full_text FROM pages_fts ORDER BY rowid").fetchall()
+        active = conn.execute(
+            "SELECT id, run_id, action FROM ocr_publications WHERE book_id=? AND retired_at IS NULL",
+            (book_id,),
+        ).fetchone()
+        publication_count = conn.execute(
+            "SELECT COUNT(*) FROM ocr_publications WHERE book_id=?",
+            (book_id,),
+        ).fetchone()[0]
+        ocr_done_at_after = conn.execute(
+            "SELECT ocr_done_at FROM books WHERE id=?",
+            (book_id,),
+        ).fetchone()[0]
+    assert [tuple(row) for row in pages] == [(1, "新本文1"), (2, "新本文2")]
+    assert [row[0] for row in fts_texts] == ["新本文1", "新本文2"]
+    assert tuple(active) == (active_publication_id, run_id, "publish")
+    assert publication_count == 2
+    assert ocr_done_at_after == ocr_done_at_before
+
+
+def test_successful_run_cannot_be_approved_twice(staged_book) -> None:
+    run_id, _ = _prepare_approved_run(staged_book)
+    approve_and_publish_run(run_id, "tester")
+
+    with pytest.raises(ValueError, match="not awaiting QA"):
+        approve_and_publish_run(run_id, "tester")
+
+    with with_db() as conn:
+        publications = conn.execute("SELECT action FROM ocr_publications ORDER BY id").fetchall()
+        active_count = conn.execute("SELECT COUNT(*) FROM ocr_publications WHERE retired_at IS NULL").fetchone()[0]
+    assert [row[0] for row in publications] == ["publish"]
+    assert active_count == 1
+
+
+def test_concurrent_run_approval_creates_one_publication(staged_book, monkeypatch) -> None:
+    run_id, _ = _prepare_approved_run(staged_book)
+    barrier = Barrier(2)
+    original_publish_rows = ocr_qa_publication._publish_rows
+
+    def publish_after_both_validated(*args, **kwargs) -> None:
+        barrier.wait(timeout=5)
+        original_publish_rows(*args, **kwargs)
+
+    monkeypatch.setattr(ocr_qa_publication, "_publish_rows", publish_after_both_validated)
+
+    def approve() -> Exception | None:
+        try:
+            ocr_qa_publication.approve_and_publish_run(run_id, "tester")
+        except Exception as error:
+            return error
+        return None
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        errors = list(executor.map(lambda _: approve(), range(2)))
+
+    failures = [error for error in errors if error is not None]
+    assert len(failures) == 1
+    assert isinstance(failures[0], ValueError)
+    assert str(failures[0]) == "OCR run is not awaiting QA"
+    with with_db() as conn:
+        publications = conn.execute("SELECT action FROM ocr_publications ORDER BY id").fetchall()
+        run = conn.execute("SELECT state, qa_state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
+    assert [row[0] for row in publications] == ["publish"]
+    assert tuple(run) == ("completed", "approved")
 
 
 def test_publication_uses_reviewed_text_deletes_stale_pages_and_rebuilds_fts(staged_book) -> None:

@@ -107,3 +107,80 @@ def test_agent_rejects_page_hash_mismatch(agent_job) -> None:
 
     with pytest.raises(ValueError, match="SHA-256"):
         ocr_agent_jobs.submit_page(job_id, "windows-ocr-1", book_name, page)
+
+
+def test_agent_heartbeat_timeout_fails_staging_without_touching_canonical(agent_job) -> None:
+    job_id, book_name, _ = agent_job
+    claimed = ocr_agent_jobs.claim("windows-ocr-1")
+    assert claimed is not None
+    run_id = int(claimed["books"][0]["run_id"])
+    with with_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO books "
+            "(name, pdf_path, images_dir, page_count, indexed_at, ocr_done_at) "
+            "VALUES (?, '', 'canonical-images', 1, 'canonical-index', 'canonical-ocr')",
+            (book_name,),
+        )
+        book_id = int(cursor.lastrowid)
+        conn.execute(
+            "INSERT INTO pages "
+            "(book_id, page_no, image_path, full_text, char_count, page_type, index_eligible) "
+            "VALUES (?, 1, '', '公開済み本文', 6, 'narrative', 1)",
+            (book_id,),
+        )
+        conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
+        publication_run = conn.execute(
+            "INSERT INTO ocr_runs "
+            "(book_name, engine, model, source_page_count, state, qa_state) "
+            "VALUES (?, 'legacy', 'canonical', 1, 'completed', 'approved')",
+            (book_name,),
+        )
+        publication_run_id = int(publication_run.lastrowid)
+        active_publication = conn.execute(
+            "INSERT INTO ocr_publications "
+            "(book_id, run_id, action, actor, published_at) "
+            "VALUES (?, ?, 'legacy_snapshot', 'fixture', 'canonical-published')",
+            (book_id, publication_run_id),
+        )
+        active_publication_id = int(active_publication.lastrowid)
+        conn.execute(
+            "UPDATE rebuild_jobs SET heartbeat_at='2000-01-01 00:00:00' WHERE id=?",
+            (job_id,),
+        )
+        conn.commit()
+
+    assert ocr_agent_jobs.claim("windows-ocr-2") is None
+
+    with with_db() as conn:
+        job = conn.execute(
+            "SELECT state, error_message FROM rebuild_jobs WHERE id=?",
+            (job_id,),
+        ).fetchone()
+        run = conn.execute(
+            "SELECT state, error_message FROM ocr_runs WHERE id=?",
+            (run_id,),
+        ).fetchone()
+        book = conn.execute(
+            "SELECT images_dir, page_count, indexed_at, ocr_done_at FROM books WHERE id=?",
+            (book_id,),
+        ).fetchone()
+        pages = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id=?",
+            (book_id,),
+        ).fetchall()
+        fts_texts = conn.execute("SELECT full_text FROM pages_fts").fetchall()
+        active = conn.execute(
+            "SELECT id, run_id, action, retired_at FROM ocr_publications WHERE book_id=? AND retired_at IS NULL",
+            (book_id,),
+        ).fetchone()
+    assert tuple(job) == ("failed", "OCR agent heartbeat timeout")
+    assert tuple(run) == ("failed", "OCR agent heartbeat timeout")
+    assert tuple(book) == ("canonical-images", 1, "canonical-index", "canonical-ocr")
+    assert [tuple(row) for row in pages] == [(1, "公開済み本文")]
+    assert [row[0] for row in fts_texts] == ["公開済み本文"]
+    assert tuple(active) == (
+        active_publication_id,
+        publication_run_id,
+        "legacy_snapshot",
+        None,
+    )

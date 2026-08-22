@@ -251,3 +251,23 @@ Google 15.2420%、初回Sol 6.7566%で、既存本文へ近かった画面はGoo
 正規本文へ自動昇格せず、必要な場合も比較・診断用の外部候補に限定する。再評価する場合は、
 別の未開封holdoutを消費する前に、開封済み画面でstable v1と`legacy_layout`を少数比較し、
 ルビ除去と列coverage検査を固定してから新しい合格条件を封印する。
+
+## 16. 2026-08-22: 次候補の公開情報screening
+
+[PaddleOCR-VL-1.6](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/algorithm/PaddleOCR-VL/PaddleOCR-VL-1.6.en.md)
+は0.9Bの文書VLMで、公式資料ではOmniDocBench v1.6の総合96.33%、text・reading orderの改善、
+screen photographyを含むReal5-OmniDocBenchでの頑健性を報告している。既に不採用とした
+PP-OCRv6 mediumとは認識器・pipelineが異なるため、次の独立候補として最初に診断する価値がある。
+一方、公開値は汎用文書benchmarkであり、Kindle縦書き日本語の小書き文字・約物を保証しない。
+
+[dots.mocr](https://github.com/studio-dots-ai/dots.ocr)は3Bの多言語文書VLMで、公式repositoryの
+汎用document parsing指標では旧dots.ocrとPaddleOCR-VL-1.5を上回るが、日本語縦書き小説に限定した
+値は示されていない。したがって次点候補とし、汎用leaderboardだけで導入・正式評価へ進めない。
+
+縦書き日本語の事前screeningには、LREC 2026論文の公式実装
+[llm-jp/eval_vertical_ja](https://github.com/llm-jp/eval_vertical_ja)が公開する、合成の
+JSSODa-testと実文書由来のVJRODaを用いる。同研究は既存MLLMが横書きより縦書きで悪化することを
+報告しているため、多言語OCR対応という表記だけを採用根拠にしない。公開screeningは方向・列順・
+出力契約のfail-fast用途に限定し、B-35正式値は同一画像SHAの人手verified ground truthだけでCERを
+計算する。screening通過後も、開封済み30画面でページ最大CER、列欠落、固有名詞、小書き文字・約物を
+確認し、固定候補が全項目へ届くまで新holdoutを消費しない。
