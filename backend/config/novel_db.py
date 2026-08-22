@@ -42,6 +42,7 @@ class _NovelDbSettings(BaseSettings):
     # ---------------------------------------------------------------------------
     NOVEL_DB_OLLAMA_BASE_URL: str = "http://localhost:11434"
     NOVEL_DB_MLX_BASE_URL: str = "http://127.0.0.1:11437"
+    NOVEL_DB_MLX_DSPARK_BASE_URL: str = "http://127.0.0.1:11439"
     # "ollama"（既定）またはApple Silicon用"mlx"。
     NOVEL_DB_EMBED_BACKEND: str = "ollama"
     NOVEL_DB_EMBED_MODEL: str = "bge-m3"
@@ -50,7 +51,7 @@ class _NovelDbSettings(BaseSettings):
     NOVEL_DB_EMBED_NUM_GPU: int = 0
     NOVEL_DB_LLM_MODEL: str = "qwen3.6-iq4xs"
     # 既定 `llama_server`（実機ベンチで tg 5× 高速化、scope=all 応答 24s→14s）。
-    # Apple Siliconでは`mlx`を選択可能。Phase Cで`ollama`分岐撤去。未知値はLLMError。
+    # Apple Siliconでは`mlx` / `mlx_dspark`を選択可能。Phase Cで`ollama`分岐撤去。未知値はLLMError。
     NOVEL_DB_LLM_BACKEND: str = "llama_server"
     NOVEL_DB_LLAMA_SERVER_URL: str = "http://127.0.0.1:11435"
     # 主要登場人物抽出用モデル（短答型タスク）。
@@ -106,6 +107,7 @@ NOVEL_DB_LANCE_PATH = _s.NOVEL_DB_LANCE_PATH
 NOVEL_DB_LEXICAL_BACKEND = _s.NOVEL_DB_LEXICAL_BACKEND
 NOVEL_DB_OLLAMA_BASE_URL = _s.NOVEL_DB_OLLAMA_BASE_URL
 NOVEL_DB_MLX_BASE_URL = _s.NOVEL_DB_MLX_BASE_URL
+NOVEL_DB_MLX_DSPARK_BASE_URL = _s.NOVEL_DB_MLX_DSPARK_BASE_URL
 NOVEL_DB_EMBED_BACKEND = _s.NOVEL_DB_EMBED_BACKEND
 NOVEL_DB_EMBED_MODEL = _s.NOVEL_DB_EMBED_MODEL
 NOVEL_DB_EMBED_DIM = 1024  # bge-m3 の出力次元（固定値）

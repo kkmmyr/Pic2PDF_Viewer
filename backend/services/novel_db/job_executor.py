@@ -6,6 +6,9 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from local_llm import LLMError
+
+import config
 from utils.logger import get_logger
 
 from .connection import with_db
@@ -28,6 +31,7 @@ def execute_job(worker: Any, job: dict, deps: JobExecutionDependencies) -> None:
     """Execute one claimed job using the worker's observable progress hooks."""
     job_id = job["id"]
     mode = job["mode"]
+    _reject_unapproved_dspark_persistence(mode)
     targets = worker._resolve_targets(job["job_type"], job["target_id"], mode)
     total = len(targets)
     worker._update_progress(job_id, 0, total)
@@ -51,6 +55,19 @@ def execute_job(worker: Any, job: dict, deps: JobExecutionDependencies) -> None:
         _execute_relations(worker, job_id, targets, total, deps)
     else:
         _execute_rebuild(worker, job_id, targets, total, deps)
+
+
+def _reject_unapproved_dspark_persistence(mode: str) -> None:
+    """Keep the comparison-only dspark backend away from published rows."""
+    if config.NOVEL_DB_LLM_BACKEND != "mlx_dspark":
+        return
+    uses_dspark = mode in {"full_build", "generate_relations"} or (
+        mode == "generate_contexts" and config.NOVEL_DB_GEMMA_BACKEND == "qwen"
+    )
+    if uses_dspark:
+        raise LLMError(
+            "mlx_dspark is limited to non-persistent QA until its novel quality gate passes",
+        )
 
 
 def _execute_full_build(

@@ -14,6 +14,7 @@ MCP サーバー）。
     LlamaServerBackend  — llama.cpp llama-server /v1/chat/completions
     MlxBackend          — mlx_vlm.server /v1/chat/completions
     MlxLmBackend        — mlx_lm.server /v1/chat/completions
+    MlxDsparkBackend    — mlx-dspark /v1/chat/completions
     backend_from_env    — 環境変数から Backend を 1 つ作る（CLI / MCP 用）
 
 利用方法（アプリ側、設定を明示渡し）:
@@ -36,6 +37,7 @@ from ._backend import Backend, BackendConfig, LLMError
 from ._factory import backend_from_env
 from ._llama_server import LlamaServerBackend
 from ._mlx import MlxBackend
+from ._mlx_dspark import MlxDsparkBackend
 from ._mlx_lm import MlxLmBackend
 from ._ollama import OllamaBackend
 
@@ -47,5 +49,6 @@ __all__ = [
     "LlamaServerBackend",
     "MlxBackend",
     "MlxLmBackend",
+    "MlxDsparkBackend",
     "backend_from_env",
 ]

@@ -95,7 +95,7 @@ Apple Siliconでは§5のMLXへ切替できる。MLX版bge-m3は
 ## 5. Apple Silicon MLX（任意）
 
 M1 Max 64GBで検証した構成。MLX runtimeとモデルはuv workspaceへ追加せず、
-repo外の専用venvに隔離する。2026-08-17の採用版は`mlx-vlm==0.6.13`である。
+repo外の専用venvに隔離する。現行のEmbedding対応版は`mlx-vlm==0.6.15`である。
 
 ```bash
 uv venv --python 3.12 /path/to/pic2pdf-mlx/.venv
@@ -163,7 +163,86 @@ embeddingとの同一文cosine 0.9999以上、旧/新交差Top-10一致を確認
 将来Gemmaを再評価して`NOVEL_DB_GEMMA_BACKEND=mlx`にする場合、Qwen/Gemmaは
 同じ生成cacheを使うため、モデルが異なるリクエストを同時実行しない。
 
-### 5.1 Nemotron Labs 3 Puzzle 75B（比較用・排他起動）
+### 5.1 Qwen3.8-27B + `mlx-dspark`（MacのMLX寄せ・比較用）
+
+Qwen3.8-27BをMLX 4bitで使う場合、生成は`mlx-dspark`へ分離する。
+`mlx-dspark`はMiaAI LabのDGX Spark用SGLang recipeではなく、Apple Silicon上で
+MLX重みを推測デコードするコミュニティruntimeである。runtimeとQwen3.8は既存の
+`mlx_vlm`用venvへ混ぜず、専用venv・専用ポートへ置く。
+
+```bash
+uv venv --python 3.12 /path/to/pic2pdf-mlx/runtimes/mlx-dspark/.venv
+uv pip install --python /path/to/pic2pdf-mlx/runtimes/mlx-dspark/.venv/bin/python \
+  mlx-dspark==0.15.1 mlx-lm==0.31.3 mlx-vlm==0.6.15 huggingface_hub
+
+/path/to/pic2pdf-mlx/runtimes/mlx-dspark/.venv/bin/hf download \
+  mlx-community/Qwen3.8-27B-4bit \
+  --local-dir /path/to/pic2pdf-mlx/models/qwen3.8-27b-4bit
+```
+
+`mlx-dspark`はEmbedding endpointを持たないため、bge-m3だけを既存venvの
+`mlx_vlm.server`で11437へ起動し、Qwen3.8の生成を11439へ起動する。Qwen3.6の重みを
+11437へ同時にロードしない。
+
+```bash
+# Embedding-only server（既存venv）
+/path/to/pic2pdf-mlx/.venv/bin/mlx_vlm.server \
+  --host 127.0.0.1 \
+  --port 11437 \
+  --embedding-model /path/to/pic2pdf-mlx/models/bge-m3-fp16 \
+  --log-level INFO
+
+# Qwen3.8 generation server（専用venv）
+/path/to/pic2pdf-mlx/runtimes/mlx-dspark/.venv/bin/mlx-dspark serve \
+  --host 127.0.0.1 \
+  --port 11439 \
+  --model /path/to/pic2pdf-mlx/models/qwen3.8-27b-4bit \
+  --mode auto \
+  --no-thinking \
+  --max-batch 1 \
+  --default-max-tokens 8192 \
+  --context-window 131072 \
+  --kv-bits 8
+```
+
+Macの`.env`は次のようにする。`NOVEL_DB_MLX_BASE_URL`はEmbedding専用、
+`NOVEL_DB_MLX_DSPARK_BASE_URL`はQwen生成専用で、Windows/Linuxの既定値は変更しない。
+
+```dotenv
+NOVEL_DB_MLX_BASE_URL=http://127.0.0.1:11437
+NOVEL_DB_MLX_DSPARK_BASE_URL=http://127.0.0.1:11439
+NOVEL_DB_LLM_BACKEND=mlx_dspark
+NOVEL_DB_LLM_MODEL=/path/to/pic2pdf-mlx/models/qwen3.8-27b-4bit
+NOVEL_DB_GEMMA_BACKEND=ollama
+NOVEL_DB_CHAR_EXTRACT_MODEL=gemma4:12b
+NOVEL_DB_CONTEXT_MODEL=gemma4:12b
+NOVEL_DB_QA_EXPAND_MODEL=gemma4:12b
+NOVEL_DB_EMBED_BACKEND=mlx
+NOVEL_DB_EMBED_MODEL=/path/to/pic2pdf-mlx/models/bge-m3-fp16
+```
+
+初期値は`context-window=131072`、KV cache 8bit、同時生成1とする。起動後に
+`curl http://127.0.0.1:11439/health`、`curl http://127.0.0.1:11437/health`、
+Embedding 1024次元を確認する。`mlx-dspark`は`response_format`を解釈しないため、
+`format="json"`を指定するJSON objectタスクは共通LLMの限定adapterが自然停止・JSON形式を検査する。
+JSON配列を要求する関係抽出はこのadapterの対象外である。Qwen3.8の固定小説品質ゲート合格までは、
+Macでの比較・QA用途に限定する。applicationは`full_build` / `generate_relations`と、
+`NOVEL_DB_GEMMA_BACKEND=qwen`時の`generate_contexts`をjob開始前に拒否し、自動公開へ接続しない。
+
+2026-08-22のM1 Max 64GB実機では、上記version構成に`mlx 0.32.1`と
+`transformers 5.15.1`が解決され、Qwen3.8 target約15GB、DFlash2 cache約3.6GBとなった。
+初回の`--mode auto`はdrafterを取得し、Metal kernelを一度calibrationしてから
+`mode=dflash`で待受を開始する。起動ログが`loading auto engine`で止まって見えても、
+drafterの`.incomplete`が増加中なら中断せず待つ。待受後の`/health`では少なくとも
+`status=ok`、`mode=dflash`、`context_window=131072`、`kv_bits=8`、
+`thinking_default=off`、memory guard正常を確認する。
+
+同実機では短答`1+1 -> 2`、共通Backendの限定JSON adapterで`{"answer":2}`、
+`embed_batch`で1件・1024次元を確認した。これは起動・API・形式契約のsmoke testであり、
+Qwen3.8の小説品質ゲート合格を意味しない。品質比較時は短答のtoken/sを性能値として採用せず、
+固定小説fixtureの入力・出力token、TTFT、decode時間、完了理由を保存する。
+
+### 5.2 Nemotron Labs 3 Puzzle 75B（比較用・排他起動）
 
 `Nemotron-Labs-3-Puzzle-75B-A9B`は75.3B total / 9.3B activeの
 Mamba 2・Attention・LatentMoE混成モデルである。64GB Macではuniform 6bit版ではなく、
@@ -250,7 +329,7 @@ Hugging Face上の別モデルとして解決されるため、localhost client�
 Mamba/SSM hybridの再評価では安全側に倒してcacheを無効化する。2026-08-17のPuzzle実測は
 cache 1で取得した記録なので、将来runtime更新後に再試験する場合はcache 0から取り直す。
 
-### 5.2 Nemotron 3.5 Lightning 30B（比較用・MLX不採用）
+### 5.3 Nemotron 3.5 Lightning 30B（比較用・MLX不採用）
 
 75Bより小さい30B-A3Bは既存Qwen / bge-m3用venvの`mlx-lm 0.31.3`でロードできる。
 4bit版と6bit版を固定revisionで取得し、配布元SHA-256と照合する。Hugging Face Xet経路が
@@ -305,7 +384,7 @@ NVIDIA公式例はthinkingを`chat_template_kwargs.enable_thinking=true`で明�
 directの短block抽出と型付き局所照合を先に使う。thinkingは、正解固定fixtureでdirect不合格かつ
 短い根拠窓へ限定できる判定だけrequest単位で有効にする。
 
-### 5.3 Ornith 1.5 35B-A3B（比較用・GPU smoke合格）
+### 5.4 Ornith 1.5 35B-A3B（比較用・GPU smoke合格）
 
 Ornith 1.5 35B-A3BはQwen3.5系のMoEで、約35B total / 約3B active、最大262,144 token、
 Thinkingとtool callingを備える。M1 Max 64GBでは公式MLX 4bit版をstock

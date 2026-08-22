@@ -190,6 +190,14 @@ Nemotronは短窓thinkingだけ合格したが、長文事実抽出の話者・�
   Qwen3.6の約31分22秒に対し約97分12秒だった。比較用登録に留め、本番既定値へ配線しない。
   途中切れに出力・context上限到達が含まれるため、完全不採用ではなく設定再評価待ちとする。
   保存済み事実表に対する局所A/Bのみ実行し、合格条件だけを巻全体へ拡大する。
+- Qwen3.8のMac MLX比較経路として、生成を`mlx-dspark`の`127.0.0.1:11439`、
+  bge-m3をEmbedding-only `mlx_vlm.server`の`127.0.0.1:11437`へ分離できる。
+  M1 Max 64GBではQwen3.8 4bitのload、DFlash2、131,072 context・KV 8bit、短答、
+  限定JSON、1024次元Embeddingまで疎通済みである。ただしこれはruntime確認であり、直前項の
+  Ollama Q4_K_Mによる小説品質不合格を取り消さない。`.env`でのopt-in比較に限定し、
+  applicationは永続生成jobを拒否してQAだけを許可する。Windows/Linux既定値と自動公開は変更しない。詳細は
+  [ADR-0019](../基本設計/ADR/0019_apple-silicon-mlx-inference.md)と
+  [GPU環境セットアップ](GPU環境セットアップ.md)を参照する。
 - Mac停止やモデル不採用時はWindowsの現行推論環境へ戻す。
 - Kindle撮影、OCR、検索索引構築はMac移行と独立して継続する。
 

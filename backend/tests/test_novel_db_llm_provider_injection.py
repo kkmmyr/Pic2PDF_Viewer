@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import pytest
-from local_llm import Backend, LLMError, MlxBackend
+from local_llm import Backend, LLMError, MlxBackend, MlxDsparkBackend
 
 from services.novel_db import llm_provider as llm_provider_module
 from services.novel_db.llm import stream_qa
@@ -50,6 +50,28 @@ def test_build_provider_supports_all_mlx_roles(monkeypatch: pytest.MonkeyPatch) 
     assert isinstance(provider.verifier, MlxBackend)
     assert provider.qwen.config.default_options["presence_penalty"] == 1.5
     assert provider.gemma.config.default_options["top_k"] == 64
+
+
+def test_build_provider_supports_mlx_dspark_for_qwen(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_LLM_BACKEND", "mlx_dspark")
+    monkeypatch.setattr(
+        llm_provider_module.config,
+        "NOVEL_DB_MLX_DSPARK_BASE_URL",
+        "http://test-dspark:11439",
+    )
+    monkeypatch.setattr(
+        llm_provider_module.config,
+        "NOVEL_DB_LLM_MODEL",
+        "/models/qwen3.8",
+    )
+
+    provider = build_llm_provider()
+
+    assert isinstance(provider.qwen, MlxDsparkBackend)
+    assert provider.qwen.config.base_url == "http://test-dspark:11439"
+    assert provider.qwen.config.model == "/models/qwen3.8"
 
 
 def test_build_provider_rejects_unknown_gemma_backend(monkeypatch: pytest.MonkeyPatch) -> None:

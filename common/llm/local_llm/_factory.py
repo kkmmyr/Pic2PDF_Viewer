@@ -1,7 +1,8 @@
 """環境変数から `Backend` を 1 つ作るヘルパー（CLI / MCP 専用）。
 
 Pic2PDF 等のアプリは `config.py` の値から直接 `BackendConfig` を作って
-`OllamaBackend` / `LlamaServerBackend` / `MlxBackend` / `MlxLmBackend`を
+`OllamaBackend` / `LlamaServerBackend` / `MlxBackend` / `MlxLmBackend` /
+`MlxDsparkBackend`を
 instantiateするため、こちらは使わない。
 
 環境変数を読むのは本ファイルの 1 箇所のみ。他のモジュール (`Backend` 抽象や
@@ -15,6 +16,7 @@ import os
 from ._backend import Backend, BackendConfig, LLMError
 from ._llama_server import LlamaServerBackend
 from ._mlx import MlxBackend
+from ._mlx_dspark import MlxDsparkBackend
 from ._mlx_lm import MlxLmBackend
 from ._ollama import OllamaBackend
 
@@ -24,11 +26,12 @@ def backend_from_env() -> Backend:
 
     | 変数 | 既定 | 用途 |
     |---|---|---|
-    | `QWEN_BACKEND` | `llama_server` | `llama_server` / `ollama` / `mlx` / `mlx_lm`を選択 |
+    | `QWEN_BACKEND` | `llama_server` | `llama_server` / `ollama` / `mlx` / `mlx_lm` / `mlx_dspark`を選択 |
     | `QWEN_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama base URL |
     | `QWEN_LLAMA_SERVER_BASE_URL` | `http://127.0.0.1:11435` | llama-server base URL |
     | `QWEN_MLX_BASE_URL` | `http://127.0.0.1:11437` | MLX server base URL |
     | `QWEN_MLX_LM_BASE_URL` | `http://127.0.0.1:11440` | MLX-LM server base URL |
+    | `QWEN_MLX_DSPARK_BASE_URL` | `http://127.0.0.1:11439` | mlx-dspark base URL |
     | `QWEN_MODEL` | `qwen3.6:35b-a3b` | デフォルトモデル |
     | `QWEN_TIMEOUT_SEC` | `600` | リクエスト timeout 秒 |
 
@@ -78,6 +81,17 @@ def backend_from_env() -> Backend:
                 base_url=os.environ.get(
                     "QWEN_MLX_LM_BASE_URL",
                     "http://127.0.0.1:11440",
+                ),
+                model=model,
+                timeout=timeout,
+            )
+        )
+    if kind == "mlx_dspark":
+        return MlxDsparkBackend(
+            BackendConfig(
+                base_url=os.environ.get(
+                    "QWEN_MLX_DSPARK_BASE_URL",
+                    "http://127.0.0.1:11439",
                 ),
                 model=model,
                 timeout=timeout,

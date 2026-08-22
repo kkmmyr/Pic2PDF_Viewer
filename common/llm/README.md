@@ -23,6 +23,7 @@ Pic2PDF workspace内では`qwen-common`依存、外部projectではeditable pack
 | `LlamaServerBackend` | llama.cpp `llama-server` の OpenAI 互換 SSE を叩いて Ollama 形式に正規化する具象 |
 | `MlxBackend` | `mlx_vlm.server`のOpenAI互換SSEを叩き、thinkingとsampling名をMLX契約へ変換する具象 |
 | `MlxLmBackend` | 公式`mlx_lm.server`用。nested thinking契約と限定JSON adapterを持つ具象 |
+| `MlxDsparkBackend` | `mlx-dspark`用。nested thinking契約と限定JSON adapterを持つ具象 |
 | `backend_from_env` | 環境変数 (`QWEN_*`) から Backend を 1 つ作る（CLI / MCP 専用） |
 
 `Backend` には `ask` / `aask`（ストリームを集約して完全 response を返す）の
@@ -77,11 +78,12 @@ backend = backend_from_env()  # QWEN_BACKEND に対応するBackendを返す
 
 | 変数 | 既定 | 用途 |
 |---|---|---|
-| `QWEN_BACKEND` | `llama_server` | `llama_server` / `ollama` / `mlx` / `mlx_lm` の選択 |
+| `QWEN_BACKEND` | `llama_server` | `llama_server` / `ollama` / `mlx` / `mlx_lm` / `mlx_dspark` の選択 |
 | `QWEN_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama の base URL |
 | `QWEN_LLAMA_SERVER_BASE_URL` | `http://127.0.0.1:11435` | llama-server の base URL |
 | `QWEN_MLX_BASE_URL` | `http://127.0.0.1:11437` | `mlx_vlm.server`のbase URL |
 | `QWEN_MLX_LM_BASE_URL` | `http://127.0.0.1:11440` | 公式`mlx_lm.server`のbase URL |
+| `QWEN_MLX_DSPARK_BASE_URL` | `http://127.0.0.1:11439` | `mlx-dspark`のbase URL |
 | `QWEN_MODEL` | `qwen3.6:35b-a3b` | デフォルトモデル名 |
 | `QWEN_TIMEOUT_SEC` | `600` | 1 リクエストの timeout 秒 |
 
@@ -104,6 +106,11 @@ backend = backend_from_env()  # QWEN_BACKEND に対応するBackendを返す
 受理して正規化する。説明文、複数fence、duplicate key、非有限数、array / scalar、未終端、
 `finish_reason != stop`は部分応答を返す前に`LLMError`とする。生成時点でJSON Schemaを拘束する用途は
 `MlxBackend` + `mlx_vlm.server`を使用する。
+
+`MlxDsparkBackend`も同じ限定JSON adapterを使う。`mlx-dspark`はOpenAI互換の
+`/v1/chat/completions`を提供するが、`response_format`を生成制約として扱わないためである。
+`chat_template_kwargs.enable_thinking`は`mlx-dspark`が受理するnested契約として送る。
+`mlx-dspark`が実装しない`min_p`と`repetition_penalty`系の項目は送信しない。
 
 ## 依存
 
@@ -132,6 +139,7 @@ D:\61.tool\common\llm\
 │   ├── _llama_server.py             # LlamaServerBackend
 │   ├── _mlx.py                      # MlxBackend
 │   ├── _mlx_lm.py                   # MlxLmBackend
+│   ├── _mlx_dspark.py               # MlxDsparkBackend
 │   ├── _json_output.py              # MLX-LM限定JSON adapter
 │   ├── _sse.py                      # OpenAI SSE → Ollama dict 変換の純関数
 │   ├── _factory.py                  # backend_from_env()

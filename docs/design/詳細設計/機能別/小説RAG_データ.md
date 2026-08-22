@@ -104,12 +104,13 @@
 | `NOVEL_DB_LANCE_PATH` | `NOVEL_DB_DIR`の親にある`novel.lancedb`（通常開発では`backend/data/novel.lancedb`） | LanceDB ベクトルストアのパス。固定`NOVEL_DB_DIR`を持つLinuxではrelease世代外へ解決する |
 | `NOVEL_DB_LEXICAL_BACKEND` | `fts5` | lexical検索（`fts5` / `shadow` / `lance_icu`）。`shadow`はFTS5だけを返しICUを観測、`lance_icu`は障害時FTS5へfallback |
 | `NOVEL_DB_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama エンドポイント（embedding / Gemma） |
-| `NOVEL_DB_MLX_BASE_URL` | `http://127.0.0.1:11437` | Apple Silicon用MLX OpenAI互換エンドポイント。loopback限定で起動する |
+| `NOVEL_DB_MLX_BASE_URL` | `http://127.0.0.1:11437` | Apple Silicon用MLX Embedding endpoint。loopback限定で起動する |
+| `NOVEL_DB_MLX_DSPARK_BASE_URL` | `http://127.0.0.1:11439` | `mlx-dspark`生成endpoint。loopback限定で起動する |
 | `NOVEL_DB_EMBED_BACKEND` | `ollama` | 埋め込みbackend（`ollama` / `mlx`） |
 | `NOVEL_DB_EMBED_MODEL` | `bge-m3` | 埋め込みモデル。MLX時はCLS poolingを設定したローカルディレクトリまたはHugging Face ID |
 | `NOVEL_DB_EMBED_NUM_GPU` | `0` | embedding の GPU レイヤ数（0=CPU、llama-server に VRAM を譲る） |
 | `NOVEL_DB_LLM_MODEL` | `qwen3.6-iq4xs` | 重量 LLM（QA / サマリ / 関係抽出） |
-| `NOVEL_DB_LLM_BACKEND` | `llama_server` | 重量 LLM の backend（`llama_server` / `mlx`。他値は起動時 `LLMError`） |
+| `NOVEL_DB_LLM_BACKEND` | `llama_server` | 重量 LLM の backend（`llama_server` / `mlx` / `mlx_dspark`。他値は起動時 `LLMError`） |
 | `NOVEL_DB_LLAMA_SERVER_URL` | `http://127.0.0.1:11435` | llama-server エンドポイント |
 | `NOVEL_DB_CHAR_EXTRACT_MODEL` | `gemma4:12b` | 主要登場人物抽出（短答型） |
 | `NOVEL_DB_CONTEXT_MODEL` | `gemma4:12b` | B-9 チャンク文脈生成 |
@@ -244,8 +245,11 @@ table名・schema・行内容を照合する。productionの2026-08-22復旧後�
 | Ollama | `http://localhost:11434` | bge-m3, gemma4:12b | embedding / Gemma 系タスク |
 | llama-server | `http://127.0.0.1:11435` | qwen3.6-iq4xs（Qwen3.6 35B-A3B iq4xs） | 重量 LLM（QA / サマリ / 関係抽出） |
 | MLX server（任意、Apple Silicon） | `http://127.0.0.1:11437` | Qwen3.6 35B-A3B 4bit / Gemma 4 12B 4bit / bge-m3 FP16+CLS | envで選択した生成・embedding。生成モデルは同一cacheで逐次切替 |
+| mlx-dspark（任意、Apple Silicon） | `http://127.0.0.1:11439` | Qwen3.8-27B 4bit | MLX speculative decodingによる重量LLM。Embeddingは提供しない |
 
-共通LLMモジュール`local_llm`（`D:\61.tool\common\llm`）の`OllamaBackend` / `LlamaServerBackend` / `MlxBackend`を使用。
+共通LLMモジュール`local_llm`（`D:\61.tool\common\llm`）の`OllamaBackend` / `LlamaServerBackend` /
+`MlxBackend` / `MlxDsparkBackend`を使用する。`mlx_dspark`構成では11437をbge-m3の
+Embedding-only serverとして使い、生成用Qwenを11439へ二重ロードしない。
 
 ### 5.2 backend シングルトン（`services/novel_db/_llm_backend.py`）
 
@@ -253,13 +257,14 @@ table名・schema・行内容を照合する。productionの2026-08-22復旧後�
 
 | シングルトン | 実体 | モデル | 主な利用先 |
 |---|---|---|---|
-| `QWEN_BACKEND` | `LlamaServerBackend`（11435）または`MlxBackend`（11437） | `NOVEL_DB_LLM_MODEL` | QA / 書籍サマリ / キャラサマリ / 関係グラフ |
+| `QWEN_BACKEND` | `LlamaServerBackend`（11435）/ `MlxBackend`（11437）/ `MlxDsparkBackend`（11439） | `NOVEL_DB_LLM_MODEL` | QA / 書籍サマリ / キャラサマリ / 関係グラフ |
 | `GEMMA_BACKEND` | `OllamaBackend`（11434, timeout 120）/ `MlxBackend`（11437） | `NOVEL_DB_CHAR_EXTRACT_MODEL` | キャラ抽出 / チャンク文脈生成。`NOVEL_DB_GEMMA_BACKEND=qwen`時は`QWEN_BACKEND`を流用 |
 | `QUERY_BACKEND` | `OllamaBackend`（11434, timeout 60）/ `MlxBackend`（11437） | `NOVEL_DB_QA_EXPAND_MODEL` | Query Expansion。Gemma backendがMLXのときだけ同じMLX serverを使う |
 
 補足:
-- `NOVEL_DB_LLM_BACKEND`は`llama_server` / `mlx`だけを受理し、未知値は起動時に`LLMError`で即失敗する（Ollama分岐はPhase Cで撤去済み）。
+- `NOVEL_DB_LLM_BACKEND`は`llama_server` / `mlx` / `mlx_dspark`を受理し、未知値は起動時に`LLMError`で即失敗する（Ollama分岐はPhase Cで撤去済み）。
 - embedding（bge-m3）は既定で CPU 推論（`NOVEL_DB_EMBED_NUM_GPU=0`）。llama-server の Qwen に VRAM を譲るため。GPU に戻すには `NOVEL_DB_EMBED_NUM_GPU=99` を設定して uvicorn を再起動。
 - QA の num_ctx は `NOVEL_DB_QA_NUM_CTX=32768`（full-book モードは `131072`）。llama-server は `-c 36864` 以上で起動している前提。
 - MLX時はmodel設定をローカルパスまたはHugging Face IDへ揃える。Qwen/Gemmaは同じtext-generation cacheを逐次切替するため、別モデルの生成を同時に開始しない。bge-m3は別embedding cacheへ保持される。
+- `mlx_dspark`時はQwen3.8の生成を11439、bge-m3のEmbeddingを11437へ分離する。`mlx-dspark`は`response_format`を生成制約に使わないため、`format="json"`を明示したJSON objectタスクだけを共通Backendの限定adapterで自然停止・形式検証する。JSON配列の関係抽出は対象外とする。Qwen3.8は比較用のMac opt-inであり、固定小説品質ゲート合格までは`full_build` / `generate_relations`と、Gemma役をQwenへ寄せた`generate_contexts`をjob開始前に拒否する。非永続のQAだけを許可し、公開SQLite行を更新しない。
 - 2026-08-17実機ではGemma MLXが固定判定・人物抽出・出力終端の品質ゲートに不合格だったため、Macの採用構成も`NOVEL_DB_GEMMA_BACKEND=ollama`を維持する。`mlx`分岐は将来の変換/runtime再評価用であり、現在の推奨値ではない。

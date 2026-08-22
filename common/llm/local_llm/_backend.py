@@ -60,7 +60,7 @@ class Backend(abc.ABC):
     """同期 + async ストリーミングと、その集約版を提供する LLM バックエンド。
 
     具体実装は`OllamaBackend` / `LlamaServerBackend` / `MlxBackend` /
-    `MlxLmBackend`。
+    `MlxLmBackend` / `MlxDsparkBackend`。
     新バックエンド追加時は `stream_ask` / `astream_ask` の 2 抽象メソッドだけ
     実装すれば、`ask` / `aask` は本クラスのデフォルト実装が利用される。
 

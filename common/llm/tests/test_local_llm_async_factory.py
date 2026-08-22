@@ -12,6 +12,7 @@ from local_llm import (
     LlamaServerBackend,
     LLMError,
     MlxBackend,
+    MlxDsparkBackend,
     MlxLmBackend,
     OllamaBackend,
     backend_from_env,
@@ -30,6 +31,7 @@ def clear_env(monkeypatch):
         "QWEN_LLAMA_SERVER_BASE_URL",
         "QWEN_MLX_BASE_URL",
         "QWEN_MLX_LM_BASE_URL",
+        "QWEN_MLX_DSPARK_BASE_URL",
         "QWEN_MODEL",
         "QWEN_TIMEOUT_SEC",
     ]:
@@ -237,6 +239,17 @@ class TestBackendFromEnv:
         assert isinstance(backend, MlxLmBackend)
         assert backend.config.base_url == "http://custom-mlx-lm:11440"
         assert backend.config.model == "/models/ornith"
+
+    def test_mlx_dspark_via_env(self, monkeypatch):
+        monkeypatch.setenv("QWEN_BACKEND", "mlx_dspark")
+        monkeypatch.setenv("QWEN_MLX_DSPARK_BASE_URL", "http://custom-dspark:11439")
+        monkeypatch.setenv("QWEN_MODEL", "/models/qwen3.8")
+
+        backend = backend_from_env()
+
+        assert isinstance(backend, MlxDsparkBackend)
+        assert backend.config.base_url == "http://custom-dspark:11439"
+        assert backend.config.model == "/models/qwen3.8"
 
     def test_unknown_backend_raises(self, monkeypatch):
         monkeypatch.setenv("QWEN_BACKEND", "vllm")

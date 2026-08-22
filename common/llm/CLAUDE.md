@@ -31,7 +31,7 @@ uv run --project common/llm python -c "from local_llm import backend_from_env; p
 
 - Qwen3.x は thinking モデル。`stream=True` とthinking抑制（Ollamaでは
   `think=False`、llama-serverでは`chat_template_kwargs.enable_thinking=false`、
-  MLX-VLMではトップレベル`enable_thinking=false`、公式MLX-LMでは
+  MLX-VLMではトップレベル`enable_thinking=false`、公式MLX-LM / mlx-dsparkでは
   `chat_template_kwargs.enable_thinking=false`）
   の **両方** が必須。各 Backend 実装で常にこの 2 つを送るようにしているので、
   ここを崩さないこと
@@ -50,6 +50,9 @@ uv run --project common/llm python -c "from local_llm import backend_from_env; p
 - 公式`mlx_lm.server`は`response_format`を生成制約へ使わない。`MlxLmBackend`の
   `format="json"`は完了後の限定adapterであり、raw object / 単独の小文字`json` fence以外を
   fail closedにする。受理範囲を広げる場合は先に設計書と拒否testを更新する
+- `mlx-dspark`も`response_format`を生成制約へ使わない。`MlxDsparkBackend`は
+  `MlxLmBackend`と同じ限定JSON adapterを使い、OpenAI互換のnested
+  `chat_template_kwargs.enable_thinking`を送る。`MlxBackend`のtop-level契約と混同しない
 
 ## 作業スタイル
 

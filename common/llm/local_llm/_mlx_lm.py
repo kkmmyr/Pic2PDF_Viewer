@@ -58,7 +58,7 @@ class MlxLmBackend(LlamaServerBackend):
     ) -> Iterator[dict[str, Any]]:
         if context:
             raise LLMError(
-                "context resume is not supported with mlx_lm backend; "
+                f"context resume is not supported with {self._backend_name} backend; "
                 "use OllamaBackend if you need session continuation",
             )
         body = self._build_body(
@@ -89,7 +89,7 @@ class MlxLmBackend(LlamaServerBackend):
     ) -> AsyncIterator[dict[str, Any]]:
         if context:
             raise LLMError(
-                "context resume is not supported with mlx_lm backend; "
+                f"context resume is not supported with {self._backend_name} backend; "
                 "use OllamaBackend if you need session continuation",
             )
         body = self._build_body(

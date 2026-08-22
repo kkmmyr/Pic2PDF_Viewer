@@ -97,6 +97,48 @@ page-level ICU検索を導入する場合は、対象pageを別tableへ完全再
 確認する。[小説RAG 検索・QA設計 §10](../../詳細設計/機能別/小説RAG_検索QA設計.md#10-日本語検索基盤の比較検証ゲート)を
 後続判断の正本とし、本ADRのMLX runtime採用判断そのものは変更しない。
 
+## 追補: Qwen3.8 と `mlx-dspark` のMac比較経路（2026-08-22）
+
+Qwen3.8-27B 4bitをApple Siliconで試す場合は、既存の`mlx_vlm.server`経路とは別に、
+コミュニティruntimeの`mlx-dspark`を任意選択できるようにする。これはMiaAI Labの
+DGX Spark / SGLangレシピをMacへ移植するものではなく、MLX重みを対象にした
+OpenAI互換のローカル推論経路である。Windows/Linuxの既定backend、既存のQwen3.6
+比較経路、公開要約の品質ゲートは変更しない。
+
+`mlx-dspark`は`response_format`を実装していないため、共通LLMの
+`MlxDsparkBackend`はnested `chat_template_kwargs.enable_thinking`とsampling名を送り、
+`format="json"`を明示したJSON objectタスクでは本文を自然停止までbufferして限定JSONだけを受理する。説明文、
+複数コードフェンス、重複キー、途中切れは受理せず`LLMError`とする。生成モデルは
+`127.0.0.1:11439`、bge-m3のEmbedding-only `mlx_vlm.server`は`127.0.0.1:11437`へ
+分離し、Qwenの大きな重みを二重にロードしない。
+
+M1 Max 64GBの初期運用値は、Qwen3.8-27B 4bit、`--mode auto`、thinking無効、
+`--context-window 131072`、KV cache 8bit、同時生成1とする。これは速度・メモリの
+初期値であり、Qwen3.8をQwen3.6の品質上位互換または本番自動公開モデルとみなす判定ではない。
+固定小説ケースを通過するまでは、Macの`.env`での比較利用に限定する。
+application側は`mlx_dspark`選択中の`full_build`と`generate_relations`をjob開始前に拒否し、
+`NOVEL_DB_GEMMA_BACKEND=qwen`で同じQwenを使う`generate_contexts`も拒否する。非永続のQAは
+比較用途として許可する。これによりopt-in設定だけで公開用SQLite行を更新しない。
+
+### M1 Max 64GBでの経路確認（2026-08-22）
+
+専用Python 3.12環境に`mlx-dspark 0.15.1`、`mlx 0.32.1`、`mlx-lm 0.31.3`、
+`mlx-vlm 0.6.15`を隔離導入し、`mlx-community/Qwen3.8-27B-4bit`約15GBと
+`incoai/Qwen3.8-27B-DFlash2`のローカルcache約3.6GBを取得した。初回起動ではdrafter取得に加え、
+small-M QMM、SDPA split、prefill wide-GEMMの一度限りのcalibrationが走るため、HTTP待受開始前に
+数分を要する。2回目以降は生成serverとモデルcacheを削除しない限り、このcalibration結果を再利用する。
+
+起動後の`/health`で`mode=dflash`、`context_window=131072`、`kv_bits=8`、
+`thinking_default=off`、memory guard正常を確認した。OpenAI互換APIの短答は`1+1`へ`2`、
+共通`MlxDsparkBackend`の`format="json"`は`{"answer":2}`を返した。別portのbge-m3
+Embedding-only serverは、アプリの`embed_batch`経由で1入力・1024次元、L2 norm約0.99982を返した。
+
+以上はモデルロード、API契約、JSON fail-closed経路、Embedding次元の疎通確認である。
+小説の事実抽出・要約品質を再評価した結果ではないため、Ollama Q4_K_Mで得た既存のQwen3.8
+品質不合格と公開禁止を上書きしない。MLX-dsparkを本番候補へ昇格する場合は、同じ固定本文、
+prompt、sampling、出力上限、機械ゲートでOllama/Qwen3.6と再比較する。既存品質判定の実測正本は
+[小説RAG 技術知見 §9.36–9.37](../../../log/技術知見/小説RAG_技術知見.md)とする。
+
 ## 将来の再評価条件
 
 - MLX serverが複数生成モデルの安全な並行cacheまたは明示的なrequest queueを提供する。

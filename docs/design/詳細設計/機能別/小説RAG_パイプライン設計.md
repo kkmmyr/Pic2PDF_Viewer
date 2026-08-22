@@ -213,6 +213,14 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
   詳細・一覧の文字数契約を同時に守れず、仁耀側の統一構想を珀陽へ帰属させる意味誤りも残った。
   よってQwen3.8の巻全体再試験、高精度量子化、本番配線には進まない。将来再開する場合は、自由文promptの
   追加ではなく、主語・行動・対象・中間/最終状態をJSON Schemaで固定した中間表を早期ゲートとする。
+  2026-08-22に追加した`mlx-dspark`経路では、M1 Max 64GB上でQwen3.8 4bitのload、DFlash2、
+  OpenAI互換短答、共通Backendの限定JSON、bge-m3 1024次元Embeddingまで確認した。
+  ただしこれはtransport smokeであり、本項の品質比較はOllama Q4_K_Mで得た結果のまま維持する。
+  MLX-dsparkの品質採否は、同一固定本文・prompt・sampling・上限・seedを再現し、許可外page、主体、
+  行動対象、最終状態、完了理由を同じ機械ゲートで比較した場合だけ更新する。短答の成功や速度だけで
+  巻全体、公開要約、自動公開へ昇格しない。
+  applicationは`mlx_dspark`選択中の`full_build` / `generate_relations`と、
+  `NOVEL_DB_GEMMA_BACKEND=qwen`時の`generate_contexts`をjob開始前にfail closedし、比較用QAだけを許可する。
 - **Gemma4の役割別比較結果**: 10巻の隔離試験では、31Bによる詳細あらすじは889字で28分31秒、
   一覧用短縮要約は490字で22分30秒を要した。日本語は自然でQwenの「牢へ戻る」という誤断定を
   避けたが、正しい最終合意を明記せず、主体・時制の意味変更も残った。事実抽出第1ブロックの

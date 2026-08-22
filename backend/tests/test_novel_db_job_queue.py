@@ -3,7 +3,9 @@
 from unittest.mock import ANY, call, patch
 
 import pytest
+from local_llm import LLMError
 
+from services.novel_db import job_executor as job_executor_module
 from services.novel_db import with_db
 from services.novel_db.job_queue import NovelDbJobQueue
 from services.novel_db.migrations import upgrade_head
@@ -162,9 +164,10 @@ def test_update_detail_skips_locked_database_without_failing_job(queue):
         locker.rollback()
 
 
-def test_generate_relations_loads_series_index_once(queue):
+def test_generate_relations_loads_series_index_once(queue, monkeypatch: pytest.MonkeyPatch):
     """複数書籍の関係生成でもnovelメタは1回だけ索引化する。"""
     worker = queue._worker
+    monkeypatch.setattr(job_executor_module.config, "NOVEL_DB_LLM_BACKEND", "llama_server")
     job = {
         "id": 1,
         "job_type": "all",
@@ -185,6 +188,52 @@ def test_generate_relations_loads_series_index_once(queue):
 
     mock_load_index.assert_called_once_with()
     assert mock_generate.call_count == 2
+
+
+@pytest.mark.parametrize(
+    ("mode", "gemma_backend"),
+    [
+        ("full_build", "ollama"),
+        ("generate_relations", "ollama"),
+        ("generate_contexts", "qwen"),
+    ],
+)
+def test_mlx_dspark_rejects_persistent_generation_before_resolving_targets(
+    queue,
+    monkeypatch: pytest.MonkeyPatch,
+    mode: str,
+    gemma_backend: str,
+) -> None:
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": mode}
+    monkeypatch.setattr(job_executor_module.config, "NOVEL_DB_LLM_BACKEND", "mlx_dspark")
+    monkeypatch.setattr(job_executor_module.config, "NOVEL_DB_GEMMA_BACKEND", gemma_backend)
+
+    with (
+        patch.object(worker, "_resolve_targets") as mock_resolve,
+        pytest.raises(LLMError, match="limited to non-persistent QA"),
+    ):
+        worker._execute_job(job)
+
+    mock_resolve.assert_not_called()
+
+
+def test_mlx_dspark_allows_context_generation_with_non_qwen_gemma(
+    queue,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    worker = queue._worker
+    job = {"id": 1, "job_type": "all", "target_id": None, "mode": "generate_contexts"}
+    monkeypatch.setattr(job_executor_module.config, "NOVEL_DB_LLM_BACKEND", "mlx_dspark")
+    monkeypatch.setattr(job_executor_module.config, "NOVEL_DB_GEMMA_BACKEND", "ollama")
+
+    with (
+        patch.object(worker, "_resolve_targets", return_value=[]),
+        patch.object(worker, "_update_progress") as mock_progress,
+    ):
+        worker._execute_job(job)
+
+    mock_progress.assert_called_once_with(1, 0, 0)
 
 
 def test_ocr_combines_pending_pages_and_stages_each_book_for_qa(queue):

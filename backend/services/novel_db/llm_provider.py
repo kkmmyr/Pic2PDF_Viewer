@@ -36,6 +36,13 @@ def _build_mlx_backend(backend_config: BackendConfig) -> Backend:
     return MlxBackend(backend_config)
 
 
+def _build_mlx_dspark_backend(backend_config: BackendConfig) -> Backend:
+    """MLX-dspark選択時だけ実装をimportし、既定経路との互換性を保つ。"""
+    from local_llm import MlxDsparkBackend
+
+    return MlxDsparkBackend(backend_config)
+
+
 @dataclass(frozen=True, slots=True)
 class NovelLlmProvider:
     """Application serviceへ注入する用途別backend集合。"""
@@ -46,27 +53,39 @@ class NovelLlmProvider:
     verifier: Backend
 
 
-def build_llm_provider() -> NovelLlmProvider:
-    """現在設定からproviderを構築する。"""
+def _build_qwen_backend() -> Backend:
+    """Build the configured heavyweight generation backend."""
     if config.NOVEL_DB_LLM_BACKEND == "llama_server":
-        qwen: Backend = LlamaServerBackend(
+        return LlamaServerBackend(
             BackendConfig(
                 base_url=config.NOVEL_DB_LLAMA_SERVER_URL,
                 model=config.NOVEL_DB_LLM_MODEL,
             )
         )
-    elif config.NOVEL_DB_LLM_BACKEND == "mlx":
-        qwen = _build_mlx_backend(
+    if config.NOVEL_DB_LLM_BACKEND == "mlx":
+        return _build_mlx_backend(
             BackendConfig(
                 base_url=config.NOVEL_DB_MLX_BASE_URL,
                 model=config.NOVEL_DB_LLM_MODEL,
                 default_options=_QWEN_MLX_DEFAULT_OPTIONS,
             )
         )
-    else:
-        raise LLMError(
-            f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} (supported: 'llama_server', 'mlx')",
+    if config.NOVEL_DB_LLM_BACKEND == "mlx_dspark":
+        return _build_mlx_dspark_backend(
+            BackendConfig(
+                base_url=config.NOVEL_DB_MLX_DSPARK_BASE_URL,
+                model=config.NOVEL_DB_LLM_MODEL,
+                default_options=_QWEN_MLX_DEFAULT_OPTIONS,
+            )
         )
+    raise LLMError(
+        f"unknown NOVEL_DB_LLM_BACKEND: {config.NOVEL_DB_LLM_BACKEND} (supported: 'llama_server', 'mlx', 'mlx_dspark')",
+    )
+
+
+def build_llm_provider() -> NovelLlmProvider:
+    """現在設定からproviderを構築する。"""
+    qwen = _build_qwen_backend()
 
     gemma: Backend
     if config.NOVEL_DB_GEMMA_BACKEND == "qwen":
