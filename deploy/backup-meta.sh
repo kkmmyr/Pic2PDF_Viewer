@@ -4,8 +4,12 @@
 set -euo pipefail
 
 LABEL=${1:-$(date +%Y-%m-%d_%H%M%S)}
+LOCK_FILE=/opt/pic2pdf-viewer/.backup.lock
 
 cd /opt/pic2pdf-viewer/backend
+
+exec 9>"$LOCK_FILE"
+flock 9
 
 exec .venv/bin/python \
   -m tools.server_backup backup --label "$LABEL"

@@ -7,6 +7,6 @@ Type=oneshot
 User=amashio
 WorkingDirectory=/opt/pic2pdf-viewer/backend
 EnvironmentFile=/opt/pic2pdf-viewer/.env
-ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/python -m tools.server_backup verify-latest
+ExecStart=/usr/bin/flock /opt/pic2pdf-viewer/.backup.lock /opt/pic2pdf-viewer/backend/.venv/bin/python -m tools.server_backup verify-latest
 StandardOutput=append:/opt/pic2pdf-viewer/logs/backup-restore-test.log
 StandardError=append:/opt/pic2pdf-viewer/logs/backup-restore-test.log

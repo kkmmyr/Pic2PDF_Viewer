@@ -49,6 +49,14 @@ uv --version
 過去の端末に残っている member 直下の `.venv` は互換残骸であり、
 標準環境として扱わない。
 
+Linux productionだけはsystemdの既存`ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/uvicorn`
+を保つ互換境界として、`backend`自体を`backend-<generation>`へのsymlinkにする。各backend世代が
+自身の`.venv`を所有し、対応する`common/llm-<generation>`も固定する。deploy時はルート`uv.lock`と
+workspace memberをstagingへ配置し、`UV_PROJECT_ENVIRONMENT=<新backend世代>/.venv` +
+`uv sync --locked --package pic2pdf-viewer-backend --no-dev`でactive世代とは別に構築する。
+import smoke後にbackend / common symlinkを切り替えてserviceをrestartし、失敗時はsourceとvenvを
+一体で直前世代へ戻す。
+
 `scripts/setup_service.bat` もルート `.venv\Scripts\python.exe` を参照する。
 既存 Windows サービスが旧 `backend/.venv` を登録している場合は、
 ルートで `uv sync` 後に setup script でサービスを再登録してから旧環境を削除する。

@@ -70,11 +70,22 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 この変更を本番へ配置してはならない。サーバー側の依存更新方法を確定し、LanceDB version、backend
 import、既存FTS5検索をsmoke確認してからmigration / index構築へ進む。
 
+**運用前提（2026-08-22承認）**: productionは信頼済みoperator 1名だけが利用する個人環境であり、
+高可用性SLAは設けない。この前提では、短時間のmaintenance停止、shadow logの手動集計、旧index / venv
+世代の手動整理、query hashが辞書推測され得る残存リスクを受容する。専用alert基盤や無停止blue-green
+serviceまでは初回導入条件にしない。一方、個人利用でもデータ破損・検索欠落は受容しないため、workspace
+lockによるdependency同期、実行中writer 0件、backupと復元検査、build manifest整合、`fts5` fallbackは
+省略不可とする。
+
 本番候補環境では次の順序を守る。page ICU構築はembeddingやLLMを呼ばず、GPUを使用しない。
+revision `0014`は外部索引の状態表を追加するだけのbackward-compatible migrationである。deployは
+このmigrationだけを直前backend世代にも配置してから適用し、DB revisionが進んだ後でも旧source / venvを
+再起動できるようにする。今後、未承認migrationが追加された場合は自動deployをfail closedとし、rollback
+互換性を別途設計するまで適用しない。
 
 | 順序 | 操作 | 成功条件 / 失敗時の扱い |
 |---|---|---|
-| 0 | 本番dependencyを同期し、LanceDB `>=0.34,<0.35`、backend import、FTS5 smokeを確認する | いずれか不合格ならコード配置・migration・index構築を行わず、従来版を継続する |
+| 0 | ルート`uv.lock`とworkspace memberを別backend世代へ配置し、その世代専用venvへdependencyを同期する。LanceDB `>=0.34,<0.35`、backend import、FTS5 smokeを確認する | active source / venvを直接更新しない。いずれか不合格なら世代切替・migration・index構築を行わず、従来backend世代を継続する |
 | 1 | OCR / rebuild等のwriterと定期backupが重ならないmaintenance windowを確保し、SQLite / LanceDBの復元可能なbackupを作る | LanceDB backupはdirectory copyのため、書込みを停止して取得・復元検査する。configured pathが意図した本番実体を指す |
 | 2 | backendを配置し、`cd backend && uv run python scripts/build_page_fts_index.py`を実行する | CLIがAlembicをheadへ上げ、stdoutの単一JSONが`ok=true`。`row_count`、`source_sha256`、table名、LanceDB version、index設定を保存する |
 | 3 | `novel_search_index_state`の`status=active`、source / active revision一致、manifest row数を確認する | 不一致・build失敗・同時更新ではshadowへ進まず、FTS5を継続して原因解消後に完全再構築する |

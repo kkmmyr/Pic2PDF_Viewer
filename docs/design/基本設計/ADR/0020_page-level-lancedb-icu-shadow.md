@@ -38,6 +38,10 @@ lexical backendは`fts5` / `shadow` / `lance_icu`の3モードとし、初期既
 queryを記録せず観測する。`lance_icu`はactive世代が最新の場合だけICUを返し、索引欠落・
 stale・LanceDB例外時はFTS5へ縮退する。空のICU検索結果は正常結果として扱いfallbackしない。
 
+productionは信頼済みoperator 1名の個人環境として運用する。このため短時間停止、手動shadow監視、
+旧世代の手動整理は受容し、初回導入で高可用性・自動alert・自動GCを要求しない。ただし個人利用を理由に
+dependency lock、writer停止確認、backup / restore検査、manifest検証、FTS5 fallbackを省略しない。
+
 ## 根拠
 
 - 完全再構築は検証コーパス8,576ページで約2.45秒・26.1MBと十分小さく、初期段階で
