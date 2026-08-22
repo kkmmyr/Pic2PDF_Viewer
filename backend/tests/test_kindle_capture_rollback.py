@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -247,3 +248,57 @@ def test_complete_compensates_when_conditional_job_update_matches_zero_rows(
         ).fetchone()
     assert row["status"] == "failed"
     assert row["book_id"] is None
+
+
+def test_complete_compensates_when_quality_warning_insert_fails(
+    tmp_data_dir,
+    tmp_path,
+    monkeypatch,
+    make_png,
+):
+    inbox = tmp_path / "capture-inbox"
+    monkeypatch.setattr(config, "KINDLE_CAPTURE_INBOX_DIR", str(inbox))
+    job = _prepare_ready_job(inbox, make_png)
+    ready = inbox / f"{job['id']}.ready"
+    manifest_path = ready / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["quality"]["findings"] = [
+        {
+            "code": "blank_or_sparse_candidate",
+            "severity": "warning",
+            "files": ["001.png"],
+            "metrics": {"mean_luma": 255.0, "stddev_luma": 0.0},
+        }
+    ]
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    with with_db() as conn:
+        conn.execute(
+            """
+            CREATE TRIGGER fail_capture_warning_insert
+            BEFORE INSERT ON capture_quality_warnings
+            BEGIN
+                SELECT RAISE(ABORT, 'injected warning insert failure');
+            END
+            """
+        )
+
+    target = Path(tmp_data_dir["COMIC_IMAGES_DIR"], "キャプチャ作品")
+    with pytest.raises(sqlite3.IntegrityError, match="injected warning insert failure"):
+        complete(job["id"], "windows-1")
+
+    assert not target.exists()
+    assert "キャプチャ作品.pdf" not in load_meta("comic")
+    assert manifest_path.is_file()
+    assert not Path(inbox, "processed", job["id"]).exists()
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT status,book_id FROM capture_jobs WHERE id=?",
+            (job["id"],),
+        ).fetchone()
+        audit_count = conn.execute("SELECT COUNT(*) FROM capture_quality_audits").fetchone()[0]
+    assert row["status"] == "awaiting_files"
+    assert row["book_id"] is None
+    assert audit_count == 0

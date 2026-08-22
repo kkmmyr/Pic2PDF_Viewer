@@ -4,6 +4,7 @@ import {
     commitMigration,
     createCaptureJob,
     fetchCaptureJobs,
+    fetchCaptureQualityWarnings,
     fetchCatalogStats,
     fetchImportRuns,
     fetchImportSources,
@@ -15,8 +16,9 @@ import {
     importOrders,
     linkKindleBook,
     previewMigration,
+    updateCaptureQualityWarning,
 } from '@/features/kindle/api';
-import type { KindleCatalogFilters } from '@/features/kindle/types';
+import type { KindleCaptureWarningStatus, KindleCatalogFilters } from '@/features/kindle/types';
 
 const QUERY_ROOT = ['kindleCatalog'] as const;
 
@@ -87,6 +89,36 @@ export function useKindleCaptureJobs(options: { enabled?: boolean } = {}) {
         error: captureJobs.error,
         createCaptureJob: captureJobMutation.mutateAsync,
         creatingCaptureJob: captureJobMutation.isPending,
+    };
+}
+
+export function useKindleCaptureQualityWarnings(status: KindleCaptureWarningStatus) {
+    const queryClient = useQueryClient();
+    const warnings = useQuery({
+        queryKey: [...QUERY_ROOT, 'captureQualityWarnings', status],
+        queryFn: () => fetchCaptureQualityWarnings(status),
+    });
+    const readMutation = useMutation({
+        mutationFn: ({ warningId, isRead }: { warningId: number; isRead: boolean }) =>
+            updateCaptureQualityWarning(warningId, { is_read: isRead }),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({
+                queryKey: [...QUERY_ROOT, 'captureQualityWarnings'],
+            });
+        },
+    });
+
+    return {
+        warnings: warnings.data?.items ?? [],
+        total: warnings.data?.total ?? 0,
+        unreadCount: warnings.data?.unread_count ?? 0,
+        readCount: warnings.data?.read_count ?? 0,
+        isLoading: warnings.isLoading,
+        error: warnings.error,
+        updateRead: readMutation.mutateAsync,
+        updatingWarningId: readMutation.isPending
+            ? (readMutation.variables?.warningId ?? null)
+            : null,
     };
 }
 

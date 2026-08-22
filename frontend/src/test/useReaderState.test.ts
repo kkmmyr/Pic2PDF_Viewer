@@ -9,6 +9,8 @@ const readerStateMocks = vi.hoisted(() => ({
     },
     setNumPages: vi.fn(),
     resetNumPages: vi.fn(),
+    setPageNumber: vi.fn(),
+    documentNumPages: 0,
 }));
 
 // 複数の API フェッチ hook をモックしてスモークテストを実現する
@@ -24,7 +26,7 @@ vi.mock('../hooks/reader/useImagePreloader', () => ({
 vi.mock('../hooks/reader/useReaderNavigation', () => ({
     useReaderNavigation: () => ({
         pageNumber: 1,
-        setPageNumber: vi.fn(),
+        setPageNumber: readerStateMocks.setPageNumber,
         handleNext: vi.fn(),
         handlePrev: vi.fn(),
         resetPage: vi.fn(),
@@ -106,7 +108,7 @@ vi.mock('../hooks/reader/useReaderUIState', () => ({
 }));
 vi.mock('../hooks/reader/usePdfDocumentState', () => ({
     usePdfDocumentState: () => ({
-        numPages: 0,
+        numPages: readerStateMocks.documentNumPages,
         setNumPages: readerStateMocks.setNumPages,
         resetNumPages: readerStateMocks.resetNumPages,
         pdfVersion: 0,
@@ -152,6 +154,7 @@ describe('useReaderState', () => {
         readerStateMocks.bookImages.imageUrls = null;
         readerStateMocks.bookImages.numPages = 0;
         readerStateMocks.bookImages.isImageMode = false;
+        readerStateMocks.documentNumPages = 0;
     });
 
     it('初期状態: direction="rtl", numPages=0, isImageMode=false', () => {
@@ -191,5 +194,17 @@ describe('useReaderState', () => {
         expect(resetOrder).toBeDefined();
         expect(syncOrder).toBeDefined();
         expect(syncOrder!).toBeGreaterThan(resetOrder!);
+    });
+
+    it('URLの初期ページをページ数確定後に一度だけ範囲内へ適用する', () => {
+        readerStateMocks.documentNumPages = 5;
+
+        const { rerender } = renderHook(() => useReaderState({ ...defaultProps, initialPage: 8 }));
+
+        expect(readerStateMocks.setPageNumber).toHaveBeenCalledTimes(1);
+        expect(readerStateMocks.setPageNumber).toHaveBeenCalledWith(5);
+
+        rerender();
+        expect(readerStateMocks.setPageNumber).toHaveBeenCalledTimes(1);
     });
 });

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import MetaData
+from sqlalchemy import Index, MetaData, text
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
@@ -188,3 +188,46 @@ class CaptureJob(KindleSQLModel, table=True):
     captured_screens: int | None = None
     error_code: str | None = None
     error_message: str | None = None
+
+
+class CaptureQualityAudit(KindleSQLModel, table=True):
+    __tablename__ = "capture_quality_audits"  # type: ignore[reportAssignmentType]
+    __table_args__ = (
+        UniqueConstraint("job_id"),
+        Index(
+            "uq_capture_quality_audits_active_book",
+            "source",
+            "book_id",
+            unique=True,
+            sqlite_where=text("superseded_at IS NULL"),
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    job_id: str = Field(foreign_key="capture_jobs.id", index=True)
+    asin: str = Field(foreign_key="books.asin", index=True)
+    source: str = Field(index=True)
+    book_id: str = Field(index=True)
+    qa_policy_version: str
+    warning_policy_version: str
+    quality_sha256: str = Field(max_length=64)
+    created_at: str
+    superseded_at: str | None = Field(default=None, index=True)
+    superseded_by_job_id: str | None = Field(
+        default=None,
+        foreign_key="capture_jobs.id",
+    )
+
+
+class CaptureQualityWarning(KindleSQLModel, table=True):
+    __tablename__ = "capture_quality_warnings"  # type: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("audit_id", "code"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    audit_id: int = Field(foreign_key="capture_quality_audits.id", index=True)
+    code: str = Field(index=True)
+    finding_count: int
+    files_json: str
+    findings_json: str
+    is_read: bool = Field(default=False, index=True)
+    read_at: str | None = None

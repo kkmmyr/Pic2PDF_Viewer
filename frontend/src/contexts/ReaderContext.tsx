@@ -8,6 +8,7 @@ type ReaderContextValue = ReturnType<typeof useReaderState> & {
     selectedPdf: string;
     currentPath: string;
     currentSource: LibrarySource;
+    initialPage?: number;
 };
 
 const ReaderContext = createContext<ReaderContextValue | null>(null);

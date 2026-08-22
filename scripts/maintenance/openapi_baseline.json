@@ -1179,6 +1179,19 @@
         "title": "CaptureJobCreateRequest",
         "type": "object"
       },
+      "CaptureQualityWarningReadRequest": {
+        "properties": {
+          "is_read": {
+            "title": "Is Read",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_read"
+        ],
+        "title": "CaptureQualityWarningReadRequest",
+        "type": "object"
+      },
       "CharacterDetail": {
         "properties": {
           "first_page": {
@@ -3013,6 +3026,146 @@
           "items"
         ],
         "title": "KindleCaptureJobsResponse",
+        "type": "object"
+      },
+      "KindleCaptureQualityWarningOut": {
+        "properties": {
+          "asin": {
+            "title": "Asin",
+            "type": "string"
+          },
+          "audit_id": {
+            "title": "Audit Id",
+            "type": "integer"
+          },
+          "book_id": {
+            "title": "Book Id",
+            "type": "string"
+          },
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "finding_count": {
+            "title": "Finding Count",
+            "type": "integer"
+          },
+          "findings": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_read": {
+            "title": "Is Read",
+            "type": "boolean"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "pages": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
+          "read_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read At"
+          },
+          "source": {
+            "enum": [
+              "comic",
+              "novel"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "warning_policy_version": {
+            "title": "Warning Policy Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "audit_id",
+          "job_id",
+          "asin",
+          "title",
+          "source",
+          "book_id",
+          "warning_policy_version",
+          "created_at",
+          "code",
+          "finding_count",
+          "files",
+          "pages",
+          "findings",
+          "is_read",
+          "read_at"
+        ],
+        "title": "KindleCaptureQualityWarningOut",
+        "type": "object"
+      },
+      "KindleCaptureQualityWarningsResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/KindleCaptureQualityWarningOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "read_count": {
+            "title": "Read Count",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "unread_count": {
+            "title": "Unread Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "unread_count",
+          "read_count"
+        ],
+        "title": "KindleCaptureQualityWarningsResponse",
         "type": "object"
       },
       "KindleCatalogBookOut": {
@@ -8000,6 +8153,106 @@
           }
         },
         "summary": "Create Capture Job",
+        "tags": [
+          "kindle_catalog"
+        ]
+      }
+    },
+    "/api/kindle-catalog/capture-quality-warnings": {
+      "get": {
+        "operationId": "get_capture_quality_warnings_api_kindle_catalog_capture_quality_warnings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": "unread",
+              "enum": [
+                "unread",
+                "read",
+                "all"
+              ],
+              "title": "Status",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KindleCaptureQualityWarningsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Capture Quality Warnings",
+        "tags": [
+          "kindle_catalog"
+        ]
+      }
+    },
+    "/api/kindle-catalog/capture-quality-warnings/{warning_id}": {
+      "patch": {
+        "operationId": "update_capture_quality_warning_api_kindle_catalog_capture_quality_warnings__warning_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "warning_id",
+            "required": true,
+            "schema": {
+              "title": "Warning Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CaptureQualityWarningReadRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KindleCaptureQualityWarningOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Capture Quality Warning",
         "tags": [
           "kindle_catalog"
         ]

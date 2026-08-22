@@ -4,6 +4,10 @@ import type {
     KindleCaptureJob,
     KindleCaptureJobCreateRequest,
     KindleCaptureJobsResponse,
+    KindleCaptureQualityWarning,
+    KindleCaptureQualityWarningReadRequest,
+    KindleCaptureQualityWarningsResponse,
+    KindleCaptureWarningStatus,
     KindleCatalogBooksResponse,
     KindleCatalogFilters,
     KindleCatalogSourceStatus,
@@ -49,6 +53,19 @@ export function createCaptureJob(
     request: KindleCaptureJobCreateRequest,
 ): Promise<KindleCaptureJob> {
     return apiClient.post(API_ENDPOINTS.KINDLE_CAPTURE_JOBS, request);
+}
+
+export function fetchCaptureQualityWarnings(
+    status: KindleCaptureWarningStatus,
+): Promise<KindleCaptureQualityWarningsResponse> {
+    return apiClient.get(API_ENDPOINTS.KINDLE_CAPTURE_QUALITY_WARNINGS(status));
+}
+
+export function updateCaptureQualityWarning(
+    warningId: number,
+    request: KindleCaptureQualityWarningReadRequest,
+): Promise<KindleCaptureQualityWarning> {
+    return apiClient.patch(API_ENDPOINTS.KINDLE_CAPTURE_QUALITY_WARNING(warningId), request);
 }
 
 export function fetchCatalogStats(): Promise<KindleCatalogStats> {

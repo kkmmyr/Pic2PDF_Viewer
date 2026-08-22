@@ -4,7 +4,10 @@ from datetime import datetime
 from pathlib import Path
 
 import config
-from services.kindle_catalog.capture_package_validator import validate_ready_dir
+from services.kindle_catalog.capture_package_validator import (
+    build_quality_audit,
+    validate_ready_dir,
+)
 from services.kindle_catalog.capture_publication import CapturePublication
 from services.kindle_catalog.capture_registration_repository import (
     load_awaiting_job,
@@ -25,7 +28,8 @@ def complete(
     """`<job_id>.ready`を検証し、正式領域へatomic publishする。"""
     job = load_awaiting_job(job_id, agent_id)
     ready_dir = Path(config.KINDLE_CAPTURE_INBOX_DIR) / f"{job_id}.ready"
-    _manifest, files = validate_ready_dir(job, ready_dir)
+    manifest, files = validate_ready_dir(job, ready_dir)
+    quality_audit = build_quality_audit(manifest)
     _inject_failure("after_ready_validation")
     publication = CapturePublication(job, ready_dir, completed_at)
     try:
@@ -47,6 +51,7 @@ def complete(
             completed_at=completed_at,
             book_id=publication.book_id,
             captured_screens=len(files),
+            quality_audit=quality_audit,
         )
     except Exception:
         publication.rollback()

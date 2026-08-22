@@ -643,6 +643,9 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
   private artifact一式は
   `/opt/pic2pdf-viewer/data/.capture-quality-holdout/b32-20260822-v2/`へ保存し、
   digestと全contact sheetを再照合済みである。
+- warningの運用正本は成功jobごとの監査世代とし、同一codeを1候補へ集約する。再撮影または
+  新policyでの再監査は旧世代を削除せずsupersedeし、新世代を未確認で開始する。warning 0件の
+  新世代も保存することで、旧画像の候補を現在のreaderへ誤って残さない。
 
 ### 8.11 シリーズ内画面数外れ値の初期policy（2026-08-22）
 

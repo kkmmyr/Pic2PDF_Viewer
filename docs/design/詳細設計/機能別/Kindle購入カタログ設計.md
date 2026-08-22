@@ -157,10 +157,23 @@ Windows側の合否だけを信用せず、証跡欠落・不一致・blocking�
 blockingへ昇格しない。固定seedで完全重複・白紙化・微差重複・25%上端切れを各1件注入した
 制御故障では5 codeすべてrecall 1.0だったが、実陽性の人手labelを代替する根拠にはしない。
 
-警告UIを追加する場合は登録成功と分離した「要確認候補」とし、書籍・code単位で件数をまとめ、
-対象ページを開けるようにする。失敗toast、自動削除、OCR開始の自動停止には流用せず、章扉・表紙・
-挿絵・奥付等の正常例を含む旨を明示する。現行manifestのwarningは登録後に永続化されないため、
-UI実装前に保存先、既読状態、再監査時のpolicy version更新規則を別途設計する。
+warning証跡は次の2テーブルへ保存する。
+
+- `capture_quality_audits`: 成功job、source、ASIN、正式`book_id`、QA / warning policy version、
+  quality証跡SHA-256、作成日時、旧世代化日時と後継jobを持つ監査世代。warning 0件でも1行を作る。
+- `capture_quality_warnings`: 監査世代内の同一codeを1行へ集約し、finding件数、重複除去済みfiles、
+  元finding JSON、`is_read`、`read_at`を持つ。登録時は常に未確認で開始する。
+
+ready package検証では`kindle-image-warning-v1`の既知code、`severity=warning`、連番PNGへの参照、
+metrics objectを再検証する。正式画像公開後の`succeeded`更新と同じSQLite transactionで監査世代と
+warningを挿入し、失敗時はDBと正式画像を従来どおりrollbackする。同じsource・`book_id`の再撮影が
+成功した場合は旧監査世代を削除せずsupersedeし、新世代だけを通常APIへ返す。新世代はwarning 0件でも
+作るため、旧画像の候補が現画像へ残らない。将来の再監査はpolicy versionまたはquality証跡digestが異なる
+新世代として保存し、旧世代をsupersedeする。新世代の既読状態は引き継がない。
+
+UIは登録成功と分離した「要確認候補」とし、書籍・code単位で件数をまとめ、対象ページを既存readerで
+開けるようにする。失敗toast、自動削除、OCR開始の自動停止には流用せず、章扉・表紙・挿絵・奥付等の
+正常例を含む旨を明示する。
 
 ### 7.2 シリーズ直列実行
 
@@ -232,6 +245,11 @@ invalidate範囲、toast文言、responsive layoutをこの再配置では変更
 - pollingにより確認ダイアログ表示後にactive jobが判明した場合は確定ボタンも無効化し、
   handlerでもjob作成を行わない。backendの全体最大1件transaction制約は競合時の最終防衛線として維持する。
 - キャプチャページは active / failed / succeeded の工程、経過時間、撮影画面数、失敗別対処を表示し、failed job は確認ダイアログから新しい job として再実行する。
+- 同ページの要確認候補は`unread / read / all`を切り替え、未確認件数、code別説明、候補ページ、
+  確認済み／未確認操作を表示する。ページ導線はnovelを`/novel/reader/:bookName?page=N`、
+  comicを`/comic?file=:bookId&page=N`で開く。novelの`bookName`は保存用`book_id`末尾の`.pdf`を
+  除いた画像ディレクトリ名とする。comic readerの`page`は初回表示だけに適用し、
+  通常の別書籍選択ではURLから除去する。
 - 取込・管理は既存 3 API の順次実行と個別実行、最終結果、旧 DB 移行を集約する。
 - 購入書籍の検索語、フィルター、ページ、ページ件数は URL クエリを正本とし、検索入力だけ 300ms のデバウンスを持つ。
 - queryの許容値、既定25件、25/50/100件、正のpage検証、条件変更時のpage resetは

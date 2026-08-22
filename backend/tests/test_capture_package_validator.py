@@ -5,7 +5,10 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from services.kindle_catalog.capture_package_validator import validate_ready_dir
+from services.kindle_catalog.capture_package_validator import (
+    build_quality_audit,
+    validate_ready_dir,
+)
 
 
 def _job() -> dict:
@@ -164,4 +167,71 @@ def test_validator_rejects_blocking_overlay_candidate(tmp_path) -> None:
     _rewrite(ready, manifest)
 
     with pytest.raises(ValueError, match="overlay"):
+        validate_ready_dir(_job(), ready)
+
+
+def test_quality_audit_groups_valid_findings_by_code(tmp_path) -> None:
+    ready, manifest = _ready_package(tmp_path)
+    manifest["quality"]["findings"] = [
+        {
+            "code": "blank_or_sparse_candidate",
+            "severity": "warning",
+            "files": ["001.png"],
+            "metrics": {"mean_luma": 255.0},
+        },
+        {
+            "code": "blank_or_sparse_candidate",
+            "severity": "warning",
+            "files": ["001.png"],
+        },
+    ]
+    _rewrite(ready, manifest)
+
+    validated, _files = validate_ready_dir(_job(), ready)
+    audit = build_quality_audit(validated)
+
+    assert audit["qa_policy_version"] == "kindle-image-qa-v1"
+    assert len(audit["quality_sha256"]) == 64
+    assert audit["warnings"] == [
+        {
+            "code": "blank_or_sparse_candidate",
+            "finding_count": 2,
+            "files": ["001.png"],
+            "findings": manifest["quality"]["findings"],
+        }
+    ]
+
+
+@pytest.mark.parametrize(
+    "finding",
+    [
+        {
+            "code": "unknown_candidate",
+            "severity": "warning",
+            "files": ["001.png"],
+        },
+        {
+            "code": "blank_or_sparse_candidate",
+            "severity": "blocking",
+            "files": ["001.png"],
+        },
+        {
+            "code": "blank_or_sparse_candidate",
+            "severity": "warning",
+            "files": ["999.png"],
+        },
+        {
+            "code": "blank_or_sparse_candidate",
+            "severity": "warning",
+            "files": ["001.png"],
+            "metrics": None,
+        },
+    ],
+)
+def test_validator_rejects_invalid_warning_evidence(tmp_path, finding) -> None:
+    ready, manifest = _ready_package(tmp_path)
+    manifest["quality"]["findings"] = [finding]
+    _rewrite(ready, manifest)
+
+    with pytest.raises(ValueError, match="warning証跡"):
         validate_ready_dir(_job(), ready)

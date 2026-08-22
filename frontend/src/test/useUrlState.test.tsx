@@ -17,12 +17,13 @@ describe('useUrlState', () => {
         expect(result.current.selectedPdf).toBeNull();
     });
 
-    it('URL クエリから currentPath / selectedPdf が読み出される', () => {
+    it('URL クエリから currentPath / selectedPdf / initialPage が読み出される', () => {
         const { result } = renderHook(() => useUrlState(), {
-            wrapper: wrapper('/?path=sub&file=book.pdf'),
+            wrapper: wrapper('/?path=sub&file=book.pdf&page=7'),
         });
         expect(result.current.currentPath).toBe('sub');
         expect(result.current.selectedPdf).toBe('book.pdf');
+        expect(result.current.initialPage).toBe(7);
     });
 
     it('navigateIntoFolder で path が "{base}/{dir}" に更新', () => {
@@ -60,6 +61,7 @@ describe('useUrlState', () => {
         act(() => result.current.selectPdf('book.pdf', 'sub'));
         expect(result.current.selectedPdf).toBe('book.pdf');
         expect(result.current.currentPath).toBe('sub');
+        expect(result.current.initialPage).toBeUndefined();
     });
 
     it('selectPdf で author / series フィルターが保持される', () => {
@@ -74,11 +76,12 @@ describe('useUrlState', () => {
 
     it('clearPdf で file が消え、path は維持', () => {
         const { result } = renderHook(() => useUrlState(), {
-            wrapper: wrapper('/?file=x.pdf&path=sub'),
+            wrapper: wrapper('/?file=x.pdf&path=sub&page=4'),
         });
         act(() => result.current.clearPdf());
         expect(result.current.selectedPdf).toBeNull();
         expect(result.current.currentPath).toBe('sub');
+        expect(result.current.initialPage).toBeUndefined();
     });
 
     it('clearPdf で author / series フィルターが保持される', () => {

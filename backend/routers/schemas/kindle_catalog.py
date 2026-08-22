@@ -55,6 +55,10 @@ class AgentHeartbeatRequest(BaseModel):
     agent_id: str
 
 
+class CaptureQualityWarningReadRequest(BaseModel):
+    is_read: bool
+
+
 class KindleCatalogBookOut(BaseModel):
     asin: str
     title: str
@@ -242,3 +246,29 @@ class KindleCaptureCompleteResponse(BaseModel):
     source: Literal["comic", "novel"]
     book_id: str
     captured_screens: int
+
+
+class KindleCaptureQualityWarningOut(BaseModel):
+    id: int
+    audit_id: int
+    job_id: str
+    asin: str
+    title: str
+    source: Literal["comic", "novel"]
+    book_id: str
+    warning_policy_version: str
+    created_at: str
+    code: str
+    finding_count: int
+    files: list[str]
+    pages: list[int]
+    findings: list[dict]
+    is_read: bool
+    read_at: str | None
+
+
+class KindleCaptureQualityWarningsResponse(BaseModel):
+    items: list[KindleCaptureQualityWarningOut]
+    total: int
+    unread_count: int
+    read_count: int

@@ -99,6 +99,10 @@ export const API_ENDPOINTS = {
     KINDLE_CATALOG_LINK_CANDIDATES: '/api/kindle-catalog/links/candidates',
     KINDLE_CATALOG_LINKS: '/api/kindle-catalog/links',
     KINDLE_CAPTURE_JOBS: '/api/kindle-catalog/capture-jobs',
+    KINDLE_CAPTURE_QUALITY_WARNINGS: (status: 'unread' | 'read' | 'all') =>
+        `/api/kindle-catalog/capture-quality-warnings?status=${status}`,
+    KINDLE_CAPTURE_QUALITY_WARNING: (warningId: number) =>
+        `/api/kindle-catalog/capture-quality-warnings/${warningId}`,
     /** UI プリファレンス（フィルター + ピン）取得 */
     PREFS: (source: string) => `/api/prefs?source=${encodeURIComponent(source)}`,
     /** UI フィルター更新 */

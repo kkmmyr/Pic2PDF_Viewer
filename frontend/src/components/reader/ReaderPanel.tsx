@@ -15,6 +15,7 @@ interface ReaderPanelProps {
     selectedPdf: string;
     currentPath: string;
     currentSource: LibrarySource;
+    initialPage?: number;
     onPdfUpdated: () => void;
     onClose: () => void;
     /** 同フォルダ内の別書籍に切り替える（「次の巻へ」遷移用） */

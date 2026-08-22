@@ -1100,6 +1100,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/kindle-catalog/capture-quality-warnings': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Capture Quality Warnings */
+        get: operations['get_capture_quality_warnings_api_kindle_catalog_capture_quality_warnings_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-catalog/capture-quality-warnings/{warning_id}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Capture Quality Warning */
+        patch: operations['update_capture_quality_warning_api_kindle_catalog_capture_quality_warnings__warning_id__patch'];
+        trace?: never;
+    };
     '/api/kindle-catalog/agents/claim': {
         parameters: {
             query?: never;
@@ -2325,6 +2359,11 @@ export interface components {
             /** Expected Screens */
             expected_screens?: number | null;
         };
+        /** CaptureQualityWarningReadRequest */
+        CaptureQualityWarningReadRequest: {
+            /** Is Read */
+            is_read: boolean;
+        };
         /** CharacterDetail */
         CharacterDetail: {
             /** Name */
@@ -2921,6 +2960,57 @@ export interface components {
         KindleCaptureJobsResponse: {
             /** Items */
             items: components['schemas']['KindleCaptureJobOut'][];
+        };
+        /** KindleCaptureQualityWarningOut */
+        KindleCaptureQualityWarningOut: {
+            /** Id */
+            id: number;
+            /** Audit Id */
+            audit_id: number;
+            /** Job Id */
+            job_id: string;
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'comic' | 'novel';
+            /** Book Id */
+            book_id: string;
+            /** Warning Policy Version */
+            warning_policy_version: string;
+            /** Created At */
+            created_at: string;
+            /** Code */
+            code: string;
+            /** Finding Count */
+            finding_count: number;
+            /** Files */
+            files: string[];
+            /** Pages */
+            pages: number[];
+            /** Findings */
+            findings: {
+                [key: string]: unknown;
+            }[];
+            /** Is Read */
+            is_read: boolean;
+            /** Read At */
+            read_at: string | null;
+        };
+        /** KindleCaptureQualityWarningsResponse */
+        KindleCaptureQualityWarningsResponse: {
+            /** Items */
+            items: components['schemas']['KindleCaptureQualityWarningOut'][];
+            /** Total */
+            total: number;
+            /** Unread Count */
+            unread_count: number;
+            /** Read Count */
+            read_count: number;
         };
         /** KindleCatalogBookOut */
         KindleCatalogBookOut: {
@@ -6236,6 +6326,72 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['KindleCaptureJobOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_capture_quality_warnings_api_kindle_catalog_capture_quality_warnings_get: {
+        parameters: {
+            query?: {
+                status?: 'unread' | 'read' | 'all';
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureQualityWarningsResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    update_capture_quality_warning_api_kindle_catalog_capture_quality_warnings__warning_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                warning_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['CaptureQualityWarningReadRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindleCaptureQualityWarningOut'];
                 };
             };
             /** @description Validation Error */

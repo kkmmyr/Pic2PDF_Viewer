@@ -16,24 +16,21 @@ export type KindleImportRun = components['schemas']['KindleImportRunOut'];
 export type KindleImportRunsResponse = components['schemas']['KindleImportRunsResponse'];
 export type KindleCaptureJob = components['schemas']['KindleCaptureJobOut'];
 export type KindleCaptureJobsResponse = components['schemas']['KindleCaptureJobsResponse'];
+export type KindleCaptureQualityWarning = components['schemas']['KindleCaptureQualityWarningOut'];
+export type KindleCaptureQualityWarningsResponse =
+    components['schemas']['KindleCaptureQualityWarningsResponse'];
+export type KindleCaptureQualityWarningReadRequest =
+    components['schemas']['CaptureQualityWarningReadRequest'];
 export type KindleLinkRequest = components['schemas']['LinkRequest'];
 export type KindleCaptureJobCreateRequest = components['schemas']['CaptureJobCreateRequest'];
 export type KindleMigrationCommitRequest = components['schemas']['MigrationCommitRequest'];
 
 export type KindleBookType = 'comic' | 'novel' | 'other' | 'unknown' | '';
 export type KindleOwnership =
-    | 'purchased'
-    | 'borrowed_active'
-    | 'borrowed_ended'
-    | 'returned'
-    | 'unknown'
-    | '';
+    'purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown' | '';
 export type KindleCaptureState =
-    | 'not_captured'
-    | 'captured'
-    | 'multiple_links'
-    | 'capture_pending'
-    | '';
+    'not_captured' | 'captured' | 'multiple_links' | 'capture_pending' | '';
+export type KindleCaptureWarningStatus = 'unread' | 'read' | 'all';
 
 export interface KindleCatalogFilters {
     q: string;

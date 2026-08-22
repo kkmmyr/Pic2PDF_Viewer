@@ -6,6 +6,8 @@ export function useUrlState() {
 
     const currentPath = searchParams.get('path') || '';
     const selectedPdf = searchParams.get('file') || null;
+    const pageParam = Number.parseInt(searchParams.get('page') ?? '', 10);
+    const initialPage = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : undefined;
 
     const navigateIntoFolder = useCallback(
         (dirName: string, basePath: string) => {
@@ -33,6 +35,7 @@ export function useUrlState() {
             setSearchParams((prev) => {
                 const next = new URLSearchParams(prev);
                 next.set('file', pdfName);
+                next.delete('page');
                 if (currentPath) next.set('path', currentPath);
                 else next.delete('path');
                 return next;
@@ -45,6 +48,7 @@ export function useUrlState() {
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             next.delete('file');
+            next.delete('page');
             return next;
         });
     }, [setSearchParams]);
@@ -52,6 +56,7 @@ export function useUrlState() {
     return {
         currentPath,
         selectedPdf,
+        initialPage,
         navigateIntoFolder,
         navigateUp,
         selectPdf,

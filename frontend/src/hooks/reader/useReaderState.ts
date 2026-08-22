@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { pdfjs } from 'react-pdf';
 import type { LibrarySource, ReadingDirection } from '@/types';
 import { buildStaticUrl, STATIC_PATHS } from '@/config/api';
@@ -25,6 +25,7 @@ interface UseReaderStateProps {
     selectedPdf: string;
     currentPath: string;
     currentSource: LibrarySource;
+    initialPage?: number;
     onPdfUpdated: () => void;
     onClose: () => void;
     onSelectPdf?: (name: string) => void;
@@ -39,12 +40,14 @@ export function useReaderState({
     selectedPdf,
     currentPath,
     currentSource,
+    initialPage,
     onPdfUpdated,
     onClose,
     onSelectPdf,
 }: UseReaderStateProps) {
     const { height: windowHeight } = useWindowSize();
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
+    const initialPageKey = useRef<string | null>(null);
 
     const {
         numPages,
@@ -199,6 +202,14 @@ export function useReaderState({
     useEffect(() => {
         if (isImageMode) setNumPages(imageNumPages);
     }, [selectedPdf, isImageMode, imageNumPages, setNumPages]);
+
+    useEffect(() => {
+        if (numPages <= 0) return;
+        const key = `${selectedPdf}\u0000${initialPage ?? 1}`;
+        if (initialPageKey.current === key) return;
+        initialPageKey.current = key;
+        setPageNumber(Math.min(initialPage ?? 1, numPages));
+    }, [selectedPdf, initialPage, numPages, setPageNumber]);
 
     // ページペア切替時に Auto 見開き判定をリセット。直後に PageRenderer の onRenderSuccess
     // で左右両ページの寸法が通知され、片方でも横長なら 1 ページ表示に確定する。

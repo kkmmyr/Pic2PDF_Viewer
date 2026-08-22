@@ -7,12 +7,14 @@ vi.mock('@/features/kindle/queries', () => ({
     useKindleLinking: vi.fn(),
     useKindleLinkCandidates: vi.fn(),
     useKindleCaptureJobs: vi.fn(),
+    useKindleCaptureQualityWarnings: vi.fn(),
     useKindleImports: vi.fn(),
 }));
 
 import {
     useKindleBooks,
     useKindleCaptureJobs,
+    useKindleCaptureQualityWarnings,
     useKindleImports,
     useKindleLinkCandidates,
     useKindleLinking,
@@ -26,12 +28,14 @@ const mockedUseKindleBooks = vi.mocked(useKindleBooks);
 const mockedUseKindleLinking = vi.mocked(useKindleLinking);
 const mockedUseKindleLinkCandidates = vi.mocked(useKindleLinkCandidates);
 const mockedUseKindleCaptureJobs = vi.mocked(useKindleCaptureJobs);
+const mockedUseKindleCaptureQualityWarnings = vi.mocked(useKindleCaptureQualityWarnings);
 const mockedUseKindleImports = vi.mocked(useKindleImports);
 const link = vi.fn();
 const importOrders = vi.fn();
 const importKindleInfo = vi.fn();
 const importAutobuy = vi.fn();
 const createCaptureJob = vi.fn();
+const updateWarningRead = vi.fn();
 
 const book = {
     asin: 'B000TEST01',
@@ -61,6 +65,8 @@ describe('Kindle catalog pages', () => {
         importKindleInfo.mockReset();
         importAutobuy.mockReset();
         createCaptureJob.mockReset();
+        updateWarningRead.mockReset();
+        updateWarningRead.mockResolvedValue(undefined);
         link.mockResolvedValue({
             source: 'comic',
             book_id: 'existing-book',
@@ -180,6 +186,16 @@ describe('Kindle catalog pages', () => {
             error: null,
             createCaptureJob,
             creatingCaptureJob: false,
+        });
+        mockedUseKindleCaptureQualityWarnings.mockReturnValue({
+            warnings: [],
+            total: 0,
+            unreadCount: 0,
+            readCount: 0,
+            isLoading: false,
+            error: null,
+            updateRead: updateWarningRead,
+            updatingWarningId: null,
         });
         mockedUseKindleImports.mockReturnValue({
             stats: {
@@ -444,6 +460,97 @@ describe('Kindle catalog pages', () => {
         expect(screen.getByText('KindleライブラリでASINを照合しています。')).toBeInTheDocument();
         expect(screen.getByText('0 画面')).toBeInTheDocument();
         expect(screen.getByText('windows-test')).toBeInTheDocument();
+    });
+
+    it('品質warningを確認管理し、comicの候補ページを直接開ける', async () => {
+        mockedUseKindleCaptureQualityWarnings.mockReturnValue({
+            warnings: [
+                {
+                    id: 11,
+                    audit_id: 7,
+                    job_id: 'job-quality',
+                    asin: 'B000TEST01',
+                    title: 'テスト作品 1巻',
+                    source: 'comic',
+                    book_id: 'テスト作品 1巻.pdf',
+                    warning_policy_version: 'kindle-image-warning-v1',
+                    created_at: '2026-08-22T12:00:00+09:00',
+                    code: 'blank_or_sparse_candidate',
+                    finding_count: 2,
+                    files: ['001.png', '003.png'],
+                    pages: [1, 3],
+                    findings: [],
+                    is_read: false,
+                    read_at: null,
+                },
+            ],
+            total: 1,
+            unreadCount: 1,
+            readCount: 0,
+            isLoading: false,
+            error: null,
+            updateRead: updateWarningRead,
+            updatingWarningId: null,
+        });
+        renderWithRouter(<KindleCapturePage />, '/kindle/capture');
+
+        expect(screen.getByText('白紙・低情報量候補')).toBeInTheDocument();
+        expect(screen.getByText(/正常なページも含まれます/)).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText(/候補ページ/), { target: { value: '3' } });
+        const pageLink = screen.getByRole('link', {
+            name: 'テスト作品 1巻の3ページを開く',
+        });
+        const href = pageLink.getAttribute('href') ?? '';
+        expect(decodeURIComponent(href.replaceAll('+', ' '))).toBe(
+            '/comic?file=テスト作品 1巻.pdf&page=3',
+        );
+        expect(pageLink).toHaveAttribute('target', '_blank');
+
+        fireEvent.click(screen.getByRole('button', { name: '確認済みにする' }));
+        await waitFor(() =>
+            expect(updateWarningRead).toHaveBeenCalledWith({ warningId: 11, isRead: true }),
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: '確認済み 0' }));
+        expect(mockedUseKindleCaptureQualityWarnings).toHaveBeenLastCalledWith('read');
+    });
+
+    it('novelの品質warningは拡張子を除いたreader導線を使う', () => {
+        mockedUseKindleCaptureQualityWarnings.mockReturnValue({
+            warnings: [
+                {
+                    id: 12,
+                    audit_id: 8,
+                    job_id: 'job-novel-quality',
+                    asin: 'B000NOVEL1',
+                    title: '小説作品',
+                    source: 'novel',
+                    book_id: '小説作品.pdf',
+                    warning_policy_version: 'kindle-image-warning-v1',
+                    created_at: '2026-08-22T12:00:00+09:00',
+                    code: 'novel_edge_content_candidate',
+                    finding_count: 1,
+                    files: ['005.png'],
+                    pages: [5],
+                    findings: [],
+                    is_read: false,
+                    read_at: null,
+                },
+            ],
+            total: 1,
+            unreadCount: 1,
+            readCount: 0,
+            isLoading: false,
+            error: null,
+            updateRead: updateWarningRead,
+            updatingWarningId: null,
+        });
+        renderWithRouter(<KindleCapturePage />, '/kindle/capture');
+
+        const pageLink = screen.getByRole('link', { name: '小説作品の5ページを開く' });
+        expect(decodeURIComponent(pageLink.getAttribute('href') ?? '')).toBe(
+            '/novel/reader/小説作品?page=5',
+        );
     });
 
     it('失敗ジョブは原因と対処を表示し、確認後に新しいジョブで再実行する', async () => {

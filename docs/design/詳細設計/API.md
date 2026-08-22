@@ -164,6 +164,13 @@ OpenAPI 上は `text/event-stream` としてしか表現されず中身が読め
 - **シリーズ並べ替えの再採番規則**: `series/reorder` は渡された配列の順序どおりに `series_index` を `1.0, 2.0, 3.0, ...` へ振り直す（欠番・重複を許さず常に連番化する。DnD 並べ替え UI からの呼び出しを想定）。
 
 - **Hitomi検出履歴**: `GET /api/hitomi/new-arrivals` は `status=unread|read|all`（既定 `unread`）、`offset`、`limit` を受け付ける。レスポンスは選択状態の `total` と全体の `unread_count` / `read_count` を含む。既読化は `is_read=1` と `read_at` の更新であり、作品行を削除しない。旧 `new_arrivals.json` から移行した既読行は元データに既読日時がないため `read_at=null` のまま保持する。
+- **Kindle capture品質warning**:
+  - `GET /api/kindle-catalog/capture-quality-warnings`は`status=unread|read|all`（既定`unread`）を受け、
+    現在の正式画像に対応するactive監査世代だけから書籍・warning code単位の候補、対象ページ、
+    `total` / `unread_count` / `read_count`を返す。
+  - `PATCH /api/kindle-catalog/capture-quality-warnings/{warning_id}`は`is_read`だけを更新し、
+    `true`ではJSTの`read_at`を設定、`false`では`read_at=null`へ戻す。supersede済み世代は更新しない。
+  - warningは登録成功と独立した確認補助であり、API操作によって画像、OCR、capture job状態を変更しない。
 
 ---
 

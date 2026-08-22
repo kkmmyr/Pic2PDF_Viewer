@@ -15,6 +15,14 @@ _TERMINATION_REASONS = {
     "visual_no_change_after_retries",
     "expected_screen_count_confirmed",
 }
+_WARNING_CODES = {
+    "adjacent_near_duplicate_candidate",
+    "blank_or_sparse_candidate",
+    "exact_duplicate_candidate",
+    "low_size_candidate",
+    "novel_edge_content_candidate",
+    "repeated_screen_overlay_candidate",
+}
 
 
 def safe_title(title: str) -> str:
@@ -161,7 +169,12 @@ def _validate_geometry(capture: dict, dimensions: tuple[int, int]) -> list[int]:
     return crop
 
 
-def _validate_quality(quality: dict, count: int, dimensions: tuple[int, int]) -> None:
+def _validate_quality(
+    quality: dict,
+    count: int,
+    dimensions: tuple[int, int],
+    declared_names: set[str],
+) -> None:
     if (
         quality.get("schema_version") != 1
         or quality.get("policy_version") != "kindle-image-qa-v1"
@@ -184,6 +197,51 @@ def _validate_quality(quality: dict, count: int, dimensions: tuple[int, int]) ->
         or overlay.get("blocking_candidate_count") != 0
     ):
         raise ValueError("capture overlay detector evidence is invalid")
+    for finding in quality["findings"]:
+        if (
+            not isinstance(finding, dict)
+            or finding.get("code") not in _WARNING_CODES
+            or finding.get("severity") != "warning"
+            or not isinstance(finding.get("files"), list)
+            or not finding["files"]
+            or not all(isinstance(name, str) and name in declared_names for name in finding["files"])
+            or ("metrics" in finding and not isinstance(finding["metrics"], dict))
+        ):
+            raise ValueError("登録前画像QAのwarning証跡が不正です")
+
+
+def build_quality_audit(manifest: dict) -> dict:
+    """検証済みmanifestからDB保存用の決定的な監査データを組み立てる。"""
+    quality = manifest["quality"]
+    grouped: dict[str, dict] = {}
+    for finding in quality["findings"]:
+        warning = grouped.setdefault(
+            finding["code"],
+            {"code": finding["code"], "findings": [], "files": set()},
+        )
+        warning["findings"].append(finding)
+        warning["files"].update(finding["files"])
+    warnings = [
+        {
+            "code": code,
+            "finding_count": len(item["findings"]),
+            "files": sorted(item["files"]),
+            "findings": item["findings"],
+        }
+        for code, item in sorted(grouped.items())
+    ]
+    canonical_quality = json.dumps(
+        quality,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "qa_policy_version": quality["policy_version"],
+        "warning_policy_version": quality["warning_policy_version"],
+        "quality_sha256": hashlib.sha256(canonical_quality).hexdigest(),
+        "warnings": warnings,
+    }
 
 
 def _validate_canary(capture: dict, crop: list[int], dimensions: tuple[int, int]) -> None:
@@ -219,6 +277,11 @@ def validate_ready_dir(job: dict, ready_dir: Path) -> tuple[dict, list[Path]]:
     count = len(files)
     _validate_completion(job, capture, count, manifest["files"][-1]["name"])
     crop = _validate_geometry(capture, dimensions)
-    _validate_quality(quality, count, dimensions)
+    _validate_quality(
+        quality,
+        count,
+        dimensions,
+        {item["name"] for item in manifest["files"]},
+    )
     _validate_canary(capture, crop, dimensions)
     return manifest, files

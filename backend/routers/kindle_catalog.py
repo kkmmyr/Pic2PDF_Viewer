@@ -13,6 +13,8 @@ from routers.api_schemas import (
     KindleCaptureHeartbeatResponse,
     KindleCaptureJobOut,
     KindleCaptureJobsResponse,
+    KindleCaptureQualityWarningOut,
+    KindleCaptureQualityWarningsResponse,
     KindleCatalogBooksResponse,
     KindleCatalogSourceStatusResponse,
     KindleCatalogStatsResponse,
@@ -31,12 +33,14 @@ from routers.schemas.kindle_catalog import (
     AgentHeartbeatRequest,
     AgentStateRequest,
     CaptureJobCreateRequest,
+    CaptureQualityWarningReadRequest,
     LinkRequest,
     MigrationCommitRequest,
     UnlinkRequest,
 )
 from services.kindle_catalog import (
     capture_jobs,
+    capture_quality_warnings,
     enrichment_imports,
     imports,
     legacy_source_status,
@@ -184,6 +188,30 @@ def create_capture_job(request: CaptureJobCreateRequest):
 @router.get("/capture-jobs", response_model=KindleCaptureJobsResponse)
 def get_capture_jobs(limit: int = Query(default=100, ge=1, le=500)):
     return {"items": capture_jobs.list_jobs(limit)}
+
+
+@router.get(
+    "/capture-quality-warnings",
+    response_model=KindleCaptureQualityWarningsResponse,
+)
+def get_capture_quality_warnings(
+    status: Literal["unread", "read", "all"] = "unread",
+):
+    return capture_quality_warnings.list_warnings(status)
+
+
+@router.patch(
+    "/capture-quality-warnings/{warning_id}",
+    response_model=KindleCaptureQualityWarningOut,
+)
+def update_capture_quality_warning(
+    warning_id: int,
+    request: CaptureQualityWarningReadRequest,
+):
+    try:
+        return capture_quality_warnings.set_read(warning_id, request.is_read)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post(

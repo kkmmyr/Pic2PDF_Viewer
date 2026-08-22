@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useKindleCaptureJobs } from '@/features/kindle/queries';
 import type { KindleCaptureJob } from '@/features/kindle/types';
+import { KindleCaptureQualityWarnings } from '@/features/kindle/KindleCaptureQualityWarnings';
 import { formatDateTimeJa } from '@/utils/date';
 import { errorMessage } from '@/utils/error';
 
@@ -237,6 +238,8 @@ export function KindleCaptureScreen() {
                         {errorMessage(capture.error, 'キャプチャジョブを取得できませんでした')}
                     </Alert>
                 )}
+
+                <KindleCaptureQualityWarnings />
 
                 <section className="mt-4">
                     <div className="mb-3 flex flex-wrap items-end justify-between gap-2">

@@ -8,7 +8,8 @@ import { useLibraryStore } from '@/stores/libraryStore';
 import { pdfQueryKey } from '@/hooks/library/useLibraryPdfs';
 
 function LibraryView() {
-    const { currentPath, selectedPdf, navigateUp, selectPdf, clearPdf } = useUrlState();
+    const { currentPath, selectedPdf, initialPage, navigateUp, selectPdf, clearPdf } =
+        useUrlState();
     const currentSource = useCurrentSource();
     const { setContext } = useLibraryStore();
     const queryClient = useQueryClient();
@@ -41,6 +42,7 @@ function LibraryView() {
                     selectedPdf={selectedPdf}
                     currentPath={currentPath}
                     currentSource={currentSource}
+                    initialPage={initialPage}
                     onPdfUpdated={handlePdfUpdated}
                     onClose={clearPdf}
                     onSelectPdf={handlePdfClick}
