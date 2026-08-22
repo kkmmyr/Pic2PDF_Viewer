@@ -332,6 +332,19 @@
       "owner": "novel-ocr",
       "reason": "timeboxed NDL OCR and Parseq training/recovery experiments",
       "recheck_after": "2026-11-16"
+    },
+    {
+      "id": "sol-image-ocr-campaign",
+      "patterns": [
+        "backend/services/novel_db/sol_ocr_campaign.py",
+        "backend/services/novel_db/sol_ocr_holdout.py",
+        "backend/services/novel_db/sol_ocr_import.py",
+        "backend/tools/sol_ocr_*.py"
+      ],
+      "classification": "temporary",
+      "owner": "novel-ocr",
+      "reason": "timeboxed Sol image OCR tuning, holdout, and reproducibility tooling; not a runtime API",
+      "recheck_after": "2026-11-16"
     }
   ]
 }
