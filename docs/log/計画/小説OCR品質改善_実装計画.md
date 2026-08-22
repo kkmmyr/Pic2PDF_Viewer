@@ -168,8 +168,11 @@ OCR品質が合格しても公開処理の安全性は別に検証する。
 途中失敗、OCR agentのheartbeat timeoutについて、旧本文・FTS・active publicationを同時に保持する
 明示的な回帰testが不足していた。この3境界を追加し、公開transaction先頭で同一runを
 `state='awaiting_qa'`条件付きno-op updateにより原子的にclaimして、同時再承認が二重publicationを
-作らないことも固定する。backup失敗・実ディスク不足と実process hangは、mock DB例外だけで完了扱いにせず、
-隔離DBとserver運用試験を別途保存してH5を完了する。
+作らないことも固定する。追加監査で確認したSQLite Online Backupの未接続は、公開・rollbackの
+書き込み予約後・canonical変更前に検証済み世代を原子的に作成し、参照をpublication履歴へ残す実装で解消した。
+実backupの復元と`integrity_check`、backup例外時のcanonical無変更は自動testで固定した。
+実ディスク不足と実process hang、本番filesystemでの世代公開は、mock DB例外だけで完了扱いにせず、
+隔離server運用試験を別途保存してH5を完了する。
 
 ## 9. 完了条件
 

@@ -271,3 +271,17 @@ JSSODa-testと実文書由来のVJRODaを用いる。同研究は既存MLLMが�
 出力契約のfail-fast用途に限定し、B-35正式値は同一画像SHAの人手verified ground truthだけでCERを
 計算する。screening通過後も、開封済み30画面でページ最大CER、列欠落、固有名詞、小書き文字・約物を
 確認し、固定候補が全項目へ届くまで新holdoutを消費しない。
+
+## 17. 2026-08-22: 公開前Online Backupの設計差分
+
+公開・rollbackはSQLite transactionで本文、FTS、active publicationを一体更新するが、設計で必須とした
+transaction前のSQLite Online Backup呼び出しが実装経路に存在しなかった。transaction rollbackは
+論理的な途中失敗を防ぐ一方、filesystem障害やDBファイル単位の復旧点を代替しない。
+
+公開操作ごとに`novel.db`をOnline Backupし、復元先で`integrity_check=ok`を確認してから世代を原子的に
+公開する実装へ変更した。backup失敗時はOCR公開transactionへ入らず、公開前世代を実際に開いて
+runとpublicationの状態を照合するtestも追加した。実ディスク不足とprocess hang、本番filesystem上の
+世代公開は、通常の一時ディレクトリtestだけで実運用合格とせず、隔離serverで別に確認する。
+
+各公開・rollbackの完全DB世代を監査用に保持し、自動削除は行わない。公開頻度は低い前提だが、
+本番昇格前に1世代の実サイズ、保存先空き容量、日次server backupへ退避後の保持規則を確認する。

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .connection import open_db, with_db
+from .ocr_publication_backup import append_backup_reference, create_verified_publication_backup
 from .ocr_run_store import OcrInputPage, collect_input_pages
 
 
@@ -212,11 +213,13 @@ def activate_published_run(run_id: int, actor: str, note: str | None = None) -> 
                 )
             )
 
+        book = conn.execute("SELECT id FROM books WHERE name=?", (book_name,)).fetchone()
+        if book is None:
+            raise LookupError(f"book not found for OCR run: {book_name}")
+        book_id = int(book[0])
         with conn:
-            book = conn.execute("SELECT id FROM books WHERE name=?", (book_name,)).fetchone()
-            if book is None:
-                raise LookupError(f"book not found for OCR run: {book_name}")
-            book_id = int(book[0])
+            conn.execute("BEGIN IMMEDIATE")
+            backup_reference = create_verified_publication_backup(run_id, "rollback")
             conn.execute(
                 "UPDATE books SET images_dir=?, page_count=?, indexed_at=NULL, "
                 "ocr_done_at=datetime('now', '+9 hours') WHERE id=?",
@@ -229,7 +232,7 @@ def activate_published_run(run_id: int, actor: str, note: str | None = None) -> 
                 pages=pages,
                 actor=actor,
                 action="rollback",
-                note=note,
+                note=append_backup_reference(note, backup_reference),
             )
 
 

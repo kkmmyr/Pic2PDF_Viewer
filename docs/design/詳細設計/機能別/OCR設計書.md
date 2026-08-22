@@ -251,7 +251,13 @@ OCR完了と公開承認を分離する。全ページ処理後はまず `awaiti
 2. `corrected_text`が非空なら `selected_engine=codex` を同じQA更新で保存する。
 3. `required` / `rejected` / 未知のQA状態が残るrunは公開しない。
 4. 公開本文、FTS、`books.ocr_done_at` は同一公開処理で整合させる。
-5. 公開修復前にSQLite Online Backupを取得し、失敗時は旧公開本文と索引を保持する。
+5. 公開・rollbackは`BEGIN IMMEDIATE`で書き込み順を予約した後、canonical変更前にSQLite Online
+   Backupを取得し、`integrity_check=ok`、SHA-256、run ID、操作種別をmanifestへ記録する。
+   世代は`NOVEL_DB_DIR`の兄弟にある
+   `ocr-publication-backups/`へ一時ディレクトリから原子的に公開し、backupまたはmanifest作成の
+   失敗時は予約transactionをrollbackして旧公開本文と索引を保持する。publication noteには検証済み世代の
+   参照を付加する。参照切れを避けるため自動削除は行わず、本番では世代サイズと空き容量を監視し、
+   日次server backupへ退避済みの世代だけを別承認で整理する。
 6. raw候補、補正文、入力画像SHA、model revision、承認者・日時を監査可能に保つ。
 7. 初回Sol昇格前に、現在のcanonical本文を`engine=legacy / model=pre-sol-snapshot`の合成runへ
    保存する。既存approved runは現在のcanonical本文と一致する保証がないため流用しない。
@@ -371,7 +377,8 @@ Levenshteinで既存の編集距離と完全一致させ、以後はページ単
 
 OCR agentのheartbeat timeout、部分ページ、worker出力不正はstaging/runを失敗または未完了の
 状態へ留め、canonical本文へ到達しない。これらのDB不変条件は自動testで固定するが、backup失敗、
-実ディスク不足、実process hangは隔離環境の運用試験を別途必要とする。
+SQLite Online Backupの生成・復元、backup失敗時の無変更は自動testで固定する。実ディスク不足、
+実process hang、および本番と同じfilesystem上での世代公開は隔離serverの運用試験を別途必要とする。
 
 ## 6. Codex補助QAの委任境界
 

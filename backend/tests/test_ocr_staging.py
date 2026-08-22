@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -8,8 +9,8 @@ from threading import Barrier
 import pytest
 from PIL import Image
 
+from services.novel_db import ocr_publication_history, ocr_qa_publication
 from services.novel_db import ocr_qa as qa_facade
-from services.novel_db import ocr_qa_publication
 from services.novel_db import ocr_staging as staging_facade
 from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
@@ -418,6 +419,99 @@ def test_concurrent_run_approval_creates_one_publication(staged_book, monkeypatc
         run = conn.execute("SELECT state, qa_state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
     assert [row[0] for row in publications] == ["publish"]
     assert tuple(run) == ("completed", "approved")
+
+
+def test_publication_creates_verified_pre_transaction_backup(staged_book, tmp_data_dir) -> None:
+    run_id, _ = _prepare_approved_run(staged_book)
+
+    approve_and_publish_run(run_id, "tester", "operator note")
+
+    backup_root = Path(tmp_data_dir["NOVEL_DB_DIR"]).parent / "ocr-publication-backups"
+    generations = [path for path in backup_root.iterdir() if path.is_dir()]
+    assert len(generations) == 1
+    generation = generations[0]
+    manifest = json.loads((generation / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["operation"] == "publish"
+    assert manifest["run_id"] == run_id
+    assert manifest["integrity_check"] == "ok"
+    assert manifest["bytes"] == (generation / "novel.db").stat().st_size
+    assert len(manifest["sha256"]) == 64
+    with sqlite3.connect(generation / "novel.db") as restored:
+        restored_run = restored.execute(
+            "SELECT state, qa_state FROM ocr_runs WHERE id=?",
+            (run_id,),
+        ).fetchone()
+        restored_publications = restored.execute("SELECT COUNT(*) FROM ocr_publications").fetchone()[0]
+    assert restored_run == ("awaiting_qa", "pending")
+    assert restored_publications == 0
+    with with_db() as conn:
+        note = conn.execute(
+            "SELECT note FROM ocr_publications WHERE run_id=? AND retired_at IS NULL",
+            (run_id,),
+        ).fetchone()[0]
+    assert note == f"operator note; verified backup={generation}"
+
+
+def test_publication_backup_failure_preserves_canonical_state(staged_book, monkeypatch) -> None:
+    run_id, book_name = _prepare_approved_run(staged_book)
+    book_id = _seed_existing_canonical(book_name)
+
+    def fail_backup(*_args, **_kwargs) -> str:
+        raise OSError("forced publication backup failure")
+
+    monkeypatch.setattr(ocr_qa_publication, "create_verified_publication_backup", fail_backup)
+    with pytest.raises(OSError, match="forced publication backup failure"):
+        approve_and_publish_run(run_id, "tester")
+
+    with with_db() as conn:
+        book = conn.execute(
+            "SELECT images_dir, page_count, indexed_at, ocr_done_at FROM books WHERE id=?",
+            (book_id,),
+        ).fetchone()
+        pages = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id=? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        fts_texts = conn.execute("SELECT full_text FROM pages_fts ORDER BY rowid").fetchall()
+        publications = conn.execute("SELECT COUNT(*) FROM ocr_publications").fetchone()[0]
+        run = conn.execute("SELECT state, qa_state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
+    assert tuple(book) == ("old-images", 2, "old-index", "old-ocr")
+    assert [tuple(row) for row in pages] == [(1, "旧本文一"), (2, "旧本文二")]
+    assert [row[0] for row in fts_texts] == ["旧本文一", "旧本文二"]
+    assert publications == 0
+    assert tuple(run) == ("awaiting_qa", "pending")
+
+
+def test_rollback_backup_failure_keeps_active_publication(staged_book, monkeypatch) -> None:
+    run_id, book_name = _prepare_approved_run(staged_book)
+    book_id = _seed_existing_canonical(book_name)
+    approve_and_publish_run(run_id, "tester")
+    with with_db() as conn:
+        publications = conn.execute(
+            "SELECT id, run_id FROM ocr_publications WHERE book_id=? ORDER BY id",
+            (book_id,),
+        ).fetchall()
+        legacy_run_id = int(publications[0][1])
+        active_publication_id = int(publications[1][0])
+
+    def fail_backup(*_args, **_kwargs) -> str:
+        raise OSError("forced rollback backup failure")
+
+    monkeypatch.setattr(ocr_publication_history, "create_verified_publication_backup", fail_backup)
+    with pytest.raises(OSError, match="forced rollback backup failure"):
+        activate_published_run(legacy_run_id, "tester")
+
+    with with_db() as conn:
+        pages = conn.execute(
+            "SELECT page_no, full_text FROM pages WHERE book_id=? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        active = conn.execute(
+            "SELECT id, run_id FROM ocr_publications WHERE book_id=? AND retired_at IS NULL",
+            (book_id,),
+        ).fetchone()
+    assert [tuple(row) for row in pages] == [(1, "新本文1"), (2, "新本文2")]
+    assert tuple(active) == (active_publication_id, run_id)
 
 
 def test_publication_uses_reviewed_text_deletes_stale_pages_and_rebuilds_fts(staged_book) -> None:

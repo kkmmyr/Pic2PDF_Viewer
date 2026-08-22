@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 
 from .connection import with_db
+from .ocr_publication_backup import append_backup_reference, create_verified_publication_backup
 from .ocr_publication_history import PublicationPage, ensure_legacy_snapshot, publish_pages
 from .ocr_run_store import OcrInputPage, collect_input_pages, validate_complete_run
 from .page_fts import mark_page_fts_stale
@@ -108,7 +109,10 @@ def _publish_rows(
     with with_db() as conn:
         images_dir = input_pages[0].image_path.parent
         with conn:
+            conn.execute("BEGIN IMMEDIATE")
             _claim_run_for_publication(conn, run_id)
+            backup_reference = create_verified_publication_backup(run_id, "publish")
+            publication_note = append_backup_reference(note, backup_reference)
             existing = conn.execute("SELECT id FROM books WHERE name = ?", (book_name,)).fetchone()
             if existing is None:
                 cursor = conn.execute(
@@ -159,7 +163,7 @@ def _publish_rows(
                 pages=publication_pages,
                 actor=reviewer,
                 action="publish",
-                note=note,
+                note=publication_note,
             )
             conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
             mark_page_fts_stale(conn)
