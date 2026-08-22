@@ -60,18 +60,28 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 
 ### 1.2 運用手順とrollback
 
-**適用状態（2026-08-22 16:22 JST）**: productionへstage 1 `shadow`を適用済みである。active backendは
-`backend-20260822141221-47136`、LanceDBは`0.34.0`、Alembicは`0014`。page ICUは8,576行を完全構築し、
-source / active revision `0`、canonical SHA-256
-`94f0bfab52393f2c8bc7b0bb53ce8d7e338d0096764c71bac2f33e2dee153cd0`、SQLite integrity `ok`、
-未索引0件を確認した。production設定は`NOVEL_DB_LEXICAL_BACKEND=shadow`であり、利用者へ返す結果は
-従来FTS5のまま。`lance_icu`への昇格は未承認である。
+**適用状態（2026-08-22 16:45 JST）**: productionへstage 1 `shadow`を適用済みである。active backend / commonは
+`backend-20260822163430-62582` / `common/llm-20260822163430-62582`、LanceDBは`0.34.0`、Alembicは`0014`。
+LanceDBはrelease世代外の`/opt/pic2pdf-viewer/data/novel.lancedb`へ固定し、`chunks=3,489`、
+`summaries=18`、page ICU `8,576`行・未索引0件を保持する。page source / active revisionは`0`、
+canonical SHA-256は`94f0bfab52393f2c8bc7b0bb53ce8d7e338d0096764c71bac2f33e2dee153cd0`、SQLite integrityは`ok`。
+production設定は`NOVEL_DB_LEXICAL_BACKEND=shadow`であり、利用者へ返す結果は従来FTS5のまま。
+`lance_icu`への昇格は未承認である。
 
 holdout合格後の新世代`backend-20260822161815-61291`はsource / venv / HTTP probeに合格したが、
 省略時のLanceDB pathがversion付きbackend配下へ解決し、SQLite active pointerに対応するtableを
 継承しなかった。shadowはFTS5へ安全に縮退したものの、制御smoke 5件が5 / 5 fallbackとなったため
 旧世代へrollbackした。以後は`NOVEL_DB_DIR`の兄弟にLanceDBを固定し、切替前smokeで世代外pathと
 active ICU no-match検索を検証する。
+
+修正版のclean releaseは固定pathとpage ICUを検証してactive化した。ただし移行前は、page ICUが
+当時のactive release、`chunks` / `summaries`が直前releaseのLanceDBへ分かれており、page tableだけを
+固定pathへ複製した時点ではdense 2 tableが欠けていた。旧実体と検証済みbackupに同一内容が残っていることを
+確認し、共通backup lock・writer 0件・service一時停止下で3 tableを統合してatomic swapした。
+旧denseとのschema / 行multiset一致、dense 2 tableのvector検索、page ICU検索、service / HTTPを確認し、
+snapshot `2026-08-22_164434_post-lance-repair`の別directory復元試験でも3 tableの件数一致を確認した。
+今後のLanceDB移設はpage ICUの疎通だけで完了扱いにせず、移設前の全releaseとbackupからtable inventoryを
+照合し、既存の`chunks` / `summaries` / active page tableを同じ固定pathへ保存する。
 
 事前監査で検出したLanceDB `0.30.2`とdependency未同期の旧deploy経路は、source・common・venvを
 一体化した世代releaseへ置換した。active環境を直接更新せず、検証済みbackup、locked dependency、
@@ -370,6 +380,15 @@ p50 / p95 / max latency、0-hit件数、成功時top集合のJaccard平均 / p50
 - FTS5の順位契約はBM25 score昇順を第一キー、canonical `pages.id`昇順を第二キーとする。
   score同点時だけ一意なpage IDで順序を固定し、production検索と評価CLIで同じSQLを使う。これにより
   別connection / restartを跨ぐtop-k比較を決定的にし、shadow overlapから順序noiseを除く。
+- storage修正版commit `a035625`を含むclean generation
+  `/opt/pic2pdf-viewer/backend-20260822163430-62582`をactive化した。activation smokeは固定Lance path、
+  active ICU table、no-match検索、service / root / novel books HTTPを通過し、CI run `32559772894`も全job green。
+- 固定pathへの統合後、制御5 queryは成功5 / fallback 0、FTS5 p95 `2.908ms`、ICU p95 `14.752ms`、
+  FTS5 0-hit 4件、ICU 0-hit 0件、top集合Jaccard平均`.133333`だった。これは運用smokeであり、
+  実利用観測には数えない。
+- 復旧後snapshot `2026-08-22_164434_post-lance-repair`はSQLite 3種とLanceDB
+  `chunks=3,489` / `summaries=18` / page ICU `8,576`を別directoryへ復元検査済み。再起動後の
+  public root / books / MkDocsはHTTP 200、service error logは0件だった。
 
 2026-08-22の実装後統合試験では、固定SQLiteのread-only原本から別scratchへ複製し、既存Alembic
 0013から0014へupgradeして8,576ページを構築した。固定20問のtop 30順位は旧隔離ICU評価と20/20で

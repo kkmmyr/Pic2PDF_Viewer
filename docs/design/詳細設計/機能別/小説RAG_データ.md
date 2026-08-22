@@ -101,7 +101,7 @@
 | 環境変数 | デフォルト | 用途 |
 |---|---|---|
 | `NOVEL_DB_DIR` | `backend/data/novel_db` | `novel.db`（SQLite）の格納ディレクトリ（`__init__.py` 定義） |
-| `NOVEL_DB_LANCE_PATH` | `backend/data/novel.lancedb` | LanceDB ベクトルストアのパス |
+| `NOVEL_DB_LANCE_PATH` | `NOVEL_DB_DIR`の親にある`novel.lancedb`（通常開発では`backend/data/novel.lancedb`） | LanceDB ベクトルストアのパス。固定`NOVEL_DB_DIR`を持つLinuxではrelease世代外へ解決する |
 | `NOVEL_DB_LEXICAL_BACKEND` | `fts5` | lexical検索（`fts5` / `shadow` / `lance_icu`）。`shadow`はFTS5だけを返しICUを観測、`lance_icu`は障害時FTS5へfallback |
 | `NOVEL_DB_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama エンドポイント（embedding / Gemma） |
 | `NOVEL_DB_MLX_BASE_URL` | `http://127.0.0.1:11437` | Apple Silicon用MLX OpenAI互換エンドポイント。loopback限定で起動する |
@@ -190,9 +190,16 @@ Alembic upgrade、世代table作成、整合検査、active pointer切替まで�
 ### 3.4 データ格納先
 
 - SQLite: `backend/data/novel_db/novel.db`（`NOVEL_DB_DIR`）
-- LanceDB: `backend/data/novel.lancedb`（`NOVEL_DB_LANCE_PATH`。※novel.db とは別階層）
+- LanceDB: `NOVEL_DB_DIR`の親にある`novel.lancedb`（`NOVEL_DB_LANCE_PATH`。通常開発では
+  `backend/data/novel.lancedb`、Linux productionでは`/opt/pic2pdf-viewer/data/novel.lancedb`）
 - 小説の PDF / 画像 / サムネイル: `backend/data/kindle_novel/{pdfs,images,thumbnails}`（source=`novel` は内部的に `kindle_novel` ディレクトリに対応）
 - `kindle_novel/images/` 直下の各ディレクトリは書籍候補として列挙されるため、予備撮影・中断結果は置かない。診断データは `kindle_novel/capture_diagnostics/` 等の兄弟ディレクトリへ保管する。
+
+LanceDB directoryは`chunks`、`summaries`、世代別`pages_icu_*`を一体として扱う。release世代間の
+移設時はactive page tableの検索成功だけで完全性を判定せず、移設前の全実体と検証済みbackupから
+table名・schema・行内容を照合する。productionの2026-08-22復旧後基準は`chunks=3,489`、
+`summaries=18`、active page table `8,576`で、snapshot
+`2026-08-22_164434_post-lance-repair`の別directory復元試験に合格している。
 
 ---
 
