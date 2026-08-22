@@ -35,13 +35,16 @@ ssh "${LINUX}" "set -e; \
   test ! -e '${NEXT_BACKEND}' && test ! -L '${NEXT_BACKEND}'; \
   test ! -e '${NEXT_COMMON}' && test ! -L '${NEXT_COMMON}'; \
   test ! -e '${STAGED_WORKSPACE}' && test ! -L '${STAGED_WORKSPACE}'; \
-  mkdir -p '${NEXT_BACKEND}' '${NEXT_COMMON}' '${STAGED_WORKSPACE}/common'"
+  mkdir -p '${NEXT_BACKEND}' '${NEXT_COMMON}' '${STAGED_WORKSPACE}/common' \
+    '${STAGED_WORKSPACE}/kindle-pdf'"
 
 # uv workspace root（本番dependencyの正本）
 tar czf - -C "${SRC}" pyproject.toml uv.lock \
     | ssh "${LINUX}" "mkdir -p '${APP_ROOT}' && tar xzf - -C '${APP_ROOT}'"
 tar czf - -C "${SRC}" pyproject.toml uv.lock \
     | ssh "${LINUX}" "tar xzf - -C '${STAGED_WORKSPACE}'"
+tar czf - -C "${SRC}/kindle-pdf" pyproject.toml \
+    | ssh "${LINUX}" "tar xzf - -C '${STAGED_WORKSPACE}/kindle-pdf'"
 
 # backend (Python ソース・設定。.venv / data / __pycache__ は除外)
 # -prune でディレクトリごとスキップ（Git Bash では -not -path が効かないため）
