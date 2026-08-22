@@ -1700,12 +1700,14 @@ R@10回帰1件、MRR / nDCG悪化で不採用とした。第三者MLX 8bit版は
 | `backend/scripts/extract_characters.py` | キャラ一括抽出 CLI |
 | `backend/scripts/build_chunk_contexts.py` | チャンク contextualize 一括 CLI |
 | `backend/scripts/eval_novel_search.py` | FTS5 / LanceDB ICU・ngram lexical比較 CLI |
+| `backend/scripts/novel_search_holdout.py` | 未調整holdoutのsource / 関連page hashを検索前に検証するfail-closed境界 |
 | `backend/scripts/eval_novel_reranker_mlx.py` | 固定lexical候補のQwen3 reranker比較 CLI |
 | `backend/scripts/eval_novel_dense.py` | NPZから隔離LanceDBを作るdense比較・bge基準ゲート CLI |
 | `backend/scripts/export_novel_embeddings_mlx.py` | bge-m3 / Qwen3 Embedding / HarrierのMLX vector隔離生成 CLI |
 | `backend/scripts/export_novel_embeddings_pplx_mlx.py` | PPLX context vector隔離生成 CLI |
 | `backend/scripts/export_novel_embeddings_nemotron_mlx.py` | Nemotron-3-Embed vector隔離生成 CLI |
 | `backend/scripts/fixtures/novel_search_eval_v1.json` | 本文を含まない固定20問・関連page正解集合 |
+| `backend/scripts/fixtures/novel_search_holdout_v1.json` | B-37の別3冊・未調整12問。source / 関連page hash付き一回評価fixture |
 | `D:\61.tool\common\llm\local_llm\` | 共通 LLM クライアント（Backend ABC + 2 つの具象） |
 
 ---

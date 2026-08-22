@@ -24,6 +24,7 @@ from scripts.eval_novel_search import (
     open_sqlite_read_only,
     reciprocal_rank_fusion,
 )
+from scripts.novel_search_holdout import validate_sealed_fixture_corpus
 
 BOOK = "評価用の本"
 
@@ -234,3 +235,94 @@ def test_repository_fixture_is_frozen_and_meets_minimum_size() -> None:
     assert metadata["adoption_eligible"] is True
     assert len(cases) >= 20
     assert len(relevant_books) >= 3
+
+
+def test_sealed_fixture_validates_source_and_relevant_page_hashes(tmp_path: Path) -> None:
+    sqlite_path = tmp_path / "source.db"
+    _create_source_db(sqlite_path)
+    source_hash = "a" * 64
+    with sqlite3.connect(sqlite_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE novel_search_index_state (
+                index_name TEXT PRIMARY KEY,
+                source_sha256 TEXT,
+                status TEXT
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO novel_search_index_state VALUES ('page_icu', ?, 'active')",
+            (source_hash,),
+        )
+        text = str(conn.execute("SELECT full_text FROM pages WHERE id = 1").fetchone()[0])
+        metadata = {
+            "sealed_corpus": {
+                "page_fts_source_sha256": source_hash,
+                "pages": [
+                    {
+                        "book_name": BOOK,
+                        "page_no": 1,
+                        "full_text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+                    }
+                ],
+            }
+        }
+
+        result = validate_sealed_fixture_corpus(conn, metadata, {(BOOK, 1)})
+
+    assert result["valid"] is True
+    assert result["page_count"] == 1
+
+
+def test_sealed_fixture_rejects_changed_relevant_page(tmp_path: Path) -> None:
+    sqlite_path = tmp_path / "source.db"
+    _create_source_db(sqlite_path)
+    source_hash = "b" * 64
+    with sqlite3.connect(sqlite_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE novel_search_index_state (
+                index_name TEXT PRIMARY KEY,
+                source_sha256 TEXT,
+                status TEXT
+            )
+            """
+        )
+        conn.execute(
+            "INSERT INTO novel_search_index_state VALUES ('page_icu', ?, 'active')",
+            (source_hash,),
+        )
+        metadata = {
+            "sealed_corpus": {
+                "page_fts_source_sha256": source_hash,
+                "pages": [
+                    {
+                        "book_name": BOOK,
+                        "page_no": 1,
+                        "full_text_sha256": "0" * 64,
+                    }
+                ],
+            }
+        }
+
+        with pytest.raises(RuntimeError, match="page content mismatch"):
+            validate_sealed_fixture_corpus(conn, metadata, {(BOOK, 1)})
+
+
+def test_repository_holdout_is_sealed_and_disjoint_from_tuning_fixture() -> None:
+    fixtures = Path(__file__).parents[1] / "scripts" / "fixtures"
+    baseline_metadata, baseline_cases = load_fixture(fixtures / "novel_search_eval_v1.json")
+    holdout_metadata, holdout_cases = load_fixture(fixtures / "novel_search_holdout_v1.json")
+
+    baseline_books = {key.book_name for case in baseline_cases for key in case.relevant}
+    holdout_books = {key.book_name for case in holdout_cases for key in case.relevant}
+    sealed_pages = holdout_metadata["sealed_corpus"]["pages"]
+
+    assert baseline_metadata["label_status"] == "frozen-before-retrieval"
+    assert holdout_metadata["label_status"] == "sealed-before-first-retrieval"
+    assert holdout_metadata["adoption_eligible"] is True
+    assert len(holdout_cases) == 12
+    assert len(holdout_books) == 3
+    assert holdout_books.isdisjoint(baseline_books)
+    assert len(sealed_pages) == len({(row["book_name"], row["page_no"]) for row in sealed_pages})

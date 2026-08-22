@@ -408,3 +408,28 @@ result / manifest JSONは本文・snippet・embeddingを含まないため、has
 `eval_novel_dense.py`、`export_novel_embeddings_mlx.py`、
 `export_novel_embeddings_pplx_mlx.py`、`export_novel_embeddings_nemotron_mlx.py`、回帰testは
 `backend/tests/test_eval_novel_*.py`と`test_export_novel_embeddings_*.py`を正本とする。
+
+### 10.5 B-37 未調整holdoutの封印・一回評価
+
+既存20問の正解集合と検索結果を使わず、別シリーズの`後宮の烏`、
+`薬屋のひとりごと (ヒーロー文庫)`、`蜘蛛ですが、なにか？`から各4問、計12問を作る。
+各書籍で先頭・末尾5ページを除いたeligible page列の20% / 45% / 70% / 85%位置を先に固定し、
+その本文と隣接pageだけを読んで自然文query、関連page、3段階relevanceを付与する。方式別の検索順位、
+score、hit有無はfixtureをGitへcommit / pushするまで実行しない。
+
+fixture正本は`backend/scripts/fixtures/novel_search_holdout_v1.json`（SHA-256
+`8e8b3ccde781e90b2a7a13af21da356163f29a510288a4dbe230e9fba55fc86b`）とする。production page ICUの
+source SHA-256と全関連pageの本文SHA-256を同梱し、評価CLIは次を満たさなければindex構築・検索前に
+fail closedとする。
+
+- `novel_search_index_state.page_icu`が`active`で、source SHA-256が封印値と一致する。
+- fixtureの関連page集合と封印page集合が完全一致し、重複がない。
+- 各`book_name / page_no`が一意に存在し、`full_text` SHA-256が封印値と一致する。
+
+封印時のproduction read-only照合ではsource state一致、関連page 27件、本文hash不一致0件だった。
+この照合は検索API・FTS5・ICU queryを呼ばず、正解集合とcorpus同一性だけを確認した。
+
+封印後の評価は`current_fts5`とproduction候補と同設定の`lance_icu`だけを、limit 30、warmup 1回、
+実測3回で一度実行する。採用条件は個別Recall@10回帰0件、集約Recall@10非劣化、かつMRR@10または
+nDCG@10のどちらかが改善することとする。結果を開封したfixtureは採否にかかわらず調整用へ退役し、
+同じholdoutを見てquery・正解page・grade・tokenizer・閾値を変更して再採用判定しない。

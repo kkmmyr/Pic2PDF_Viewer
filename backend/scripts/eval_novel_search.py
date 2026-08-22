@@ -42,16 +42,12 @@ _BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
+from scripts.novel_search_holdout import validate_sealed_fixture_corpus
 from services.novel_db.search import build_fts5_or_query
 
 SCHEMA_VERSION = 1
 DEFAULT_FIXTURE = Path(__file__).with_name("fixtures") / "novel_search_eval_v1.json"
-LEXICAL_METHODS = (
-    "current_fts5",
-    "lance_icu",
-    "lance_ngram",
-    "lance_icu_ngram_rrf",
-)
+LEXICAL_METHODS = ("current_fts5", "lance_icu", "lance_ngram", "lance_icu_ngram_rrf")
 
 
 @dataclass(frozen=True, order=True)
@@ -537,6 +533,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         sqlite_info = inspect_sqlite(conn, args.sqlite)
         if sqlite_info["integrity_check"] != "ok":
             raise RuntimeError(f"SQLite integrity_check failed: {sqlite_info['integrity_check']}")
+        relevant_pages = {(key.book_name, key.page_no) for case in cases for key in case.relevant}
+        sealed_validation = validate_sealed_fixture_corpus(conn, fixture_metadata, relevant_pages)
         source_lance_info = inspect_source_lance(args.source_lance, conn) if args.source_lance else None
         pages = load_eligible_pages(conn)
         if len(pages) != sqlite_info["index_eligible_pages"]:
@@ -628,6 +626,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "sha256": _sha256_file(args.fixture),
                 "case_count": len(cases),
                 "relevant_book_count": len({key.book_name for case in cases for key in case.relevant}),
+                "sealed_corpus_validation": sealed_validation,
             },
             "corpus": {
                 "sqlite": sqlite_info,

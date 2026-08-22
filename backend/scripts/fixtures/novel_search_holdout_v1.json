@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "name": "novel-search-holdout-v1",
+  "created_at": "2026-08-22",
+  "sealed_at": "2026-08-22T15:50:42+09:00",
+  "label_status": "sealed-before-first-retrieval",
+  "adoption_eligible": true,
+  "labeling_basis": "既存20問・方式別順位・score・hit有無を見ず、固定位置の本文と隣接pageだけから作成。",
+  "selection_policy": {
+    "excluded_fixture": "novel_search_eval_v1.json",
+    "excluded_fixture_sha256": "b61f76a2f06e6980c82f9cacab0c78b49230ee6a778c7f404ed9d27d6c1a499e",
+    "book_policy": "既存fixtureと別シリーズ、100 eligible page以上の3冊をinventoryだけから固定",
+    "books": [
+      "後宮の烏",
+      "薬屋のひとりごと (ヒーロー文庫)",
+      "蜘蛛ですが、なにか？"
+    ],
+    "body_margin_pages": 5,
+    "eligible_body_positions": [0.2, 0.45, 0.7, 0.85],
+    "position_rounding": "round((eligible_body_count - 1) * position)",
+    "cases_per_book": 4
+  },
+  "sealed_corpus": {
+    "page_fts_source_sha256": "94f0bfab52393f2c8bc7b0bb53ce8d7e338d0096764c71bac2f33e2dee153cd0",
+    "pages": [
+      {
+        "book_name": "後宮の烏",
+        "page_no": 30,
+        "full_text_sha256": "830c60ae5076c99ac9efc9eb1461d354232ecd78208f205a5a7968a2022d33d4"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 31,
+        "full_text_sha256": "104d3e9032e2adda5156a1bfede1d74839ca797ee769df1672e419d2788e9d1c"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 32,
+        "full_text_sha256": "e707a3ef5c3c1e5da532e18e7be6d6ac565f20bdd63ea4588c12f359bebd7e30"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 61,
+        "full_text_sha256": "c4aa8a8909ea29e90f33855423bf3054ee39e2f72cfde6690aa605c63d75c485"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 91,
+        "full_text_sha256": "a673fa8170ffcdcfa82e729d5ff2f2c21edb9be3b9866062765c79aeb87ee806"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 92,
+        "full_text_sha256": "2838913bf6e72b8ec91f71cd545f45f4163174586266a42a8c106f9bee77459e"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 93,
+        "full_text_sha256": "0e2932a70d1ef96ce6d019f13f4d76ee48163b38571a46d847e672baa71d6943"
+      },
+      {
+        "book_name": "後宮の烏",
+        "page_no": 111,
+        "full_text_sha256": "3bf303461ae4193c9aabf8b6a4bede544074f605255a43d838382b89a989caad"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 33,
+        "full_text_sha256": "97779583c47df70e57c8267323d325a00d9d47c4c6c10a3ccd9e94b56e7bc890"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 34,
+        "full_text_sha256": "6888ebe1815b0c3ac6c2c3a816a6920d22668a1f9530d306a82a42e08566221b"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 35,
+        "full_text_sha256": "1061218190844b6bd6f420444aa0ed8e56b3021bddc91bdecb04ae2ff9ac67a1"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 62,
+        "full_text_sha256": "7e7b72c661298661e223590b7b0fd1717d44d2a909a9396218e5c971c029f601"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 63,
+        "full_text_sha256": "5bf41a2b0737704166af9043735c49b44a1d7e4d773b5e6bb2de9e467dd1680e"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 92,
+        "full_text_sha256": "4513d368a9a47a0888e537c0ab91abd844b0e4fbbbe78e386663ad7d93e43a5f"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 93,
+        "full_text_sha256": "96ea30e87d4a58da40e53bf4fd78c163c69d448f6ca22d11e682bcb2b7b27eed"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 110,
+        "full_text_sha256": "351365d885683f3dcf15736a43e0fe0f355f6e49e1b17dd03b015248bdd0d154"
+      },
+      {
+        "book_name": "薬屋のひとりごと (ヒーロー文庫)",
+        "page_no": 111,
+        "full_text_sha256": "1fc4f2863b1b894f2d585e32d483ad73700c0f9bd70ecfcbef13ea12d284d02d"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 43,
+        "full_text_sha256": "d77a9e3e2e8432e3503845ce630445ff8249991353438f361d7ccd6823f722c7"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 44,
+        "full_text_sha256": "eb98760d3f47a40c4acea63a6c5759c272e0fe463cd873e6f11f1a90a291aec9"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 90,
+        "full_text_sha256": "226ecefd13d4353e16c0f3f94a8ca6e0768f988afd6f159892e875ac4bdaa7b0"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 91,
+        "full_text_sha256": "c197e39a78362e41b17fa1f5b228fe9432cd9f21352ac41852c11123760c47c1"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 92,
+        "full_text_sha256": "00827526a70bbcd3166aebd3aa2bd830a1b21a34b2c404488992f04562d79c2a"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 137,
+        "full_text_sha256": "151ff2277eecc238fd6c9173b15838a3f8dbf1492355eb61577e96fa6474a069"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 138,
+        "full_text_sha256": "5bb5967eb6af2f07db34616a9921563c57b44b9f07def0b3282800ce8aa75681"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 166,
+        "full_text_sha256": "d64c6cefe11c495511b261815958737d82c730276fcaa4308a6e6c640baae5c8"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 167,
+        "full_text_sha256": "060efc13bbcbd6f2240f5071dafe38c51aa3accaf76e8f8b817f963eb385eb0d"
+      },
+      {
+        "book_name": "蜘蛛ですが、なにか？",
+        "page_no": 168,
+        "full_text_sha256": "a0f39ef264d8c2baebe4a3e7fbe8c74eef07a627d4cbfb4d157faf1a0966452a"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "koukyuu_jiju_accepts_role",
+      "query": "九九が寿雪の侍女を引き受けた決め手と、その直後に向かった場所",
+      "scope": {"type": "book", "book_name": "後宮の烏"},
+      "source": "sealed-position-20pct",
+      "relevant": [
+        {"book_name": "後宮の烏", "page_no": 30, "grade": 1},
+        {"book_name": "後宮の烏", "page_no": 31, "grade": 3},
+        {"book_name": "後宮の烏", "page_no": 32, "grade": 1}
+      ]
+    },
+    {
+      "id": "koukyuu_fears_emotional_bonds",
+      "query": "寿雪が九九たちと親しくなって秘密が知られることを恐れた理由",
+      "scope": {"type": "book", "book_name": "後宮の烏"},
+      "source": "sealed-position-45pct",
+      "relevant": [
+        {"book_name": "後宮の烏", "page_no": 61, "grade": 3}
+      ]
+    },
+    {
+      "id": "koukyuu_yang_tenth_lark_princess",
+      "query": "羊十娘が語った雲雀公主の暮らしぶりと好きだった花",
+      "scope": {"type": "book", "book_name": "後宮の烏"},
+      "source": "sealed-position-70pct",
+      "relevant": [
+        {"book_name": "後宮の烏", "page_no": 91, "grade": 1},
+        {"book_name": "後宮の烏", "page_no": 92, "grade": 3},
+        {"book_name": "後宮の烏", "page_no": 93, "grade": 2}
+      ]
+    },
+    {
+      "id": "koukyuu_emperor_asks_winter_official",
+      "query": "皇帝が冬官に烏妃の孤独を問いただした場面",
+      "scope": {"type": "book", "book_name": "後宮の烏"},
+      "source": "sealed-position-85pct",
+      "relevant": [
+        {"book_name": "後宮の烏", "page_no": 111, "grade": 3}
+      ]
+    },
+    {
+      "id": "kusuriya_sleeping_attendants_aphrodisiac",
+      "query": "三人の侍女が台所で服を乱して眠ってしまった原因",
+      "scope": {"type": "book", "book_name": "薬屋のひとりごと (ヒーロー文庫)"},
+      "source": "sealed-position-20pct",
+      "relevant": [
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 33, "grade": 2},
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 34, "grade": 3},
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 35, "grade": 1}
+      ]
+    },
+    {
+      "id": "kusuriya_attendants_misunderstand_maomao",
+      "query": "翡翠宮の侍女たちが猫猫を可哀想な少女だと誤解している設定",
+      "scope": {"type": "book", "book_name": "薬屋のひとりごと (ヒーロー文庫)"},
+      "source": "sealed-position-45pct",
+      "relevant": [
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 62, "grade": 2},
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 63, "grade": 3}
+      ]
+    },
+    {
+      "id": "kusuriya_apprentice_delays_doctor",
+      "query": "禿が倒れた妓女のために医者ではなく薬屋を呼んで時間を稼いだ理由",
+      "scope": {"type": "book", "book_name": "薬屋のひとりごと (ヒーロー文庫)"},
+      "source": "sealed-position-70pct",
+      "relevant": [
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 92, "grade": 2},
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 93, "grade": 3}
+      ]
+    },
+    {
+      "id": "kusuriya_honey_burn_external_contact",
+      "query": "蜂蜜嫌いと腕の火傷から猫猫が外部連絡役として疑った人物",
+      "scope": {"type": "book", "book_name": "薬屋のひとりごと (ヒーロー文庫)"},
+      "source": "sealed-position-85pct",
+      "relevant": [
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 110, "grade": 2},
+        {"book_name": "薬屋のひとりごと (ヒーロー文庫)", "page_no": 111, "grade": 3}
+      ]
+    },
+    {
+      "id": "spider_brother_resolves_reincarnation_anxiety",
+      "query": "転生した赤ん坊が不安を乗り越え、妹の誇れる兄になろうと決めたきっかけ",
+      "scope": {"type": "book", "book_name": "蜘蛛ですが、なにか？"},
+      "source": "sealed-position-20pct",
+      "relevant": [
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 43, "grade": 2},
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 44, "grade": 3}
+      ]
+    },
+    {
+      "id": "spider_snake_web_level_up",
+      "query": "蜘蛛が蛇を巣の糸で拘束して倒し一気に二つレベルを上げた戦い",
+      "scope": {"type": "book", "book_name": "蜘蛛ですが、なにか？"},
+      "source": "sealed-position-45pct",
+      "relevant": [
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 90, "grade": 2},
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 91, "grade": 3},
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 92, "grade": 1}
+      ]
+    },
+    {
+      "id": "spider_appraisal_bad_skill",
+      "query": "鑑定が外れスキルと言われる理由とシュンが取得した判断",
+      "scope": {"type": "book", "book_name": "蜘蛛ですが、なにか？"},
+      "source": "sealed-position-70pct",
+      "relevant": [
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 137, "grade": 2},
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 138, "grade": 3}
+      ]
+    },
+    {
+      "id": "spider_monkey_throws_web",
+      "query": "猿の一撃を避け糸で腕を封じたのに逆に投げ飛ばされた戦闘",
+      "scope": {"type": "book", "book_name": "蜘蛛ですが、なにか？"},
+      "source": "sealed-position-85pct",
+      "relevant": [
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 166, "grade": 2},
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 167, "grade": 3},
+        {"book_name": "蜘蛛ですが、なにか？", "page_no": 168, "grade": 1}
+      ]
+    }
+  ]
+}
