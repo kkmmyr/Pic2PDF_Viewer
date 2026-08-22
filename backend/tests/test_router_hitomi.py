@@ -333,3 +333,12 @@ class TestRunNow:
         finally:
             if acquired:
                 router_hitomi._run_lock.release()
+
+    def test_409_when_monitor_process_lock_is_held(self, client, hitomi_data_dir):
+        from services.hitomi.process_lock import monitor_process_lock
+
+        with monitor_process_lock(hitomi_data_dir):
+            res = client.post("/api/hitomi/run-now?force=true")
+
+        assert res.status_code == 409
+        assert res.json()["detail"] == "監視が既に別プロセスで実行中です"

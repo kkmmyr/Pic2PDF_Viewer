@@ -1,6 +1,7 @@
 """hitomi.la 新着監視 API。
 
-各エンドポイントの詳細は docs/design/詳細設計/機能別/hitomi新着監視設計書.md §6 を参照。
+各エンドポイントのschemaは `/openapi.json`、設計意図は
+docs/design/詳細設計/機能別/hitomi新着監視設計書.md を参照。
 監視状態は hitomi/ 配下の JSON、検出作品と既読履歴は meta2.db に保存する。
 """
 
@@ -153,6 +154,8 @@ def post_run_now(force: bool = False) -> dict:
             now_local = datetime.now().astimezone()
             threshold = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
         exit_code = hitomi_monitor.main(DATA_DIR, threshold=threshold)
+        if exit_code == 3:
+            raise HTTPException(status_code=409, detail="監視が既に別プロセスで実行中です")
         state = state_store.load_state(DATA_DIR)
         return {
             "exit_code": exit_code,

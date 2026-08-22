@@ -12,6 +12,7 @@ from utils.atomic_json import atomic_write_json
 class ArtistState(TypedDict, total=False):
     top_id: int
     checked_at: str
+    pending_gallery_ids: list[int]
 
 
 class State(TypedDict, total=False):

@@ -1,8 +1,4 @@
-"""tools.hitomi_monitor の純粋ロジック（should_skip_artist）のユニットテスト。
-
-main() 全体のテストはネットワーク + ファイル I/O が絡むため省略。
-スキップ判定ロジックは pure function として抽出済みなので、ここで網羅する。
-"""
+"""tools.hitomi_monitor の判定と永続化境界を検証する。"""
 
 import os
 import sys
@@ -85,3 +81,103 @@ def test_main_reuses_one_http_client(monkeypatch, tmp_path):
     fetch_nozomi.assert_called_once_with("author", "japanese", count=20, client=client)
     fetch_metadata.assert_called_once_with(123, client=client)
     client_context.__exit__.assert_called_once()
+
+
+def test_main_keeps_failed_metadata_id_for_next_run(monkeypatch, tmp_path):
+    state = {"artists": {"author:japanese": {"top_id": 100}}}
+    entry = {"normalized": "author", "display_name": "Author", "language": "japanese"}
+    saved_states = []
+    merged_items = []
+
+    monkeypatch.setattr(hitomi_monitor.watchlist, "load_watchlist", lambda _path: [entry])
+    monkeypatch.setattr(hitomi_monitor.state_store, "load_state", lambda _path: state)
+    monkeypatch.setattr(hitomi_monitor.state_store, "save_state", lambda _path, value: saved_states.append(value))
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "import_legacy_json", lambda _path: 0)
+    monkeypatch.setattr(hitomi_monitor.nozomi, "fetch_nozomi_head", lambda *args, **kwargs: [102, 101, 100])
+
+    def _fetch_metadata(gallery_id, *, client):
+        if gallery_id == 101:
+            raise hitomi_monitor.metadata.HitomiMetadataError("temporary failure")
+        return {"title": f"book-{gallery_id}", "files": []}
+
+    monkeypatch.setattr(hitomi_monitor.metadata, "fetch_metadata", _fetch_metadata)
+
+    def _merge(items):
+        merged_items.extend(items)
+        return len(items)
+
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "merge_new_items", _merge)
+    monkeypatch.setattr(hitomi_monitor.notify, "notify_run_result", lambda **_kwargs: None)
+
+    assert hitomi_monitor.main(tmp_path) == 1
+    assert [item["id"] for item in merged_items] == [102]
+    artist_state = saved_states[-1]["artists"]["author:japanese"]
+    assert artist_state["top_id"] == 102
+    assert artist_state["pending_gallery_ids"] == [101]
+
+
+def test_main_retries_pending_id_after_top_id_advanced(monkeypatch, tmp_path):
+    state = {
+        "artists": {
+            "author:japanese": {
+                "top_id": 102,
+                "pending_gallery_ids": [101],
+            }
+        }
+    }
+    entry = {"normalized": "author", "display_name": "Author", "language": "japanese"}
+    saved_states = []
+    merged_items = []
+
+    monkeypatch.setattr(hitomi_monitor.watchlist, "load_watchlist", lambda _path: [entry])
+    monkeypatch.setattr(hitomi_monitor.state_store, "load_state", lambda _path: state)
+    monkeypatch.setattr(hitomi_monitor.state_store, "save_state", lambda _path, value: saved_states.append(value))
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "import_legacy_json", lambda _path: 0)
+    monkeypatch.setattr(hitomi_monitor.nozomi, "fetch_nozomi_head", lambda *args, **kwargs: [102, 101, 100])
+    monkeypatch.setattr(
+        hitomi_monitor.metadata,
+        "fetch_metadata",
+        lambda gallery_id, *, client: {"title": f"book-{gallery_id}", "files": []},
+    )
+
+    def _merge(items):
+        merged_items.extend(items)
+        return len(items)
+
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "merge_new_items", _merge)
+    monkeypatch.setattr(hitomi_monitor.notify, "notify_run_result", lambda **_kwargs: None)
+
+    assert hitomi_monitor.main(tmp_path) == 0
+    assert [item["id"] for item in merged_items] == [101]
+    assert saved_states[-1]["artists"]["author:japanese"]["pending_gallery_ids"] == []
+
+
+def test_main_does_not_advance_state_when_arrival_merge_fails(monkeypatch, tmp_path):
+    initial_state = {
+        "artists": {
+            "author:japanese": {
+                "top_id": 100,
+                "pending_gallery_ids": [99],
+            }
+        }
+    }
+    entry = {"normalized": "author", "display_name": "Author", "language": "japanese"}
+    hitomi_monitor.state_store.save_state(tmp_path, initial_state)
+
+    monkeypatch.setattr(hitomi_monitor.watchlist, "load_watchlist", lambda _path: [entry])
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "import_legacy_json", lambda _path: 0)
+    monkeypatch.setattr(hitomi_monitor.nozomi, "fetch_nozomi_head", lambda *args, **kwargs: [102, 101, 100])
+    monkeypatch.setattr(
+        hitomi_monitor.metadata,
+        "fetch_metadata",
+        lambda gallery_id, *, client: {"title": f"book-{gallery_id}", "files": []},
+    )
+
+    def _fail_merge(_items):
+        raise OSError("database unavailable")
+
+    monkeypatch.setattr(hitomi_monitor.arrival_store, "merge_new_items", _fail_merge)
+
+    assert hitomi_monitor.main(tmp_path) == 2
+    persisted = hitomi_monitor.state_store.load_state(tmp_path)
+    assert persisted["artists"] == initial_state["artists"]
