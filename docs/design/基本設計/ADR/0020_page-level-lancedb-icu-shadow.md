@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-22
-- **適用状態**: production stage 1 `shadow`適用済み（LanceDB 0.34.0 / 8,576ページ）。利用者への返却はFTS5を維持し、`lance_icu`昇格は未承認
+- **適用状態**: production stage 1 `shadow`適用済み（LanceDB 0.34.0 / 8,576ページ）。別3冊の未調整holdoutは採用ゲート合格。利用者への返却はFTS5を維持し、`lance_icu`昇格は未承認
 - **決定者**: プロジェクトオーナー / Codex
 - **関連**: [小説RAG 検索・QA設計 §10](../../詳細設計/機能別/小説RAG_検索QA設計.md#10-日本語検索基盤の比較検証ゲート)、[小説RAG データ設計](../../詳細設計/機能別/小説RAG_データ.md)、バックログ B-37
 
@@ -54,6 +54,9 @@ dependency lock、writer停止確認、backup / restore検査、manifest検証�
   の正本をSQLiteへ保てる。
 - LanceDB公式は通常検索が未索引行もflat scanする一方、`fast_search()`は未索引行を省くと説明する。
   今回は完全構築後の`num_unindexed_rows=0`を公開条件とし、`fast_search()`を使わない。
+- 既存20問と別の3冊12問をcommit `89fc93e`で評価前に封印した一回holdoutでは、FTS5の12 / 12
+  0-hitに対しICUは0-hit 0件、Recall@10 `.792`、MRR@10 `.833`、nDCG@10 `.748`、p95 `3.486ms`、
+  個別Recall@10回帰0件だった。正解が12位だった1問を含め、開封後のquery・正解・設定調整は行わない。
 
 参考: [LanceDB Full-Text Search](https://docs.lancedb.com/search/full-text-search)、
 [Reindexing](https://docs.lancedb.com/indexing/reindexing)、
@@ -88,8 +91,8 @@ dependency lock、writer停止確認、backup / restore検査、manifest検証�
 
 ## 将来の再評価条件
 
-- shadow期間で未調整holdoutを含む品質ゲートとlatency / error率を満たしたとき、既定値を
-  `lance_icu`へ切り替えるか別ADRで判断する。
+- 未調整holdout品質ゲートは合格済み。root所有backup unitの共通lock反映と実運用shadowの
+  非0件観測を満たしたとき、既定値を`lance_icu`へ切り替えるか別承認で判断する。
 - LanceDB 0.35以降、tokenizer / score / prefilter semanticsが変わったとき。
 - 完全再構築時間または世代容量が運用上無視できなくなったとき、増分更新と安全な世代GCを検討する。
 - canonical本文をSQLite以外から更新する経路を追加するとき、同じrevision契約へ組み込む。
