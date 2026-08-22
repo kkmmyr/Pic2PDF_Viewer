@@ -17,7 +17,7 @@ Windows をメイン環境として運用しつつ、Mac からコード編集�
 |---|---|---|
 | Homebrew | `https://brew.sh` | `brew --version` |
 | uv (Python 管理) | `brew install uv` | `uv --version` |
-| Node.js 22.x + npm 10.x | nvmなどでmajor versionを固定 | `node --version && npm --version` |
+| Node.js 22.x + npm 10.x | `.node-version`を読めるversion manager | `node --version && npm --version` |
 | git | 標準搭載 or `brew install git` | `git --version` |
 
 ---
@@ -75,7 +75,8 @@ cd frontend
 npm ci
 ```
 
-CIと同じNode.js 22 + npm 10を使う。`npm install`は依存を意図して更新し、
+CIと同じルート`.node-version`のNode.js 22と、`frontend/package.json`の
+`packageManager`に記録したnpm 10を使う。`npm install`は依存を意図して更新し、
 `package.json`と`package-lock.json`を同じcommitで変更するときだけ実行する。
 通常のセットアップで`npm ci`が失敗した場合は`npm install`で回避せず、
 lockfileの再現性不具合として扱う。
