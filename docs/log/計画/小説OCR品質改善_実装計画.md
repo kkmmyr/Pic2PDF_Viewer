@@ -39,6 +39,8 @@
 | 公開縦書きscreening判定器 | 完了 | JSSODa-test / VJRODaの予測を完全性・digest・CERで再現可能に評価 |
 | PaddleOCR-VL Apple Siliconスモーク | 完了 | JSSODa縦書き1〜4段の固定4枚で総合CER 0.3107%、最大0.6906%、列欠落0 |
 | PaddleOCR-VL JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚で総合CER 9.8305%、最大569.5767%。外れ値除外後も総合1.9573%、最大25.8567%のため不採用 |
+| dots.mocr Apple Siliconスモーク | 通過 | JSSODa縦書き1〜4段とPaddleOCR-VL最大外れ値の固定5枚で総合CER 0.4654%、最大0.6614%、列欠落・反復0 |
+| dots.mocr JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚の最良layout版で総合CER 0.8990%、最大4.0155%。2.0% gate未達のため本番候補へ昇格しない |
 | 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -197,6 +199,33 @@ MLX-VLMでは長文OCRが生成上限まで反復し、通常のrepetition penal
 PaddleOCR-VLの連続batchで古いmRoPE状態を再利用する問題は
 [PR #1285](https://github.com/Blaizzy/mlx-vlm/pull/1285)で修正済みで、今回の導入版にも修正箇所が存在する。
 したがって、未修正batching issueだけを原因とする扱い、しきい値変更、反復部分の後処理削除では採用へ戻さない。
+
+次候補の`dots.mocr`は、公式model revision
+`e539fbb52280393adc081b289ec597430a0f9031`をM1 Max 64GB上の`MLX-VLM 0.6.15`でBF16のまま
+読み込み、公式`prompt_ocr`の`Extract the text content from this image.`、temperature 0.1、top_p 1.0、
+seed 0、最大2,048 token、単ページ実行へ固定する。モデルはcustom Transformers codeを含むため、固定snapshot内の
+Python 3ファイルを監査し、明示許可した検証CLIだけで`trust_remote_code=True`を使う。processor初期化には
+`torch 2.7.0`と`torchvision 0.22.0`が必要だったが、推論本体はApple Silicon GPUのMLXで動作する。
+
+JSSODa-test縦書き1〜4段の固定4枚と、PaddleOCR-VLが生成反復した`001751`を加えた5枚3,653文字の
+スモークでは、総編集距離17、総合CER 0.4654%、ページ最大CER 0.6614%、列欠落・生成反復0だった。
+モデルを1回だけ読み込んだ5枚推論は68.36秒、process最大RSSは約6.87GiB、MLX peak memoryは約9.15GBで、
+64GB unified memoryは制約にならなかった。この段階では方向・列順・難例耐性の予備gateを通過しただけであり、
+公開screeningを通過するまで本番候補へ昇格しない。
+
+単純な`prompt_ocr`による先頭79/1,125枚のscreeningは、総合CER 1.6402%、ページ最大26.9289%だった。
+罫線で分割された`000918`と`001293`では最下段を省略し、`000639`では段落順を入れ替えた。
+公式が一般文書解析に推奨する`prompt_layout_all_en`へ切り替え、bbox・category・textのJSONを検証して
+モデル出力順に本文を結合すると、この3枚は最大1.9093%まで回復した。79枚全体も総合CER 0.8990%へ
+改善し、JSON失敗・列単位欠落・生成反復は0だった。平均12.40秒/枚、process最大RSS約6.93GiB、
+MLX peak memory約9.50GBで、64GB unified memoryには十分な余裕があった。
+
+ただしlayout版もページ最大CER 4.0155%で、1〜4段の各group最大が2.4390〜4.0155%となり、
+既定の2.0% gateを満たさなかった。上位5難例のtemperature 0再生成でも最大4.0155%は変わらず、
+最大難例をlayout bboxごとにcropして再OCRする二段階方式は4.0155%から5.6995%へ悪化した。
+原因はメモリ、出力上限、サンプリング、領域欠落ではなく、通常の文字誤認識がページ内に累積する
+モデル品質と判断する。全1,125枚、同一画面3回、VJRODa、開封済み30画面へは進めず、
+モデルまたはMLX実装の更新時に同じ79枚と固定artifactから再開する。
 
 ## 7. Phase H4 — Codex確認縮小の段階評価
 

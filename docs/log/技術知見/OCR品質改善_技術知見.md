@@ -260,9 +260,33 @@ screen photographyを含むReal5-OmniDocBenchでの頑健性を報告してい�
 PP-OCRv6 mediumとは認識器・pipelineが異なるため、次の独立候補として最初に診断する価値がある。
 一方、公開値は汎用文書benchmarkであり、Kindle縦書き日本語の小書き文字・約物を保証しない。
 
-[dots.mocr](https://github.com/studio-dots-ai/dots.ocr)は3Bの多言語文書VLMで、公式repositoryの
+[dots.mocr](https://github.com/studio-dots-ai/dots.mocr)は3Bの多言語文書VLMで、公式repositoryの
 汎用document parsing指標では旧dots.ocrとPaddleOCR-VL-1.5を上回るが、日本語縦書き小説に限定した
 値は示されていない。したがって次点候補とし、汎用leaderboardだけで導入・正式評価へ進めない。
+
+2026-08-23時点の公式配布はHugging Faceの`dots-studio/dots.mocr`へ移っており、固定revision
+`e539fbb52280393adc081b289ec597430a0f9031`のBF16重みは約6.1 GBだった。
+[MLX-VLMのdots.mocr実装](https://github.com/Blaizzy/mlx-vlm/tree/main/mlx_vlm/models/dots_ocr)を使うと、
+M1 Max 64GBでprocess最大RSS約6.87GiB、MLX peak memory約9.15GBに収まり、5ページをモデル再読込なしで
+68.36秒で処理できた。JSSODa縦書き1〜4段4枚とPaddleOCR-VL最大外れ値1枚では、総合CER 0.4654%、
+ページ最大0.6614%、列欠落・反復0だった。したがってApple Siliconのメモリ適合性と初期の縦書き精度は通過した。
+
+一方、公式repositoryも解析失敗が残ることを明記し、非公式の
+[scene textでの反復・幻覚報告](https://github.com/studio-dots-ai/dots.mocr/issues/1)もある。
+5枚だけで安定性を断定せず、生成結果を後処理削除しないJSSODa全件評価と同一画面反復試験を必須にする。
+custom Transformers codeは固定snapshotの`configuration_dots.py`、`modeling_dots_ocr.py`、
+`modeling_dots_vision.py`を監査済みだが、通常のアプリ実行へ`trust_remote_code`を広げず、隔離した評価CLIでのみ許可する。
+
+同じ79枚を単純OCR promptで評価すると総合CER 1.6402%、最大26.9289%で、罫線分割ページの段落省略と
+読順入れ替えが生じた。公式の`prompt_layout_all_en`で領域JSONを取得し、返却順にtextを結合すると、
+総合0.8990%、最大4.0155%まで改善し、大規模欠落・反復は解消した。document VLMでは「textだけ」の
+promptより、領域検出と読順を同時に要求する公式layout promptが縦書き複数領域にも有効だった。
+
+それでも1〜4段の各group最大は2.4390〜4.0155%で、2.0% gateには届かなかった。temperature 0は
+上位5枚を改善せず、layout bbox crop後の再OCRも最大難例を4.0155%から5.6995%へ悪化させた。
+64GB unified memoryの不足ではなく文字認識品質の上限であり、今回のrevisionをKindle正式評価へ進めない。
+評価CLIは固定snapshot fingerprint、prompt digest、入力SHA、ページ単位fsync、JSON fail closedを保持し、
+将来のmodelまたはMLX更新時に同じ公開標本で差分を再現できるようにした。
 
 縦書き日本語の事前screeningには、LREC 2026論文の公式実装
 [llm-jp/eval_vertical_ja](https://github.com/llm-jp/eval_vertical_ja)が公開する、合成の
