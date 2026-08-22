@@ -32,6 +32,7 @@
 | [0018](0018_sol-primary-post-ocr-generation.md) | OCR後の公開成果物をSol主生成・選択的独立評価へ段階移行 | Accepted | 2026-08-02 |
 | [0019](0019_apple-silicon-mlx-inference.md) | Apple Siliconのローカル推論にMLXを追加 | Accepted | 2026-08-17 |
 | [0020](0020_page-level-lancedb-icu-shadow.md) | Page-level LanceDB ICU BM25を世代管理shadowで導入 | Accepted | 2026-08-22 |
+| [0021](0021_sol-image-ocr-campaign.md) | Sol画像OCRを版管理付きcampaignとして段階導入 | Accepted | 2026-08-19 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順

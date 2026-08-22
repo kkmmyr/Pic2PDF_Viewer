@@ -1,12 +1,16 @@
 # OCR設計書
 
-> status: living | last-verified: 2026-08-16
+> status: living | last-verified: 2026-08-22
 
 <!-- contract-owner: ocr-publication -->
 
 縦書き小説をSurya OCR 2でテキスト化し、入力完全性検査、ページ品質検査、画像照合QAを
 通過した結果だけを `novel.db` へ公開する設計である。yomitokuは独立照合・比較・
 後方互換用エンジンとして残す。
+
+2026-08-19からは[ADR-0021](../../基本設計/ADR/0021_sol-image-ocr-campaign.md)に基づき、
+固定manifestの原画像をGPT-5.6 Solで読み取る版管理付きcampaignを別経路として段階導入する。
+現行Suryaの機械性能評価、B-35 formal holdout、Sol画像OCRの運用品質比較は混同しない。
 
 - 現在の公開条件と運用上の意味は本書を正本とする。
 - 機械判定値は `scripts/maintenance/ocr_quality_policy.json` を正本とし、本書へ複製しない。
@@ -32,6 +36,20 @@ kindle-pdf/main_novel.py
   -> 必須ページの画像照合・補正・run承認
   -> pages / pages_fts / books.ocr_done_atを同一公開処理で更新
 ```
+
+Sol画像OCR campaignは次の別経路を使う。
+
+```text
+medaroserver 数値名PNG -> immutable campaign manifest（book/page/SHA）
+  -> 冊子単位に最大3 workerへ分割 -> GPT-5.6 Sol 独立候補A/B
+  -> 第三workerの列coverage・読順検査 -> resolved OCR artifact
+  -> schema・manifest・画像SHA・全標本集合検証 -> ocr_runs / ocr_page_resultsへimport
+  -> 冊子完全性・画像照合QA -> ocr_publicationsのactive run切替
+  -> pages / pages_fts / books.ocr_done_atを同一transactionで更新
+```
+
+Sol workerはSQLiteへ直接接続しない。worker認証情報とCodex認証cacheはmedaroserverへ配置せず、
+manifestで許可された画像と成果物だけを保護された経路で受け渡す。
 
 旧 `ocr_service.py` とスレッド常駐方式は撤去済みである。ジョブキュー、スキップ条件、
 API契約は [詳細設計書_バックエンド編](../詳細設計書_バックエンド編.md) を正とする。
@@ -85,6 +103,12 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_qa_review.py` | page review入力検証、採用候補検証、page単位のQA状態遷移 |
 | `backend/services/novel_db/ocr_qa_queries.py` | QA run一覧・詳細、SHA照合付き画像path解決 |
 | `backend/services/novel_db/ocr_qa_publication.py` | run承認条件、採用本文検証、books・pages・FTS・runの原子的な正式公開 |
+| `backend/services/novel_db/ocr_publication_history.py` | legacy snapshot、active run履歴、Sol昇格・rollbackの原子的切替 |
+| `backend/services/novel_db/sol_ocr_campaign.py` | immutable manifest・pilot標本・worker割当の生成検証、画像export |
+| `backend/services/novel_db/sol_ocr_holdout.py` | 既出pilot・B-35除外、fresh holdoutの品質非参照選定・封印・一度限りledger |
+| `backend/services/novel_db/sol_ocr_import.py` | Sol page artifactのschema・SHA検証、idempotent checkpoint import、legacy差分report |
+| `backend/tools/sol_ocr_v2.py` | 列証跡付きraw候補を自己SHA付きv2候補へ完全集合で正規化 |
+| `backend/tools/sol_ocr_holdout.py` | fresh holdoutの作成・再検証・sealed/opened/retired ledger操作 |
 | `backend/services/novel_db/ocr_qa.py` | QA公開関数のimport互換facade |
 | `backend/services/novel_db/job_state.py` / `job_targets.py` / `job_executor.py` | job状態、対象解決、mode別application serviceへのdispatch |
 | `backend/services/novel_db/surya_ocr.py` | package・standaloneの既存Surya import契約を保つ期限付きfacade |
@@ -177,12 +201,35 @@ confidenceは補助情報であり、列・文章欠落を直接表さない。y
 
 - `ocr_page_results.page_no`、`pages.page_no`、検索結果はPNG由来のキャプチャ画面番号を正とする。
 - Kindle紙面ページ番号はリフローにより画面送りと一致しない。紙面ページ番号として表示しない。
+- OCR入力は拡張子`.png`かつstemが数字だけの通常ファイルに限定する。桁数は固定しない。
+  `008_debug_vis.png`、`cover.png`等は対象外とし、数値名PNGだけで1始まりの連番を検査する。
 - 正式書籍だけを `kindle_novel/images/{書籍名}/` に置き、診断・中断画像は外へ分離する。
 - OCR投入前に連番、復号、同一解像度、SHA完全重複、白紙候補、先頭・中間・末尾、Kindle終端を
   確認する。重複・白紙候補は数値だけで削除しない。
 - 過去runの画面数や紙面ページ数を期待撮影画面数へ流用しない。
 - `capture_state=captured`、`ocr_done_at`、`indexed_at`、OCR run状態は別の完了条件である。
-- 範囲限定作業では `POST /api/ocr/run` に対象を明示し、1冊ずつ直列投入する。
+- 通常の範囲限定Surya作業では `POST /api/ocr/run` に対象を明示し、1冊ずつ直列投入する。
+- Sol campaignだけはimmutable manifestを冊子単位で最大3 workerへ分割できる。同じ冊子を
+  複数workerへ割り当てず、成果物importと正規版切替はメインsessionが直列実行する。
+- page artifactは`sol-ocr-page-v1`とし、campaign/pilot digest、sample・worker、model、prompt版、
+  book/page、画像SHA、転記本文、判読注記、処理日時以外を受理しない。同じpage・SHA・本文の再送は
+  idempotentに扱い、異なる本文の再送は競合として自動上書きしない。
+- `sol-ocr-page-v1`は2026-08-19の初回pilot監査専用とし、新規pilot・全冊実行には使用しない。
+  再開時は`sol-ocr-page-v2`で、同じ原画像を互いの本文を見ない独立session A/Bが右から左へ
+  overlap付き列帯単位で転記し、各候補本文・列数・列先頭末尾anchor・候補SHAを別artifactへ保存する。
+- A/Bと異なる第三sessionは原画像を左から右にも走査し、候補ごとの列coverage、読順、台詞境界、
+  固有名詞、ルビ混入を検査する。checkerは画像にない本文を生成せず、A/Bの一方を選ぶか
+  `needs_review` / `fail`にする。選択候補のcoverageが`complete`、読順が`pass`、重大欠落0の場合だけ
+  `canonical_eligible=true`とする。A/Bが一致してもchecker検査を省略しない。
+- v2 importは候補A/B、checker、resolved envelopeのSHA参照、producer/checker sessionの相違、
+  prompt/policy SHA、campaign/pilot digest、画像SHAを検証し、manifestの全sample ID集合とartifact集合が
+  完全一致しない限りDB transactionを開始しない。campaign・promptが異なるrunを再利用しない。
+- 初回pilotとそこから調整した結果は`purpose=tuning`へ固定する。prompt/policy固定後、初回pilotと
+  B-35 formal holdoutのpage key・画像SHAを除外した品質非参照のfresh holdoutを封印する。
+  合格閾値を開封前に固定し、一度だけ評価する。既存OCRは候補生成・checker選択へ渡さず、評価時だけ
+  提示順をblind化して比較する。開封後の標本は次回正式評価に再利用しない。
+- fresh holdoutの画像exportは、manifest検証とledgerの`opened`記録が完了した後だけ許可する。
+  export時にも全画像SHAとroot内相対pathを再検証し、`retired_to_tuning`後の再exportを拒否する。
 - 既存版と再撮影版が併存する場合、旧画像・旧OCR・DBを検証付きバックアップへ退避し、
   新版だけを運用対象にする。旧版は復旧専用で保持する。
 
@@ -203,6 +250,19 @@ OCR完了と公開承認を分離する。全ページ処理後はまず `awaiti
 4. 公開本文、FTS、`books.ocr_done_at` は同一公開処理で整合させる。
 5. 公開修復前にSQLite Online Backupを取得し、失敗時は旧公開本文と索引を保持する。
 6. raw候補、補正文、入力画像SHA、model revision、承認者・日時を監査可能に保つ。
+7. 初回Sol昇格前に、現在のcanonical本文を`engine=legacy / model=pre-sol-snapshot`の合成runへ
+   保存する。既存approved runは現在のcanonical本文と一致する保証がないため流用しない。
+   合成runはcanonical `pages.full_text`を`ocr_page_results.published_text`へそのまま固定し、
+   後からpage分類規則が変わってもrollback時に旧公開本文を再計算しない。
+8. `ocr_publications`は冊子ごとにactive履歴を1件だけ持ち、切替時に旧activeをretireする。
+   rollbackは履歴を削除せず、legacy runを再activateする新しいpublication eventとして記録する。
+9. active切替、全page upsert、余剰page削除、FTS、`ocr_done_at`は同一transactionで行う。
+   冊子の一部だけを公開しない。既存OCRのない冊子はlegacy runを作らず、初回Sol版を起点とする。
+10. 本番切替前にSQLite Online Backupを取得して復元検証する。DB内の過去の診断画像由来余剰行は
+    backupには保持するが、数値名PNG manifestにもとづくlegacy版・比較・rollback正本には含めない。
+
+Solとlegacyの差分は文字編集距離、増減文字数、空本文、反復、ページ別外れ値として報告するが、
+正解本文がない差分をCERまたは精度と呼ばない。CER比較は同一画像SHAのverified ground truthだけで行う。
 
 ## 5. 正解コーパスとB-35品質ゲート
 
@@ -344,6 +404,10 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
 - 両候補が同じ列・固有名詞を誤る場合、候補比較だけでは検出できない。
 - B-35正式holdoutの封印・一度だけ開封は機械強制するが、新しい未調整holdoutでの
   機械単独総合合格は未達である。
+- Google Document AI Enterprise OCR `pretrained-ocr-v2.1.1-2025-01-31`は、2026-08-22の
+  開封済み30画面pilotでルビ混入と縦列読順崩壊を確認したため、正規本文の生成元にしない。
+  利用する場合は外部候補としてstagingに隔離し、列coverage・約物・ルビを原画像で独立確認する。
+  pilot差分率はverified ground truthに対するCERではなく、自動公開条件へ転用しない。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

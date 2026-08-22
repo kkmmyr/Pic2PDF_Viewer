@@ -229,3 +229,17 @@ def test_worker_standalone_cli_emits_fatal_event_for_empty_manifest(tmp_path: Pa
 
     assert completed.returncode == 1
     assert json.loads(completed.stdout) == {"event": "fatal", "error": "OCR task list is empty"}
+
+
+def test_worker_directory_input_excludes_non_numeric_png_stems(tmp_path: Path) -> None:
+    images_dir = tmp_path / "book"
+    images_dir.mkdir()
+    for filename in ("001.png", "002.png", "008_debug_vis.png", "cover.png"):
+        (images_dir / filename).touch()
+
+    tasks = ocr_worker._load_tasks(["ocr_worker.py", str(images_dir)])
+
+    assert [(task["page_no"], Path(task["image_path"]).name) for task in tasks] == [
+        (1, "001.png"),
+        (2, "002.png"),
+    ]

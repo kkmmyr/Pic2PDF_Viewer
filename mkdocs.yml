@@ -167,6 +167,7 @@ nav:
       - バックログ: log/計画/バックログ.md
       - MacローカルLLM移行・比較計画: log/計画/MacローカルLLM移行・比較計画.md
       - 小説OCR品質改善 実装計画: log/計画/小説OCR品質改善_実装計画.md
+      - Sol画像OCR campaign実行計画: log/計画/Sol画像OCR_campaign実行計画.md
       - リファクタリング計画書: log/計画/リファクタリング計画書.md
       - R0〜R7 リファクタリング契約表: archive/リファクタリング契約表_R0-R7.md
   - アーカイブ:

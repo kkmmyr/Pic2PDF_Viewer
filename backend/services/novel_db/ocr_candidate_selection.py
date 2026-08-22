@@ -6,7 +6,7 @@ import re
 
 try:
     from .ocr_content_guards import has_suspicious_repetition
-except ImportError:
+except ImportError:  # Standalone ``python ocr_worker.py`` execution.
     from ocr_content_guards import has_suspicious_repetition
 
 _WHITESPACE_RE = re.compile(r"\s+")

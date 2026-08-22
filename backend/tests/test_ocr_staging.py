@@ -12,6 +12,7 @@ from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
 from services.novel_db.migrations import upgrade_head
 from services.novel_db.ocr_page_classification import classify_run_pages
+from services.novel_db.ocr_publication_history import activate_published_run
 from services.novel_db.ocr_qa_publication import approve_and_publish_run
 from services.novel_db.ocr_qa_queries import get_qa_image_path, get_qa_run, list_qa_runs
 from services.novel_db.ocr_qa_review import review_qa_page
@@ -256,11 +257,11 @@ def test_publication_uses_reviewed_text_deletes_stale_pages_and_rebuilds_fts(sta
         book_id = int(cursor.lastrowid)
         conn.executemany(
             "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count, page_type, index_eligible) "
-            "VALUES (?, ?, '', ?, ?, 'narrative', 1)",
+            "VALUES (?, ?, '', ?, ?, ?, ?)",
             [
-                (book_id, 1, "旧本文一", 4),
-                (book_id, 2, "旧本文二", 4),
-                (book_id, 3, "削除対象本文", 6),
+                (book_id, 1, "旧本文一", 4, "narrative", 1),
+                (book_id, 2, "旧奥付本文", 5, "colophon_or_ad", 0),
+                (book_id, 3, "削除対象本文", 6, "narrative", 1),
             ],
         )
         conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
@@ -274,8 +275,39 @@ def test_publication_uses_reviewed_text_deletes_stale_pages_and_rebuilds_fts(sta
             (book_id,),
         ).fetchall()
         fts_texts = conn.execute("SELECT full_text FROM pages_fts ORDER BY rowid").fetchall()
+        publications = conn.execute(
+            "SELECT run_id, action, retired_at FROM ocr_publications WHERE book_id=? ORDER BY id",
+            (book_id,),
+        ).fetchall()
     assert [tuple(row) for row in pages] == [(1, "外部採用本文"), (2, "補正採用本文")]
     assert [row[0] for row in fts_texts] == ["外部採用本文", "補正採用本文"]
+    assert [(row[1], row[2] is None) for row in publications] == [
+        ("legacy_snapshot", False),
+        ("publish", True),
+    ]
+
+    legacy_run_id = int(publications[0][0])
+    activate_published_run(legacy_run_id, "tester", "rollback test")
+
+    with with_db() as conn:
+        restored = conn.execute(
+            "SELECT page_no, full_text, page_type, index_eligible FROM pages WHERE book_id=? ORDER BY page_no",
+            (book_id,),
+        ).fetchall()
+        active = conn.execute(
+            "SELECT run_id, action FROM ocr_publications WHERE book_id=? AND retired_at IS NULL",
+            (book_id,),
+        ).fetchone()
+        legacy_materialized = conn.execute(
+            "SELECT page_no, published_text FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
+            (legacy_run_id,),
+        ).fetchall()
+    assert [tuple(row) for row in restored] == [
+        (1, "旧本文一", "narrative", 1),
+        (2, "旧奥付本文", "colophon_or_ad", 0),
+    ]
+    assert tuple(active) == (legacy_run_id, "rollback")
+    assert [tuple(row) for row in legacy_materialized] == [(1, "旧本文一"), (2, "旧奥付本文")]
 
 
 def test_page_approval_requires_classification(staged_book) -> None:

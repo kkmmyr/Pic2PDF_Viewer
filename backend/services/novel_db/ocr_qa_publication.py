@@ -5,6 +5,7 @@ from __future__ import annotations
 import sqlite3
 
 from .connection import with_db
+from .ocr_publication_history import PublicationPage, ensure_legacy_snapshot, publish_pages
 from .ocr_run_store import OcrInputPage, collect_input_pages, validate_complete_run
 from .page_fts import mark_page_fts_stale
 
@@ -98,45 +99,44 @@ def _publish_rows(
                 book_id = cursor.lastrowid
             else:
                 book_id = int(existing[0])
+                ensure_legacy_snapshot(
+                    conn,
+                    book_id=book_id,
+                    book_name=book_name,
+                    input_pages=input_pages,
+                    actor=reviewer,
+                )
                 conn.execute(
                     "UPDATE books SET images_dir=?, page_count=?, indexed_at=NULL, "
                     "ocr_done_at=datetime('now', '+9 hours') WHERE id=?",
                     (str(images_dir), len(input_pages), book_id),
                 )
 
+            publication_pages: list[PublicationPage] = []
             for row in rows:
                 page_no = int(row[0])
                 image_path = input_pages[page_no - 1].image_path
                 page_type = str(row[7])
                 selected_text = _selected_text(row)
                 published_text = selected_text if page_type == "narrative" else ""
-                conn.execute(
-                    """
-                    INSERT INTO pages (
-                        book_id, page_no, image_path, full_text, char_count,
-                        page_type, index_eligible
+                publication_pages.append(
+                    PublicationPage(
+                        page_no=page_no,
+                        image_path=str(image_path),
+                        image_sha256=input_pages[page_no - 1].image_sha256,
+                        published_text=published_text,
+                        page_type=page_type,
+                        index_eligible=bool(row[8]),
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(book_id, page_no) DO UPDATE SET
-                        image_path=excluded.image_path,
-                        full_text=excluded.full_text,
-                        char_count=excluded.char_count,
-                        page_type=excluded.page_type,
-                        index_eligible=excluded.index_eligible
-                    """,
-                    (
-                        book_id,
-                        page_no,
-                        str(image_path),
-                        published_text,
-                        len(published_text),
-                        page_type,
-                        bool(row[8]),
-                    ),
                 )
-            conn.execute(
-                "DELETE FROM pages WHERE book_id=? AND page_no > ?",
-                (book_id, len(input_pages)),
+            publish_pages(
+                conn,
+                book_id=book_id,
+                run_id=run_id,
+                pages=publication_pages,
+                actor=reviewer,
+                action="publish",
+                note=note,
             )
             conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
             mark_page_fts_stale(conn)
