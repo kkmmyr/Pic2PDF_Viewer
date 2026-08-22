@@ -1,6 +1,6 @@
 # 小説OCR品質改善 実装計画
 
-> status: active | last-verified: 2026-08-22 | owner: project owner
+> status: active | last-verified: 2026-08-23 | owner: project owner
 >
 > 状態詳細: B-35正式holdoutの機械強制は完了、機械単独品質が未達
 > 対象: Kindle小説画像のOCR、品質判定、Windows OCR agent、QA公開
@@ -37,6 +37,8 @@
 | Codex補助込み運用 | 条件付き合格 | 原画像QAの正解化実績であり機械性能ではない |
 | 正式holdoutの機械的封印 | 完了 | 2026-08-17に30画面を一度だけ開封し、台帳へ記録済み |
 | 公開縦書きscreening判定器 | 完了 | JSSODa-test / VJRODaの予測を完全性・digest・CERで再現可能に評価 |
+| PaddleOCR-VL Apple Siliconスモーク | 完了 | JSSODa縦書き1〜4段の固定4枚で総合CER 0.3107%、最大0.6906%、列欠落0 |
+| PaddleOCR-VL JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚で総合CER 9.8305%、最大569.5767%。外れ値除外後も総合1.9573%、最大25.8567%のため不採用 |
 | 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -153,6 +155,48 @@ Macでの実行は公式Apple Silicon手順に従い、完全なPaddleOCR-VL pip
 別process・別virtual environmentで構成する。VLM component単体のHTTP呼び出しは完全pipelineの
 精度を再現しないため採用しない。最初は1並列・固定revision・固定seedで実行し、GPUを他用途が
 使用中の間はmodel download、service起動、推論を行わない。
+
+2026-08-23にM1 Max 64GBで、`PaddlePaddle 3.2.1`、`PaddleOCR 3.7.0`、
+`PaddleX 3.7.2`、`MLX-VLM 0.6.15`を別のPython 3.12環境へ導入した。VLMは
+`PaddlePaddle/PaddleOCR-VL-1.6`のrevision
+`c5630abae1d940eafe0697512a0325494b02ab42`、レイアウト解析は`PP-DocLayoutV3`を使う。
+JSSODa-test revision `b38c3f83cf627a72afb1652640141ffbf81bedd6`から縦書き1〜4段を1枚ずつ
+固定したスモークでは、4枚2,897文字の総合CER 0.3107%、ページ最大0.6906%、列欠落0だった。
+clientの最大RSSは約2.43GiB、MLX serviceの常駐RSSは約1.9〜2.1GiBで、メモリ圧迫は発生しなかった。
+
+`mlx-vlm==0.6.15`だけではchat template用`jinja2`が導入されず、service再起動前はHTTP 500に
+なるため、検証環境では`jinja2==3.1.6`を明示依存とする。PaddleOCR CLIの`save_all()`は推論後に
+Word出力まで試みて`python-docx`未導入で失敗するため、全件screeningはPython APIからJSONだけを
+回収する。予測JSONLは1ページ成功ごとにflushし、既存IDの重複、入力画像欠落、空本文、metadata外IDを
+fail closedで拒否する。同じmodel revision、prompt ID、seed、入力画像SHAの場合だけ再開を許可し、
+screening完了後に既存の`ocr_benchmark_vertical_screen.py`で全ID完全性とCERを判定する。
+性能調整では、公式の1:1 client / service推奨に従ってVLM同時要求数と入力ページbatch数を独立に記録する。
+複数ページを1回のpipeline呼び出しへまとめる場合も、結果件数と入力順を検査してから各ページを個別に
+fsyncする。batch途中のservice失敗では未保存batchだけを再実行し、既存checkpointは変更しない。
+1並列との差分が本文完全一致し、メモリ圧迫・service errorがなく、実測短縮する設定だけを全件へ使う。
+
+固定4枚の比較では、VLM同時要求4・ページbatch 1は推論18.62秒で1・1の18.76秒と実質同等だった。
+VLM同時要求4・ページbatch 4は19.02秒で短縮せず、4枚中1枚で読点1文字が欠落して本文完全一致にも
+失敗した。client最大RSSも約1.1GiBから約2.36GiBへ増えたため、JSSODa全件は同時要求1・
+ページbatch 1へ固定する。並列値とbatch値はcheckpoint provenanceへ保存し、異なる設定を混在させない。
+
+同時要求1・ページbatch 1の本screeningは、79/1,125枚をcheckpointした時点でfail-fast終了した。
+総合CER 9.8305%、ページ最大569.5767%、完全一致率7.5949%だった。最大外れ値`001751`は、罫線で
+3領域に分かれた正常な縦書き画像に対し、MLX-VLMが同一句を生成上限まで反復した。外れ値1枚を
+除外しても78枚の総合CERは1.9573%、ページ最大は25.8567%で、1・2・4段にも23%以上の難例がある。
+メモリは十分に空いていたため64GB unified memory不足ではなく、モデル・layout・生成経路の品質問題と
+判断する。公式APIが提供する`repetition_penalty=1.1`と`max_new_tokens=1024`でも同ページは反復し、
+CER 125.6614%だった。MLX-VLM 0.6.15は既知のPaddleOCR-VL batching修正を含む版であり、1並列でも
+再現するため、並列バグの回避だけでは解消しない。VJRODaと開封済み30画面へは進めず、次候補の
+`dots.mocr`を公開screeningから評価する。異常出力は診断artifactとして保持し、本番本文へ補正採用しない。
+
+公開情報との照合では、[PaddleOCR-VL公式ガイド](https://github.com/PaddlePaddle/PaddleOCR/blob/main/docs/version3.x/pipeline_usage/PaddleOCR-VL.en.md)
+が`repetition_penalty`と`max_new_tokens`を調整可能としている一方、値だけで品質回復する保証はない。
+MLX-VLMでは長文OCRが生成上限まで反復し、通常のrepetition penaltyで止まらない
+[別OCRモデルのconfirmed issue](https://github.com/Blaizzy/mlx-vlm/issues/1021)も報告されている。
+PaddleOCR-VLの連続batchで古いmRoPE状態を再利用する問題は
+[PR #1285](https://github.com/Blaizzy/mlx-vlm/pull/1285)で修正済みで、今回の導入版にも修正箇所が存在する。
+したがって、未修正batching issueだけを原因とする扱い、しきい値変更、反復部分の後処理削除では採用へ戻さない。
 
 ## 7. Phase H4 — Codex確認縮小の段階評価
 

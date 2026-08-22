@@ -19,6 +19,10 @@ from services.novel_db.ocr_qa_staging import stage_run_for_qa
 from services.novel_db.ocr_run_store import collect_input_pages, prepare_run, save_page_result
 
 
+def _unique_content(length: int, *, start: int = 0) -> str:
+    return "".join(chr(0x4E00 + start + index) for index in range(length))
+
+
 @pytest.fixture
 def staged_book(tmp_data_dir) -> tuple[str, list]:
     upgrade_head()
@@ -77,11 +81,12 @@ def test_page_type_does_not_exclude_late_narrative(
 
 
 def test_qa_risk_detects_long_non_narrative_and_name_disagreement() -> None:
+    non_narrative = _unique_content(640)
     assert detect_qa_risk_flags(
         page_type="colophon_or_ad",
-        full_text="広告の説明です。" * 80,
+        full_text=non_narrative,
         char_count=640,
-        primary_text="広告の説明です。" * 80,
+        primary_text=non_narrative,
         external_text="",
     ) == {"page_type_text_conflict"}
     assert detect_qa_risk_flags(
@@ -107,8 +112,8 @@ def test_qa_risk_ignores_unpaired_candidate_omissions() -> None:
 
 
 def test_qa_risk_detects_unselected_longer_external_candidate() -> None:
-    primary = "".join(f"主系で取得した通常本文の段落{index}です。" for index in range(30))
-    external = primary + "".join(f"補助候補だけが保持した縦列{index}です。" for index in range(4))
+    primary = _unique_content(300)
+    external = primary + _unique_content(40, start=500)
 
     assert detect_qa_risk_flags(
         page_type="narrative",
@@ -195,7 +200,7 @@ def test_qa_risk_uses_selected_engine_text(tmp_data_dir) -> None:
     run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
     repeated = "\n".join(["茉莉花は静かに書類へ目を落とした。"] * 3)
     result = _passed_page(1, input_pages[0].image_sha256, repeated)
-    result["external_text"] = "外部OCRで修正された正常な本文です。" * 20
+    result["external_text"] = _unique_content(300)
     save_page_result(run_id, result)
     with with_db() as conn:
         conn.execute(
@@ -245,7 +250,7 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
     run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
 
     for page in input_pages:
-        result = _passed_page(page.page_no, page.image_sha256, "これは通常の本文です。" * 40)
+        result = _passed_page(page.page_no, page.image_sha256, _unique_content(400))
         if page.page_no == 9:
             result["quality_flags"] = [
                 "cross_engine_consensus",

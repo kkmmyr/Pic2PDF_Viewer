@@ -178,6 +178,9 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
 - normal proseでprimaryに異常反復があり、externalが256文字以上かつ反復なしの場合は、
   externalのconfidence合否にかかわらずレビュー候補へ切り替える。採用結果には
   `external_recovered_primary_repetition` flagを残して必須QAへ送り、自動公開へ昇格させない。
+- 異常反復は、同一長文行・複数行blockに加えて、改行を含まない生成ループも検査する。後者は
+  空白・句読点を除いた内容文字の12文字n-gramが同一ページ内で8回以上現れた場合に不合格とする。短い台詞、
+  擬音、通常の章見出しだけでは不合格にせず、候補選択・QA risk・公開前検査で同じ判定器を使う。
 - normal proseでprimaryが合格し、externalがconfidence等で不合格でも、primaryが256文字以上かつ
   externalが30文字・2%以上長く、externalに反復がない場合はexternal本文をレビュー候補として採用する。
   この判定値はQAリスク検出と同じ純関数を使用し、`external_low_confidence_more_complete_candidate`

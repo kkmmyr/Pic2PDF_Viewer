@@ -24,6 +24,10 @@ from services.novel_db.ocr_qa_staging import stage_run_for_qa
 from services.novel_db.ocr_run_store import collect_input_pages, prepare_run, save_page_result
 
 
+def _unique_content(length: int, *, start: int = 0) -> str:
+    return "".join(chr(0x4E00 + start + index) for index in range(length))
+
+
 def test_facade_preserves_public_symbol_identity() -> None:
     assert staging_facade.collect_input_pages is collect_input_pages
     assert staging_facade.prepare_run is prepare_run
@@ -667,7 +671,7 @@ def test_stage_requires_sample_boundary_but_not_every_excluded_page(tmp_data_dir
     input_pages = collect_input_pages(book_name)
     run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
     for page in input_pages:
-        text = "これは物語本文として十分な長さを持つ文章です。" * 20
+        text = _unique_content(400)
         if page.page_no == 12:
             text = "別作品 電子特別お試し版"
         save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, text))

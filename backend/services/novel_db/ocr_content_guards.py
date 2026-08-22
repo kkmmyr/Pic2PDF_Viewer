@@ -18,6 +18,8 @@ _MIN_REPEATED_LINE_COUNT = 3
 _MIN_LONG_LINE_LENGTH = 40
 _MIN_REPEATED_BLOCK_LENGTH = 40
 _MIN_REPEATED_BLOCK_COUNT = 2
+_INLINE_NGRAM_LENGTH = 12
+_MIN_INLINE_NGRAM_COUNT = 8
 
 
 def detect_sample_boundary(
@@ -72,4 +74,11 @@ def has_suspicious_repetition(text: str | None) -> bool:
         for index in range(len(significant) - 1)
         if len(_CONTENT_CHAR_RE.findall(significant[index] + significant[index + 1])) >= _MIN_REPEATED_BLOCK_LENGTH
     ]
-    return any(count >= _MIN_REPEATED_BLOCK_COUNT for count in Counter(blocks).values())
+    if any(count >= _MIN_REPEATED_BLOCK_COUNT for count in Counter(blocks).values()):
+        return True
+
+    compact = "".join(_CONTENT_CHAR_RE.findall(text or ""))
+    inline_ngrams = (
+        compact[index : index + _INLINE_NGRAM_LENGTH] for index in range(len(compact) - _INLINE_NGRAM_LENGTH + 1)
+    )
+    return any(count >= _MIN_INLINE_NGRAM_COUNT for count in Counter(inline_ngrams).values())

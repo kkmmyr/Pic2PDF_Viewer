@@ -4,6 +4,10 @@ from services.novel_db.ocr_candidate_selection import (
 )
 
 
+def _unique_content(length: int, *, start: int = 0) -> str:
+    return "".join(chr(0x4E00 + start + index) for index in range(length))
+
+
 def test_external_completeness_ignores_whitespace() -> None:
     primary = ("主 " * 256).strip()
     external = ("主\n" * 256) + ("外\n" * 30)
@@ -27,7 +31,7 @@ def test_external_repetition_fallback_accepts_non_repeated_full_page() -> None:
     repeated_line = "主系OCRが同じ長い文章を異常に反復しています。" * 3
     primary = "\n".join([repeated_line] * 3)
 
-    assert is_external_safe_repetition_fallback(primary, "外" * 256)
+    assert is_external_safe_repetition_fallback(primary, _unique_content(256))
 
 
 def test_external_repetition_fallback_rejects_short_external() -> None:

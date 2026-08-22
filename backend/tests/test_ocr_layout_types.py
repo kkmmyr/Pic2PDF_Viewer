@@ -3,6 +3,10 @@ from services.novel_db.ocr_worker import select_layout_ocr_result
 from services.novel_db.surya_types import SuryaPageResult
 
 
+def _unique_content(length: int, *, start: int = 0) -> str:
+    return "".join(chr(0x4E00 + start + index) for index in range(length))
+
+
 def test_mixed_illustration_is_detected_from_non_text_block() -> None:
     raw_output = (
         '<div data-label="Picture" data-bbox="0 0 500 1000"></div>'
@@ -110,8 +114,9 @@ def test_mixed_illustration_does_not_select_shorter_external_candidate() -> None
 
 
 def test_normal_prose_selects_more_complete_low_confidence_external_for_qa() -> None:
+    primary_text = _unique_content(300)
     primary = SuryaPageResult(
-        full_text="主" * 300,
+        full_text=primary_text,
         raw_output="",
         blocks=[],
         state="passed",
@@ -120,7 +125,7 @@ def test_normal_prose_selects_more_complete_low_confidence_external_for_qa() -> 
         attempt_count=1,
     )
     external = SuryaPageResult(
-        full_text="主" * 300 + "外" * 40,
+        full_text=primary_text + _unique_content(40, start=500),
         raw_output="",
         blocks=[],
         state="failed",
@@ -189,7 +194,7 @@ def test_normal_prose_recovers_repeated_primary_with_external_for_qa() -> None:
         attempt_count=3,
     )
     external = SuryaPageResult(
-        full_text="外" * 256,
+        full_text=_unique_content(256),
         raw_output="",
         blocks=[],
         state="failed",

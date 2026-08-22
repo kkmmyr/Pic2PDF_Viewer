@@ -65,6 +65,18 @@ def test_repetition_detects_repeated_two_line_block() -> None:
     assert has_suspicious_repetition("\n".join([*block, "間の文章", *block]))
 
 
+def test_repetition_detects_inline_generation_loop() -> None:
+    repeated_phrase = "それを先を豊かにすることが"
+
+    assert has_suspicious_repetition(f"本文の始まり。{repeated_phrase * 8}本文の終わり。")
+
+
+def test_repetition_allows_inline_phrase_below_loop_threshold() -> None:
+    repeated_phrase = "それを先を豊かにすることが"
+
+    assert not has_suspicious_repetition(repeated_phrase * 7)
+
+
 def test_repetition_ignores_short_dialogue_and_normal_prose() -> None:
     text = "\n".join(["はい", "はい", "はい", "茉莉花は書類を読んだ。", "珀陽は窓の外を見た。"])
     assert not has_suspicious_repetition(text)
