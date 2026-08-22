@@ -213,11 +213,23 @@ adapterからcapture agentやHTTP transportを参照しない。
   Kindle UI操作、ページ送り、package確定、正式登録は常に1件ずつ直列実行する。
 
 - 警告候補の未調整holdout評価は`capture_quality_holdout.py`を使い、画像directoryと
-  人手確定labelを持つprivate manifestを読み取り専用で評価する。検出器本体と同じ
+  確定labelを持つprivate manifestを読み取り専用で評価する。manifestの構築・署名・検証と
+  provenance contractは`capture_quality_holdout_contract.py`、監査・指標集計・CLIは
+  `capture_quality_holdout.py`が担当する。検出器本体と同じ
   `audit_capture_images()`を呼び、完全重複、低容量、白紙・疎、隣接dHash近似重複、
   小説上下端、反復overlayについてcode別のTP/FP/FN、precision、recallをJSONへ保存する。
-  manifest digest、画像SHA、検出policy versionをレポートへ固定し、同じ入力で決定的に
-  再生成できるようにする。評価器は画像削除、package生成、登録、警告のblocking昇格を行わない。
+  `--build-spec` / `--manifest-output`でspecから画像SHA付きmanifestを原子的に生成し、従来の
+  `--manifest` / `--output`で評価する。case ID、source、連番画像、label code、label対象file、
+  重複labelをmanifest digest計算前と評価前の両方で検証する。構造監査や画像復号に失敗したcaseを
+  予測0件として集計せず、holdout全体をfail closedで終了する。
+- manifest digest、画像SHA、検出policy versionをレポートへ固定し、同じ入力で決定的に
+  再生成できるようにする。実画像に陽性labelがないcodeはrecallを`null`とし、制御故障による
+  recallと実画像の適合率を混ぜない。AI支援labelはreviewer種別と人手確認状態をprivate artifactへ
+  明記し、人手確定済みと扱わない。任意の`provenance`は`dataset_role`、`ground_truth_kind`、
+  `reviewer_kind`、`human_confirmation`、関連digest、任意の確認日時`reviewed_at`を持ち、manifest
+  digestの対象としてreportへそのまま引き継ぐ。制御故障は
+  `controlled_corruption / deterministic_corruption`として
+  実画像holdoutと別reportに固定する。評価器は画像削除、package生成、登録、警告のblocking昇格を行わない。
 
 - Sambaの一時的な共有違反・アクセス拒否により`.partial → .ready`の同一共有内renameが
   失敗した場合は、コピーやmanifest生成をやり直さず、renameだけを短いバックオフ付きで

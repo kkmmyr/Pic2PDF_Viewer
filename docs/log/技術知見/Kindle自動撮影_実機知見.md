@@ -619,6 +619,30 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
 - 最終確認は漫画・小説とも`capture_state=captured`、active job 0件で、capture agentを
   停止した。以上によりR1 Windows実機受入を合格とする。
 
+### 8.10 B-32 未調整holdoutと警告運用判断（2026-08-22）
+
+- 現行本番画像から検出結果を見ず、固定seed、source、タイトルfamily hashだけで漫画2冊・
+  小説2冊を選んだ。全524画面のSHA-256を先に封印し、選定digestは
+  `90cf0775f6672ce61af945251ea3572257c79756a93691a326f6b3c5c1787c0c`となった。
+  既知のOneDrive通知混入／正常再撮影pairは検出器の校正に使ったため、このholdoutから除外した。
+- Codexによる全画面の縮小画像QAでは、欠落、重複、白紙化、上下端切れ、Kindle / OS UI混入を
+  0件とlabelした。章扉、表紙、挿絵、奥付、意図的な余白は正常とした。label digestは
+  `1f46d57bee94c395aab209a1603250a3b7935e1aee237817542fe737d8ebb4be`だが、
+  `human_confirmation=pending`であり、人手確定labelとは扱わない。
+- `kindle-image-warning-v1`の実測は近似重複5、白紙・疎6、低容量13、小説端密度2の計26件で、
+  すべて正常画面への候補だった。完全重複と反復overlayは0件、構造監査errorも0件だった。
+  欠陥label基準の暫定precisionは発火した4 codeすべて0、陽性0件のためrecallは`null`である。
+- 同じ4冊をhardlinkした一時領域へ、固定seedで完全重複、白紙化、1 pixelだけ異なる重複、
+  25%上端切れを各1件注入し、レシピdigest
+  `706e8c48e8f89638b9c35692f9a9986545a6f7503a7a9647b2ebe3cddffbf62e`を
+  評価前に固定した。5 codeのTPは各1、FNは0でrecall 1.0だった。ただし実機故障分布ではなく、
+  detector回帰を補う制御故障としてのみ利用する。
+- 以上から、完全重複以外の警告をblocking、失敗表示、自動削除へ昇格しない。将来のUIは
+  登録成功後の「要確認候補」として書籍・code単位に集約し、ページを開ける補助導線に限定する。
+  private artifact一式は
+  `/opt/pic2pdf-viewer/data/.capture-quality-holdout/b32-20260822-v2/`へ保存し、
+  digestと全contact sheetを再照合済みである。
+
 ## 9. Kindle 更新時の再検証
 
 Kindle 更新後は、いきなり正式撮影せず `diagnose_new_kindle.py` と短い書籍で次を確認する。
