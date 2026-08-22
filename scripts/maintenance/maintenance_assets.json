@@ -288,9 +288,12 @@
         "scripts/maintenance/ocr_benchmark_*.py",
         "scripts/maintenance/compare_ocr_benchmarks.py",
         "scripts/maintenance/analyze_ocr_error_patterns.py",
-        "scripts/maintenance/merge_ocr_consensus_gaps.py",
-        "scripts/maintenance/seed_ocr_holdout_from_qa.py",
-        "scripts/maintenance/ensemble_ocr_candidates.py",
+      "scripts/maintenance/merge_ocr_consensus_gaps.py",
+      "scripts/maintenance/seed_ocr_holdout_from_qa.py",
+      "scripts/maintenance/ocr_holdout_ledger.py",
+      "scripts/maintenance/ocr_holdout_manifest.py",
+      "scripts/maintenance/seal_ocr_holdout.py",
+      "scripts/maintenance/ensemble_ocr_candidates.py",
         "scripts/maintenance/prepare_ocr_prevalidation_qa.py",
         "scripts/maintenance/paddle_ocr_worker.py",
         "scripts/maintenance/paddle_column_ocr_worker.py",
@@ -342,9 +345,20 @@
         "backend/tools/sol_ocr_*.py"
       ],
       "classification": "temporary",
-      "owner": "novel-ocr",
-      "reason": "timeboxed Sol image OCR tuning, holdout, and reproducibility tooling; not a runtime API",
-      "recheck_after": "2026-11-16"
-    }
-  ]
+    "owner": "novel-ocr",
+    "reason": "timeboxed Sol image OCR tuning, holdout, and reproducibility tooling; not a runtime API",
+    "recheck_after": "2026-11-16"
+  },
+  {
+    "id": "ornith-mlx-evaluation",
+    "patterns": [
+      "scripts/maintenance/eval_ornith_mlx*.py",
+      "scripts/maintenance/tests/test_eval_ornith_mlx*.py"
+    ],
+    "classification": "temporary",
+    "owner": "novel-rag",
+    "reason": "timeboxed reproduction of the rejected Ornith MLX acceptance gates; not a runtime API",
+    "recheck_after": "2026-11-16"
+  }
+]
 }

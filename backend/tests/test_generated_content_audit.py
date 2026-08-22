@@ -22,8 +22,7 @@ from services.novel_db.migrations import upgrade_head
 def _catalog_summary(subject: str = "茉莉花") -> str:
     return (
         f"{subject}は官吏として難題の調査を引き受け、"
-        + "集めた手掛かりを一つずつ照合しながら周囲との信頼を深め、事件の背景へ近づく過程を描き、"
-        * 10
+        + "集めた手掛かりを一つずつ照合しながら周囲との信頼を深め、事件の背景へ近づく過程を描き、" * 10
         + "最後には真相を明らかにして新たな役割を担う。"
     )
 

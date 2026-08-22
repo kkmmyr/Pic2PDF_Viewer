@@ -1,15 +1,6 @@
 version = 1
 
 [[exemptions]]
-package = "onnx"
-locked_version = "1.21.0"
-expires = 2026-10-18
-reason = "ONNX 1.22への更新はyomitokuのモデル読込・OCR実機互換をGPU環境で確認してから行う"
-ids = [
-  "GHSA-hwpq-hmq9-wj77",
-]
-
-[[exemptions]]
 package = "torch"
 locked_version = "2.5.1+cu121"
 expires = 2026-10-18
