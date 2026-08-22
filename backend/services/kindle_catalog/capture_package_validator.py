@@ -81,7 +81,8 @@ def _valid_transient_overlay_finding(
         and _is_positive_int(metrics.get("matched_tile_count"))
         and metrics["matched_tile_count"] >= 2
         and metrics.get("consecutive_page_count") == len(files)
-        and type(maximum_mad) in {int, float}
+        and isinstance(maximum_mad, int | float)
+        and not isinstance(maximum_mad, bool)
         and 0 <= maximum_mad <= _TRANSIENT_MAX_TILE_MAD
     )
 
@@ -237,6 +238,8 @@ def _validate_quality(
     declared_names: set[str],
 ) -> None:
     warning_policy = quality.get("warning_policy_version")
+    if not isinstance(warning_policy, str):
+        raise ValueError("登録前画像QAの証跡が不正です")
     allowed_warning_codes = _WARNING_CODES_BY_POLICY.get(warning_policy)
     if (
         quality.get("schema_version") != 1

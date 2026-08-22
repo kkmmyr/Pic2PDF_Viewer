@@ -192,6 +192,16 @@ def test_validator_rejects_missing_overlay_detector_evidence(tmp_path) -> None:
         validate_ready_dir(_job(), ready)
 
 
+@pytest.mark.parametrize("warning_policy", [None, [], True])
+def test_validator_rejects_non_string_warning_policy(tmp_path, warning_policy: object) -> None:
+    ready, manifest = _ready_package(tmp_path)
+    manifest["quality"]["warning_policy_version"] = warning_policy
+    _rewrite(ready, manifest)
+
+    with pytest.raises(ValueError, match="登録前画像QAの証跡が不正です"):
+        validate_ready_dir(_job(), ready)
+
+
 def test_validator_rejects_blocking_overlay_candidate(tmp_path) -> None:
     ready, manifest = _ready_package(tmp_path)
     manifest["quality"]["overlay_detector"]["passed"] = False
