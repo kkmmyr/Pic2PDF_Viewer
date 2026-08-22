@@ -7,7 +7,7 @@ import secrets
 import sqlite3
 import unicodedata
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import config
@@ -36,7 +36,7 @@ _REQUIRED_BOOK_COLUMNS = {"asin", "title"}
 @dataclass(frozen=True)
 class _PreviewGrant:
     fingerprint: str
-    expires_at: object
+    expires_at: datetime
 
 
 _preview_grants: dict[str, _PreviewGrant] = {}

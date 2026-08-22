@@ -8,7 +8,7 @@ Create Date: 2026-07-25 16:29:11.867505
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-import sqlmodel
+from sqlmodel.sql.sqltypes import AutoString
 
 from alembic import op
 
@@ -23,27 +23,27 @@ def upgrade() -> None:
     op.create_table(
         "authors",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("name_key", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("name", AutoString(), nullable=False),
+        sa.Column("name_key", AutoString(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_authors_name_key"), "authors", ["name_key"], unique=True)
     op.create_table(
         "books",
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(length=20), nullable=False),
-        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("title_normalized", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("publisher", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("isbn", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("isbn13", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("category", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("book_type", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("kindle_acquisition_date", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("asin", AutoString(length=20), nullable=False),
+        sa.Column("title", AutoString(), nullable=False),
+        sa.Column("title_normalized", AutoString(), nullable=True),
+        sa.Column("publisher", AutoString(), nullable=True),
+        sa.Column("isbn", AutoString(), nullable=True),
+        sa.Column("isbn13", AutoString(), nullable=True),
+        sa.Column("category", AutoString(), nullable=False),
+        sa.Column("book_type", AutoString(), nullable=False),
+        sa.Column("kindle_acquisition_date", AutoString(), nullable=True),
         sa.Column("total_reading_ms", sa.Integer(), nullable=True),
-        sa.Column("last_read_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("last_read_at", AutoString(), nullable=True),
         sa.Column("is_completed", sa.Boolean(), nullable=True),
-        sa.Column("created_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("updated_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("created_at", AutoString(), nullable=True),
+        sa.Column("updated_at", AutoString(), nullable=True),
         sa.PrimaryKeyConstraint("asin"),
     )
     op.create_index(op.f("ix_books_book_type"), "books", ["book_type"], unique=False)
@@ -54,14 +54,14 @@ def upgrade() -> None:
     op.create_table(
         "import_runs",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("source_kind", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("status", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("started_at", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("finished_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("source_kind", AutoString(), nullable=False),
+        sa.Column("status", AutoString(), nullable=False),
+        sa.Column("started_at", AutoString(), nullable=False),
+        sa.Column("finished_at", AutoString(), nullable=True),
         sa.Column("files_processed", sa.Integer(), nullable=False),
         sa.Column("records_processed", sa.Integer(), nullable=False),
         sa.Column("records_skipped", sa.Integer(), nullable=False),
-        sa.Column("error_message", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("error_message", AutoString(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_import_runs_source_kind"), "import_runs", ["source_kind"], unique=False)
@@ -69,12 +69,12 @@ def upgrade() -> None:
     op.create_table(
         "imported_files",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("source_kind", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("filename", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("sha256", sqlmodel.sql.sqltypes.AutoString(length=64), nullable=False),
-        sa.Column("imported_at", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("source_kind", AutoString(), nullable=False),
+        sa.Column("filename", AutoString(), nullable=False),
+        sa.Column("sha256", AutoString(length=64), nullable=False),
+        sa.Column("imported_at", AutoString(), nullable=False),
         sa.Column("record_count", sa.Integer(), nullable=True),
-        sa.Column("status", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("status", AutoString(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("source_kind", "filename", "sha256"),
     )
@@ -83,11 +83,11 @@ def upgrade() -> None:
     op.create_table(
         "series",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("author", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("author_key", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("created_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("updated_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("name", AutoString(), nullable=False),
+        sa.Column("author", AutoString(), nullable=True),
+        sa.Column("author_key", AutoString(), nullable=False),
+        sa.Column("created_at", AutoString(), nullable=True),
+        sa.Column("updated_at", AutoString(), nullable=True),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("name", "author_key"),
     )
@@ -95,7 +95,7 @@ def upgrade() -> None:
     op.create_table(
         "book_authors",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("asin", AutoString(), nullable=False),
         sa.Column("author_id", sa.Integer(), nullable=False),
         sa.Column("sort_order", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
@@ -114,8 +114,8 @@ def upgrade() -> None:
     op.create_table(
         "book_genres",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("genre", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("asin", AutoString(), nullable=False),
+        sa.Column("genre", AutoString(), nullable=False),
         sa.ForeignKeyConstraint(
             ["asin"],
             ["books.asin"],
@@ -127,14 +127,14 @@ def upgrade() -> None:
     op.create_index(op.f("ix_book_genres_genre"), "book_genres", ["genre"], unique=False)
     op.create_table(
         "book_series",
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("asin", AutoString(), nullable=False),
         sa.Column("series_id", sa.Integer(), nullable=False),
         sa.Column("volume_number", sa.Float(), nullable=True),
-        sa.Column("volume_label", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("detection_method", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("volume_label", AutoString(), nullable=True),
+        sa.Column("detection_method", AutoString(), nullable=True),
         sa.Column("is_manually_edited", sa.Boolean(), nullable=False),
         sa.Column("confidence", sa.Float(), nullable=True),
-        sa.Column("updated_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("updated_at", AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
             ["asin"],
             ["books.asin"],
@@ -149,16 +149,16 @@ def upgrade() -> None:
     op.create_table(
         "borrowings",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("authors", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("loan_program", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("loan_status", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("loan_creation_date", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("loan_acceptance_date", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("end_date", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("asin", AutoString(), nullable=False),
+        sa.Column("title", AutoString(), nullable=False),
+        sa.Column("authors", AutoString(), nullable=True),
+        sa.Column("loan_program", AutoString(), nullable=True),
+        sa.Column("loan_status", AutoString(), nullable=False),
+        sa.Column("loan_creation_date", AutoString(), nullable=False),
+        sa.Column("loan_acceptance_date", AutoString(), nullable=True),
+        sa.Column("end_date", AutoString(), nullable=True),
         sa.Column("source_file_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("created_at", AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
             ["asin"],
             ["books.asin"],
@@ -175,21 +175,21 @@ def upgrade() -> None:
     op.create_index(op.f("ix_borrowings_loan_status"), "borrowings", ["loan_status"], unique=False)
     op.create_table(
         "capture_jobs",
-        sa.Column("id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("source", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("status", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("direction", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("id", AutoString(), nullable=False),
+        sa.Column("asin", AutoString(), nullable=False),
+        sa.Column("source", AutoString(), nullable=False),
+        sa.Column("status", AutoString(), nullable=False),
+        sa.Column("direction", AutoString(), nullable=False),
         sa.Column("expected_screens", sa.Integer(), nullable=True),
-        sa.Column("requested_at", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("claimed_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("started_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("completed_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("agent_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("book_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("requested_at", AutoString(), nullable=False),
+        sa.Column("claimed_at", AutoString(), nullable=True),
+        sa.Column("started_at", AutoString(), nullable=True),
+        sa.Column("completed_at", AutoString(), nullable=True),
+        sa.Column("agent_id", AutoString(), nullable=True),
+        sa.Column("book_id", AutoString(), nullable=True),
         sa.Column("captured_screens", sa.Integer(), nullable=True),
-        sa.Column("error_code", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("error_message", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("error_code", AutoString(), nullable=True),
+        sa.Column("error_message", AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
             ["asin"],
             ["books.asin"],
@@ -203,15 +203,15 @@ def upgrade() -> None:
     op.create_table(
         "purchases",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("order_number", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("order_date", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("order_number", AutoString(), nullable=False),
+        sa.Column("order_date", AutoString(), nullable=False),
+        sa.Column("asin", AutoString(), nullable=True),
+        sa.Column("title", AutoString(), nullable=False),
         sa.Column("price", sa.Integer(), nullable=True),
-        sa.Column("order_status", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("digital_order_item_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("order_status", AutoString(), nullable=False),
+        sa.Column("digital_order_item_id", AutoString(), nullable=True),
         sa.Column("source_file_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("created_at", AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
             ["asin"],
             ["books.asin"],
@@ -230,14 +230,14 @@ def upgrade() -> None:
     op.create_table(
         "returns",
         sa.Column("id", sa.Integer(), nullable=False),
-        sa.Column("asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("order_id", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("asin", AutoString(), nullable=False),
+        sa.Column("title", AutoString(), nullable=False),
+        sa.Column("order_id", AutoString(), nullable=True),
         sa.Column("refund_amount", sa.Integer(), nullable=True),
-        sa.Column("return_date", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("return_status", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("return_date", AutoString(), nullable=False),
+        sa.Column("return_status", AutoString(), nullable=True),
         sa.Column("source_file_id", sa.Integer(), nullable=True),
-        sa.Column("created_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("created_at", AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
             ["asin"],
             ["books.asin"],
@@ -254,12 +254,12 @@ def upgrade() -> None:
     op.create_index(op.f("ix_returns_return_date"), "returns", ["return_date"], unique=False)
     op.create_table(
         "series_subscriptions",
-        sa.Column("series_asin", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("subscription_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column("title", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column("series_asin", AutoString(), nullable=False),
+        sa.Column("subscription_id", AutoString(), nullable=False),
+        sa.Column("title", AutoString(), nullable=False),
         sa.Column("series_id", sa.Integer(), nullable=True),
-        sa.Column("resolution_method", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("imported_at", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column("resolution_method", AutoString(), nullable=True),
+        sa.Column("imported_at", AutoString(), nullable=True),
         sa.ForeignKeyConstraint(
             ["series_id"],
             ["series.id"],

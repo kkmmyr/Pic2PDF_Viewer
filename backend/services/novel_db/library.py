@@ -137,7 +137,9 @@ def get_book_detail(conn: sqlite3.Connection, book_name: str) -> BookDetail | No
         return None
 
     meta = load_meta("novel")
-    meta_entry = meta.get(_meta_key(safe_name), {})
+    meta_entry = meta.get(_meta_key(safe_name))
+    if meta_entry is None:
+        meta_entry = MetaEntry(authors=[])
 
     db_row = conn.execute(
         """
@@ -208,7 +210,9 @@ def list_books(conn: sqlite3.Connection) -> list[BookSummary]:
     summaries: list[BookSummary] = []
     for book_dir in sorted(d for d in images_dir.iterdir() if d.is_dir()):
         name = book_dir.name
-        meta_entry = meta.get(_meta_key(name), {})
+        meta_entry = meta.get(_meta_key(name))
+        if meta_entry is None:
+            meta_entry = MetaEntry(authors=[])
         info = indexed.get(name)
         summaries.append(
             BookSummary(

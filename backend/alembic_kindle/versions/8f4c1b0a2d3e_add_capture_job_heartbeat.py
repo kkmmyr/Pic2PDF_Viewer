@@ -8,7 +8,7 @@ Create Date: 2026-07-25 21:30:00.000000
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-import sqlmodel
+from sqlmodel.sql.sqltypes import AutoString
 
 from alembic import op
 
@@ -23,7 +23,7 @@ def upgrade() -> None:
         "capture_jobs",
         sa.Column(
             "heartbeat_at",
-            sqlmodel.sql.sqltypes.AutoString(),
+            AutoString(),
             nullable=True,
         ),
     )

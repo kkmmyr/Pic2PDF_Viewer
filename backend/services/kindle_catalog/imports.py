@@ -322,14 +322,17 @@ def run_orders_import() -> dict:
                     results.append({"filename": path.name, "kind": kind, "status": "skipped", "records": 0})
                     continue
                 rows = _read_rows(path, kind)
-                source_file_id = conn.execute(
+                cursor = conn.execute(
                     """
                     INSERT INTO imported_files(
                         source_kind,filename,sha256,imported_at,record_count,status
                     ) VALUES (?,?,?,?,0,'running')
                     """,
                     (kind, path.name, digest, jst_now().isoformat()),
-                ).lastrowid
+                )
+                source_file_id = cursor.lastrowid
+                if source_file_id is None:
+                    raise RuntimeError("imported file ID was not generated")
                 handlers = {
                     "purchases": _import_purchases,
                     "borrowings": _import_borrowings,

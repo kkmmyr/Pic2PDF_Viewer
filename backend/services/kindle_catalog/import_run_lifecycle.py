@@ -6,7 +6,7 @@ from utils.dt import jst_now
 
 def start_import_run(source_kind: str) -> int:
     with with_db() as conn:
-        return conn.execute(
+        cursor = conn.execute(
             """
             INSERT INTO import_runs(
                 source_kind,status,started_at,files_processed,
@@ -14,7 +14,11 @@ def start_import_run(source_kind: str) -> int:
             ) VALUES (?,'running',?,0,0,0)
             """,
             (source_kind, jst_now().isoformat()),
-        ).lastrowid
+        )
+        run_id = cursor.lastrowid
+        if run_id is None:
+            raise RuntimeError("import run ID was not generated")
+        return run_id
 
 
 def finish_import_run(
