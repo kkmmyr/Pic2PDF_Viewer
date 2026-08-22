@@ -18,8 +18,8 @@ from .llm_provider import NovelLlmProvider, get_llm_provider
 
 # PoC で確定した QA 用 LLM パラメータ。num_ctx は config 化されており、B-13 段階 A〜C で
 # 段階拡大（既定 32768）。
-# 注意: llama-server バックエンドでは num_ctx は起動時 `-c` で決まるため、ここで
-# 渡しても無視される（指定しても害はない）。env が llama_server の場合は
+# 注意: llama-server / MLX backendではnum_ctxはserver起動時の上限で決まるため、ここで
+# 渡しても無視される（指定しても害はない）。envがllama_serverの場合は
 # start-qwen-server.bat 側で `-c 131072` を変更すること。
 LLM_OPTIONS = make_llm_options(
     temperature=0.2,
@@ -62,7 +62,7 @@ async def stream_qa(
     """Qwen に stream=True で投げ、各イベントを yield する。
 
     実体は`llm_provider`から取得したQwen backendの`astream_ask`を呼ぶだけ。
-    バックエンド分岐（Ollama / llama-server）、thinking 抑制、SSE→Ollama 形式の
+    バックエンド分岐（llama-server / MLX）、thinking抑制、SSE→Ollama形式の
     正規化はすべて共通モジュール (`local_llm`) 側に集約している。
     """
     kwargs = {"model": model, "options": options or LLM_OPTIONS, "timeout": timeout}

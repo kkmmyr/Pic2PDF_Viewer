@@ -5,17 +5,25 @@
 
 from __future__ import annotations
 
+import hashlib
 import html
 import re
 import sqlite3
+import time
 from dataclasses import dataclass
 from urllib.parse import quote
+
+from config.novel_db import novel_db_settings as _cfg
+from utils.logger import get_logger
 
 from .book_summary_search import find_similar_books, search_book_summaries
 from .embedder import embed_batch
 from .lance_store import get_chunks_table
+from .page_fts import search_page_fts
 from .search_scope import Scope, ScopeType
 from .search_scope import resolve_book_names as _resolve_book_names
+
+logger = get_logger(__name__)
 
 # ──────────────────────────────────────────────
 # 共有データクラス・ユーティリティ
@@ -149,6 +157,74 @@ def fts_search(
         return []
 
 
+def _search_key_set(rows: list[tuple]) -> set[tuple[str, int]]:
+    return {(str(row[0]), int(row[1])) for row in rows}
+
+
+def lexical_search(
+    conn: sqlite3.Connection,
+    query: str,
+    scope: Scope,
+    top: int = 30,
+    *,
+    min_chars: int = 0,
+    body_page_margin: int = 0,
+) -> list[tuple]:
+    """設定に応じてFTS5 / ICUを選び、shadowまたは障害時はFTS5を返す。"""
+    mode = _cfg.NOVEL_DB_LEXICAL_BACKEND
+    kwargs = {
+        "min_chars": min_chars,
+        "body_page_margin": body_page_margin,
+    }
+    if mode == "fts5":
+        return fts_search(conn, query, scope, top, **kwargs)
+
+    query_hash = hashlib.sha256(query.encode("utf-8")).hexdigest()[:12]
+    if mode == "shadow":
+        started = time.perf_counter()
+        fts_rows = fts_search(conn, query, scope, top, **kwargs)
+        fts_ms = (time.perf_counter() - started) * 1000.0
+        started = time.perf_counter()
+        try:
+            icu_rows = search_page_fts(conn, query, scope, top, **kwargs)
+        except Exception as exc:
+            icu_ms = (time.perf_counter() - started) * 1000.0
+            logger.warning(
+                "lexical shadow unavailable: query_hash=%s fts_count=%d fts_ms=%.3f icu_ms=%.3f error_type=%s",
+                query_hash,
+                len(fts_rows),
+                fts_ms,
+                icu_ms,
+                type(exc).__name__,
+            )
+            return fts_rows
+        icu_ms = (time.perf_counter() - started) * 1000.0
+        overlap = len(_search_key_set(fts_rows) & _search_key_set(icu_rows))
+        logger.info(
+            "lexical shadow: query_hash=%s fts_count=%d icu_count=%d overlap=%d fts_ms=%.3f icu_ms=%.3f",
+            query_hash,
+            len(fts_rows),
+            len(icu_rows),
+            overlap,
+            fts_ms,
+            icu_ms,
+        )
+        return fts_rows
+
+    if mode == "lance_icu":
+        try:
+            return search_page_fts(conn, query, scope, top, **kwargs)
+        except Exception as exc:
+            logger.warning(
+                "lexical ICU fallback: query_hash=%s error_type=%s",
+                query_hash,
+                type(exc).__name__,
+            )
+            return fts_search(conn, query, scope, top, **kwargs)
+
+    raise RuntimeError(f"unsupported lexical backend: {mode}")
+
+
 # ──────────────────────────────────────────────
 # LanceDB KNN ベクトル検索
 # ──────────────────────────────────────────────
@@ -231,7 +307,7 @@ def hybrid_search(
         max_per_book: 1 書籍あたりの取得上限（書籍偏り抑制、scope=all/series 向け）。
         body_page_margin: 各書籍の先頭・末尾 N ページを除外。
     """
-    fts = fts_search(
+    fts = lexical_search(
         conn,
         query,
         scope,
@@ -378,6 +454,7 @@ __all__ = [
     "find_similar_books",
     "fts_search",
     "hybrid_search",
+    "lexical_search",
     "load_all_pages_of_book",
     "sanitize_snippet",
     "search_book_summaries",

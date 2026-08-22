@@ -12,6 +12,7 @@ Alembic の include_name フィルタで autogenerate 対象外にする。
 
 from __future__ import annotations
 
+from sqlalchemy import Index, text
 from sqlmodel import Field, SQLModel, UniqueConstraint
 
 
@@ -45,6 +46,22 @@ class Page(SQLModel, table=True):
     main_characters: str | None = None
     page_type: str = "narrative"
     index_eligible: bool = True
+
+
+class NovelSearchIndexState(SQLModel, table=True):
+    """SQLite本文を正本とする外部検索索引の世代・active pointer。"""
+
+    __tablename__ = "novel_search_index_state"  # type: ignore[reportAssignmentType]
+
+    index_name: str = Field(primary_key=True)
+    source_revision: int = 0
+    active_source_revision: int | None = None
+    active_table_name: str | None = None
+    source_sha256: str | None = None
+    row_count: int | None = None
+    status: str = "missing"
+    built_at: str | None = None
+    lancedb_version: str | None = None
 
 
 class Chunk(SQLModel, table=True):
@@ -211,6 +228,7 @@ class OcrPageResult(SQLModel, table=True):
     external_text: str | None = None
     selected_engine: str = "primary"
     corrected_text: str | None = None
+    published_text: str | None = None
     index_eligible: bool = False
 
 
@@ -225,6 +243,29 @@ class OcrAgentJobRun(SQLModel, table=True):
     job_id: int = Field(foreign_key="rebuild_jobs.id")
     run_id: int = Field(foreign_key="ocr_runs.id")
     book_name: str
+
+
+class OcrPublication(SQLModel, table=True):
+    __tablename__ = "ocr_publications"  # type: ignore[reportAssignmentType]
+    __table_args__ = (
+        Index("idx_ocr_publications_book", "book_id", "published_at"),
+        Index(
+            "uq_ocr_publications_active_book",
+            "book_id",
+            unique=True,
+            sqlite_where=text("retired_at IS NULL"),
+        ),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    book_id: int = Field(foreign_key="books.id")
+    run_id: int = Field(foreign_key="ocr_runs.id")
+    superseded_publication_id: int | None = Field(default=None, foreign_key="ocr_publications.id")
+    action: str
+    actor: str
+    note: str | None = None
+    published_at: str
+    retired_at: str | None = None
 
 
 class OcrGroundTruthPage(SQLModel, table=True):

@@ -6,6 +6,7 @@ Novel DB（小説 RAG 機能）の設定値。
 """
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -25,18 +26,23 @@ class _NovelDbSettings(BaseSettings):
     # LanceDB ベクトルストアパス
     # ---------------------------------------------------------------------------
     NOVEL_DB_LANCE_PATH: str = _DEFAULT_LANCE_PATH
+    # page-level lexical検索。初期既定はFTS5を維持し、shadow後にICUを明示選択する。
+    NOVEL_DB_LEXICAL_BACKEND: Literal["fts5", "shadow", "lance_icu"] = "fts5"
 
     # ---------------------------------------------------------------------------
     # 埋め込みモデル / LLM
     # ---------------------------------------------------------------------------
     NOVEL_DB_OLLAMA_BASE_URL: str = "http://localhost:11434"
+    NOVEL_DB_MLX_BASE_URL: str = "http://127.0.0.1:11437"
+    # "ollama"（既定）またはApple Silicon用"mlx"。
+    NOVEL_DB_EMBED_BACKEND: str = "ollama"
     NOVEL_DB_EMBED_MODEL: str = "bge-m3"
     # 既定 0 = CPU 推論。llama-server（Qwen 35B）に VRAM を譲るため。
     # GPU に戻すなら NOVEL_DB_EMBED_NUM_GPU=99 を設定して uvicorn を再起動。
     NOVEL_DB_EMBED_NUM_GPU: int = 0
     NOVEL_DB_LLM_MODEL: str = "qwen3.6-iq4xs"
     # 既定 `llama_server`（実機ベンチで tg 5× 高速化、scope=all 応答 24s→14s）。
-    # Phase C で `ollama` 分岐撤去。未知の値は LLMError。
+    # Apple Siliconでは`mlx`を選択可能。Phase Cで`ollama`分岐撤去。未知値はLLMError。
     NOVEL_DB_LLM_BACKEND: str = "llama_server"
     NOVEL_DB_LLAMA_SERVER_URL: str = "http://127.0.0.1:11435"
     # 主要登場人物抽出用モデル（短答型タスク）。
@@ -51,11 +57,12 @@ class _NovelDbSettings(BaseSettings):
     # TODO(Step5高速化): Gemma4 MTP (Multi-Token Prediction) — llama.cpp 公式対応待ち
     NOVEL_DB_CONTEXT_MODEL: str = "gemma4:12b"
     # §4.5 本構築統合: キャラ抽出 / チャンク文脈生成のバックエンド切替
-    # "ollama" (既定): Ollama 経由で gemma4:e4b を使用
-    # "qwen"         : llama-server の Qwen に統一（thinking は _DEFAULT_THINK=False で自動抑制）
+    # "ollama" (既定): Ollama 経由でGemmaを使用
+    # "qwen"         : QWEN_BACKENDに統一（thinkingは自動抑制）
+    # "mlx"          : Apple SiliconのMLX serverでGemmaを使用
     NOVEL_DB_GEMMA_BACKEND: str = "ollama"
     # 要約根拠検証。既定はQwenを直列再利用し、別モデルを常駐させない。
-    # 独立比較では "ollama" または "llama_server" とモデル名を指定する。
+    # 独立比較では"ollama" / "llama_server" / "mlx"とモデル名を指定する。
     NOVEL_DB_VERIFIER_BACKEND: str = "qwen"
     NOVEL_DB_VERIFIER_MODEL: str = ""
     NOVEL_DB_VERIFIER_BASE_URL: str = "http://127.0.0.1:11436"
@@ -88,7 +95,10 @@ novel_db_settings = _s  # public singleton
 # モジュールレベル定数として再公開（`from config import NOVEL_DB_*` 互換）
 # ---------------------------------------------------------------------------
 NOVEL_DB_LANCE_PATH = _s.NOVEL_DB_LANCE_PATH
+NOVEL_DB_LEXICAL_BACKEND = _s.NOVEL_DB_LEXICAL_BACKEND
 NOVEL_DB_OLLAMA_BASE_URL = _s.NOVEL_DB_OLLAMA_BASE_URL
+NOVEL_DB_MLX_BASE_URL = _s.NOVEL_DB_MLX_BASE_URL
+NOVEL_DB_EMBED_BACKEND = _s.NOVEL_DB_EMBED_BACKEND
 NOVEL_DB_EMBED_MODEL = _s.NOVEL_DB_EMBED_MODEL
 NOVEL_DB_EMBED_DIM = 1024  # bge-m3 の出力次元（固定値）
 NOVEL_DB_EMBED_NUM_GPU = _s.NOVEL_DB_EMBED_NUM_GPU

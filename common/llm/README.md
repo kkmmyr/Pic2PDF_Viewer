@@ -1,6 +1,6 @@
 # local_llm — 共通 LLM クライアント
 
-ローカル Ollama / llama-server 上の LLM（主に Qwen3.x の thinking モデル）を
+ローカルOllama / llama-server / Apple Silicon MLX上のLLM（主にQwen3.xのthinkingモデル）を
 **複数プロジェクトから安全に呼び出す** ための共通ヘルパー。
 Pic2PDF workspace内では`qwen-common`依存、外部projectではeditable package依存として利用する。
 
@@ -9,7 +9,7 @@ Pic2PDF workspace内では`qwen-common`依存、外部projectではeditable pack
 - Qwen3.x は thinking モデルで、`stream=True` / `think=False` の併用が必須
   （さもないと `response` が空 / 途中で切れる事故が起きる）
 - 上記の地雷を踏み抜く呼び出しを各プロジェクトで再実装したくない
-- バックエンド（Ollama / llama-server）の切替や、新バックエンド追加時の影響を
+- バックエンド（Ollama / llama-server / MLX）の切替や、新バックエンド追加時の影響を
   1 箇所に閉じ込めたい
 
 ## 公開 API
@@ -21,12 +21,14 @@ Pic2PDF workspace内では`qwen-common`依存、外部projectではeditable pack
 | `LLMError` | バックエンド呼び出し失敗時の例外 |
 | `OllamaBackend` | Ollama `/api/generate` を NDJSON ストリーミングで叩く具象 |
 | `LlamaServerBackend` | llama.cpp `llama-server` の OpenAI 互換 SSE を叩いて Ollama 形式に正規化する具象 |
+| `MlxBackend` | `mlx_vlm.server`のOpenAI互換SSEを叩き、thinkingとsampling名をMLX契約へ変換する具象 |
+| `MlxLmBackend` | 公式`mlx_lm.server`用。nested thinking契約と限定JSON adapterを持つ具象 |
 | `backend_from_env` | 環境変数 (`QWEN_*`) から Backend を 1 つ作る（CLI / MCP 専用） |
 
 `Backend` には `ask` / `aask`（ストリームを集約して完全 response を返す）の
 共通実装が組み込まれているので、サブクラスは 2 つの抽象メソッドだけ書けばよい。
 
-イベントの形式は両 backend で **Ollama 互換 dict** に統一されている
+イベントの形式は全backendで **Ollama 互換 dict** に統一されている
 （`{"response": "...", "done": false}` / 末尾は `{"response": "", "done": true,
 "done_reason": "stop", "prompt_eval_count": ..., "eval_count": ...}`）。
 
@@ -65,7 +67,7 @@ async for event in backend.astream_ask("..."):
 ```python
 from local_llm import backend_from_env
 
-backend = backend_from_env()  # QWEN_BACKEND を見て LlamaServerBackend / OllamaBackend を返す
+backend = backend_from_env()  # QWEN_BACKEND に対応するBackendを返す
 ```
 
 外部projectへ組み込む場合は、対象projectで
@@ -75,9 +77,11 @@ backend = backend_from_env()  # QWEN_BACKEND を見て LlamaServerBackend / Olla
 
 | 変数 | 既定 | 用途 |
 |---|---|---|
-| `QWEN_BACKEND` | `llama_server` | `llama_server` / `ollama` の選択 |
+| `QWEN_BACKEND` | `llama_server` | `llama_server` / `ollama` / `mlx` / `mlx_lm` の選択 |
 | `QWEN_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama の base URL |
 | `QWEN_LLAMA_SERVER_BASE_URL` | `http://127.0.0.1:11435` | llama-server の base URL |
+| `QWEN_MLX_BASE_URL` | `http://127.0.0.1:11437` | `mlx_vlm.server`のbase URL |
+| `QWEN_MLX_LM_BASE_URL` | `http://127.0.0.1:11440` | 公式`mlx_lm.server`のbase URL |
 | `QWEN_MODEL` | `qwen3.6:35b-a3b` | デフォルトモデル名 |
 | `QWEN_TIMEOUT_SEC` | `600` | 1 リクエストの timeout 秒 |
 
@@ -94,6 +98,12 @@ backend = backend_from_env()  # QWEN_BACKEND を見て LlamaServerBackend / Olla
 | `num_ctx` | 8192 |
 
 `stream_ask` の `options` 引数で個別上書き可能（マージは Backend 側で行う）。
+
+`MlxLmBackend`で`format="json"`を指定した場合、server未対応の`response_format`は送らない。
+最終contentを自然停止までbufferし、生のJSON objectまたは単独の小文字`json`コードフェンスだけを
+受理して正規化する。説明文、複数fence、duplicate key、非有限数、array / scalar、未終端、
+`finish_reason != stop`は部分応答を返す前に`LLMError`とする。生成時点でJSON Schemaを拘束する用途は
+`MlxBackend` + `mlx_vlm.server`を使用する。
 
 ## 依存
 
@@ -120,12 +130,15 @@ D:\61.tool\common\llm\
 │   ├── _backend.py                  # Backend(ABC) / BackendConfig / LLMError
 │   ├── _ollama.py                   # OllamaBackend
 │   ├── _llama_server.py             # LlamaServerBackend
+│   ├── _mlx.py                      # MlxBackend
+│   ├── _mlx_lm.py                   # MlxLmBackend
+│   ├── _json_output.py              # MLX-LM限定JSON adapter
 │   ├── _sse.py                      # OpenAI SSE → Ollama dict 変換の純関数
 │   ├── _factory.py                  # backend_from_env()
 │   └── logger.py                    # mcp / cli 共通ロガー
 ├── ask.py                           # CLI
 ├── mcp_server.py                    # MCP サーバー
-├── tests\                           # pytest（34 件）
+├── tests\                           # pytest
 ├── docs\                            # 利用ガイド
 └── README.md                        # 本ファイル
 ```
@@ -225,7 +238,9 @@ CLI からの呼び出しも `logs/YYYY-MM-DD.log` に `cli` / `cli_session` ソ
 - **Phase 3**（完了）: CLI (`ask.py` / `ask.ps1`) と利用ガイド追加
 - **B-14 / ADR-0009**（完了、2026-05-11）: llama-server バックエンド追加
   （応答 5× 高速化）
+- **ADR-0019**（完了、2026-08-17）: Apple Silicon用MLXバックエンドと
+  bge-m3 CLS互換経路を追加（既定のWindows/Linux経路は維持）
 - **A-0〜A-7**（完了、2026-05-11）: Qwen 専用設計から Backend 抽象に再設計。
-  ディレクトリリネーム (`Qwen/` → `llm/`)、Backend ABC + 2 つの具象 + ファクトリに
+  ディレクトリリネーム (`Qwen/` → `llm/`)、Backend ABC + 当時2つの具象 + ファクトリに
   分離、env 経由設定渡しを廃止し `BackendConfig` 引数渡しに統一。詳細は
   Pic2PDF_Viewer の `docs/archive/LLM層リファクタリング_完了記録.md`

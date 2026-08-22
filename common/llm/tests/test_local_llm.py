@@ -1,7 +1,7 @@
 """local_llm パッケージのユニットテスト。
 
 A-6 で旧 test_qwen_client.py から移行。テスト対象を BackendConfig dataclass
-+ Backend ABC + 2 つの具象 Backend + SSE 純関数 + backend_from_env に分割した。
++ Backend ABC + 5 つの具象 Backend + SSE 純関数に分割した。
 
 実 HTTP は urllib (sync) / httpx (async) を mock してリクエストボディと URL を
 検証する。
@@ -19,6 +19,8 @@ from local_llm import (
     BackendConfig,
     LlamaServerBackend,
     LLMError,
+    MlxBackend,
+    MlxLmBackend,
     OllamaBackend,
 )
 from local_llm._sse import convert_openai_chunk, fallback_done_event
@@ -26,19 +28,6 @@ from local_llm._sse import convert_openai_chunk, fallback_done_event
 # ---------------------------------------------------------------------------
 # fixtures / helpers
 # ---------------------------------------------------------------------------
-
-
-@pytest.fixture(autouse=True)
-def clear_env(monkeypatch):
-    """各テストで QWEN_* 環境変数を初期化する（backend_from_env 用）。"""
-    for key in [
-        "QWEN_BACKEND",
-        "QWEN_OLLAMA_BASE_URL",
-        "QWEN_LLAMA_SERVER_BASE_URL",
-        "QWEN_MODEL",
-        "QWEN_TIMEOUT_SEC",
-    ]:
-        monkeypatch.delenv(key, raising=False)
 
 
 def _ollama_ndjson_response(chunks: list[dict]) -> MagicMock:
@@ -72,6 +61,7 @@ def _openai_sse_response(chunks: list[dict | str]) -> MagicMock:
 
 _OLLAMA_CFG = BackendConfig(base_url="http://test-ollama:11434")
 _LLAMA_CFG = BackendConfig(base_url="http://test-llama:11435")
+_MLX_CFG = BackendConfig(base_url="http://test-mlx:11437")
 
 
 # ---------------------------------------------------------------------------
@@ -108,6 +98,8 @@ class TestBackendABC:
         # 実体テストは後段の TestOllamaBackend / TestLlamaServerBackend で
         assert isinstance(OllamaBackend(_OLLAMA_CFG), Backend)
         assert isinstance(LlamaServerBackend(_LLAMA_CFG), Backend)
+        assert isinstance(MlxBackend(_MLX_CFG), Backend)
+        assert isinstance(MlxLmBackend(_MLX_CFG), Backend)
 
 
 # ---------------------------------------------------------------------------
@@ -505,6 +497,66 @@ class TestLlamaServerBackendStreamAsk:
         done_events = [e for e in events if e.get("done")]
         assert len(done_events) == 1
         assert done_events[0]["eval_count"] == 1
+
+
+class TestMlxBackendBody:
+    def test_maps_thinking_and_sampling_options(self):
+        body = MlxBackend(_MLX_CFG)._build_body(
+            "q",
+            system=None,
+            model="/models/qwen",
+            options={
+                "top_p": 0.95,
+                "top_k": 20,
+                "min_p": 0.01,
+                "seed": 42,
+                "repeat_penalty": 1.15,
+                "repeat_last_n": 128,
+                "presence_penalty": 1.5,
+                "frequency_penalty": 0.2,
+            },
+            think=None,
+        )
+
+        assert body["model"] == "/models/qwen"
+        assert body["enable_thinking"] is False
+        assert "chat_template_kwargs" not in body
+        assert body["top_p"] == 0.95
+        assert body["top_k"] == 20
+        assert body["min_p"] == 0.01
+        assert body["seed"] == 42
+        assert body["repetition_penalty"] == 1.15
+        assert body["repetition_context_size"] == 128
+        assert body["presence_penalty"] == 1.5
+        assert body["frequency_penalty"] == 0.2
+
+    def test_explicit_repetition_penalty_takes_precedence(self):
+        body = MlxBackend(_MLX_CFG)._build_body(
+            "q",
+            system=None,
+            model=None,
+            options={"repeat_penalty": 1.1, "repetition_penalty": 1.3},
+            think=True,
+            format="json",
+        )
+
+        assert body["enable_thinking"] is True
+        assert body["repetition_penalty"] == 1.3
+        assert body["response_format"] == {"type": "json_object"}
+
+    def test_stream_ask_uses_mlx_endpoint_and_error_label(self):
+        import urllib.error
+
+        captured: dict[str, str] = {}
+
+        def fake_urlopen(req, timeout=None):
+            captured["url"] = req.full_url
+            raise urllib.error.URLError("connection refused")
+
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            with pytest.raises(LLMError, match="MLX server request failed"):
+                list(MlxBackend(_MLX_CFG).stream_ask("x"))
+        assert captured["url"] == "http://test-mlx:11437/v1/chat/completions"
 
 
 class TestStreamChatDefaultNotImplemented:

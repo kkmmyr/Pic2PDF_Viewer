@@ -1,5 +1,7 @@
 """services/novel_db/search.py の単体・統合テスト。"""
 
+import sqlite3
+
 import pytest
 
 from services.meta_store import save_meta
@@ -11,6 +13,7 @@ from services.novel_db.search import (
     _resolve_book_names,
     build_fts5_or_query,
     hybrid_search,
+    lexical_search,
     load_all_pages_of_book,
     sanitize_snippet,
 )
@@ -96,6 +99,67 @@ class TestResolveBookNames:
 
         result = _resolve_book_names(Scope(type="series", id="s1"))
         assert sorted(result) == ["book-a", "book-b"]
+
+
+def test_lexical_shadow_returns_fts5_rows_and_only_logs_query_hash(monkeypatch):
+    from services.novel_db import search as search_mod
+
+    query = "ログへ残してはいけない秘密の質問"
+    fts_rows = [("book-a", 1, "fts", -1.0)]
+    icu_rows = [("book-b", 2, "icu", 1.0)]
+    monkeypatch.setattr(search_mod._cfg, "NOVEL_DB_LEXICAL_BACKEND", "shadow")
+    monkeypatch.setattr(search_mod, "fts_search", lambda *args, **kwargs: fts_rows)
+    monkeypatch.setattr(search_mod, "search_page_fts", lambda *args, **kwargs: icu_rows)
+    log_messages: list[str] = []
+    monkeypatch.setattr(
+        search_mod.logger,
+        "info",
+        lambda message, *args: log_messages.append(message % args),
+    )
+
+    with sqlite3.connect(":memory:") as conn:
+        rows = lexical_search(conn, query, Scope(type="all"))
+
+    log_text = "\n".join(log_messages)
+    assert rows is fts_rows
+    assert query not in log_text
+    assert "query_hash=" in log_text
+    assert "fts_count=1" in log_text
+    assert "icu_count=1" in log_text
+
+
+def test_lexical_icu_uses_valid_empty_result_without_fallback(monkeypatch):
+    from services.novel_db import search as search_mod
+
+    fallback_calls = 0
+
+    def fallback(*args, **kwargs):
+        nonlocal fallback_calls
+        fallback_calls += 1
+        return [("fallback", 1, "fts", -1.0)]
+
+    monkeypatch.setattr(search_mod._cfg, "NOVEL_DB_LEXICAL_BACKEND", "lance_icu")
+    monkeypatch.setattr(search_mod, "fts_search", fallback)
+    monkeypatch.setattr(search_mod, "search_page_fts", lambda *args, **kwargs: [])
+
+    with sqlite3.connect(":memory:") as conn:
+        assert lexical_search(conn, "該当なし", Scope(type="all")) == []
+    assert fallback_calls == 0
+
+
+def test_lexical_icu_failure_falls_back_to_fts5(monkeypatch):
+    from services.novel_db import search as search_mod
+
+    expected = [("fallback", 1, "fts", -1.0)]
+    monkeypatch.setattr(search_mod._cfg, "NOVEL_DB_LEXICAL_BACKEND", "lance_icu")
+    monkeypatch.setattr(search_mod, "fts_search", lambda *args, **kwargs: expected)
+
+    def fail(*args, **kwargs):
+        raise RuntimeError("simulated LanceDB outage")
+
+    monkeypatch.setattr(search_mod, "search_page_fts", fail)
+    with sqlite3.connect(":memory:") as conn:
+        assert lexical_search(conn, "障害試験", Scope(type="all")) is expected
 
 
 # ---------------------------------------------------------------------------

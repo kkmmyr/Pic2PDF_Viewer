@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
-from local_llm import Backend
+import pytest
+from local_llm import Backend, LLMError, MlxBackend
 
+from services.novel_db import llm_provider as llm_provider_module
 from services.novel_db.llm import stream_qa
-from services.novel_db.llm_provider import NovelLlmProvider
+from services.novel_db.llm_provider import NovelLlmProvider, build_llm_provider
 from services.novel_db.query_expander import expand_query
 from services.novel_db.relation_parser import parse_relation_response
 from services.novel_db.summary_generation import run_map_reduce_summary
@@ -32,6 +34,30 @@ class FakeBackend:
 def _provider(fake: FakeBackend) -> NovelLlmProvider:
     backend = cast(Backend, fake)
     return NovelLlmProvider(qwen=backend, gemma=backend, query=backend, verifier=backend)
+
+
+def test_build_provider_supports_all_mlx_roles(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_LLM_BACKEND", "mlx")
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_GEMMA_BACKEND", "mlx")
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_VERIFIER_BACKEND", "mlx")
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_VERIFIER_MODEL", "/models/verifier")
+
+    provider = build_llm_provider()
+
+    assert isinstance(provider.qwen, MlxBackend)
+    assert isinstance(provider.gemma, MlxBackend)
+    assert isinstance(provider.query, MlxBackend)
+    assert isinstance(provider.verifier, MlxBackend)
+    assert provider.qwen.config.default_options["presence_penalty"] == 1.5
+    assert provider.gemma.config.default_options["top_k"] == 64
+
+
+def test_build_provider_rejects_unknown_gemma_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_LLM_BACKEND", "llama_server")
+    monkeypatch.setattr(llm_provider_module.config, "NOVEL_DB_GEMMA_BACKEND", "unknown")
+
+    with pytest.raises(LLMError, match="unknown NOVEL_DB_GEMMA_BACKEND"):
+        build_llm_provider()
 
 
 def test_query_expander_accepts_fake_provider_without_global_patch() -> None:

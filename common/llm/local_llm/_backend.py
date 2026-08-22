@@ -7,6 +7,7 @@ Backend は 2 つの抽象メソッド (`stream_ask` / `astream_ask`) を実装�
 設定は `BackendConfig` dataclass を引数渡しする方式に統一しており、
 環境変数を読むのは `_factory.backend_from_env()` の 1 箇所のみ。
 """
+
 from __future__ import annotations
 
 import abc
@@ -18,7 +19,7 @@ from typing import Any
 class LLMError(RuntimeError):
     """バックエンド呼び出し失敗時に投げる。
 
-    Ollama / llama-server 接続失敗、サポート外引数（llama-server で context 渡し
+    Ollama / llama-server / MLX接続失敗、サポート外引数（OpenAI互換backendでcontext渡し
     等）、未知の backend 種別などを区別せず本クラスで投げる。
     """
 
@@ -46,6 +47,7 @@ class BackendConfig:
     `default_options` は `stream_ask` の `options` 引数とマージされ、呼び出し側
     `options` が優先される。
     """
+
     base_url: str
     model: str = "qwen3.6:35b-a3b"
     timeout: int = 600
@@ -57,7 +59,8 @@ class BackendConfig:
 class Backend(abc.ABC):
     """同期 + async ストリーミングと、その集約版を提供する LLM バックエンド。
 
-    具体実装は `OllamaBackend` / `LlamaServerBackend`。
+    具体実装は`OllamaBackend` / `LlamaServerBackend` / `MlxBackend` /
+    `MlxLmBackend`。
     新バックエンド追加時は `stream_ask` / `astream_ask` の 2 抽象メソッドだけ
     実装すれば、`ask` / `aask` は本クラスのデフォルト実装が利用される。
 
@@ -87,10 +90,11 @@ class Backend(abc.ABC):
 
         最終イベントには `done=True` / `done_reason` / `eval_count` 等が含まれる。
         `context` は Ollama backend のみセッション継続用に使える
-        （llama-server backend では `LLMError` を投げる）。
+        （llama-server / MLX backendでは`LLMError`を投げる）。
         `format` は LLM 出力フォーマットの強制（現状 `"json"` のみサポート）。
-        Ollama では body トップレベル `format` キーへ、llama-server では
+        Ollamaではbodyトップレベル`format`キーへ、llama-server / MLX-VLMでは
         OpenAI 互換 `response_format={"type": "json_object"}` へ変換される。
+        MLX-LMではserverが未対応のため、完了後に限定的なfail-closed正規化を行う。
         """
 
     @abc.abstractmethod

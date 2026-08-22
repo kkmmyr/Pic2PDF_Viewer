@@ -1,8 +1,8 @@
 # MacローカルLLM移行・比較計画
 
-> 状態: 初回比較完了（3回再現性試験・本番採否は未完了）
+> 状態: 初回モデル比較・MLX runtime比較完了（Ornith日本語小説RAGは不採用、比較checkpointのみ保持）
 > 作成日: 2026-07-28
-> 最終更新: 2026-08-15
+> 最終更新: 2026-08-22
 > 対象: 小説RAGの事実抽出、巻別要約、人物辞典、生成物QA
 
 ## 1. 目的
@@ -41,7 +41,9 @@ OCR後の公開成果物はSol主生成へ段階移行中である。本計画�
 | 3 | Qwen3.6-27B Dense | MLX 6bit、収まらない場合4bit | 最終要約・人物説明の事実保持と文章品質 |
 | 4 | Gemma 4-31B Dense | MLXまたはGGUF 4bit/6bit | 別系統モデルによる独立校正・事実性確認 |
 | 5 | Muse Glimmer 30B Dense | GGUF Q6_K_XL | Meta系の別モデルによる構造化抽出・日本語要約・独立検証 |
-| 6 | NVIDIA Nemotron 3.5 Lightning 30B-A3B | GGUF Q4_K_M | 新規MoE系の短窓検証・構造化抽出・指示遵守 |
+| 6 | NVIDIA Nemotron 3.5 Lightning 30B-A3B | GGUF Q4_K_M / MLX affine 4bit・6bit | 新規MoE系の短窓検証・構造化抽出・指示遵守、runtime差 |
+| 7 | Nemotron Labs 3 Puzzle 75B-A9B | MLX mixed 4/6-bit | 64GB適合性、世代更新後の短窓推論・長文根拠保持・JSON終端 |
+| 8 | Ornith 1.5 35B-A3B | 公式MLX affine 4bit | Qwen3.5 MoE派生の速度・Thinking品質・厳密形式・小説RAG適合性 |
 
 Qwen3.6-27BはDenseモデルのため、活性約3Bの35B-A3Bより低速になる見込みである。
 速度ではなく夜間バッチの品質候補として評価する。Gemma 4-31Bは全面置換を前提とせず、
@@ -60,6 +62,23 @@ Nemotron 3.5 Lightning 30B-A3Bは2026年8月公開の新規候補で、約3B act
 Mamba/MoE/attention hybrid、thinking切替、tool calling、長文contextを備える。公開ベンチマークは
 日本語小説のページ根拠付き抽出を直接保証しないため、Qwenの置換候補とはせず、固定短窓と第1ブロックの
 早期ゲートから評価する。64GBではOllama公式Q4_K_Mを単独常駐させ、本番既定値へ配線しない。
+Ollama版の短窓thinkingが他候補より良かった記録を再確認するため、MLX 4bitと6bitも同じ本文・
+prompt・sampling・seed群で比較する。MLXで軽くなること自体を採用理由にせず、prompt cache汚染、
+MTP非対応、thinking終端、出力token量、physical footprintを別々に記録する。
+
+Nemotron Labs 3 Puzzle 75B-A9Bは75.3B total / 9.3B activeで、Nemotron 3 Superから
+圧縮されたMamba 2・Attention・LatentMoE混成モデルである。M2 Max 64GBで実測済みの
+mixed 4/6-bit MLX変換を第一候補とし、既存Qwen / bge-m3 serverを停止した単独常駐で評価する。
+通常の`mlx-lm`は異種expert幅へ未対応なので、監査済み固定feature branchを専用venvへ隔離する。
+モデル取得・起動だけでは採用せず、旧30B-A3Bと同じ74〜75ページ固定ケース、JSON終端、
+32,768 token以上の段階的長文入力を早期ゲートにする。本番既定値と公開物には配線しない。
+
+Ornith 1.5 35B-A3BはQwen3.5系の約35B total / 約3B active MoEへself-improvement trainingを
+重ねたreasoning modelである。公式MLX 4bit版は18.2GiBで、M1 Max 64GBへのロード余裕と
+MoEの速度を期待できる。一方、公開評価はagentic coding中心で日本語小説を直接保証せず、
+Qwen3.5 hybridのprefix cache不整合とlong-context resource limitも未解決である。
+まずcache 0・同時実行1・Thinking有効の短答 / API / benchmarkだけを行い、その後に固定小説ケース、
+構造化出力、長文の順で拡大する。起動成功だけでQwenを置き換えず、本番設定へ配線しない。
 
 Qwen3.8-27Bは世代更新による現行Qwen3.6-35B-A3Bの置換可否を、速度よりも完成物の
 事実性で判定する。短窓と巻全体は両方とも`think=false`に揃え、Thinkingの有無で
@@ -81,6 +100,24 @@ M1 Max 64GBでQwen3.6-27B Dense 6bitを別プロセスとして2本常駐させ�
 - [Muse Glimmer 30B GGUFモデルカード（Unsloth）](https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF)
 - [NVIDIA Nemotron 3.5 Lightning公式モデルカード](https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16)
 - [Nemotron 3.5 Lightning Ollamaライブラリ](https://ollama.com/library/nemotron-3.5-lightning)
+- [Nemotron 3.5 Lightning MLX 4bit](https://huggingface.co/mlx-community/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit)
+- [Nemotron 3.5 Lightning MLX 6bit](https://huggingface.co/Vontra/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-MLX-6bit)
+- [MLX-LM](https://github.com/ml-explore/mlx-lm)
+- [MLX-LM hybrid modelのprompt cache課題](https://github.com/ml-explore/mlx-lm/issues/980)
+- [MLX-LM prompt cache prefix不整合](https://github.com/ml-explore/mlx-lm/issues/1494)
+- [NVIDIA Nemotron Labs 3 Puzzle 75B-A9B公式モデルカード](https://huggingface.co/nvidia/NVIDIA-Nemotron-Labs-3-Puzzle-75B-A9B-FP8)
+- [Nemotron Puzzle MLX mixed 4/6-bit](https://huggingface.co/tekosML/Nemotron-Labs-3-Puzzle-75B-A9B-MLX-4bit-experts-6bit)
+- [Ornith 1.5 35B-A3B公式モデルカード](https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B)
+- [Ornith 1.5 35B-A3B公式MLX 4bit](https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit)
+- [Ornith 1.5 MLXコミュニティ実測](https://www.reddit.com/r/oMLX/comments/1vtg1rv/ornith_seems_to_be_better/)
+- [MLX-LM Qwen3.5 hybrid prefix cache課題](https://github.com/ml-explore/mlx-lm/issues/980)
+- [MLX-LM Qwen3.5 MoE long-context resource limit](https://github.com/ml-explore/mlx-lm/issues/1644)
+- [MLX-LM HTTP server仕様](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/SERVER.md)
+- [MLX-LM request単位Thinkingの報告](https://github.com/ml-explore/mlx-lm/issues/1352)
+- [MLX-VLM](https://github.com/Blaizzy/mlx-vlm)
+- [MLX-VLM structured output + Thinking修正](https://github.com/Blaizzy/mlx-vlm/pull/1299)
+- [MLX-VLM同時structured outputのprocessorずれ報告](https://github.com/Blaizzy/mlx-vlm/issues/1574)
+- [非公式mlx-openai-server](https://github.com/cubist38/mlx-openai-server)
 - [Qwen3公式non-thinking生成設定](https://huggingface.co/Qwen/Qwen3-8B)
 - [Ollama Structured Outputs](https://docs.ollama.com/capabilities/structured-outputs)
 - [Ollama Modelfileパラメーター](https://docs.ollama.com/modelfile)
@@ -248,6 +285,250 @@ Q4_K_Mの設定改善後も品質不足の場合だけ、より高精度な量�
 という帰属誤りと保護作戦の目的変形も残った。局所ゲートを通過しないため、3回再現性試験、巻全体再生成、
 高精度量子化には進まない。Qwen3.8は比較用登録に留め、公開文はSol経路を優先する。
 
+#### Qwen / Gemma / bge-m3のMLX移行実測（2026-08-17）
+
+M1 Max 64GB、macOS 26.6.1、`mlx-vlm 0.6.13`の専用venvで、次の固定revisionを
+repo外へ取得し、全safetensorsを配布メタデータのSHA-256と照合した。
+
+- `mlx-community/Qwen3.6-35B-A3B-4bit` — `38740b847e4c...`
+- `mlx-community/gemma-4-12B-4bit` — `7d7c99c4d1b1...`
+- `mlx-community/bge-m3-mlx-fp16` — `a37eddded9a6...`
+
+Qwenは現行Ollama登録の`top_k=20 / top_p=0.95 / min_p=0 /
+presence_penalty=1.5 / repeat_penalty=1.15`へ揃えた。終盤固定ケースは両方3/3、
+第1ブロックはMLX約169秒 / Ollama約187秒、保存済み事実表からの要約4工程は
+約519秒 / 約544秒だった。62,569 prompt tokenの77ページ一括判定もMLX約272秒 /
+Ollama約286秒で完走したが、両方が同じ最終状態矛盾を返した。MLX常駐は約20GB、
+Ollama表示は24GBで、試験中の追加swapはなかった。runtime差は小さく、長文誤りは
+64GB不足ではなくQwen自体の限界と判定したため、MacのQwenはMLXを採用する。
+
+bge-m3は配布物にpooling設定がなく、既定meanでは同一文cosine平均約0.701、
+新旧Top-10一致率約53%となったため不採用とした。`1_Pooling/config.json`をCLSへ固定すると、
+50入力の同一文cosine平均0.999985・最小0.999968、6クエリの旧/新/交差Top-5・Top-10が
+すべて一致した。50件はMLX約3.28秒 / Ollama約6.24秒で、再indexなしでMLXを採用する。
+
+GemmaはOllamaが終盤固定ケース3/3だったのに対し、MLXは3回とも誤答した。
+人物抽出8ページもOllamaが`茉莉花`を約5.31秒で返した一方、MLXは不在の`珀陽`を加え、
+続けて`<image|>`を含む875 tokenを出して約47.7秒を要した。MLX常駐RSS約11.5GiB、
+swap増加なしのためメモリ不足ではない。現行変換/runtimeのテキスト互換不良として
+Gemma MLXを不採用にし、MacでもOllama `gemma4:12b`を保持する。
+
+したがってMacの採用構成は**Qwen=MLX / bge-m3=MLX（CLS）/ Gemma=Ollama**の混在とする。
+各モデルの旧Ollama登録は個別ゲートで扱い、Qwenとbge-m3だけをアプリ統合smoke後に削除できる。
+Windows本番のQwen GGUF / llama-serverはrollbackとして維持する。詳細は
+[ADR-0019](../../design/基本設計/ADR/0019_apple-silicon-mlx-inference.md)を参照する。
+
+#### Nemotron Labs 3 Puzzle 75B MLX導入・早期ゲート実測（2026-08-17）
+
+community mixed 4/6-bit変換を固定revision `695829721099...`で42.007GiB取得し、9 shardと
+tokenizerのSHA-256を配布メタデータへ照合した。Puzzle対応`mlx-lm`は固定commit `0f88e16`の
+専用venvへ隔離し、branch差分を監査した上で単体test 12件に合格した。checkpoint内のcustom Pythonと
+`--trust-remote-code`は使っていない。既存Qwen / bge-m3を停止した排他serverはhealth、短答、
+OpenAI互換streamingに成功し、warm短答は1.564秒だった。
+
+他用途のComfyUIを停止しない実機条件では、server起動前後でsystem-wide swapが8.74GBから
+最大33.79GBへ増え、空きメモリ指標は最小9%になった。OOMは起きず64GBへロードできたが、同時に
+別のML workloadを使う安全余裕はない。
+
+茉莉花官吏伝10巻74〜75ページの固定ケースでは、non-thinkingが134.142秒、入力2,568 / 出力35 tokenで
+最終合意を「牢へ戻る」と誤判定した。thinkingは187.346秒、出力2,048 token上限まで`OCR`を反復し、
+最終JSONを返さなかった。`low_effort`は48.073秒で終端したが、同じ誤判定に加えて指定enumを外した。
+形式・意味の早期ゲートが不合格のため、32,768 token、4ブロック、巻全体要約には拡大しない。
+本番既定値はQwen=MLX / bge-m3=MLX / Gemma=Ollamaを維持し、Nemotronのcheckpointとruntimeだけを
+再評価用に残す。既存OllamaのNemotron 3.5 Lightningも別モデルとして保持する。
+
+#### Nemotron 3.5 Lightning 30BのOllama / MLX再比較（2026-08-18）
+
+ネット上の公式情報とMLX-LM実装を先に調査し、Mamba 2・MoE・Attention hybrid、30B total /
+約3B active、公式sampling `temperature=1.0 / top_p=0.95`を確認した。MLX-LMは
+long promptとcacheを提供するが、hybrid modelのcache制約とprefix不整合が未解決であり、
+Nemotron-Hの`mtp.*`補助重みは変換時に除外される。ローカルでもcache有効時に
+無関係な乱数promptへ直前回答の一部を返す汚染を再現したため、全比較をcache 0で取り直した。
+
+4bitは公式`mlx-community`変換revision `55ac8c892611...`、6bitは
+同じBF16元モデルをstock affine group 64で変換したrevision `bd2a75d36c78...`を使った。
+4bit 4 shard、6bit 5 shard、tokenizerのSHA-256はすべて配布元値と一致した。6bitの設定・
+chat templateは4bitと量子化幅以外に差がなく、25,667,608,448 bytes、実効6.50 bits/weightである。
+
+74〜75ページ固定ケースの結果は次のとおりだった。
+
+| runtime / 条件 | JSON | 中核意味判定 | wall time / output |
+|---|---:|---:|---:|
+| Ollama Q4_K_M direct | 1/1 | 0/1 | 9.216秒 / 154 token |
+| Ollama Q4_K_M thinking | 3/3 | 3/3 | 59.413〜91.418秒。理由の言語・正規名まで含む契約は2/3 |
+| MLX 4bit direct | 1/1 | 0/1 | 9.546秒 / 169 token |
+| MLX 4bit thinking、8,192上限 | 3/3 | 0/3 | 43.690〜44.251秒 / 各2,359 token |
+| MLX 6bit direct | 1/1 | 0/1 | 14.291秒 / 168 token |
+| MLX 6bit thinking、8,192上限 | 0/3 | 0/3 | 237.164〜250.933秒 / 3回とも上限 |
+| MLX 6bit thinking、12,288診断 | 1/1 | 1/1 | 268.377秒 / 9,205 token |
+
+MLX 6bitは約24GB footprintで単独ロードでき、試験後は空きメモリ指標95%、
+system-wide swap約3.0GBまで回復した。したがって4bitの誤答は量子化精度不足、
+6bitの冗長thinkingはMLX経路の生成効率・終端運用の問題であり、64GB不足ではない。
+6bitは上限を増やせば正解可能だが、Ollamaより大幅に遅く、cacheを使えずMTPもない。
+通常の8,192 token早期ゲートを通らないため第1ブロックへ拡大せず、NemotronのMLX切替を
+不採用とする。既存Ollama Q4_K_MとMLX checkpointは比較用に保持し、Macの採用構成は変更しない。
+
+#### Nemotron 3.5 Lightning 30BのThinking利用再監査（2026-08-18）
+
+前回評価器と保存JSONを再確認し、固定74〜75ページはOllama `think=true`と
+10,172文字の`message.thinking`、MLX比較は`chat_template_kwargs.enable_thinking=true`を
+実際に使っていたことを確認した。初回8〜27ページのThinking raw応答だけは未保存だったため、
+NVIDIA公式例と同じ`temperature=1.0 / top_p=0.95 / max_tokens=16000`で取り直した。
+
+固定ケースはdirect 1回が中核0/1、Thinking 3回が3/3だった。8〜27ページの汎用抽出は
+Thinkingが559.465秒・16,000 tokenで`length`、24〜27ページへ縮めても414.988秒・16,000 token・
+最終本文0文字で失敗した。directは20ページを225.731秒、4ページを63.734秒で完走したが、
+自由抽出には話者・時点誤りが残った。その誤りを26〜27ページ・4項目の列挙Schemaへ分解すると、
+direct 9.201秒とThinking 132.680秒の双方が全問正解した。
+
+このためPhase 2へNemotronの巻全体試験を追加しない。比較用の最適経路は、短block direct抽出、
+決定的検査、型付き局所照合を先に実行し、正解固定fixtureでdirectが不合格となる曖昧な最終状態判定だけ
+Thinkingへ送る。MLX切替、本番既定値、自動公開は変更しない。
+
+#### Ornith 1.5 35B-A3B MLX導入・GPU smoke（2026-08-21）
+
+公式`ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit`をrevision
+`19504d912fa8fc7622bf6b1de3db5d5d890b1f02`へ固定し、14ファイル・19,530,936,278 bytesを
+取得した。全LFS SHA-256 / Git object、4 shardの1,757 tensorとindexを照合し、custom Pythonなし、
+stock `mlx-lm 0.31.3 / mlx 0.32.0`の`qwen3_5_moe`実装で扱えることを静的確認した。
+
+公式通常sampling `temperature=0.6 / top_p=0.95 / top_k=20`、Thinking有効、cache 0、
+同時実行1、prefill step 2,048、追加KV / activation量子化なしでM1 Max 64GBを試した。
+短答は正答し、prefill 32.287 token/s、decode 50.911 token/s、peak 19.777GBだった。
+512 prompt / 128 generation tokenのbenchmark 3回平均はprefill 304.922 token/s、
+decode 51.780 token/s、peak 20.176GBで、system-wide swapは1,358.25MiBから増えなかった。
+
+OpenAI互換APIは256 output tokenではThinking後の最終文が`length`で切れ、512では
+289 completion token・`stop`となり、`message.reasoning`と`message.content`を分離した。
+既存SSE正規化も173 completion token・usage付き`stop`で完走した。ただし3経路とも
+「最終回答は1行だけ」という指定へ説明文を追加したため、厳密形式は未合格である。
+
+現行`MlxBackend`は`mlx_vlm.server`用のトップレベル`enable_thinking`を使い、今回の
+`mlx_lm.server`は`chat_template_kwargs`を使う。server既定Thinking有効のsmoke成功を
+request単位のon/off互換とみなさない。runtime・64GB・APIの早期ゲートだけを合格とし、
+次は74〜75ページ固定ケースとJSON契約を先に評価する。`NOVEL_DB_*`、自動公開、既存採用構成は
+変更せず、巻全体試験にはまだ進まない。
+
+#### Ornith本番採用の段階ゲート（2026-08-21）
+
+本番採用評価は、固定74〜75ページのThinking 3回、8〜27ページのnon-thinking事実抽出、
+`mlx_lm.server`向けbackend契約、4ブロック・隔離1冊、32K→64K→131K長文の順に進める。
+前段不合格時は後段を実行しない。固定短窓は4-key JSON、enum、中核3判定、日本語正規名、自然停止を
+3/3必須とし、第1ブロックはmarkerとpage範囲だけでなく既知の話者・場面・時点ずれを原文照合する。
+
+試験は固定revision、`mlx-lm 0.31.3 / mlx 0.32.0`、cache 0、同時実行1、prefill step 2,048、
+最大8,192 output tokenで行う。Thinkingは公式通常sampling
+`temperature=0.6 / top_p=0.95 / top_k=20`とseed 3種を使用する。Linux本番DBはread-only、
+成果物はローカル実験ディレクトリ、公開物・checkpoint・索引・環境変数は不変とする。
+本番候補への昇格は重大誤り0、既存Qwenとの差分監査、人手承認までを必要条件とし、自動公開は含めない。
+
+#### Ornith Gate A実測・停止判断（2026-08-21）
+
+74〜75ページ固定ケースでは、non-thinking診断が厳格JSON・中核3判定・日本語正規名・自然停止へ
+1/1で合格した（9.660秒、173 completion token）。ただし理由文は途中の「牢へ戻る」という意図を
+「仮の返事」と説明しており、軽微な過剰解釈を手動監査で検出した。
+
+Thinking 3回はすべて意味上の期待値と`仁耀` / `珀陽`に一致し、32.564〜33.720秒、
+各1,206 completion tokenで自然停止した。一方、最終objectを3回とも`json`コードフェンスで囲み、
+生contentの厳格JSONは0/3だった。フェンスを除く診断結果で事後的に合格条件を変更せず、Gate A不合格、
+本番採用保留とする。fail closedにより8〜27ページ、backend契約、4ブロック、隔離1冊、長文は実行しない。
+本番DB・公開物・索引・環境変数は変更せず、評価serverも停止済みである。
+
+再試験候補は、単独JSONコードフェンスだけを扱うadapter仕様と回帰test、および
+`chat_template_kwargs.enable_thinking`のrequest単位対応を先に確定した別プロトコルである。
+現行結果を正規化後の3/3合格へ読み替えない。
+
+#### Ornith Gate A2 / A3再評価（2026-08-21、実行前固定）
+
+公式・upstream実装の再確認により、`mlx_lm.server`は`chat_template_kwargs`を受け取る一方で
+`response_format`を生成制約へ使わず、`mlx_vlm.server 0.6.15`は`llguidance`による
+`json_object / json_schema`制約とThinking併用修正を持つことを確認した。旧Gate Aを変更せず、
+次の独立2経路を同じ固定fixtureで再試験する。
+
+| Gate | runtime / 経路 | 事前固定した合格条件 |
+|---|---|---|
+| A2 | `mlx_lm.server` + 新規`MlxLmBackend` | raw objectまたは単独の小文字`json` fenceだけを厳格adapterが受理し、正規化後JSON・意味・正規名・enum・`stop`が3/3 |
+| A3 | `mlx_vlm.server 0.6.15` + native `json_schema` | adapterなしの生contentが厳格JSONで、意味・正規名・enum・`stop`が3/3 |
+
+A2 adapterはJSON全体を完了までbufferし、説明文、複数・別種fence、array / scalar、duplicate key、
+非有限数、1MiB超過、構文不正、未終端、`length`を応答前に拒否する。同期・async、Thinking on/off、
+usage有無をunit testし、GPU試験前に回帰testを通す。A3は`--max-num-seqs 1`、KV量子化なしで実行し、
+同時requestのstructured-output processorずれを評価条件から除く。
+
+いずれかが3/3なら合格した経路だけでGate Bへ進む。両方合格時は生成中からschemaを拘束できるA3を
+本番候補として優先する。両方不合格ならfail closedで停止する。`NOVEL_DB_*`、公開物、索引、
+checkpointは変更せず、非公式`mlx-openai-server`は両経路不合格時の別検討に留める。
+
+A3の初回起動では0.6.13がtext-only Ornithにもvision tower 393 parameterを要求して停止した。
+upstream issue #1812 / merged PR #1879と一致し、修正を含む公式0.6.15へ更新した。
+`mlx 0.32.0 / mlx-lm 0.31.3`は維持され、追加は`websockets 17.0.1`だけである。configや重みを
+加工せず0.6.15でA3を開始し、0.6.13の起動失敗は品質3試行へ数えない。
+
+#### Gate A2 / A3合格とGate B不合格（2026-08-21）
+
+A2は限定adapter後の厳格JSON・意味・正規名・自然停止が3/3、A3はadapterなしのnative
+`json_schema`で同条件が3/3となった。両方合格時の事前規則どおりA3をGate Bへ採用した。
+A2は27.753〜33.480秒・各1,206 completion token、A3は26.034〜37.697秒・
+1,130〜1,910 completion tokenだった。常駐は約18.5〜19.0GiBでswap増加はなかった。
+
+しかし固定8〜27ページの現行事実抽出は、書籍事実が214.303秒、人物別事実が183.516秒で
+それぞれ8,192 tokenへ達し`length`となった。書籍事実118項目の先頭根拠は8〜20ページだけで、
+全項目が末尾へ空の次page markerを付けた。芳子星・珀陽の話者入れ替え、主体誤り、簡体字・中国語の
+混入もあり、上限拡大だけでは解消しない。Gate Bを不合格とし、Gate C / Dと本番配線を停止する。
+
+公式カードは対象言語を`en`とし、評価対象もagentic coding中心である。最後の限定診断として、
+現行Gate Bの判定を変更せず、固定20ページを4ページ×5窓へ分割し、A3 native schemaで各窓を
+最大12事実・単一page・短い明示subject/action/reasonへ拘束するGate B2を1回だけ実施する。
+公式`0.6 / 0.95 / top_k 20 / min_p 0`、Thinking、seed固定で全窓の自然停止、日本語、coverage、
+既知高リスク窓を確認する。1窓でも不合格ならOrnithの日本語小説RAG採用を終了し、既存Qwenを維持する。
+
+#### Ornith Gate B2不合格とbudget原因診断（2026-08-22）
+
+Gate B2は12〜15、16〜19ページの2窓だけが合格し、8〜11、20〜23、24〜27ページは
+8,192 completion tokenまでThinkingが続いてcontent 0字となった。全体は24事実、coverage 12〜19ページで、
+5/5窓と全20ページを必要とする条件へ不合格だった。失敗reasoningには用語綴りの自己訂正ループと、
+台帳外人物を既存正規名へ推測対応させる過程があった。
+
+成功24事実の原文照合でも、芳子星と皓茉莉花の科挙推薦人関係を逆転した重大誤り、黒槐国行き承諾の
+page帰属違い、不自然な日本語を確認した。構造だけでなく意味条件にも不合格のため、事前規則どおり
+Ornithの日本語小説RAG採用を終了し、Qwen既定を維持する。Gate C / D、10巻A/B、巻全体、公開更新は行わない。
+
+インターネット調査で確認したMLX-VLM 0.6.15の公式`thinking_budget`だけは、停止原因の分離に直接対応する。
+同じ5窓へ`thinking_budget=4096`だけを追加するGate B3を1回実行し、上限時に`</think>`へ強制遷移できるかを
+確認する。Gate B2の採否を変更する試験ではなく、全窓が構造・coverage・意味へ合格しても3 seed再現、
+Qwen比較、手動承認までは本番候補へ戻さない。1窓でも失敗すれば追加GPU試験を終了する。
+
+Gate B3は全5窓が`stop`、各12事実、8〜27ページcoverageへ改善し、4,096 tokenのThinking予算が
+0.6.15で有効なことを確認した。しかし8〜11ページに簡体字`进`が混ざり、固定意味検査3件が欠落した。
+60事実の原文照合では、8ページの主体混在、18ページの推薦人関係逆転、25ページの衝突理由誤帰属、
+26ページの華副三司使→`苑翔景`誤登録が残った。停止性だけを解消しても日本語意味精度は救済できないため、
+Gate B3も不合格とし、追加GPU試験、3 seed、Qwen比較、Gate C / D、巻全体、本番配線を終了する。
+checkpointはupstream runtimeまたは変換更新時の比較用に保持し、既存Qwen採用構成を維持する。
+評価serverは正常停止し、TCP 11440と関連processが残っていないことを確認した。
+
+#### 不採用後の根拠引用先行診断（Gate B4、2026-08-22）
+
+B3の不採用判定を覆さない解決調査として、誤りが集中した8、10、18、25、26、27ページだけを
+単ページ・固定質問で再評価する。モデルには人物台帳を渡さず、固定page、本文からの連続引用、引用内の
+主体表記、引用だけから言えるclaimを最大4件返させる。評価器側で引用の完全一致と主体包含を決定的に検査し、
+推薦人方向、衝突命令、別人物の理由混入、役職名の誤対応、同一人物疑惑を固定意味条件で監査する。
+
+公式samplingとThinkingを維持し、`max_tokens=4096 / thinking_budget=2048`、seed固定、1回、再試行なしとする。
+6/6ページと全claimの手動照合へ合格した場合も役割は高リスク根拠選択器に限定し、既存Qwen比較前に
+本番候補へ戻さない。不合格ならOrnith固有の追加GPU試験を終了する。本番DB、索引、公開成果物、
+`NOVEL_DB_*`は変更しない。
+
+Gate B4は6/6が`stop`とraw厳格JSONへ到達したが、12引用中の原文完全一致は5件、主体包含は6件、
+両方の合格は1件だけで、ページ単位は0/6だった。固定意味条件も10/14で、18ページの推薦人関係、
+25ページの衝突主体、26ページの同一人物疑惑、27ページの荷物検査許可が欠落した。人物台帳由来の誤リンクは
+遮断できたが、直接引用の生成と複数論点保持が成立しないため、Ornith固有の追加GPU試験を終了する。
+
+今後の共通pipeline改善候補は、原文spanへアプリ側で安定ID / offset / SHA-256を付け、LLMにはSchema enumの
+IDだけを選ばせる根拠ID先行方式とする。原文はIDから決定的に復元し、曖昧一致補正を禁止する。各claimを
+個別検証し、人物正規化を後段へ分けた上で、まず既存Qwen / Solの固定ケースで比較する。これはOrnithの
+本番候補復帰を意味しない。
+
 ### Phase 2: 固定10巻A/B比較
 
 各候補を同じ入力・プロンプト・sampling条件で3回ずつ実行し、次を記録する。
@@ -266,9 +547,22 @@ Q4_K_Mの設定改善後も品質不足の場合だけ、より高精度な量�
   高リスク主張監査をQwenと同じ順序で比較した。初回仮判定では巻全文の抽出・生成を速度と契約遵守から
   不採用とし、短い根拠窓の高リスク主張監査だけを追加評価候補として残す。3回再現性試験までは
   本番採用・恒久不採用の確定判断にしない。
-- Nemotron 3.5 Lightningは短窓thinkingだけ合格したが、directの意味判定と第1ブロックの
-  出力契約・話者・ページ根拠・人物正規名で不合格となった。初回仮判定では巻全体へ拡大せず、
-  本番経路へ配線しない。将来runtime・量子化・prompt adapterが改善した場合だけ早期ゲートから再試験する。
+- Nemotron 3.5 Lightningは短窓thinkingだけ合格したが、directの固定意味判定と汎用抽出の
+  出力契約・話者・ページ根拠・人物正規名で不合格となった。公式16,000 tokenへ広げても
+  20ページと4ページのThinking抽出が未終端だったため、巻全体へ拡大せず本番経路へ配線しない。
+  型付き2ページ局所照合はdirect 9.201秒で合格し、Thinking 132.680秒の追加効果がなかったため、
+  入力分割とSchema拘束をThinkingより先に適用する。MLX 4bitは同じ短窓を3/3誤り、MLX 6bitは
+  12,288上限なら1回正解したが9,205 output token・268.377秒を要した。64GBには入るがOllamaより
+  非効率なのでMLXへ切り替えない。将来runtime・量子化・prompt adapterが改善した場合だけcache 0の
+  早期ゲートから再試験する。
+- Nemotron Labs 3 Puzzle 75BのMLX mixed 4/6-bitは64GBへロードできたが、system-wide swapの
+  大幅増加、固定短窓の最終状態誤り、thinking反復、enum違反により早期ゲート不合格とする。
+  32,768 token以上へ拡大せず、本番経路へ配線しない。upstream runtimeまたは変換更新時だけ再試験する。
+- Ornith 1.5 35B-A3B MLX 4bitは約20.18GB peak、decode約51.8 token/sで64GB適合とAPI smokeに
+  合格した。固定74〜75ページは意味上3/3正しかったが、Thinking最終contentのJSONコードフェンスにより
+  事前固定した厳格契約へ0/3となり、Gate Aで本番採用を保留した。8〜27ページ以降はfail closedで未実施。
+  単独JSONフェンスを限定除去するadapterと`mlx_lm.server`向けthinking契約を事前に実装・回帰testし、
+  別プロトコルでGate Aから再合格するまでは現行`MlxBackend`へ本番配線しない。
 - Qwen3.8-27Bは人物抽出の反復崩壊を抑えたが、許可外ページ事実、完成文の主体誤り、
   最終合意の欠落、途中切れが残った。Qwen3.6より約3.10倍遅く、完成品質も上回らないため、
   初回仮判定では現行Qwen3.6を置き換えず、本番経路へ配線しない。設定改善の3条件もすべて不合格で、

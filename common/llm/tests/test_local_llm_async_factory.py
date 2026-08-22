@@ -11,12 +11,30 @@ from local_llm import (
     BackendConfig,
     LlamaServerBackend,
     LLMError,
+    MlxBackend,
+    MlxLmBackend,
     OllamaBackend,
     backend_from_env,
 )
 
 _OLLAMA_CFG = BackendConfig(base_url="http://test-ollama:11434")
 _LLAMA_CFG = BackendConfig(base_url="http://test-llama:11435")
+
+
+@pytest.fixture(autouse=True)
+def clear_env(monkeypatch):
+    """各テストでbackend factory用の環境変数を初期化する。"""
+    for key in [
+        "QWEN_BACKEND",
+        "QWEN_OLLAMA_BASE_URL",
+        "QWEN_LLAMA_SERVER_BASE_URL",
+        "QWEN_MLX_BASE_URL",
+        "QWEN_MLX_LM_BASE_URL",
+        "QWEN_MODEL",
+        "QWEN_TIMEOUT_SEC",
+    ]:
+        monkeypatch.delenv(key, raising=False)
+
 
 # ---------------------------------------------------------------------------
 # async — httpx をライブラリレベルで mock
@@ -197,6 +215,28 @@ class TestBackendFromEnv:
         assert backend.config.base_url == "http://custom-ollama:11434"
         assert backend.config.model == "qwen3.6:14b"
         assert backend.config.timeout == 300
+
+    def test_mlx_via_env(self, monkeypatch):
+        monkeypatch.setenv("QWEN_BACKEND", "mlx")
+        monkeypatch.setenv("QWEN_MLX_BASE_URL", "http://custom-mlx:11437")
+        monkeypatch.setenv("QWEN_MODEL", "/models/qwen")
+
+        backend = backend_from_env()
+
+        assert isinstance(backend, MlxBackend)
+        assert backend.config.base_url == "http://custom-mlx:11437"
+        assert backend.config.model == "/models/qwen"
+
+    def test_mlx_lm_via_env(self, monkeypatch):
+        monkeypatch.setenv("QWEN_BACKEND", "mlx_lm")
+        monkeypatch.setenv("QWEN_MLX_LM_BASE_URL", "http://custom-mlx-lm:11440")
+        monkeypatch.setenv("QWEN_MODEL", "/models/ornith")
+
+        backend = backend_from_env()
+
+        assert isinstance(backend, MlxLmBackend)
+        assert backend.config.base_url == "http://custom-mlx-lm:11440"
+        assert backend.config.model == "/models/ornith"
 
     def test_unknown_backend_raises(self, monkeypatch):
         monkeypatch.setenv("QWEN_BACKEND", "vllm")

@@ -1422,7 +1422,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.136" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "img2pdf" },
-    { name = "lancedb", specifier = ">=0.30.2" },
+    { name = "lancedb", specifier = ">=0.34,<0.35" },
     { name = "natsort" },
     { name = "numpy", specifier = ">=2.4.4" },
     { name = "pillow" },

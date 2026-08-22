@@ -1,8 +1,9 @@
 """OpenAI 互換 /v1/chat/completions の SSE チャンクを Ollama 形式に正規化する。
 
-`LlamaServerBackend` でのみ使用。`OllamaBackend` 側は `/api/generate` が元から
+`LlamaServerBackend`と`MlxBackend`で使用。`OllamaBackend`側は`/api/generate`が元から
 Ollama 形式の NDJSON を返すので変換不要。
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -20,7 +21,7 @@ def convert_openai_chunk(chunk: dict[str, Any]) -> dict[str, Any] | None:
         - usage チャンク: `{"response": "", "done": True, "done_reason": ..., eval_count: ...}`
 
     という遅延終了形にする。`done=True` を 1 度だけ・`eval_count` 付きで出すための
-    仕掛け。`_finish` は内部マーカー（外には漏れ出ない、`LlamaServerBackend` の
+    仕掛け。`_finish`は内部マーカー（外には漏れ出ず、OpenAI互換Backendの
     ストリーマで吸収される）。
 
     返り値:

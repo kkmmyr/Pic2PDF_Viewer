@@ -14,7 +14,7 @@ dependencies = [
     "httpx>=0.28.1",
     "numpy>=2.4.4",
     "python-multipart>=0.0.28",
-    "lancedb>=0.30.2",
+    "lancedb>=0.34,<0.35",
     "alembic>=1.18.4",
     "qwen-common",
     "tzdata>=2026.2",

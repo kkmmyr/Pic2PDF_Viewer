@@ -26,6 +26,7 @@ from .connection import with_db
 from .embedder import embed_batch
 from .extractor import PageText, run_ocr_subprocess
 from .lance_store import get_chunks_table
+from .page_fts import mark_page_fts_stale
 
 logger = get_logger(__name__)
 
@@ -94,6 +95,7 @@ def _store_ocr_pages(book_name: str, pages: list[PageText]) -> None:
                 )
 
             conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
+            mark_page_fts_stale(conn)
 
     logger.info("_store_ocr_pages finished: %s (pages=%d)", book_name, len(pages))
 

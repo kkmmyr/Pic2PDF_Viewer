@@ -1,6 +1,6 @@
 # 小説 RAG データ設計（スキーマ・環境変数・API・レイアウト）
 
-> status: living | last-verified: 2026-07-28
+> status: living | last-verified: 2026-08-22
 
 小説 RAG（novel_db）サブシステムの横断的な事実の正本。DB スキーマ / 環境変数 / ディレクトリレイアウト / API エンドポイント一覧 / LLM backend・port を 1 箇所に集約する。個別処理の設計は [パイプライン設計](小説RAG_パイプライン設計.md)・[検索QA設計](小説RAG_検索QA設計.md)を参照。
 
@@ -13,22 +13,24 @@
 小説 RAG は **2 つのストア** を併用する。
 
 - **SQLite**（`novel.db`）— 本文・チャンク・QA 履歴・キャラ辞典等のリレーショナルデータ。**スキーマの唯一の真実の源は Alembic**（`backend/alembic/versions/`）。起動時に `services/novel_db/migrations.py::upgrade_head()`（`main.py` から呼び出し）が `alembic upgrade head` を実行して最新 revision に追従する。
-- **LanceDB**（`novel.lancedb`）— bge-m3 の埋め込みベクトル（ANN 検索用）。スキーマは `services/novel_db/lance_store.py` の PyArrow スキーマが定義。
+- **LanceDB**（`novel.lancedb`）— bge-m3 の埋め込みベクトル（ANN検索用）と、段階導入中のpage-level ICU BM25。固定tableのスキーマは`lance_store.py`、世代page tableは`page_fts.py`のPyArrowスキーマが定義。
 
 `services/novel_db/models.py` に SQLModel 定義があるが、これは `alembic revision --autogenerate` の差分検出用であり、実行時クエリの多くは生 `sqlite3`（`connection.py`）で行われる。
 
 ### 1.1 SQLite テーブル（`novel.db`）
 
-現行 head は revision `0011`。OCRステージング・QA・正解コーパス・事実抽出チェックポイント・生成品質監査を含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
+現行 head は revision `0014`。OCRステージング・QA・正解コーパス・公開履歴・事実抽出チェックポイント・生成品質監査・外部検索索引状態を含む通常テーブルとFTS5仮想テーブルで構成する。カラム詳細・インデックス・制約はAlembic revisionを参照。
 
 | テーブル | 用途 | 主なカラム | 定義元 |
 |---|---|---|---|
 | `books` | 書籍メタ（1 冊 = 1 PDF） | `name`(UNIQUE), `pdf_path`, `images_dir`, `page_count`, `indexed_at`, 詳細版`summary`, 一覧用`catalog_summary`, 各生成日時, `ocr_done_at` | 0003, 0011 |
 | `ocr_runs` | OCR実行単位のステージング | `book_name`, `engine`, `model`, `source_page_count`, `state`, QA状態・承認情報 | 0004, 0005 |
-| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, OCR結果・品質値、QA状態、`page_type`, `layout_type`, `primary_text`, `external_text`, `selected_engine`, `corrected_text`, `index_eligible` | 0004, 0005, 0007, 0008 |
-| `ocr_ground_truth_pages` | OCR正解コーパス | `run_id`+`page_no`(UNIQUE), `image_sha256`, `page_type`, `layout_type`, `reference_text`, `state`, `note`, 検証日時 | 0007, 0008 |
+| `ocr_page_results` | ページ単位チェックポイント | `run_id`+`page_no`(UNIQUE), `image_sha256`, OCR結果・品質値、QA状態、`page_type`, `layout_type`, `primary_text`, `external_text`, `selected_engine`, `corrected_text`, `published_text`, `index_eligible` | 0004, 0005, 0007, 0008, 0013 |
+| `ocr_ground_truth_pages` | OCR正解コーパス | `run_id`+`page_no`(UNIQUE), `image_sha256`, `page_type`, `layout_type`, `reference_text`, `state`, `note`, 検証日時, CER入力hash・編集距離・参照文字数cache | 0007, 0008, 0012 |
+| `ocr_publications` | 書籍ごとのOCR公開履歴・旧公開への参照 | `book_id`, `run_id`, `superseded_publication_id`, `action`, `actor`, `note`, `published_at`, `retired_at`; active bookはpartial UNIQUE | 0013 |
 | `pages` | ページ単位の本文 | `book_id`(FK), `page_no`, `image_path`, `full_text`, `char_count`, `main_characters`, `page_type`, `index_eligible`; UNIQUE(book_id, page_no) | 0003, 0007 |
 | `pages_fts` | `pages.full_text` の全文検索（FTS5, `tokenize='trigram'`, `content='pages'`） | `full_text` | 0003 |
+| `novel_search_index_state` | 外部検索索引のsource世代とactive pointer（singleton key=`page_icu`） | `index_name`(PK), `source_revision`, `active_source_revision`, `active_table_name`, `source_sha256`, `row_count`, `status`, `built_at`, `lancedb_version` | 0014 |
 | `chunks` | 埋め込み単位のチャンク | `page_id`(FK), `chunk_idx`, `text`, `char_count`, `contextual_text`, `contextual_generated_at`(B-9 Contextual Retrieval) | 0003 |
 | `qa_history` | 単発 QA の実行ログ | `scope_type`, `scope_id`, `question`, `answer`, `prompt`, `context_json`, `model`, `options_json`, `eval_count`, `done_reason`, `error_message` | 0003 |
 | `book_characters` | キャラ辞典（書籍 × キャラ, B-15） | `book_id`(FK), `name`, `summary`, `first_page`, `page_count`, `generated_at`; UNIQUE(book_id, name) | 0003 |
@@ -57,21 +59,36 @@
 - 公開候補本文の解決は`ocr_publication.resolve_selected_text()`を正本とする。
   `selected_engine=primary / external / codex`に応じて候補を選び、未採用候補の反復を
   公開本文の異常として扱わない。
+- revision 0012 / 0013はLinux配置済みDBとmigration chainに存在していたが、作業ツリーから欠落していた
+  正式migrationを2026-08-22に配置済みサーバーから原文のまま復元した。0012はCER再計算cache、0013は
+  `published_text`と公開履歴tableを追加する。現在公開中runの読取り契約は上記の
+  `list_current_published_runs()`を維持し、履歴tableへの全面移行はこの検索変更に含めない。
+- `novel_search_index_state.source_revision`はcanonical `pages`コーパスの変更世代である。OCR公開、
+  legacy OCR保存、補正ページ再構築は本文変更と同じtransactionで値を増やし`status=stale`にする。
+  `active_source_revision=source_revision AND status=active`のときだけ`active_table_name`を検索できる。
+  source hashはSQLiteファイル全体ではなく、対象pageをID順にcanonical encodingしたSHA-256である。
 
 ### 1.2 LanceDB テーブル（`novel.lancedb`）
 
-`lance_store.py` が 2 テーブルを遅延生成する（埋め込み次元は bge-m3 の **1024** 固定）。
+`lance_store.py` が2つの固定tableを遅延生成し、`page_fts.py`が世代別page tableを明示構築する。
+埋め込み次元はbge-m3の **1024** 固定。
 
 | テーブル | スキーマ | 用途 |
 |---|---|---|
 | `chunks` | `chunk_id:int64`, `book_name:utf8`, `page_no:int32`, `text:utf8`, `char_count:int32`, `page_count:int32`, `embedding:list<float32>[1024]` | チャンク単位の KNN ベクトル検索 |
 | `summaries` | `book_id:int64`, `book_name:utf8`, `embedding:list<float32>[1024]` | 書籍サマリのベクトル（scope=all の書籍選定） |
+| `pages_icu_r<revision>_<hash>_<build-id>` | `page_id:int64`, `book_id:int64`, `book_name:utf8`, `page_no:int32`, `text:utf8`, `char_count:int32`, `page_count:int32` | `index_eligible=1`のpage-level ICU BM25。世代ごとにimmutable |
 
 - `chunks.chunk_id` は SQLite `chunks.id` と対応（LanceDB 側は本文とベクトルのみ保持、リレーショナル情報は SQLite が正）。
 - `books.indexed_at IS NULL`は「未構築」だけでなく、SQLiteとLanceDBをまたぐ更新が
   完了しなかった可能性を示す不完全状態でもある。この状態では検索品質を保証せず、
   書籍単位再構築で両ストアを収束させる。
 - ANN インデックス（IVF_PQ, `num_partitions=256`, `num_sub_vectors=64`）はチャンク数 > **50,000** で `maybe_create_index()` が自動構築する。それ未満はフルスキャン KNN。
+- page tableのFTS index名は`page_icu_fts`、設定は`base_tokenizer=icu / stem=false /
+  remove_stop_words=false / ascii_folding=false / with_position=false`。公開条件はsource row数・unique ID・
+  canonical SHA-256一致、`num_indexed_rows=row_count`、`num_unindexed_rows=0`である。
+- page tableは増分更新せず、本文変更後にCLIで完全再構築してactive pointerを切り替える。
+  旧active tableはrollback用に保持し、既存`chunks` / `summaries`を上書きしない。
 
 ---
 
@@ -85,23 +102,26 @@
 |---|---|---|
 | `NOVEL_DB_DIR` | `backend/data/novel_db` | `novel.db`（SQLite）の格納ディレクトリ（`__init__.py` 定義） |
 | `NOVEL_DB_LANCE_PATH` | `backend/data/novel.lancedb` | LanceDB ベクトルストアのパス |
+| `NOVEL_DB_LEXICAL_BACKEND` | `fts5` | lexical検索（`fts5` / `shadow` / `lance_icu`）。`shadow`はFTS5だけを返しICUを観測、`lance_icu`は障害時FTS5へfallback |
 | `NOVEL_DB_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama エンドポイント（embedding / Gemma） |
-| `NOVEL_DB_EMBED_MODEL` | `bge-m3` | 埋め込みモデル |
+| `NOVEL_DB_MLX_BASE_URL` | `http://127.0.0.1:11437` | Apple Silicon用MLX OpenAI互換エンドポイント。loopback限定で起動する |
+| `NOVEL_DB_EMBED_BACKEND` | `ollama` | 埋め込みbackend（`ollama` / `mlx`） |
+| `NOVEL_DB_EMBED_MODEL` | `bge-m3` | 埋め込みモデル。MLX時はCLS poolingを設定したローカルディレクトリまたはHugging Face ID |
 | `NOVEL_DB_EMBED_NUM_GPU` | `0` | embedding の GPU レイヤ数（0=CPU、llama-server に VRAM を譲る） |
 | `NOVEL_DB_LLM_MODEL` | `qwen3.6-iq4xs` | 重量 LLM（QA / サマリ / 関係抽出） |
-| `NOVEL_DB_LLM_BACKEND` | `llama_server` | 重量 LLM の backend（`llama_server` のみサポート。他値は起動時 `LLMError`） |
+| `NOVEL_DB_LLM_BACKEND` | `llama_server` | 重量 LLM の backend（`llama_server` / `mlx`。他値は起動時 `LLMError`） |
 | `NOVEL_DB_LLAMA_SERVER_URL` | `http://127.0.0.1:11435` | llama-server エンドポイント |
 | `NOVEL_DB_CHAR_EXTRACT_MODEL` | `gemma4:12b` | 主要登場人物抽出（短答型） |
 | `NOVEL_DB_CONTEXT_MODEL` | `gemma4:12b` | B-9 チャンク文脈生成 |
-| `NOVEL_DB_GEMMA_BACKEND` | `ollama` | Gemma 系タスクの backend（`ollama` / `qwen`=QWEN backend 流用） |
-| `NOVEL_DB_VERIFIER_BACKEND` | `qwen` | 要約根拠検証のbackend（`qwen` / `ollama` / `llama_server`）。既定は執筆サーバーを直列再利用 |
+| `NOVEL_DB_GEMMA_BACKEND` | `ollama` | Gemma 系タスクの backend（`ollama` / `qwen`=QWEN backend 流用 / `mlx`） |
+| `NOVEL_DB_VERIFIER_BACKEND` | `qwen` | 要約根拠検証のbackend（`qwen` / `ollama` / `llama_server` / `mlx`）。既定は執筆サーバーを直列再利用 |
 | `NOVEL_DB_VERIFIER_MODEL` | 空（`NOVEL_DB_LLM_MODEL`を継承） | 要約根拠検証モデル。独立批評モデルを使う場合だけ指定 |
-| `NOVEL_DB_VERIFIER_BASE_URL` | `http://127.0.0.1:11436` | `NOVEL_DB_VERIFIER_BACKEND=llama_server`時の独立サーバーURL |
+| `NOVEL_DB_VERIFIER_BASE_URL` | `http://127.0.0.1:11436` | verifierが`llama_server`または`mlx`時の独立サーバーURL |
 | `NOVEL_DB_QA_TOP_K` | `64` | RAG QA で LLM に渡すチャンク数（B-13 段階 B） |
 | `NOVEL_DB_QA_NUM_CTX` | `32768` | QA 時の num_ctx（llama-server は `-c 36864` 起動が前提） |
 | `NOVEL_DB_QA_EXPAND_ENABLED` | `True` | B-11 Query Expansion の有効化 |
 | `NOVEL_DB_QA_EXPAND_N` | `3` | クエリ拡張の生成数 |
-| `NOVEL_DB_QA_EXPAND_MODEL` | `gemma4:12b` | クエリ拡張モデル |
+| `NOVEL_DB_QA_EXPAND_MODEL` | `gemma4:12b` | クエリ拡張モデル。MLX時はGemmaのローカルディレクトリまたはHugging Face ID |
 | `NOVEL_DB_QA_FULL_BOOK_MODE` | `True` | B-13 段階 C（scope=book で本文丸ごと読込） |
 | `NOVEL_DB_QA_FULL_BOOK_NUM_CTX` | `131072` | full-book モード時の num_ctx |
 
@@ -125,14 +145,14 @@
 
 RAG のコアロジック。主なモジュール:
 
-- **接続 / スキーマ**: `connection.py`（sqlite3 接続）, `migrations.py`（Alembic 実行）, `models.py`（SQLModel）, `lance_store.py`（LanceDB）
+- **接続 / スキーマ**: `connection.py`（sqlite3接続）, `migrations.py`（Alembic実行）, `models.py`（SQLModel）, `lance_store.py`（固定LanceDB table）, `page_fts.py`（世代別ICU index・状態管理）
 - **構築パイプライン**: `builder.py`, `full_builder.py`, `extractor.py`, `ocr_worker.py`, `chunker.py`, `embedder.py`, `contextualizer.py`
 - **ジョブ**: `job_queue.py`, `job_worker.py`
 - **検索 / QA application**: `retrieval.py`, `query_expander.py`, `llm.py`, `qa_history.py`, `qa_sessions.py`, `discussion_service.py`
-- **検索 / QA domain**: `search_scope.py`, `search.py`, `book_summary_search.py`, `prompt_builder.py`, `query_expansion_parser.py`, `discussion_parser.py`, `discussion_stream.py`, `discussion_repository.py`
+- **検索 / QA domain・repository**: `search_scope.py`, `search.py`, `page_fts.py`, `book_summary_search.py`, `prompt_builder.py`, `query_expansion_parser.py`, `discussion_parser.py`, `discussion_stream.py`, `discussion_repository.py`
 - **サマリ / キャラ application**: `summarizer.py`, `character_extractor.py`, `character_summarizer.py`, `relation_extractor.py`
 - **サマリ / キャラ domain・repository**: `summary_generation.py`, `summary_repository.py`, `summary_index.py`, `summary_grounding_parser.py`, `generated_content_snapshot.py`, `generated_content_diff.py`, `generated_content_restore.py`, `character_db.py`, `graph_query.py`
-- **LLM provider / prompt**: `llm_provider.py` が用途別 backend の構築と lifecycle を所有する。`summary_prompts.py`、`character_prompts.py`、`grounding_prompts.py` が domain 別 template と option を所有する。`_llm_backend.py` と `_prompts.py` は既存 import 用の期限付き facade とし、application code は所有モジュールを直接参照する。
+- **LLM provider / prompt**: `llm_provider.py` が用途別 backend（llama-server / Ollama / MLX）の構築と lifecycle を所有する。`summary_prompts.py`、`character_prompts.py`、`grounding_prompts.py` が domain 別 template と option を所有する。`_llm_backend.py` と `_prompts.py` は既存 import 用の期限付き facade とし、application code は所有モジュールを直接参照する。
 
 application service は provider を省略可能な明示引数として受け取り、省略時だけ既定 provider を
 解決する。テストは module global backend の method を patch せず fake provider を渡せる。
@@ -154,11 +174,18 @@ SQLite/LanceDB の read/write は repository module に限定し、parser/valida
 | スクリプト | 役割 |
 |---|---|
 | `build_novel_db.py` | OCR済み本文 → チャンク → embedding の再構築（`--book` / `--all` / `--list`）。`--book`と`--page`を併用すると補正済み1ページだけを再構築 |
+| `build_page_fts_index.py` | 全`index_eligible` pageから世代別LanceDB ICU indexを完全再構築し、整合検査後にactive pointerを切替。結果を本文なしJSONで出力 |
 | `build_chunk_contexts.py` | B-9 Contextual Retrieval のチャンク文脈生成 + 再 embedding |
 | `build_novel_summaries.py` | 書籍サマリ（あらすじ）を map-reduce で生成 |
 | `build_character_summaries.py` | B-15 キャラ辞典の人物像サマリ生成 |
 
 （関連: `extract_characters.py`, `eval_chunk_strategy.py` も同ディレクトリに存在）
+
+`build_page_fts_index.py`はGPU / embedding / LLMを使用しない。configured SQLiteとLanceDBを対象に
+Alembic upgrade、世代table作成、整合検査、active pointer切替までを行うため、実行前に
+`NOVEL_DB_DIR` / `NOVEL_DB_LANCE_PATH`とバックアップを確認する。正常世代はrollback用に保持し、
+旧世代の自動削除は行わない。構築後のshadow開始・rollback手順は
+[検索QA設計 §1.2](小説RAG_検索QA設計.md#12-運用手順とrollback)を参照する。
 
 ### 3.4 データ格納先
 
@@ -209,8 +236,9 @@ SQLite/LanceDB の read/write は repository module に限定し、parser/valida
 |---|---|---|---|
 | Ollama | `http://localhost:11434` | bge-m3, gemma4:12b | embedding / Gemma 系タスク |
 | llama-server | `http://127.0.0.1:11435` | qwen3.6-iq4xs（Qwen3.6 35B-A3B iq4xs） | 重量 LLM（QA / サマリ / 関係抽出） |
+| MLX server（任意、Apple Silicon） | `http://127.0.0.1:11437` | Qwen3.6 35B-A3B 4bit / Gemma 4 12B 4bit / bge-m3 FP16+CLS | envで選択した生成・embedding。生成モデルは同一cacheで逐次切替 |
 
-共通 LLM モジュール `local_llm`（`D:\61.tool\common\llm`）の `OllamaBackend` / `LlamaServerBackend` を使用。
+共通LLMモジュール`local_llm`（`D:\61.tool\common\llm`）の`OllamaBackend` / `LlamaServerBackend` / `MlxBackend`を使用。
 
 ### 5.2 backend シングルトン（`services/novel_db/_llm_backend.py`）
 
@@ -218,11 +246,13 @@ SQLite/LanceDB の read/write は repository module に限定し、parser/valida
 
 | シングルトン | 実体 | モデル | 主な利用先 |
 |---|---|---|---|
-| `QWEN_BACKEND` | `LlamaServerBackend`（11435） | `NOVEL_DB_LLM_MODEL`（qwen3.6-iq4xs） | QA / 書籍サマリ / キャラサマリ / 関係グラフ |
-| `GEMMA_BACKEND` | `OllamaBackend`（11434, timeout 120） | `NOVEL_DB_CHAR_EXTRACT_MODEL`（gemma4:12b） | キャラ抽出 / チャンク文脈生成。`NOVEL_DB_GEMMA_BACKEND=qwen` 時は `QWEN_BACKEND` を流用 |
-| `QUERY_BACKEND` | `OllamaBackend`（11434, timeout 60） | `NOVEL_DB_QA_EXPAND_MODEL`（gemma4:12b） | B-11 Query Expansion 専用 |
+| `QWEN_BACKEND` | `LlamaServerBackend`（11435）または`MlxBackend`（11437） | `NOVEL_DB_LLM_MODEL` | QA / 書籍サマリ / キャラサマリ / 関係グラフ |
+| `GEMMA_BACKEND` | `OllamaBackend`（11434, timeout 120）/ `MlxBackend`（11437） | `NOVEL_DB_CHAR_EXTRACT_MODEL` | キャラ抽出 / チャンク文脈生成。`NOVEL_DB_GEMMA_BACKEND=qwen`時は`QWEN_BACKEND`を流用 |
+| `QUERY_BACKEND` | `OllamaBackend`（11434, timeout 60）/ `MlxBackend`（11437） | `NOVEL_DB_QA_EXPAND_MODEL` | Query Expansion。Gemma backendがMLXのときだけ同じMLX serverを使う |
 
 補足:
-- `NOVEL_DB_LLM_BACKEND` が `llama_server` 以外だと起動時に `LLMError` で即失敗（Ollama 分岐は Phase C で撤去済み）。
+- `NOVEL_DB_LLM_BACKEND`は`llama_server` / `mlx`だけを受理し、未知値は起動時に`LLMError`で即失敗する（Ollama分岐はPhase Cで撤去済み）。
 - embedding（bge-m3）は既定で CPU 推論（`NOVEL_DB_EMBED_NUM_GPU=0`）。llama-server の Qwen に VRAM を譲るため。GPU に戻すには `NOVEL_DB_EMBED_NUM_GPU=99` を設定して uvicorn を再起動。
 - QA の num_ctx は `NOVEL_DB_QA_NUM_CTX=32768`（full-book モードは `131072`）。llama-server は `-c 36864` 以上で起動している前提。
+- MLX時はmodel設定をローカルパスまたはHugging Face IDへ揃える。Qwen/Gemmaは同じtext-generation cacheを逐次切替するため、別モデルの生成を同時に開始しない。bge-m3は別embedding cacheへ保持される。
+- 2026-08-17実機ではGemma MLXが固定判定・人物抽出・出力終端の品質ゲートに不合格だったため、Macの採用構成も`NOVEL_DB_GEMMA_BACKEND=ollama`を維持する。`mlx`分岐は将来の変換/runtime再評価用であり、現在の推奨値ではない。

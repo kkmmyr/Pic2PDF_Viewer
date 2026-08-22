@@ -2,7 +2,7 @@
 
 実機検証・モデル選定・回避策・ベンチマークの記録。設計書（How を書く場所）/ ADR（単発判断）とは別に、運用で蓄えた「経験則」を残す。
 
-最終更新: 2026-08-15（§9.37 Qwen3.8設定改善の局所A/Bを追加）
+最終更新: 2026-08-22（§9.48 日本語検索基盤の比較結果と再現境界を反映）
 
 関連:
 - 設計: [パイプライン設計](../../design/詳細設計/機能別/小説RAG_パイプライン設計.md) / [検索QA設計](../../design/詳細設計/機能別/小説RAG_検索QA設計.md) / [データ設計](../../design/詳細設計/機能別/小説RAG_データ.md)
@@ -1338,6 +1338,355 @@ Qwen3系の公式non-thinkingガイダンスは`temperature=0.7`、`top_p=0.8`�
 中間状態・最終状態をJSON Schemaで固定した中間表と決定的検査を先に作り、公開文の最終生成・評価は
 ADR-0018のSol経路を優先する。
 
+### 9.38 Nemotron Puzzle 75B MLXは64GBへロードできるが固定小説ケースを通らない（2026-08-17）
+
+`tekosML/Nemotron-Labs-3-Puzzle-75B-A9B-MLX-4bit-experts-6bit`を固定revision
+`695829721099e64aeaae22fa2f81d7740815a49e`で取得した。routed expert 4bit、dense/shared expertと
+embedding 6bit、出力head BF16の混合変換で、directoryは42.007GiBである。9個のsafetensorsと
+`tokenizer.json`は配布元SHA-256へすべて一致した。異種expert幅に必要な`mlx-lm` feature branchは
+commit `0f88e16`へ固定して既存`mlx-vlm`と別venvへ隔離し、差分監査とPuzzle test 12件を通した。
+checkpoint内のTransformers custom Pythonと`--trust-remote-code`は使っていない。
+
+M1 Max 64GBでQwen / bge-m3 serverだけを停止し、別用途のComfyUIには触れずNemotronを
+`127.0.0.1:11438`へ排他起動した。health、短答、既存`LlamaServerBackend`のstreamingは成功し、
+warm短答は1.564秒だった。一方、起動前8.74GBだったsystem-wide swapは初回生成中に最大33.79GB、
+空きメモリ指標は最小9%となった。この値にはOSと他processの退避も含まれ、モデル単体使用量ではないが、
+64GBで他のML workloadと併用する余裕がないことは確認できる。
+
+茉莉花官吏伝10巻74〜75ページの同一本文・同一最終状態判定は次の結果だった。
+
+| 条件 | 時間 | 入力 / 出力token | 結果 |
+|---|---:|---:|---|
+| non-thinking、temperature 0 | 134.142秒 | 2,568 / 35 | 牢へ戻ると誤判定、3項目とも不正解 |
+| thinking、temperature 1.0 / top_p 0.95 | 187.346秒 | 2,568 / 2,048 | `OCR`反復で上限、最終JSONなし |
+| thinking + `low_effort` | 48.073秒 | 2,575 / 238 | 同じ誤判定、指定enumも違反 |
+
+正解は「最長10年逃げ続け、必要時に脱獄の手引きを証言する」であり、途中発言の「牢に戻る」は
+最終状態ではない。directと`low_effort`はいずれも後続の「……わかった」をこの合意へ結び付けられず、
+通常thinkingは意味判定の前に反復崩壊した。旧Nemotron 3.5 Lightningは同ケースのthinkingだけは
+正解していたため、75B・active 9.3Bという規模増加をそのまま日本語小説品質の改善とみなせない。
+
+早期ゲートで意味・終端・enumのすべてに失敗したため、32,768 token試験、第1ブロック、巻全体要約へは
+進まない。checkpointと専用runtimeはupstream統合・変換更新時の再評価用に残すが、本番既定値と
+自動公開へ配線しない。評価後はNemotronを停止し、Qwen / bge-m3 serverのhealth、短答、
+1,024次元embeddingを再確認して元の採用構成へ戻した。
+
+### 9.39 Nemotron 30Bは64GB不足ではなくMLX量子化とthinking効率で差が出る（2026-08-18）
+
+§9.35で短窓thinkingだけが正解した`nemotron-3.5-lightning:30b-a3b-q4_K_M`を、
+stock `mlx-lm 0.31.3 / mlx 0.32.0`上の4bit・6bitと同一条件で再比較した。
+公式モデルは30B total / 約3B activeのMamba 2・MoE・Attention hybridで、推奨thinking samplingは
+`temperature=1.0 / top_p=0.95`である。4bitは
+`mlx-community/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-4bit` revision
+`55ac8c89261109b36c04371cd3f479a4594208c8`、6bitは
+`Vontra/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-MLX-6bit` revision
+`bd2a75d36c78b83bd89dd7c7a26916116c54fecd`へ固定した。
+
+4bit 4 shard、6bit 5 shardとtokenizerは配布元SHA-256へすべて一致した。4bitは
+17,775,339,392 bytes、6bitは25,667,608,448 bytes / 31,577,935,872 parametersで
+実効6.50 bits/weightである。両方とも同じBF16元モデル、affine group 64、同じchat templateで、
+`config.json`の差は4 / 6bitだけだった。MLXのNemotron-H実装は`mtp.*`を
+除外するため、Ollama Modelfileの`draft_num_predict=2`相当は使えない。
+
+最初にprompt cache 1 / 4GBで試した結果は無効とした。固定ケース後の無関係な乱数promptへ
+seed 1 / 2 / 3のすべてで直前の自己紹介回答を返し、cacheを0にすると数字だけを正しく返したためである。
+MLX-LM upstreamにもhybrid Mamba/SSM cacheとprefix不整合のopen issueがある。以後は
+`--prompt-cache-size 0 --prompt-cache-bytes 0`へ固定した。
+
+同じ74〜75ページ、同じ4-key JSON object、同じsamplingで取り直した結果:
+
+| runtime / 量子化 | direct | thinking |
+|---|---|---|
+| Ollama Q4_K_M | 9.216秒、JSON合格・意味不合格 | 59.413 / 67.030 / 91.418秒。中核3判定は3/3、理由の言語・正規名契約は2/3 |
+| MLX 4bit | 9.546秒、JSON合格・意味不合格 | 43.690〜44.251秒、2,359 output token。3回とも同じ誤判定 |
+| MLX 6bit | 14.291秒、JSON合格・意味不合格 | 8,192上限では237.164〜250.933秒、3回とも同一thinkingを本文再掲の途中で切り、JSONなし |
+
+MLX 6bitだけ12,288 output tokenへ広げた診断1回は、9,205 token・268.377秒で自然停止し、
+最長10年の逃亡継続、旧事実メモの矛盾、誤要約の矛盾を3件とも正しく返した。よって6bitは
+意味能力を回復するが、通常上限と速度のゲートを満たさない。4bitは小さい代わりに意味を失い、
+6bitはOllamaとほぼ同じ約24GB footprintなのに約4分半と冗長になった。
+
+6bitロード直後にsystem-wide swapが一時約7.47GBから12.84GBへ増えたが、試験中のfootprintは
+約24GBで固定され、終了前には空きメモリ指標95%、swap約3.0GBまで縮小した。モデル単体の
+メモリ不足ではない。64GB Macへの技術的適合は4bit・6bitとも合格だが、実用上の判断は次のとおり。
+
+- 短い根拠窓のthinking品質は既存Ollama Q4_K_Mが現在も最良であり、「他よりマシだった」という
+  過去の記憶はこの用途に限って正しい。
+- MLX 4bitは品質低下、MLX 6bitはcache無効・MTP非対応・9,000 token超の冗長thinkingにより不採用。
+- §9.35のOllama第1ブロックには話者・場面・根拠page・正規名の誤りがあるため、短窓正解を
+  本1冊の要約能力へ一般化しない。今回も早期ゲート後に第1ブロックや巻全体へ拡大しない。
+- 比較checkpointはruntime更新時の再評価用に保持し、本番設定と自動公開へ配線しない。
+  評価後はQwen / bge-m3 serverのhealth、短答、1,024次元embeddingを確認して復旧した。
+
+### 9.40 Nemotron 30Bは前回もThinkingを使っており、長文抽出では常用しない（2026-08-18）
+
+前回試験の評価器と保存成果物を再監査した。74〜75ページ固定ケースのOllama requestは
+`think=true`を明示し、保存JSONにも10,172文字の`message.thinking`が残っていたため、前回の正解は
+実際のThinkingによるものである。MLX比較も`chat_template_kwargs.enable_thinking=true`を明示していた。
+一方、初回8〜27ページ試験は報告書にThinking条件と約8分28秒の失敗が記録されていたものの、
+raw応答が残っていなかった。固定短窓は監査可能、第1ブロックは再現試験が必要、と区別した。
+
+[NVIDIA公式モデルカード](https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-BF16)は
+chat templateの`enable_thinking=true / false`で切り替え、Thinkingの既定値を有効、例示samplingを
+`temperature=1.0 / top_p=0.95 / max_tokens=16000`としている。
+[Ollama公式Thinking仕様](https://docs.ollama.com/capabilities/thinking)ではnative requestの
+`think=true`、`message.thinking`と`message.content`の分離を定めている。
+[MLX-LM server実装](https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/server.py)は
+requestの`chat_template_kwargs`をchat templateへ渡す。これらと同じ明示条件でOllama Q4_K_Mを
+再試験した。
+
+[現行NVIDIA NIMの同系30B例](https://build.nvidia.com/nvidia/nemotron-3.5-nano-30b-a3b)は
+`reasoning_budget=16384`も指定する。ただし固定したLightning 4bit / 6bitのローカルchat templateを
+検索すると参照変数は`enable_thinking`だけで、`reasoning_budget`と`low_effort`は実装されていなかった。
+Ollama native APIにも当該モデル向けの独立budget指定はない。よって今回は未対応引数を渡して効いたと
+みなさず、別checkpointまたはruntime更新後の再評価項目とした。
+
+74〜75ページの固定最終状態判定は、direct 1回が31.227秒・173 output tokenでJSONを守ったものの
+中核3判定をすべて誤った。Thinking 3回は71.508 / 83.065 / 113.254秒、thinking 7,844 / 7,271 /
+12,057文字で自然停止し、中核3判定は3/3正解した。ただし1回は理由を英語で書き、人物名も
+`Inaho / Pekyou`と誤ったため、日本語・正規名まで含む完全契約は2/3だった。
+
+同じ公式条件の8〜27ページ汎用事実抽出は、入力21,229 tokenに対して559.465秒で16,000 output tokenを
+使い切り、`finish_reason=length`、thinking 33,712文字、最終本文203文字となった。必須
+`[BOOK_FACTS]`はなく、8,192から16,000への拡張では解消しなかった。directは本文抽出145.716秒・
+2,918 token、人物再編80.015秒・3,842 tokenで完走し、134 recordの参照番号はすべて8〜27ページ内だった。
+ただし25ページの髪結いを22ページ、26ページの衝突命令を24ページ、24ページの尾行を27ページとする
+場面ずれ、同一人物の短縮名・役職名重複が残り、range内参照だけでは公開根拠にならなかった。
+
+入力長の効果を分離するため24〜27ページだけでも比較した。directは本文抽出46.595秒、人物再編
+17.139秒、27 recordで完走し、大きなpageずれは減った。一方、来現の質問や犀輿の調査提案を
+別人物へ帰属し、三方国会談当時と現在の文官・武官らしさを逆転した。Thinkingは入力4,945 tokenまで
+減らしても414.988秒・16,000 output token・thinking 39,551文字・最終本文0文字で終端しなかった。
+したがって、汎用抽出のThinking失敗は20ページ入力だけに限定されない。
+
+最後に、この3種の誤りを26〜27ページと4つの列挙Schemaへ限定した局所照合を行った。directは
+9.201秒、Thinkingは132.680秒・thinking 14,359文字で、どちらも話者2件と時点2件を全問正解した。
+局所照合ではThinkingではなく、根拠窓・判定対象・enumを狭めたことが主な改善要因だった。
+
+運用上は、短いblockのdirect抽出、page範囲と形式の決定的検査、主語・時点・最終状態ごとの型付き局所照合、
+の順に進める。Thinkingは74〜75ページのように正解固定fixtureでdirectが落ち、短い根拠窓へ限定しても
+意味統合が必要なケースだけrequest単位で使う。汎用抽出・全block・本1冊にThinkingを常用せず、
+Nemotronを本番生成や自動公開へ配線しない。再試験中の空きメモリ指標は56〜57%、swapは約2.86GBで
+増加しなかったため、今回の終端・品質差も64GB不足ではない。試験後はNemotronを停止し、Qwen短答と
+bge-m3の1,024次元embeddingを確認して通常構成へ復旧した。
+
+### 9.41 Ornith 1.5 35B-A3B MLXは64GBへ余裕を持って収まるが、厳密形式は未合格（2026-08-21）
+
+公式`ornith-ai/Ornith-1.5-35B-A3B-MLX-4bit`をrevision
+`19504d912fa8fc7622bf6b1de3db5d5d890b1f02`へ固定してrepo外へ取得した。配布物14件の合計は
+19,530,936,278 bytes（18.2GiB）。4 shard、tokenizer、画像のSHA-256と通常Git object、
+safetensorsの1,757 tensor、index、data offsetをすべて配布メタデータへ照合した。
+checkpointにcustom Pythonはなく、`--trust-remote-code`を使わずstock
+`mlx-lm 0.31.3 / mlx 0.32.0`の`qwen3_5_moe`実装でロードできる。
+
+[公式モデルカード](https://huggingface.co/ornith-ai/Ornith-1.5-35B-A3B)はThinkingを既定とし、
+通常タスクへ`temperature=0.6 / top_p=0.95 / top_k=20`、benchmark再現へ
+`temperature=1.0`を示す。[MLX-LM公式説明](https://github.com/ml-explore/mlx-lm#long-prompts-and-generations)は
+long prompt向けcacheを提供するが、[Qwen3.5 hybridのprefix cache issue](https://github.com/ml-explore/mlx-lm/issues/980)は
+未解決である。また同じ40層・256 expert・8 active expert構成をM1 Max 64GBで使い、40K〜75K prompt、
+cache 4GB、decode並行2にするとMetal resource limitへ達する
+[実測報告](https://github.com/ml-explore/mlx-lm/issues/1644)がある。このため初期試験は
+`--prompt-cache-size 0 --prompt-cache-bytes 0`、同時実行1、localhost限定、
+prefill step 2,048、追加KV / activation量子化なしとした。
+
+M1 Max 64GBの実測は次のとおり。
+
+| 試験 | prompt / output | 速度 | peak / 終端 |
+|---|---:|---:|---|
+| standalone日本語推論 | 101 / 145 token | prefill 32.287、decode 50.911 token/s | 19.777GB、`stop`、正答 |
+| benchmark 3回平均 | 512 / 128 token | prefill 304.922、decode 51.780 token/s | 20.176GB |
+| API上限256 | 80 / 256 token | — | `length`、Thinking後の最終文途中 |
+| API上限512 | 80 / 289 token | — | `stop`、reasoning / content分離、正答 |
+| 共通SSE client | 42 / 173 token | — | usage付き`stop`、正答 |
+
+全試験でsystem-wide swapは1,358.25MiBから増えず、server停止後の空きメモリ指標は95%へ戻った。
+[M3 Ultra 256GBのコミュニティ比較](https://www.reddit.com/r/oMLX/comments/1vtg1rv/ornith_seems_to_be_better/)も
+同じ4bit版をpeak 20.2GBと報告しており、メモリ量は今回と整合する。ただし同報告の107.9 decode
+token/sと小規模11/12評価は別hardware・少数問題なので、M1速度や日本語小説品質へ一般化しない。
+
+standalone、API、SSEはすべて正答した一方、「最終回答は1行だけ」へ説明を追加した。
+また256 output tokenは短い質問でもThinkingに不足した。厳密形式用途では上限を十分に取り、
+最終contentを決定的schema / parserで検査し、違反時はfail closedにする必要がある。
+現行`MlxBackend`は`mlx_vlm.server`向けトップレベル`enable_thinking`、Ornithの
+`mlx_lm.server`は`chat_template_kwargs.enable_thinking`であるため、smoke成功だけで本番配線しない。
+次の品質ゲートは74〜75ページ固定ケースとJSON契約であり、合格前に第1ブロックや巻全体へ拡大しない。
+Macの採用構成はQwen=MLX / bge-m3=MLX / Gemma=Ollamaのまま維持する。
+
+### 9.42 Ornithの意味正答と厳格JSON契約は分けて判定する（2026-08-21）
+
+74〜75ページの固定fixtureを、`mlx_lm.server`へrequest単位の
+`chat_template_kwargs.enable_thinking`を明示して再評価した。non-thinking診断は9.660秒、
+173 completion tokenで、厳格JSON、中核3判定、正規名、自然停止へ1/1で合格した。ただし理由文は、
+原文上の途中の意図である「牢へ戻る」を「仮の返事」と説明した。最終状態が正しくても、根拠にない
+心理・意図の補足を別途手動監査する必要がある。
+
+Thinkingはseed 3種とも32.564〜33.720秒、各1,206 completion token、自然停止だった。
+最終object内の中核3判定と`仁耀` / `珀陽`はすべて正しく、途中の帰牢意図と最終的な最長10年の逃亡も
+区別できた。しかし3回とも最終contentを`json`コードフェンスで囲み、生contentへの厳格parserは0/3。
+reasoningとcontentもseed間で同一だった。
+
+このケースでは「意味が正しい」と「呼び出し側の出力契約を満たす」を別の軸として記録する。
+単独コードフェンスの除去は安全に実装できる余地があるが、評価後に許容するとゲートの後付け変更になる。
+正規化を採る場合は、許容するwrapper、複数objectや前後説明を拒否する条件、parser失敗時のfail closedを
+先にadapter仕様とtestへ固定し、別試行として再評価する。今回はGate A不合格のまま8〜27ページ、
+backend統合、4ブロック・長文へ進めず、現行採用構成を維持した。これは64GB不足による停止ではなく、
+出力契約と理由の根拠性に基づく採否判断である。
+
+### 9.43 Ornithはnative Schemaで短窓に合格するが現行20ページ抽出では暴走する（2026-08-21）
+
+旧Gate Aを変更せず、`mlx_lm.server`の限定fence adapter（A2）と`mlx_vlm 0.6.15`のnative
+`json_schema`（A3）を同じ74〜75ページで再試験した。A2はraw厳格JSON 0/3だがadapter後3/3、
+A3はraw厳格JSON・意味・正規名・自然停止が3/3だった。A3は26.034〜37.697秒、
+1,130〜1,910 completion tokenで、生成中からschemaを拘束できるA3を次段の候補にした。
+
+固定8〜27ページを現行promptとnon-thinkingで処理すると、書籍事実は16,681 prompt / 8,192
+completion token・214.303秒、人物別事実は8,552 / 8,192 token・183.516秒で、両方`length`だった。
+書籍事実は118項目すべてに空の次page markerを末尾追加し、先頭根拠が20ページで止まった。
+10ページの芳子星と珀陽の連続発言を入れ替え、珀陽を`彼女`とする主体誤りもあり、`最好`、
+`心地而感到`、`常识`、`夕方法与夜`、`的人都`等の中国語が日本語へ混ざった。人物別事実は
+3名の途中で切れ、同じ問題を複製した。page範囲検査や出力上限増加だけでは安全にならない。
+
+processは約19.05GiB、空きメモリ指標95%、swapは1,192.81MiBから増えず、64GB不足ではない。
+公式カードのmetadataは`language: en`で、主評価もagentic codingであり、日本語小説適合性を示さない。
+同系統Ornith 1.0にも公式sampling適用後の長めの実タスクで未終端となる報告があるため、温度変更や
+repetition penaltyだけで直るとは仮定しない。
+
+Gate Bは不合格のまま後続拡大を止める。原因分離の最後の診断だけ、4ページ×5窓、Thinking、公式sampling、
+各窓最大12件・単一page・文字数上限付きnative JSON Schemaへ変更する。人物別生成を廃止して
+各事実の正規名配列から決定的に再編する形が、全窓の自然停止、日本語、coverage、話者・時点へ
+合格するかを確認する。1窓でも失敗すれば、Ornithは日本語小説RAGへ採用しない。
+
+### 9.44 Ornithは4ページnative SchemaでもThinking停止と日本語意味へ不合格（2026-08-22）
+
+Gate B2を事前固定どおり5窓へ1回ずつ実行した。12〜15ページは5,234、16〜19ページは7,656
+completion tokenで厳格JSON、各12事実、全page coverage、`stop`へ合格した。一方、8〜11、20〜23、
+24〜27ページは8,192 tokenへ達し、reasoningだけを16,579〜23,295字生成してcontentは0字だった。
+全体は2/5窓、24事実、coverage 12〜19ページで、短窓と最大件数・文字数制約だけでは停止を安定化できない。
+
+失敗はJSON Schema本文の開始前に起きている。20〜23ページでは`三カ国会談`の綴りを何度も自己訂正し、
+24〜27ページでは台帳にない犀輿らを`苑翔景`や`鉦春雪`へ対応付ける推測を繰り返した。これはメモリ不足や
+schema parserの破損ではなく、モデルの回答前reasoningが発散する事例である。
+
+成功した24事実にも、原文の「芳子星は皓茉莉花の科挙推薦人」を逆向きに記述する重大誤り、17ページの
+黒槐国行き承諾を18ページへ置く帰属違い、`脱獄の手助い証拠`などの不自然な日本語が残った。
+したがってThinkingだけを強制終了できても、日本語の主体・関係精度が自動的に解決するわけではない。
+
+公式MLX-VLM 0.6.15は`thinking_budget`をserver requestで受け、prompt内で開いている`<think>`のtoken数が
+予算を超えると`</think>`を強制する。Ornithのchat templateはThinking有効時に`<think>`をpre-openするため、
+適用条件に合う。最大8,192 tokenの半分を回答用に残す`thinking_budget=4096`を、同一fixture・schema・
+sampling・seedへ追加するGate B3を原因診断として1回だけ実行する。ただしGate B2不合格と日本語RAG不採用は
+変更せず、B3合格時も3 seed、Qwen比較、全事実手動監査なしに本番へ配線しない。
+
+- [MLX-VLM公式Thinking Budget](https://github.com/Blaizzy/mlx-vlm#thinking-budget)
+- [server batchingへの適用修正 #1228](https://github.com/Blaizzy/mlx-vlm/pull/1228)
+- [model依存でbudgetが効かない事例 #1819](https://github.com/Blaizzy/mlx-vlm/issues/1819)
+
+### 9.45 Thinking budgetはOrnithの停止を直すが意味精度を直さない（2026-08-22）
+
+Gate B2と同一条件へ`thinking_budget=4096`だけを追加したGate B3では、全5窓が4,902〜5,110
+completion token、97.706〜100.554秒、`stop`となった。各窓12事実、8〜27ページの全coverageを得たため、
+MLX-VLM 0.6.15のserver batchingでbudgetがOrnithへ適用されることは確認できた。予算なしB2の
+3/5窓content 0字という停止問題には、直接の効果がある。
+
+ただし8〜11ページは`进入`の簡体字混入で機械不合格となり、10ページの重要な二つの発言、26ページの
+衝突命令も抽出されなかった。60事実を手動照合すると、皓茉莉花の戦争への葛藤を珀陽の事実へ混ぜる、
+芳子星と茉莉花の科挙推薦人関係を逆転する、新人文官の衝突理由へ茉莉花側の準備を付ける、華副三司使を
+`苑翔景`へ誤対応するという重大な主体・関係・因果・人物正規化誤りがあった。`黑曜城`や不自然な日本語も残る。
+
+各reasoningは検討途中で強制的に閉じられ、その後のschema拘束でJSONだけは完成していた。よって
+Thinking budgetは、回答用tokenと最大遅延を確保する**停止ガード**であり、未完推論の品質を保証する
+仕組みではない。日本語小説RAGでは、`stop`、JSON、coverageだけで採用せず、重要事実の再現、正規名の
+誤対応、関係方向、因果、言語を独立ゲートにする。OrnithはB3不合格で追加試験を終了し、Qwenを維持する。
+評価器へ簡体字`黑`、8ページ主体、18ページ推薦人方向、25〜26ページ因果、26ページ人物誤対応の回帰検査を
+追加した。保存済みB3結果に再適用すると、言語2件と意味9条件が不合格になった。
+
+### 9.46 構造制約と意味グラウンディングを分離する（2026-08-22、Gate B4実行前）
+
+Ornith Gate B3はnative JSON Schema、全page coverage、自然停止へ到達しても、主体、推薦人の関係方向、
+衝突理由、人物正規化を誤った。llguidanceやllama.cppの公式説明からも、grammar / JSON Schemaが保証するのは
+生成可能な構文であり、文字列が入力本文に存在することやclaimが正しいことではない。形式合格を意味合格として
+扱わず、本文との照合を別の決定的検査へ分ける必要がある。
+
+次の限定診断では、モデルが正規化事実と人物台帳リンクを同時生成する設計をやめ、先にページ本文から
+`evidence`を連続引用し、引用内の`subject_span`と引用だけから言える`claim`を返す。評価器は引用の
+完全一致と主体包含を文字列演算で検査する。人物の正規化は、引用内の完全一致名か承認済み別名規則から
+一意に決まる場合だけ後段で行う。これにより、少なくとも根拠にない文章と役職名からの推測リンクを
+保存前にfail closedできる。ただし、正しい引用を選んでもclaimの関係方向を誤る可能性は残るため、
+固定意味期待値と全claimの手動監査は省略しない。
+
+Ornith公式はreasoningを既定とし、推奨samplingを`0.6 / 0.95 / top_k 20`としている。非公式mere-runには
+non-thinkingで反復やsignature echoへ崩れるという実測報告がある。したがってGate B4はnon-thinkingへ
+切り替えず、単ページ化で問題量を減らした上でThinking budgetを停止ガードとして使う。
+
+- [Ornith公式README](https://github.com/ornith-ai/Ornith-1/blob/main/README.md)
+- [MLX-VLM公式Thinking Budget](https://github.com/Blaizzy/mlx-vlm#thinking-budget)
+- [llguidance公式repository](https://github.com/guidance-ai/llguidance)
+- [llama.cpp公式grammar説明](https://github.com/ggerganov/llama.cpp/blob/master/grammars/README.md)
+- [PsiloQA: span単位hallucination検出](https://aclanthology.org/2025.findings-emnlp.626/)
+- [mere-runのOrnith運用知見（非公式）](https://github.com/sawfwair/mere-run/blob/main/docs/runtime/text.md)
+- [llama.cpp利用者議論 #6651（非公式）](https://github.com/ggerganov/llama.cpp/discussions/6651)
+
+### 9.47 LLMに原文を再入力させず根拠IDだけを選ばせる（2026-08-22）
+
+Gate B4では単ページ・固定質問まで縮小しても、12引用中の原文完全一致は5件、引用内主体は6件、
+両方を満たしたのは1件だけだった。モデルは`戦争`を`戰爭`、`立ち上がらせろ`を`立ち上げませろ`、
+`犀輿は`を`犀輿是`へ変えた。引用を一字も変えない指示と厳格JSON Schemaは、この転記を防げなかった。
+これはschemaがstringの長さと構造を制約しても、そのstringが入力の部分文字列かを制約しないためである。
+
+また18ページと26ページでは、reasoning中に質問の2論点を把握して2recordを予定したのに、最終JSONは
+1recordだけだった。27ページでも荷物検査の提案は拾ったが、来現が許可した対象をclaimへ残さなかった。
+原文一致だけを直しても、推論から最終回答への欠落と意味上のcoverageは別に残る。
+
+安全な方式では、入力本文の連続spanをアプリ側で作り、`page:start_offset:end_offset:source_sha256`から
+安定した`evidence_id`を付ける。モデルにはIDと原文を提示するが、出力はSchema enum内のIDだけに限定する。
+アプリがIDから原文を復元するため、モデルによる文字転記と曖昧一致補正をなくせる。各claimを1件ずつ
+検証し、関係方向・因果・重要論点coverageを独立判定する。人物正規化は復元済み原文の完全一致名または
+承認済み別名から一意に決まる場合だけ後段で行う。
+
+この設計は**引用の忠実性**を解決するが、**正しいspanを選ぶrecall**と**claimの意味精度**を保証しない。
+そのため最初に既存Qwen / Solの固定ケースへ適用し、決定的ID検査、独立verification、人手承認を維持する。
+日本語・小説抽出を公式評価対象としていない英語・coding / agentic中心のOrnithを、この変更だけで再採用しない。
+
+### 9.48 日本語OCR本文ではLanceDB ICUを先に採り、dense大型化を急がない（2026-08-22）
+
+検索結果を見る前に固定した20問・関連6冊のfixtureと、読み取り専用の81冊・9,913ページで、
+FTS5、LanceDB FTS、reranker、5種のembeddingを順番に比較した。lexicalは`index_eligible=1`の
+8,576ページ全件を対象にした一方、既存dense corpusの6,238チャンクは32冊・3,060ページだけを覆い、
+正解ページ2件にchunkがなかった。dense値を全81冊の索引品質とはみなさない。
+[LanceDB公式FTS](https://docs.lancedb.com/search/full-text-search)が提供するICU tokenizerは、
+現行FTS5のR@10 `.090`、18/20問0-hitを、R@10 `.886`、0-hit 0件へ改善した。p95は2.12ms、
+8,576ページの構築は2.45秒、directory 26.1MBで、個別R@10回帰もなかった。ngramとICU+ngram RRFは
+R@30を`.963`まで上げたがR@10回帰が1件あり、最終rankerではなく診断用候補生成に留める。
+
+[Qwen3-Reranker-0.6B](https://huggingface.co/Qwen/Qwen3-Reranker-0.6B)はICU + ngram RRF top 30を
+再順位付けした。bge-m3 top 30との和集合診断では新しい正解ページが増えなかったため、実score対象は
+600 lexical pairへ固定した。
+MRRを`.685 → .816`、nDCGを`.701 → .790`へ改善した。しかし20問中2問のR@10を悪化させた。
+平均改善だけで採らずfail closedとした。600 pairは333.8秒、MLX peak 1.73GBで、64GB不足は
+不採用理由ではない。
+
+dense比較では[Nemotron-3-Embed-1B](https://huggingface.co/nvidia/Nemotron-3-Embed-1B-BF16) 8bitが
+bge-m3比で個別R@10回帰0件、MRR +8.17%、nDCG +12.19%となり最良だった。一方、ICU候補と和集合しても
+新しい正解ページは0件で、candidate R@30は`.963`のまま、平均候補数だけ43.05へ増えた。
+[PPLX context](https://huggingface.co/perplexity-ai/pplx-embed-context-v1-0.6b)はlate chunkingを
+切り詰めなしで実行したが、30分17秒を要しMRR / nDCGともbgeを下回った。
+[Qwen3 Embedding](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B)は高速でR@10 `.769`だったがMRRは
+bge比-4.25%。Nemotronを上回らないため置換しない。
+
+[Harrier 0.6B公式](https://huggingface.co/microsoft/harrier-oss-v1-0.6b)はBF16・last-token・L2・
+query instructionという契約を確認した。MLXではBF16配列のNumPy搬出エラーと、特定の複数入力batchで
+非有限値を再現した。各入力を単体にすると正常だったため、公式revisionから
+[mlx-embeddings](https://github.com/Blaizzy/mlx-embeddings) 0.1.0でlocal FP16へ変換した。
+元BF16とのtoken IDは一致し、問題16件のcosineは最小`.99991`、全6,238件を10分20秒で完走したが、
+R@10回帰1件、MRR / nDCG悪化で不採用とした。第三者MLX 8bit版は公式と異なるprefix例や誤った
+規模別スコアをモデルカードに含むため、今回の回避策には使わなかった。
+
+したがって、大量日本語OCR本文は、まず完全なpage-level LanceDB ICU indexを構築し、denseやrerankerを
+足す前にlexicalだけで正解集合を測る。dense大型化は「意味検索らしさ」ではなく、lexical候補へ新しい
+正解を追加できた場合に限る。現本番LanceDBは3,489行・3,457 unique ID・重複32行・SQLiteから
+2,781 ID欠落・19冊だけなので再利用せず、8,576対象ページの再構築と件数一致を本番切替の前提とする。
+今回の全候補はMLX peak 2.17GB以下で、64GBユニファイドメモリは制約にならなかった。
+
 ## 10. 関連ファイル
 
 | パス | 役割 |
@@ -1350,6 +1699,13 @@ ADR-0018のSol経路を優先する。
 | `backend/scripts/build_novel_summaries.py` | サマリ一括生成 CLI |
 | `backend/scripts/extract_characters.py` | キャラ一括抽出 CLI |
 | `backend/scripts/build_chunk_contexts.py` | チャンク contextualize 一括 CLI |
+| `backend/scripts/eval_novel_search.py` | FTS5 / LanceDB ICU・ngram lexical比較 CLI |
+| `backend/scripts/eval_novel_reranker_mlx.py` | 固定lexical候補のQwen3 reranker比較 CLI |
+| `backend/scripts/eval_novel_dense.py` | NPZから隔離LanceDBを作るdense比較・bge基準ゲート CLI |
+| `backend/scripts/export_novel_embeddings_mlx.py` | bge-m3 / Qwen3 Embedding / HarrierのMLX vector隔離生成 CLI |
+| `backend/scripts/export_novel_embeddings_pplx_mlx.py` | PPLX context vector隔離生成 CLI |
+| `backend/scripts/export_novel_embeddings_nemotron_mlx.py` | Nemotron-3-Embed vector隔離生成 CLI |
+| `backend/scripts/fixtures/novel_search_eval_v1.json` | 本文を含まない固定20問・関連page正解集合 |
 | `D:\61.tool\common\llm\local_llm\` | 共通 LLM クライアント（Backend ABC + 2 つの具象） |
 
 ---

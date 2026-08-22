@@ -7,6 +7,7 @@
 
 `context` 引数（Ollama のセッション継続）には対応しない (`LLMError`)。
 """
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,9 @@ from ._sse import convert_openai_chunk, fallback_done_event
 class LlamaServerBackend(Backend):
     """llama-server `/v1/chat/completions` を OpenAI SSE で叩き、Ollama 形式 dict に正規化。"""
 
+    _backend_name = "llama_server"
+    _request_error_label = "llama-server"
+
     def stream_ask(
         self,
         prompt: str,
@@ -36,11 +40,15 @@ class LlamaServerBackend(Backend):
     ) -> Iterator[dict[str, Any]]:
         if context:
             raise LLMError(
-                "context resume is not supported with llama_server backend; "
+                f"context resume is not supported with {self._backend_name} backend; "
                 "use OllamaBackend if you need session continuation",
             )
         body = self._build_body(
-            prompt, system=system, model=model, options=options, think=think,
+            prompt,
+            system=system,
+            model=model,
+            options=options,
+            think=think,
             format=format,
         )
         yield from self._stream_body_sync(body, timeout=timeout)
@@ -59,11 +67,15 @@ class LlamaServerBackend(Backend):
     ) -> AsyncIterator[dict[str, Any]]:
         if context:
             raise LLMError(
-                "context resume is not supported with llama_server backend; "
+                f"context resume is not supported with {self._backend_name} backend; "
                 "use OllamaBackend if you need session continuation",
             )
         body = self._build_body(
-            prompt, system=system, model=model, options=options, think=think,
+            prompt,
+            system=system,
+            model=model,
+            options=options,
+            think=think,
             format=format,
         )
         async for event in self._stream_body_async(body, timeout=timeout):
@@ -84,7 +96,11 @@ class LlamaServerBackend(Backend):
             messages.append({"role": "system", "content": system})
         messages.append({"role": "user", "content": prompt})
         return self._build_body_from_messages(
-            messages, model=model, options=options, think=think, format=format,
+            messages,
+            model=model,
+            options=options,
+            think=think,
+            format=format,
         )
 
     def _build_body_from_messages(
@@ -122,7 +138,7 @@ class LlamaServerBackend(Backend):
                 body["response_format"] = {"type": "json_object"}
             else:
                 raise LLMError(
-                    f"format={format!r} is not supported by LlamaServerBackend; "
+                    f"format={format!r} is not supported by {type(self).__name__}; "
                     f"only 'json' is implemented",
                 )
         return body
@@ -146,7 +162,10 @@ class LlamaServerBackend(Backend):
         role の順序検証は呼び出し側責務（chat-template はそのまま messages を流す）。
         """
         body = self._build_body_from_messages(
-            messages, model=model, options=options, think=think,
+            messages,
+            model=model,
+            options=options,
+            think=think,
         )
         yield from self._stream_body_sync(body, timeout=timeout)
 
@@ -161,7 +180,10 @@ class LlamaServerBackend(Backend):
     ) -> AsyncIterator[dict[str, Any]]:
         """OpenAI 互換 messages を直接渡して async ストリーミングする。"""
         body = self._build_body_from_messages(
-            messages, model=model, options=options, think=think,
+            messages,
+            model=model,
+            options=options,
+            think=think,
         )
         async for event in self._stream_body_async(body, timeout=timeout):
             yield event
@@ -171,7 +193,10 @@ class LlamaServerBackend(Backend):
     # ------------------------------------------------------------------
 
     def _stream_body_sync(
-        self, body: dict[str, Any], *, timeout: int | None,
+        self,
+        body: dict[str, Any],
+        *,
+        timeout: int | None,
     ) -> Iterator[dict[str, Any]]:
         req = urllib.request.Request(
             f"{self.config.base_url}/v1/chat/completions",
@@ -192,7 +217,7 @@ class LlamaServerBackend(Backend):
                     line = raw.decode("utf-8").strip()
                     if not line or not line.startswith("data:"):
                         continue
-                    payload = line[len("data:"):].strip()
+                    payload = line[len("data:") :].strip()
                     if payload == "[DONE]":
                         break
                     try:
@@ -207,16 +232,21 @@ class LlamaServerBackend(Backend):
                         if event.get("response"):
                             yield event
                         continue
-                    yield event
                     if event.get("done"):
+                        if pending_finish is not None:
+                            event["done_reason"] = pending_finish
                         pending_finish = None
+                    yield event
                 if pending_finish is not None:
                     yield fallback_done_event(pending_finish)
         except urllib.error.URLError as e:
-            raise LLMError(f"llama-server request failed: {e}") from e
+            raise LLMError(f"{self._request_error_label} request failed: {e}") from e
 
     async def _stream_body_async(
-        self, body: dict[str, Any], *, timeout: float | None,
+        self,
+        body: dict[str, Any],
+        *,
+        timeout: float | None,
     ) -> AsyncIterator[dict[str, Any]]:
         import httpx  # noqa: PLC0415
 
@@ -234,7 +264,7 @@ class LlamaServerBackend(Backend):
                     line = line.strip()
                     if not line or not line.startswith("data:"):
                         continue
-                    payload = line[len("data:"):].strip()
+                    payload = line[len("data:") :].strip()
                     if payload == "[DONE]":
                         break
                     try:
@@ -249,8 +279,10 @@ class LlamaServerBackend(Backend):
                         if event.get("response"):
                             yield event
                         continue
-                    yield event
                     if event.get("done"):
+                        if pending_finish is not None:
+                            event["done_reason"] = pending_finish
                         pending_finish = None
+                    yield event
         if pending_finish is not None:
             yield fallback_done_event(pending_finish)

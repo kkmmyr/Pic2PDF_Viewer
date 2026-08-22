@@ -352,7 +352,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     print(f"\n【クエリ: {args.query!r}  top={args.top}】")
-    print("embedding 計算中（Ollama bge-m3 が起動していること）...")
+    print("embedding 計算中（設定済みのbge-m3 backendが起動していること）...")
 
     query_emb = embed_batch([args.query])[0]
     page_chunks_emb = _embed_all(page_chunks, "現状")

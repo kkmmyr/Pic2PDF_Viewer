@@ -1,6 +1,6 @@
 # プロジェクト概要
 
-ローカル Ollama / llama-server 上の LLM（主に Qwen3.x の thinking モデル）を
+ローカルOllama / llama-server / Apple Silicon MLX上のLLM（主にQwen3.xのthinkingモデル）を
 複数プロジェクトから呼び出すための共通ヘルパー。Pic2PDF workspaceでは
 `qwen-common`依存、外部projectではeditable package依存として取り込み、
 `from local_llm import BackendConfig, LlamaServerBackend, ...`の公開APIだけを参照する。
@@ -14,8 +14,8 @@
 
 ## 主要コマンド
 
-このリポジトリ自体は実行可能な app ではなく「他プロジェクトから sys.path で
-取り込まれるライブラリ」。動作確認は利用側プロジェクト（例: Pic2PDF_Viewer）か、
+このリポジトリ自体は実行可能なappではなく、workspaceまたはeditable package依存で
+取り込まれるライブラリ。動作確認は利用側プロジェクト（例: Pic2PDF_Viewer）か、
 本リポジトリの pytest で行う。
 
 ```powershell
@@ -29,8 +29,10 @@ uv run --project common/llm python -c "from local_llm import backend_from_env; p
 
 ## 非自明ルール
 
-- Qwen3.x は thinking モデル。`stream=True` と thinking 抑制（Ollama では
-  `think=False`、llama-server では `chat_template_kwargs.enable_thinking=false`）
+- Qwen3.x は thinking モデル。`stream=True` とthinking抑制（Ollamaでは
+  `think=False`、llama-serverでは`chat_template_kwargs.enable_thinking=false`、
+  MLX-VLMではトップレベル`enable_thinking=false`、公式MLX-LMでは
+  `chat_template_kwargs.enable_thinking=false`）
   の **両方** が必須。各 Backend 実装で常にこの 2 つを送るようにしているので、
   ここを崩さないこと
 - `num_predict` を小さくすると thinking ブロックで全消費されて `response` が
@@ -45,6 +47,9 @@ uv run --project common/llm python -c "from local_llm import backend_from_env; p
   公開 API は `local_llm/__init__.py` の re-export のみ
 - 環境変数を読むのは `_factory.backend_from_env()` の **1 箇所のみ**。
   他の場所では `BackendConfig` を引数で受け取る設計を維持する
+- 公式`mlx_lm.server`は`response_format`を生成制約へ使わない。`MlxLmBackend`の
+  `format="json"`は完了後の限定adapterであり、raw object / 単独の小文字`json` fence以外を
+  fail closedにする。受理範囲を広げる場合は先に設計書と拒否testを更新する
 
 ## 作業スタイル
 

@@ -54,7 +54,7 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 `pages.full_text` を入力に `chunks`（SQLite）と LanceDB `chunks` テーブルを再構築する。**`pages` は一切変更しない**（OCR 済みの本文を前提）。
 
 - **チャンク分割（`chunker.chunk_page`）**: 全文 ≤ 800 字なら 1 チャンク。超える場合は末尾 100 字以内の句点境界（`。」!?`）優先で切り、50 字オーバーラップ。`char_count < 30` のページ（章扉・ヘッダのみ）はスキップ。
-- **embedding（`embedder.embed_batch`）**: Ollama `/api/embed`（httpx）で bge-m3（1024 次元）。builder は 16 件バッチ。`options.num_gpu` に `NOVEL_DB_EMBED_NUM_GPU`（既定 CPU）を渡し llama-server に VRAM を譲る。次元・件数不一致は `EmbeddingError`。
+- **embedding（`embedder.embed_batch`）**: `NOVEL_DB_EMBED_BACKEND`によりOllama `/api/embed`またはMLX `/v1/embeddings`（httpx）でbge-m3（1024次元）を取得する。builderは16件バッチ。Ollamaには`options.num_gpu=NOVEL_DB_EMBED_NUM_GPU`（既定CPU）を渡す。MLXはFP16版の`1_Pooling/config.json`をCLS poolingに固定し、応答を`index`順へ並べ直す。次元・件数・indexの重複/欠落は`EmbeddingError`。
 - **保存**: 既存 chunks を LanceDB（`chunk_id IN (...)`）と SQLite の両方から削除 → `chunk_page` の結果を `chunks` に INSERT、embedding を LanceDB に `add`（本文・page_no・char_count・page_count を同梱）。完了時に `books.indexed_at` を更新。progress_callback で `embedding done/total` を通知。
 - **ページ単位再構築（`page_index_builder.rebuild_page_from_pages`）**:
   画像照合後に1ページだけ本文を補正した場合、
@@ -112,6 +112,22 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
   記載された全ページを個別に抽出し、1件でも入力ブロック内に存在しない出力は保存せず失敗とする。
   公開版人物名ヒントが当該ブロックに登場せず、モデルが人物見出しへ`該当事実なし`・`言及なし`・
   `登場なし`を明示した場合は、根拠のない事実として扱わず、その空の人物候補だけを除外する。
+- **既知の意味グラウンディング限界**: 上記検査が保証するのは「指定ページが入力範囲内にある」ことまでで、
+  そのページ本文が出力事実の主語、関係方向、因果を実際に支持することは保証しない。Ornith 1.5の固定試験では、
+  厳格JSONと全ページcoverageへ合格しても、推薦人関係の逆転、別人物の理由の混入、役職名から既存人物への
+  誤対応が発生した。ページ番号と人物台帳を同じ生成でモデルに埋めさせるだけでは、意味検査の代替にならない。
+- **直接引用生成方式の却下**: Ornith Gate B4で、単ページ・固定質問・厳格Schemaでも12引用中5件しか
+  原文へ完全一致せず、引用と主体表記の両条件を満たしたのは1件だけだった。`戦争`→`戰爭`、
+  `立ち上がらせろ`→`立ち上げませろ`のような再生成時の改変が生じるため、モデルへ原文文字列をコピーさせ、
+  後から一致検査する方式は採用しない。一致しない引用を曖昧一致で原文へ寄せる補正も、誤った根拠を正当化する
+  危険があるため行わない。
+- **根拠ID先行方式（次期候補・本番未実装）**: アプリ側でページ本文を改変せず連続spanへ分け、
+  page、開始・終了offset、本文SHA-256から安定した`evidence_id`を付ける。promptにはIDと原文を提示し、
+  モデルはSchema enumに含まれるIDだけを選ぶ。保存時はアプリがIDから原文を復元するため、モデルが引用を
+  再入力する欄を設けない。各claimは1件ずつ独立検証し、1件以上の根拠ID、関係方向、因果、重要事実の欠落を
+  決定的ゲートと別モデル・人手で確認する。公開人物名へのリンクも同じ生成で推測させず、復元した原文内の
+  完全一致名または承認済み別名規則から一意に決まる場合だけ後処理で付ける。この方式は引用改変を解消するが、
+  Gate B4で残った質問論点の欠落までは解消しないため、現行Qwen経路や`fact_extraction_blocks`をまだ変更しない。
 - **Step 2b 詳細あらすじ執筆**: `books.summary`用の詳細あらすじは事実表だけから独立生成する。中心人物、因果、時系列、対立、転機、結果、関係変化、巻の意味を自然な複数段落へ編集する。
 - **Step 2c 一覧向け短縮要約**: 詳細あらすじの双方向根拠検査合格後、事実表と合格済み詳細版から400〜700文字の`books.catalog_summary`を別に生成・校正する。中心人物、発端、中心課題、主要な対立または転機、結果、重要な関係変化を残し、詳細版を単純切り詰めしない。
 - **Step 2d 人物別執筆**: 事実表の人物名を`character_names.normalize_character_entries`で正規化する。
@@ -139,7 +155,7 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
   いないページは引用不可とする。検索候補の主張への割当誤差と、本文未提示ページの引用を区別する。
 - **検証モデル配線**: 既定の`NOVEL_DB_VERIFIER_BACKEND=qwen`は執筆用Qwenサーバーを
   検証時に直列再利用し、64GB Macへ別の大規模モデルを常駐させない。
-  比較時は`ollama`または独立`llama_server`と`NOVEL_DB_VERIFIER_MODEL`を指定し、
+  比較時は`ollama`、独立`llama_server`または`mlx`と`NOVEL_DB_VERIFIER_MODEL`を指定し、
   Gemma等の別系統モデルへ切り替えられる。独立モデルを使う場合も執筆と検証を同時実行せず、
   実測メモリとswapが許容範囲であることを運用条件とする。
 - **Gemma4の位置付け**: Gemma系の主比較対象は`gemma4:31b`とし、12Bの結果は予備比較として
@@ -163,13 +179,22 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
   文字数・status・期間上限の機械ゲート代替には使わない。この比較はtemperature 0・seed 42・
   DFlash未使用の各1回であり、3回再現性試験とMuseのchat template上のduplicate BOS解消までは
   本番採用または恒久不採用を確定しない。公開成果物の主生成はADR-0018のSol段階移行を優先する。
-- **Nemotron 3.5 Lightningの位置付け**: M1 Max 64GBではQ4_K_M 25GBを32,768 context、
-  100% GPU、空きメモリ54%、swap 0で単独実行できる。74〜75ページの固定短窓はthinkingありで
-  3判定を正解したが108.496秒を要し、directは形式を守って意味を誤った。8〜27ページの事実抽出は
-  thinkingありで`[BOOK_FACTS]`を欠落し、directもマーカー補完後の内容に話者、場面、根拠ページ、
-  人物正規名の誤りが残った。許可範囲内のpage番号だけでは根拠精度を保証できないため、現行の
-  事実抽出・巻全体生成・自動公開へ配線しない。Museより遅い短窓thinkingにも現時点の追加価値はなく、
-  比較用登録だけを残す。将来再試験する場合も、固定短窓と第1ブロックの早期ゲートから始める。
+- **Nemotron 3.5 Lightningの位置付け**: M1 Max 64GBではQ4_K_M 25GBを単独実行できる。
+  74〜75ページの固定短窓は、保存済み初回試験と2026-08-18の再監査のいずれも
+  Ollama native `think=true`を実際に使っていた。公式例と同じ`temperature=1.0`、`top_p=0.95`、
+  `max_tokens=16000`で取り直した3回も中核3判定は3/3だったが、理由の日本語・正規名まで含む契約は
+  2/3で、directは意味を誤った。一方、8〜27ページの汎用事実抽出はthinkingが559.465秒・
+  16,000 output tokenで`length`となり、必須`[BOOK_FACTS]`を返せなかった。24〜27ページへ
+  縮めても414.988秒・16,000 token・最終本文0文字で同じ失敗となった。
+  directは20ページを225.731秒で完走し、4ページなら63.734秒まで短縮して大きなpageずれも減ったが、
+  話者と過去・現在の帰属誤りは残った。同じ誤りを26〜27ページ・4項目の列挙Schemaへ分解すると
+  directが9.201秒、thinkingが132.680秒でともに全問正解した。したがって、汎用抽出へthinkingを
+  常用せず、短いblockのdirect抽出、型付き局所照合、固定fixtureでdirectが落ちる難しい最終状態判定だけ
+  thinking、の順で使う。許可範囲内page番号だけでは根拠精度を保証できないため、現行の巻全体生成・
+  自動公開へNemotronを配線しない。MLX 4bitは固定短窓を3/3誤り、MLX 6bitは8,192 tokenで
+  3/3未終端、12,288上限の診断1回だけ9,205 token・268.377秒で正解した。失敗は64GB不足ではなく、
+  量子化精度とthinking効率の問題である。Nemotron-HのMLX prompt cacheは回答残留を再現したため
+  必ず無効化し、MLX切替と本番配線は行わない。
 - **Qwen3.8-27Bの位置付け**: `qwen3.8:27b`のQ4_K_MをOllama 0.32.12、32,768 context、
   `think=false`でQwen3.6-35B-A3Bと同一評価した。固定74〜75ページの最終行動判定は両方合格したが、
   4ブロック抽出でQwen3.8は許可外の70〜71ページ事実を第3ブロックに生成した。

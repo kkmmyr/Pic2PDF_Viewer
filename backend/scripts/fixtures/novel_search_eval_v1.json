@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "name": "novel-search-eval-v1",
+  "created_at": "2026-08-22",
+  "label_status": "frozen-before-retrieval",
+  "adoption_eligible": true,
+  "labeling_basis": "既存の検索実測・固定意味評価と、隔離SQLite本文の人手確認。検索方式の結果を見る前に固定。",
+  "cases": [
+    {
+      "id": "father_announces_next_queen",
+      "query": "父王が次期女王を発表する場面",
+      "scope": {
+        "type": "book",
+        "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)"
+      },
+      "source": "documented-retrieval-case",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+          "page_no": 10,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+          "page_no": 11,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+          "page_no": 14,
+          "grade": 1
+        }
+      ]
+    },
+    {
+      "id": "bernard_teaching_royal_duty",
+      "query": "ベルナードの教え 国民への義務",
+      "scope": {
+        "type": "all"
+      },
+      "source": "documented-retrieval-case",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 9 提督の商談 (ビーズログ文庫)",
+          "page_no": 113,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "bureaucrat_prevents_war",
+      "query": "戦争を起こさない国 王の誓い",
+      "scope": {
+        "type": "all"
+      },
+      "source": "documented-retrieval-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 三 月下賢人、堂に垂せず (ビーズログ文庫)",
+          "page_no": 16,
+          "grade": 1
+        },
+        {
+          "book_name": "茉莉花官吏伝 三 月下賢人、堂に垂せず (ビーズログ文庫)",
+          "page_no": 19,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "matthias_murder_truth",
+      "query": "マティアス殺害事件の真相",
+      "scope": {
+        "type": "all"
+      },
+      "source": "documented-retrieval-case",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 92,
+          "grade": 1
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 97,
+          "grade": 2
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 104,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 107,
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "guido_swapped_birth",
+      "query": "グイード 取り替えっ子 出生",
+      "scope": {
+        "type": "all"
+      },
+      "source": "documented-retrieval-case",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 103,
+          "grade": 2
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 104,
+          "grade": 2
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 105,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 106,
+          "grade": 1
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 110,
+          "grade": 1
+        }
+      ]
+    },
+    {
+      "id": "okobore_becomes_praise",
+      "query": "おこぼれ姫 上等 国一番",
+      "scope": {
+        "type": "all"
+      },
+      "source": "documented-retrieval-case",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+          "page_no": 11,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 1 (ビーズログ文庫)",
+          "page_no": 103,
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "matsurika_war_conflict",
+      "query": "戦争をするかどうかに葛藤している人物と理由",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 8,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "kosei_no_single_perfect_answer",
+      "query": "唯一で完璧な正答はないと述べた子星",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 10,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "hakuyo_likes_both",
+      "query": "珀陽が両方好きだと答える場面",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 10,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "hakuyo_sends_matsurika_abroad",
+      "query": "珀陽が茉莉花をしばらく国外へ出すと決める",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 18,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "kosei_recommends_matsurika",
+      "query": "茉莉花の科挙試験の推薦人は子星",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 18,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "young_clerk_collision",
+      "query": "年若い文官が茉莉花の肩にぶつかる",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 25,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "clerk_ordered_to_collide",
+      "query": "新人文官は女性文官に茉莉花へぶつかるよう命じられた",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 26,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "hua_questions_dark_matsurika_identity",
+      "query": "華副三司使たちは暗茉莉花が同一人物か疑う",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 26,
+          "grade": 3
+        },
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 27,
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "laixian_questions_dark_matsurika_identity",
+      "query": "来現は暗茉莉花が別人かもしれないと疑う",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 27,
+          "grade": 3
+        },
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 26,
+          "grade": 1
+        }
+      ]
+    },
+    {
+      "id": "laixian_allows_luggage_search",
+      "query": "来現が犀輿に荷物を探る許可を出す",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "ornith-gate-b4-fixed-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 27,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "jinyao_final_agreement",
+      "query": "仁耀は最終的に牢へ戻るのか、それとも最長十年逃亡を続けるのか",
+      "scope": {
+        "type": "book",
+        "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)"
+      },
+      "source": "fixed-summary-quality-case",
+      "relevant": [
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 74,
+          "grade": 2
+        },
+        {
+          "book_name": "茉莉花官吏伝 十　中原の鹿を逐わず (ビーズログ文庫)",
+          "page_no": 75,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "matthias_true_murder_location",
+      "query": "マティアスの本当の殺害場所は西の別邸",
+      "scope": {
+        "type": "book",
+        "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)"
+      },
+      "source": "human-labeled-isolated-source",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 97,
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "id": "theodor_killed_matthias",
+      "query": "マティアスを殺した犯人は弟のテオドール",
+      "scope": {
+        "type": "book",
+        "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)"
+      },
+      "source": "human-labeled-isolated-source",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 104,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 11 臣下の役目 (ビーズログ文庫)",
+          "page_no": 107,
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "id": "guido_true_identity_heinrich",
+      "query": "グイードの本当の身分はアウフレヒト侯爵家嫡男ハイリッヒ",
+      "scope": {
+        "type": "book",
+        "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)"
+      },
+      "source": "human-labeled-isolated-source",
+      "relevant": [
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 105,
+          "grade": 3
+        },
+        {
+          "book_name": "おこぼれ姫と円卓の騎士 2 女王の条件 (ビーズログ文庫)",
+          "page_no": 104,
+          "grade": 1
+        }
+      ]
+    }
+  ]
+}

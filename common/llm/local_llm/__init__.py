@@ -1,4 +1,4 @@
-"""local_llm — Ollama / llama-server を叩く LLM Backend 抽象。
+"""local_llm — Ollama / llama-server / MLXを叩くLLM Backend抽象。
 
 Qwen3.x の thinking モデル特有の地雷（`stream=True` / `think=False` 必須、
 `num_predict` を thinking で食い潰される事故）を踏み抜く呼び出しを集約した
@@ -12,6 +12,8 @@ MCP サーバー）。
     LLMError            — バックエンド呼び出し失敗時に投げる
     OllamaBackend       — Ollama /api/generate
     LlamaServerBackend  — llama.cpp llama-server /v1/chat/completions
+    MlxBackend          — mlx_vlm.server /v1/chat/completions
+    MlxLmBackend        — mlx_lm.server /v1/chat/completions
     backend_from_env    — 環境変数から Backend を 1 つ作る（CLI / MCP 用）
 
 利用方法（アプリ側、設定を明示渡し）:
@@ -33,6 +35,8 @@ MCP サーバー）。
 from ._backend import Backend, BackendConfig, LLMError
 from ._factory import backend_from_env
 from ._llama_server import LlamaServerBackend
+from ._mlx import MlxBackend
+from ._mlx_lm import MlxLmBackend
 from ._ollama import OllamaBackend
 
 __all__ = [
@@ -41,5 +45,7 @@ __all__ = [
     "LLMError",
     "OllamaBackend",
     "LlamaServerBackend",
+    "MlxBackend",
+    "MlxLmBackend",
     "backend_from_env",
 ]

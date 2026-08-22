@@ -22,7 +22,8 @@ Gemma 4 と比べて高品質だが応答時間は長い（1 問 ~120 秒）。
 
 設定値は `local_llm/_backend.py` の `BackendConfig.default_options` で定義。
 モデルとエンドポイントは環境変数で上書き可能（`backend_from_env()` 経由、
-`QWEN_MODEL` / `QWEN_OLLAMA_BASE_URL` / `QWEN_LLAMA_SERVER_BASE_URL` /
+`QWEN_MODEL` / `QWEN_OLLAMA_BASE_URL` / `QWEN_LLAMA_SERVER_BASE_URL` / `QWEN_MLX_BASE_URL` /
+`QWEN_MLX_LM_BASE_URL` /
 `QWEN_BACKEND` / `QWEN_TIMEOUT_SEC`）。
 
 ### Thinking の扱い（Qwen 流儀）

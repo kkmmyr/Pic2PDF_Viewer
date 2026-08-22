@@ -123,6 +123,10 @@ def test_run_resumes_then_requires_qa_before_publication(staged_book) -> None:
         ]
         run = conn.execute("SELECT state, qa_state, qa_reviewer FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
         assert tuple(run) == ("completed", "approved", "tester")
+        index_state = conn.execute(
+            "SELECT source_revision, status FROM novel_search_index_state WHERE index_name='page_icu'"
+        ).fetchone()
+        assert tuple(index_state) == (1, "stale")
 
 
 def test_stage_rejects_source_image_changed_after_ocr(staged_book) -> None:

@@ -6,6 +6,7 @@ import sqlite3
 
 from .connection import with_db
 from .ocr_run_store import OcrInputPage, collect_input_pages, validate_complete_run
+from .page_fts import mark_page_fts_stale
 
 
 def _validate_approval_counts(counts: sqlite3.Row) -> None:
@@ -138,6 +139,7 @@ def _publish_rows(
                 (book_id, len(input_pages)),
             )
             conn.execute("INSERT INTO pages_fts(pages_fts) VALUES('rebuild')")
+            mark_page_fts_stale(conn)
             conn.execute(
                 "UPDATE ocr_runs SET state='completed', finished_at=datetime('now', '+9 hours'), "
                 "error_message=NULL, qa_state='approved', qa_reviewer=?, "

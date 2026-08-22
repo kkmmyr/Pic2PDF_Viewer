@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import re
 
-from .ocr_content_guards import has_suspicious_repetition
+try:
+    from .ocr_content_guards import has_suspicious_repetition
+except ImportError:
+    from ocr_content_guards import has_suspicious_repetition
 
 _WHITESPACE_RE = re.compile(r"\s+")
 _MIN_PRIMARY_LENGTH_FOR_COMPLETENESS = 256

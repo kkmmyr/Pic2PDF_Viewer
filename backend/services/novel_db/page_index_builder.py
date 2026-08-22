@@ -12,6 +12,7 @@ from utils.logger import get_logger
 from .chunker import MIN_CHARS_FOR_CHUNK, chunk_page
 from .embedder import embed_batch
 from .lance_store import get_chunks_table
+from .page_fts import mark_page_fts_stale
 
 logger = get_logger(__name__)
 
@@ -176,6 +177,10 @@ def rebuild_page_from_pages(
     ``books.indexed_at`` をNULLのままにして書籍単位rebuildが必要な状態を示す。
     """
     context = _load_page_context(conn, book_name, page_no)
+    # 補正本文に対する後続処理が失敗しても、旧page ICU索引を検索へ返さない。
+    mark_page_fts_stale(conn)
+    conn.commit()
+
     chunk_texts, embeddings = _prepare_chunks(context)
     old_chunk_ids = [
         int(row[0])

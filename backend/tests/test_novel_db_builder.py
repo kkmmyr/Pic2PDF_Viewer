@@ -82,6 +82,21 @@ def _stub_embed_batch_failing(texts: list[str]) -> list[list[float]]:
     raise EmbeddingError("simulated network error")
 
 
+def test_store_ocr_pages_marks_page_icu_stale(novel_db_env, monkeypatch):
+    monkeypatch.setattr(builder, "_resolve_images_dir", lambda _book_name: novel_db_env["images_dir"])
+
+    builder._store_ocr_pages(
+        "ocr-book",
+        [{"page_no": 1, "full_text": "公開する本文", "char_count": 7}],
+    )
+
+    with with_db(str(novel_db_env["db_path"])) as conn:
+        state = conn.execute(
+            "SELECT source_revision, status FROM novel_search_index_state WHERE index_name='page_icu'"
+        ).fetchone()
+        assert tuple(state) == (1, "stale")
+
+
 def test_rebuild_from_pages_creates_chunks(novel_db_env, monkeypatch):
     book_name = "test-book-1"
     monkeypatch.setattr(builder, "embed_batch", _stub_embed_batch)
@@ -243,6 +258,10 @@ def test_rebuild_page_changes_only_target_page_and_refreshes_fts(novel_db_env, m
             ).fetchone()[0]
             is not None
         )
+        state = conn.execute(
+            "SELECT source_revision, status FROM novel_search_index_state WHERE index_name='page_icu'"
+        ).fetchone()
+        assert tuple(state) == (1, "stale")
 
 
 def test_rebuild_page_removes_chunks_for_non_indexable_page(novel_db_env, monkeypatch):

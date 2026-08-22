@@ -10,7 +10,7 @@ LLM 選定:
 - `NOVEL_DB_QA_EXPAND_MODEL` 環境変数で切替可
 
 LLM 呼び出しは Phase B（2026-05-11）以降、共通モジュール `local_llm` の
-`OllamaBackend` 経由に集約。
+共通Backend経由に集約。
 
 詳細は docs/log/計画/バックログ.md B-11 / docs/design/詳細設計/機能別/小説RAG_検索QA設計.md §3 を参照。
 """
