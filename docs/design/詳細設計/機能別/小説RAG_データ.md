@@ -186,7 +186,7 @@ SQLite/LanceDB の read/write は repository module に限定し、parser/valida
 Alembic upgrade、世代table作成、整合検査、active pointer切替までを行うため、実行前に
 `NOVEL_DB_DIR` / `NOVEL_DB_LANCE_PATH`とバックアップを確認する。正常世代はrollback用に保持し、
 旧世代の自動削除は行わない。構築後のshadow開始・rollback手順は
-[検索QA設計 §1.2](小説RAG_検索QA設計.md#12-運用手順とrollback)を参照する。
+[検索QA設計 §1.2](小説RAG_検索QA設計.md#rag-search-rollback)を参照する。
 
 ### 3.4 データ格納先
 

@@ -3,7 +3,7 @@
 - **Status**: Accepted
 - **Date**: 2026-08-19
 - **決定者**: プロジェクトオーナー
-- **関連**: [ADR-0018](0018_sol-primary-post-ocr-generation.md) / [OCR設計書](../../詳細設計/機能別/OCR設計書.md) / [Sol画像OCR campaign実行計画](../../../log/計画/Sol画像OCR_campaign実行計画.md)
+- **関連**: [ADR-0018](0018_sol-primary-post-ocr-generation.md) / [OCR設計書](../../詳細設計/機能別/OCR設計書.md) / [Sol画像OCR campaign停止記録](../../../archive/検証/Sol画像OCR_campaign_停止記録.md)
 
 ## コンテキスト
 

@@ -105,6 +105,7 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_qa_queries.py` | QA run一覧・詳細、SHA照合付き画像path解決 |
 | `backend/services/novel_db/ocr_qa_publication.py` | run承認条件、採用本文検証、books・pages・FTS・runの原子的な正式公開 |
 | `backend/services/novel_db/ocr_publication_history.py` | legacy snapshot、active run履歴、Sol昇格・rollbackの原子的切替 |
+| `backend/services/novel_db/ocr_publication_backup.py` | 公開・rollback前のSQLite Online Backup、manifest公開、publication noteへの世代参照付加 |
 | `backend/services/novel_db/sol_ocr_campaign.py` | immutable manifest・pilot標本・worker割当の生成検証、画像export |
 | `backend/services/novel_db/sol_ocr_holdout.py` | 既出pilot・B-35除外、fresh holdoutの品質非参照選定・封印・一度限りledger |
 | `backend/services/novel_db/sol_ocr_import.py` | Sol page artifactのschema・SHA検証、idempotent checkpoint import、legacy差分report |

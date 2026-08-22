@@ -61,6 +61,9 @@ backend/scripts/results/
 experiments/.venv
 experiments/*.ipynb
 
+# 独立リポジトリ（https://github.com/kkmmyr/imagegen-catalog）
+/imagegen-catalog/
+
 # 日次同期チェック（機械固有の実行状態・ローカルレポート）
 .claude/daily-flags/
 .claude/daily-reports/

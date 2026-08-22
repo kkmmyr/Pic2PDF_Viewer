@@ -24,10 +24,10 @@ repos:
   - repo: local
     hooks:
       - id: check-docs
-        name: check-docs (docs リンク切れ・変更履歴肥大化・nav 孤児を検知)
+        name: check-docs (文書構造・正本・ライフサイクルを検査)
         entry: uv run python scripts/maintenance/check_docs.py
         language: system
-        files: ^(docs/.*\.md|mkdocs\.yml)$
+        files: ^(docs/.*\.md|mkdocs\.yml|scripts/maintenance/(check_docs.*\.py|docs_contracts\.json))$
         pass_filenames: false
 
       - id: file-map

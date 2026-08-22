@@ -15,6 +15,10 @@
     {
       "id": "ocr-publication",
       "owner": "docs/design/詳細設計/機能別/OCR設計書.md"
+    },
+    {
+      "id": "docs-governance",
+      "owner": "docs/design/環境構築/設計書運用ルール.md"
     }
   ]
 }

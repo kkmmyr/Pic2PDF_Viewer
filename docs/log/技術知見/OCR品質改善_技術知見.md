@@ -285,3 +285,28 @@ runとpublicationの状態を照合するtestも追加した。実ディスク�
 
 各公開・rollbackの完全DB世代を監査用に保持し、自動削除は行わない。公開頻度は低い前提だが、
 本番昇格前に1世代の実サイズ、保存先空き容量、日次server backupへ退避後の保持規則を確認する。
+
+## 18. 2026-08-22: 縦書き公開screeningの再現契約
+
+PaddleOCR-VL公式資料では、VLM componentだけの直接実行は完全pipelineと同等ではなく、
+過剰生成や公称精度を再現できない場合はlayout analysisを含むpipeline使用を最初に確認するよう
+明記されている。Apple SiliconではPaddlePaddleによる完全pipelineをclient側で動かし、
+MLX-VLM serviceをVLM推論backendとして接続する公式経路がある。このためMac検証でも
+MLX-VLMへ画像を直接投げず、`PaddleOCRVL(..., vl_rec_backend="mlx-vlm-server")`を使う。
+
+llm-jpの公式評価実装は、JSSODa-testを`is_vertical`と`num_columns`で分け、VJRODaを実文書の
+縦書き標本として評価する。元実装には生成反復を除去するoptionがあるが、今回のscreeningでは
+反復自体を失敗として観測するため適用しない。`ocr_benchmark_vertical_screen.py`は公式JSONLの
+`id` / `pred`契約を受け、NFKC・空白除去・dash統一を既存B-35比較器と共有する。入力digest、
+完全なID対応、model revision、prompt、seedを固定し、公開screening値とKindle正式値を混同しない。
+
+JSSODa-testは2,256件・約456 MB・CC BY 4.0であり、方向と1〜4列の切り分けに使える。
+ただし合成画像なので、Kindleのルビ、画面撮影、長文縦列、小書き文字・約物の正式な代替にはしない。
+VJRODaも実文書由来だがKindle小説そのものではない。両方を通過した候補だけを開封済み30画面へ
+進め、そこでページ最大CER 2.0%未満などの既定条件を満たすまで新holdoutは消費しない。
+
+実公開metadata 2,256件を使ったcontract smokeでは、縦書き1,125件（1列284、2列274、
+3列285、4列282）・正規化784,988文字を欠落なく集計し、完全一致入力で全groupのCER 0を確認した。
+VJRODaの公式GitLabは同日のMac環境から20秒で接続timeoutしたため、実metadata全件の読込確認は
+未実施である。`id` / `text` / `pred`とタグ除去は公式評価実装およびfixtureで固定済みだが、
+model推論前に公式hostの再疎通と実metadata digest固定を行う。

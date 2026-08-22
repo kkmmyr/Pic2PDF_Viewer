@@ -1,5 +1,9 @@
 # Sol画像OCR campaign実行計画
 
+> frozen: 2026-08-22 | outcome: pilot不合格、全量展開停止
+>
+> 再開する場合も本記録をactive計画へ戻さず、固定manifestを更新した新計画を作成する。
+
 > status: pilot-failed / full expansion stopped | started: 2026-08-19 | evaluated: 2026-08-19 | owner: main Sol session
 
 medaroserverの正式小説画像をGPT-5.6 Solで再OCRし、既存OCRとの差を保存したうえで、

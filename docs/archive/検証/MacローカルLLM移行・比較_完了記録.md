@@ -1,5 +1,11 @@
 # MacローカルLLM移行・比較計画
 
+> frozen: 2026-08-22 | outcome: 初期MLX移行完了、追加モデル比較完了
+>
+> 過去の比較計画と実測記録。現在の決定は
+> [ADR-0019](../../design/基本設計/ADR/0019_apple-silicon-mlx-inference.md)、
+> 現行手順は[GPU環境セットアップ](../../design/環境構築/GPU環境セットアップ.md)を参照する。
+
 > 状態: 初回モデル比較・MLX runtime比較完了（Ornith日本語小説RAGは不採用、比較checkpointのみ保持）
 > 作成日: 2026-07-28
 > 最終更新: 2026-08-22

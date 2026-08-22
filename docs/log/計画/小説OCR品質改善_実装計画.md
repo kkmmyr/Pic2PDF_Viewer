@@ -1,7 +1,8 @@
 # 小説OCR品質改善 実装計画
 
-> 状態: 継続中 — B-35正式holdoutの機械強制は完了、機械単独品質が未達
-> 更新日: 2026-08-22
+> status: active | last-verified: 2026-08-22 | owner: project owner
+>
+> 状態詳細: B-35正式holdoutの機械強制は完了、機械単独品質が未達
 > 対象: Kindle小説画像のOCR、品質判定、Windows OCR agent、QA公開
 
 過去の完了工程と実測値は
@@ -35,6 +36,7 @@
 | 3シリーズ30画面の診断 | 完了 | 集計CER達成、ページ最大・固有名詞で機械総合FAIL |
 | Codex補助込み運用 | 条件付き合格 | 原画像QAの正解化実績であり機械性能ではない |
 | 正式holdoutの機械的封印 | 完了 | 2026-08-17に30画面を一度だけ開封し、台帳へ記録済み |
+| 公開縦書きscreening判定器 | 完了 | JSSODa-test / VJRODaの予測を完全性・digest・CERで再現可能に評価 |
 | 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -139,6 +141,18 @@ PP-OCRv6 mediumも最大CER画面で全文33.6462%、NDLOCR行bbox再利用11.69
 封印せず、まず公開の縦書き日本語JSSODa-test / VJRODaで方向・列順をscreeningし、通過版だけを
 開封済み30画面へ固定prompt・revision・seedで適用する。ページ最大CER 2.0%未満、列欠落疑い0、
 固有名詞・約物の非劣化を同時に満たした場合だけ、品質非参照の新holdoutを封印する。
+
+公開screeningは`scripts/maintenance/ocr_benchmark_vertical_screen.py`を正規入口とする。
+JSSODa-testでは縦書きだけを既定対象とし、列数別の加重CER、ページ最大CER、完全一致率を出す。
+VJRODaでは実文書全件を同じ正規化・CER契約で評価する。metadataとpredictionのID重複、欠落、
+余剰IDをfail closedで拒否し、両入力のSHA-256、model revision、prompt ID、seedをレポートへ固定する。
+反復除去は行わず、生成系OCRの異常も候補品質として残す。これは候補のfail-fast判定であり、
+B-35正式holdoutの代替にはしない。
+
+Macでの実行は公式Apple Silicon手順に従い、完全なPaddleOCR-VL pipelineとMLX-VLM serviceを
+別process・別virtual environmentで構成する。VLM component単体のHTTP呼び出しは完全pipelineの
+精度を再現しないため採用しない。最初は1並列・固定revision・固定seedで実行し、GPUを他用途が
+使用中の間はmodel download、service起動、推論を行わない。
 
 ## 7. Phase H4 — Codex確認縮小の段階評価
 

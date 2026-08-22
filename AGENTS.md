@@ -57,6 +57,7 @@ cd frontend && npm run generate:types
 ## 設計書
 
 `docs/` 配下に要件定義・基本設計（アーキテクチャ詳細含む）・詳細設計・API 仕様・OCR・セキュリティ・変更履歴がある。設計判断の理由は `docs/design/基本設計/ADR/` に ADR として記録。
+文書の分類・status・正本・archive移動・サイズ上限は `docs/design/環境構築/設計書運用ルール.md` を正本とする。`design/`へ検証日誌を追記せず、完了・中止した計画は同じ変更で`archive/`へ移す。
 mkdocs セットアップ・HTML 配信の詳細は `docs/design/環境構築/` を参照。
 
 ## タスク完了後の必須アクション

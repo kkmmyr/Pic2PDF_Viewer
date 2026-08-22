@@ -1,7 +1,7 @@
 """`docs/**/*.md` の整合性を検査する（pre-commit フックからコミットをブロックする）。
 
 check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツール）とは異なり、
-本スクリプトは違反があれば **exit 1** する。以下 8 ルールを検査する。
+本スクリプトは違反があれば **exit 1** する。以下 11 ルールを検査する。
 
   Rule 1: docs 間の相対 Markdown リンク切れ
   Rule 2: メインの変更履歴.md の行数肥大化（週次ローテーション漏れ）
@@ -11,6 +11,9 @@ check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツー�
   Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ（ブロッキング）
   Rule 7: 登録済み横断契約の正本マップリンク欠落（ブロッキング）
   Rule 8: 登録済み横断契約のowner marker欠落・重複（ブロッキング）
+  Rule 9: ADRのサイズ超過（ブロッキング）
+  Rule 10: living技術知見のサイズ超過（ブロッキング）
+  Rule 11: active計画のstatusヘッダ欠落・完了計画の置き忘れ（ブロッキング）
 
 usage:
     uv run python scripts/maintenance/check_docs.py
@@ -44,7 +47,9 @@ CHANGELOG_LINE_LIMIT = 800
 
 # Rule 4: design/ の spec 文書がこの行数を超えたらブロックする。
 # 既存超過0件を基準線とし、設計過程・歴史の分離または責務単位の分割を求める。
-DESIGN_DOC_LINE_LIMIT = 800
+DESIGN_DOC_LINE_LIMIT = 700
+ADR_DOC_LINE_LIMIT = 250
+TECH_KNOWLEDGE_LINE_LIMIT = 1000
 
 MD_LINK_RE = re.compile(r"\[(?:[^\]]*)\]\(([^)#\s][^)]*)\)")
 WEEKLY_CHANGELOG_RE = re.compile(r"^\d{4}-W\d{2}\.md$")
@@ -56,6 +61,16 @@ STATUS_HEADER_RE = re.compile(
     r"last-verified:\s*\d{4}-\d{2}-\d{2}\s*$"
 )
 DESIGN_DIR = DOCS_DIR / "design"
+ADR_DIR = DESIGN_DIR / "基本設計" / "ADR"
+TECH_KNOWLEDGE_DIR = DOCS_DIR / "log" / "技術知見"
+PLAN_DIR = DOCS_DIR / "log" / "計画"
+PLAN_STATUS_HEADER_RE = re.compile(
+    r"^>\s*status:\s*(?:active|blocked)\s*\|\s*"
+    r"last-verified:\s*\d{4}-\d{2}-\d{2}\s*\|\s*owner:\s*\S.*$"
+)
+INACTIVE_PLAN_STATUS_RE = re.compile(
+    r"^>\s*status:\s*(?:completed|cancelled|stopped|done)\b", re.IGNORECASE
+)
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +223,10 @@ def _is_exempt_orphan(rel: Path) -> bool:
 
     parts = rel.parts
 
+    # archive配下はliving navから独立した凍結記録。現在文書から必要な記録へリンクする。
+    if "archive" in parts or "99_アーカイブ" in parts:
+        return True
+
     # ADR 配下は README.md 以外すべて免除
     if "ADR" in parts:
         if rel.name == "README.md" and len(parts) >= 2 and parts[-2] == "ADR":
@@ -216,10 +235,6 @@ def _is_exempt_orphan(rel: Path) -> bool:
 
     # 変更履歴/ 配下の週次アーカイブ（YYYY-Www.md）は索引経由のため免除
     if "変更履歴" in parts and WEEKLY_CHANGELOG_RE.match(rel.name):
-        return True
-
-    # アーカイブ配下の 要件/ フォルダ（撤去済み機能の個別要件定義）は免除
-    if "要件" in parts and ("archive" in parts or "99_アーカイブ" in parts):
         return True
 
     return False
@@ -309,6 +324,66 @@ def check_design_headers() -> list[str]:
     return violations
 
 
+def _line_count(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+
+
+def check_adr_size() -> list[str]:
+    """Rule 9: ADRは決定・理由・影響に限定し、実験日誌を蓄積しない。"""
+    violations: list[str] = []
+    if not ADR_DIR.exists():
+        return violations
+    for path in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]_*.md")):
+        if path.name == "0000_template.md":
+            continue
+        count = _line_count(path)
+        if count > ADR_DOC_LINE_LIMIT:
+            rel = path.relative_to(PROJECT_ROOT)
+            violations.append(
+                f"{rel}: {count} 行（上限 {ADR_DOC_LINE_LIMIT} 行超）"
+                " -> 決定・理由・影響だけを残し、検証履歴をarchive/検証へ移してください"
+            )
+    return violations
+
+
+def check_technical_knowledge_size() -> list[str]:
+    """Rule 10: living技術知見は現行結論と再利用可能な知見へ集約する。"""
+    violations: list[str] = []
+    if not TECH_KNOWLEDGE_DIR.exists():
+        return violations
+    for path in sorted(TECH_KNOWLEDGE_DIR.glob("*.md")):
+        count = _line_count(path)
+        if count > TECH_KNOWLEDGE_LINE_LIMIT:
+            rel = path.relative_to(PROJECT_ROOT)
+            violations.append(
+                f"{rel}: {count} 行（上限 {TECH_KNOWLEDGE_LINE_LIMIT} 行超）"
+                " -> 現行知見と時系列の検証履歴を分離してください"
+            )
+    return violations
+
+
+def check_plan_lifecycle() -> list[str]:
+    """Rule 11: log/計画にはactive/blockedの未完了計画だけを置く。"""
+    violations: list[str] = []
+    if not PLAN_DIR.exists():
+        return violations
+    for path in sorted(PLAN_DIR.glob("*.md")):
+        rel = path.relative_to(PROJECT_ROOT)
+        head = path.read_text(encoding="utf-8", errors="replace").splitlines()[:10]
+        if any(INACTIVE_PLAN_STATUS_RE.match(line.strip()) for line in head):
+            violations.append(
+                f"{rel}: 完了・中止状態の計画がlog/計画に残っています"
+                " -> docs/archive/へ移してください"
+            )
+            continue
+        if not any(PLAN_STATUS_HEADER_RE.match(line.strip()) for line in head):
+            violations.append(
+                f"{rel}: 冒頭10行にactive/blockedのstatusヘッダがありません"
+                " -> `> status: active|blocked | last-verified: YYYY-MM-DD | owner: ...`を追加してください"
+            )
+    return violations
+
+
 def check_file_map_annotations() -> list[str]:
     """Rule 6: ファイルマップの手書き注釈を検査する。"""
     return find_file_map_violations(PROJECT_ROOT)
@@ -339,6 +414,9 @@ def main() -> None:
     header_missing = check_design_headers()
     file_map_violations = check_file_map_annotations()
     contract_links, contract_markers = check_canonical_contracts()
+    adr_size_violations = check_adr_size()
+    knowledge_size_violations = check_technical_knowledge_size()
+    plan_lifecycle_violations = check_plan_lifecycle()
 
     print("=== check_docs: docs/ 整合性チェック ===\n")
 
@@ -365,6 +443,17 @@ def main() -> None:
     _print_violations("[Rule 6] ファイルマップ注釈の参照切れ", file_map_violations)
     _print_violations("[Rule 7] 横断契約の正本マップリンク", contract_links)
     _print_violations("[Rule 8] 横断契約のowner marker", contract_markers)
+    _print_violations(
+        f"[Rule 9] ADR文書サイズ (> {ADR_DOC_LINE_LIMIT} 行)",
+        adr_size_violations,
+    )
+    _print_violations(
+        f"[Rule 10] 技術知見サイズ (> {TECH_KNOWLEDGE_LINE_LIMIT} 行)",
+        knowledge_size_violations,
+    )
+    _print_violations(
+        "[Rule 11] 計画ライフサイクル", plan_lifecycle_violations
+    )
 
     total = (
         len(broken_links)
@@ -375,6 +464,9 @@ def main() -> None:
         + len(file_map_violations)
         + len(contract_links)
         + len(contract_markers)
+        + len(adr_size_violations)
+        + len(knowledge_size_violations)
+        + len(plan_lifecycle_violations)
     )
     if total == 0:
         print("違反なし。")

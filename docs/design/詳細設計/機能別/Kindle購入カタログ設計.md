@@ -53,6 +53,7 @@ medaroserver では `AMAZON_DATA_DIR=/opt/pic2pdf-viewer/import/kindle/files` �
 - Kindle Info（書誌、ジャンル、著者、読書状態）
 - シリーズ自動購入 JSON
 
+<a id="kindle-amazon-export"></a>
 ### 4.1 Amazon エクスポートのバージョン選択
 
 Amazon の Kindle エクスポートでは、従来の `_FE.csv` 名に代わり、同じ論理データが
@@ -111,6 +112,7 @@ series解決・全量置換は`autobuy_importer.py`が所有する。`enrichment
 
 `PUT /api/kindle-catalog/links` は `book_id` と ASIN を受け、対象が `comic` または `novel` であること、ASIN がカタログに存在することを検証した後、既存フィールドを保持して `meta2.db.books_meta.asin` だけを更新する。
 
+<a id="kindle-capture-contract"></a>
 ## 7. キャプチャ連携
 
 本節をLinux backend、Windows capture agent、シリーズ実行scriptをまたぐjob契約の正本とする。
@@ -243,7 +245,7 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
 
 ## 9. UI
 
-初回移行完了後の通常運用 UI は [Kindle 購入カタログ画面 UI/UX 改善 要件](../../要件定義/Kindle購入カタログ画面_UI改善_要件.md) に従い、購入書籍、画像紐付け、キャプチャ、取込・管理の 4 ページへ分離する。各ページは Kindle 領域内の共通サブナビゲーションと固有 URL を持ち、購入書籍を初期ページとする。
+初回移行完了後の通常運用 UI は、購入書籍、画像紐付け、キャプチャ、取込・管理の 4 ページへ分離する。各ページは Kindle 領域内の共通サブナビゲーションと固有 URL を持ち、購入書籍を初期ページとする。実装前の UI/UX 要件と受入経緯は[凍結要件記録](../../../archive/要件/Kindle購入カタログ画面_UI改善_要件.md)を参照する。
 
 フロントエンド実装は`features/kindle/`を所有境界とする。`api.ts`はHTTP、`queries.ts`は
 TanStack Queryとinvalidate、`types.ts`はOpenAPI生成型alias、各`*Screen.tsx`は表示と

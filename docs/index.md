@@ -1,8 +1,23 @@
 # Pic2PDF_Viewer 設計ドキュメント
 
-WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。Kindle キャプチャ連携 / OCR（yomitoku）による Searchable PDF 生成 / 小説テキスト検索・RAG 質問応答機能を提供する。
+同人誌・漫画・小説を扱うマルチソース閲覧Webアプリ。WebP画像・ZIPの取り込みと
+ブラウザ閲覧、Kindleキャプチャ連携、Surya OCR 2 + QAによる小説本文のSQLite公開、
+bge-m3とQwenを使った全文検索・RAG質問応答を提供する。小説はSearchable PDFを生成せず、
+原画像と`novel.db`の本文を分離して管理する。
 
-このサイトは `docs/` 配下の Markdown を **mkdocs-material** で HTML 化したもの。ソースは Markdown のままで、ビルド時に静的 HTML が生成される。Claude Code が読み書きするのは Markdown 側、ユーザーが閲覧するのが本 HTML 側、という役割分担。
+このサイトは`docs/`配下のMarkdownを**mkdocs-material**でHTML化したもの。
+Markdownを正本とし、HTMLは閲覧用の生成物とする。
+
+## 最初に読む文書
+
+| 知りたいこと | 参照先 |
+|---|---|
+| 現在できること・全体構成 | [要件定義書](design/要件定義/要件定義書.md) / [基本設計書](design/基本設計/基本設計書.md) |
+| 現在の優先順位 | [バックログ](log/計画/バックログ.md) |
+| 内部改善・技術メンテナンス | [リファクタリング計画書](log/計画/リファクタリング計画書.md) |
+| 現在発生している障害 | [既知の問題](log/既知の問題.md) |
+| 設計書の置き場所・更新方法 | [設計書運用ルール](design/環境構築/設計書運用ルール.md) |
+| 過去の試験・完了記録 | `archive/`（living文書から必要な記録へリンクする） |
 
 ---
 
@@ -28,7 +43,8 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 
 | 事実 | 所有文書（正本） |
 |---|---|
-| プロジェクト全体のディレクトリ構成・3 バケットの役割 | 本 `index.md` ＋ `mkdocs.yml` の `nav`（個別ファイルのリンク一覧） |
+| プロジェクト全体のディレクトリ構成・3バケットの役割 | 本`index.md`＋`mkdocs.yml`の`nav`（個別ファイルのリンク一覧） |
+| 設計書の分類・状態・更新・archive移動・サイズ上限 | [設計書運用ルール](design/環境構築/設計書運用ルール.md) |
 | 開発/リリースのポート割当（8766 / 5176 / 8090）・リリースビルド構成・起動スクリプト | [詳細設計書_共通.md](design/詳細設計/詳細設計書_共通.md) §3 |
 | source 3 値（doujin / comic / novel）・静的マウント・データディレクトリ配置 | [詳細設計書_共通.md](design/詳細設計/詳細設計書_共通.md) §2 |
 | meta.db スキーマ（SQLModel / `MetaEntry`）・backend クラス設計 | [詳細設計書_バックエンド編.md](design/詳細設計/詳細設計書_バックエンド編.md) |
@@ -68,16 +84,19 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 ## 整合性の自動チェック（ガバナンス）
 
 `docs/**/*.md`または`mkdocs.yml`を変更するコミットは、pre-commitフック経由で
-`scripts/maintenance/check_docs.py`が検査する。次のRule 1〜8はすべてblockingである。
+`scripts/maintenance/check_docs.py`が検査する。次のRule 1〜11はすべてblockingである。
 
 1. **リンク切れ**（ブロック） — living 文書の相対 Markdown リンクが実在ファイルを指しているか（`archive/` と週次変更履歴アーカイブの歴史的リンク切れは非ブロックの info 扱い — 過去の記録を doc 再編のたびに書き換えないため）
 2. **変更履歴の肥大化**（ブロック） — `log/変更履歴.md` が上限 800 行を超えていないか（超過時は週次ローテーションを促す）
 3. **nav 同期**（ブロック） — `mkdocs.yml` の nav ツリーが実ファイルと一致しているか（dead entry / orphan ファイルがないか）
-4. **サイズ上限**（ブロック） — `design/`各設計書が800行を超えていないか（超過時は設計過程・歴史の混在と責務境界を確認する）
+4. **designサイズ上限**（ブロック） — ADR以外の`design/`文書が700行を超えていないか
 5. **status ヘッダ**（ブロック） — `design/` 各設計書の冒頭 10 行に `> status: living｜absorption-pending | last-verified: YYYY-MM-DD` があるか
 6. **ファイルマップ注釈**（ブロック） — 自動生成ファイルマップの「主要ファイル補足」が実在パスを参照しているか
 7. **正本マップリンク**（ブロック） — 登録した横断契約のowner文書へ正本マップから到達できるか
 8. **契約owner重複**（ブロック） — owner markerの欠落・未登録・別文書への重複がないか
+9. **ADRサイズ上限**（ブロック） — ADRが250行を超え、決定記録へ検証日誌が混入していないか
+10. **技術知見サイズ上限**（ブロック） — living技術知見が1,000行を超えていないか
+11. **計画ライフサイクル**（ブロック） — `log/計画/`の状態ヘッダが欠けていないか、完了・中止計画が残っていないか
 
 詳細な基準、baseline、例外管理は
 [品質ガードレール](design/詳細設計/品質ガードレール.md)を正本とする。
@@ -89,10 +108,10 @@ WebP 画像・ZIP を PDF 化してブラウザで閲覧する Web アプリ。K
 
 ```powershell
 # 単発ビルド（→ frontend/public/site/ に出力）
-uv run mkdocs build --clean
+uvx --with mkdocs-material --with mkdocs-mermaid2-plugin mkdocs build --clean
 
 # 開発時プレビュー（→ http://localhost:8000）
-uv run mkdocs serve
+uvx --with mkdocs-material --with mkdocs-mermaid2-plugin mkdocs serve
 ```
 
 出力先は Vite の `publicDir`（`frontend/public/site/`）。これにより以下の経路すべてで閲覧可能:
@@ -112,5 +131,5 @@ uv run mkdocs serve
 
 - **ソース・オブ・トゥルース** は `docs/` 配下の Markdown（`design/` / `log/` / `archive/` の 3 バケット）
 - **ユーザー閲覧用** は本 HTML（mkdocs build 出力）
-- **編集**: Claude Code に依頼すると Markdown が更新される。次回 `mkdocs build` で HTML 反映
+- **編集**: Markdown側を更新し、次回`mkdocs build`でHTMLへ反映
 - **git 管理**: `docs/*.md` のみ。`frontend/public/site/` は `.gitignore`

@@ -58,6 +58,7 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 `shadow`ログはqueryのSHA-256先頭12桁、FTS5 / ICU件数、上位集合の重複数、各latency、成否だけを
 記録し、query本文・OCR本文・snippetを記録しない。ICUが利用不能でも検索レスポンスはFTS5で継続する。
 
+<a id="rag-search-rollback"></a>
 ### 1.2 運用手順とrollback
 
 **適用状態（2026-08-22 16:45 JST）**: productionへstage 1 `shadow`を適用済みである。active backend / commonは
@@ -174,7 +175,7 @@ LLM 呼び出しとは独立した純関数群。
 
 ## 8. 読書会 番組台本生成（`discussion_service.py` ほか）B-28
 
-書籍全文を Qwen 131k コンテキストに投入し、固定ホストキャラ 2 人（レイ＆ミオ）による番組台本を 2 段の LLM 呼び出しで SSE 生成する。B-20（自由ペルソナ 2 人の読書会対話）を置き換えた（要件と設計判断の経緯は [読書会ロングフォーム拡張_要件.md](../../要件定義/読書会ロングフォーム拡張_要件.md)）。
+書籍全文を Qwen 131k コンテキストに投入し、固定ホストキャラ 2 人（レイ＆ミオ）による番組台本を 2 段の LLM 呼び出しで SSE 生成する。B-20（自由ペルソナ 2 人の読書会対話）を置き換えた。要件確定と検証の経緯は[凍結記録](../../../archive/要件/読書会ロングフォーム拡張_要件・検証記録.md)を参照する。
 
 - **モジュール構成**: `discussion_cast.py`（ホスト人格核）/ `discussion_prompts.py`（構成・台本prompt）/ `discussion_parser.py`（plan・turnの純粋parse/validate）/ `discussion_stream.py`（segment/turn event生成）/ `discussion_checks.py`（DoD機械チェック）/ `discussion_repository.py`（history保存・一覧・削除）/ `discussion_service.py`（application orchestrationと互換公開面）。
 - **2 段パイプライン**:
@@ -199,6 +200,7 @@ LLM 呼び出しとは独立した純関数群。
 
 ---
 
+<a id="rag-search-evaluation"></a>
 ## 10. 日本語検索基盤の比較検証ゲート
 
 大量の日本語 OCR 本文に対する検索方式の変更は、生成 LLM の比較とは分離し、次の順序で
