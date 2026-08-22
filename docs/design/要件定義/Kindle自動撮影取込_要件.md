@@ -1,6 +1,6 @@
 # Kindle 自動撮影取込 要件
 
-> status: living | last-verified: 2026-08-02
+> status: living | last-verified: 2026-08-22
 
 要件状態: **実装・Phase 5 実機受入完了（2026-07-26）**
 
