@@ -125,7 +125,9 @@ assert_unit_inactive() {
 }
 
 assert_no_novel_writers() {
-  "${ACTIVE_ENV}/bin/python" - <<'PY'
+  (
+    cd "$ACTIVE_BACKEND"
+    "${ACTIVE_ENV}/bin/python" - <<'PY'
 import sqlite3
 from pathlib import Path
 
@@ -160,6 +162,7 @@ print(f"Novel writer check: rebuild_jobs={rebuild_count}, ocr_runs={ocr_count}")
 if rebuild_count or ocr_count:
     raise SystemExit("queued or running Novel writers must reach zero before deployment")
 PY
+  )
 }
 
 freeze_app() {
