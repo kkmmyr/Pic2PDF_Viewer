@@ -91,7 +91,7 @@ revision `0014`は外部索引の状態表を追加するだけのbackward-compa
 | 1 | OCR / rebuild等のwriterと定期backupが重ならないmaintenance windowを確保し、SQLite / LanceDBの復元可能なbackupを作る | LanceDB backupはdirectory copyのため、書込みを停止して取得・復元検査する。configured pathが意図した本番実体を指す |
 | 2 | backendを配置し、`cd backend && uv run python scripts/build_page_fts_index.py`を実行する | CLIがAlembicをheadへ上げ、stdoutの単一JSONが`ok=true`。`row_count`、`source_sha256`、table名、LanceDB version、index設定を保存する |
 | 3 | `novel_search_index_state`の`status=active`、source / active revision一致、manifest row数を確認する | 不一致・build失敗・同時更新ではshadowへ進まず、FTS5を継続して原因解消後に完全再構築する |
-| 4 | `NOVEL_DB_LEXICAL_BACKEND=shadow`を設定してbackendを再起動する | 利用者へ返す順位はFTS5と同一。`lexical shadow` / `lexical shadow unavailable`ログからerror率、ICU latency p95、上位重複を外部集計する |
+| 4 | `NOVEL_DB_LEXICAL_BACKEND=shadow`を設定してbackendを再起動する | 利用者へ返す順位はFTS5と同一。`lexical shadow` / `lexical shadow unavailable`ログを集計CLIへ入力し、成功・fallback率、FTS5 / ICU latency、上位重複を保存する |
 | 5 | 実運用shadowと未調整holdoutのゲートを評価する | 合格しても自動切替しない。`lance_icu`へのproduction切替は別承認・別変更とする |
 
 canonical本文の更新でstateが`stale`になった場合、shadow / `lance_icu`はいずれもFTS5を返す。
@@ -328,6 +328,20 @@ ICUの両方に劣る。Harrier公式BF16は特定の複数入力batchで非有�
 検証済みAPIを保つため`>=0.34,<0.35`へ制約し、minor更新時もGate Aとindex障害testを再実行する。
 設計判断は[ADR-0020](../../基本設計/ADR/0020_page-level-lancedb-icu-shadow.md)を参照する。
 
+shadow観測はproductionの`backend/data/logs/app.log*`から対象期間だけを取り出し、次で集計する。
+
+```bash
+cd backend
+grep -hE 'lexical shadow|lexical ICU fallback' data/logs/app.log* \
+  | uv run python scripts/summarize_lexical_shadow.py --since 2026-08-22T00:00:00
+```
+
+出力はschema version付きJSONとし、shadow成功 / unavailable件数・率、unique query数、FTS5 / ICUの
+p50 / p95 / max latency、0-hit件数、成功時top集合のJaccard平均 / p50 / 最小値、段階2で発生した
+`lance_icu` fallback件数を含む。query本文とquery hash一覧は出力しない。shadow観測が0件なら
+`status=insufficient_data`を出して終了code 2とし、採用ゲートを通過させない。smoke・障害注入ログは
+実運用期間と分けて入力し、未調整holdoutの品質評価とは別の運用証跡として保存する。
+
 #### 2026-08-22 production stage 1 実行記録
 
 - deploy commitは`c31822f`。writerは各停止境界で`rebuild_jobs=0` / `ocr_runs=0`を確認し、snapshot
@@ -343,6 +357,10 @@ ICUの両方に劣る。Harrier公式BF16は特定の複数入力batchで非有�
   これはholdout品質評価ではなく運用smokeであり、段階2の採否には使わない。
 - selectorをinstrumentした5/5 probeで、`shadow`が同じ呼出し内のFTS5 list objectをそのまま返すことを
   確認した。ICUを意図的に例外化した障害注入でも19件のFTS5結果を返し、service error logは0件だった。
+- 集計CLIをproduction `app.log`へ適用し、14:15〜14:17のsmoke 10件は成功10 / fallback 0、
+  unique query 5、FTS5 p95 0.711ms、ICU p95 19.848ms、top集合Jaccard平均0.183254、ICU 0-hit 2件だった。
+  14:17〜14:18の障害注入1件はfallback率1.0として別集計できた。14:18以降の実利用観測は0件で
+  `insufficient_data`・終了code 2となるため、production shadow観測ゲートは未合格のままとする。
 - FTS5の順位契約はBM25 score昇順を第一キー、canonical `pages.id`昇順を第二キーとする。
   score同点時だけ一意なpage IDで順序を固定し、production検索と評価CLIで同じSQLを使う。これにより
   別connection / restartを跨ぐtop-k比較を決定的にし、shadow overlapから順序noiseを除く。
