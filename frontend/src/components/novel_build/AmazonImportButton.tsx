@@ -1,46 +1,19 @@
-import { useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { API_ENDPOINTS } from '@/config/api';
-import apiClient from '@/config/api_client';
+import { useAmazonImport } from '@/hooks/library/useAmazonImport';
 
 export function AmazonImportButton() {
-    const [isImporting, setIsImporting] = useState(false);
+    const { importAmazon, isImporting } = useAmazonImport();
 
     const handleImport = async () => {
-        setIsImporting(true);
-        try {
-            const [novelRes, comicRes] = await Promise.allSettled([
-                apiClient.post<{ updated: number; skipped: number; unmatched: number }>(
-                    API_ENDPOINTS.AMAZON_IMPORT('novel'),
-                ),
-                apiClient.post<{ updated: number; skipped: number; unmatched: number }>(
-                    API_ENDPOINTS.AMAZON_IMPORT('comic'),
-                ),
-            ]);
-
-            const novelData = novelRes.status === 'fulfilled' ? novelRes.value.data : null;
-            const comicData = comicRes.status === 'fulfilled' ? comicRes.value.data : null;
-
-            const updated = (novelData?.updated ?? 0) + (comicData?.updated ?? 0);
-            const skipped = (novelData?.skipped ?? 0) + (comicData?.skipped ?? 0);
-            const unmatched = (novelData?.unmatched ?? 0) + (comicData?.unmatched ?? 0);
-            const hasError = novelRes.status === 'rejected' || comicRes.status === 'rejected';
-
-            if (hasError && updated === 0) {
-                const msg =
-                    novelRes.status === 'rejected'
-                        ? (novelRes.reason as Error).message
-                        : ((comicRes as PromiseRejectedResult).reason as Error).message;
-                toast.error(`インポート失敗: ${msg}`);
-            } else {
-                toast.success(
-                    `更新: ${updated} 件 / スキップ: ${skipped} 件 / 未マッチ: ${unmatched} 件`,
-                );
-            }
-        } finally {
-            setIsImporting(false);
+        const result = await importAmazon();
+        if (result.hasError && result.updated === 0) {
+            toast.error(`インポート失敗: ${result.errorMessage ?? '不明なエラー'}`);
+        } else {
+            toast.success(
+                `更新: ${result.updated} 件 / スキップ: ${result.skipped} 件 / 未マッチ: ${result.unmatched} 件`,
+            );
         }
     };
 

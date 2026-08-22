@@ -6844,7 +6844,7 @@
     }
   },
   "info": {
-    "description": "WebP / ZIP 画像を PDF 化してブラウザ閲覧するマルチソース（doujin / comic / novel）ライブラリのバックエンド API。Kindle キャプチャ連携、yomitoku による OCR 検索可能 PDF 生成、novel 向けの bge-m3 + Qwen によるフルテキスト検索・RAG 質問応答を含む。",
+    "description": "WebP / ZIP 画像を PDF 化してブラウザ閲覧するマルチソース（doujin / comic / novel）ライブラリのバックエンド API。Kindle キャプチャ連携、Surya OCR 2 による novel DB への本文公開、novel 向けの bge-m3 + Qwen によるフルテキスト検索・RAG 質問応答を含む。",
     "title": "Pic2PDF Viewer API",
     "version": "0.1.0"
   },
@@ -11593,7 +11593,7 @@
     },
     "/api/thumbnails/page": {
       "get": {
-        "description": "指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。\n\ngenerated ソースは images/ 配下の WebP を直接返す。\nkindle / novel は PDF を fitz でレンダリングして返す。",
+        "description": "指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。\n\ndoujin ソースは images/ 配下の WebP を直接返す。\ncomic / novel は PDF を fitz でレンダリングして返す。",
         "operationId": "get_page_thumbnail_api_thumbnails_page_get",
         "parameters": [
           {

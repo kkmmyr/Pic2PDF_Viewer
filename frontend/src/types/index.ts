@@ -17,15 +17,6 @@ export type BookImagesResponse = components['schemas']['BookImagesResponse'];
 export type DeletePagesResponse = components['schemas']['DeletePagesResponse'];
 
 /**
- * OCR ステータスAPIレスポンス
- */
-export interface OcrStatusResponse {
-    status: 'idle' | 'running' | 'error';
-    last_return_code: number | null;
-    logs: string[];
-}
-
-/**
  * 読み取り方向
  */
 export type ReadingDirection = 'rtl' | 'ltr';
@@ -74,11 +65,7 @@ export interface GenerateJob {
 // OpenAPIのstateはstring、nullable項目はoptionalで生成されるため、
 // UIで必要な閉じたunionと必須keyをこのadapter型で狭める。
 export type DoujinWatcherState =
-    | 'idle'
-    | 'waiting_stable'
-    | 'running'
-    | 'input_missing'
-    | 'disabled';
+    'idle' | 'waiting_stable' | 'running' | 'input_missing' | 'disabled';
 
 export interface DoujinWatcherPendingItem {
     name: string;

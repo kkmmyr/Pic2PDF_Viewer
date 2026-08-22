@@ -98,11 +98,11 @@ class TestDeletePages:
         assert res.status_code == 400
 
     # -----------------------------------------------------------------------
-    # generated ソース（image-only モード）の削除経路
+    # doujin ソース（image-only モード）の削除経路
     # -----------------------------------------------------------------------
 
     def test_delete_generated_image_only(self, client, tmp_data_dir, make_webp):
-        """generated は images/{book_name}/ から WebP を削除する。"""
+        """doujin は images/{book_name}/ から WebP を削除する。"""
         img_dir = tmp_data_dir["IMAGES_DIR"]
         book_dir = os.path.join(img_dir, "book")
         for i in range(5):

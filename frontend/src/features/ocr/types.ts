@@ -1,5 +1,8 @@
 import type { components } from '@/types/api';
 
+export type OcrStatusResponse = components['schemas']['StatusResponse'];
+export type OcrRunResponse = components['schemas']['OcrRunResponse'];
+export type OcrStopResponse = components['schemas']['OcrStopResponse'];
 export type OcrQaRunSummary = components['schemas']['OcrQaRunSummary'];
 export type OcrQaPage = components['schemas']['OcrQaPageOut'];
 export type OcrQaRunDetail = components['schemas']['OcrQaRunDetail'];

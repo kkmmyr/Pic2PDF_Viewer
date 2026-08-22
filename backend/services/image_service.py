@@ -1,5 +1,5 @@
 """
-image-only モード（generated ソース）の書籍ページ列を操作するサービス。
+image-only モード（doujin ソース）の書籍ページ列を操作するサービス。
 
 `PdfService` の image-only 版に相当する。書籍は `images/{path}/{book_name}/` 配下の
 WebP ファイル列として表現され、natsort 順がページ順になる。

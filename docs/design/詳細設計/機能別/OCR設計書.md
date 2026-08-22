@@ -18,8 +18,9 @@
   実測経緯は [OCR品質改善 技術知見](../../../log/技術知見/OCR品質改善_技術知見.md) を参照する。
 - OCR結果の取り込み先は [小説RAG パイプライン設計](小説RAG_パイプライン設計.md) と
   [検索QA設計](小説RAG_検索QA設計.md) を参照する。
-- `generated` sourceは [ADR-0003](../../基本設計/ADR/0003_generated-image-only-mode.md) により
-  OCR対象外である。
+- sourceの正本は`doujin` / `comic` / `novel`の3値である。本書のOCR公開pipelineは
+  `novel`（`kindle_novel/images`）だけを対象とし、`doujin`（ADR-0003当時の旧名`generated`）と
+  `comic`は対象外である。
 
 ## 1. アーキテクチャ
 
@@ -116,9 +117,11 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/job_worker.py` | queue workerと既存monkeypatch pointを保つfacade |
 | `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー |
 
-フロントエンドは`features/ocr/api.ts`をHTTP境界、`useOCRQaController`と
-`useOCRGroundTruthController`をQuery/mutation/input状態の所有者とし、各Panelは表示と
-event配線だけを行う。OpenAPI生成型を`features/ocr/types.ts`から参照する。
+フロントエンドは`features/ocr/api.ts`をstatus / run / stop、QA、ground truthのHTTP境界、
+`useOcrStatus`、`useOCRQaController`、`useOCRGroundTruthController`をQuery/mutation/input状態の
+所有者とし、各Panelは表示とevent配線だけを行う。runの単冊指定`target_dir`は
+request bodyではなくOpenAPI契約のquery parameterとする。status / run / stopを含む
+OpenAPI生成型を`features/ocr/types.ts`から参照する。
 
 ### 互換facadeとテスト所有
 

@@ -59,7 +59,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
     thumb_name = get_thumbnail_name(filename)
     thumb_path = resolve_under_base(base_thumb_dir, join_path(path, thumb_name))
 
-    # generated は image-only モード: images/{book_name}/ から WebP を削除する
+    # doujin は image-only モード: images/{book_name}/ から WebP を削除する
     if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
@@ -78,7 +78,7 @@ def delete_pages(filename: str, request: DeletePagesRequest, path: str = "", sou
 
         return {"message": "Pages deleted successfully", "total_pages": new_total}
 
-    # kindle / novel: 従来通り PDF から fitz でページ削除
+    # comic / novel: 従来通り PDF から fitz でページ削除
     base_pdf_dir = dirs["pdf"]
     pdf_path = resolve_under_base(base_pdf_dir, join_path(path, filename))
 
@@ -105,7 +105,7 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
     thumb_name = get_thumbnail_name(filename)
     thumb_path = resolve_under_base(base_thumb_dir, join_path(path, thumb_name))
 
-    # generated は image-only モード: images/{book_name}/ の WebP を再採番リネーム
+    # doujin は image-only モード: images/{book_name}/ の WebP を再採番リネーム
     if source == "doujin":
         book_name = os.path.splitext(filename)[0]
         base_img_dir = dirs["img"]
@@ -127,7 +127,7 @@ def reorder_pages(filename: str, request: ReorderPagesRequest, path: str = "", s
 
         return {"message": "Pages reordered successfully", "total_pages": new_total}
 
-    # kindle / novel: PDF を fitz で再構築
+    # comic / novel: PDF を fitz で再構築
     base_pdf_dir = dirs["pdf"]
     pdf_path = resolve_under_base(base_pdf_dir, join_path(path, filename))
 

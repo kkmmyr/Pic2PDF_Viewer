@@ -1,8 +1,11 @@
 import { useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/config/api_client';
-import { API_ENDPOINTS } from '@/config/api';
-import type { OcrStatusResponse } from '@/types';
+import {
+    fetchOcrStatus,
+    startOcr as requestOcrStart,
+    stopOcr as requestOcrStop,
+} from '@/features/ocr/api';
+import type { OcrStatusResponse } from '@/features/ocr/types';
 
 /**
  * OCR ステータスをポーリングで取得するフック。
@@ -13,7 +16,7 @@ import type { OcrStatusResponse } from '@/types';
 export function useOcrStatus(enabled = true) {
     const { data, refetch } = useQuery<OcrStatusResponse>({
         queryKey: ['ocrStatus'],
-        queryFn: () => apiClient.get<unknown, OcrStatusResponse>(API_ENDPOINTS.OCR_STATUS),
+        queryFn: fetchOcrStatus,
         enabled,
         refetchInterval: 2000,
         staleTime: 0,
@@ -25,11 +28,11 @@ export function useOcrStatus(enabled = true) {
     const logs = data?.logs ?? [];
 
     const startOcr = useCallback(async (targetDir?: string) => {
-        return apiClient.post(API_ENDPOINTS.OCR_RUN, { target_dir: targetDir });
+        return requestOcrStart(targetDir);
     }, []);
 
     const stopOcr = useCallback(async () => {
-        return apiClient.post(API_ENDPOINTS.OCR_STOP);
+        return requestOcrStop();
     }, []);
 
     return { status, logs, startOcr, stopOcr, refetch };

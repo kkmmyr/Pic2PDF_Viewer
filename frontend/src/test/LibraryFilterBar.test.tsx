@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LibraryFilterBar } from '@/components/library/LibraryFilterBar';
 
 const baseProps: Parameters<typeof LibraryFilterBar>[0] = {
@@ -29,7 +30,17 @@ const baseProps: Parameters<typeof LibraryFilterBar>[0] = {
 
 function renderFilterBar(overrides: Partial<Parameters<typeof LibraryFilterBar>[0]> = {}) {
     const props = { ...baseProps, ...overrides };
-    return { props, ...render(<LibraryFilterBar {...props} />) };
+    const queryClient = new QueryClient({
+        defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
+    });
+    return {
+        props,
+        ...render(
+            <QueryClientProvider client={queryClient}>
+                <LibraryFilterBar {...props} />
+            </QueryClientProvider>,
+        ),
+    };
 }
 
 describe('LibraryFilterBar', () => {

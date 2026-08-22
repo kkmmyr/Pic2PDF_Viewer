@@ -36,7 +36,7 @@ class GenerateResult(NamedTuple):
 def generate_thumbnail(image_path: str, output_path: str) -> bool:
     """画像ファイル（WebP / JPEG / PNG など PIL が読める形式）からサムネイル JPG を生成する。
 
-    fitz は WebP を読めないため、generated ソース（image-only モード）の
+    fitz は WebP を読めないため、doujin ソース（image-only モード）の
     サムネイル生成・再生成はこの関数を使う必要がある。PDF からの生成は
     `services.thumbnail_service.ThumbnailService.generate_thumbnail` を使う。
 

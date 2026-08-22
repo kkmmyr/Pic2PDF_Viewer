@@ -60,7 +60,7 @@ describe('useOcrStatus', () => {
         expect(result.current.logs).toEqual([]);
     });
 
-    it('startOcr で POST /api/ocr/run（target_dir 付き）', async () => {
+    it('startOcr で target_dir を query parameter として POST /api/ocr/run へ送る', async () => {
         mockedGet.mockResolvedValue({ status: 'idle', last_return_code: null, logs: [] });
         mockedPost.mockResolvedValue(undefined);
 
@@ -71,10 +71,12 @@ describe('useOcrStatus', () => {
             await result.current.startOcr('/some/dir');
         });
 
-        expect(mockedPost).toHaveBeenCalledWith('/api/ocr/run', { target_dir: '/some/dir' });
+        expect(mockedPost).toHaveBeenCalledWith('/api/ocr/run', undefined, {
+            params: { target_dir: '/some/dir' },
+        });
     });
 
-    it('startOcr で target_dir 省略時は undefined が渡る', async () => {
+    it('startOcr で target_dir 省略時は request bodyとqueryを送らない', async () => {
         mockedGet.mockResolvedValue({ status: 'idle', last_return_code: null, logs: [] });
         mockedPost.mockResolvedValue(undefined);
 
@@ -85,7 +87,7 @@ describe('useOcrStatus', () => {
             await result.current.startOcr();
         });
 
-        expect(mockedPost).toHaveBeenCalledWith('/api/ocr/run', { target_dir: undefined });
+        expect(mockedPost).toHaveBeenCalledWith('/api/ocr/run');
     });
 
     it('stopOcr で POST /api/ocr/stop', async () => {

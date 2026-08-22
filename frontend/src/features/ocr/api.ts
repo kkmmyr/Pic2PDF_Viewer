@@ -7,8 +7,28 @@ import type {
     OcrPageType,
     OcrQaRunDetail,
     OcrQaRunListResponse,
+    OcrRunResponse,
     OcrSelectedEngine,
+    OcrStatusResponse,
+    OcrStopResponse,
 } from './types';
+
+export function fetchOcrStatus(): Promise<OcrStatusResponse> {
+    return apiClient.get<unknown, OcrStatusResponse>(API_ENDPOINTS.OCR_STATUS);
+}
+
+export function startOcr(targetDir?: string): Promise<OcrRunResponse> {
+    if (!targetDir) {
+        return apiClient.post<unknown, OcrRunResponse>(API_ENDPOINTS.OCR_RUN);
+    }
+    return apiClient.post<unknown, OcrRunResponse>(API_ENDPOINTS.OCR_RUN, undefined, {
+        params: { target_dir: targetDir },
+    });
+}
+
+export function stopOcr(): Promise<OcrStopResponse> {
+    return apiClient.post<unknown, OcrStopResponse>(API_ENDPOINTS.OCR_STOP);
+}
 
 export function fetchOcrQaRuns(): Promise<OcrQaRunListResponse> {
     return apiClient.get<unknown, OcrQaRunListResponse>(API_ENDPOINTS.OCR_QA_RUNS);

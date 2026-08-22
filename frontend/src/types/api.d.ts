@@ -178,8 +178,8 @@ export interface paths {
          * Get Page Thumbnail
          * @description 指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。
          *
-         *     generated ソースは images/ 配下の WebP を直接返す。
-         *     kindle / novel は PDF を fitz でレンダリングして返す。
+         *     doujin ソースは images/ 配下の WebP を直接返す。
+         *     comic / novel は PDF を fitz でレンダリングして返す。
          */
         get: operations['get_page_thumbnail_api_thumbnails_page_get'];
         put?: never;
@@ -5852,8 +5852,7 @@ export interface operations {
                     | ('purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown')
                     | null;
                 capture_state?:
-                    | ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending')
-                    | null;
+                    ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending') | null;
                 page?: number;
                 page_size?: number;
             };

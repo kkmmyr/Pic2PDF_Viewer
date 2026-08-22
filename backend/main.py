@@ -68,7 +68,7 @@ app = FastAPI(
     title="Pic2PDF Viewer API",
     description=(
         "WebP / ZIP 画像を PDF 化してブラウザ閲覧するマルチソース（doujin / comic / novel）ライブラリの"
-        "バックエンド API。Kindle キャプチャ連携、yomitoku による OCR 検索可能 PDF 生成、"
+        "バックエンド API。Kindle キャプチャ連携、Surya OCR 2 による novel DB への本文公開、"
         "novel 向けの bge-m3 + Qwen によるフルテキスト検索・RAG 質問応答を含む。"
     ),
     version="0.1.0",

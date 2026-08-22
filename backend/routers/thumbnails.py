@@ -41,7 +41,7 @@ class RegenerateThumbnailBulkRequest(BaseModel):
 def _regenerate_one(pdf_dir: str, thumb_dir: str, path: str, name: str, img_dir: str = "") -> bool:
     """1冊分のサムネイル再生成。成功時 True を返す。
 
-    PDF が存在しない場合（generated image-only モード）は
+    PDF が存在しない場合（doujin image-only モード）は
     img_dir 配下の先頭 WebP を `pdf_generator.generate_thumbnail`（PIL ベース）で処理する。
     fitz は WebP を読めないため、画像→JPG は PIL 経路を使う必要がある。
     """
@@ -71,8 +71,8 @@ def get_page_thumbnail(
 ):
     """指定ページのサムネイル画像をオンデマンド生成して返す。ページスライダーのプレビュー用。
 
-    generated ソースは images/ 配下の WebP を直接返す。
-    kindle / novel は PDF を fitz でレンダリングして返す。
+    doujin ソースは images/ 配下の WebP を直接返す。
+    comic / novel は PDF を fitz でレンダリングして返す。
     """
     validate_safe_path(path, param_name="path")
     validate_safe_name(name, param_name="name")
@@ -81,7 +81,7 @@ def get_page_thumbnail(
 
     dirs = get_dirs_by_source(source)
 
-    # generated: images/ ディレクトリから該当ページの WebP を直接返す
+    # doujin: images/ ディレクトリから該当ページの WebP を直接返す
     if source == "doujin":
         book_name = os.path.splitext(name)[0]
         webps = list_book_images(dirs["img"], book_name, path)
@@ -97,7 +97,7 @@ def get_page_thumbnail(
             headers={"Cache-Control": "max-age=3600"},
         )
 
-    # kindle / novel: PDF を fitz でレンダリング
+    # comic / novel: PDF を fitz でレンダリング
     pdf_path = resolve_under_base(dirs["pdf"], join_path(path, name))
     if not os.path.exists(pdf_path):
         raise HTTPException(status_code=404, detail="PDF not found")

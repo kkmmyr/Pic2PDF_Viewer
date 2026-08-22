@@ -103,7 +103,7 @@ export const OCRPanel: React.FC = () => {
             <div className="flex-1 flex flex-col min-h-0 m-4">
                 <div className="flex items-center gap-2 mb-2 pb-2 border-b border-gray-700 text-gray-400 text-xs">
                     <Terminal className="w-4 h-4" />
-                    <span>Console Output (ocr_service)</span>
+                    <span>Console Output (OCR job queue)</span>
                 </div>
                 <div className="flex-1 overflow-y-auto bg-[#0d1117] dark:bg-[#0d1117] rounded-lg p-3 font-mono text-sm text-[#d4d4d4] border border-gray-700">
                     {logs.length === 0 ? (

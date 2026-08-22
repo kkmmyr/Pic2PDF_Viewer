@@ -1,41 +1,17 @@
+import { ChevronDown, Download, Settings } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Settings, ChevronDown, Download } from 'lucide-react';
-import { API_ENDPOINTS } from '@/config/api';
-import apiClient from '@/config/api_client';
+
+import { useMetaExport } from '@/hooks/library/useMetaExport';
 import type { LibrarySource } from '@/types';
 
 interface ToolsMenuProps {
     source: LibrarySource;
 }
 
-/**
- * Library 画面ヘッダーの「ツール ▼」ドロップダウン。
- * メタデータエクスポートを集約する。
- */
-async function downloadMetaExport(source: LibrarySource): Promise<void> {
-    // apiClient のレスポンスインターセプタは response.data を返すため、blob が直接得られる。
-    // Content-Disposition ヘッダは参照できなくなるが、バックエンドの命名規則
-    // (`meta_{source}_{YYYYMMDD}.json`) と同形式をフロント側で生成する。
-    const blob = await apiClient.get<unknown, Blob>(API_ENDPOINTS.META_EXPORT(source), {
-        responseType: 'blob',
-    });
-    const today = new Date();
-    const dateStr =
-        today.getFullYear().toString() +
-        String(today.getMonth() + 1).padStart(2, '0') +
-        String(today.getDate()).padStart(2, '0');
-    const filename = `meta_${source}_${dateStr}.json`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(a.href);
-}
-
 export function ToolsMenu({ source }: ToolsMenuProps) {
     const [open, setOpen] = useState(false);
-    const [exporting, setExporting] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const { exportMeta, isExporting } = useMetaExport(source);
 
     useEffect(() => {
         if (!open) return;
@@ -76,19 +52,12 @@ export function ToolsMenu({ source }: ToolsMenuProps) {
                             メタデータ（著者・シリーズ等）をバックアップ
                         </span>
                         <button
-                            onClick={async () => {
-                                setExporting(true);
-                                try {
-                                    await downloadMetaExport(source);
-                                } finally {
-                                    setExporting(false);
-                                }
-                            }}
-                            disabled={exporting}
+                            onClick={() => exportMeta()}
+                            disabled={isExporting}
                             className="flex items-center gap-1.5 px-3 py-1 text-sm bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-md shrink-0"
                         >
                             <Download className="w-3.5 h-3.5" />
-                            {exporting ? 'エクスポート中...' : 'エクスポート'}
+                            {isExporting ? 'エクスポート中...' : 'エクスポート'}
                         </button>
                     </div>
                 </div>
