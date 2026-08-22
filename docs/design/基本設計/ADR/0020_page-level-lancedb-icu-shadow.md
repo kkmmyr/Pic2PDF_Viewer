@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-22
-- **適用状態**: 実装・隔離snapshot検証済み / productionはLanceDB依存更新待ちで、migration・index構築・shadow開始は未実施
+- **適用状態**: production stage 1 `shadow`適用済み（LanceDB 0.34.0 / 8,576ページ）。利用者への返却はFTS5を維持し、`lance_icu`昇格は未承認
 - **決定者**: プロジェクトオーナー / Codex
 - **関連**: [小説RAG 検索・QA設計 §10](../../詳細設計/機能別/小説RAG_検索QA設計.md#10-日本語検索基盤の比較検証ゲート)、[小説RAG データ設計](../../詳細設計/機能別/小説RAG_データ.md)、バックログ B-37
 

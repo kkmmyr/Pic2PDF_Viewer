@@ -60,15 +60,17 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 
 ### 1.2 運用手順とrollback
 
-**適用状態（2026-08-22）**: ソース・Alembic revision 0014・構築CLI・回帰testと隔離snapshot検証は
-完了している。本番DBのmigration、本番LanceDBへのpage index構築、production環境変数の変更は
-未実施であり、productionの返却結果は従来のFTS5のままである。
+**適用状態（2026-08-22 14:15 JST）**: productionへstage 1 `shadow`を適用済みである。active backendは
+`backend-20260822141221-47136`、LanceDBは`0.34.0`、Alembicは`0014`。page ICUは8,576行を完全構築し、
+source / active revision `0`、canonical SHA-256
+`94f0bfab52393f2c8bc7b0bb53ce8d7e338d0096764c71bac2f33e2dee153cd0`、SQLite integrity `ok`、
+未索引0件を確認した。production設定は`NOVEL_DB_LEXICAL_BACKEND=shadow`であり、利用者へ返す結果は
+従来FTS5のまま。`lance_icu`への昇格は未承認である。
 
-同日の本番read-only事前監査では、Ubuntu 24.04 / Python 3.12.3環境のLanceDBは`0.30.2`で、
-本実装が固定する`>=0.34,<0.35`を満たしていない。また`deploy_to_linux.sh`はbackend sourceを
-転送するがPython dependencyと`common/llm`を同期しない。したがって既存deploy scriptだけで
-この変更を本番へ配置してはならない。サーバー側の依存更新方法を確定し、LanceDB version、backend
-import、既存FTS5検索をsmoke確認してからmigration / index構築へ進む。
+事前監査で検出したLanceDB `0.30.2`とdependency未同期の旧deploy経路は、source・common・venvを
+一体化した世代releaseへ置換した。active環境を直接更新せず、検証済みbackup、locked dependency、
+import / FTS5 smoke、backward-compatible migration、HTTP probeを通してsymlinkを切り替える。
+旧backend releaseはrollback用に保持する。
 
 **運用前提（2026-08-22承認）**: productionは信頼済みoperator 1名だけが利用する個人環境であり、
 高可用性SLAは設けない。この前提では、短時間のmaintenance停止、shadow logの手動集計、旧index / venv
@@ -325,6 +327,24 @@ ICUの両方に劣る。Harrier公式BF16は特定の複数入力batchで非有�
 この変更の完了範囲は段階1までであり、production既定値の段階2切替は含まない。LanceDB dependencyは
 検証済みAPIを保つため`>=0.34,<0.35`へ制約し、minor更新時もGate Aとindex障害testを再実行する。
 設計判断は[ADR-0020](../../基本設計/ADR/0020_page-level-lancedb-icu-shadow.md)を参照する。
+
+#### 2026-08-22 production stage 1 実行記録
+
+- deploy commitは`c31822f`。writerは各停止境界で`rebuild_jobs=0` / `ocr_runs=0`を確認し、snapshot
+  `2026-08-22_141238_pre-deploy`を作成後、SQLite 3種とLanceDB `chunks=3,489` / `summaries=18`を
+  別directoryへ復元検査した。
+- active releaseは`/opt/pic2pdf-viewer/backend-20260822141221-47136`、直前releaseは
+  `/opt/pic2pdf-viewer/backend-pre-release-20260822141202-2749904`。LanceDB 0.34.0、qwen-commonの
+  世代source、backend import、既存FTS5、service / root / novel books HTTP probeが合格した。
+- page table `pages_icu_r0_94f0bfab5239_1787375595960524766`は8,576行、ICU FTS index 1件、
+  source hash / active pointer / row数が一致した。既存`chunks` / `summaries`は変更していない。
+- corpusから決定的に導出した非0-hit 5 probeではICU追加時間がwarm時3.205〜14.047ms、例外0件。
+  FTS5件数は18〜20、ICU件数は0〜20、top 20集合の重複は0〜16で、実方式差が観測できた。
+  これはholdout品質評価ではなく運用smokeであり、段階2の採否には使わない。
+- selectorをinstrumentした5/5 probeで、`shadow`が同じ呼出し内のFTS5 list objectをそのまま返すことを
+  確認した。ICUを意図的に例外化した障害注入でも19件のFTS5結果を返し、service error logは0件だった。
+- 切替前後の別connection間ではFTS5 result digestが変化した。原因は`ORDER BY score`同点時に二次sortが
+  ない既存挙動であり、shadowによる順位変更ではない。厳密なcross-run top-k比較では既知課題として扱う。
 
 2026-08-22の実装後統合試験では、固定SQLiteのread-only原本から別scratchへ複製し、既存Alembic
 0013から0014へupgradeして8,576ページを構築した。固定20問のtop 30順位は旧隔離ICU評価と20/20で
