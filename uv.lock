@@ -1457,7 +1457,7 @@ dependencies = [
     { name = "pillow" },
     { name = "pyautogui" },
     { name = "python-dotenv" },
-    { name = "uiautomation" },
+    { name = "uiautomation", marker = "sys_platform == 'win32'" },
 ]
 
 [package.dev-dependencies]
@@ -1478,7 +1478,7 @@ requires-dist = [
     { name = "pillow", specifier = ">=12.3.0" },
     { name = "pyautogui" },
     { name = "python-dotenv" },
-    { name = "uiautomation", specifier = "==2.0.29" },
+    { name = "uiautomation", marker = "sys_platform == 'win32'", specifier = "==2.0.29" },
 ]
 
 [package.metadata.requires-dev]

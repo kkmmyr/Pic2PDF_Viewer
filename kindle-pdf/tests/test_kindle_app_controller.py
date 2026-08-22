@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from _ctypes import COMError
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -19,6 +18,7 @@ from kindle_app_controller import (
     select_verified_candidate,
     visual_frames_differ,
 )
+from kindle_platform import COMError
 
 
 def _identity(**overrides) -> BookIdentity:
@@ -158,7 +158,7 @@ def test_foreground_activation_attaches_threads_and_verifies_target(
 
     user32 = _User32()
     monkeypatch.setattr(
-        window_module.ctypes,
+        window_module,
         "windll",
         SimpleNamespace(
             user32=user32,
@@ -190,7 +190,7 @@ def test_foreground_activation_stops_when_windows_rejects_it(
         SetForegroundWindow=lambda _handle: 0,
     )
     monkeypatch.setattr(
-        window_module.ctypes,
+        window_module,
         "windll",
         SimpleNamespace(
             user32=user32,

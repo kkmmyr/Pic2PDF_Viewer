@@ -9,7 +9,7 @@ dependencies = [
     "opencv-python",
     "numpy",
     "python-dotenv",
-    "uiautomation==2.0.29",
+    "uiautomation==2.0.29; sys_platform == 'win32'",
 ]
 
 [dependency-groups]

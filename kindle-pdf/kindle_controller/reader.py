@@ -1,10 +1,9 @@
 import logging
 import time
-from _ctypes import COMError
 from collections.abc import Callable
 
-import pyautogui
 from PIL import Image
+from kindle_platform import COMError, pyautogui
 
 from .models import (
     KindleControllerError,

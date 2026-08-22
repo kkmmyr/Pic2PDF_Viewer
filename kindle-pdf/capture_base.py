@@ -2,19 +2,16 @@ import datetime
 import os
 import re
 import time
-import tkinter as tk
-from ctypes import WINFUNCTYPE, create_unicode_buffer, pointer, windll
+from ctypes import create_unicode_buffer, pointer
 from ctypes import wintypes
 from ctypes.wintypes import RECT
 from dataclasses import dataclass
-from tkinter import messagebox
 from typing import Optional
 
-import pyautogui as pag
 from PIL import Image
 
 from capture_loop import CaptureLoopMixin
-from capture_ui import BookInfoDialog
+from kindle_platform import WINFUNCTYPE, pyautogui as pag, windll
 
 try:
     from dotenv import load_dotenv as _load_dotenv
@@ -130,6 +127,10 @@ class KindleCapturer(CaptureLoopMixin):
 
     def get_book_title(self) -> str:
         """ウィンドウタイトルから書籍名を取得してサニタイズ"""
+        import tkinter as tk
+
+        from capture_ui import BookInfoDialog
+
         length = windll.user32.GetWindowTextLengthW(self.hwnd)
         buff = create_unicode_buffer(length + 1)
         windll.user32.GetWindowTextW(self.hwnd, buff, length + 1)
@@ -197,6 +198,8 @@ class KindleCapturer(CaptureLoopMixin):
                 print(f"PDF saved to: {pdf_path}")
                 return pdf_path
         except Exception as exc:
+            from tkinter import messagebox
+
             print(f"PDF creation failed: {exc}")
             messagebox.showerror("エラー", f"PDF作成中にエラーが発生しました: {exc}")
         return None

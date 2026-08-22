@@ -239,6 +239,7 @@ def test_location_start_rejects_missing_value_readback(
     )
     monkeypatch.setattr(controller_module.time, "sleep", lambda _seconds: None)
     monkeypatch.setattr(controller_module.pyautogui, "hotkey", lambda *_keys: None)
+    monkeypatch.setattr(controller_module.pyautogui, "press", lambda _key: None)
     monkeypatch.setattr(
         controller_module.pyautogui,
         "write",

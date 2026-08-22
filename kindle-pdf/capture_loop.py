@@ -2,11 +2,9 @@ import os
 import os.path as osp
 import time
 from collections.abc import Callable
-from ctypes import windll
 
 import cv2
 import numpy as np
-import pyautogui as pag
 from PIL import ImageGrab
 
 from capture_loop_io import capture_screen, prepare_image_dir, save_png
@@ -22,6 +20,7 @@ from capture_loop_policy import (
     expected_count_reached,
     page_change_recovery_actions,
 )
+from kindle_platform import pyautogui as pag, windll
 
 _COMPATIBILITY_EXPORTS = (cv2, ImageGrab, CaptureReport, CaptureResult)
 

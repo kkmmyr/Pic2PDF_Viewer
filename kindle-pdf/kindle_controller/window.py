@@ -1,11 +1,10 @@
-import ctypes
+from __future__ import annotations
+
 import logging
 import subprocess
 import time
-from _ctypes import COMError
 
-import pyautogui
-import uiautomation as auto
+from kindle_platform import COMError, auto, pyautogui, windll
 
 from .models import ControllerConfig, KindleControllerError
 
@@ -70,7 +69,7 @@ class WindowController:
                 "kindle_ui_unavailable",
                 "Kindleウィンドウの識別情報を取得できませんでした",
             ) from exc
-        user32 = ctypes.windll.user32
+        user32 = windll.user32
         if window_handle <= 0 or not user32.IsWindow(window_handle):
             raise KindleControllerError(
                 "kindle_ui_unavailable",
@@ -82,8 +81,8 @@ class WindowController:
 
     def _bring_to_foreground(self, window_handle: int) -> None:
         """前面threadへ一時接続し、Kindleが実際に前面になったことを確認する。"""
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
+        user32 = windll.user32
+        kernel32 = windll.kernel32
         foreground_handle = int(user32.GetForegroundWindow() or 0)
         current_thread = int(kernel32.GetCurrentThreadId())
         related_threads = {

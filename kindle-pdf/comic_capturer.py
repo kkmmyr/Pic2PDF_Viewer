@@ -1,15 +1,15 @@
 import time
 from collections.abc import Callable
-from ctypes import POINTER, Structure, c_void_p, pointer, sizeof, windll
+from ctypes import POINTER, Structure, c_void_p, pointer, sizeof
 from ctypes import wintypes
 from ctypes.wintypes import RECT
 from dataclasses import dataclass
 
 import numpy as np
-import pyautogui as pag
 from PIL import ImageGrab
 
 from capture_base import Config, KindleCapturer
+from kindle_platform import pyautogui as pag, windll
 
 
 @dataclass

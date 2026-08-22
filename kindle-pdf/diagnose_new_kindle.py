@@ -6,11 +6,13 @@
 """
 
 import sys
-from ctypes import WINFUNCTYPE, byref, create_unicode_buffer, windll
+from ctypes import byref, create_unicode_buffer
 from ctypes.wintypes import BOOL, DWORD, HWND, LPARAM, RECT
 
 import numpy as np
 from PIL import ImageGrab
+
+from kindle_platform import WINFUNCTYPE, windll
 
 
 # ----- 定数 -----

@@ -95,9 +95,19 @@ Node.js 26では、Node組込みのexperimental Web StorageとVitestのjsdomが�
 # バックエンド
 cd backend && uv run pytest -q
 
+# KindleのOS非依存ロジックとWindows境界のモック契約
+cd ../kindle-pdf && uv run pytest -q
+
 # フロントエンド
 cd frontend && npm run test
 ```
+
+Kindle testはmacOSでも収集・実行する。Windows API、UI Automation、
+PyAutoGUIの実呼び出しは共通プラットフォーム境界で遅延し、testでは
+決定的な代替実装へ差し替える。これはWindows実機受入の代替ではない。
+Macで実機APIを直接呼ぶとプラットフォーム非対応エラーで安全に停止し、
+Kindle接続・ウィンドウ前面化・全ページ撮影は引き続きWindowsの
+ロック解除済み端末で確認する。
 
 ### アプリ起動（任意）
 

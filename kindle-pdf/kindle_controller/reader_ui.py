@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import time
-from _ctypes import COMError
 from typing import Protocol
 
-import pyautogui
+from kindle_platform import COMError, pyautogui
 
 from .models import ControllerConfig, KindleControllerError
 from .reader_policy import PageLayoutPolicy

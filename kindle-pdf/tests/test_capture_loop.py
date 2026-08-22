@@ -1,4 +1,5 @@
 from ctypes.wintypes import RECT
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -175,7 +176,7 @@ def test_capture_loop_stops_at_expected_count(tmp_path, monkeypatch):
     total, _save_dir = result
 
     assert total == 2
-    assert [path.rsplit("\\", 1)[-1] for _image_value, path in saved] == [
+    assert [Path(path).name for _image_value, path in saved] == [
         "001.png",
         "002.png",
     ]
@@ -317,7 +318,7 @@ def test_capture_loop_rejects_two_screen_cycle_before_fourth_save(
     with pytest.raises(RuntimeError, match="two-screen cycle"):
         capturer.capture_loop("book")
 
-    assert [path.rsplit("\\", 1)[-1] for path in saved] == [
+    assert [Path(path).name for path in saved] == [
         "001.png",
         "002.png",
         "003.png",
@@ -360,7 +361,7 @@ def test_capture_loop_treats_late_two_screen_cycle_as_end_and_discards_duplicate
     assert result.captured_screens == 12
     assert result.report.last_saved_file == "012.png"
     assert result.report.termination_reason == "visual_no_change_after_retries"
-    assert [path.rsplit("\\", 1)[-1] for path in discarded] == ["013.png"]
+    assert [Path(path).name for path in discarded] == ["013.png"]
     assert len(saved) == 13
 
 

@@ -2,9 +2,6 @@
 
 import time
 
-import pyautogui
-import uiautomation as auto
-
 from kindle_controller.library import LibraryControllerMixin
 from kindle_controller.models import (
     BookCandidate,
@@ -19,6 +16,7 @@ from kindle_controller.models import (
     visual_frames_differ,
 )
 from kindle_controller.reader import ReaderControllerMixin
+from kindle_platform import auto, pyautogui
 
 _COMPATIBILITY_EXPORTS = (
     time,
