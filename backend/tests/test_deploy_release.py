@@ -76,6 +76,15 @@ def test_release_archive_drops_host_metadata(tmp_path: Path) -> None:
     assert all("xattr" not in key.lower() for member in members for key in member.pax_headers)
 
 
+def test_release_smoke_checks_stable_lance_path_and_active_icu() -> None:
+    script = ACTIVATION_SCRIPT.read_text(encoding="utf-8")
+
+    assert "LanceDB path is scoped to a backend release" in script
+    assert 'config.NOVEL_DB_LEXICAL_BACKEND in {"shadow", "lance_icu"}' in script
+    assert "search_page_fts(" in script
+    assert "page ICU no-match smoke unexpectedly returned a row" in script
+
+
 def test_activation_rejects_appledouble_before_systemd_or_writes(tmp_path: Path) -> None:
     app_root = tmp_path / "app"
     previous_backend = app_root / "backend-previous"

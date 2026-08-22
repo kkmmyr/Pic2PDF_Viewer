@@ -193,7 +193,10 @@ freeze_app() {
 
 smoke_next_release() {
   cd "$NEXT_BACKEND"
-  PIC2PDF_EXPECTED_COMMON="$NEXT_COMMON" "${NEXT_ENV}/bin/python" - <<'PY'
+  PIC2PDF_EXPECTED_APP_ROOT="$APP_ROOT" \
+    PIC2PDF_EXPECTED_BACKEND="$NEXT_BACKEND" \
+    PIC2PDF_EXPECTED_COMMON="$NEXT_COMMON" \
+    "${NEXT_ENV}/bin/python" - <<'PY'
 import os
 import sqlite3
 from importlib.metadata import version
@@ -203,7 +206,8 @@ import config
 import lancedb
 import local_llm
 import main
-from services.novel_db.page_fts import PAGE_FTS_INDEX_CONFIG
+from services.novel_db.page_fts import PAGE_FTS_INDEX_CONFIG, search_page_fts
+from services.novel_db.search_scope import Scope
 
 lance_version = version("lancedb")
 parts = tuple(int(part) for part in lance_version.split(".")[:2])
@@ -214,6 +218,22 @@ expected_common = Path(os.environ["PIC2PDF_EXPECTED_COMMON"]).resolve()
 common_file = Path(local_llm.__file__).resolve()
 if not common_file.is_relative_to(expected_common):
     raise SystemExit(f"qwen-common is not loaded from the staged generation: {common_file}")
+app_root = Path(os.environ["PIC2PDF_EXPECTED_APP_ROOT"]).resolve()
+expected_backend = Path(os.environ["PIC2PDF_EXPECTED_BACKEND"]).resolve()
+lance_path = Path(config.NOVEL_DB_LANCE_PATH).resolve()
+try:
+    lance_relative = lance_path.relative_to(app_root)
+except ValueError:
+    lance_relative = None
+if lance_path.is_relative_to(expected_backend) or (
+    lance_relative is not None
+    and lance_relative.parts
+    and (
+        lance_relative.parts[0] == "backend"
+        or lance_relative.parts[0].startswith("backend-")
+    )
+):
+    raise SystemExit(f"LanceDB path is scoped to a backend release: {lance_path}")
 if PAGE_FTS_INDEX_CONFIG.get("base_tokenizer") != "icu":
     raise SystemExit("page FTS ICU configuration could not be imported")
 if main.app is None:
@@ -231,13 +251,28 @@ try:
         "SELECT rowid FROM pages_fts WHERE pages_fts MATCH ? LIMIT 1",
         ('"pic2pdf_deploy_smoke_no_match"',),
     ).fetchall()
+    page_icu_status = "not-required"
+    if config.NOVEL_DB_LEXICAL_BACKEND in {"shadow", "lance_icu"}:
+        if not lance_path.is_dir():
+            raise SystemExit(f"configured LanceDB directory is missing: {lance_path}")
+        connection.execute("PRAGMA query_only = ON")
+        probe = search_page_fts(
+            connection,
+            "zzpic2pdfdeploysmokeqzjx",
+            Scope("all"),
+            top=1,
+        )
+        if probe:
+            raise SystemExit("page ICU no-match smoke unexpectedly returned a row")
+        page_icu_status = "verified"
 finally:
     connection.close()
 
 print(
     "Release smoke passed: "
     f"lancedb={getattr(lancedb, '__version__', lance_version)}, "
-    f"qwen_common={common_file}, lexical=fts5"
+    f"qwen_common={common_file}, lexical={config.NOVEL_DB_LEXICAL_BACKEND}, "
+    f"page_icu={page_icu_status}, lance_path={lance_path}"
 )
 PY
 }

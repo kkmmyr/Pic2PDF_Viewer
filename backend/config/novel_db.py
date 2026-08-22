@@ -5,12 +5,20 @@ Novel DB（小説 RAG 機能）の設定値。
 直接インポートも可能: `from config.novel_db import NOVEL_DB_LLM_MODEL`
 """
 
+import os
 from pathlib import Path
 from typing import Literal
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-_DEFAULT_LANCE_PATH = str(Path(__file__).parent.parent / "data" / "novel.lancedb")
+_DEFAULT_NOVEL_DB_DIR = Path(__file__).parent.parent / "data" / "novel_db"
+
+
+def _default_lance_path() -> str:
+    """Keep LanceDB beside the configured SQLite directory, not inside a release."""
+    novel_db_dir = Path(os.environ.get("NOVEL_DB_DIR", _DEFAULT_NOVEL_DB_DIR))
+    return str(novel_db_dir.parent / "novel.lancedb")
 
 
 class _NovelDbSettings(BaseSettings):
@@ -25,7 +33,7 @@ class _NovelDbSettings(BaseSettings):
     # ---------------------------------------------------------------------------
     # LanceDB ベクトルストアパス
     # ---------------------------------------------------------------------------
-    NOVEL_DB_LANCE_PATH: str = _DEFAULT_LANCE_PATH
+    NOVEL_DB_LANCE_PATH: str = Field(default_factory=_default_lance_path)
     # page-level lexical検索。初期既定はFTS5を維持し、shadow後にICUを明示選択する。
     NOVEL_DB_LEXICAL_BACKEND: Literal["fts5", "shadow", "lance_icu"] = "fts5"
 

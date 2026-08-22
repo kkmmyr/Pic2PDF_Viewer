@@ -10,10 +10,14 @@ config モジュールのユニットテスト。
 
 import os
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from config import VALID_SOURCES, get_dirs_by_source
+from config.novel_db import _NovelDbSettings
 
 
 class TestGetDirsBySource:
@@ -51,3 +55,31 @@ class TestGetDirsBySource:
 class TestValidSources:
     def test_contains_three_sources(self):
         assert set(VALID_SOURCES) == {"doujin", "comic", "novel"}
+
+
+class TestNovelDbSettings:
+    def test_lance_path_defaults_to_novel_db_sibling(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        novel_db_dir = tmp_path / "stable-data" / "novel_db"
+        monkeypatch.setenv("NOVEL_DB_DIR", str(novel_db_dir))
+        monkeypatch.delenv("NOVEL_DB_LANCE_PATH", raising=False)
+
+        settings = _NovelDbSettings()
+
+        assert settings.NOVEL_DB_LANCE_PATH == str(novel_db_dir.parent / "novel.lancedb")
+
+    def test_explicit_lance_path_overrides_derived_default(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        explicit = tmp_path / "explicit" / "index.lancedb"
+        monkeypatch.setenv("NOVEL_DB_DIR", str(tmp_path / "novel_db"))
+        monkeypatch.setenv("NOVEL_DB_LANCE_PATH", str(explicit))
+
+        settings = _NovelDbSettings()
+
+        assert settings.NOVEL_DB_LANCE_PATH == str(explicit)

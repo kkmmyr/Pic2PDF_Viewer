@@ -60,12 +60,18 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 
 ### 1.2 運用手順とrollback
 
-**適用状態（2026-08-22 14:15 JST）**: productionへstage 1 `shadow`を適用済みである。active backendは
+**適用状態（2026-08-22 16:22 JST）**: productionへstage 1 `shadow`を適用済みである。active backendは
 `backend-20260822141221-47136`、LanceDBは`0.34.0`、Alembicは`0014`。page ICUは8,576行を完全構築し、
 source / active revision `0`、canonical SHA-256
 `94f0bfab52393f2c8bc7b0bb53ce8d7e338d0096764c71bac2f33e2dee153cd0`、SQLite integrity `ok`、
 未索引0件を確認した。production設定は`NOVEL_DB_LEXICAL_BACKEND=shadow`であり、利用者へ返す結果は
 従来FTS5のまま。`lance_icu`への昇格は未承認である。
+
+holdout合格後の新世代`backend-20260822161815-61291`はsource / venv / HTTP probeに合格したが、
+省略時のLanceDB pathがversion付きbackend配下へ解決し、SQLite active pointerに対応するtableを
+継承しなかった。shadowはFTS5へ安全に縮退したものの、制御smoke 5件が5 / 5 fallbackとなったため
+旧世代へrollbackした。以後は`NOVEL_DB_DIR`の兄弟にLanceDBを固定し、切替前smokeで世代外pathと
+active ICU no-match検索を検証する。
 
 事前監査で検出したLanceDB `0.30.2`とdependency未同期の旧deploy経路は、source・common・venvを
 一体化した世代releaseへ置換した。active環境を直接更新せず、検証済みbackup、locked dependency、
@@ -87,7 +93,7 @@ revision `0014`は外部索引の状態表を追加するだけのbackward-compa
 
 | 順序 | 操作 | 成功条件 / 失敗時の扱い |
 |---|---|---|
-| 0 | ルート`uv.lock`とworkspace memberを別backend世代へ配置し、その世代専用venvへdependencyを同期する。LanceDB `>=0.34,<0.35`、backend import、FTS5 smokeを確認する | active source / venvを直接更新しない。いずれか不合格なら世代切替・migration・index構築を行わず、従来backend世代を継続する |
+| 0 | ルート`uv.lock`とworkspace memberを別backend世代へ配置し、その世代専用venvへdependencyを同期する。LanceDB `>=0.34,<0.35`、backend import、FTS5 smoke、version付きbackend世代外のLance pathを確認する。`shadow` / `lance_icu`ではactive ICU tableのno-match検索も通す | active source / venvを直接更新しない。いずれか不合格なら世代切替・migration・index構築を行わず、従来backend世代を継続する |
 | 1 | OCR / rebuild等のwriterと定期backupが重ならないmaintenance windowを確保し、SQLite / LanceDBの復元可能なbackupを作る | LanceDB backupはdirectory copyのため、書込みを停止して取得・復元検査する。configured pathが意図した本番実体を指す |
 | 2 | backendを配置し、`cd backend && uv run python scripts/build_page_fts_index.py`を実行する | CLIがAlembicをheadへ上げ、stdoutの単一JSONが`ok=true`。`row_count`、`source_sha256`、table名、LanceDB version、index設定を保存する |
 | 3 | `novel_search_index_state`の`status=active`、source / active revision一致、manifest row数を確認する | 不一致・build失敗・同時更新ではshadowへ進まず、FTS5を継続して原因解消後に完全再構築する |
