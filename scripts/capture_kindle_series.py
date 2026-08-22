@@ -1,7 +1,8 @@
 """Capture a Kindle series sequentially through the Pic2PDFViewer API.
 
 This module remains the command and import compatibility facade.  The implementation
-is split into inventory, session safety, orchestration, HTTP, and CLI modules.
+is split into inventory, session safety, screen-count quality, orchestration, HTTP,
+and CLI modules.
 """
 
 # ruff: noqa: E402
@@ -45,6 +46,7 @@ from kindle_series_orchestrator import (
     execute_series,
 )
 from kindle_series_session import SessionSafetyGuard
+from kindle_series_screen_count import SeriesScreenCountPolicy
 
 _COMPATIBILITY_EXPORTS = (
     time,
@@ -68,6 +70,7 @@ __all__ = [
     "SOURCE_ORDER",
     "SeriesBook",
     "SeriesCaptureError",
+    "SeriesScreenCountPolicy",
     "SessionSafetyGuard",
     "TERMINAL_STATUSES",
     "UNFINISHED_STATUSES",

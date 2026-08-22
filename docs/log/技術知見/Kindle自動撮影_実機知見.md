@@ -643,6 +643,22 @@ Windows 側の転送失敗、Linux 側の検証失敗、正式配置失敗では
   `/opt/pic2pdf-viewer/data/.capture-quality-holdout/b32-20260822-v2/`へ保存し、
   digestと全contact sheetを再照合済みである。
 
+### 8.11 シリーズ内画面数外れ値の初期policy（2026-08-22）
+
+- 単冊の最低画面数（novel 50 / comic 10）は明らかな早期終了を拒否できるが、
+  最低値を超えた部分的な撮影終了は検出できない。一方、巻ごとの長さには正常差があるため、
+  未校正の絶対画面数をblockingにすると誤拒否リスクが高い。
+- 初期policyは同じseriesの中でも`comic` / `novel`を分け、登録済みの最新成功jobと
+  実行中sessionの完了冊から正の画面数を収集する。3冊以上でのみ中央値を使い、
+  0.5倍未満または2倍超を`series_screen_count_outlier_candidate`とする。中央値は
+  少数の過去外れ値に引きずられにくく、幅広い比率は短編・特典巻の正常差を誤検知しにくい。
+- 候補は登録済み撮影を取り消さず、後続jobも止めない。policy version、ASIN、撮影数、
+  reference冊数・範囲・中央値、比率をatomic session stateへ残し、実機の長さ分布と見逃しを
+  蓄積してから閾値やblocking化を再判断する。
+- 画面数証跡追加後のsession stateはschema v2とし、完了ASINと画面数の完全対応、warningの
+  source・撮影数の一致をresume前に検証する。証跡を持たなschema v1は自動補完せず、
+  稼働状態の目視確認後に新規sessionとして開始する。
+
 ## 9. Kindle 更新時の再検証
 
 Kindle 更新後は、いきなり正式撮影せず `diagnose_new_kindle.py` と短い書籍で次を確認する。

@@ -174,6 +174,7 @@ UI実装前に保存先、既読状態、再監査時のpolicy version更新規�
 
 - `kindle_series_inventory.py`: catalog itemの絞り込み、source・巻数決定、並び順。
 - `kindle_series_session.py`: manifest digest、session state、atomic永続化、breaker。
+- `kindle_series_screen_count.py`: 成功実績の選別、source別中央値、warning contract。
 - `kindle_series_orchestrator.py`: 1冊ずつのjob作成・監視・限定復旧・登録確認。
 - `kindle_series_http.py`: 購入カタログAPI transport。
 - `kindle_series_cli.py`: 引数検証、依存組み立て、exit code変換。
@@ -181,9 +182,20 @@ UI実装前に保存先、既読状態、再監査時のpolicy version更新規�
 orchestratorはHTTP実装へ依存せず`CaptureApi` protocolだけを参照する。session breakerは
 job作成前に検査し、inventory・CLI・HTTP adapterからKindle UIを直接操作しない。
 
-既定はdry-runで、実行には `--apply` とsession stateを要求する。stateは対象manifest digest、
-完了ASIN、復旧回数、停止理由をatomic置換JSONへ保存し、既存stateは `--resume-session` を
-明示した場合だけ、同じmanifestかつrunning状態で再開する。
+既定はdry-runで、実行には `--apply` とsession stateを要求する。state schema v2は対象manifest digest、
+完了ASIN、ASIN別撮影画面数、品質warning、復旧回数、停止理由をatomic置換JSONへ保存し、既存stateは `--resume-session` を
+明示した場合だけ、同じmanifestかつrunning状態で再開する。resume時は完了ASINと
+画面数の1対1対応、warningのASIN・source・撮影数と観測値の一致を再検査する。必須fieldがない
+schema v1や不整合stateは暗黙移行せずresumeを拒否し、実行状況を確認してから新規stateを作る。
+
+画面数外れ値policy `kindle-series-screen-count-v1` は、対象inventory内で最新の
+`succeeded` jobが確認できる登録済みASINと、実行中sessionの完了ASINをreferenceとする。
+`comic` / `novel` は混ぜず、同sourceの正の画面数が3冊以上ある場合に限り、新しい
+画面数が中央値の0.5倍未満または2倍超なら
+`series_screen_count_outlier_candidate` warningを生成する。warningにはpolicy version、
+ASIN、source、撮影数、reference冊数・最小・中央値・最大、比率を固定する。長編・短編や
+特典巻の正常差を考慮し、初期policyは登録取消、session breaker、後続job停止に使わない。
+撮影成功応答の画面数が正の整数でない場合はwarningとして集計せず、API不整合としてfail closedする。
 
 Kindle processの自動復旧は `--recover-kindle-crash` 指定時だけ許可する。撮影開始前・撮影枚数0・
 process消失・許可error codeを同時に満たし、再起動後に同一ASINを一意照合でき、他の未完了jobが

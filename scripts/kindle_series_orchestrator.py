@@ -12,6 +12,7 @@ from kindle_series_models import (
     SeriesCaptureError,
 )
 from kindle_series_session import SessionSafetyGuard
+from kindle_series_screen_count import SeriesScreenCountPolicy
 
 
 def _unfinished_jobs(
@@ -22,8 +23,7 @@ def _unfinished_jobs(
     return [
         job
         for job in jobs
-        if job.get("status") in UNFINISHED_STATUSES
-        and job.get("id") != except_job_id
+        if job.get("status") in UNFINISHED_STATUSES and job.get("id") != except_job_id
     ]
 
 
@@ -102,20 +102,66 @@ class SeriesCaptureOrchestrator:
         if not apply:
             print("Dry-run only. Pass --apply to create capture jobs.", flush=True)
             return 0
-        if _unfinished_jobs(self.api.list_jobs()):
+        initial_jobs = self.api.list_jobs()
+        if _unfinished_jobs(initial_jobs):
             self.guard.trip("unfinished_job_before_session")
+        screen_count_policy = SeriesScreenCountPolicy.from_history(
+            books,
+            initial_jobs,
+            self.guard.captured_screens_by_asin,
+        )
 
         for index, book in enumerate(remaining, start=1):
             result = self._capture_book(book, index=index, total=len(remaining))
             self._confirm_registration(book)
-            self.guard.record_success(book)
+            captured_screens = self._record_success(
+                book,
+                result,
+                screen_count_policy,
+            )
             print(
-                f"  registered screens={result.get('captured_screens') or 0}",
+                f"  registered screens={captured_screens}",
                 flush=True,
             )
-        print(f"Series capture completed: {len(remaining)} book(s)", flush=True)
         self.guard.complete()
+        print(
+            f"Series capture completed: {len(remaining)} book(s), "
+            f"quality_warnings={len(self.guard.quality_warnings)}",
+            flush=True,
+        )
         return 0
+
+    def _record_success(
+        self,
+        book: SeriesBook,
+        result: dict,
+        policy: SeriesScreenCountPolicy,
+    ) -> int:
+        captured_screens = result.get("captured_screens")
+        if (
+            isinstance(captured_screens, bool)
+            or not isinstance(captured_screens, int)
+            or captured_screens <= 0
+        ):
+            self.guard.trip(f"invalid_screen_count:{book.asin}")
+        assert isinstance(captured_screens, int)
+        warning = policy.observe(book, captured_screens)
+        self.guard.record_success(
+            book,
+            captured_screens=captured_screens,
+            warning=warning,
+        )
+        if warning is not None:
+            print(
+                "  WARNING series_screen_count_outlier_candidate "
+                f"asin={book.asin} screens={captured_screens} "
+                f"median={warning['reference_median']:.1f} "
+                f"references={warning['reference_count']} "
+                f"ratio={warning['ratio_to_median']:.6f}; "
+                "registration kept and the series continues",
+                flush=True,
+            )
+        return captured_screens
 
     @staticmethod
     def _validate_inventory(books: list[SeriesBook]) -> None:
@@ -126,9 +172,7 @@ class SeriesCaptureOrchestrator:
         ]
         if not invalid:
             return
-        detail = ", ".join(
-            f"{book.asin}:{book.capture_state}" for book in invalid
-        )
+        detail = ", ".join(f"{book.asin}:{book.capture_state}" for book in invalid)
         raise SeriesCaptureError(f"Inventory contains unsafe capture states: {detail}")
 
     @staticmethod
@@ -144,8 +188,7 @@ class SeriesCaptureOrchestrator:
         )
         for book in remaining:
             print(
-                f"- {book.source} vol={book.volume_number:g} "
-                f"{book.asin} {book.title}",
+                f"- {book.source} vol={book.volume_number:g} {book.asin} {book.title}",
                 flush=True,
             )
 
@@ -229,9 +272,7 @@ class SeriesCaptureOrchestrator:
         try:
             return self.failure_recovery.recover(self.api, book, result)
         except Exception as exc:
-            self.guard.trip(
-                f"kindle_recovery_failed:{book.asin}:{type(exc).__name__}"
-            )
+            self.guard.trip(f"kindle_recovery_failed:{book.asin}:{type(exc).__name__}")
             raise
 
     def _confirm_registration(self, book: SeriesBook) -> None:
