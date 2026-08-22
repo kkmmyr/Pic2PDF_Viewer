@@ -231,15 +231,20 @@ def _validate_geometry(capture: dict, dimensions: tuple[int, int]) -> list[int]:
     return crop
 
 
+def _get_warning_policy(quality: dict) -> str:
+    warning_policy = quality.get("warning_policy_version")
+    if not isinstance(warning_policy, str):
+        raise ValueError("登録前画像QAの証跡が不正です")
+    return warning_policy
+
+
 def _validate_quality(
     quality: dict,
     count: int,
     dimensions: tuple[int, int],
     declared_names: set[str],
 ) -> None:
-    warning_policy = quality.get("warning_policy_version")
-    if not isinstance(warning_policy, str):
-        raise ValueError("登録前画像QAの証跡が不正です")
+    warning_policy = _get_warning_policy(quality)
     allowed_warning_codes = _WARNING_CODES_BY_POLICY.get(warning_policy)
     if (
         quality.get("schema_version") != 1
