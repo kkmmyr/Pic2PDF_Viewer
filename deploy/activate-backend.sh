@@ -124,6 +124,17 @@ assert_unit_inactive() {
   esac
 }
 
+assert_no_appledouble_files() {
+  contaminated_path=$(find \
+    "$NEXT_BACKEND" \
+    "$NEXT_COMMON" \
+    "$WORKSPACE_ROOT" \
+    -type f -name '._*' -print -quit)
+  if [ -n "$contaminated_path" ]; then
+    fail "AppleDouble metadata is not allowed in staged release: ${contaminated_path}"
+  fi
+}
+
 assert_no_novel_writers() {
   (
     cd "$ACTIVE_BACKEND"
@@ -406,6 +417,7 @@ fi
 if [ -e "$NEXT_ENV" ] || [ -L "$NEXT_ENV" ]; then
   fail "new environment path already exists: ${NEXT_ENV}"
 fi
+assert_no_appledouble_files
 if ! systemctl is-active --quiet "$SERVICE_NAME"; then
   fail "${SERVICE_NAME} must be active before deployment"
 fi

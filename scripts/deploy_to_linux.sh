@@ -15,7 +15,10 @@ LINUX_HOST=medaroserver
 LINUX="${LINUX_USER}@${LINUX_HOST}"
 APP_ROOT=/opt/pic2pdf-viewer
 # リポジトリルートをスクリプト位置から自動解決（Mac / Windows Git Bash 両対応）
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=release_archive.sh
+source "${SCRIPT_DIR}/release_archive.sh"
 DEPLOY_GENERATION="$(date +%Y%m%d%H%M%S)-$$"
 NEXT_BACKEND="${APP_ROOT}/backend-${DEPLOY_GENERATION}"
 NEXT_COMMON="${APP_ROOT}/common/llm-${DEPLOY_GENERATION}"
@@ -39,20 +42,21 @@ ssh "${LINUX}" "set -e; \
     '${STAGED_WORKSPACE}/kindle-pdf'"
 
 # uv workspace root（本番dependencyの正本）
-tar czf - -C "${SRC}" pyproject.toml uv.lock \
+create_release_archive -czf - -C "${SRC}" pyproject.toml uv.lock \
     | ssh "${LINUX}" "mkdir -p '${APP_ROOT}' && tar xzf - -C '${APP_ROOT}'"
-tar czf - -C "${SRC}" pyproject.toml uv.lock \
+create_release_archive -czf - -C "${SRC}" pyproject.toml uv.lock \
     | ssh "${LINUX}" "tar xzf - -C '${STAGED_WORKSPACE}'"
-tar czf - -C "${SRC}/kindle-pdf" pyproject.toml \
+create_release_archive -czf - -C "${SRC}/kindle-pdf" pyproject.toml \
     | ssh "${LINUX}" "tar xzf - -C '${STAGED_WORKSPACE}/kindle-pdf'"
 
-# backend (Python ソース・設定。.venv / data / __pycache__ は除外)
+# backend (Python ソース・設定。.venv / data / test・lint cacheは除外)
 # -prune でディレクトリごとスキップ（Git Bash では -not -path が効かないため）
 (cd "${SRC}/backend" && find . \
     \( -name '.venv*' -o -name 'data' -o -name 'complete' -o -name '__pycache__' \
-       -o -name 'htmlcov' -o -name '.pytest_cache' -o -name 'logs' -o -name 'input' \) -prune \
+       -o -name 'htmlcov' -o -name '.pytest_cache' -o -name '.ruff_cache' \
+       -o -name '.mypy_cache' -o -name '.basedpyright' -o -name 'logs' -o -name 'input' \) -prune \
     -o -type f -not -name '*.pyc' -print \
-    | tar czf - -C "${SRC}/backend" --files-from=-) \
+    | create_release_archive -czf - -C "${SRC}/backend" --files-from=-) \
     | ssh "${LINUX}" "tar xzf - -C '${NEXT_BACKEND}'"
 
 # qwen-common workspace member（backendからeditable dependencyとして参照）
@@ -60,18 +64,18 @@ tar czf - -C "${SRC}/kindle-pdf" pyproject.toml \
     \( -name '.venv*' -o -name '__pycache__' -o -name '.pytest_cache' \
        -o -name '*.egg-info' \) -prune \
     -o -type f -not -name '*.pyc' -print \
-    | tar czf - -C "${SRC}/common/llm" --files-from=-) \
+    | create_release_archive -czf - -C "${SRC}/common/llm" --files-from=-) \
     | ssh "${LINUX}" "tar xzf - -C '${NEXT_COMMON}'"
 
 ssh "${LINUX}" "ln -s '${NEXT_BACKEND}' '${STAGED_WORKSPACE}/backend' && \
   ln -s '${NEXT_COMMON}' '${STAGED_WORKSPACE}/common/llm'"
 
 # frontend/dist (ビルド成果物のみ)
-tar czf - -C "${SRC}/frontend" dist \
+create_release_archive -czf - -C "${SRC}/frontend" dist \
     | ssh "${LINUX}" "tar xzf - -C '${APP_ROOT}/frontend'"
 
 # deploy/ (systemd / nginx 設定)
-tar czf - -C "${SRC}" deploy \
+create_release_archive -czf - -C "${SRC}" deploy \
     | ssh "${LINUX}" "tar xzf - -C '${APP_ROOT}'"
 
 # ---- 3. 検証付きbackup・世代venv構築・atomic切替 ----
