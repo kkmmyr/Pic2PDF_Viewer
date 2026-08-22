@@ -68,9 +68,10 @@ export function KindleBookDetailDialog({ book, onClose }: KindleBookDetailDialog
         setConfirmOpen(false);
     }, [book]);
 
-    const activeJob = book
-        ? capture.jobs.find((job) => job.asin === book.asin && ACTIVE_JOB_STATUSES.has(job.status))
-        : undefined;
+    const activeJob = capture.jobs.find((job) => ACTIVE_JOB_STATUSES.has(job.status));
+    const sameBookActiveJob = book && activeJob?.asin === book.asin ? activeJob : undefined;
+    const otherBookActiveJob =
+        book && activeJob && activeJob.asin !== book.asin ? activeJob : undefined;
     const alreadyCaptured = book?.capture_state === 'captured';
     const startDisabled = capture.creatingCaptureJob || activeJob !== undefined || alreadyCaptured;
 
@@ -186,10 +187,10 @@ export function KindleBookDetailDialog({ book, onClose }: KindleBookDetailDialog
                                 </div>
                             </section>
 
-                            {activeJob && (
+                            {sameBookActiveJob && (
                                 <Alert variant="warning">
                                     <div className="font-medium">
-                                        この書籍は{jobStatusLabel(activeJob.status)}です
+                                        この書籍は{jobStatusLabel(sameBookActiveJob.status)}です
                                     </div>
                                     <p className="mt-1">
                                         同じASINの処理中ジョブがあるため、新しいジョブは作成できません。
@@ -198,14 +199,36 @@ export function KindleBookDetailDialog({ book, onClose }: KindleBookDetailDialog
                                         variant="secondary"
                                         size="sm"
                                         className="mt-3"
-                                        onClick={() => openCapturePage(activeJob.id)}
+                                        onClick={() => openCapturePage(sameBookActiveJob.id)}
                                     >
                                         既存ジョブを確認
                                     </Button>
                                 </Alert>
                             )}
 
-                            {alreadyCaptured && !activeJob && (
+                            {otherBookActiveJob && (
+                                <Alert variant="warning">
+                                    <div className="font-medium">
+                                        別の書籍は{jobStatusLabel(otherBookActiveJob.status)}です
+                                    </div>
+                                    <p className="mt-1">
+                                        {otherBookActiveJob.title
+                                            ? `「${otherBookActiveJob.title}」`
+                                            : `ASIN ${otherBookActiveJob.asin}`}
+                                        の処理中ジョブがあるため、新しいジョブは作成できません。
+                                    </p>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        className="mt-3"
+                                        onClick={() => openCapturePage(otherBookActiveJob.id)}
+                                    >
+                                        処理中ジョブを確認
+                                    </Button>
+                                </Alert>
+                            )}
+
+                            {alreadyCaptured && !sameBookActiveJob && (
                                 <Alert variant="info">
                                     この書籍は取込済みです。上書き撮影は初期版の対象外です。
                                 </Alert>
@@ -231,7 +254,7 @@ export function KindleBookDetailDialog({ book, onClose }: KindleBookDetailDialog
                 title="Kindle撮影を開始しますか？"
                 message={confirmationMessage}
                 confirmLabel="ジョブを作成"
-                confirmDisabled={capture.creatingCaptureJob}
+                confirmDisabled={startDisabled}
                 onConfirm={() => void createJob()}
                 onCancel={() => setConfirmOpen(false)}
             />

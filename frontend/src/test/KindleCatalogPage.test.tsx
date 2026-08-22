@@ -266,6 +266,96 @@ describe('Kindle catalog pages', () => {
         );
     });
 
+    it('他ASINのactive jobを表示して撮影開始を無効化する', () => {
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [
+                {
+                    id: 'job-other',
+                    asin: 'B000OTHER1',
+                    source: 'novel',
+                    status: 'capturing',
+                    direction: 'left',
+                    expected_screens: null,
+                    requested_at: '2026-07-25T12:00:00+09:00',
+                    claimed_at: '2026-07-25T12:00:05+09:00',
+                    heartbeat_at: '2026-07-25T12:01:00+09:00',
+                    started_at: '2026-07-25T12:00:10+09:00',
+                    completed_at: null,
+                    agent_id: 'windows-test',
+                    book_id: null,
+                    captured_screens: 42,
+                    error_code: null,
+                    error_message: null,
+                    title: '別の処理中作品',
+                },
+            ],
+            isLoading: false,
+            error: null,
+            createCaptureJob,
+            creatingCaptureJob: false,
+        });
+        renderWithRouter(<KindleCatalogPage />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'テスト作品 1巻' }));
+
+        expect(screen.getByText('別の書籍は撮影中です')).toBeInTheDocument();
+        expect(screen.getByText(/別の処理中作品/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: '撮影して取り込む' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: '処理中ジョブを確認' })).toBeInTheDocument();
+    });
+
+    it('確認表示後に他ASINのactive jobが判明したら確定を無効化する', () => {
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [],
+            isLoading: false,
+            error: null,
+            createCaptureJob,
+            creatingCaptureJob: false,
+        });
+        const view = renderWithRouter(<KindleCatalogPage />);
+        fireEvent.click(screen.getByRole('button', { name: 'テスト作品 1巻' }));
+        fireEvent.click(screen.getByRole('button', { name: '撮影して取り込む' }));
+        expect(screen.getByRole('button', { name: 'ジョブを作成' })).toBeEnabled();
+
+        mockedUseKindleCaptureJobs.mockReturnValue({
+            jobs: [
+                {
+                    id: 'job-other',
+                    asin: 'B000OTHER1',
+                    source: 'comic',
+                    status: 'queued',
+                    direction: 'left',
+                    expected_screens: null,
+                    requested_at: '2026-07-25T12:00:00+09:00',
+                    claimed_at: null,
+                    heartbeat_at: null,
+                    started_at: null,
+                    completed_at: null,
+                    agent_id: null,
+                    book_id: null,
+                    captured_screens: null,
+                    error_code: null,
+                    error_message: null,
+                    title: '別の処理中作品',
+                },
+            ],
+            isLoading: false,
+            error: null,
+            createCaptureJob,
+            creatingCaptureJob: false,
+        });
+        view.rerender(
+            <MemoryRouter initialEntries={['/kindle/catalog']}>
+                <KindleCatalogPage />
+            </MemoryRouter>,
+        );
+
+        const confirmButton = screen.getByRole('button', { name: 'ジョブを作成' });
+        expect(confirmButton).toBeDisabled();
+        fireEvent.click(confirmButton);
+        expect(createCaptureJob).not.toHaveBeenCalled();
+    });
+
     it('検索語をデバウンスして一覧クエリへ反映する', async () => {
         vi.useFakeTimers();
         renderWithRouter(<KindleCatalogPage />);
