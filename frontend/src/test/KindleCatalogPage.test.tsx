@@ -473,9 +473,9 @@ describe('Kindle catalog pages', () => {
                     title: 'テスト作品 1巻',
                     source: 'comic',
                     book_id: 'テスト作品 1巻.pdf',
-                    warning_policy_version: 'kindle-image-warning-v1',
+                    warning_policy_version: 'kindle-image-warning-v2',
                     created_at: '2026-08-22T12:00:00+09:00',
-                    code: 'blank_or_sparse_candidate',
+                    code: 'transient_bottom_right_overlay_candidate',
                     finding_count: 2,
                     files: ['001.png', '003.png'],
                     pages: [1, 3],
@@ -494,7 +494,7 @@ describe('Kindle catalog pages', () => {
         });
         renderWithRouter(<KindleCapturePage />, '/kindle/capture');
 
-        expect(screen.getByText('白紙・低情報量候補')).toBeInTheDocument();
+        expect(screen.getByText('短時間の右下通知候補')).toBeInTheDocument();
         expect(screen.getByText(/正常なページも含まれます/)).toBeInTheDocument();
         fireEvent.change(screen.getByLabelText(/候補ページ/), { target: { value: '3' } });
         const pageLink = screen.getByRole('link', {

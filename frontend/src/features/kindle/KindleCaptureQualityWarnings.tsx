@@ -19,6 +19,10 @@ const WARNING_LABELS: Record<string, { label: string; description: string }> = {
         label: '画面UIの重なり候補',
         description: '同じ位置に繰り返し表示されたUIや帯が写り込んだ可能性があります。',
     },
+    transient_bottom_right_overlay_candidate: {
+        label: '短時間の右下通知候補',
+        description: '連続する数ページの右下に、OSやアプリの通知が写り込んだ可能性があります。',
+    },
     blank_or_sparse_candidate: {
         label: '白紙・低情報量候補',
         description: '白紙に近いページです。章扉や意図的な空白ページの場合もあります。',

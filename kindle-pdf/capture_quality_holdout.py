@@ -72,8 +72,8 @@ def _audit_case(
             error,
             (
                 "kindle-image-qa-v1",
-                "kindle-image-warning-v1",
-                "kindle-repeated-overlay-v1",
+                "kindle-image-warning-v2",
+                "kindle-repeated-overlay-v2",
             ),
         )
     result_manifest = result.to_manifest()

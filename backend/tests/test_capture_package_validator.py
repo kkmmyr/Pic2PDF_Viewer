@@ -11,20 +11,24 @@ from services.kindle_catalog.capture_package_validator import (
 )
 
 
-def _job() -> dict:
+def _job(captured_screens: int = 1) -> dict:
     return {
         "id": "11111111-1111-1111-1111-111111111111",
         "asin": "B000CAPTURE",
         "source": "novel",
-        "captured_screens": 1,
+        "captured_screens": captured_screens,
     }
 
 
-def _ready_package(tmp_path: Path) -> tuple[Path, dict]:
+def _ready_package(tmp_path: Path, page_count: int = 1) -> tuple[Path, dict]:
     ready = tmp_path / "job.ready"
-    image_path = ready / "images" / "001.png"
-    image_path.parent.mkdir(parents=True)
-    Image.new("RGB", (20, 30), color=(1, 2, 3)).save(image_path)
+    image_dir = ready / "images"
+    image_dir.mkdir(parents=True)
+    image_paths = []
+    for page_no in range(1, page_count + 1):
+        image_path = image_dir / f"{page_no:03}.png"
+        Image.new("RGB", (20, 30), color=(page_no, 2, 3)).save(image_path)
+        image_paths.append(image_path)
     manifest = {
         "manifest_version": 2,
         "job_id": _job()["id"],
@@ -34,19 +38,19 @@ def _ready_package(tmp_path: Path) -> tuple[Path, dict]:
             "policy_version": "kindle-completeness-v1",
             "termination_reason": "visual_no_change_after_retries",
             "end_of_book_proven": True,
-            "captured_screens": 1,
+            "captured_screens": page_count,
             "expected_screens": None,
             "direction": "left",
             "layout": "single",
             "crop_bounds": [0, 0, 20, 30],
             "image_size": [20, 30],
-            "last_saved_file": "001.png",
+            "last_saved_file": f"{page_count:03}.png",
             "unchanged_observation_windows": 2,
             "termination_unchanged_windows": 2,
             "observation_timeout_seconds": 5.0,
             "retry_limit": 1,
             "turn_commands": 2,
-            "successful_transitions": 0,
+            "successful_transitions": page_count - 1,
             "retry_commands": 1,
             "opposite_direction_commands": 0,
             "canary": {
@@ -65,7 +69,7 @@ def _ready_package(tmp_path: Path) -> tuple[Path, dict]:
             "policy_version": "kindle-image-qa-v1",
             "warning_policy_version": "kindle-image-warning-v1",
             "outcome": "passed",
-            "page_count": 1,
+            "page_count": page_count,
             "dimensions": [20, 30],
             "findings": [],
             "overlay_detector": {
@@ -78,12 +82,13 @@ def _ready_package(tmp_path: Path) -> tuple[Path, dict]:
         },
         "files": [
             {
-                "name": "001.png",
+                "name": image_path.name,
                 "sha256": hashlib.sha256(image_path.read_bytes()).hexdigest(),
                 "width": 20,
                 "height": 30,
                 "size": image_path.stat().st_size,
             }
+            for image_path in image_paths
         ],
     }
     (ready / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
@@ -92,6 +97,33 @@ def _ready_package(tmp_path: Path) -> tuple[Path, dict]:
 
 def _rewrite(ready: Path, manifest: dict) -> None:
     (ready / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+
+def _set_v2_transient_warning(manifest: dict) -> None:
+    quality = manifest["quality"]
+    quality["warning_policy_version"] = "kindle-image-warning-v2"
+    quality["overlay_detector"] = {
+        "policy_version": "kindle-repeated-overlay-v2",
+        "passed": True,
+        "sampled_page_count": 3,
+        "candidate_count": 0,
+        "blocking_candidate_count": 0,
+        "transient_scanned_page_count": 3,
+        "transient_candidate_count": 1,
+    }
+    quality["findings"] = [
+        {
+            "code": "transient_bottom_right_overlay_candidate",
+            "severity": "warning",
+            "files": ["001.png", "002.png", "003.png"],
+            "metrics": {
+                "normalized_bounds": [928, 1472, 1024, 1536],
+                "matched_tile_count": 2,
+                "consecutive_page_count": 3,
+                "max_tile_mad": 3.8,
+            },
+        }
+    ]
 
 
 def test_validator_accepts_independently_verified_v2_package(tmp_path) -> None:
@@ -164,6 +196,67 @@ def test_validator_rejects_blocking_overlay_candidate(tmp_path) -> None:
     ready, manifest = _ready_package(tmp_path)
     manifest["quality"]["overlay_detector"]["passed"] = False
     manifest["quality"]["overlay_detector"]["blocking_candidate_count"] = 1
+    _rewrite(ready, manifest)
+
+    with pytest.raises(ValueError, match="overlay"):
+        validate_ready_dir(_job(), ready)
+
+
+def test_validator_accepts_v2_transient_overlay_warning(tmp_path) -> None:
+    ready, manifest = _ready_package(tmp_path, page_count=3)
+    _set_v2_transient_warning(manifest)
+    _rewrite(ready, manifest)
+
+    validated, files = validate_ready_dir(_job(3), ready)
+
+    assert len(files) == 3
+    assert build_quality_audit(validated)["warning_policy_version"] == "kindle-image-warning-v2"
+
+
+def test_validator_rejects_v2_transient_count_mismatch(tmp_path) -> None:
+    ready, manifest = _ready_package(tmp_path, page_count=3)
+    _set_v2_transient_warning(manifest)
+    manifest["quality"]["overlay_detector"]["transient_candidate_count"] = 0
+    _rewrite(ready, manifest)
+
+    with pytest.raises(ValueError, match="overlay"):
+        validate_ready_dir(_job(3), ready)
+
+
+def test_validator_rejects_transient_bounds_outside_bottom_right(tmp_path) -> None:
+    ready, manifest = _ready_package(tmp_path, page_count=3)
+    _set_v2_transient_warning(manifest)
+    manifest["quality"]["findings"][0]["metrics"]["normalized_bounds"] = [
+        0,
+        0,
+        96,
+        64,
+    ]
+    _rewrite(ready, manifest)
+
+    with pytest.raises(ValueError, match="warning証跡"):
+        validate_ready_dir(_job(3), ready)
+
+
+def test_validator_rejects_v2_warning_under_v1_policy(tmp_path) -> None:
+    ready, manifest = _ready_package(tmp_path)
+    manifest["quality"]["findings"] = [
+        {
+            "code": "transient_bottom_right_overlay_candidate",
+            "severity": "warning",
+            "files": ["001.png"],
+            "metrics": {},
+        }
+    ]
+    _rewrite(ready, manifest)
+
+    with pytest.raises(ValueError, match="warning証跡"):
+        validate_ready_dir(_job(), ready)
+
+
+def test_validator_rejects_mixed_warning_and_overlay_policy_versions(tmp_path) -> None:
+    ready, manifest = _ready_package(tmp_path)
+    manifest["quality"]["warning_policy_version"] = "kindle-image-warning-v2"
     _rewrite(ready, manifest)
 
     with pytest.raises(ValueError, match="overlay"):

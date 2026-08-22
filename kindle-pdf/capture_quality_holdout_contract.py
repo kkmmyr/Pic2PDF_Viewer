@@ -23,6 +23,7 @@ _MULTI_FILE_LABEL_CODES = frozenset(
         "exact_duplicate_candidate",
         "repeated_screen_overlay_candidate",
         "repeated_screen_overlay_detected",
+        "transient_bottom_right_overlay_candidate",
     }
 )
 _ALLOWED_LABEL_CODES = (

@@ -16,6 +16,7 @@ def _save_distinct_page(
     page_no: int,
     *,
     overlay: bool = False,
+    overlay_tint: int = 245,
 ) -> None:
     image = Image.new("RGB", (512, 384), color=(255, 255, 255))
     random = Random(page_no)
@@ -25,7 +26,7 @@ def _save_distinct_page(
     if overlay:
         draw.rectangle(
             (370, 275, 511, 383),
-            fill=(245, 245, 245),
+            fill=(overlay_tint, overlay_tint, overlay_tint),
             outline=(20, 20, 20),
             width=3,
         )
@@ -132,11 +133,55 @@ def test_partial_repeated_overlay_is_warning_only(tmp_path) -> None:
         finding["code"] for finding in result.findings
     }
     detector = result.to_manifest()["overlay_detector"]
-    assert detector["policy_version"] == "kindle-repeated-overlay-v1"
+    assert detector["policy_version"] == "kindle-repeated-overlay-v2"
     assert detector["passed"] is True
     assert detector["sampled_page_count"] == 12
     assert detector["candidate_count"] >= 1
     assert detector["blocking_candidate_count"] == 0
+    assert detector["transient_scanned_page_count"] == 12
+
+
+def test_transient_bottom_right_overlay_is_warning_only(tmp_path) -> None:
+    for page_no in range(1, 13):
+        _save_distinct_page(
+            tmp_path / f"{page_no:03}.png",
+            page_no,
+            overlay=page_no <= 3,
+            overlay_tint=242 + page_no,
+        )
+
+    result = audit_capture_images(tmp_path, expected_count=12, max_workers=1)
+    findings = [
+        finding
+        for finding in result.findings
+        if finding["code"] == "transient_bottom_right_overlay_candidate"
+    ]
+
+    assert len(findings) == 1
+    assert findings[0]["files"] == ["001.png", "002.png", "003.png"]
+    assert findings[0]["severity"] == "warning"
+    assert findings[0]["metrics"]["consecutive_page_count"] == 3
+    assert findings[0]["metrics"]["max_tile_mad"] <= 6
+    manifest = result.to_manifest()
+    assert manifest["warning_policy_version"] == "kindle-image-warning-v2"
+    assert manifest["overlay_detector"]["transient_candidate_count"] == 1
+
+
+def test_two_page_bottom_right_overlay_does_not_trigger_transient_warning(
+    tmp_path,
+) -> None:
+    for page_no in range(1, 13):
+        _save_distinct_page(
+            tmp_path / f"{page_no:03}.png",
+            page_no,
+            overlay=page_no <= 2,
+        )
+
+    result = audit_capture_images(tmp_path, expected_count=12, max_workers=1)
+
+    assert "transient_bottom_right_overlay_candidate" not in {
+        finding["code"] for finding in result.findings
+    }
 
 
 def test_exact_duplicate_pages_do_not_become_overlay_failure(tmp_path) -> None:
@@ -162,4 +207,6 @@ def test_varying_page_content_and_blank_margins_do_not_trigger_overlay(
     result = audit_capture_images(tmp_path, expected_count=12, max_workers=4)
 
     assert result.to_manifest()["policy_version"] == "kindle-image-qa-v1"
+    assert result.to_manifest()["warning_policy_version"] == "kindle-image-warning-v2"
     assert result.to_manifest()["overlay_detector"]["candidate_count"] == 0
+    assert result.to_manifest()["overlay_detector"]["transient_candidate_count"] == 0

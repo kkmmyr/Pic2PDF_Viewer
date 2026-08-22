@@ -12,6 +12,8 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from capture_transient_overlay import audit_transient_bottom_right_overlays
+
 _MAX_WORKERS = 4
 _SAMPLE_LIMIT = 32
 _NORMALIZED_WIDTH = 1024
@@ -214,20 +216,27 @@ def audit_repeated_overlays(
         [pages[index]["sha256"] for index in sample_indices],
     )
     clusters = _cluster_candidates(candidates)
-    findings = [_cluster_finding(cluster) for cluster in clusters]
+    repeated_findings = [_cluster_finding(cluster) for cluster in clusters]
     blocking_count = max(
         _MIN_DISTINCT_PAGES,
         math.ceil(len(sample_indices) * _BLOCKING_REPEAT_RATIO),
     )
     blocking = [
         finding
-        for finding in findings
+        for finding in repeated_findings
         if finding["metrics"]["repeated_page_count"] >= blocking_count
     ]
+    transient_findings = audit_transient_bottom_right_overlays(
+        numbered,
+        pages,
+        load_thumbnail=_load_thumbnail,
+    )
     return {
-        "policy_version": "kindle-repeated-overlay-v1",
+        "policy_version": "kindle-repeated-overlay-v2",
         "passed": not blocking,
         "sampled_page_count": len(sample_indices),
-        "candidate_count": len(findings),
+        "candidate_count": len(repeated_findings),
         "blocking_candidate_count": len(blocking),
-    }, findings
+        "transient_scanned_page_count": len(numbered),
+        "transient_candidate_count": len(transient_findings),
+    }, [*repeated_findings, *transient_findings]

@@ -194,8 +194,9 @@ adapterからcapture agentやHTTP transportを参照しない。
 
 `capture_agent_transport.py`は設定・API・heartbeat、`capture_quality.py`は連番・復号・
 寸法・hash検査と警告候補集計、`capture_overlay.py`は複数ページ間の反復オーバーレイ検出、
-`capture_package.py`はversion 2 manifestと`.partial → .ready`公開、`capture_agent.py`は
-工程制御とエラー変換を担当する。
+`capture_transient_overlay.py`は連続3画面の短時間右下通知検出、`capture_package.py`は
+version 2 manifestと`.partial → .ready`公開、`capture_agent.py`は工程制御とエラー変換を
+担当する。
 
 - 撮影完了後は、連番、全画像の復号、寸法一貫性、SHA-256、画面数と終了証跡を
   fail-closedで検査する。完全重複、低容量、白紙・疎な画面は閾値校正中のため
@@ -209,6 +210,12 @@ adapterからcapture agentやHTTP transportを参照しない。
   20%以上50%未満は`repeated_screen_overlay_candidate` warningとする。これにより、
   ページ全体の重複や白余白だけでは発火せず、通知文言やOS種類に依存しない。
   標本画像の縮小・エッジ抽出だけを最大4 workerで並列化し、候補集約は決定的な順序で行う。
+- 短時間通知は全ページを順に読み、正規化画像3枚だけをrolling保持する。異なる3画面の
+  右下隅にある隣接2タイルが、各タイルの輝度分散8以上、Canny edge率1.5%以上、
+  3画面間の最大画素MAD 6以下を満たす場合に限り
+  `transient_bottom_right_overlay_candidate` warningとする。連続windowは1 findingへまとめ、
+  全ページをメモリへ保持しない。実陽性2種を検出し、正常727画面で候補0だった初期値であり、
+  blocking、自動削除、OCR停止には使わない。
 - ページ単位の復号・寸法・hash・統計計算だけを少数workerで並列化できる。
   Kindle UI操作、ページ送り、package確定、正式登録は常に1件ずつ直列実行する。
 

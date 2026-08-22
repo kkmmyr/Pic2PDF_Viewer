@@ -64,7 +64,7 @@ SQLite に保存・API で返されるタイムスタンプはすべて **JST (A
 - claim・状態更新・heartbeat は `heartbeat_at` を更新する。次回 claim 時に既定 300 秒の期限を超えた active job を `agent_heartbeat_timeout` で失敗へ回収する。
 - `capturing → capturing` の同一状態更新は、撮影済み画面数の進捗反映に限って許可する。`started_at` は初回の撮影開始時刻を保持する。
 - 旧手動エージェントとの後方互換用に `claimed → waiting_user → capturing` は読み取り・更新契約として維持するが、現行自動エージェントは使用しない。
-- `POST /api/kindle-catalog/agents/jobs/{job_id}/complete` は `.ready` package の version 2 manifest を読み、job identity、許可ファイル名、件数・容量、SHA-256、復号結果、寸法、001始まりの連番を実ファイルから再計算し、撮影完了証跡、カナリア、登録前画像QA、反復オーバーレイ検出証跡の形式と内部整合を検証する。終端観測フレームとカナリア画像はpackageに含まれないため、意味判定をLinux側で再実行しない。いずれかが不正な場合は正式画像配置とDB更新を行わず、完了要求を失敗させる。
+- `POST /api/kindle-catalog/agents/jobs/{job_id}/complete` は `.ready` package の version 2 manifest を読み、job identity、許可ファイル名、件数・容量、SHA-256、復号結果、寸法、001始まりの連番を実ファイルから再計算し、撮影完了証跡、カナリア、登録前画像QA、画面オーバーレイ検出証跡の形式と内部整合を検証する。旧agentの`kindle-image-warning-v1` / `kindle-repeated-overlay-v1`と、新agentのv2組を受け付け、`transient_bottom_right_overlay_candidate`はv2組だけに許可する。終端観測フレームとカナリア画像はpackageに含まれないため、意味判定をLinux側で再実行しない。いずれかが不正な場合は正式画像配置とDB更新を行わず、完了要求を失敗させる。
 - 同一 agent の再起動後に `locating_book` 以降のactive jobを再claimしても暗黙再開しない。`awaiting_files` の完了APIだけを冪等再試行可能とし、それ以前は `agent_restart_requires_new_job` で新規job作成を要求する。
 
 詳細なデータ境界は [Kindle 購入カタログ設計](機能別/Kindle購入カタログ設計.md) を参照。

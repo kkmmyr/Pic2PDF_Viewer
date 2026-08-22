@@ -70,6 +70,7 @@ kindle-pdf/
 ├── capture_canary.py     # 正式撮影前の2画面カナリア
 ├── capture_quality.py    # 連番・復号・寸法・hash・warning候補の登録前QA
 ├── capture_overlay.py    # 複数ページ間の反復画面オーバーレイ検出
+├── capture_transient_overlay.py # 連続3画面の短時間右下通知検出
 ├── capture_package.py    # version 2 manifestと.partial→.ready公開
 ├── kindle_app_controller.py # Kindle検索・照合・ダウンロード・先頭移動
 ├── main_manual.py        # 固定クロップモード（旧 main.py）

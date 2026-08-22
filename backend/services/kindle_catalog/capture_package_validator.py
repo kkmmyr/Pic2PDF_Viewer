@@ -15,14 +15,75 @@ _TERMINATION_REASONS = {
     "visual_no_change_after_retries",
     "expected_screen_count_confirmed",
 }
-_WARNING_CODES = {
-    "adjacent_near_duplicate_candidate",
-    "blank_or_sparse_candidate",
-    "exact_duplicate_candidate",
-    "low_size_candidate",
-    "novel_edge_content_candidate",
-    "repeated_screen_overlay_candidate",
+_BASE_WARNING_CODES = frozenset(
+    {
+        "adjacent_near_duplicate_candidate",
+        "blank_or_sparse_candidate",
+        "exact_duplicate_candidate",
+        "low_size_candidate",
+        "novel_edge_content_candidate",
+        "repeated_screen_overlay_candidate",
+    }
+)
+_WARNING_CODES_BY_POLICY = {
+    "kindle-image-warning-v1": _BASE_WARNING_CODES,
+    "kindle-image-warning-v2": _BASE_WARNING_CODES | {"transient_bottom_right_overlay_candidate"},
 }
+_OVERLAY_POLICY_BY_WARNING_POLICY = {
+    "kindle-image-warning-v1": "kindle-repeated-overlay-v1",
+    "kindle-image-warning-v2": "kindle-repeated-overlay-v2",
+}
+_TRANSIENT_NORMALIZED_WIDTH = 1024
+_TRANSIENT_TILE_SIZE = 64
+_TRANSIENT_TILE_STRIDE = 32
+_TRANSIENT_CORNER_MARGIN = _TRANSIENT_TILE_STRIDE
+_TRANSIENT_MAX_TILE_MAD = 6.0
+
+
+def _is_nonnegative_int(value: object) -> bool:
+    return type(value) is int and value >= 0
+
+
+def _is_positive_int(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
+def _valid_transient_overlay_finding(
+    finding: dict,
+    dimensions: tuple[int, int],
+) -> bool:
+    files = finding.get("files")
+    metrics = finding.get("metrics")
+    if not isinstance(files, list) or len(files) < 3 or len(set(files)) != len(files) or not isinstance(metrics, dict):
+        return False
+    matches = [_CAPTURE_NAME.fullmatch(name) for name in files]
+    if any(match is None for match in matches):
+        return False
+    page_numbers = [int(match.group("number")) for match in matches if match]
+    bounds = metrics.get("normalized_bounds")
+    maximum_mad = metrics.get("max_tile_mad")
+    normalized_height = max(
+        1,
+        round(dimensions[1] * _TRANSIENT_NORMALIZED_WIDTH / dimensions[0]),
+    )
+    return (
+        page_numbers == list(range(page_numbers[0], page_numbers[0] + len(files)))
+        and isinstance(bounds, list)
+        and len(bounds) == 4
+        and all(type(value) is int for value in bounds)
+        and all(value % _TRANSIENT_TILE_STRIDE == 0 for value in bounds)
+        and 0 <= bounds[0] < bounds[2] <= _TRANSIENT_NORMALIZED_WIDTH
+        and 0 <= bounds[1] < bounds[3] <= normalized_height
+        and bounds[2] - bounds[0] >= _TRANSIENT_TILE_SIZE
+        and bounds[3] - bounds[1] >= _TRANSIENT_TILE_SIZE
+        and bounds[2] >= _TRANSIENT_NORMALIZED_WIDTH - _TRANSIENT_CORNER_MARGIN
+        and bounds[3] >= normalized_height - _TRANSIENT_CORNER_MARGIN
+        and _is_positive_int(metrics.get("matched_tile_count"))
+        and metrics["matched_tile_count"] >= 2
+        and metrics.get("consecutive_page_count") == len(files)
+        and type(maximum_mad) in {int, float}
+        and 0 <= maximum_mad <= _TRANSIENT_MAX_TILE_MAD
+    )
 
 
 def safe_title(title: str) -> str:
@@ -175,10 +236,12 @@ def _validate_quality(
     dimensions: tuple[int, int],
     declared_names: set[str],
 ) -> None:
+    warning_policy = quality.get("warning_policy_version")
+    allowed_warning_codes = _WARNING_CODES_BY_POLICY.get(warning_policy)
     if (
         quality.get("schema_version") != 1
         or quality.get("policy_version") != "kindle-image-qa-v1"
-        or quality.get("warning_policy_version") != "kindle-image-warning-v1"
+        or allowed_warning_codes is None
         or quality.get("outcome") != "passed"
         or quality.get("page_count") != count
         or tuple(quality.get("dimensions") or ()) != dimensions
@@ -186,21 +249,26 @@ def _validate_quality(
     ):
         raise ValueError("登録前画像QAの証跡が不正です")
     overlay = quality.get("overlay_detector")
+    expected_overlay_policy = _OVERLAY_POLICY_BY_WARNING_POLICY[warning_policy]
     if (
         not isinstance(overlay, dict)
-        or overlay.get("policy_version") != "kindle-repeated-overlay-v1"
+        or overlay.get("policy_version") != expected_overlay_policy
         or overlay.get("passed") is not True
-        or not isinstance(overlay.get("sampled_page_count"), int)
-        or not 1 <= overlay["sampled_page_count"] <= count
-        or not isinstance(overlay.get("candidate_count"), int)
-        or overlay["candidate_count"] < 0
+        or not _is_positive_int(overlay.get("sampled_page_count"))
+        or overlay["sampled_page_count"] > count
+        or not _is_nonnegative_int(overlay.get("candidate_count"))
         or overlay.get("blocking_candidate_count") != 0
+    ):
+        raise ValueError("capture overlay detector evidence is invalid")
+    if expected_overlay_policy == "kindle-repeated-overlay-v2" and (
+        overlay.get("transient_scanned_page_count") != count
+        or not _is_nonnegative_int(overlay.get("transient_candidate_count"))
     ):
         raise ValueError("capture overlay detector evidence is invalid")
     for finding in quality["findings"]:
         if (
             not isinstance(finding, dict)
-            or finding.get("code") not in _WARNING_CODES
+            or finding.get("code") not in allowed_warning_codes
             or finding.get("severity") != "warning"
             or not isinstance(finding.get("files"), list)
             or not finding["files"]
@@ -208,6 +276,15 @@ def _validate_quality(
             or ("metrics" in finding and not isinstance(finding["metrics"], dict))
         ):
             raise ValueError("登録前画像QAのwarning証跡が不正です")
+        if finding["code"] == "transient_bottom_right_overlay_candidate":
+            if not _valid_transient_overlay_finding(finding, dimensions):
+                raise ValueError("登録前画像QAのwarning証跡が不正です")
+    if expected_overlay_policy == "kindle-repeated-overlay-v2":
+        transient_finding_count = sum(
+            finding["code"] == "transient_bottom_right_overlay_candidate" for finding in quality["findings"]
+        )
+        if overlay["transient_candidate_count"] != transient_finding_count:
+            raise ValueError("capture overlay detector evidence is invalid")
 
 
 def build_quality_audit(manifest: dict) -> dict:

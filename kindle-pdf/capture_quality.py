@@ -35,7 +35,7 @@ class CaptureQualityResult:
         return {
             "schema_version": 1,
             "policy_version": "kindle-image-qa-v1",
-            "warning_policy_version": "kindle-image-warning-v1",
+            "warning_policy_version": "kindle-image-warning-v2",
             "outcome": "passed",
             "page_count": self.page_count,
             "dimensions": list(self.dimensions),

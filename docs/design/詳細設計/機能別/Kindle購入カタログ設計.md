@@ -150,6 +150,13 @@ Windows側の合否だけを信用せず、証跡欠落・不一致・blocking�
 完全重複、低容量、白紙・疎な画面、隣接dHash近似重複、小説上下端の内容密度は
 誤検知校正中のためwarningに留め、自動削除や登録拒否には使用しない。
 
+等間隔標本から外れる短時間通知は、全ページを3画面だけ保持するrolling windowで検査する。
+各画面hashが異なり、幅1024へ正規化した右下隅の64pxタイル2枚が全3画面で
+輝度分散8以上、Canny edge率1.5%以上、画素MAD最大6以下を同時に満たした場合だけ
+`transient_bottom_right_overlay_candidate` warningとする。連続windowは同じ候補へ集約し、
+対象ページ、正規化bounds、最大MADを証跡へ残す。これは登録拒否へ使わず、単一・2画面、
+右下以外、通知位置が動くUIは検出対象外とする。
+
 2026-08-22の未調整実画像holdoutでは、検出結果を参照せず固定seedとタイトルfamily hashだけで
 漫画2冊・小説2冊（524画面）を選び、全画像SHA-256を先に封印した。Codex画像QAでは撮影欠陥を
 0件と判定した一方、近似重複5、白紙・疎6、低容量13、小説端密度2の計26 warningが出た。
@@ -165,7 +172,11 @@ warning証跡は次の2テーブルへ保存する。
   元finding JSON、`is_read`、`read_at`を持つ。登録時は常に未確認で開始する。
 
 ready package検証では`kindle-image-warning-v1`の既知code、`severity=warning`、連番PNGへの参照、
-metrics objectを再検証する。正式画像公開後の`succeeded`更新と同じSQLite transactionで監査世代と
+metrics objectを再検証する。段階更新中の旧agent用v1組と、短時間右下通知を含む
+`kindle-image-warning-v2` / `kindle-repeated-overlay-v2`組を受け付け、新warning codeはv2だけに
+許可する。v2 overlay証跡は全ページ走査数と短時間候補数に加え、3枚以上の連続PNG、
+正規化右下bounds、隣接tile数、MAD上限も検証する。正式画像公開後の
+`succeeded`更新と同じSQLite transactionで監査世代と
 warningを挿入し、失敗時はDBと正式画像を従来どおりrollbackする。同じsource・`book_id`の再撮影が
 成功した場合は旧監査世代を削除せずsupersedeし、新世代だけを通常APIへ返す。新世代はwarning 0件でも
 作るため、旧画像の候補が現画像へ残らない。将来の再監査はpolicy versionまたはquality証跡digestが異なる
