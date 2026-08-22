@@ -1,6 +1,6 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-08-15
+> status: living | last-verified: 2026-08-22
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
@@ -17,7 +17,7 @@ Windows をメイン環境として運用しつつ、Mac からコード編集�
 |---|---|---|
 | Homebrew | `https://brew.sh` | `brew --version` |
 | uv (Python 管理) | `brew install uv` | `uv --version` |
-| Node.js 20+ | `brew install node` または nvm | `node --version` |
+| Node.js 22.x + npm 10.x | nvmなどでmajor versionを固定 | `node --version && npm --version` |
 | git | 標準搭載 or `brew install git` | `git --version` |
 
 ---
@@ -72,8 +72,17 @@ uv sync --group dev
 
 ```bash
 cd frontend
-npm install
+npm ci
 ```
+
+CIと同じNode.js 22 + npm 10を使う。`npm install`は依存を意図して更新し、
+`package.json`と`package-lock.json`を同じcommitで変更するときだけ実行する。
+通常のセットアップで`npm ci`が失敗した場合は`npm install`で回避せず、
+lockfileの再現性不具合として扱う。
+
+Node.js 26では、Node組込みのexperimental Web StorageとVitestのjsdomが競合し、
+`localStorage` / `sessionStorage`利用testが一括失敗することを2026-08-22に確認した。
+製品回帰ではないため、通常検証はNode.js 22へ戻して実行する。
 
 ---
 
