@@ -360,6 +360,35 @@ p50 / p95 / max latency、0-hit件数、成功時top集合のJaccard平均 / p50
 `status=insufficient_data`を出して終了code 2とし、採用ゲートを通過させない。smoke・障害注入ログは
 実運用期間と分けて入力し、未調整holdoutの品質評価とは別の運用証跡として保存する。
 
+production stage 1の実利用観測は、導入smoke後の`2026-08-23T08:56:00`を開始境界とし、
+`backend/scripts/fixtures/lexical_shadow_policy_v1.json`を判定値の正本とする。昇格候補へ進むには、
+20観測以上、query hashで10種類以上、暦日3日以上を満たし、shadow unavailableと
+`lance_icu` fallbackが0件、解析不能行0件、ICU成功時p95が200ms以下でなければならない。
+0-hit件数とtop集合Jaccardは方式差の診断値として保存するが、fixtureで確認済みの検索品質を
+実利用queryの正解なしで再判定できないため、運用合否の閾値にはしない。
+
+```bash
+cd backend
+ssh -o BatchMode=yes amashio@medaroserver \
+  "grep -hE 'lexical shadow|lexical ICU fallback' \
+  /opt/pic2pdf-viewer/backend/data/logs/app.log* 2>/dev/null" \
+  | uv run python scripts/summarize_lexical_shadow.py \
+      --since 2026-08-23T08:56:00 \
+      --policy scripts/fixtures/lexical_shadow_policy_v1.json \
+      --fail-on-gate
+```
+
+gate合格は段階2への自動切替を意味しない。利用者の別承認後にだけ`lance_icu`へ変更し、
+切替後の障害注入とFTS5 rollbackを再確認する。観測不足は終了code 2、閾値違反は1、合格は0とする。
+
+#### 2026-08-23 production実利用観測の開始監査
+
+- active releaseは`/opt/pic2pdf-viewer/backend-20260822163430-62582`、serviceは`active`、
+  `NOVEL_DB_LEXICAL_BACKEND=shadow`を維持していた。
+- app logの5件はすべて2026-08-22 16:35の固定activation smokeで、自然な実利用queryは0件だった。
+  この5件を実利用ゲートへ混ぜず、上記開始境界から新規観測する。
+- 観測不足のため`lance_icu`への昇格やservice再起動は行っていない。
+
 #### 2026-08-22 production stage 1 実行記録
 
 - deploy commitは`c31822f`。writerは各停止境界で`rebuild_jobs=0` / `ocr_runs=0`を確認し、snapshot

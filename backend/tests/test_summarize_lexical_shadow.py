@@ -4,7 +4,7 @@ import io
 import json
 from datetime import datetime
 
-from scripts.summarize_lexical_shadow import main, summarize_lines
+from scripts.summarize_lexical_shadow import evaluate_gate, load_policy, main, summarize_lines
 
 _SUCCESS_A = (
     "2026-08-22 10:00:00 [INFO] search: lexical shadow: "
@@ -45,6 +45,12 @@ def test_summarize_lines_reports_rates_latency_overlap_without_hashes() -> None:
     assert result["zero_hit"] == {"fts5": 1, "icu_success": 1}
     assert result["top_set_overlap"]["jaccard_mean"] == 0.75
     assert result["lance_icu_fallbacks"] == 1
+    assert result["observation_window"] == {
+        "first_at": "2026-08-22T10:00:00",
+        "last_at": "2026-08-22T10:10:00",
+        "distinct_local_dates": 1,
+        "timestamped_observations": 3,
+    }
     serialized = json.dumps(result)
     assert "111111111111" not in serialized
     assert "222222222222" not in serialized
@@ -77,3 +83,66 @@ def test_malformed_candidate_is_counted_but_not_observed() -> None:
 
     assert result["shadow"]["observations"] == 0
     assert result["input"]["malformed_lines"] == 1
+
+
+def _policy(**overrides: int | float | str) -> dict[str, int | float | str]:
+    policy: dict[str, int | float | str] = {
+        "schema_version": "lexical-shadow-policy-v1",
+        "min_observations": 3,
+        "min_unique_queries": 2,
+        "min_distinct_local_dates": 1,
+        "max_fallback_rate": 0.0,
+        "max_icu_success_p95_ms": 200.0,
+        "max_malformed_lines": 0,
+        "max_lance_icu_fallbacks": 0,
+    }
+    policy.update(overrides)
+    return policy
+
+
+def test_gate_distinguishes_pending_failure_and_pass() -> None:
+    second_query = _SUCCESS_B.replace("111111111111", "222222222222")
+    summary = summarize_lines([_SUCCESS_A, second_query])
+    gate = evaluate_gate(summary, _policy(), "a" * 64)
+    assert gate["status"] == "pending"
+    assert gate["pending_reasons"] == ["min_observations"]
+
+    failed = evaluate_gate(
+        summarize_lines([_SUCCESS_A, second_query, _UNAVAILABLE]),
+        _policy(),
+        "a" * 64,
+    )
+    assert failed["status"] == "failed"
+    assert failed["failure_reasons"] == ["max_fallback_rate"]
+
+    passed = evaluate_gate(
+        summarize_lines([_SUCCESS_A, _SUCCESS_B, _SUCCESS_A.replace("111111111111", "222222222222")]),
+        _policy(),
+        "a" * 64,
+    )
+    assert passed["status"] == "passed"
+
+
+def test_main_applies_policy_and_returns_pending_exit_code(tmp_path, monkeypatch, capsys) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(_policy()), encoding="utf-8")
+    monkeypatch.setattr("sys.stdin", io.StringIO(_SUCCESS_A + "\n"))
+
+    exit_code = main(["--policy", str(policy_path), "--fail-on-gate"])
+    output = json.loads(capsys.readouterr().out)
+
+    assert exit_code == 2
+    assert output["gate"]["status"] == "pending"
+    assert len(output["gate"]["policy_sha256"]) == 64
+
+
+def test_load_policy_rejects_invalid_schema(tmp_path) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text('{"schema_version":"wrong"}', encoding="utf-8")
+
+    try:
+        load_policy(policy_path)
+    except ValueError as exc:
+        assert "unsupported" in str(exc)
+    else:
+        raise AssertionError("invalid policy must fail closed")

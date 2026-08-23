@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -12,6 +13,8 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+POLICY_SCHEMA_VERSION = "lexical-shadow-policy-v1"
 
 _FLOAT = r"\d+(?:\.\d+)?"
 _SUCCESS_RE = re.compile(
@@ -79,6 +82,7 @@ def summarize_lines(
     unavailable: list[dict[str, int | float | str]] = []
     lance_fallbacks = 0
     query_hashes: set[str] = set()
+    observation_times: list[datetime] = []
     candidate_lines = 0
     malformed_lines = 0
     filtered_lines = 0
@@ -99,6 +103,7 @@ def summarize_lines(
 
         match = _SUCCESS_RE.search(line)
         if match is not None:
+            timestamp = _line_timestamp(line)
             record: dict[str, int | float | str] = {
                 "hash": match.group("hash"),
                 "fts": int(match.group("fts")),
@@ -109,10 +114,13 @@ def summarize_lines(
             }
             successes.append(record)
             query_hashes.add(str(record["hash"]))
+            if timestamp is not None:
+                observation_times.append(timestamp)
             continue
 
         match = _UNAVAILABLE_RE.search(line)
         if match is not None:
+            timestamp = _line_timestamp(line)
             record = {
                 "hash": match.group("hash"),
                 "fts": int(match.group("fts")),
@@ -121,6 +129,8 @@ def summarize_lines(
             }
             unavailable.append(record)
             query_hashes.add(str(record["hash"]))
+            if timestamp is not None:
+                observation_times.append(timestamp)
             continue
 
         if _ICU_FALLBACK_RE.search(line) is not None:
@@ -166,11 +176,82 @@ def summarize_lines(
             "jaccard_min": _rounded(min(jaccards)) if jaccards else None,
         },
         "lance_icu_fallbacks": lance_fallbacks,
+        "observation_window": {
+            "first_at": min(observation_times).isoformat() if observation_times else None,
+            "last_at": max(observation_times).isoformat() if observation_times else None,
+            "distinct_local_dates": len({value.date() for value in observation_times}),
+            "timestamped_observations": len(observation_times),
+        },
         "input": {
             "candidate_lines": candidate_lines,
             "filtered_lines": filtered_lines,
             "malformed_lines": malformed_lines,
         },
+    }
+
+
+def load_policy(path: Path) -> tuple[dict[str, int | float | str], str]:
+    raw = path.read_bytes()
+    policy = json.loads(raw)
+    if not isinstance(policy, dict) or policy.get("schema_version") != POLICY_SCHEMA_VERSION:
+        raise ValueError("unsupported lexical shadow policy schema")
+    integer_fields = (
+        "min_observations",
+        "min_unique_queries",
+        "min_distinct_local_dates",
+        "max_malformed_lines",
+        "max_lance_icu_fallbacks",
+    )
+    for field in integer_fields:
+        value = policy.get(field)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            raise ValueError(f"policy {field} must be a non-negative integer")
+    float_fields = ("max_fallback_rate", "max_icu_success_p95_ms")
+    for field in float_fields:
+        value = policy.get(field)
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or value < 0:
+            raise ValueError(f"policy {field} must be a non-negative number")
+    if float(policy["max_fallback_rate"]) > 1:
+        raise ValueError("policy max_fallback_rate must be at most 1")
+    return policy, hashlib.sha256(raw).hexdigest()
+
+
+def evaluate_gate(
+    summary: dict[str, Any],
+    policy: dict[str, int | float | str],
+    policy_sha256: str,
+) -> dict[str, Any]:
+    pending_reasons: list[str] = []
+    failure_reasons: list[str] = []
+    shadow = summary["shadow"]
+    window = summary["observation_window"]
+    if shadow["observations"] < policy["min_observations"]:
+        pending_reasons.append("min_observations")
+    if shadow["unique_query_count"] < policy["min_unique_queries"]:
+        pending_reasons.append("min_unique_queries")
+    if window["distinct_local_dates"] < policy["min_distinct_local_dates"]:
+        pending_reasons.append("min_distinct_local_dates")
+    if window["timestamped_observations"] != shadow["observations"]:
+        failure_reasons.append("missing_observation_timestamp")
+    fallback_rate = shadow["fallback_rate"]
+    if fallback_rate is not None and fallback_rate > policy["max_fallback_rate"]:
+        failure_reasons.append("max_fallback_rate")
+    icu_p95 = summary["latency_ms"]["icu_success"]["p95"]
+    if icu_p95 is not None and icu_p95 > policy["max_icu_success_p95_ms"]:
+        failure_reasons.append("max_icu_success_p95_ms")
+    if summary["input"]["malformed_lines"] > policy["max_malformed_lines"]:
+        failure_reasons.append("max_malformed_lines")
+    if summary["lance_icu_fallbacks"] > policy["max_lance_icu_fallbacks"]:
+        failure_reasons.append("max_lance_icu_fallbacks")
+
+    status = "failed" if failure_reasons else "pending" if pending_reasons else "passed"
+    return {
+        "schema_version": POLICY_SCHEMA_VERSION,
+        "status": status,
+        "policy_sha256": policy_sha256,
+        "pending_reasons": pending_reasons,
+        "failure_reasons": failure_reasons,
+        "thresholds": policy,
     }
 
 
@@ -188,6 +269,12 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("paths", nargs="*", type=Path, help="log files; stdin when omitted")
     parser.add_argument("--since", help="inclusive local ISO timestamp")
     parser.add_argument("--until", help="exclusive local ISO timestamp")
+    parser.add_argument("--policy", type=Path, help="operational promotion gate policy JSON")
+    parser.add_argument(
+        "--fail-on-gate",
+        action="store_true",
+        help="return 0 for pass, 1 for failure, or 2 while observations are pending",
+    )
     return parser
 
 
@@ -200,8 +287,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         _build_parser().error(str(exc))
     if since is not None and until is not None and since >= until:
         _build_parser().error("--since must be earlier than --until")
+    if args.fail_on_gate and args.policy is None:
+        _build_parser().error("--fail-on-gate requires --policy")
     result = summarize_lines(_read_lines(args.paths), since=since, until=until)
+    if args.policy is not None:
+        try:
+            policy, policy_sha256 = load_policy(args.policy)
+            result["gate"] = evaluate_gate(result, policy, policy_sha256)
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            _build_parser().error(str(exc))
     print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    if args.fail_on_gate:
+        return {"passed": 0, "failed": 1, "pending": 2}[result["gate"]["status"]]
     return 0 if result["has_observations"] else 2
 
 

@@ -1,0 +1,10 @@
+{
+  "schema_version": "lexical-shadow-policy-v1",
+  "min_observations": 20,
+  "min_unique_queries": 10,
+  "min_distinct_local_dates": 3,
+  "max_fallback_rate": 0.0,
+  "max_icu_success_p95_ms": 200.0,
+  "max_malformed_lines": 0,
+  "max_lance_icu_fallbacks": 0
+}
