@@ -86,7 +86,7 @@ def append_inline_inputs(
         sections.extend(
             [
                 "",
-                f"<data-file name={json.dumps(name)} chars=\"{len(content)}\" sha256=\"{digest}\">",
+                f'<data-file name={json.dumps(name)} chars="{len(content)}" sha256="{digest}">',
                 content,
                 "</data-file>",
             ]

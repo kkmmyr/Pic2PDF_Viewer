@@ -8,9 +8,7 @@ from scripts.run_sol_codex_job import append_inline_inputs, build_command, sanit
 
 
 def test_sanitized_environment_removes_api_credentials() -> None:
-    result = sanitized_environment(
-        {"PATH": "/bin", "OPENAI_API_KEY": "secret", "CODEX_API_KEY": "secret-2"}
-    )
+    result = sanitized_environment({"PATH": "/bin", "OPENAI_API_KEY": "secret", "CODEX_API_KEY": "secret-2"})
     assert result == {"PATH": "/bin"}
 
 

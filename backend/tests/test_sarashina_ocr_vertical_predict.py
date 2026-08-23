@@ -6,15 +6,8 @@ from pathlib import Path
 
 import pytest
 
-_SCRIPT_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "scripts"
-    / "maintenance"
-    / "sarashina_ocr_vertical_predict.py"
-)
-_SPEC = importlib.util.spec_from_file_location(
-    "sarashina_ocr_vertical_predict", _SCRIPT_PATH
-)
+_SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "maintenance" / "sarashina_ocr_vertical_predict.py"
+_SPEC = importlib.util.spec_from_file_location("sarashina_ocr_vertical_predict", _SCRIPT_PATH)
 assert _SPEC is not None and _SPEC.loader is not None
 predict = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(predict)
