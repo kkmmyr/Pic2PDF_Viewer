@@ -2,8 +2,11 @@
 
 import json
 import os
+import sys
+import time
 
 import fitz
+import pytest
 
 from services.novel_db import extractor
 from services.novel_db.extractor import extract_pages
@@ -100,8 +103,11 @@ def test_iter_ocr_pages_forwards_progress_events(monkeypatch):
         stdout = iter(line + "\n" for line in lines)
         returncode = 0
 
-        def wait(self):
+        def wait(self, timeout=None):
             return 0
+
+        def poll(self):
+            return self.returncode
 
     monkeypatch.setattr(extractor.subprocess, "Popen", lambda *_args, **_kwargs: FakeProcess())
     progress = []
@@ -116,3 +122,52 @@ def test_iter_ocr_pages_forwards_progress_events(monkeypatch):
     assert progress[0]["stage"] == "page_started"
     assert progress[0]["server_generation"] == 2
     assert pages[0][1]["full_text"] == "本文"
+
+
+def test_iter_ocr_pages_terminates_a_real_hung_worker_after_partial_output(tmp_path, monkeypatch) -> None:
+    worker = tmp_path / "hung_worker.py"
+    pid_file = tmp_path / "worker.pid"
+    worker.write_text(
+        """import json
+import os
+import time
+from pathlib import Path
+
+Path(os.environ["HANG_PID_FILE"]).write_text(str(os.getpid()), encoding="utf-8")
+print(json.dumps({
+    "event": "page",
+    "book_name": "book",
+    "page": {
+        "page_no": 1,
+        "image_sha256": "hash",
+        "state": "passed",
+        "full_text": "本文",
+        "char_count": 2,
+        "raw_output": "",
+        "block_count": 1,
+        "quality_flags": [],
+        "ink_coverage": 1.0,
+        "attempt_count": 1
+    }
+}), flush=True)
+time.sleep(30)
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(extractor, "_resolve_ocr_python", lambda: sys.executable)
+    monkeypatch.setattr(extractor, "_OCR_WORKER_SCRIPT", worker)
+    monkeypatch.setenv("HANG_PID_FILE", str(pid_file))
+
+    started = time.monotonic()
+    with pytest.raises(RuntimeError, match="produced no output"):
+        list(
+            extractor.iter_ocr_pages(
+                [{"book_name": "book", "page_no": 1, "image_path": "001.png"}],
+                inactivity_timeout_sec=0.2,
+            )
+        )
+
+    assert time.monotonic() - started < 5
+    pid = int(pid_file.read_text(encoding="utf-8"))
+    with pytest.raises(ProcessLookupError):
+        os.kill(pid, 0)

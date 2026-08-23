@@ -11,9 +11,11 @@ from __future__ import annotations
 import json
 import os
 import platform
+import queue
 import re
 import subprocess
 import tempfile
+import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import NotRequired, TypedDict
@@ -41,6 +43,7 @@ def _resolve_ocr_python() -> str:
 
 
 _OCR_WORKER_SCRIPT = Path(__file__).parent / "ocr_worker.py"
+_STREAM_END = object()
 
 
 class PageText(TypedDict):
@@ -63,6 +66,27 @@ class OcrPageResult(PageText):
     primary_text: NotRequired[str | None]
     external_text: NotRequired[str | None]
     selected_engine: NotRequired[str]
+
+
+def _read_worker_output(stream: Iterator[str], events: queue.Queue[object]) -> None:
+    try:
+        for line in stream:
+            events.put(line)
+    except BaseException as exc:
+        events.put(exc)
+    finally:
+        events.put(_STREAM_END)
+
+
+def _stop_worker_process(proc: subprocess.Popen[str]) -> None:
+    if proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=15)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=5)
 
 
 def _ocr_worker_env() -> dict[str, str]:
@@ -99,11 +123,20 @@ def iter_ocr_pages(
     tasks: list[OcrTask],
     *,
     progress_callback: Callable[[OcrProgressEvent], None] | None = None,
+    inactivity_timeout_sec: float | None = None,
 ) -> Iterator[tuple[str, OcrPageResult]]:
     """Run the isolated worker and yield one durable result candidate per page."""
     if not tasks:
         return
+    if inactivity_timeout_sec is None:
+        from config import app_settings
+
+        inactivity_timeout_sec = app_settings.OCR_WORKER_INACTIVITY_TIMEOUT_SEC
+    if inactivity_timeout_sec <= 0:
+        raise ValueError("OCR worker inactivity timeout must be positive")
     manifest_path: Path | None = None
+    proc: subprocess.Popen[str] | None = None
+    reader: threading.Thread | None = None
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as manifest:
             json.dump({"tasks": tasks}, manifest, ensure_ascii=False)
@@ -118,7 +151,29 @@ def iter_ocr_pages(
             env=_ocr_worker_env(),
         )
         assert proc.stdout is not None
-        for line in proc.stdout:
+        events: queue.Queue[object] = queue.Queue()
+        reader = threading.Thread(
+            target=_read_worker_output,
+            args=(proc.stdout, events),
+            name="ocr-worker-stdout",
+            daemon=True,
+        )
+        reader.start()
+        while True:
+            try:
+                event = events.get(timeout=inactivity_timeout_sec)
+            except queue.Empty as exc:
+                _stop_worker_process(proc)
+                raise RuntimeError(
+                    f"OCR worker produced no output for {inactivity_timeout_sec:g} seconds"
+                ) from exc
+            if event is _STREAM_END:
+                break
+            if isinstance(event, BaseException):
+                raise RuntimeError("OCR worker stdout reader failed") from event
+            if not isinstance(event, str):
+                raise RuntimeError("OCR worker stdout reader returned an invalid event")
+            line = event
             line = line.strip()
             if not line:
                 continue
@@ -137,6 +192,10 @@ def iter_ocr_pages(
         if proc.returncode != 0:
             raise RuntimeError(f"OCR worker exited with code {proc.returncode}")
     finally:
+        if proc is not None:
+            _stop_worker_process(proc)
+        if reader is not None:
+            reader.join(timeout=1)
         if manifest_path is not None:
             manifest_path.unlink(missing_ok=True)
 

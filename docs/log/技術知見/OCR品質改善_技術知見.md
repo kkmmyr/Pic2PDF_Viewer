@@ -334,3 +334,39 @@ VJRODaも実文書由来だがKindle小説そのものではない。両方を�
 VJRODaの公式GitLabは同日のMac環境から20秒で接続timeoutしたため、実metadata全件の読込確認は
 未実施である。`id` / `text` / `pred`とタグ除去は公式評価実装およびfixtureで固定済みだが、
 model推論前に公式hostの再疎通と実metadata digest固定を行う。
+
+## 19. 2026-08-23: Sarashina2.2-OCRを次の独立候補に選定
+
+[公式model card](https://huggingface.co/sbintuitions/sarashina2.2-ocr)は、日本語・英語文書向けの
+end-to-end 3B OCRとして縦書き日本語と自然な読順を明示し、VJRODaでCER 22.6、BLEU 79.9を報告する。
+同表の旧dots.ocrはCER 40.1であり、縦書き日本語に特化した次候補として診断価値がある。ただし
+dots.mocrではなく旧dots.ocrとの比較であり、本プロジェクトのCER契約やKindle画像を代替しない。
+
+公式revision`eafb8d48cb2f2a3a6dce571d26b26586ff048fda`はMIT license、BF16重み約7.8GB、
+Transformers 4.57.1とcustom codeを使う。`configuration_sarashina2_vision.py`、
+`modeling_sarashina2_vision.py`、`processing_sarashina2_vision.py`のimportとSHA-256を監査し、
+ネットワーク、subprocess、任意ファイル操作を持たないことを確認した。通常アプリへremote code許可を
+広げず、固定snapshotを照合する隔離CLIだけで評価する。
+
+公式推論はCUDAを例示し、Apple Silicon MPSを保証しない。非公式の日本語手書き比較では推奨
+`repetition_penalty=1.2`で数値列の生成loopが発生し、1.3で収束した報告がある。このため公式値を
+最初に固定5枚で評価し、loopは後処理削除せず不合格へ残す。1.3は別の診断runとし、採用値へ混ぜない。
+
+固定5枚3,653文字のMPS BF16実測は総合CER 0.2190%、ページ最大0.9259%、完全一致3/5で、
+総合0.5%以下・最大2%未満の事前gateを通過した。旧候補で反復した`001751`もCER 0.9259%で収束し、
+後処理による反復削除は使用していない。5枚は312.14秒、process最大RSS約9.58GiB、peak memory
+footprint約23.73GiBで、64GB unified memory内に収まった。79枚screeningは同一checkpointで継続する。
+
+継続runは71/79枚で総合CER 0.8385%、最大100%となり停止した。`001626`では文字起こし317文字は
+完全一致した後、モデルが同内容の要約箇条書きを付加した。明示的に要約・Markdownを禁止しても
+image-onlyと完全に同じ649 raw文字を返した。先頭blockだけなら正解になるが、一般文書の正当な段落と
+区別できない後処理なので採用しない。71枚3,266.33秒、最大RSS約16.42GiB、peak footprint約54.28GiB、
+swap 0であり、品質失敗はmemory不足ではなく出力契約の不安定性である。
+
+H5の実運用確認では、30秒sleepする実workerを0.2秒無通信期限で回収して子PID消滅を確認した。
+また本番ext4配置先で388,210,688 bytesのOnline Backupを原子的に公開し、manifest・復元DBとも
+`integrity_check=ok`、canonical SHA不変を確認した。監査世代は削除済み。production active releaseには
+backup moduleが未配置だったため、deploy後のservice経路確認とroot権限を要する実ENOSPCが残る。
+その後、Linux user namespace内の8MiB tmpfsで実ENOSPCを再現し、空き135,168 bytesで
+SQLite `OperationalError`、canonical SHA不変、`integrity_check=ok`、公開世代0件を確認した。
+host filesystemとproduction DBは変更していないため、残るのはactive releaseへ実装を配置した後の再確認である。

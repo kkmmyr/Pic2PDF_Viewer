@@ -79,6 +79,7 @@ class _AppSettings(BaseSettings):
     SURYA_MMPROJ_PATH: Path | None = None
     SURYA_REQUEST_TIMEOUT_SEC: float = 600.0
     SURYA_MAX_ATTEMPTS: int = 3
+    OCR_WORKER_INACTIVITY_TIMEOUT_SEC: float = Field(default=2100.0, gt=0.0)
     OCR_QUALITY_MIN_INK_COVERAGE: float = 0.85
     # worker所有llama-serverの世代交代条件
     OCR_SERVER_MAX_PAGES: int = Field(default=24, ge=1)

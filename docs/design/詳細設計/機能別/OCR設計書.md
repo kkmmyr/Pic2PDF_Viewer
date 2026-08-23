@@ -74,6 +74,7 @@ Windowsから本番SQLiteを直接開かない。
 | `SURYA_MODEL_REVISION` | `unversioned` | `ocr_runs.model`へ保存する固定版識別子 |
 | `SURYA_REQUEST_TIMEOUT_SEC` | `600` | 1ページのタイムアウト |
 | `SURYA_MAX_ATTEMPTS` | `3` | 画像候補の最大試行数 |
+| `OCR_WORKER_INACTIVITY_TIMEOUT_SEC` | `2100` | workerのstdout無通信をhangとみなす期限。超過時はterminate後、15秒で終了しなければkillする |
 | `OCR_QUALITY_MIN_INK_COVERAGE` | `0.85` | OCR bboxの文字候補成分最低coverage |
 | `OCR_CROSSCHECK_ALL_PAGES` | `true` | Surya合格ページもyomitokuで再読する |
 | `OCR_CROSS_ENGINE_MIN_SIMILARITY` | `0.85` | エンジン間の最低一致率 |
@@ -93,6 +94,11 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
 | `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
+
+親processはworkerのJSONLを別threadで読み、最後のstdout eventから
+`OCR_WORKER_INACTIVITY_TIMEOUT_SEC`を超えた場合にworkerを回収して失敗とする。page結果が一部返っていても
+呼出し全体を成功扱いせず、後続の公開・FTS更新へ進めない。generatorの途中破棄時も同じ回収処理を行い、
+孤児processを残さない。既定値は1ページの最大3試行を許容する値とし、隔離試験では短い期限へ上書きする。
 | `backend/services/novel_db/surya_parsing.py` | 公式prompt、HTML/layout/bbox解析 |
 | `backend/services/novel_db/surya_quality.py` | coverage、品質flag、補助OCR照合 |
 | `backend/services/novel_db/surya_server.py` | llama-serverのhealth check・起動・終了 |

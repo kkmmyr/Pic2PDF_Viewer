@@ -227,6 +227,35 @@ MLX peak memory約9.50GBで、64GB unified memoryには十分な余裕があっ�
 モデル品質と判断する。全1,125枚、同一画面3回、VJRODa、開封済み30画面へは進めず、
 モデルまたはMLX実装の更新時に同じ79枚と固定artifactから再開する。
 
+2026-08-23の再調査では、次の独立候補を`sbintuitions/sarashina2.2-ocr`とする。
+日本語・英語文書向けのend-to-end OCRで、公式model cardはVJRODaの縦書き読順を含む評価において
+旧dots.ocrより低いCERを報告している。ただしdots.mocrとの直接比較ではなく、Kindle小説での
+ページ最大CERも未確認なので、公開値だけで本番候補へ昇格しない。
+
+評価はMIT licenseのBF16重みとrevision`eafb8d48cb2f2a3a6dce571d26b26586ff048fda`を固定し、
+公式Transformers 4.57.1設定、temperature 0、top_p 0.95、repetition penalty 1.2から開始する。
+公式手順はCUDAであり、Mac MPSは未保証なので、まずJSSODa固定5枚でload、本文、読順、反復、
+処理時間、RSSを診断する。custom code 3ファイルは固定snapshotで監査し、ネットワーク、subprocess、
+任意ファイル操作のimportがないことを確認したが、`trust_remote_code=True`は隔離評価CLIだけに許可する。
+非公式検証で推奨penalty 1.2の生成loop報告があるため、既存の反復検査を無効化せず、loop時は不合格を
+正本とする。penalty 1.3は原因診断として別runに限り、改善値を公式設定の結果へ混ぜない。
+
+固定5枚が総合CER 0.5%以下、ページ最大2.0%未満、列欠落・反復0を満たした場合だけ、dots.mocrと
+同じ先頭79枚へ進む。79枚でもページ最大2.0%未満を満たした場合だけ全JSSODa、VJRODa、
+開封済み30画面の順で進み、新しい未調整holdoutはその後まで封印しない。Markdown記号をCERのために
+恣意的に削除せず、モデルのraw textを既存の共通正規化へ渡す。
+
+image-onlyで正しい文字起こしの後に要約・箇条書きを付加するpageが出た場合、Markdown除去や
+first-block切出しでは救済しない。「文字起こし本文だけ」を明示するtext promptを別prompt IDで
+当該page→固定5枚の順に診断し、改善した場合も79枚を新規runで再評価する。
+
+2026-08-23実測では固定5枚を総合CER 0.2190%、最大0.9259%で通過したが、先頭79枚runは71枚時点で
+総合0.8385%、最大100%となりfail-fast終了した。`001626`は317文字の文字起こし部分が完全一致した後、
+同内容の要約箇条書きを付加して634正規化文字になった。明示text promptでも649 raw文字の出力が
+image-onlyと完全一致しCER 100%だった。first-block切出しは一般ページの段落境界と区別できないため
+採用せず、Sarashina2.2-OCRは本番候補から外す。71枚は3,266.33秒、最大RSS約16.42GiB、peak memory
+footprint約54.28GiB、swap 0であり、失敗原因を64GB unified memory不足とは判定しない。
+
 ## 7. Phase H4 — Codex確認縮小の段階評価
 
 H3の機械総合合格後にだけ着手する。
@@ -258,8 +287,21 @@ OCR品質が合格しても公開処理の安全性は別に検証する。
 作らないことも固定する。追加監査で確認したSQLite Online Backupの未接続は、公開・rollbackの
 書き込み予約後・canonical変更前に検証済み世代を原子的に作成し、参照をpublication履歴へ残す実装で解消した。
 実backupの復元と`integrity_check`、backup例外時のcanonical無変更は自動testで固定した。
-実ディスク不足と実process hang、本番filesystemでの世代公開は、mock DB例外だけで完了扱いにせず、
-隔離server運用試験を別途保存してH5を完了する。
+process hangについては親process側のstdout無通信期限、terminate、kill、generator破棄時回収を実装し、
+実processを使う回帰試験と隔離server試験で孤児process 0を確認する。実ディスク不足と
+本番filesystemでの世代公開は、mock DB例外だけで完了扱いにせず、隔離server運用試験を別途保存して
+H5を完了する。
+
+2026-08-23に実processがpage結果を1件返した後30秒sleepするケースを0.2秒無通信期限で実行し、
+5秒以内の失敗化と子PID消滅を確認した。本番と同じext4配置先では388,210,688 bytesのOnline Backup、
+原子的な世代公開、manifestと復元先の`integrity_check=ok`、canonical DBの前後SHA一致を確認し、
+監査用世代は検証後に削除した。active production releaseには当該backup moduleがまだ含まれないため、
+commit/deploy後のservice経路再確認を残す。実ENOSPCはhost filesystemを満杯にせず、Linux user namespace内の
+8MiB tmpfsとsynthetic SQLiteで再現し、canonical SHA・`integrity_check`・未公開世代数を検査する。
+
+同日の隔離実測は空き135,168 bytesでSQLite `OperationalError`を発生させ、canonical SHA不変、
+`integrity_check=ok`、公開世代0件を確認した。namespace終了時にtmpfsは破棄され、host側の一時mountpointと
+監査コードも削除した。H5の未完了はcommit/deploy後のactive service経路再確認だけとなる。
 
 ## 9. 完了条件
 
