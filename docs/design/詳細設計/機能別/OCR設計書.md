@@ -456,6 +456,10 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
   `000142`がCER 753.8883%・同一文節反復となった。停止までのpeak footprintは約6.90GiB、
   swap 0であり64GB unified memory不足ではない。変換元revisionもconfigから復元できないため、
   固定変換版を本番候補にせず、反復penaltyや文字列切出しで採用値を救済しない。
+- HunyuanOCR 1.5 BF16 GGUFは、公式llama.cpp生成条件で固定`000006`をCER 0.3378%で通過したが、
+  `000142`は段落重複・順序入替によりCER 13.0340%だった。最大RSS約14.34GiB、swap 0であり
+  64GB unified memory不足ではない。固定GGUF pairを本番候補にせず、段落dedupe・順序補正で
+  採用値を救済しない。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

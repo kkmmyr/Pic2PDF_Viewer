@@ -311,6 +311,19 @@ Layout-as-Thoughtは初回採用値から除外せず、追加説明・思考・
 64GB unified memory不足ではなく日本語縦書きの認識・読順・生成反復の不合格とし、残り3枚と
 79枚は実行しない。4bit版のpenalty追加や反復切出しで採用値を救済せず、本番候補から外す。
 
+続けてTencent `HunyuanOCR-1.5`を評価した。公式はPC・consumer GPU向けllama.cpp経路と、
+temperature 0、top_p 1、top_k無効、repetition penalty 1.08を明示する。Apple Siliconでは
+llama.cpp build `b10360-48d22e295`と、`prithivMLmods/HunyuanOCR-1.5-GGUF-Updated`
+revision`9ddd3b47beb0de305ecd89a717748bac080d7aee`のBF16本体・projectorを固定した。
+派生repoのApache-2.0 metadataには依存せず、元モデルのTencent Hunyuan Community Licenseを
+利用条件の正本とする。派生repoは元Tencent revisionを保持しないため、BF16 GGUF自体を候補として判定する。
+
+公式文書解析promptで`000006`は592文字中2文字誤り、CER 0.3378%、欠落・反復0で通過した。
+しかし`000142`は同一段落を二重出力して段落順も入れ替わり、913正解文字に対して1,030予測文字、
+CER 13.0340%だった。2枚総合CERは8.0399%。2枚目は14.57秒、process最大RSS約14.34GiB、
+peak footprint約13.28GiB、swap 0だった。ページ最大2.0%と列欠落・重複gateに不合格のため、
+残り3枚と79枚は実行せず、本番候補から外す。段落重複除去や順序並べ替えで採用値を救済しない。
+
 ## 7. Phase H4 — Codex確認縮小の段階評価
 
 H3の機械総合合格後にだけ着手する。

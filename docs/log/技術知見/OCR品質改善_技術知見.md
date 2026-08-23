@@ -451,3 +451,25 @@ Layout-as-Thoughtや反復抑制を先に追加せず、固定5枚の総合CER 0
 footprint 7,409,799,056 byte、swap 0であり、64GB unified memory不足ではない。専用CLIはraw出力を
 fsync保存し、custom Pythonもmodel fingerprintへ含める。固定revisionは本番候補から外し、
 反復penalty・文字列切出し・Layout-as-Thoughtによる同一候補の救済は行わない。
+
+## 22. 2026-08-23: HunyuanOCR 1.5 BF16 llama.cpp診断
+
+[Tencent公式model card](https://huggingface.co/tencent/HunyuanOCR)は1B級HunyuanOCR 1.5、
+最大4K画像・128K context、llama.cppによるPC配備、temperature 0・top_p 1・top_k無効・
+repetition penalty 1.08の共通生成条件を示す。調査時revisionは
+`449e7d471a8a1ef5bd5d652e4881183d7252cbc7`、licenseはTencent Hunyuan Community Licenseである。
+日本語縦書き小説のCER・段落重複率は公開していない。
+
+[BF16 GGUF派生](https://huggingface.co/prithivMLmods/HunyuanOCR-1.5-GGUF-Updated) revision
+`9ddd3b47beb0de305ecd89a717748bac080d7aee`から、BF16本体1.0GBとprojector 951MBだけを取得した。
+SHA-256は本体`489dc42338cac27b1d93b7f503b5df65d8e829dd33b43bad94227d929d8a4541`、
+projector`2c9c459f68a9a3c221b1a8088d9c91ac1007ef22aa89045108d14d949f9a3994`である。
+派生metadataのApache-2.0表記は元licenseを上書きする根拠とせず、元Tencent revisionも埋め込まれて
+いないため、このGGUF pair自体を独立候補として扱った。
+
+llama.cpp build`b10360-48d22e295`、公式中国語文書解析prompt、最大4,096 tokenで固定2枚を実行した。
+llama-cli出力fileの固定`User:` / `Assistant:` framingだけをprotocolとして分離し、assistant本文へは
+後処理していない。`000006`はCER 0.3378%で通過したが、`000142`は段落の二重出力と順序入替により
+CER 13.0340%、2枚総合8.0399%となった。2枚目14.57秒、最大RSS 15,393,259,520 byte、peak
+footprint 14,257,417,832 byte、swap 0である。64GB不足ではなく列読順・重複品質の不合格とし、
+残り3枚と79枚を実行しない。段落dedupe・順序補正・再promptで採用値を救済しない。
