@@ -42,6 +42,7 @@
 | dots.mocr Apple Siliconスモーク | 通過 | JSSODa縦書き1〜4段とPaddleOCR-VL最大外れ値の固定5枚で総合CER 0.4654%、最大0.6614%、列欠落・反復0 |
 | dots.mocr JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚の最良layout版で総合CER 0.8990%、最大4.0155%。2.0% gate未達のため本番候補へ昇格しない |
 | Unlimited-OCR Apple Siliconスモーク | fail-fast完了 | 固定5枚すべてで出力反復。総合CER 690.7200%、最大1,069.3122%のため79枚へ進めず不採用 |
+| Nemotron Parse 2.0 MLX 8bitスモーク | fail-fast完了 | 通常promptと日本語decodeのruntime不整合を回避後も、固定1枚目で誤認文節が4,096 token上限まで反復したため拡大しない |
 | 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -274,6 +275,21 @@ JSSODa固定5枚で総合CER 0.5%以下、ページ最大2.0%未満、列欠落�
 約7.42GB、peak memory footprint約13.44GB、swap 0であり、64GB unified memory不足とは判定しない。
 公開screening gateを固定5枚で不合格としたため79枚へ進めず、Unlimited-OCRを本番候補から外す。
 反復を隠すno-repeat n-gramや重複削除を採用値へ使わず、必要なら生成loopの原因診断だけを別runにする。
+
+次にNVIDIA `NVIDIA-Nemotron-Parse-2.0`を調査した。公式モデルは約903M parameterで
+CJKを含む多言語改善を謳うが、日本語縦書き固有値はない。MLX変換は
+`mlx-community/Nemotron-Parse-2.0-8bit` revision
+`e7e89479657fb3631028ac12b6bc0d5a59ceafe4`を固定した。4bitは変換元の公開試験で
+表の反復回帰があるため使わない。変換cardのApache-2.0表記に依存せず、元モデルの
+NVIDIA Open Model License 1.1を利用条件の正本とする。
+
+MLX-VLMの通常文promptでは`<<<<`反復となり、元実装の専用task token列
+`</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>`が必須だった。
+さらに標準のBPE streaming detokenizerは日本語token `キ`で`KeyError`になるため、
+評価時だけ`NaiveStreamingDetokenizer`で一括decodeした。それでもJSSODa固定先頭
+`000006`は誤認文節を4,096 token上限まで反復し、42.40秒、process最大RSS約2.20GB、
+peak footprint約41.66GB、swap 0だった。メモリ不足ではなく日本語縦書き品質の不合格とし、
+残り4枚と79枚は実行しない。反復削除、強制停止processor、本文切出しで採用値を救済しない。
 
 ## 7. Phase H4 — Codex確認縮小の段階評価
 

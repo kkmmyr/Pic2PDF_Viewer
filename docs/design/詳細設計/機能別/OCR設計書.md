@@ -447,6 +447,11 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
 - Unlimited-OCR BF16は、MLX-VLM 0.6.15の固定5枚で全ページが生成反復し、総合CER
   690.7200%、ページ最大1,069.3122%だったため本番候補にしない。最大RSS約7.42GB、swap 0なので
   64GB unified memory不足による不合格とは扱わない。反復除去後の本文を採用値へ転用しない。
+- Nemotron Parse 2.0 MLX 8bitは、元実装の専用task token列と日本語decode回避を
+  適用してもJSSODa固定先頭1枚で誤認文節が4,096 token上限まで反復した。
+  swap 0であり64GB unified memory不足ではない。標準MLX-VLMの逐次decodeでは
+  日本語tokenによる`KeyError`も起きるため、runtime修正だけで品質合格と見なさず、
+  固定revisionは本番候補にしない。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

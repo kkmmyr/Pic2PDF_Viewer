@@ -394,3 +394,34 @@ cropping有効、base 1024px、crop 640px、最大4,096 tokenを固定した。�
 したがって失敗原因は64GB unified memory不足ではなく、この固定MLX生成経路の日本語縦書き品質である。
 反復除去を品質値の救済へ使わず、79枚screeningへ進めない。予測CLIはmodel・prompt・入力SHAを固定し、
 raw textをページ単位でfsyncするため、将来runtime差分を診断する場合も今回の不採用値と混在させない。
+
+## 20. 2026-08-23: Nemotron Parse 2.0のMLX日本語縦書き診断
+
+[NVIDIA公式model card](https://huggingface.co/nvidia/NVIDIA-Nemotron-Parse-2.0)は、903M parameterの
+C-RADIO vision encoder + mBART decoderで、20,000 tokenの語彙拡張とCJK・Indicの改善を示す。
+MOSCARに日本語を含むが、公開指標は日本語縦書き小説の文字精度を直接保証しない。
+調査時の元モデルrevisionは`b6742064f4a8cf22a10383ece5e7fbead355ac04`、利用条件は
+NVIDIA Open Model License 1.1である。MLX変換のconfigにsource revisionは記録されておらず、
+変換元の厳密なcommitは復元できない。変換cardのApache-2.0 metadataは元licenseを上書きする
+根拠としない。
+
+[MLX 8bit変換](https://huggingface.co/mlx-community/Nemotron-Parse-2.0-8bit) revision
+`e7e89479657fb3631028ac12b6bc0d5a59ceafe4`は1,658,167,275 byteの重みを持ち、変換cardの
+M2 Pro計測はピークRAM 14.50GBである。4bit版は同cardの表文書で生成反復回帰を起こしたため、
+8bitだけを評価した。[MLX-VLM移植PR](https://github.com/Blaizzy/mlx-vlm/pull/1866)は同一入力の
+Hugging Face CPU経路とbyte-for-byte生成を確認しているが、非Latinの公開精度値はない。
+
+公開cardの「image-to-text onlyでpromptは無視」という説明を通常文`Extract the text`で
+実行すると、日本語ページは`<<<<`反復になった。同梱の元実装とgolden試験が使う
+`</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>`を
+明示すると、合成golden画像ではbbox・class付き構造出力に復帰した。したがって実運用上は
+promptが無視されると見なさない。
+
+同task tokenでJSSODa `000006`を実行すると、MLX-VLM 0.6.15および移植merge
+`8683ec195f57118e52674a5b97080f63db928b65`の両方で、BPE streaming detokenizerが日本語
+token `キ`をbyte mapで引き`KeyError`となった。`NaiveStreamingDetokenizer`へ隔離した
+評価経路だけを切り替えるとdecodeは完走したが、実文は少数の誤認断片後に同一文節を
+4,096 token上限まで反復した。42.40秒、process最大RSS約2.20GB、peak footprint約41.66GB、
+swap 0である。これは64GB unified memory不足ではなく、日本語縦書きの生成品質と
+runtime表示層の両方の不適合である。反復停止processorは幻覚を隠すため採用値へ使わず、
+固定5枚の残り4枚と79枚は実行しない。
