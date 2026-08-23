@@ -192,6 +192,13 @@
     },
     {
       "rule": "code-size",
+      "key": "scripts/maintenance/check_docs.py",
+      "owner": "quality",
+      "reason": "documentation links, nav, size, and lifecycle contracts remain one fail-closed pre-commit check",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "code-size",
       "key": "scripts/maintenance/ensemble_ocr_candidates.py",
       "owner": "novel-ocr",
       "reason": "candidate ledger parsing and ensemble reporting still share the reviewed OCR report schema",
@@ -291,9 +298,10 @@
       "scripts/maintenance/merge_ocr_consensus_gaps.py",
       "scripts/maintenance/seed_ocr_holdout_from_qa.py",
       "scripts/maintenance/ocr_holdout_ledger.py",
-      "scripts/maintenance/ocr_holdout_manifest.py",
-      "scripts/maintenance/seal_ocr_holdout.py",
-      "scripts/maintenance/ensemble_ocr_candidates.py",
+        "scripts/maintenance/ocr_holdout_manifest.py",
+        "scripts/maintenance/seal_ocr_holdout.py",
+        "scripts/maintenance/ensemble_ocr_candidates.py",
+        "scripts/maintenance/tests/test_check_docs.py",
         "scripts/maintenance/prepare_ocr_prevalidation_qa.py",
         "scripts/maintenance/paddle_ocr_worker.py",
         "scripts/maintenance/paddle_column_ocr_worker.py",
@@ -334,6 +342,19 @@
       "classification": "temporary",
       "owner": "novel-ocr",
       "reason": "timeboxed NDL OCR and Parseq training/recovery experiments",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "id": "ocr-model-screening-runners",
+      "patterns": [
+        "scripts/maintenance/dots_mocr_vertical_predict.py",
+        "scripts/maintenance/paddleocr_vl_vertical_predict.py",
+        "scripts/maintenance/sarashina_ocr_vertical_predict.py",
+        "scripts/maintenance/unlimited_ocr_vertical_predict.py"
+      ],
+      "classification": "temporary",
+      "owner": "novel-ocr",
+      "reason": "timeboxed reproduction of model-specific public vertical OCR screening runs; not a runtime API",
       "recheck_after": "2026-11-16"
     },
     {

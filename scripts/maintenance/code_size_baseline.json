@@ -9,9 +9,6 @@
   "backend/services/novel_db/search.py": 462,
   "backend/services/novel_db/surya_runtime.py": 440,
   "scripts/maintenance/check_claude_drift.py": 433,
-  "scripts/maintenance/ensemble_ocr_candidates.py": 553,
-  "scripts/maintenance/eval_ornith_mlx.py": 441,
-  "scripts/maintenance/eval_ornith_mlx_gate_b.py": 405,
-  "scripts/maintenance/eval_ornith_mlx_gate_b2.py": 694,
-  "scripts/maintenance/eval_ornith_mlx_gate_b4.py": 570
+  "scripts/maintenance/check_docs.py": 479,
+  "scripts/maintenance/ensemble_ocr_candidates.py": 553
 }

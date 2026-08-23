@@ -387,8 +387,10 @@ Levenshteinで既存の編集距離と完全一致させ、以後はページ単
 
 OCR agentのheartbeat timeout、部分ページ、worker出力不正はstaging/runを失敗または未完了の
 状態へ留め、canonical本文へ到達しない。これらのDB不変条件は自動testで固定するが、backup失敗、
-SQLite Online Backupの生成・復元、backup失敗時の無変更は自動testで固定する。実ディスク不足、
-実process hang、および本番と同じfilesystem上での世代公開は隔離serverの運用試験を別途必要とする。
+SQLite Online Backupの生成・復元、backup失敗時の無変更は自動testで固定する。実ディスク不足は
+user namespace内の容量制限tmpfs、実process hangは親process watchdog、本番と同じfilesystem上の
+世代公開はactive release自身からの復元検査で確認する。監査世代は期待したbackup rootとrun IDを
+照合した場合だけ検証後に削除し、canonical DBや通常のbackup世代を自動削除しない。
 
 ## 6. Codex補助QAの委任境界
 
@@ -442,6 +444,9 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
   開封済み30画面pilotでルビ混入と縦列読順崩壊を確認したため、正規本文の生成元にしない。
   利用する場合は外部候補としてstagingに隔離し、列coverage・約物・ルビを原画像で独立確認する。
   pilot差分率はverified ground truthに対するCERではなく、自動公開条件へ転用しない。
+- Unlimited-OCR BF16は、MLX-VLM 0.6.15の固定5枚で全ページが生成反復し、総合CER
+  690.7200%、ページ最大1,069.3122%だったため本番候補にしない。最大RSS約7.42GB、swap 0なので
+  64GB unified memory不足による不合格とは扱わない。反復除去後の本文を採用値へ転用しない。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

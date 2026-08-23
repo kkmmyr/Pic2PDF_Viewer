@@ -41,6 +41,7 @@
 | PaddleOCR-VL JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚で総合CER 9.8305%、最大569.5767%。外れ値除外後も総合1.9573%、最大25.8567%のため不採用 |
 | dots.mocr Apple Siliconスモーク | 通過 | JSSODa縦書き1〜4段とPaddleOCR-VL最大外れ値の固定5枚で総合CER 0.4654%、最大0.6614%、列欠落・反復0 |
 | dots.mocr JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚の最良layout版で総合CER 0.8990%、最大4.0155%。2.0% gate未達のため本番候補へ昇格しない |
+| Unlimited-OCR Apple Siliconスモーク | fail-fast完了 | 固定5枚すべてで出力反復。総合CER 690.7200%、最大1,069.3122%のため79枚へ進めず不採用 |
 | 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -256,6 +257,24 @@ image-onlyと完全一致しCER 100%だった。first-block切出しは一般ペ
 採用せず、Sarashina2.2-OCRは本番候補から外す。71枚は3,266.33秒、最大RSS約16.42GiB、peak memory
 footprint約54.28GiB、swap 0であり、失敗原因を64GB unified memory不足とは判定しない。
 
+追加調査した`yuta1984/ndlocrlite-web`の2026年4月再学習PARSeq 3モデルは、8月18日に評価済みの
+公式NDLOCR-Lite v1.2.3と30・50・100文字版のSHA-256がすべて一致した。派生Web実装にも24px入力の
+公開モデルへ16px shapeを指定する不整合があるため、新しい独立候補として再評価しない。
+`honmono-ocr`も公開benchmarkは縦書きを含むが、参照コードが404、モデルが認証なしで取得不能のため、
+固定実装を再現できる候補へ数えない。
+
+次候補はBaiduの`Unlimited-OCR` 3Bとし、公式MLX-VLM実装、MITのBF16変換
+`mlx-community/Unlimited-OCR-bf16` revision`6d9f675e3fa73dd49cd03f630868b1941c72803f`を固定する。
+公式のsingle-page基準prompt `document parsing.`、temperature 0、モデル固有後処理なしから開始する。
+raw textをそのまま共通正規化へ渡し、反復本文や誤認識を後処理で削除しない。
+JSSODa固定5枚で総合CER 0.5%以下、ページ最大2.0%未満、列欠落・反復0の場合だけ、同じ先頭79枚へ進む。
+
+固定5枚の実測では全ページが生成上限まで反復し、3,653正解文字に対して正規化後の総合CER
+690.7200%、ページ最大1,069.3122%、完全一致0%だった。5枚推論は144.00秒、process最大RSS
+約7.42GB、peak memory footprint約13.44GB、swap 0であり、64GB unified memory不足とは判定しない。
+公開screening gateを固定5枚で不合格としたため79枚へ進めず、Unlimited-OCRを本番候補から外す。
+反復を隠すno-repeat n-gramや重複削除を採用値へ使わず、必要なら生成loopの原因診断だけを別runにする。
+
 ## 7. Phase H4 — Codex確認縮小の段階評価
 
 H3の機械総合合格後にだけ着手する。
@@ -301,7 +320,10 @@ commit/deploy後のservice経路再確認を残す。実ENOSPCはhost filesystem
 
 同日の隔離実測は空き135,168 bytesでSQLite `OperationalError`を発生させ、canonical SHA不変、
 `integrity_check=ok`、公開世代0件を確認した。namespace終了時にtmpfsは破棄され、host側の一時mountpointと
-監査コードも削除した。H5の未完了はcommit/deploy後のactive service経路再確認だけとなる。
+監査コードも削除した。commit/deploy後のactive release
+`/opt/pic2pdf-viewer/backend-20260823102845-20977`から同じbackup moduleを実行し、本番ext4上で
+388,210,688 bytesの世代公開、manifestと復元先の`integrity_check=ok`、canonical SHA不変を再確認した。
+監査用世代だけを検証後に削除し、H5の障害注入・本番service経路確認を完了した。
 
 ## 9. 完了条件
 

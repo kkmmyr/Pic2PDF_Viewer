@@ -370,3 +370,27 @@ backup moduleが未配置だったため、deploy後のservice経路確認とroo
 その後、Linux user namespace内の8MiB tmpfsで実ENOSPCを再現し、空き135,168 bytesで
 SQLite `OperationalError`、canonical SHA不変、`integrity_check=ok`、公開世代0件を確認した。
 host filesystemとproduction DBは変更していないため、残るのはactive releaseへ実装を配置した後の再確認である。
+
+deploy後のactive release`/opt/pic2pdf-viewer/backend-20260823102845-20977`でbackup moduleの配置を確認し、
+そのrelease自身から本番ext4へ388,210,688 bytesの監査世代を作成した。manifestと復元DBはともに
+`integrity_check=ok`、canonical DBの前後SHAは一致した。対象が監査用run IDで期待したbackup root直下に
+あることを検証してから、その監査世代だけを削除した。これによりH5の残件は解消した。
+
+次候補の再調査では、`honmono-ocr`が14,256実画像行の公開benchmarkで縦書きを含む一方、参照先GitHubは
+404、モデルは認証なしで取得できず、固定実装を再現できなかったため候補から外した。
+`yuta1984/ndlocrlite-web`の入力高24px PARSeqも確認したが、公式NDLOCR-Lite v1.2.3の30・50・100文字版と
+3 SHAが完全一致し、既に開封済み30画面で単体CER 3.1832%と判明した候補の再配布だった。さらにWeb側は
+24pxモデルへ16px入力を指定しており、そのままの推論経路はshape不一致になる。独立候補として再評価しない。
+
+代わりに、2026年6月公開のBaidu `Unlimited-OCR` 3Bを次候補とする。公式MLX-VLMはsingle-pageに
+`document parsing.`を基準promptとして示し、モデル実装がApple Siliconへ追加済みである。MITのBF16変換
+revision`6d9f675e3fa73dd49cd03f630868b1941c72803f`を取得し、生成反復を隠す固有後処理を加えず、
+JSSODa固定5枚から同じfail-fast gateで評価する。汎用文書benchmarkと日本語縦書き品質は同一視しない。
+
+取得したsnapshotは復元後6.68GBで、MLX-VLM 0.6.15、prompt `document parsing.`、temperature 0、
+cropping有効、base 1024px、crop 640px、最大4,096 tokenを固定した。固定5枚はすべて本文途中から
+同じ断片を生成上限まで反復し、3,653正解文字に対する総合CER 690.7200%、ページ最大1,069.3122%、
+完全一致0%だった。5枚は144.00秒、process最大RSS約7.42GB、peak footprint約13.44GB、swap 0である。
+したがって失敗原因は64GB unified memory不足ではなく、この固定MLX生成経路の日本語縦書き品質である。
+反復除去を品質値の救済へ使わず、79枚screeningへ進めない。予測CLIはmodel・prompt・入力SHAを固定し、
+raw textをページ単位でfsyncするため、将来runtime差分を診断する場合も今回の不採用値と混在させない。
