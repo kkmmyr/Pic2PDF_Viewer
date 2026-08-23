@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { Check, Eye, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
 import { Alert } from '@/components/ui/alert';
@@ -35,11 +37,26 @@ const QWEN_DOTS_ENGINE_LABELS: Record<OcrSelectedEngine, string> = {
     codex: '人手確認済み補正',
 };
 
+type ImageZoom = 'fit' | 'double';
+
 export function getOcrEngineLabels(engine: string | undefined): Record<OcrSelectedEngine, string> {
     return engine === 'qwen35_dots_review_v1' ? QWEN_DOTS_ENGINE_LABELS : LEGACY_ENGINE_LABELS;
 }
 
+function getSelectionReasonLabel(reason: string): string {
+    const labels: Record<string, string> = {
+        qwen_clean: 'Qwen候補に機械的な注意信号なし',
+        dots_materially_more_complete: 'dots.mocr候補の方が明確に情報量が多い',
+        dots_image_only_review_required: '両候補に本文なし（dots.mocrが画像のみと判定）',
+        qwen_clean_dots_candidate_error: 'Qwen候補を採用（dots.mocr候補の解析に失敗）',
+        qwen_flagged_dots_candidate_error: 'Qwen候補に注意信号あり・dots.mocr候補の解析に失敗',
+        qwen_flagged_dots_empty_review_required: 'Qwen候補に注意信号あり・dots.mocr候補に本文なし',
+    };
+    return labels[reason] ?? `Qwen候補の注意信号によりdots.mocr候補を採用: ${reason}`;
+}
+
 export function OCRQaPanel() {
+    const [imageZoom, setImageZoom] = useState<ImageZoom>('double');
     const {
         runsQuery,
         awaitingRuns,
@@ -164,16 +181,55 @@ export function OCRQaPanel() {
                         </nav>
 
                         {selectedPage ? (
-                            <div className="grid min-w-0 grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+                            <div
+                                className={`grid min-w-0 grid-cols-1 gap-4 p-4 ${
+                                    imageZoom === 'fit'
+                                        ? 'xl:grid-cols-[minmax(0,1fr)_minmax(18rem,1fr)]'
+                                        : ''
+                                }`}
+                            >
                                 <div className="min-w-0">
-                                    <h3 className="mb-2 font-semibold">
-                                        原画像 — 画面 {selectedPage.page_no}
-                                    </h3>
-                                    <div className="flex max-h-[520px] justify-center overflow-auto rounded-lg bg-gray-100 p-2 dark:bg-gray-950">
+                                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                        <h3 className="font-semibold">
+                                            原画像 — 画面 {selectedPage.page_no}
+                                        </h3>
+                                        <div
+                                            role="group"
+                                            aria-label="原画像の表示倍率"
+                                            className="flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600"
+                                        >
+                                            {(
+                                                [
+                                                    ['fit', '画面幅'],
+                                                    ['double', '2倍'],
+                                                ] as const
+                                            ).map(([value, label]) => (
+                                                <button
+                                                    key={value}
+                                                    type="button"
+                                                    aria-pressed={imageZoom === value}
+                                                    onClick={() => setImageZoom(value)}
+                                                    className={`rounded-md px-2.5 py-1 text-xs font-medium ${
+                                                        imageZoom === value
+                                                            ? 'bg-primary-600 text-white'
+                                                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
+                                                    }`}
+                                                >
+                                                    {label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <div
+                                        key={selectedPage.page_no}
+                                        tabIndex={0}
+                                        aria-label="拡大した原画像。上下方向はホイール、トラックパッド、矢印キーで移動できます"
+                                        className="h-[calc(100dvh-8rem)] min-h-[640px] max-h-[1200px] overflow-x-hidden overflow-y-auto rounded-lg bg-gray-100 p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-950"
+                                    >
                                         <img
                                             src={`${API_CONFIG.BASE_URL}${selectedPage.image_url}`}
                                             alt={`${detail.book_name} 画面 ${selectedPage.page_no}`}
-                                            className="h-auto max-w-full object-contain"
+                                            className="h-auto w-full object-contain"
                                         />
                                     </div>
                                 </div>
@@ -189,6 +245,15 @@ export function OCRQaPanel() {
                                             </span>
                                         ))}
                                     </div>
+                                    {selectedPage.selection_reason && (
+                                        <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                                            初期候補の選択理由:{' '}
+                                            {getSelectionReasonLabel(selectedPage.selection_reason)}
+                                            <span className="ml-1 font-mono text-[11px] opacity-75">
+                                                ({selectedPage.selection_reason})
+                                            </span>
+                                        </p>
+                                    )}
                                     <div className="grid gap-2">
                                         <label className="flex items-center gap-3 text-sm">
                                             採用候補

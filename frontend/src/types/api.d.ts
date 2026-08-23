@@ -3692,6 +3692,8 @@ export interface components {
             selected_engine: 'primary' | 'external' | 'codex';
             /** Corrected Text */
             corrected_text: string | null;
+            /** Selection Reason */
+            selection_reason: string | null;
             /** Index Eligible */
             index_eligible: boolean;
             /** Image Url */

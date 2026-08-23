@@ -189,6 +189,22 @@ def test_run_checkpoints_raw_html_provenance_and_repetition(
     ) == (0, 1)
 
 
+def test_review_mode_checkpoints_raw_candidate_parse_error(tmp_path: Path) -> None:
+    base = _config(tmp_path)
+    config = predict.RunConfig(**{**base.__dict__, "allow_empty_prediction": True})
+    response = "<div></div>"
+
+    assert predict.run_predictions(
+        config,
+        engine_factory=lambda _config: _Engine(response),
+    ) == (1, 1)
+
+    record = json.loads(config.output_path.read_text(encoding="utf-8"))
+    assert record["pred"] == ""
+    assert record["raw_response"] == response
+    assert record["candidate_error"] == "Qwen HTML has no non-empty layout blocks"
+
+
 def test_resume_rejects_tampered_raw_html_before_engine_creation(
     tmp_path: Path,
 ) -> None:

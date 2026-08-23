@@ -73,14 +73,22 @@ def _config(tmp_path: Path) -> Any:
 
 
 class _Engine:
-    def __init__(self, *, fail_on_call: int | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fail_on_call: int | None = None,
+        responses: list[str] | None = None,
+    ) -> None:
         self.calls: list[Path] = []
         self.fail_on_call = fail_on_call
+        self.responses = responses
 
     def generate(self, image_path: Path) -> str:
         self.calls.append(image_path)
         if self.fail_on_call == len(self.calls):
             raise RuntimeError("inference failed")
+        if self.responses is not None:
+            return self.responses[len(self.calls) - 1]
         return f"本文{len(self.calls)}"
 
 
@@ -144,6 +152,22 @@ def test_layout_response_concatenates_model_reading_order() -> None:
     assert cell_count == 3
 
 
+def test_layout_response_allows_picture_only_in_review_mode() -> None:
+    response = json.dumps(
+        [{"bbox": [0, 0, 10, 10], "category": "Picture"}],
+        ensure_ascii=False,
+    )
+
+    text, cell_count = predict._extract_prediction(
+        response,
+        response_mode="layout_json",
+        allow_empty_prediction=True,
+    )
+
+    assert text == ""
+    assert cell_count == 1
+
+
 def test_layout_response_rejects_invalid_json() -> None:
     with pytest.raises(ValueError, match="invalid JSON"):
         predict._extract_prediction("not-json", response_mode="layout_json")
@@ -189,6 +213,28 @@ def test_run_checkpoints_each_page_and_records_generation_contract(
     assert records[0]["temperature"] == 0.1
     assert len(records[0]["model_fingerprint"]) == 64
     assert len(records[0]["prompt_sha256"]) == 64
+
+
+def test_review_mode_checkpoints_invalid_layout_json_as_auditable_candidate_error(
+    tmp_path: Path,
+) -> None:
+    base = _config(tmp_path)
+    config = predict.RunConfig(
+        **{
+            **base.__dict__,
+            "response_mode": "layout_json",
+            "allow_empty_prediction": True,
+        }
+    )
+    engine = _Engine(responses=['[{"category":"Text"', '[{"category":"Text"'])
+
+    generated, completed = predict.run_predictions(config, engine_factory=lambda _config: engine)
+
+    records = [json.loads(line) for line in config.output_path.read_text(encoding="utf-8").splitlines()]
+    assert (generated, completed) == (2, 2)
+    assert [record["pred"] for record in records] == ["", ""]
+    assert all(record["raw_response"].startswith("[") for record in records)
+    assert all(record["candidate_error"].startswith("dots.mocr layout response is invalid JSON") for record in records)
 
 
 def test_failed_page_keeps_prior_checkpoint_and_resume_skips_it(

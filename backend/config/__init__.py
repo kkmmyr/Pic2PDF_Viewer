@@ -67,7 +67,7 @@ class _AppSettings(BaseSettings):
     # OCR パッケージディレクトリ（ocr_engine.py が置かれた common/ocr/ パス）
     # ocr_worker.py サブプロセスに OCR_PATH 環境変数として渡される
     OCR_PACKAGE_PATH: str | None = None
-    # OCRエンジン（surya2 / yomitoku）
+    # OCRエンジン（surya2 / yomitoku / qwen35_dots_review_v1）
     OCR_ENGINE: str = "surya2"
     # Surya OCR 2 OpenAI互換推論サーバー
     SURYA_INFERENCE_URL: str = "http://127.0.0.1:8768/v1"
@@ -92,6 +92,13 @@ class _AppSettings(BaseSettings):
     OCR_EXTERNAL_CONFIDENCE_MEDIAN: float = Field(default=0.85, ge=0.0, le=1.0)
     OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN: float = Field(default=0.75, ge=0.0, le=1.0)
     OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO: float = Field(default=0.25, ge=0.0, le=1.0)
+    # Qwen3.5 + dots.mocrレビュー前提複合worker（Apple Siliconで逐次実行）
+    OCR_QWEN_PYTHON: str | None = None
+    OCR_DOTS_PYTHON: str | None = None
+    OCR_QWEN_MODEL_PATH: Path | None = None
+    OCR_DOTS_MODEL_PATH: Path | None = None
+    OCR_QWEN_DOTS_ARTIFACT_DIR: Path | None = None
+    OCR_QWEN_DOTS_STAGE_TIMEOUT_SEC: float = Field(default=21600.0, gt=0.0)
     OCR_AGENT_ENABLED: bool = False
     OCR_AGENT_HEARTBEAT_TIMEOUT_SEC: int = Field(default=300, ge=1)
     # 同人誌入力フォルダの自動監視を有効にするか

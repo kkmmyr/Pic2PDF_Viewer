@@ -33,7 +33,8 @@
 | [0019](0019_apple-silicon-mlx-inference.md) | Apple Siliconのローカル推論にMLXを追加 | Accepted | 2026-08-17 |
 | [0020](0020_page-level-lancedb-icu-shadow.md) | Page-level LanceDB ICU BM25を世代管理shadowで導入 | Accepted | 2026-08-22 |
 | [0021](0021_sol-image-ocr-campaign.md) | Sol画像OCRを版管理付きcampaignとして段階導入 | Accepted | 2026-08-19 |
-| [0022](0022_review-assisted-qwen-dots-ocr.md) | Qwen3.5 OCRとdots.mocrを全ページレビュー前提で採用 | Accepted | 2026-08-23 |
+| [0022](0022_review-assisted-qwen-dots-ocr.md) | Qwen3.5 OCRとdots.mocrを全ページレビュー前提で採用 | Superseded by ADR-0023 | 2026-08-23 |
+| [0023](0023_risk-scoped-qwen-dots-review.md) | Qwen＋dots OCRの人手QAをリスク対象へ限定 | Accepted | 2026-08-23 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順

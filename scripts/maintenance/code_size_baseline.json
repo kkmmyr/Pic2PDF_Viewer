@@ -1,7 +1,7 @@
 {
   "backend/scripts/eval_novel_dense.py": 691,
   "backend/scripts/eval_novel_reranker_mlx.py": 584,
-  "backend/scripts/eval_novel_search.py": 673,
+  "backend/scripts/eval_novel_search.py": 672,
   "backend/scripts/export_novel_embeddings_mlx.py": 591,
   "backend/scripts/export_novel_embeddings_pplx_mlx.py": 413,
   "backend/services/novel_db/full_builder.py": 409,
@@ -10,5 +10,7 @@
   "backend/services/novel_db/surya_runtime.py": 440,
   "scripts/maintenance/check_claude_drift.py": 433,
   "scripts/maintenance/check_docs.py": 479,
-  "scripts/maintenance/ensemble_ocr_candidates.py": 553
+  "scripts/maintenance/dots_mocr_vertical_predict.py": 575,
+  "scripts/maintenance/ensemble_ocr_candidates.py": 553,
+  "scripts/maintenance/qwen35_ocr_jp_vertical_predict.py": 486
 }

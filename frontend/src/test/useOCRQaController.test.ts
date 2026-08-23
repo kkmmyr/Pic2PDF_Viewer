@@ -58,6 +58,7 @@ const runDetail: OcrQaRunDetail = {
             external_text: '',
             selected_engine: 'primary',
             corrected_text: null,
+            selection_reason: null,
             index_eligible: true,
             image_url: '/image',
         },

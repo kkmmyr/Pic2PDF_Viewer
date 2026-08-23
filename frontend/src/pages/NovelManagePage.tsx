@@ -58,7 +58,7 @@ export default function NovelManagePage() {
     } = useNovelManage();
 
     return (
-        <div className="mx-auto max-w-6xl px-4 py-8">
+        <div className="mx-auto max-w-[1800px] px-4 py-8">
             {/* ヘッダー */}
             <div className="flex items-center gap-3 mb-6">
                 <div className="bg-primary-100 dark:bg-primary-900/40 p-2 rounded-lg">

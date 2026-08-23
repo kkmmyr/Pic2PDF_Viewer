@@ -164,6 +164,56 @@ def test_selector_uses_non_repeating_materially_longer_dots_candidate(
     assert selected[0]["selection_reason"] == "dots_materially_more_complete"
     assert selected[0]["primary_text"] == qwen["pred"]
     assert selected[0]["external_text"] == dots["pred"]
+    assert selected[0]["primary_raw_output"] == qwen["raw_response"]
+    assert selected[0]["external_raw_output"] == dots["raw_response"]
+    assert selected[0]["primary_provenance"]["model_revision"] == "qwen-revision"
+
+
+def test_selector_falls_back_from_qwen_parse_error_in_review_mode(tmp_path: Path) -> None:
+    qwen = _record("illustrated", "", engine="qwen")
+    qwen.update(
+        html_truncated=False,
+        suspicious_repetition=False,
+        candidate_error="Qwen HTML has no non-empty layout blocks",
+    )
+    dots = _record("illustrated", "画像内の台詞", engine="dots")
+    qwen_path = tmp_path / "qwen.jsonl"
+    dots_path = tmp_path / "dots.jsonl"
+    _write(qwen_path, [qwen])
+    _write(dots_path, [dots])
+
+    selected = select.select_predictions(
+        qwen_path=qwen_path,
+        dots_path=dots_path,
+        allow_empty_candidates=True,
+    )
+
+    assert selected[0]["selected_engine"] == "dots.mocr"
+    assert selected[0]["selection_reason"] == "qwen_candidate_error"
+
+
+def test_selector_keeps_clean_qwen_when_dots_candidate_cannot_be_parsed(
+    tmp_path: Path,
+) -> None:
+    qwen = _record("long-page", "正常本文", engine="qwen")
+    qwen.update(html_truncated=False, suspicious_repetition=False)
+    dots = _record("long-page", "", engine="dots")
+    dots["candidate_error"] = "dots.mocr layout response is invalid JSON: Unterminated string"
+    qwen_path = tmp_path / "qwen.jsonl"
+    dots_path = tmp_path / "dots.jsonl"
+    _write(qwen_path, [qwen])
+    _write(dots_path, [dots])
+
+    selected = select.select_predictions(
+        qwen_path=qwen_path,
+        dots_path=dots_path,
+        allow_empty_candidates=True,
+    )
+
+    assert selected[0]["selected_engine"] == "qwen3.5-ocr-jp-2b"
+    assert selected[0]["pred"] == "正常本文"
+    assert selected[0]["selection_reason"] == "qwen_clean_dots_candidate_error"
+    assert selected[0]["external_provenance"]["candidate_error"].startswith("dots.mocr layout response is invalid JSON")
 
 
 def test_selector_recomputes_repetition_and_rejects_input_mismatch(

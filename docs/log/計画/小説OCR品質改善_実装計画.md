@@ -48,7 +48,7 @@
 | Hayai OCR v2 MPSスモーク | fail-fast完了 | 固定1枚目が8文字出力・CER 99.4932%だったため残り4枚へ進めず不採用 |
 | Qwen3.5-OCR-JP-2B単体スモーク | fail-fast完了 | 固定5枚中4枚は総合CER 0.2416%だが、`001751`が8,000 token反復し、単体総合344.1829%のため不採用 |
 | Qwen3.5 OCR + dots.mocr初期複合候補 | 15/79枚でfail-fast完了 | 総合CER 0.5166%、最大3.1042%。最大ページは反復・HTML切断なしでfallback不能のため自動公開候補として不採用 |
-| Qwen3.5 OCR + dots.mocrレビュー版 | 導入準備中 | 開封済み79枚を完走し、Qwen 72枚・dots 7枚、総合CER 0.4091%、最大2.8835%。全ページQA前提で正式採用候補、worker統合と1冊pilotが残る |
+| Qwen3.5 OCR + dots.mocrレビュー版 | 1冊pilot完了 | 開封済み79枚の総合CER 0.4091%、最大2.8835%。実書籍57画面を19画面の所有者確認、7画面の追加原画像監査、31画面の機械支援監査で承認し、隔離DBの公開・backup・旧版rollbackに合格 |
 | 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -399,10 +399,11 @@ v2 selectorは既存15枚から`000260`だけをfallback対象にした。dots.m
 
 ## 7. Phase H4 — レビュー前提laneと確認縮小の段階評価
 
-ADR-0022により、Qwen＋dots複合版はH3の機械総合不合格でも全ページ画像照合を条件に導入できる。
-このlaneではQwenとdotsを全ページ生成し、全ページを`required`とする。narrativeは両候補本文と原画像を
-比較して必要箇所を
-`corrected_text`へ保存する。未修正予測と修正後本文を別集計し、全ページ承認まで公開しない。
+ADR-0023により、Qwen＋dots複合版はH3の機械総合不合格でもリスク対象の人手画像照合と監査付き残ページ承認を
+条件に導入できる。このlaneではQwenとdotsを全ページ生成し、clean以外の候補選択理由、候補解析失敗、反復、
+有意な文字量差、image-only、通常散文以外のlayout、分類未確定、内容riskとclean中央標本を`required`とする。
+残るclean通常本文は両候補・provenance・画像SHA・非空・非反復・文字量差を再検証し、QAメモへ機械支援承認を
+記録する。人手または機械支援の承認が全対象へ記録されるまで公開しない。
 
 開封済みJSSODa縦書き79枚のレビュー版は、反復・HTML切断4枚、非保持markup 1枚、隣接狭列の
 bbox読順違反1枚、dotsの有意な文字量増加1枚をdots初期候補へ切り替えた。総編集距離223/54,504文字、
@@ -411,7 +412,8 @@ bbox読順違反1枚、dotsの有意な文字量増加1枚をdots初期候補へ
 候補間のID・画像SHAに加えて、各候補のrevision・fingerprint・promptが全ページ同一であることを検証する。
 この値は開封後にsignalを調整したscreening値で、H3または未調整holdoutの合格値へ数えない。
 
-Codex確認の縮小または自動公開は、従来どおりH3の機械総合合格後にだけ着手する。
+自動公開は従来どおりH3の機械総合合格後にだけ着手する。人手確認範囲の縮小は、個人利用のpilotで
+候補切替全15画面、候補異常・分類未確定、clean標本を含む計19画面に重大問題がなかった実績を根拠とする。
 
 1. 同一画面3回で判定と差分が一致することを確認する。
 2. 100画面連続で構造化出力成功率99%以上、timeout・未回収process 0を確認する。
@@ -459,13 +461,20 @@ commit/deploy後のservice経路再確認を残す。実ENOSPCはhost filesystem
 388,210,688 bytesの世代公開、manifestと復元先の`integrity_check=ok`、canonical SHA不変を再確認した。
 監査用世代だけを検証後に削除し、H5の障害注入・本番service経路確認を完了した。
 
+同日のrun 184実書籍試験では、ADR-0023に従って全57画面を承認し、隔離DBで公開した。公開前backupは
+389,599,232 bytes、rollback前backupは390,479,872 bytesで、いずれもmanifest・SHA・復元DBの
+`integrity_check=ok`を確認した。旧run 76へrollback後、本文・文字数・page分類・索引可否・FTSは
+公開前と一致し、現在の57画像も存在・入力SHA一致した。画像絶対パスは現在環境へ再基準化され、
+`ocr_done_at`は切替時刻へ更新されるため、DBファイルのバイト一致をrollback成功条件にはしない。
+run 184は`completed / approved`で保持し、隔離DBのactive publicationはrun 76へ戻した。本番DBは未変更である。
+
 ## 9. 完了条件
 
 B-35のレビュー前提laneは次の全条件を満たした時に完了とする。
 
 - H1〜H5の受入条件が自動テストまたは保存済み監査成果物で検証される。
-- Qwen＋dots複合engineの版・両raw候補・候補切替理由が保存され、1冊の全ページQAと全narrativeページの原画像照合を終えている。
+- Qwen＋dots複合engineの版・両raw候補・候補切替理由が保存され、1冊のリスク対象・clean標本の人手QAと残ページの監査付き承認を終えている。
 - 必要な補正文を保存し、承認後公開と旧版rollbackを実行して本文・FTS・履歴の整合を確認する。
 - QA未承認・品質未達・障害時に旧公開本文と索引が保持される。
-- 自動公開またはCodex確認縮小は、正式holdoutでpolicy JSONの全項目が機械候補として合格するまで無効である。
+- 自動公開は、正式holdoutでpolicy JSONの全項目が機械候補として合格するまで無効である。
 - `docs/log/変更履歴.md` とB-35バックログを更新し、完了実績をarchiveへ移す。

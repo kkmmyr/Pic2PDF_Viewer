@@ -55,6 +55,7 @@ class OcrQaPageOut(BaseModel):
     external_text: str
     selected_engine: Literal["primary", "external", "codex"]
     corrected_text: str | None
+    selection_reason: str | None
     index_eligible: bool
     image_url: str
 

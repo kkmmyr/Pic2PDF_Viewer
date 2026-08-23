@@ -23,7 +23,8 @@ from typing import Protocol
 _ROOT_DIR = Path(__file__).resolve().parents[2]
 _MAINTENANCE_DIR = Path(__file__).resolve().parent
 _BACKEND_DIR = _ROOT_DIR / "backend"
-for _import_path in (_MAINTENANCE_DIR, _BACKEND_DIR):
+_NOVEL_DB_SERVICE_DIR = _BACKEND_DIR / "services" / "novel_db"
+for _import_path in (_MAINTENANCE_DIR, _NOVEL_DB_SERVICE_DIR):
     if str(_import_path) not in sys.path:
         sys.path.insert(0, str(_import_path))
 
@@ -35,8 +36,7 @@ from dots_mocr_vertical_predict import (  # noqa: E402  # pyright: ignore[report
     _validate_checkpoint,
     load_vertical_pages,
 )
-
-from services.novel_db.ocr_content_guards import (  # noqa: E402
+from ocr_content_guards import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     has_suspicious_repetition,
 )
 
@@ -104,7 +104,9 @@ class _LayoutHtmlParser(HTMLParser):
         try:
             x1, y1, x2, y2 = (float(part) for part in parts)
         except ValueError as exc:
-            raise ValueError("Qwen HTML layout block has a non-numeric data-bbox") from exc
+            raise ValueError(
+                "Qwen HTML layout block has a non-numeric data-bbox"
+            ) from exc
         if x2 <= x1 or y2 <= y1:
             raise ValueError("Qwen HTML layout block has an invalid data-bbox")
 
@@ -117,7 +119,9 @@ class _LayoutHtmlParser(HTMLParser):
         has_bbox = "data-bbox" in attr_map
         has_label = "data-label" in attr_map
         if has_bbox != has_label:
-            raise ValueError("Qwen HTML layout block must have data-bbox and data-label")
+            raise ValueError(
+                "Qwen HTML layout block must have data-bbox and data-label"
+            )
         if has_bbox:
             if self._block_tag is not None:
                 raise ValueError("Qwen HTML layout blocks must not be nested")
@@ -267,7 +271,10 @@ def run_predictions(
 ) -> tuple[int, int]:
     pages = load_vertical_pages(config)
     fingerprint = model_fingerprint(config.model_path)
-    checkpoint = _load_checkpoint(config.output_path)
+    checkpoint = _load_checkpoint(
+        config.output_path,
+        allow_empty_prediction=config.allow_empty_prediction,
+    )
     _validate_checkpoint(
         config=config,
         pages=pages,
@@ -285,7 +292,10 @@ def run_predictions(
         raw_response = record.get("raw_response")
         if not isinstance(raw_response, str) or not raw_response.strip():
             raise ValueError(f"checkpoint id {record_id} has no raw_response")
-        if record.get("raw_response_sha256") != hashlib.sha256(raw_response.encode()).hexdigest():
+        if (
+            record.get("raw_response_sha256")
+            != hashlib.sha256(raw_response.encode()).hexdigest()
+        ):
             raise ValueError(f"checkpoint id {record_id} raw_response_sha256 mismatch")
 
     pending = [page for page in pages if page.record_id not in checkpoint]
@@ -300,41 +310,50 @@ def run_predictions(
         started_at = time.monotonic()
         response = engine.generate(page.image_path)
         elapsed = time.monotonic() - started_at
-        prediction, block_count, html_truncated = extract_html_prediction(response)
+        candidate_error: str | None = None
+        try:
+            prediction, block_count, html_truncated = extract_html_prediction(response)
+        except ValueError as exc:
+            if not config.allow_empty_prediction:
+                raise
+            prediction = ""
+            block_count = 0
+            html_truncated = False
+            candidate_error = str(exc)
         markup_tags = fallback_markup_tags(response)
         bbox_order_suspicious = has_suspicious_vertical_bbox_order(response)
         raw_sha256 = hashlib.sha256(response.encode()).hexdigest()
         repetition = has_suspicious_repetition(prediction)
-        _append_checkpoint(
-            config.output_path,
-            {
-                "id": page.record_id,
-                "pred": prediction,
-                "raw_response": response,
-                "raw_response_sha256": raw_sha256,
-                "layout_block_count": block_count,
-                "html_truncated": html_truncated,
-                "fallback_markup_tags": markup_tags,
-                "suspicious_vertical_bbox_order": bbox_order_suspicious,
-                "suspicious_repetition": repetition,
-                "input_sha256": page.image_sha256,
-                "image_relpath": page.image_relpath,
-                "model_revision": config.model_revision,
-                "model_fingerprint": fingerprint,
-                "engine_version": config.engine_version,
-                "prompt_id": config.prompt_id,
-                "prompt_sha256": prompt_sha256,
-                "seed": config.seed,
-                "max_tokens": config.max_tokens,
-                "temperature": config.temperature,
-                "top_p": config.top_p,
-                "response_mode": config.response_mode,
-                "html_protocol_version": HTML_PROTOCOL_VERSION,
-                "generation_mode": GENERATION_MODE,
-                "elapsed_seconds": elapsed,
-                "generated_at": datetime.now(UTC).isoformat(),
-            },
-        )
+        record = {
+            "id": page.record_id,
+            "pred": prediction,
+            "raw_response": response,
+            "raw_response_sha256": raw_sha256,
+            "layout_block_count": block_count,
+            "html_truncated": html_truncated,
+            "fallback_markup_tags": markup_tags,
+            "suspicious_vertical_bbox_order": bbox_order_suspicious,
+            "suspicious_repetition": repetition,
+            "input_sha256": page.image_sha256,
+            "image_relpath": page.image_relpath,
+            "model_revision": config.model_revision,
+            "model_fingerprint": fingerprint,
+            "engine_version": config.engine_version,
+            "prompt_id": config.prompt_id,
+            "prompt_sha256": prompt_sha256,
+            "seed": config.seed,
+            "max_tokens": config.max_tokens,
+            "temperature": config.temperature,
+            "top_p": config.top_p,
+            "response_mode": config.response_mode,
+            "html_protocol_version": HTML_PROTOCOL_VERSION,
+            "generation_mode": GENERATION_MODE,
+            "elapsed_seconds": elapsed,
+            "generated_at": datetime.now(UTC).isoformat(),
+        }
+        if candidate_error is not None:
+            record["candidate_error"] = candidate_error
+        _append_checkpoint(config.output_path, record)
         completed += 1
         print(
             f"checkpointed {page.record_id}: {completed}/{len(pages)} "
@@ -350,7 +369,9 @@ class _MpsEngine:
     def __init__(self, config: RunConfig) -> None:
         installed = importlib.metadata.version("transformers")
         if installed != config.engine_version:
-            raise ValueError(f"transformers version mismatch: {installed} != {config.engine_version}")
+            raise ValueError(
+                f"transformers version mismatch: {installed} != {config.engine_version}"
+            )
         import torch  # pyright: ignore[reportMissingImports]
         from transformers import (  # pyright: ignore[reportMissingImports]
             AutoModelForImageTextToText,
@@ -423,6 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-tokens", type=int, default=8000)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--id", action="append", dest="selected_ids", default=[])
+    parser.add_argument("--allow-empty-candidate", action="store_true")
     return parser
 
 
@@ -453,6 +475,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         selected_ids=tuple(args.selected_ids),
         response_mode="html_layout_v1",
         allow_custom_model_code=False,
+        allow_empty_prediction=args.allow_empty_candidate,
     )
     generated, completed = run_predictions(config, engine_factory=_MpsEngine)
     print(f"run complete: generated={generated}, checkpoint_total={completed}")

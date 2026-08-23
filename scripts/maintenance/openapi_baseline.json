@@ -5091,6 +5091,17 @@
             "title": "Selected Engine",
             "type": "string"
           },
+          "selection_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selection Reason"
+          },
           "state": {
             "title": "State",
             "type": "string"
@@ -5114,6 +5125,7 @@
           "external_text",
           "selected_engine",
           "corrected_text",
+          "selection_reason",
           "index_eligible",
           "image_url"
         ],

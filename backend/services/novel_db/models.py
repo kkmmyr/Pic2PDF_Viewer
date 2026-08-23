@@ -227,6 +227,7 @@ class OcrPageResult(SQLModel, table=True):
     primary_text: str | None = None
     external_text: str | None = None
     selected_engine: str = "primary"
+    selection_reason: str | None = None
     corrected_text: str | None = None
     published_text: str | None = None
     index_eligible: bool = False

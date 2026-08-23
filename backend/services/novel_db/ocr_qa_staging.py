@@ -18,7 +18,14 @@ _QA_AUDIT_ONLY_FLAGS = frozenset(
         "yomitoku_adjudication",
     }
 )
-_REVIEW_ALL_PAGE_ENGINES = frozenset({"qwen35_dots_review_v1"})
+_RISK_SCOPED_REVIEW_ENGINES = frozenset({"qwen35_dots_review_v1"})
+_REVIEW_ASSISTED_AUDIT_ONLY_FLAGS = frozenset(
+    {
+        "candidate_disagreement",
+        "review_assisted_composite",
+        "selection_reason:qwen_clean",
+    }
+)
 
 
 def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
@@ -30,18 +37,22 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
         run = conn.execute("SELECT engine FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
         if run is None:
             raise LookupError(f"OCR run not found: {run_id}")
-        review_all_pages = str(run[0]) in _REVIEW_ALL_PAGE_ENGINES
+        risk_scoped_review = str(run[0]) in _RISK_SCOPED_REVIEW_ENGINES
         current_flags = conn.execute(
             "SELECT page_no, quality_flags_json FROM ocr_page_results WHERE run_id=?",
             (run_id,),
         ).fetchall()
-    flagged_pages = {
-        int(row[0]) for row in current_flags if set(json.loads(str(row[1] or "[]"))) - _QA_AUDIT_ONLY_FLAGS
-    }
+    audit_only_flags = _QA_AUDIT_ONLY_FLAGS
+    if risk_scoped_review:
+        audit_only_flags |= _REVIEW_ASSISTED_AUDIT_ONLY_FLAGS
+    flagged_pages = {int(row[0]) for row in current_flags if set(json.loads(str(row[1] or "[]"))) - audit_only_flags}
     flagged_pages.update(risk_pages)
     page_count = len(input_pages)
-    required_pages = set(range(1, min(7, page_count) + 1)) | flagged_pages
-    required_pages.update({min(8, page_count), max(1, (page_count + 1) // 2), page_count})
+    if risk_scoped_review:
+        required_pages = flagged_pages | {max(1, (page_count + 1) // 2)}
+    else:
+        required_pages = set(range(1, min(7, page_count) + 1)) | flagged_pages
+        required_pages.update({min(8, page_count), max(1, (page_count + 1) // 2), page_count})
     with with_db() as conn:
         with conn:
             conn.execute(
@@ -56,11 +67,6 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
                 "UPDATE ocr_page_results SET qa_state='required' WHERE run_id=? AND page_type='unknown'",
                 (run_id,),
             )
-            if review_all_pages:
-                conn.execute(
-                    "UPDATE ocr_page_results SET qa_state='required' WHERE run_id=?",
-                    (run_id,),
-                )
             conn.execute(
                 "UPDATE ocr_page_results SET qa_state='required' "
                 "WHERE run_id=? AND (state!='passed' OR layout_type!='normal_prose') "

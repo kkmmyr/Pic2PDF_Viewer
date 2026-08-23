@@ -75,7 +75,22 @@ def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
         "primary_text": text,
         "external_text": None,
         "selected_engine": "primary",
+        "selection_reason": None,
     }
+
+
+def test_qa_detail_exposes_candidate_selection_reason(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "qwen35_dots_review_v1", "composite", input_pages)
+    for page in input_pages:
+        result = _passed_page(page.page_no, page.image_sha256, "本文")
+        result["selection_reason"] = "dots_materially_more_complete"
+        save_page_result(run_id, result)
+    stage_run_for_qa(run_id, input_pages)
+
+    detail = get_qa_run(run_id)
+
+    assert detail["pages"][0]["selection_reason"] == "dots_materially_more_complete"
 
 
 def _prepare_approved_run(staged_book, *, text_prefix: str = "新本文") -> tuple[int, str]:

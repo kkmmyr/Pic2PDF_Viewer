@@ -66,6 +66,7 @@ class OcrPageResult(PageText):
     primary_text: NotRequired[str | None]
     external_text: NotRequired[str | None]
     selected_engine: NotRequired[str]
+    selection_reason: NotRequired[str | None]
 
 
 def _read_worker_output(stream: Iterator[str], events: queue.Queue[object]) -> None:
@@ -112,6 +113,13 @@ def _ocr_worker_env() -> dict[str, str]:
         "OCR_EXTERNAL_CONFIDENCE_MEDIAN": app_settings.OCR_EXTERNAL_CONFIDENCE_MEDIAN,
         "OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN": app_settings.OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN,
         "OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO": app_settings.OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO,
+        "OCR_QWEN_PYTHON": app_settings.OCR_QWEN_PYTHON,
+        "OCR_DOTS_PYTHON": app_settings.OCR_DOTS_PYTHON,
+        "OCR_QWEN_MODEL_PATH": app_settings.OCR_QWEN_MODEL_PATH,
+        "OCR_DOTS_MODEL_PATH": app_settings.OCR_DOTS_MODEL_PATH,
+        "OCR_QWEN_DOTS_ARTIFACT_DIR": app_settings.OCR_QWEN_DOTS_ARTIFACT_DIR
+        or (app_settings.NOVEL_DB_DIR / "ocr-candidate-artifacts"),
+        "OCR_QWEN_DOTS_STAGE_TIMEOUT_SEC": app_settings.OCR_QWEN_DOTS_STAGE_TIMEOUT_SEC,
     }
     for key, value in values.items():
         if value is not None:

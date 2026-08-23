@@ -1,6 +1,6 @@
 # ADR-0022: Qwen3.5 OCRとdots.mocrを全ページレビュー前提で採用する
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-0023
 - **Date**: 2026-08-23
 - **決定者**: プロジェクトオーナー
 - **関連**: [OCR設計書](../../詳細設計/機能別/OCR設計書.md) / [小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md) / [ADR-0021](0021_sol-image-ocr-campaign.md)
@@ -37,6 +37,13 @@
    未修正予測とverified ground truthによる機械gateは、自動公開またはレビュー縮小の条件として残す。
 5. 公式固定prompt、greedy生成、元画像RGBを既定とする。画像の一律拡大、自由prompt、
    誤字辞書による無条件置換、候補間の推測合議は採用しない。
+6. Apple Silicon 64GBでは両modelを同時常駐させず、Qwen全ページ、process終了、dots全ページ、
+   process終了、selectorの順に実行する。各段階はscope固定checkpointから再開できるが、両候補の
+   完全集合検査が終わるまではDBへpage結果を保存しない。timeout・子process失敗・選択本文の反復は
+   run全体をfail closedにする。
+7. modelが非空のraw応答を返して候補形式だけを解析できない場合は、rawと解析理由を候補checkpointへ
+   隔離する。もう一方の候補が非空かつ反復なしの場合だけ全ページQAへ進め、両候補を安全に採用できない
+   ページが1枚でもあればrun全体を失敗にする。
 
 ## 根拠
 

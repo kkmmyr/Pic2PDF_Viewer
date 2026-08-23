@@ -107,8 +107,8 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 run_id, page_no, image_sha256, state, full_text, char_count,
                 raw_output, block_count, quality_flags_json, ink_coverage,
                 attempt_count, error_message, layout_type, primary_text,
-                external_text, selected_engine, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                external_text, selected_engine, selection_reason, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                       datetime('now', '+9 hours'))
             ON CONFLICT(run_id, page_no) DO UPDATE SET
                 image_sha256 = excluded.image_sha256,
@@ -125,6 +125,7 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 primary_text = excluded.primary_text,
                 external_text = excluded.external_text,
                 selected_engine = excluded.selected_engine,
+                selection_reason = excluded.selection_reason,
                 corrected_text = NULL,
                 updated_at = excluded.updated_at
             """,
@@ -145,6 +146,7 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 page.get("primary_text"),
                 page.get("external_text"),
                 page.get("selected_engine", "primary"),
+                page.get("selection_reason"),
             ),
         )
         conn.commit()

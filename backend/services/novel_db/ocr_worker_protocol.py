@@ -40,6 +40,7 @@ def page_payload(
     primary_text: str | None = None,
     external_text: str | None = None,
     selected_engine: str = "primary",
+    selection_reason: str | None = None,
 ) -> dict[str, Any]:
     return {
         "event": "page",
@@ -61,6 +62,7 @@ def page_payload(
             "primary_text": primary_text if primary_text is not None else result.full_text,
             "external_text": external_text,
             "selected_engine": selected_engine,
+            "selection_reason": selection_reason,
         },
     }
 

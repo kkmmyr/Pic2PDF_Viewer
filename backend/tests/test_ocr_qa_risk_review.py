@@ -276,7 +276,7 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
     assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12]
 
 
-def test_review_assisted_engine_requires_every_page(tmp_data_dir) -> None:
+def test_review_assisted_engine_requires_risks_and_clean_midpoint_sample(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "qa-review-assisted"
     images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
@@ -292,10 +292,18 @@ def test_review_assisted_engine_requires_every_page(tmp_data_dir) -> None:
     )
 
     for page in input_pages:
-        save_page_result(
-            run_id,
-            _passed_page(page.page_no, page.image_sha256, _unique_content(400)),
-        )
+        result = _passed_page(page.page_no, page.image_sha256, _unique_content(400))
+        result["quality_flags"] = [
+            "candidate_disagreement",
+            "review_assisted_composite",
+            "selection_reason:qwen_clean",
+        ]
+        if page.page_no == 10:
+            result["quality_flags"][-1] = "selection_reason:dots_materially_more_complete"
+        if page.page_no == 11:
+            result["primary_text"] = "本文です。" * 60 + "珀陽様が来ました。"
+            result["external_text"] = "本文です。" * 60 + "伯陽様が来ました。"
+        save_page_result(run_id, result)
 
     stage_run_for_qa(run_id, input_pages)
 
@@ -304,7 +312,7 @@ def test_review_assisted_engine_requires_every_page(tmp_data_dir) -> None:
             "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
             (run_id,),
         ).fetchall()
-    assert [row[0] for row in rows] == list(range(1, 13))
+    assert [row[0] for row in rows] == [6, 10, 11]
 
 
 def test_stage_requires_content_risks(tmp_data_dir) -> None:

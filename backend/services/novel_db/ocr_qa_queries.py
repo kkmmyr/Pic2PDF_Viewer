@@ -56,7 +56,7 @@ def get_qa_run(run_id: int) -> dict:
             "SELECT page_no, state, qa_state, full_text, char_count, quality_flags_json, "
             "ink_coverage, attempt_count, error_message, qa_note, reviewed_at, "
             "page_type, index_eligible, layout_type, primary_text, external_text, "
-            "selected_engine, corrected_text "
+            "selected_engine, corrected_text, selection_reason "
             "FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
             (run_id,),
         ).fetchall()
@@ -98,6 +98,7 @@ def get_qa_run(run_id: int) -> dict:
                 "external_text": str(row[15] or ""),
                 "selected_engine": str(row[16] or "primary"),
                 "corrected_text": row[17],
+                "selection_reason": row[18],
                 "image_url": f"/api/ocr/qa/runs/{run_id}/pages/{int(row[0])}/image",
             }
             for row in pages
