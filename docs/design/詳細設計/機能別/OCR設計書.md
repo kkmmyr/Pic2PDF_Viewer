@@ -240,6 +240,16 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
   初回importは57件、再importは同一runの57件すべてを冪等判定し、import前後のcanonical digestは不変だった。
   明示公開後はpackageと57件一致・FTS不一致0、旧run 76へのrollback後はcanonical完全復元、publish／rollback
   backup各1世代のSHA・integrityと最終DB integrityに合格した。本番DBは変更していない。
+- その後の本番反映では、review noteを含むpackage digest
+  `d78907dfedf71deadde157104e7b7b5e7b30026f9da88ba39bf40b165e04ec98`をproduction run 184へ
+  57件stagingし、再import 57件の冪等一致を確認した。事前backupとの直接比較でcanonical pages、
+  publication history、FTS5、page-level ICU stateがstaging前後で完全一致した後、publication ID 82として
+  明示公開した。公開本文は57画面・42,903文字、`index_eligible=1`は49画面、FTS5本文不一致0件である。
+  page-level ICUはrevision 1・8,568行・source SHA-256
+  `55c8f39783ffdd30e3f4305362e79383da8ae16195f33edb003ec86945367d89`へactive化し、対象書籍の
+  bge-m3 chunk 83件はSQLite／LanceDBでID・画面番号・本文が一致した。公開前全体backup、公開処理内backup、
+  公開後・embedding前backup、全処理後の`2026-08-23_ocr-run184-complete`を保持し、各SQLiteと
+  LanceDB復元検査に合格している。
 - page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
   検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
 - run承認は`required`・`rejected`・未分類page/layoutが0件であること、入力SHAが不変であること、

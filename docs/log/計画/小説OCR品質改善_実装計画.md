@@ -48,7 +48,7 @@
 | Hayai OCR v2 MPSスモーク | fail-fast完了 | 固定1枚目が8文字出力・CER 99.4932%だったため残り4枚へ進めず不採用 |
 | Qwen3.5-OCR-JP-2B単体スモーク | fail-fast完了 | 固定5枚中4枚は総合CER 0.2416%だが、`001751`が8,000 token反復し、単体総合344.1829%のため不採用 |
 | Qwen3.5 OCR + dots.mocr初期複合候補 | 15/79枚でfail-fast完了 | 総合CER 0.5166%、最大3.1042%。最大ページは反復・HTML切断なしでfallback不能のため自動公開候補として不採用 |
-| Qwen3.5 OCR + dots.mocr Codex隔離運用 | 実装・隔離往復合格 | reviewed packageの固定provenance・digest、DB接続前の本番画像再照合、冪等staging、既存公開・backup・rollback接続をrun 184で確認。本番runtimeへは配線せずCodexが1冊ずつ明示反映する |
+| Qwen3.5 OCR + dots.mocr Codex隔離運用 | 1冊目を本番採用 | reviewed packageの固定provenance・digest、本番画像再照合、冪等staging、backup、明示公開、FTS5・ICU・bge-m3再索引をrun 184で完了。本番runtimeへは配線せずCodexが1冊ずつ明示反映する |
 | 機械単独・Codex省略 | 対象外 | 利用者QAの代わりにCodex原画像レビューを必須とし、自動公開は禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
@@ -467,6 +467,15 @@ commit/deploy後のservice経路再確認を残す。実ENOSPCはhost filesystem
 公開前と一致し、現在の57画像も存在・入力SHA一致した。画像絶対パスは現在環境へ再基準化され、
 `ocr_done_at`は切替時刻へ更新されるため、DBファイルのバイト一致をrollback成功条件にはしない。
 run 184は`completed / approved`で保持し、隔離DBのactive publicationはrun 76へ戻した。本番DBは未変更である。
+
+本番では同じレビュー結果をdigest
+`d78907dfedf71deadde157104e7b7b5e7b30026f9da88ba39bf40b165e04ec98`のpackageとしてrun 184へ
+冪等stagingし、既存canonical・publication・FTS5・ICU不変を事前backupとの直接比較で確認してから
+publication ID 82へ明示公開した。57画面・42,903文字・検索対象49画面、FTS5不一致0件となり、
+page-level ICU revision 1（8,568行）と対象書籍のbge-m3 83 chunkも再構築・照合済みである。
+`2026-08-23_ocr-run184-prepublish`、公開処理内Online Backup、
+`2026-08-23_ocr-run184-postpublish-preembed`、全処理後の`2026-08-23_ocr-run184-complete`を
+復元点として保持する。
 
 ## 9. レビュー前提laneの完了実績
 

@@ -59,6 +59,16 @@ package本文・分類と57件すべて一致し、FTS不一致0件となった�
 復元し、publish／rollback前の2世代backupはmanifest SHA一致・`integrity_check=ok`、最終DBも
 `integrity_check=ok`だった。本番DBは変更していない。
 
+同日、本番画像57件のSHA-256再照合とreviewed packageの冪等stagingを終えた後、run 184を
+production publication ID 82として明示公開した。公開結果は57画面・42,903文字・検索対象49画面、
+FTS5本文不一致0件で、runは`completed / approved`へ遷移した。公開前の全DB＋LanceDB backup
+`2026-08-23_ocr-run184-prepublish`と、公開処理内のOnline Backup
+`20260823T131218.333860Z-publish-run-184-b0b2bf250c4e`はいずれも検証済みである。
+page-level ICUはsource revision 1、8,568行へ再構築し、対象書籍のbge-m3 chunk 83件も
+SQLite／LanceDB間でID・画面番号・本文が一致した。既定のlexical backendは引き続き`shadow`とし、
+FTS5とICUの両方で既知引用が画面6へ一致することを確認した。全処理後の復元点は
+`2026-08-23_ocr-run184-complete`として全DB＋LanceDBの復元検査に合格している。
+
 ## 再評価条件
 
 - 人手なしの未調整holdoutで機械gateを継続的に満たすOCRが得られた。

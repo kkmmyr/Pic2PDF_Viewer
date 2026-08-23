@@ -277,6 +277,11 @@ index対象8,576ページをすべて含む。一方、既存dense corpusの6,23
 19冊だけで、整合性ゲートを通らなかった。このtableは基準線にも再利用せず、以下はすべて隔離領域に
 新規作成したtableの結果である。
 
+2026-08-23のrun 184本番公開後にも、production `chunks` tableをSQLite正本と再照合し、既存13冊の
+2,781 ID欠落が残っていることを確認した。run 184対象書籍は再構築した83件が完全一致し、この欠落には
+含まれない。page-level ICUは全`index_eligible`画面8,568件を別tableで完全再構築しているため影響を
+受けないが、dense／hybrid検索の既存13冊に対する網羅性はTM-7完了まで保証しない。
+
 #### Gate A — lexical
 
 | 方式 | R@5 | R@10 | R@30 | MRR@10 | nDCG@10 | p95 | build / size | 判定 |
