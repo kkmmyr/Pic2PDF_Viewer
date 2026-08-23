@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import re
 import shutil
 import sqlite3
 import tempfile
+from collections import Counter
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -18,6 +20,8 @@ from utils.atomic_json import atomic_write_json
 
 _FORMAT_VERSION = 1
 _LABEL_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+_DENSE_EMBEDDING_DIM = 1024
+_DENSE_METADATA_FIELDS = ("book_name", "page_no", "text", "char_count", "page_count")
 
 
 def _sqlite_integrity(path: Path) -> str:
@@ -59,6 +63,108 @@ def _validate_lance(path: Path) -> dict[str, int]:
     database = lancedb.connect(path)
     table_names = sorted(database.list_tables(limit=10_000).tables)
     return {table_name: database.open_table(table_name).count_rows() for table_name in table_names}
+
+
+def _sqlite_dense_chunks(path: Path) -> dict[int, tuple[str, int, str, int, int]] | None:
+    connection = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
+    try:
+        has_chunks = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunks'").fetchone()
+        if has_chunks is None:
+            return None
+        rows = connection.execute(
+            """
+            SELECT c.id, b.name, p.page_no, c.text, p.char_count, b.page_count
+            FROM chunks c
+            JOIN pages p ON p.id = c.page_id
+            JOIN books b ON b.id = p.book_id
+            ORDER BY c.id
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+    return {int(row[0]): (str(row[1]), int(row[2]), str(row[3]), int(row[4]), int(row[5])) for row in rows}
+
+
+def _dense_error(message: str) -> RuntimeError:
+    return RuntimeError(f"dense chunk cross-store validation failed: {message}")
+
+
+def _validate_dense_chunks(novel_db: Path, lance_db: Path) -> dict[str, Any]:
+    """SQLite chunksを正本としてLanceDBのID、metadata、vectorを全行検査する。"""
+    expected = _sqlite_dense_chunks(novel_db)
+    if expected is None:
+        return {"status": "not_applicable", "reason": "sqlite_chunks_table_not_present"}
+
+    if not lance_db.is_dir():
+        if expected:
+            raise _dense_error(f"LanceDB is missing for {len(expected)} SQLite rows")
+        return {
+            "status": "ok",
+            "sqlite_rows": 0,
+            "lance_rows": 0,
+            "unique_ids": 0,
+            "embedding_dim": _DENSE_EMBEDDING_DIM,
+        }
+
+    import lancedb
+
+    database = lancedb.connect(lance_db)
+    table_names = set(database.list_tables(limit=10_000).tables)
+    if "chunks" not in table_names:
+        if expected:
+            raise _dense_error(f"LanceDB chunks table is missing for {len(expected)} SQLite rows")
+        lance_rows: list[dict[str, Any]] = []
+    else:
+        table = database.open_table("chunks").to_arrow()
+        required = {"chunk_id", *_DENSE_METADATA_FIELDS, "embedding"}
+        missing_columns = sorted(required - set(table.column_names))
+        if missing_columns:
+            raise _dense_error(f"LanceDB chunks columns are missing: {missing_columns}")
+        lance_rows = table.select(["chunk_id", *_DENSE_METADATA_FIELDS, "embedding"]).to_pylist()
+
+    ids = [int(row["chunk_id"]) for row in lance_rows]
+    duplicate_ids = sorted(chunk_id for chunk_id, count in Counter(ids).items() if count > 1)
+    expected_ids = set(expected)
+    actual_ids = set(ids)
+    missing_ids = sorted(expected_ids - actual_ids)
+    extra_ids = sorted(actual_ids - expected_ids)
+    if missing_ids or extra_ids or duplicate_ids:
+        raise _dense_error(
+            f"ID mismatch: missing={missing_ids[:10]}, extra={extra_ids[:10]}, duplicates={duplicate_ids[:10]}"
+        )
+
+    metadata_mismatches: list[int] = []
+    invalid_vectors: list[int] = []
+    for row in lance_rows:
+        chunk_id = int(row["chunk_id"])
+        actual_metadata = (
+            str(row["book_name"]),
+            int(row["page_no"]),
+            str(row["text"]),
+            int(row["char_count"]),
+            int(row["page_count"]),
+        )
+        if actual_metadata != expected[chunk_id]:
+            metadata_mismatches.append(chunk_id)
+        embedding = row["embedding"]
+        if (
+            not isinstance(embedding, list)
+            or len(embedding) != _DENSE_EMBEDDING_DIM
+            or not all(math.isfinite(float(value)) for value in embedding)
+        ):
+            invalid_vectors.append(chunk_id)
+    if metadata_mismatches:
+        raise _dense_error(f"metadata mismatch for chunk IDs {metadata_mismatches[:10]}")
+    if invalid_vectors:
+        raise _dense_error(f"invalid embedding for chunk IDs {invalid_vectors[:10]}")
+
+    return {
+        "status": "ok",
+        "sqlite_rows": len(expected),
+        "lance_rows": len(lance_rows),
+        "unique_ids": len(actual_ids),
+        "embedding_dim": _DENSE_EMBEDDING_DIM,
+    }
 
 
 def _directory_size(path: Path) -> int:
@@ -163,6 +269,13 @@ def create_backup(
         else:
             artifacts["novel"] = {"status": "not_present", "source": str(novel_db)}
         artifacts["lance"] = _backup_lance(lance_db, staging_path / "novel.lancedb")
+        if artifacts["novel"]["status"] == "ok":
+            artifacts["dense_chunks"] = _validate_dense_chunks(
+                staging_path / "novel.db",
+                staging_path / "novel.lancedb",
+            )
+        else:
+            artifacts["dense_chunks"] = {"status": "not_applicable", "reason": "novel_not_present"}
 
         manifest = {
             "format_version": _FORMAT_VERSION,
@@ -219,6 +332,11 @@ def verify_latest_backup(*, backup_dir: Path, restore_test_dir: Path) -> dict[st
             checks["novel"] = _sqlite_integrity(restored / "novel.db")
         if artifacts["lance"]["status"] == "ok":
             checks["lance"] = _validate_lance(restored / "novel.lancedb")
+        if artifacts["novel"]["status"] == "ok":
+            checks["dense_chunks"] = _validate_dense_chunks(
+                restored / "novel.db",
+                restored / "novel.lancedb",
+            )
 
         result = {
             "verified_at": datetime.now(UTC).isoformat(),
