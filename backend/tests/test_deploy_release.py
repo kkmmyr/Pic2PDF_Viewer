@@ -85,6 +85,13 @@ def test_release_smoke_checks_stable_lance_path_and_active_icu() -> None:
     assert "page ICU no-match smoke unexpectedly returned a row" in script
 
 
+def test_activation_allows_reviewed_ocr_backward_compatible_migration() -> None:
+    script = ACTIVATION_SCRIPT.read_text(encoding="utf-8")
+
+    assert "0014_novel_search_index_state.py | 0015_ocr_candidate_selection_reason.py" in script
+    assert "migration is not approved for backward-compatible rollout" in script
+
+
 def test_activation_rejects_appledouble_before_systemd_or_writes(tmp_path: Path) -> None:
     app_root = tmp_path / "app"
     previous_backend = app_root / "backend-previous"
