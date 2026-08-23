@@ -26,6 +26,12 @@ except ImportError:
 
 QWEN_MODEL_REVISION = "dc58acc05962cb2ca129c8d3533ab7e5a651cc02"
 DOTS_MODEL_REVISION = "e539fbb52280393adc081b289ec597430a0f9031"
+QWEN_ENGINE_VERSION = "5.12.0"
+DOTS_ENGINE_VERSION = "0.6.15"
+QWEN_PROMPT_ID = "qwen3.5-ocr-jp-html-layout-v1"
+DOTS_PROMPT_ID = "dots-mocr-prompt-layout-v1"
+QWEN_PROMPT_SHA256 = "1dda14e45822c6b783fa7f5f09ba6c22de56c47d266d45256f7b4a0bd41030aa"
+DOTS_PROMPT_SHA256 = "16ff71ac5d218f35e5b3db41240b6e70741498bc099db3fa922ce1ff972e3b2f"
 COMPOSITE_MODEL_REVISION = f"qwen:{QWEN_MODEL_REVISION}+dots:{DOTS_MODEL_REVISION}"
 _ROOT_DIR = Path(__file__).resolve().parents[3]
 _QWEN_SCRIPT = _ROOT_DIR / "scripts" / "maintenance" / "qwen35_ocr_jp_vertical_predict.py"
@@ -287,6 +293,8 @@ def run_qwen_dots_review(tasks: list[OcrWorkerTask]) -> None:
         str(settings.qwen_model_path),
         "--model-revision",
         QWEN_MODEL_REVISION,
+        "--engine-version",
+        QWEN_ENGINE_VERSION,
         "--allow-empty-candidate",
     ]
     dots_command = [
@@ -302,8 +310,12 @@ def run_qwen_dots_review(tasks: list[OcrWorkerTask]) -> None:
         str(settings.dots_model_path),
         "--model-revision",
         DOTS_MODEL_REVISION,
+        "--engine-version",
+        DOTS_ENGINE_VERSION,
         "--prompt-mode",
         "layout",
+        "--prompt-id",
+        DOTS_PROMPT_ID,
         "--allow-custom-model-code",
         "--allow-empty-candidate",
     ]

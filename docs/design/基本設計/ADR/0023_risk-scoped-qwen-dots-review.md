@@ -1,10 +1,13 @@
 # ADR-0023: Qwen＋dots OCRの人手QAをリスク対象へ限定する
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-0024
 - **Date**: 2026-08-23
 - **決定者**: プロジェクトオーナー
 - **Supersedes**: [ADR-0022](0022_review-assisted-qwen-dots-ocr.md)の全ページ人手照合条件
 - **関連**: [OCR設計書](../../詳細設計/機能別/OCR設計書.md) / [小説OCR品質改善 実装計画](../../../log/計画/小説OCR品質改善_実装計画.md)
+
+> 2026-08-23に、人手必須QAと本番engine切替は
+> [ADR-0024](0024_codex-operated-offline-ocr-publication.md)のCodex管理隔離実行・reviewed package反映へ置き換えた。
 
 ## コンテキスト
 

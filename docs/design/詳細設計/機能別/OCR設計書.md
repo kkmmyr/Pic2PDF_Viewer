@@ -98,6 +98,9 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
 | `backend/services/novel_db/ocr_worker_engines.py` | 画像読込、Surya/yomitokuのページ処理、候補選択 |
 | `backend/services/novel_db/qwen_dots_worker.py` | 固定runtimeを逐次起動し、完全集合検査後に複合page eventを出す |
+| `backend/services/novel_db/codex_reviewed_ocr.py` | reviewed packageの固定schema、digest、model・prompt provenance、page完全性を検証してexportする |
+| `backend/services/novel_db/codex_reviewed_ocr_import.py` | 本番PNG集合・SHAをDB接続前に再検証し、専用runへ冪等stagingする |
+| `backend/tools/codex_reviewed_ocr.py` | Codexが隔離export／Linux staging importを明示実行するCLI。公開処理は含めない |
 | `backend/services/novel_db/ocr_candidate_selection.py` | primary/externalの文字量差をQAリスクとworkerで共有する純関数 |
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
@@ -169,6 +172,28 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
   中央標本を1page以上`required`にする。残る`qwen_clean`通常本文は候補・provenance・画像SHA・非空・
   非反復・文字量差を機械監査し、QAメモへ根拠を残して承認できる。selectorの初期候補は承認を意味せず、
   required pageの人手承認を終えるまでrun公開は禁止する。
+- 上記pilot用QA契約の運用先は、[ADR-0024](../../基本設計/ADR/0024_codex-operated-offline-ocr-publication.md)により
+  Codex管理のMac隔離DBへ限定する。Linux本番とWindows OCR agentの`OCR_ENGINE`は`surya2`を維持し、
+  Qwen＋dots runtime・modelを配備しない。Codexがrisk対象、clean標本、候補差分、既存canonical差分を
+  原画像監査し、原画像から確定できる補正だけを保存する。通常の利用者QAは要求せず、Codexでも一意に
+  確定できないpageだけを公開保留とする。
+- 隔離runの反映には`codex-reviewed-ocr-package-v1`を新設する。packageはschema version、package digest、
+  書名、連続page集合、入力画像SHA、engine/model revision、両候補raw、選択理由、page/layout分類、
+  index可否、選択・補正文、Codex review根拠を保持する。export前に未分類・未解決・欠落pageを拒否する。
+  Linux importは本番画像の完全page集合とSHAを再計算し、固定Qwen／dotsのmodel revision、engine version、
+  prompt ID・SHAとpackage digestを検証してから、専用runへ冪等にstagingする。検証はDB接続前に完了させる。
+  同一digestは既存rowとの完全一致を再確認し、別digestの未公開runがある場合は競合として拒否する。
+  Macから本番SQLiteを直接開かず、DB置換・手動SQL patch・import同時公開を行わない。
+- import済みrunはCodexが差分と未解決0件を再確認後、既存のOnline Backup・原子的公開処理で明示的に
+  activateする。通常の操作は次のmodule CLIを用い、`import`成功を公開成功とみなさない。
+
+  ```bash
+  cd backend
+  uv run python -m tools.codex_reviewed_ocr export --db-path <隔離novel.db> --run-id <run> \
+    --reviewer codex --review-note <監査根拠> --output <package.json>
+  uv run python -m tools.codex_reviewed_ocr import --db-path <本番novel.db> \
+    --images-root <本番images> --package <package.json>
+  ```
 - 複合版は64GB unified memoryで両modelを同時常駐させない。Qwenを全page処理してprocessを終了し、
   dotsを全page処理してprocessを終了した後、page集合・画像SHA・model revision・fingerprint・promptを
   照合する。段階timeout、終了code非0、欠落・余剰page、選択本文の空文字・反復はrun全体をfail closedにし、
@@ -205,6 +230,12 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
   `20260823T105642.543933Z-rollback-run-76-4773195e9bcb`（390,479,872 bytes）で同じ検証に合格した。
   隔離DBはrun 76のrollback publicationをactive、run 184を`completed / approved`のまま保持する。
   本番DBは変更していない。
+- 同じrun 184を`codex-reviewed-ocr-package-v1`へexportした隔離往復では、packageは1,276,317 bytes、
+  digestは`cc63d0e21ac7aed4d24772c4cdfcbb3d09744e5ec01851a760698b906ae0d25e`だった。レビュー根拠は
+  owner原画像確認19、機械監査31、Codex原画像確認7、補正pageは11・13・19・36として保持した。一時DBへの
+  初回importは57件、再importは同一runの57件すべてを冪等判定し、import前後のcanonical digestは不変だった。
+  明示公開後はpackageと57件一致・FTS不一致0、旧run 76へのrollback後はcanonical完全復元、publish／rollback
+  backup各1世代のSHA・integrityと最終DB integrityに合格した。本番DBは変更していない。
 - page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
   検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
 - run承認は`required`・`rejected`・未分類page/layoutが0件であること、入力SHAが不変であること、

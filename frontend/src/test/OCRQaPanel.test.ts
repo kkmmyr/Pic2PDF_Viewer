@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getOcrEngineLabels } from '@/features/ocr/OCRQaPanel';
+import { getOcrEngineLabels } from '@/features/ocr/ocrQaLabels';
 
 describe('getOcrEngineLabels', () => {
     it('review-assisted engineをQwenとdotsとして表示する', () => {

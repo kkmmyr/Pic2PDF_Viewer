@@ -48,8 +48,8 @@
 | Hayai OCR v2 MPSスモーク | fail-fast完了 | 固定1枚目が8文字出力・CER 99.4932%だったため残り4枚へ進めず不採用 |
 | Qwen3.5-OCR-JP-2B単体スモーク | fail-fast完了 | 固定5枚中4枚は総合CER 0.2416%だが、`001751`が8,000 token反復し、単体総合344.1829%のため不採用 |
 | Qwen3.5 OCR + dots.mocr初期複合候補 | 15/79枚でfail-fast完了 | 総合CER 0.5166%、最大3.1042%。最大ページは反復・HTML切断なしでfallback不能のため自動公開候補として不採用 |
-| Qwen3.5 OCR + dots.mocrレビュー版 | 1冊pilot完了 | 開封済み79枚の総合CER 0.4091%、最大2.8835%。実書籍57画面を19画面の所有者確認、7画面の追加原画像監査、31画面の機械支援監査で承認し、隔離DBの公開・backup・旧版rollbackに合格 |
-| 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
+| Qwen3.5 OCR + dots.mocr Codex隔離運用 | 実装・隔離往復合格 | reviewed packageの固定provenance・digest、DB接続前の本番画像再照合、冪等staging、既存公開・backup・rollback接続をrun 184で確認。本番runtimeへは配線せずCodexが1冊ずつ明示反映する |
+| 機械単独・Codex省略 | 対象外 | 利用者QAの代わりにCodex原画像レビューを必須とし、自動公開は禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
 
@@ -468,13 +468,14 @@ commit/deploy後のservice経路再確認を残す。実ENOSPCはhost filesystem
 `ocr_done_at`は切替時刻へ更新されるため、DBファイルのバイト一致をrollback成功条件にはしない。
 run 184は`completed / approved`で保持し、隔離DBのactive publicationはrun 76へ戻した。本番DBは未変更である。
 
-## 9. 完了条件
+## 9. レビュー前提laneの完了実績
 
-B-35のレビュー前提laneは次の全条件を満たした時に完了とする。
+B-35のレビュー前提laneは次の条件を満たして完了した。未完了なのは機械単独自動公開の品質条件だけである。
 
 - H1〜H5の受入条件が自動テストまたは保存済み監査成果物で検証される。
-- Qwen＋dots複合engineの版・両raw候補・候補切替理由が保存され、1冊のリスク対象・clean標本の人手QAと残ページの監査付き承認を終えている。
+- Qwen＋dots複合engineの版・両raw候補・候補切替理由が保存され、1冊の所有者確認済み知見を含むCodexレビューと監査付き承認を終えている。
 - 必要な補正文を保存し、承認後公開と旧版rollbackを実行して本文・FTS・履歴の整合を確認する。
+- reviewed packageの固定provenance・digest、本番画像再照合、冪等staging、明示公開の分離を隔離DBで確認する。
 - QA未承認・品質未達・障害時に旧公開本文と索引が保持される。
 - 自動公開は、正式holdoutでpolicy JSONの全項目が機械候補として合格するまで無効である。
 - `docs/log/変更履歴.md` とB-35バックログを更新し、完了実績をarchiveへ移す。

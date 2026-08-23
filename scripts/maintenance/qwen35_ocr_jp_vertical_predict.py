@@ -18,7 +18,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 _ROOT_DIR = Path(__file__).resolve().parents[2]
 _MAINTENANCE_DIR = Path(__file__).resolve().parent
@@ -29,16 +29,20 @@ for _import_path in (_MAINTENANCE_DIR, _NOVEL_DB_SERVICE_DIR):
         sys.path.insert(0, str(_import_path))
 
 from dots_mocr_vertical_predict import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    InputPage,
     RunConfig,
     _append_checkpoint,
     _load_checkpoint,
-    _sha256,
     _validate_checkpoint,
     load_vertical_pages,
 )
 from ocr_content_guards import (  # noqa: E402  # pyright: ignore[reportMissingImports]
     has_suspicious_repetition,
 )
+from qwen35_ocr_checkpoint import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    validate_qwen_checkpoint,
+)
+from qwen35_ocr_model import model_fingerprint  # noqa: E402  # pyright: ignore[reportMissingImports]
 
 MODEL_REVISION = "dc58acc05962cb2ca129c8d3533ab7e5a651cc02"
 OCR_PROMPT = "OCR this image as HTML layout blocks with bbox and label."
@@ -52,35 +56,6 @@ _CODE_FENCE_RE = re.compile(
 _IGNORED_TAGS = frozenset({"rt", "script", "style"})
 _LINE_BREAK_TAGS = frozenset({"br", "p"})
 _PLAIN_TEXT_TAGS = frozenset({"br", "div", "p", "rt", "ruby"})
-
-
-def model_fingerprint(model_path: Path) -> str:
-    root = model_path.resolve()
-    if not root.is_dir():
-        raise ValueError(f"model path is not a directory: {root}")
-    required = {
-        "chat_template.jinja",
-        "config.json",
-        "generation_config.json",
-        "model.safetensors.index.json",
-        "preprocessor_config.json",
-        "processor_config.json",
-        "tokenizer.json",
-        "tokenizer_config.json",
-    }
-    missing = sorted(name for name in required if not (root / name).is_file())
-    if missing:
-        raise ValueError(f"model snapshot is missing required files: {missing}")
-    weights = sorted(root.glob("*.safetensors"))
-    if not weights:
-        raise ValueError("model snapshot has no safetensors weights")
-    digest = hashlib.sha256()
-    for path in sorted(root / name for name in required) + weights:
-        digest.update(path.name.encode())
-        digest.update(b"\0")
-        digest.update(_sha256(path).encode())
-        digest.update(b"\n")
-    return digest.hexdigest()
 
 
 class PredictionEngine(Protocol):
@@ -264,6 +239,58 @@ def has_suspicious_vertical_bbox_order(response: str) -> bool:
     return False
 
 
+def _prediction_record(
+    *,
+    config: RunConfig,
+    page: InputPage,
+    response: str,
+    elapsed: float,
+    fingerprint: str,
+    prompt_sha256: str,
+) -> dict[str, Any]:
+    candidate_error: str | None = None
+    try:
+        prediction, block_count, html_truncated = extract_html_prediction(response)
+    except ValueError as exc:
+        if not config.allow_empty_prediction:
+            raise
+        prediction = ""
+        block_count = 0
+        html_truncated = False
+        candidate_error = str(exc)
+    markup_tags = fallback_markup_tags(response)
+    record: dict[str, Any] = {
+        "id": page.record_id,
+        "pred": prediction,
+        "raw_response": response,
+        "raw_response_sha256": hashlib.sha256(response.encode()).hexdigest(),
+        "layout_block_count": block_count,
+        "html_truncated": html_truncated,
+        "fallback_markup_tags": markup_tags,
+        "suspicious_vertical_bbox_order": has_suspicious_vertical_bbox_order(response),
+        "suspicious_repetition": has_suspicious_repetition(prediction),
+        "input_sha256": page.image_sha256,
+        "image_relpath": page.image_relpath,
+        "model_revision": config.model_revision,
+        "model_fingerprint": fingerprint,
+        "engine_version": config.engine_version,
+        "prompt_id": config.prompt_id,
+        "prompt_sha256": prompt_sha256,
+        "seed": config.seed,
+        "max_tokens": config.max_tokens,
+        "temperature": config.temperature,
+        "top_p": config.top_p,
+        "response_mode": config.response_mode,
+        "html_protocol_version": HTML_PROTOCOL_VERSION,
+        "generation_mode": GENERATION_MODE,
+        "elapsed_seconds": elapsed,
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+    if candidate_error is not None:
+        record["candidate_error"] = candidate_error
+    return record
+
+
 def run_predictions(
     config: RunConfig,
     *,
@@ -281,23 +308,11 @@ def run_predictions(
         checkpoint=checkpoint,
         fingerprint=fingerprint,
     )
-    expected_extra = {
-        "html_protocol_version": HTML_PROTOCOL_VERSION,
-        "generation_mode": GENERATION_MODE,
-    }
-    for record_id, record in checkpoint.items():
-        for field, expected in expected_extra.items():
-            if record.get(field) != expected:
-                raise ValueError(f"checkpoint id {record_id} {field} mismatch")
-        raw_response = record.get("raw_response")
-        if not isinstance(raw_response, str) or not raw_response.strip():
-            raise ValueError(f"checkpoint id {record_id} has no raw_response")
-        if (
-            record.get("raw_response_sha256")
-            != hashlib.sha256(raw_response.encode()).hexdigest()
-        ):
-            raise ValueError(f"checkpoint id {record_id} raw_response_sha256 mismatch")
-
+    validate_qwen_checkpoint(
+        checkpoint,
+        html_protocol_version=HTML_PROTOCOL_VERSION,
+        generation_mode=GENERATION_MODE,
+    )
     pending = [page for page in pages if page.record_id not in checkpoint]
     if not pending:
         print(f"complete: {len(pages)}/{len(pages)} pages already checkpointed")
@@ -310,56 +325,21 @@ def run_predictions(
         started_at = time.monotonic()
         response = engine.generate(page.image_path)
         elapsed = time.monotonic() - started_at
-        candidate_error: str | None = None
-        try:
-            prediction, block_count, html_truncated = extract_html_prediction(response)
-        except ValueError as exc:
-            if not config.allow_empty_prediction:
-                raise
-            prediction = ""
-            block_count = 0
-            html_truncated = False
-            candidate_error = str(exc)
-        markup_tags = fallback_markup_tags(response)
-        bbox_order_suspicious = has_suspicious_vertical_bbox_order(response)
-        raw_sha256 = hashlib.sha256(response.encode()).hexdigest()
-        repetition = has_suspicious_repetition(prediction)
-        record = {
-            "id": page.record_id,
-            "pred": prediction,
-            "raw_response": response,
-            "raw_response_sha256": raw_sha256,
-            "layout_block_count": block_count,
-            "html_truncated": html_truncated,
-            "fallback_markup_tags": markup_tags,
-            "suspicious_vertical_bbox_order": bbox_order_suspicious,
-            "suspicious_repetition": repetition,
-            "input_sha256": page.image_sha256,
-            "image_relpath": page.image_relpath,
-            "model_revision": config.model_revision,
-            "model_fingerprint": fingerprint,
-            "engine_version": config.engine_version,
-            "prompt_id": config.prompt_id,
-            "prompt_sha256": prompt_sha256,
-            "seed": config.seed,
-            "max_tokens": config.max_tokens,
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "response_mode": config.response_mode,
-            "html_protocol_version": HTML_PROTOCOL_VERSION,
-            "generation_mode": GENERATION_MODE,
-            "elapsed_seconds": elapsed,
-            "generated_at": datetime.now(UTC).isoformat(),
-        }
-        if candidate_error is not None:
-            record["candidate_error"] = candidate_error
+        record = _prediction_record(
+            config=config,
+            page=page,
+            response=response,
+            elapsed=elapsed,
+            fingerprint=fingerprint,
+            prompt_sha256=prompt_sha256,
+        )
         _append_checkpoint(config.output_path, record)
         completed += 1
         print(
             f"checkpointed {page.record_id}: {completed}/{len(pages)} "
-            f"(elapsed={elapsed:.2f}s, chars={len(prediction)}, "
-            f"repetition={repetition}, truncated={html_truncated}, "
-            f"markup={','.join(markup_tags) or '-'})",
+            f"(elapsed={elapsed:.2f}s, chars={len(record['pred'])}, "
+            f"repetition={record['suspicious_repetition']}, truncated={record['html_truncated']}, "
+            f"markup={','.join(record['fallback_markup_tags']) or '-'})",
             flush=True,
         )
     return len(pending), completed

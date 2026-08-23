@@ -676,3 +676,21 @@ rollback前backup `20260823T105642.543933Z-rollback-run-76-4773195e9bcb`は390,4
 更新される。したがってこれはrollback失敗ではなく、監査条件が本文・分類・索引復元と環境依存pathを
 混同していた問題である。本番DB SHA-256
 `2cd38925f6e9eebb36d90a5bdc3d0b1f27ef846dae22ac0e6e0786053c03ec66`は一連の試験前後で不変だった。
+
+## 28. 2026-08-23: Codex-reviewed packageの隔離往復
+
+人手QAを通常運用から外す決定に伴い、run 184のレビュー済み成果をMac隔離DBからLinux本番へ安全に渡す
+`codex-reviewed-ocr-package-v1`を実装した。packageは57画面の画像SHA、Qwen／dots双方のrawと固定
+model revision・engine version・prompt ID・prompt SHA、選択理由、分類、補正文、レビュー方法を保持する。
+package digestは転送事故の検出用checksumであり署名ではないため、信頼済みSSH/SCP経路を前提とする。
+
+実測packageは1,276,317 bytes、digest
+`cc63d0e21ac7aed4d24772c4cdfcbb3d09744e5ec01851a760698b906ae0d25e`だった。レビュー方法は所有者原画像確認19、
+機械監査31、Codex原画像確認7、補正は画面11・13・19・36である。SQLite Online Backupで作った一時DBへ
+初回57件をstagingし、同じpackageの再importは同一runの57件すべてを冪等判定した。import前後のcanonical
+digestは`76e65d4b9cf648edc6680a34f6ef212bd3041faebdaf0ce3e3563251e433c67d`で変化しなかった。
+
+既存公開処理を別操作で実行すると、57画面すべての本文・分類がpackageと一致し、FTS不一致は0件だった。
+旧active run 76へrollbackするとcanonical digestも完全復元した。publish／rollback前に各1世代作成したbackupは
+manifest SHA一致・復元DB `integrity_check=ok`、最終DBも`integrity_check=ok`だった。これにより、重いMac
+runtimeを本番へ配備せず、stagingと公開を分離したままCodexが1冊単位で反映できる。本番DBは変更していない。
