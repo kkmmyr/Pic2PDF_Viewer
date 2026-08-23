@@ -291,6 +291,26 @@ MLX-VLMの通常文promptでは`<<<<`反復となり、元実装の専用task to
 peak footprint約41.66GB、swap 0だった。メモリ不足ではなく日本語縦書き品質の不合格とし、
 残り4枚と79枚は実行しない。反復削除、強制停止processor、本文切出しで採用値を救済しない。
 
+次の独立候補はBaidu `Qianfan-OCR` 4Bとする。公式model cardはApache-2.0、192言語対応、
+`do_sample=False`と`Parse this document to Markdown.`を基準経路として示すが、日本語縦書き小説の
+ページ最大CERは公開していない。Apple Siliconでは
+`jason1966/Qianfan-OCR-MLX-4bit` revision
+`125a392cc25e8750f427c7e09b5a517f07bbf70c`を固定し、MLX-VLM 0.6.15で評価する。
+変換configは元Baidu checkpoint revisionを保持しないため、公式BF16との同一性や変換cardの
+「精度低下なし」を前提にせず、4bit版自体を独立候補として扱う。
+
+実行前に同梱custom Pythonを監査し、model、prompt、画像SHA、engine version、生成設定、raw textを
+fsync checkpointへ残す。temperature 0、最大4,096 token、後処理なしで固定5枚を評価し、総合CER
+0.5%以下、ページ最大2.0%未満、列欠落・反復0を満たした場合だけ先頭79枚へ進む。Markdown記号や
+Layout-as-Thoughtは初回採用値から除外せず、追加説明・思考・反復が本文へ混ざれば品質不合格とする。
+
+固定5枚runは2枚目でfail-fast終了した。`000006`は592正解文字に対し588予測文字、CER 2.0270%で
+ページ最大2.0%未満のgateを単独で超えた。`000142`は913正解文字に対し7,321予測文字、CER
+753.8883%となり、末尾で「決して許されることは」を反復した。2枚の完了時間は14.57秒と80.44秒、
+3枚目を停止するまでのprocess最大RSSは約3.51GiB、peak footprint約6.90GiB、swap 0だった。
+64GB unified memory不足ではなく日本語縦書きの認識・読順・生成反復の不合格とし、残り3枚と
+79枚は実行しない。4bit版のpenalty追加や反復切出しで採用値を救済せず、本番候補から外す。
+
 ## 7. Phase H4 — Codex確認縮小の段階評価
 
 H3の機械総合合格後にだけ着手する。

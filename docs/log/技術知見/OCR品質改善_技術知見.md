@@ -425,3 +425,29 @@ token `キ`をbyte mapで引き`KeyError`となった。`NaiveStreamingDetokeniz
 swap 0である。これは64GB unified memory不足ではなく、日本語縦書きの生成品質と
 runtime表示層の両方の不適合である。反復停止processorは幻覚を隠すため採用値へ使わず、
 固定5枚の残り4枚と79枚は実行しない。
+
+## 21. 2026-08-23: Qianfan-OCR MLXを次候補に固定
+
+[Baidu公式model card](https://huggingface.co/baidu/Qianfan-OCR)は、4B級のend-to-end文書VLM、
+192言語、Apache-2.0、`do_sample=False`の基本経路を示す。CCOCR multilingual等の汎用公開値はあるが、
+日本語縦書き小説のCER・列読順・生成反復を分離した値はない。公式推論はBF16 Transformersまたは
+vLLMを基準とし、Apple Silicon MLXの正しさまでは保証しない。
+
+[コミュニティMLX 4bit変換](https://huggingface.co/jason1966/Qianfan-OCR-MLX-4bit) revision
+`125a392cc25e8750f427c7e09b5a517f07bbf70c`は約2.9GBで、変換cardは約4.7GB peak memoryと
+2倍の生成速度、OCR精度維持を報告する。ただし検証例は英語・中国語・複雑layout等で、日本語縦書きの
+数値はない。configに`base_model` revisionがなく、元Baidu重みの厳密なcommitは復元できないため、
+変換版自体を固定して本プロジェクトのJSSODa gateで判定する。
+
+同梱custom Python 5本はSHA-256を保存し、ネットワーク、subprocess、任意コード評価、ファイル削除・
+書込みの呼出しがないことを実行前に静的確認した。初回はMLX-VLM 0.6.15、公式基準prompt
+`Parse this document to Markdown.`、temperature 0、最大4,096 token、raw出力無加工とする。
+Layout-as-Thoughtや反復抑制を先に追加せず、固定5枚の総合CER 0.5%以下・最大2%未満・列欠落と
+反復0を満たした場合だけ79枚へ進む。
+
+実測では`000006`がCER 2.0270%で最大gateを超え、`000142`は列読順を入れ替えた後に同一文節を
+反復し、7,321正規化文字・CER 753.8883%となった。2枚目保存後、3枚目の推論途中でfail-fast停止し、
+残り3枚と79枚は実行していない。停止まで107.83秒、process最大RSS 3,773,054,976 byte、peak
+footprint 7,409,799,056 byte、swap 0であり、64GB unified memory不足ではない。専用CLIはraw出力を
+fsync保存し、custom Pythonもmodel fingerprintへ含める。固定revisionは本番候補から外し、
+反復penalty・文字列切出し・Layout-as-Thoughtによる同一候補の救済は行わない。

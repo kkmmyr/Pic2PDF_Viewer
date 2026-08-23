@@ -349,6 +349,7 @@
       "patterns": [
         "scripts/maintenance/dots_mocr_vertical_predict.py",
         "scripts/maintenance/paddleocr_vl_vertical_predict.py",
+        "scripts/maintenance/qianfan_ocr_vertical_predict.py",
         "scripts/maintenance/sarashina_ocr_vertical_predict.py",
         "scripts/maintenance/unlimited_ocr_vertical_predict.py"
       ],

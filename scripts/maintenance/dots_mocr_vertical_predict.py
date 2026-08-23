@@ -227,7 +227,7 @@ def model_fingerprint(model_path: Path) -> str:
         path
         for path in root.iterdir()
         if path.is_file()
-        and (path.name in selected_names or path.name.endswith(".safetensors"))
+        and (path.name in selected_names or path.name.endswith((".py", ".safetensors")))
     )
     if not any(path.name.endswith(".safetensors") for path in files):
         raise ValueError("model snapshot has no safetensors weights")

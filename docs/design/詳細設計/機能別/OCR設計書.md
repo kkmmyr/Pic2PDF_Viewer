@@ -452,6 +452,10 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
   swap 0であり64GB unified memory不足ではない。標準MLX-VLMの逐次decodeでは
   日本語tokenによる`KeyError`も起きるため、runtime修正だけで品質合格と見なさず、
   固定revisionは本番候補にしない。
+- Qianfan-OCR MLX 4bitは、公式基準prompt・temperature 0でも固定`000006`がCER 2.0270%、
+  `000142`がCER 753.8883%・同一文節反復となった。停止までのpeak footprintは約6.90GiB、
+  swap 0であり64GB unified memory不足ではない。変換元revisionもconfigから復元できないため、
+  固定変換版を本番候補にせず、反復penaltyや文字列切出しで採用値を救済しない。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

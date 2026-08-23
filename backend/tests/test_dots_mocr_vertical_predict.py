@@ -105,6 +105,15 @@ def test_model_fingerprint_changes_with_weights(tmp_path: Path) -> None:
     assert predict.model_fingerprint(config.model_path) != original
 
 
+def test_model_fingerprint_changes_with_custom_python(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    original = predict.model_fingerprint(config.model_path)
+
+    (config.model_path / "modeling_dots_ocr.py").write_bytes(b"changed model code")
+
+    assert predict.model_fingerprint(config.model_path) != original
+
+
 def test_selected_ids_preserve_requested_order(tmp_path: Path) -> None:
     base = _config(tmp_path)
     config = predict.RunConfig(
