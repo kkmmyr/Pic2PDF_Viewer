@@ -20,6 +20,12 @@ import type {
     KindleMigrationCommitRequest,
     KindleMigrationPreview,
     KindleOrdersImport,
+    KindlePriceHistoryResponse,
+    KindlePriceObservationResponse,
+    KindlePriceWatch,
+    KindlePriceWatchCreateRequest,
+    KindlePriceWatchListResponse,
+    KindlePriceWatchUpdateRequest,
     KindleUnlinkedBooksResponse,
 } from '@/features/kindle/types';
 
@@ -108,4 +114,43 @@ export function fetchLinkCandidates(
 ): Promise<KindleLinkCandidatesResponse> {
     const params = new URLSearchParams({ source, book_id: bookId });
     return apiClient.get(`${API_ENDPOINTS.KINDLE_CATALOG_LINK_CANDIDATES}?${params.toString()}`);
+}
+
+export function fetchKindlePriceWatches(): Promise<KindlePriceWatchListResponse> {
+    return apiClient.get(API_ENDPOINTS.KINDLE_PRICE_WATCHES);
+}
+
+export function fetchKindlePriceHistory(watchId: number): Promise<KindlePriceHistoryResponse> {
+    return apiClient.get(API_ENDPOINTS.KINDLE_PRICE_WATCH_HISTORY(watchId));
+}
+
+export function createKindlePriceWatch(
+    request: KindlePriceWatchCreateRequest,
+): Promise<KindlePriceWatch> {
+    return apiClient.post(API_ENDPOINTS.KINDLE_PRICE_WATCHES, request);
+}
+
+export function updateKindlePriceWatch(
+    watchId: number,
+    request: KindlePriceWatchUpdateRequest,
+): Promise<KindlePriceWatch> {
+    return apiClient.patch(API_ENDPOINTS.KINDLE_PRICE_WATCH(watchId), request);
+}
+
+export function deleteKindlePriceWatch(watchId: number): Promise<{ id: number; deleted: boolean }> {
+    return apiClient.delete(API_ENDPOINTS.KINDLE_PRICE_WATCH(watchId));
+}
+
+export function recordKindlePriceObservation(
+    watchId: number,
+    request: {
+        current_price?: number | null;
+        list_price?: number | null;
+        status?: 'ok' | 'partial' | 'failed';
+        error_message?: string | null;
+        source?: 'codex_browser' | 'manual';
+        title?: string | null;
+    },
+): Promise<KindlePriceObservationResponse> {
+    return apiClient.post(API_ENDPOINTS.KINDLE_PRICE_WATCH_OBSERVATIONS(watchId), request);
 }

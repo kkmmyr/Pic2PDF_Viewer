@@ -36,6 +36,7 @@
 | [0022](0022_review-assisted-qwen-dots-ocr.md) | Qwen3.5 OCRとdots.mocrを全ページレビュー前提で採用 | Superseded by ADR-0023 | 2026-08-23 |
 | [0023](0023_risk-scoped-qwen-dots-review.md) | Qwen＋dots OCRの人手QAをリスク対象へ限定 | Superseded by ADR-0024 | 2026-08-23 |
 | [0024](0024_codex-operated-offline-ocr-publication.md) | Qwen＋dots OCRをCodex管理の隔離実行・成果物反映に限定 | Accepted | 2026-08-23 |
+| [0025](0025_kindle-price-monitor-codex-browser.md) | Kindle価格監視をCodexブラウザ観測で実行 | Accepted | 2026-08-23 |
 | — | _テンプレート: [0000_template.md](0000_template.md)_ | — | — |
 
 ## 新規 ADR 作成手順

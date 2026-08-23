@@ -107,6 +107,8 @@ class _AppSettings(BaseSettings):
     DOUJIN_WATCH_INTERVAL_SEC: int = 15
     # hitomi 新着監視の実行結果を通知する Discord Webhook URL（未設定時は通知無効）
     HITOMI_DISCORD_WEBHOOK_URL: str | None = None
+    # Kindle 価格監視の値下がり結果を通知する Discord Webhook URL（未設定時は通知無効）
+    KINDLE_PRICE_DISCORD_WEBHOOK_URL: str | None = None
 
 
 _s = _AppSettings()
@@ -168,6 +170,7 @@ KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC: int = _s.KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_
 GEMMA_TOOL_DIR: str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
 META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
 HITOMI_DISCORD_WEBHOOK_URL: str | None = _s.HITOMI_DISCORD_WEBHOOK_URL or None
+KINDLE_PRICE_DISCORD_WEBHOOK_URL: str | None = _s.KINDLE_PRICE_DISCORD_WEBHOOK_URL or None
 
 # ---------------------------------------------------------------------------
 # ソース識別子

@@ -25,6 +25,7 @@ from routers import (
     genres,
     hitomi,
     kindle_catalog,
+    kindle_price_watch,
     library,
     meta,
     meta_db_backup,
@@ -128,6 +129,7 @@ app.include_router(meta.router, prefix="/api", tags=["meta"])
 app.include_router(series.router, prefix="/api", tags=["series"])
 app.include_router(hitomi.router, prefix="/api", tags=["hitomi"])
 app.include_router(kindle_catalog.router, prefix="/api", tags=["kindle_catalog"])
+app.include_router(kindle_price_watch.router, prefix="/api", tags=["kindle_price_watch"])
 app.include_router(genres.router, prefix="/api", tags=["genres"])
 app.include_router(novel_db.router, prefix="/api", tags=["novel_db"])
 app.include_router(novel_discussion.router, prefix="/api", tags=["novel_discussion"])

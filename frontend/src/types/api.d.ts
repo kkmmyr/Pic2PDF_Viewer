@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    '/api/pdfs': {
+    "/api/pdfs": {
         parameters: {
             query?: never;
             header?: never;
@@ -12,17 +12,17 @@ export interface paths {
             cookie?: never;
         };
         /** List Pdfs */
-        get: operations['list_pdfs_api_pdfs_get'];
+        get: operations["list_pdfs_api_pdfs_get"];
         put?: never;
         post?: never;
         /** Delete Pdfs */
-        delete: operations['delete_pdfs_api_pdfs_delete'];
+        delete: operations["delete_pdfs_api_pdfs_delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/books/{path}/images': {
+    "/api/books/{path}/images": {
         parameters: {
             query?: never;
             header?: never;
@@ -30,7 +30,7 @@ export interface paths {
             cookie?: never;
         };
         /** List Book Images */
-        get: operations['list_book_images_api_books__path__images_get'];
+        get: operations["list_book_images_api_books__path__images_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -39,7 +39,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/rename': {
+    "/api/rename": {
         parameters: {
             query?: never;
             header?: never;
@@ -53,10 +53,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Rename Item */
-        patch: operations['rename_item_api_rename_patch'];
+        patch: operations["rename_item_api_rename_patch"];
         trace?: never;
     };
-    '/api/pdfs/{filename}/delete_pages': {
+    "/api/pdfs/{filename}/delete_pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -66,14 +66,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Delete Pages */
-        post: operations['delete_pages_api_pdfs__filename__delete_pages_post'];
+        post: operations["delete_pages_api_pdfs__filename__delete_pages_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/pdfs/{filename}/reorder_pages': {
+    "/api/pdfs/{filename}/reorder_pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -83,14 +83,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Reorder Pages */
-        post: operations['reorder_pages_api_pdfs__filename__reorder_pages_post'];
+        post: operations["reorder_pages_api_pdfs__filename__reorder_pages_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/pdfs/merge': {
+    "/api/pdfs/merge": {
         parameters: {
             query?: never;
             header?: never;
@@ -103,14 +103,14 @@ export interface paths {
          * Merge Pdfs
          * @description 複数の PDF を順番に結合して新しい PDF を生成する。
          */
-        post: operations['merge_pdfs_api_pdfs_merge_post'];
+        post: operations["merge_pdfs_api_pdfs_merge_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/generate': {
+    "/api/generate": {
         parameters: {
             query?: never;
             header?: never;
@@ -120,14 +120,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Generate Pdfs */
-        post: operations['generate_pdfs_api_generate_post'];
+        post: operations["generate_pdfs_api_generate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/generate/watcher': {
+    "/api/generate/watcher": {
         parameters: {
             query?: never;
             header?: never;
@@ -138,7 +138,7 @@ export interface paths {
          * Get Generate Watcher
          * @description 同人誌フォルダ自動監視の現在状態を返す。
          */
-        get: operations['get_generate_watcher_api_generate_watcher_get'];
+        get: operations["get_generate_watcher_api_generate_watcher_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -147,7 +147,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/generate/job/{job_id}': {
+    "/api/generate/job/{job_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -158,7 +158,7 @@ export interface paths {
          * Get Generate Job
          * @description ジョブの進捗・結果を取得する。
          */
-        get: operations['get_generate_job_api_generate_job__job_id__get'];
+        get: operations["get_generate_job_api_generate_job__job_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -167,7 +167,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/thumbnails/page': {
+    "/api/thumbnails/page": {
         parameters: {
             query?: never;
             header?: never;
@@ -181,7 +181,7 @@ export interface paths {
          *     doujin ソースは images/ 配下の WebP を直接返す。
          *     comic / novel は PDF を fitz でレンダリングして返す。
          */
-        get: operations['get_page_thumbnail_api_thumbnails_page_get'];
+        get: operations["get_page_thumbnail_api_thumbnails_page_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -190,7 +190,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/thumbnails/regenerate': {
+    "/api/thumbnails/regenerate": {
         parameters: {
             query?: never;
             header?: never;
@@ -200,14 +200,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Regenerate Thumbnail */
-        post: operations['regenerate_thumbnail_api_thumbnails_regenerate_post'];
+        post: operations["regenerate_thumbnail_api_thumbnails_regenerate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/thumbnails/regenerate_bulk': {
+    "/api/thumbnails/regenerate_bulk": {
         parameters: {
             query?: never;
             header?: never;
@@ -220,14 +220,14 @@ export interface paths {
          * Regenerate Thumbnail Bulk
          * @description 複数書籍のサムネイルを一括再生成する。
          */
-        post: operations['regenerate_thumbnail_bulk_api_thumbnails_regenerate_bulk_post'];
+        post: operations["regenerate_thumbnail_bulk_api_thumbnails_regenerate_bulk_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/run': {
+    "/api/ocr/run": {
         parameters: {
             query?: never;
             header?: never;
@@ -237,14 +237,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Run Ocr */
-        post: operations['run_ocr_api_ocr_run_post'];
+        post: operations["run_ocr_api_ocr_run_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/stop': {
+    "/api/ocr/stop": {
         parameters: {
             query?: never;
             header?: never;
@@ -254,14 +254,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Stop Ocr */
-        post: operations['stop_ocr_api_ocr_stop_post'];
+        post: operations["stop_ocr_api_ocr_stop_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/status': {
+    "/api/ocr/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -275,7 +275,7 @@ export interface paths {
          *     rebuild_jobs から OCR 専用行を抽出し、旧 OCRService と同じスキーマ
          *     (status / logs / last_return_code) に変換して返す。
          */
-        get: operations['get_ocr_status_api_ocr_status_get'];
+        get: operations["get_ocr_status_api_ocr_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -284,7 +284,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/agents/claim': {
+    "/api/ocr/agents/claim": {
         parameters: {
             query?: never;
             header?: never;
@@ -294,14 +294,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Claim Ocr Agent Job */
-        post: operations['claim_ocr_agent_job_api_ocr_agents_claim_post'];
+        post: operations["claim_ocr_agent_job_api_ocr_agents_claim_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/agents/jobs/{job_id}/pages/{book_name}/{page_no}/image': {
+    "/api/ocr/agents/jobs/{job_id}/pages/{book_name}/{page_no}/image": {
         parameters: {
             query?: never;
             header?: never;
@@ -309,7 +309,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Ocr Agent Page Image */
-        get: operations['get_ocr_agent_page_image_api_ocr_agents_jobs__job_id__pages__book_name___page_no__image_get'];
+        get: operations["get_ocr_agent_page_image_api_ocr_agents_jobs__job_id__pages__book_name___page_no__image_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -318,7 +318,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/agents/jobs/{job_id}/heartbeat': {
+    "/api/ocr/agents/jobs/{job_id}/heartbeat": {
         parameters: {
             query?: never;
             header?: never;
@@ -328,14 +328,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Heartbeat Ocr Agent Job */
-        post: operations['heartbeat_ocr_agent_job_api_ocr_agents_jobs__job_id__heartbeat_post'];
+        post: operations["heartbeat_ocr_agent_job_api_ocr_agents_jobs__job_id__heartbeat_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/agents/jobs/{job_id}/pages': {
+    "/api/ocr/agents/jobs/{job_id}/pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -345,14 +345,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Submit Ocr Agent Page */
-        post: operations['submit_ocr_agent_page_api_ocr_agents_jobs__job_id__pages_post'];
+        post: operations["submit_ocr_agent_page_api_ocr_agents_jobs__job_id__pages_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/agents/jobs/{job_id}/complete': {
+    "/api/ocr/agents/jobs/{job_id}/complete": {
         parameters: {
             query?: never;
             header?: never;
@@ -362,14 +362,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Complete Ocr Agent Job */
-        post: operations['complete_ocr_agent_job_api_ocr_agents_jobs__job_id__complete_post'];
+        post: operations["complete_ocr_agent_job_api_ocr_agents_jobs__job_id__complete_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/agents/jobs/{job_id}/fail': {
+    "/api/ocr/agents/jobs/{job_id}/fail": {
         parameters: {
             query?: never;
             header?: never;
@@ -379,14 +379,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Fail Ocr Agent Job */
-        post: operations['fail_ocr_agent_job_api_ocr_agents_jobs__job_id__fail_post'];
+        post: operations["fail_ocr_agent_job_api_ocr_agents_jobs__job_id__fail_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/qa/runs': {
+    "/api/ocr/qa/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -394,7 +394,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Ocr Qa Runs */
-        get: operations['get_ocr_qa_runs_api_ocr_qa_runs_get'];
+        get: operations["get_ocr_qa_runs_api_ocr_qa_runs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -403,7 +403,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/qa/runs/{run_id}': {
+    "/api/ocr/qa/runs/{run_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -411,7 +411,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Ocr Qa Run */
-        get: operations['get_ocr_qa_run_api_ocr_qa_runs__run_id__get'];
+        get: operations["get_ocr_qa_run_api_ocr_qa_runs__run_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -420,7 +420,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/qa/runs/{run_id}/pages/{page_no}/image': {
+    "/api/ocr/qa/runs/{run_id}/pages/{page_no}/image": {
         parameters: {
             query?: never;
             header?: never;
@@ -428,7 +428,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Ocr Qa Page Image */
-        get: operations['get_ocr_qa_page_image_api_ocr_qa_runs__run_id__pages__page_no__image_get'];
+        get: operations["get_ocr_qa_page_image_api_ocr_qa_runs__run_id__pages__page_no__image_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -437,7 +437,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/qa/runs/{run_id}/pages/{page_no}': {
+    "/api/ocr/qa/runs/{run_id}/pages/{page_no}": {
         parameters: {
             query?: never;
             header?: never;
@@ -451,10 +451,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Review Ocr Qa Page */
-        patch: operations['review_ocr_qa_page_api_ocr_qa_runs__run_id__pages__page_no__patch'];
+        patch: operations["review_ocr_qa_page_api_ocr_qa_runs__run_id__pages__page_no__patch"];
         trace?: never;
     };
-    '/api/ocr/qa/runs/{run_id}/classify-pages': {
+    "/api/ocr/qa/runs/{run_id}/classify-pages": {
         parameters: {
             query?: never;
             header?: never;
@@ -464,14 +464,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Classify Ocr Qa Pages */
-        post: operations['classify_ocr_qa_pages_api_ocr_qa_runs__run_id__classify_pages_post'];
+        post: operations["classify_ocr_qa_pages_api_ocr_qa_runs__run_id__classify_pages_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/qa/runs/{run_id}/approve': {
+    "/api/ocr/qa/runs/{run_id}/approve": {
         parameters: {
             query?: never;
             header?: never;
@@ -481,14 +481,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Approve Ocr Qa Run */
-        post: operations['approve_ocr_qa_run_api_ocr_qa_runs__run_id__approve_post'];
+        post: operations["approve_ocr_qa_run_api_ocr_qa_runs__run_id__approve_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/ground-truth': {
+    "/api/ocr/ground-truth": {
         parameters: {
             query?: never;
             header?: never;
@@ -496,7 +496,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Ocr Ground Truth */
-        get: operations['get_ocr_ground_truth_api_ocr_ground_truth_get'];
+        get: operations["get_ocr_ground_truth_api_ocr_ground_truth_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -505,7 +505,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/ground-truth/seed': {
+    "/api/ocr/ground-truth/seed": {
         parameters: {
             query?: never;
             header?: never;
@@ -515,14 +515,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Seed Ocr Ground Truth */
-        post: operations['seed_ocr_ground_truth_api_ocr_ground_truth_seed_post'];
+        post: operations["seed_ocr_ground_truth_api_ocr_ground_truth_seed_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/ocr/ground-truth/{entry_id}': {
+    "/api/ocr/ground-truth/{entry_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -536,10 +536,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update Ocr Ground Truth */
-        patch: operations['update_ocr_ground_truth_api_ocr_ground_truth__entry_id__patch'];
+        patch: operations["update_ocr_ground_truth_api_ocr_ground_truth__entry_id__patch"];
         trace?: never;
     };
-    '/api/ocr/ground-truth/{entry_id}/image': {
+    "/api/ocr/ground-truth/{entry_id}/image": {
         parameters: {
             query?: never;
             header?: never;
@@ -547,7 +547,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Ocr Ground Truth Image */
-        get: operations['get_ocr_ground_truth_image_api_ocr_ground_truth__entry_id__image_get'];
+        get: operations["get_ocr_ground_truth_image_api_ocr_ground_truth__entry_id__image_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -556,7 +556,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/meta': {
+    "/api/meta": {
         parameters: {
             query?: never;
             header?: never;
@@ -568,7 +568,7 @@ export interface paths {
          * @description 指定ソースの meta.json 全体を返す。
          *     レスポンス: { "key": { "authors": [...] }, ... }
          */
-        get: operations['get_meta_api_meta_get'];
+        get: operations["get_meta_api_meta_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -581,10 +581,10 @@ export interface paths {
          *     指定したフィールドのみ書き換え、省略されたフィールドは保持する。
          *     すべての list フィールドが空になった場合はエントリ自体を削除する。
          */
-        patch: operations['update_meta_api_meta_patch'];
+        patch: operations["update_meta_api_meta_patch"];
         trace?: never;
     };
-    '/api/meta/export': {
+    "/api/meta/export": {
         parameters: {
             query?: never;
             header?: never;
@@ -596,7 +596,7 @@ export interface paths {
          * @description 指定ソースの meta.json 全体を JSON ファイルとしてダウンロードする。
          *     バックアップ・環境移行用。副作用なし（読み取り専用）。
          */
-        get: operations['export_meta_api_meta_export_get'];
+        get: operations["export_meta_api_meta_export_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -605,7 +605,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/meta/view': {
+    "/api/meta/view": {
         parameters: {
             query?: never;
             header?: never;
@@ -622,14 +622,14 @@ export interface paths {
          *     - `view_count` は前回 last_viewed_at から VIEW_COUNT_DEBOUNCE_SEC 以上経過した場合のみ +1。
          *       短時間で同じ書籍を何度も開いてもカウントが膨らまないようにする。
          */
-        post: operations['record_view_api_meta_view_post'];
+        post: operations["record_view_api_meta_view_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/meta/novel/{book_key}': {
+    "/api/meta/novel/{book_key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -648,10 +648,10 @@ export interface paths {
          *
          *     book_key は "{stem}.pdf" 形式。省略フィールドは変更しない。
          */
-        patch: operations['patch_novel_meta_api_meta_novel__book_key__patch'];
+        patch: operations["patch_novel_meta_api_meta_novel__book_key__patch"];
         trace?: never;
     };
-    '/api/meta/init-genre-original': {
+    "/api/meta/init-genre-original": {
         parameters: {
             query?: never;
             header?: never;
@@ -667,14 +667,14 @@ export interface paths {
          *     - meta2.db にエントリがあるが genre が空のもの → オリジナルに更新
          *     - images/ ディレクトリにあるが meta2.db に未登録のもの → エントリを新規追加
          */
-        post: operations['init_genre_original_api_meta_init_genre_original_post'];
+        post: operations["init_genre_original_api_meta_init_genre_original_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/series/assign': {
+    "/api/series/assign": {
         parameters: {
             query?: never;
             header?: never;
@@ -690,14 +690,14 @@ export interface paths {
          *     `index` が float なら全 names に同じ巻数、配列なら names[i] に index[i] を
          *     割り当てる（複数選択からの一括登録用）。
          */
-        post: operations['assign_series_api_series_assign_post'];
+        post: operations["assign_series_api_series_assign_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/series/unassign': {
+    "/api/series/unassign": {
         parameters: {
             query?: never;
             header?: never;
@@ -710,14 +710,14 @@ export interface paths {
          * Unassign Series
          * @description 書籍をシリーズから外す（series_* フィールドを削除）。
          */
-        post: operations['unassign_series_api_series_unassign_post'];
+        post: operations["unassign_series_api_series_unassign_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/series/reorder': {
+    "/api/series/reorder": {
         parameters: {
             query?: never;
             header?: never;
@@ -733,14 +733,14 @@ export interface paths {
          *     `names` には対象シリーズに属する書籍を **新しい順序で** 渡す。`series_id` が
          *     一致しない書籍が混じっていれば 400。他のメタフィールドは保持する。
          */
-        post: operations['reorder_series_api_series_reorder_post'];
+        post: operations["reorder_series_api_series_reorder_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/series/suggest': {
+    "/api/series/suggest": {
         parameters: {
             query?: never;
             header?: never;
@@ -755,14 +755,14 @@ export interface paths {
          *
          *     `services.series_suggester.suggest_series` のラッパー。
          */
-        post: operations['suggest_series_endpoint_api_series_suggest_post'];
+        post: operations["suggest_series_endpoint_api_series_suggest_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/hitomi/new-arrivals': {
+    "/api/hitomi/new-arrivals": {
         parameters: {
             query?: never;
             header?: never;
@@ -773,7 +773,7 @@ export interface paths {
          * Get New Arrivals
          * @description 指定既読状態の作品を新着順で返す + ヘルス情報。
          */
-        get: operations['get_new_arrivals_api_hitomi_new_arrivals_get'];
+        get: operations["get_new_arrivals_api_hitomi_new_arrivals_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -782,7 +782,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/hitomi/dismiss/{gallery_id}': {
+    "/api/hitomi/dismiss/{gallery_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -792,14 +792,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Post Dismiss */
-        post: operations['post_dismiss_api_hitomi_dismiss__gallery_id__post'];
+        post: operations["post_dismiss_api_hitomi_dismiss__gallery_id__post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/hitomi/dismiss-all': {
+    "/api/hitomi/dismiss-all": {
         parameters: {
             query?: never;
             header?: never;
@@ -809,14 +809,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Post Dismiss All */
-        post: operations['post_dismiss_all_api_hitomi_dismiss_all_post'];
+        post: operations["post_dismiss_all_api_hitomi_dismiss_all_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/hitomi/watchlist': {
+    "/api/hitomi/watchlist": {
         parameters: {
             query?: never;
             header?: never;
@@ -824,17 +824,17 @@ export interface paths {
             cookie?: never;
         };
         /** Get Watchlist */
-        get: operations['get_watchlist_api_hitomi_watchlist_get'];
+        get: operations["get_watchlist_api_hitomi_watchlist_get"];
         put?: never;
         /** Post Watchlist */
-        post: operations['post_watchlist_api_hitomi_watchlist_post'];
+        post: operations["post_watchlist_api_hitomi_watchlist_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/hitomi/watchlist/{normalized}': {
+    "/api/hitomi/watchlist/{normalized}": {
         parameters: {
             query?: never;
             header?: never;
@@ -845,13 +845,13 @@ export interface paths {
         put?: never;
         post?: never;
         /** Delete Watchlist */
-        delete: operations['delete_watchlist_api_hitomi_watchlist__normalized__delete'];
+        delete: operations["delete_watchlist_api_hitomi_watchlist__normalized__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/hitomi/run-now': {
+    "/api/hitomi/run-now": {
         parameters: {
             query?: never;
             header?: never;
@@ -870,14 +870,14 @@ export interface paths {
          *     hitomi.la に過剰アクセスしないための保険。Task Scheduler からの CLI
          *     直接実行はこの制限を受けない。
          */
-        post: operations['post_run_now_api_hitomi_run_now_post'];
+        post: operations["post_run_now_api_hitomi_run_now_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/books': {
+    "/api/kindle-catalog/books": {
         parameters: {
             query?: never;
             header?: never;
@@ -885,7 +885,7 @@ export interface paths {
             cookie?: never;
         };
         /** List Books */
-        get: operations['list_books_api_kindle_catalog_books_get'];
+        get: operations["list_books_api_kindle_catalog_books_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -894,7 +894,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/stats': {
+    "/api/kindle-catalog/stats": {
         parameters: {
             query?: never;
             header?: never;
@@ -902,7 +902,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Stats */
-        get: operations['get_stats_api_kindle_catalog_stats_get'];
+        get: operations["get_stats_api_kindle_catalog_stats_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -911,7 +911,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/imports/sources': {
+    "/api/kindle-catalog/imports/sources": {
         parameters: {
             query?: never;
             header?: never;
@@ -919,7 +919,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Import Sources */
-        get: operations['get_import_sources_api_kindle_catalog_imports_sources_get'];
+        get: operations["get_import_sources_api_kindle_catalog_imports_sources_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -928,7 +928,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/imports/runs': {
+    "/api/kindle-catalog/imports/runs": {
         parameters: {
             query?: never;
             header?: never;
@@ -936,7 +936,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Import Runs */
-        get: operations['get_import_runs_api_kindle_catalog_imports_runs_get'];
+        get: operations["get_import_runs_api_kindle_catalog_imports_runs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -945,7 +945,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/imports/orders': {
+    "/api/kindle-catalog/imports/orders": {
         parameters: {
             query?: never;
             header?: never;
@@ -955,14 +955,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Import Orders */
-        post: operations['import_orders_api_kindle_catalog_imports_orders_post'];
+        post: operations["import_orders_api_kindle_catalog_imports_orders_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/imports/kindle-info': {
+    "/api/kindle-catalog/imports/kindle-info": {
         parameters: {
             query?: never;
             header?: never;
@@ -972,14 +972,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Import Kindle Info */
-        post: operations['import_kindle_info_api_kindle_catalog_imports_kindle_info_post'];
+        post: operations["import_kindle_info_api_kindle_catalog_imports_kindle_info_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/imports/autobuy': {
+    "/api/kindle-catalog/imports/autobuy": {
         parameters: {
             query?: never;
             header?: never;
@@ -989,14 +989,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Import Autobuy */
-        post: operations['import_autobuy_api_kindle_catalog_imports_autobuy_post'];
+        post: operations["import_autobuy_api_kindle_catalog_imports_autobuy_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/migration/preview': {
+    "/api/kindle-catalog/migration/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -1006,14 +1006,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Preview Legacy Migration */
-        post: operations['preview_legacy_migration_api_kindle_catalog_migration_preview_post'];
+        post: operations["preview_legacy_migration_api_kindle_catalog_migration_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/migration/commit': {
+    "/api/kindle-catalog/migration/commit": {
         parameters: {
             query?: never;
             header?: never;
@@ -1023,14 +1023,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Commit Legacy Migration */
-        post: operations['commit_legacy_migration_api_kindle_catalog_migration_commit_post'];
+        post: operations["commit_legacy_migration_api_kindle_catalog_migration_commit_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/links/unlinked': {
+    "/api/kindle-catalog/links/unlinked": {
         parameters: {
             query?: never;
             header?: never;
@@ -1038,7 +1038,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Unlinked Books */
-        get: operations['get_unlinked_books_api_kindle_catalog_links_unlinked_get'];
+        get: operations["get_unlinked_books_api_kindle_catalog_links_unlinked_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1047,7 +1047,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/links/candidates': {
+    "/api/kindle-catalog/links/candidates": {
         parameters: {
             query?: never;
             header?: never;
@@ -1055,7 +1055,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Link Candidates */
-        get: operations['get_link_candidates_api_kindle_catalog_links_candidates_get'];
+        get: operations["get_link_candidates_api_kindle_catalog_links_candidates_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1064,7 +1064,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/links': {
+    "/api/kindle-catalog/links": {
         parameters: {
             query?: never;
             header?: never;
@@ -1073,16 +1073,16 @@ export interface paths {
         };
         get?: never;
         /** Link Existing Book */
-        put: operations['link_existing_book_api_kindle_catalog_links_put'];
+        put: operations["link_existing_book_api_kindle_catalog_links_put"];
         post?: never;
         /** Unlink Existing Book */
-        delete: operations['unlink_existing_book_api_kindle_catalog_links_delete'];
+        delete: operations["unlink_existing_book_api_kindle_catalog_links_delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/capture-jobs': {
+    "/api/kindle-catalog/capture-jobs": {
         parameters: {
             query?: never;
             header?: never;
@@ -1090,17 +1090,17 @@ export interface paths {
             cookie?: never;
         };
         /** Get Capture Jobs */
-        get: operations['get_capture_jobs_api_kindle_catalog_capture_jobs_get'];
+        get: operations["get_capture_jobs_api_kindle_catalog_capture_jobs_get"];
         put?: never;
         /** Create Capture Job */
-        post: operations['create_capture_job_api_kindle_catalog_capture_jobs_post'];
+        post: operations["create_capture_job_api_kindle_catalog_capture_jobs_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/capture-quality-warnings': {
+    "/api/kindle-catalog/capture-quality-warnings": {
         parameters: {
             query?: never;
             header?: never;
@@ -1108,7 +1108,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Capture Quality Warnings */
-        get: operations['get_capture_quality_warnings_api_kindle_catalog_capture_quality_warnings_get'];
+        get: operations["get_capture_quality_warnings_api_kindle_catalog_capture_quality_warnings_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1117,7 +1117,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/capture-quality-warnings/{warning_id}': {
+    "/api/kindle-catalog/capture-quality-warnings/{warning_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1131,10 +1131,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update Capture Quality Warning */
-        patch: operations['update_capture_quality_warning_api_kindle_catalog_capture_quality_warnings__warning_id__patch'];
+        patch: operations["update_capture_quality_warning_api_kindle_catalog_capture_quality_warnings__warning_id__patch"];
         trace?: never;
     };
-    '/api/kindle-catalog/agents/claim': {
+    "/api/kindle-catalog/agents/claim": {
         parameters: {
             query?: never;
             header?: never;
@@ -1144,14 +1144,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Claim Capture Job */
-        post: operations['claim_capture_job_api_kindle_catalog_agents_claim_post'];
+        post: operations["claim_capture_job_api_kindle_catalog_agents_claim_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/agents/jobs/{job_id}/state': {
+    "/api/kindle-catalog/agents/jobs/{job_id}/state": {
         parameters: {
             query?: never;
             header?: never;
@@ -1161,14 +1161,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Update Capture Job State */
-        post: operations['update_capture_job_state_api_kindle_catalog_agents_jobs__job_id__state_post'];
+        post: operations["update_capture_job_state_api_kindle_catalog_agents_jobs__job_id__state_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/agents/jobs/{job_id}/heartbeat': {
+    "/api/kindle-catalog/agents/jobs/{job_id}/heartbeat": {
         parameters: {
             query?: never;
             header?: never;
@@ -1178,14 +1178,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Heartbeat Capture Job */
-        post: operations['heartbeat_capture_job_api_kindle_catalog_agents_jobs__job_id__heartbeat_post'];
+        post: operations["heartbeat_capture_job_api_kindle_catalog_agents_jobs__job_id__heartbeat_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/kindle-catalog/agents/jobs/{job_id}/complete': {
+    "/api/kindle-catalog/agents/jobs/{job_id}/complete": {
         parameters: {
             query?: never;
             header?: never;
@@ -1195,14 +1195,105 @@ export interface paths {
         get?: never;
         put?: never;
         /** Complete Capture Job */
-        post: operations['complete_capture_job_api_kindle_catalog_agents_jobs__job_id__complete_post'];
+        post: operations["complete_capture_job_api_kindle_catalog_agents_jobs__job_id__complete_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/genres': {
+    "/api/kindle-price-watches/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Targets
+         * @description Codex のブラウザ観測処理に渡す有効な URL 一覧。
+         */
+        get: operations["export_targets_api_kindle_price_watches_targets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kindle-price-watches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Price Watches */
+        get: operations["list_price_watches_api_kindle_price_watches_get"];
+        put?: never;
+        /** Create Price Watch */
+        post: operations["create_price_watch_api_kindle_price_watches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kindle-price-watches/{watch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Price Watch */
+        get: operations["get_price_watch_api_kindle_price_watches__watch_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Price Watch */
+        delete: operations["delete_price_watch_api_kindle_price_watches__watch_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Price Watch */
+        patch: operations["update_price_watch_api_kindle_price_watches__watch_id__patch"];
+        trace?: never;
+    };
+    "/api/kindle-price-watches/{watch_id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Price History */
+        get: operations["get_price_history_api_kindle_price_watches__watch_id__history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/kindle-price-watches/{watch_id}/observations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Price Observation */
+        post: operations["record_price_observation_api_kindle_price_watches__watch_id__observations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/genres": {
         parameters: {
             query?: never;
             header?: never;
@@ -1210,17 +1301,17 @@ export interface paths {
             cookie?: never;
         };
         /** Get Genres */
-        get: operations['get_genres_api_genres_get'];
+        get: operations["get_genres_api_genres_get"];
         put?: never;
         /** Add Genre */
-        post: operations['add_genre_api_genres_post'];
+        post: operations["add_genre_api_genres_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/genres/{name}': {
+    "/api/genres/{name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1231,13 +1322,13 @@ export interface paths {
         put?: never;
         post?: never;
         /** Delete Genre */
-        delete: operations['delete_genre_api_genres__name__delete'];
+        delete: operations["delete_genre_api_genres__name__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/genres/reorder': {
+    "/api/genres/reorder": {
         parameters: {
             query?: never;
             header?: never;
@@ -1251,10 +1342,10 @@ export interface paths {
         options?: never;
         head?: never;
         /** Reorder Genres */
-        patch: operations['reorder_genres_api_genres_reorder_patch'];
+        patch: operations["reorder_genres_api_genres_reorder_patch"];
         trace?: never;
     };
-    '/api/novel_db/books/{book_name}/characters': {
+    "/api/novel_db/books/{book_name}/characters": {
         parameters: {
             query?: never;
             header?: never;
@@ -1268,7 +1359,7 @@ export interface paths {
          *     `book_characters` に未登録（CLI 未実行）の書籍は空配列。フロントは空配列なら
          *     「キャラ辞典 未生成」表示にフォールバックする。
          */
-        get: operations['get_book_characters_api_novel_db_books__book_name__characters_get'];
+        get: operations["get_book_characters_api_novel_db_books__book_name__characters_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1277,7 +1368,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/books/{book_name}/characters/{char_name}': {
+    "/api/novel_db/books/{book_name}/characters/{char_name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1288,7 +1379,7 @@ export interface paths {
          * Get Book Character Detail
          * @description 書籍 × キャラの詳細（サマリ + 主要シーン top 5）を返す（B-15）。
          */
-        get: operations['get_book_character_detail_api_novel_db_books__book_name__characters__char_name__get'];
+        get: operations["get_book_character_detail_api_novel_db_books__book_name__characters__char_name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1297,7 +1388,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/books': {
+    "/api/novel_db/books": {
         parameters: {
             query?: never;
             header?: never;
@@ -1308,7 +1399,7 @@ export interface paths {
          * Get Books
          * @description 書籍一覧 + DB 状態を返す（[API §7.1]）。
          */
-        get: operations['get_books_api_novel_db_books_get'];
+        get: operations["get_books_api_novel_db_books_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1317,7 +1408,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/series': {
+    "/api/novel_db/series": {
         parameters: {
             query?: never;
             header?: never;
@@ -1328,7 +1419,7 @@ export interface paths {
          * Get Series
          * @description novel ソースのシリーズ一覧（書籍 1 件以上のみ）（[API §7.2]）。
          */
-        get: operations['get_series_api_novel_db_series_get'];
+        get: operations["get_series_api_novel_db_series_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1337,7 +1428,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/authors': {
+    "/api/novel_db/authors": {
         parameters: {
             query?: never;
             header?: never;
@@ -1348,7 +1439,7 @@ export interface paths {
          * Get Authors
          * @description novel ソースの全書籍から作者一覧（重複なし・アルファベット順）を返す（B-21）。
          */
-        get: operations['get_authors_api_novel_db_authors_get'];
+        get: operations["get_authors_api_novel_db_authors_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1357,7 +1448,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/books/{book_name}/similar': {
+    "/api/novel_db/books/{book_name}/similar": {
         parameters: {
             query?: never;
             header?: never;
@@ -1368,7 +1459,7 @@ export interface paths {
          * Get Similar Books
          * @description 指定書籍に意味的に近い書籍を返す（B-19）。サマリ embedding の KNN。
          */
-        get: operations['get_similar_books_api_novel_db_books__book_name__similar_get'];
+        get: operations["get_similar_books_api_novel_db_books__book_name__similar_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1377,7 +1468,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/books/{book_name}': {
+    "/api/novel_db/books/{book_name}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1388,7 +1479,7 @@ export interface paths {
          * Get Book Detail Route
          * @description 単一書籍の詳細情報（summary / character_count / discussion_count 含む）を返す。
          */
-        get: operations['get_book_detail_route_api_novel_db_books__book_name__get'];
+        get: operations["get_book_detail_route_api_novel_db_books__book_name__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1397,7 +1488,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/builds': {
+    "/api/novel_db/builds": {
         parameters: {
             query?: never;
             header?: never;
@@ -1413,14 +1504,14 @@ export interface paths {
          *     mode='rebuild': pages.full_text → chunk/embed を再構築（OCR 済み前提）
          *     mode='ocr':     images/*.png → OCR → pages.full_text を更新
          */
-        post: operations['post_rebuild_api_novel_db_builds_post'];
+        post: operations["post_rebuild_api_novel_db_builds_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/builds/status': {
+    "/api/novel_db/builds/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -1431,7 +1522,7 @@ export interface paths {
          * Get Rebuild Status
          * @description 現在のキュー状態を返す（[API §7.9]）。
          */
-        get: operations['get_rebuild_status_api_novel_db_builds_status_get'];
+        get: operations["get_rebuild_status_api_novel_db_builds_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1440,7 +1531,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/builds/{job_id}': {
+    "/api/novel_db/builds/{job_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1454,13 +1545,13 @@ export interface paths {
          * Delete Rebuild
          * @description 待機中ジョブをキャンセルする（[API §7.10]）。実行中は 409。
          */
-        delete: operations['delete_rebuild_api_novel_db_builds__job_id__delete'];
+        delete: operations["delete_rebuild_api_novel_db_builds__job_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/search': {
+    "/api/novel_db/search": {
         parameters: {
             query?: never;
             header?: never;
@@ -1476,14 +1567,14 @@ export interface paths {
          *     `min_chars` でノイズページ（章扉・目次・人物紹介・あとがき等）を除外する。
          *     検索 API では書籍偏りを許容（max_per_book は適用しない）。
          */
-        post: operations['post_search_api_novel_db_search_post'];
+        post: operations["post_search_api_novel_db_search_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/qa': {
+    "/api/novel_db/qa": {
         parameters: {
             query?: never;
             header?: never;
@@ -1496,14 +1587,14 @@ export interface paths {
          * Post Qa
          * @description RAG 質問応答を SSE で返す（[API §7.4]）。
          */
-        post: operations['post_qa_api_novel_db_qa_post'];
+        post: operations["post_qa_api_novel_db_qa_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/qa/history': {
+    "/api/novel_db/qa/history": {
         parameters: {
             query?: never;
             header?: never;
@@ -1514,7 +1605,7 @@ export interface paths {
          * Get Qa History
          * @description 履歴一覧（[API §7.5]）。book 指定時はその書籍の質問のみ返す。
          */
-        get: operations['get_qa_history_api_novel_db_qa_history_get'];
+        get: operations["get_qa_history_api_novel_db_qa_history_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1523,7 +1614,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/qa/history/{history_id}': {
+    "/api/novel_db/qa/history/{history_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1534,20 +1625,20 @@ export interface paths {
          * Get Qa History Detail
          * @description 履歴詳細（[API §7.6]）。
          */
-        get: operations['get_qa_history_detail_api_novel_db_qa_history__history_id__get'];
+        get: operations["get_qa_history_detail_api_novel_db_qa_history__history_id__get"];
         put?: never;
         post?: never;
         /**
          * Delete Qa History
          * @description 履歴削除（[API §7.7]）。
          */
-        delete: operations['delete_qa_history_api_novel_db_qa_history__history_id__delete'];
+        delete: operations["delete_qa_history_api_novel_db_qa_history__history_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/sessions': {
+    "/api/novel_db/sessions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1558,7 +1649,7 @@ export interface paths {
          * Get Chat Sessions
          * @description 会話セッション一覧（B-16）。scope_type / scope_id で絞り込み可能。
          */
-        get: operations['get_chat_sessions_api_novel_db_sessions_get'];
+        get: operations["get_chat_sessions_api_novel_db_sessions_get"];
         put?: never;
         /**
          * Post Chat Session Start
@@ -1568,14 +1659,14 @@ export interface paths {
          *     2. stream_chat に [system, user] を投入し、token を SSE で配信
          *     3. 終端で assistant メッセージを DB に append
          */
-        post: operations['post_chat_session_start_api_novel_db_sessions_post'];
+        post: operations["post_chat_session_start_api_novel_db_sessions_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/sessions/{session_id}': {
+    "/api/novel_db/sessions/{session_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1589,20 +1680,20 @@ export interface paths {
          *     UI は user/assistant のみを表示する。system は LLM 投入用の内部メッセージ
          *     なのでレスポンスから除外する。
          */
-        get: operations['get_chat_session_api_novel_db_sessions__session_id__get'];
+        get: operations["get_chat_session_api_novel_db_sessions__session_id__get"];
         put?: never;
         post?: never;
         /**
          * Delete Chat Session
          * @description 会話セッション削除（メッセージは CASCADE で連動削除）（B-16）。
          */
-        delete: operations['delete_chat_session_api_novel_db_sessions__session_id__delete'];
+        delete: operations["delete_chat_session_api_novel_db_sessions__session_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/sessions/{session_id}/messages': {
+    "/api/novel_db/sessions/{session_id}/messages": {
         parameters: {
             query?: never;
             header?: never;
@@ -1620,14 +1711,14 @@ export interface paths {
          *     3. messages + new user を投入し SSE で配信
          *     4. 終端で assistant メッセージを DB に append
          */
-        post: operations['post_chat_session_message_api_novel_db_sessions__session_id__messages_post'];
+        post: operations["post_chat_session_message_api_novel_db_sessions__session_id__messages_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel_db/sessions/{session_id}/title': {
+    "/api/novel_db/sessions/{session_id}/title": {
         parameters: {
             query?: never;
             header?: never;
@@ -1644,10 +1735,10 @@ export interface paths {
          * Patch Chat Session Title
          * @description セッションタイトルを手動更新する（B-16）。
          */
-        patch: operations['patch_chat_session_title_api_novel_db_sessions__session_id__title_patch'];
+        patch: operations["patch_chat_session_title_api_novel_db_sessions__session_id__title_patch"];
         trace?: never;
     };
-    '/api/novel/discussion/generate': {
+    "/api/novel/discussion/generate": {
         parameters: {
             query?: never;
             header?: never;
@@ -1663,14 +1754,14 @@ export interface paths {
          *     構成ステップ（planning）→ 台本ステップ（scripting）の 2 段 LLM 呼び出し。
          *     完了時に DoD 機械チェック（M1〜M5）を実行し done イベントに含める。
          */
-        post: operations['generate_discussion_api_novel_discussion_generate_post'];
+        post: operations["generate_discussion_api_novel_discussion_generate_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel/discussion/history': {
+    "/api/novel/discussion/history": {
         parameters: {
             query?: never;
             header?: never;
@@ -1681,7 +1772,7 @@ export interface paths {
          * Get Discussion History
          * @description 指定書籍のディスカッション履歴一覧を返す（B-20/B-28 両形式対応）。
          */
-        get: operations['get_discussion_history_api_novel_discussion_history_get'];
+        get: operations["get_discussion_history_api_novel_discussion_history_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1690,7 +1781,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel/discussion/history/{filename}': {
+    "/api/novel/discussion/history/{filename}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1704,13 +1795,13 @@ export interface paths {
          * Delete Discussion History
          * @description 指定ディスカッション履歴を削除する（B-28）。
          */
-        delete: operations['delete_discussion_history_api_novel_discussion_history__filename__delete'];
+        delete: operations["delete_discussion_history_api_novel_discussion_history__filename__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel/build/enqueue': {
+    "/api/novel/build/enqueue": {
         parameters: {
             query?: never;
             header?: never;
@@ -1723,14 +1814,14 @@ export interface paths {
          * Post Enqueue
          * @description Full Build / コンテキスト生成ジョブをキューに登録する（API §8.1）。
          */
-        post: operations['post_enqueue_api_novel_build_enqueue_post'];
+        post: operations["post_enqueue_api_novel_build_enqueue_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel/build/status': {
+    "/api/novel/build/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -1741,7 +1832,7 @@ export interface paths {
          * Get Status
          * @description Full Build キュー状態を返す（API §8.2）。
          */
-        get: operations['get_status_api_novel_build_status_get'];
+        get: operations["get_status_api_novel_build_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1750,7 +1841,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel/build/jobs/{job_id}': {
+    "/api/novel/build/jobs/{job_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1764,13 +1855,13 @@ export interface paths {
          * Delete Job
          * @description 待機中 Full Build ジョブをキャンセルする（API §8.3）。
          */
-        delete: operations['delete_job_api_novel_build_jobs__job_id__delete'];
+        delete: operations["delete_job_api_novel_build_jobs__job_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/novel/build/stream': {
+    "/api/novel/build/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -1784,7 +1875,7 @@ export interface paths {
          *     @log_and_raise_500 非適用: HTTP ヘッダー送信後のストリーム内例外は
          *     SSE で配信してストリームを閉じる。クライアント側は再接続する。
          */
-        get: operations['get_stream_api_novel_build_stream_get'];
+        get: operations["get_stream_api_novel_build_stream_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1793,7 +1884,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/amazon/import': {
+    "/api/amazon/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -1809,14 +1900,14 @@ export interface paths {
          *     Returns:
          *         {"updated": int, "skipped": int, "unmatched": int}
          */
-        post: operations['amazon_csv_import_api_amazon_import_post'];
+        post: operations["amazon_csv_import_api_amazon_import_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/meta_db/backup': {
+    "/api/meta_db/backup": {
         parameters: {
             query?: never;
             header?: never;
@@ -1829,14 +1920,14 @@ export interface paths {
          * Trigger Backup
          * @description meta2.db を OneDrive にスナップショットバックアップする。
          */
-        post: operations['trigger_backup_api_meta_db_backup_post'];
+        post: operations["trigger_backup_api_meta_db_backup_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/api/meta_db/backup/status': {
+    "/api/meta_db/backup/status": {
         parameters: {
             query?: never;
             header?: never;
@@ -1847,7 +1938,7 @@ export interface paths {
          * Backup Status
          * @description 最新バックアップの情報を返す。
          */
-        get: operations['backup_status_api_meta_db_backup_status_get'];
+        get: operations["backup_status_api_meta_db_backup_status_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1856,7 +1947,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_graph/series': {
+    "/api/novel_graph/series": {
         parameters: {
             query?: never;
             header?: never;
@@ -1867,7 +1958,7 @@ export interface paths {
          * Get Series List
          * @description character_relations データが存在するシリーズ一覧を返す。
          */
-        get: operations['get_series_list_api_novel_graph_series_get'];
+        get: operations["get_series_list_api_novel_graph_series_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1876,7 +1967,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_graph/series/{series_id}/books': {
+    "/api/novel_graph/series/{series_id}/books": {
         parameters: {
             query?: never;
             header?: never;
@@ -1887,7 +1978,7 @@ export interface paths {
          * Get Books In Series
          * @description シリーズに含まれる書籍一覧を返す（グラフに存在するもの）。
          */
-        get: operations['get_books_in_series_api_novel_graph_series__series_id__books_get'];
+        get: operations["get_books_in_series_api_novel_graph_series__series_id__books_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1896,7 +1987,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/novel_graph/series/{series_id}/graph': {
+    "/api/novel_graph/series/{series_id}/graph": {
         parameters: {
             query?: never;
             header?: never;
@@ -1910,7 +2001,7 @@ export interface paths {
          *     Query params:
          *         book_ids: カンマ区切りの book_id リスト（省略時は全冊）
          */
-        get: operations['get_graph_api_novel_graph_series__series_id__graph_get'];
+        get: operations["get_graph_api_novel_graph_series__series_id__graph_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1919,7 +2010,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/prefs': {
+    "/api/prefs": {
         parameters: {
             query?: never;
             header?: never;
@@ -1930,7 +2021,7 @@ export interface paths {
          * Get Prefs Endpoint
          * @description 指定ソースのフィルター設定とピン情報を返す。
          */
-        get: operations['get_prefs_endpoint_api_prefs_get'];
+        get: operations["get_prefs_endpoint_api_prefs_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1939,7 +2030,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/api/prefs/filters': {
+    "/api/prefs/filters": {
         parameters: {
             query?: never;
             header?: never;
@@ -1956,10 +2047,10 @@ export interface paths {
          * Patch Filters
          * @description readStateFilter / genreFilter を部分更新する。
          */
-        patch: operations['patch_filters_api_prefs_filters_patch'];
+        patch: operations["patch_filters_api_prefs_filters_patch"];
         trace?: never;
     };
-    '/api/prefs/pins': {
+    "/api/prefs/pins": {
         parameters: {
             query?: never;
             header?: never;
@@ -1971,19 +2062,19 @@ export interface paths {
          * Put Pin
          * @description グループピンを登録または上書きする。
          */
-        put: operations['put_pin_api_prefs_pins_put'];
+        put: operations["put_pin_api_prefs_pins_put"];
         post?: never;
         /**
          * Remove Pin
          * @description グループピンを削除する。
          */
-        delete: operations['remove_pin_api_prefs_pins_delete'];
+        delete: operations["remove_pin_api_prefs_pins_delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    '/': {
+    "/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1991,7 +2082,7 @@ export interface paths {
             cookie?: never;
         };
         /** Serve Index */
-        get: operations['_serve_index__get'];
+        get: operations["_serve_index__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2000,7 +2091,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    '/{full_path}': {
+    "/{full_path}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2008,7 +2099,7 @@ export interface paths {
             cookie?: never;
         };
         /** Serve Spa */
-        get: operations['_serve_spa__full_path__get'];
+        get: operations["_serve_spa__full_path__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2071,14 +2162,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state:
-                | 'locating_book'
-                | 'downloading'
-                | 'positioning'
-                | 'waiting_user'
-                | 'capturing'
-                | 'awaiting_files'
-                | 'failed';
+            state: "locating_book" | "downloading" | "positioning" | "waiting_user" | "capturing" | "awaiting_files" | "failed";
             /** Captured Screens */
             captured_screens?: number | null;
             /** Error Code */
@@ -2188,7 +2272,7 @@ export interface components {
              * Read State
              * @enum {string}
              */
-            read_state: 'unread' | 'reading' | 'done';
+            read_state: "unread" | "reading" | "done";
         };
         /** BookImagesResponse */
         BookImagesResponse: {
@@ -2211,7 +2295,7 @@ export interface components {
             /** Genre */
             genre?: string | null;
             /** Read State */
-            read_state?: ('unread' | 'reading' | 'done') | null;
+            read_state?: ("unread" | "reading" | "done") | null;
             /** Series Id */
             series_id?: string | null;
             /** Series Title */
@@ -2265,7 +2349,7 @@ export interface components {
              * Read State
              * @enum {string}
              */
-            read_state: 'unread' | 'reading' | 'done';
+            read_state: "unread" | "reading" | "done";
         };
         /** BuildEnqueueResponse */
         BuildEnqueueResponse: {
@@ -2284,12 +2368,12 @@ export interface components {
              * Mode
              * @enum {string}
              */
-            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "full_build" | "generate_contexts" | "generate_relations";
             /**
              * State
              * @enum {string}
              */
-            state: 'completed' | 'failed' | 'canceled';
+            state: "completed" | "failed" | "canceled";
             /** Finished At */
             finished_at?: string | null;
             /** Error Message */
@@ -2305,7 +2389,7 @@ export interface components {
              * Mode
              * @enum {string}
              */
-            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "full_build" | "generate_contexts" | "generate_relations";
             /** Enqueued At */
             enqueued_at?: string | null;
         };
@@ -2319,7 +2403,7 @@ export interface components {
              * Mode
              * @enum {string}
              */
-            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "full_build" | "generate_contexts" | "generate_relations";
             /** Started At */
             started_at?: string | null;
             /** Progress Total */
@@ -2335,11 +2419,11 @@ export interface components {
         BuildStatusResponse: {
             /** Is Running */
             is_running: boolean;
-            current_job?: components['schemas']['BuildRunningJobOut'] | null;
+            current_job?: components["schemas"]["BuildRunningJobOut"] | null;
             /** Queued Jobs */
-            queued_jobs: components['schemas']['BuildQueuedJobOut'][];
+            queued_jobs: components["schemas"]["BuildQueuedJobOut"][];
             /** Recent Finished */
-            recent_finished: components['schemas']['BuildFinishedJobOut'][];
+            recent_finished: components["schemas"]["BuildFinishedJobOut"][];
         };
         /** CaptureJobCreateRequest */
         CaptureJobCreateRequest: {
@@ -2349,13 +2433,13 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /**
              * Direction
              * @default left
              * @enum {string}
              */
-            direction: 'left' | 'right';
+            direction: "left" | "right";
             /** Expected Screens */
             expected_screens?: number | null;
         };
@@ -2377,7 +2461,7 @@ export interface components {
             /** Generated At */
             generated_at: string | null;
             /** Top Scenes */
-            top_scenes: components['schemas']['CharacterScene'][];
+            top_scenes: components["schemas"]["CharacterScene"][];
         };
         /** CharacterScene */
         CharacterScene: {
@@ -2405,7 +2489,7 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: 'user' | 'assistant' | 'system';
+            role: "user" | "assistant" | "system";
             /** Content */
             content: string;
             /** Eval Count */
@@ -2428,7 +2512,7 @@ export interface components {
              * Scope Type
              * @enum {string}
              */
-            scope_type: 'all' | 'series' | 'book';
+            scope_type: "all" | "series" | "book";
             /** Scope Id */
             scope_id: string | null;
             /** Title */
@@ -2438,11 +2522,11 @@ export interface components {
             /** Last Message At */
             last_message_at: string | null;
             /** Messages */
-            messages: components['schemas']['ChatMessagePayload'][];
+            messages: components["schemas"]["ChatMessagePayload"][];
         };
         /** ChatSessionStartRequest */
         ChatSessionStartRequest: {
-            scope: components['schemas']['ScopeModel'];
+            scope: components["schemas"]["ScopeModel"];
             /** Question */
             question: string;
         };
@@ -2454,7 +2538,7 @@ export interface components {
              * Scope Type
              * @enum {string}
              */
-            scope_type: 'all' | 'series' | 'book';
+            scope_type: "all" | "series" | "book";
             /** Scope Id */
             scope_id: string | null;
             /** Title */
@@ -2523,7 +2607,7 @@ export interface components {
             /** Passed */
             passed: boolean;
             /** Results */
-            results: components['schemas']['DiscussionCheckResultOut'][];
+            results: components["schemas"]["DiscussionCheckResultOut"][];
         };
         /** DiscussionDeleteOut */
         DiscussionDeleteOut: {
@@ -2537,11 +2621,11 @@ export interface components {
             /** Created At */
             created_at?: string | null;
             /** Personas */
-            personas: components['schemas']['DiscussionPersonaOut'][];
+            personas: components["schemas"]["DiscussionPersonaOut"][];
             /** Turn Count */
             turn_count: number;
             /** Turns */
-            turns: components['schemas']['DiscussionTurnOut'][];
+            turns: components["schemas"]["DiscussionTurnOut"][];
             /**
              * Format Version
              * @default 1
@@ -2549,8 +2633,8 @@ export interface components {
              */
             format_version: 1 | 2;
             /** Segments */
-            segments?: components['schemas']['DiscussionSegmentOut'][] | null;
-            checks?: components['schemas']['DiscussionChecksOut'] | null;
+            segments?: components["schemas"]["DiscussionSegmentOut"][] | null;
+            checks?: components["schemas"]["DiscussionChecksOut"] | null;
         };
         /** DiscussionPersonaOut */
         DiscussionPersonaOut: {
@@ -2589,7 +2673,7 @@ export interface components {
              * @default full_build
              * @enum {string}
              */
-            mode: 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "full_build" | "generate_contexts" | "generate_relations";
         };
         /**
          * GenerateJobOut
@@ -2663,10 +2747,10 @@ export interface components {
             /** Last Scan At */
             last_scan_at?: string | null;
             /** Pending Items */
-            pending_items: components['schemas']['GenerateWatcherPendingItemOut'][];
+            pending_items: components["schemas"]["GenerateWatcherPendingItemOut"][];
             /** Active Job Id */
             active_job_id?: string | null;
-            last_auto_job?: components['schemas']['GenerateWatcherLastAutoJobOut'] | null;
+            last_auto_job?: components["schemas"]["GenerateWatcherLastAutoJobOut"] | null;
             /** Retry Blocked */
             retry_blocked: boolean;
         };
@@ -2696,7 +2780,7 @@ export interface components {
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
-            detail?: components['schemas']['ValidationError'][];
+            detail?: components["schemas"]["ValidationError"][];
         };
         /** HitomiAddArtistResponse */
         HitomiAddArtistResponse: {
@@ -2735,12 +2819,12 @@ export interface components {
         /** HitomiArrivalsResponse */
         HitomiArrivalsResponse: {
             /** Items */
-            items: components['schemas']['HitomiArrivalItem'][];
+            items: components["schemas"]["HitomiArrivalItem"][];
             /**
              * Status
              * @enum {string}
              */
-            status: 'unread' | 'read' | 'all';
+            status: "unread" | "read" | "all";
             /** Total */
             total: number;
             /** Unread Count */
@@ -2757,7 +2841,7 @@ export interface components {
              * Last Run Status
              * @enum {string}
              */
-            last_run_status: 'ok' | 'partial' | 'error' | 'never';
+            last_run_status: "ok" | "partial" | "error" | "never";
             /** Last Error */
             last_error?: string | null;
         };
@@ -2790,10 +2874,10 @@ export interface components {
              * Last Run Status
              * @enum {string}
              */
-            last_run_status: 'ok' | 'partial' | 'error' | 'never';
+            last_run_status: "ok" | "partial" | "error" | "never";
             /** Last Error */
             last_error?: string | null;
-            last_run_stats?: components['schemas']['HitomiRunStats'] | null;
+            last_run_stats?: components["schemas"]["HitomiRunStats"] | null;
         };
         /** HitomiRunStats */
         HitomiRunStats: {
@@ -2821,11 +2905,11 @@ export interface components {
         /** HitomiWatchlistResponse */
         HitomiWatchlistResponse: {
             /** Artists */
-            artists: components['schemas']['HitomiWatchlistEntry'][];
+            artists: components["schemas"]["HitomiWatchlistEntry"][];
         };
         /** KindleAgentClaimResponse */
         KindleAgentClaimResponse: {
-            job: components['schemas']['KindleAgentJobOut'] | null;
+            job: components["schemas"]["KindleAgentJobOut"] | null;
         };
         /** KindleAgentJobOut */
         KindleAgentJobOut: {
@@ -2837,14 +2921,14 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Status */
             status: string;
             /**
              * Direction
              * @enum {string}
              */
-            direction: 'left' | 'right';
+            direction: "left" | "right";
             /** Expected Screens */
             expected_screens: number | null;
             /** Requested At */
@@ -2869,7 +2953,7 @@ export interface components {
             error_message: string | null;
             /** Title */
             title?: string | null;
-            identity: components['schemas']['KindleCaptureIdentityOut'];
+            identity: components["schemas"]["KindleCaptureIdentityOut"];
         };
         /** KindleCaptureCompleteResponse */
         KindleCaptureCompleteResponse: {
@@ -2881,7 +2965,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
             /** Captured Screens */
@@ -2923,14 +3007,14 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Status */
             status: string;
             /**
              * Direction
              * @enum {string}
              */
-            direction: 'left' | 'right';
+            direction: "left" | "right";
             /** Expected Screens */
             expected_screens: number | null;
             /** Requested At */
@@ -2959,7 +3043,7 @@ export interface components {
         /** KindleCaptureJobsResponse */
         KindleCaptureJobsResponse: {
             /** Items */
-            items: components['schemas']['KindleCaptureJobOut'][];
+            items: components["schemas"]["KindleCaptureJobOut"][];
         };
         /** KindleCaptureQualityWarningOut */
         KindleCaptureQualityWarningOut: {
@@ -2977,7 +3061,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
             /** Warning Policy Version */
@@ -3004,7 +3088,7 @@ export interface components {
         /** KindleCaptureQualityWarningsResponse */
         KindleCaptureQualityWarningsResponse: {
             /** Items */
-            items: components['schemas']['KindleCaptureQualityWarningOut'][];
+            items: components["schemas"]["KindleCaptureQualityWarningOut"][];
             /** Total */
             total: number;
             /** Unread Count */
@@ -3034,12 +3118,12 @@ export interface components {
              * Ownership
              * @enum {string}
              */
-            ownership: 'purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown';
+            ownership: "purchased" | "borrowed_active" | "borrowed_ended" | "returned" | "unknown";
             /**
              * Capture State
              * @enum {string}
              */
-            capture_state: 'not_captured' | 'captured' | 'multiple_links' | 'capture_pending';
+            capture_state: "not_captured" | "captured" | "multiple_links" | "capture_pending";
             /** Series Id */
             series_id: number | null;
             /** Series Name */
@@ -3052,7 +3136,7 @@ export interface components {
         /** KindleCatalogBooksResponse */
         KindleCatalogBooksResponse: {
             /** Items */
-            items: components['schemas']['KindleCatalogBookOut'][];
+            items: components["schemas"]["KindleCatalogBookOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -3085,7 +3169,7 @@ export interface components {
             series: number;
             /** Captured */
             captured: number;
-            last_import: components['schemas']['KindleImportRunOut'] | null;
+            last_import: components["schemas"]["KindleImportRunOut"] | null;
         };
         /** KindleImportFileResultOut */
         KindleImportFileResultOut: {
@@ -3122,7 +3206,7 @@ export interface components {
         /** KindleImportRunsResponse */
         KindleImportRunsResponse: {
             /** Items */
-            items: components['schemas']['KindleImportRunOut'][];
+            items: components["schemas"]["KindleImportRunOut"][];
         };
         /** KindleLinkCandidateOut */
         KindleLinkCandidateOut: {
@@ -3142,7 +3226,7 @@ export interface components {
         /** KindleLinkCandidatesResponse */
         KindleLinkCandidatesResponse: {
             /** Items */
-            items: components['schemas']['KindleLinkCandidateOut'][];
+            items: components["schemas"]["KindleLinkCandidateOut"][];
         };
         /** KindleLinkResponse */
         KindleLinkResponse: {
@@ -3150,7 +3234,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
             /** Asin */
@@ -3216,7 +3300,188 @@ export interface components {
              */
             records_skipped: number;
             /** Files */
-            files: components['schemas']['KindleImportFileResultOut'][];
+            files: components["schemas"]["KindleImportFileResultOut"][];
+        };
+        /** KindlePriceHistoryResponse */
+        KindlePriceHistoryResponse: {
+            /** Items */
+            items: components["schemas"]["KindlePriceObservationOut"][];
+        };
+        /** KindlePriceNotificationOut */
+        KindlePriceNotificationOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "price_drop" | "below_threshold";
+            /** Sent */
+            sent: boolean;
+        };
+        /** KindlePriceObservationOut */
+        KindlePriceObservationOut: {
+            /** Id */
+            id: number;
+            /** Watch Id */
+            watch_id: number;
+            /** Observed At */
+            observed_at: string;
+            /** Current Price */
+            current_price: number | null;
+            /** List Price */
+            list_price: number | null;
+            /** Ratio Percent */
+            ratio_percent: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial" | "failed";
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "codex_browser" | "manual";
+        };
+        /** KindlePriceObservationRequest */
+        KindlePriceObservationRequest: {
+            /** Current Price */
+            current_price?: number | null;
+            /** List Price */
+            list_price?: number | null;
+            /** Status */
+            status?: ("ok" | "partial" | "failed") | null;
+            /** Error Message */
+            error_message?: string | null;
+            /**
+             * Source
+             * @default codex_browser
+             * @enum {string}
+             */
+            source: "codex_browser" | "manual";
+            /** Title */
+            title?: string | null;
+        };
+        /** KindlePriceObservationResponse */
+        KindlePriceObservationResponse: {
+            observation: components["schemas"]["KindlePriceObservationOut"];
+            /** Price Dropped */
+            price_dropped: boolean;
+            /** Below Threshold */
+            below_threshold: boolean;
+            /** Notifications */
+            notifications: components["schemas"]["KindlePriceNotificationOut"][];
+        };
+        /** KindlePriceTargetOut */
+        KindlePriceTargetOut: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string | null;
+            /** Threshold Percent */
+            threshold_percent: number;
+        };
+        /** KindlePriceTargetsResponse */
+        KindlePriceTargetsResponse: {
+            /** Items */
+            items: components["schemas"]["KindlePriceTargetOut"][];
+        };
+        /** KindlePriceWatchCreateRequest */
+        KindlePriceWatchCreateRequest: {
+            /** Url */
+            url: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Threshold Percent
+             * @default 50
+             */
+            threshold_percent: number;
+            /**
+             * Notify On Drop
+             * @default true
+             */
+            notify_on_drop: boolean;
+            /**
+             * Notify Below Threshold
+             * @default true
+             */
+            notify_below_threshold: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** KindlePriceWatchDeleteResponse */
+        KindlePriceWatchDeleteResponse: {
+            /** Id */
+            id: number;
+            /** Deleted */
+            deleted: boolean;
+        };
+        /** KindlePriceWatchListResponse */
+        KindlePriceWatchListResponse: {
+            /** Items */
+            items: components["schemas"]["KindlePriceWatchOut"][];
+        };
+        /** KindlePriceWatchOut */
+        KindlePriceWatchOut: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string | null;
+            /** Threshold Percent */
+            threshold_percent: number;
+            /** Notify On Drop */
+            notify_on_drop: boolean;
+            /** Notify Below Threshold */
+            notify_below_threshold: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /**
+             * Last Status
+             * @enum {string}
+             */
+            last_status: "never" | "ok" | "partial" | "failed";
+            /** Last Error */
+            last_error: string | null;
+            /** Last Current Price */
+            last_current_price: number | null;
+            /** Last List Price */
+            last_list_price: number | null;
+            /** Last Ratio Percent */
+            last_ratio_percent: number | null;
+        };
+        /** KindlePriceWatchUpdateRequest */
+        KindlePriceWatchUpdateRequest: {
+            /** Url */
+            url?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Threshold Percent */
+            threshold_percent?: number | null;
+            /** Notify On Drop */
+            notify_on_drop?: boolean | null;
+            /** Notify Below Threshold */
+            notify_below_threshold?: boolean | null;
+            /** Enabled */
+            enabled?: boolean | null;
         };
         /** KindleUnlinkResponse */
         KindleUnlinkResponse: {
@@ -3224,7 +3489,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
             /** Unlinked */
@@ -3236,7 +3501,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
             /** Title */
@@ -3249,7 +3514,7 @@ export interface components {
         /** KindleUnlinkedBooksResponse */
         KindleUnlinkedBooksResponse: {
             /** Items */
-            items: components['schemas']['KindleUnlinkedBookOut'][];
+            items: components["schemas"]["KindleUnlinkedBookOut"][];
         };
         /** LinkRequest */
         LinkRequest: {
@@ -3257,7 +3522,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
             /** Asin */
@@ -3353,7 +3618,7 @@ export interface components {
             /** Source Page Count */
             source_page_count: number;
             /** Tasks */
-            tasks: components['schemas']['OcrAgentTaskOut'][];
+            tasks: components["schemas"]["OcrAgentTaskOut"][];
         };
         /** OcrAgentClaimRequest */
         OcrAgentClaimRequest: {
@@ -3362,7 +3627,7 @@ export interface components {
         };
         /** OcrAgentClaimResponse */
         OcrAgentClaimResponse: {
-            job: components['schemas']['OcrAgentJobOut'] | null;
+            job: components["schemas"]["OcrAgentJobOut"] | null;
         };
         /** OcrAgentFailRequest */
         OcrAgentFailRequest: {
@@ -3391,7 +3656,7 @@ export interface components {
             /** Progress Done */
             progress_done: number;
             /** Books */
-            books: components['schemas']['OcrAgentBookOut'][];
+            books: components["schemas"]["OcrAgentBookOut"][];
         };
         /** OcrAgentPageResultIn */
         OcrAgentPageResultIn: {
@@ -3424,13 +3689,7 @@ export interface components {
              * @default unknown
              * @enum {string}
              */
-            layout_type:
-                | 'unknown'
-                | 'normal_prose'
-                | 'full_width'
-                | 'mixed_illustration'
-                | 'structured'
-                | 'image_only';
+            layout_type: "unknown" | "normal_prose" | "full_width" | "mixed_illustration" | "structured" | "image_only";
             /** Primary Text */
             primary_text?: string | null;
             /** External Text */
@@ -3440,7 +3699,7 @@ export interface components {
              * @default primary
              * @enum {string}
              */
-            selected_engine: 'primary' | 'external';
+            selected_engine: "primary" | "external";
         };
         /** OcrAgentPageSubmitRequest */
         OcrAgentPageSubmitRequest: {
@@ -3448,7 +3707,7 @@ export interface components {
             agent_id: string;
             /** Book Name */
             book_name: string;
-            page: components['schemas']['OcrAgentPageResultIn'];
+            page: components["schemas"]["OcrAgentPageResultIn"];
         };
         /** OcrAgentTaskOut */
         OcrAgentTaskOut: {
@@ -3475,25 +3734,19 @@ export interface components {
              * Page Type
              * @enum {string}
              */
-            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            page_type: "unknown" | "narrative" | "toc" | "illustration" | "colophon_or_ad";
             /**
              * Layout Type
              * @enum {string}
              */
-            layout_type:
-                | 'unknown'
-                | 'normal_prose'
-                | 'full_width'
-                | 'mixed_illustration'
-                | 'structured'
-                | 'image_only';
+            layout_type: "unknown" | "normal_prose" | "full_width" | "mixed_illustration" | "structured" | "image_only";
             /** Reference Text */
             reference_text: string;
             /**
              * State
              * @enum {string}
              */
-            state: 'draft' | 'verified';
+            state: "draft" | "verified";
             /** Note */
             note: string | null;
             /** Created At */
@@ -3521,13 +3774,7 @@ export interface components {
              * Layout Type
              * @enum {string}
              */
-            layout_type:
-                | 'unknown'
-                | 'normal_prose'
-                | 'full_width'
-                | 'mixed_illustration'
-                | 'structured'
-                | 'image_only';
+            layout_type: "unknown" | "normal_prose" | "full_width" | "mixed_illustration" | "structured" | "image_only";
             /** Total Count */
             total_count: number;
             /** Verified Count */
@@ -3542,7 +3789,7 @@ export interface components {
         /** OcrGroundTruthListResponse */
         OcrGroundTruthListResponse: {
             /** Entries */
-            entries: components['schemas']['OcrGroundTruthEntryOut'][];
+            entries: components["schemas"]["OcrGroundTruthEntryOut"][];
             /** Total Count */
             total_count: number;
             /** Verified Count */
@@ -3554,9 +3801,9 @@ export interface components {
             /** Aggregate Cer */
             aggregate_cer: number | null;
             /** Metrics By Page Type */
-            metrics_by_page_type: components['schemas']['OcrGroundTruthMetricOut'][];
+            metrics_by_page_type: components["schemas"]["OcrGroundTruthMetricOut"][];
             /** Metrics By Layout Type */
-            metrics_by_layout_type: components['schemas']['OcrGroundTruthLayoutMetricOut'][];
+            metrics_by_layout_type: components["schemas"]["OcrGroundTruthLayoutMetricOut"][];
         };
         /** OcrGroundTruthMetricOut */
         OcrGroundTruthMetricOut: {
@@ -3564,7 +3811,7 @@ export interface components {
              * Page Type
              * @enum {string}
              */
-            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            page_type: "unknown" | "narrative" | "toc" | "illustration" | "colophon_or_ad";
             /** Total Count */
             total_count: number;
             /** Verified Count */
@@ -3579,7 +3826,7 @@ export interface components {
         /** OcrGroundTruthSeedRequest */
         OcrGroundTruthSeedRequest: {
             /** Samples */
-            samples: components['schemas']['OcrGroundTruthSeedSample'][];
+            samples: components["schemas"]["OcrGroundTruthSeedSample"][];
         };
         /** OcrGroundTruthSeedResponse */
         OcrGroundTruthSeedResponse: {
@@ -3603,23 +3850,17 @@ export interface components {
              * Page Type
              * @enum {string}
              */
-            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            page_type: "unknown" | "narrative" | "toc" | "illustration" | "colophon_or_ad";
             /**
              * Layout Type
              * @enum {string}
              */
-            layout_type:
-                | 'unknown'
-                | 'normal_prose'
-                | 'full_width'
-                | 'mixed_illustration'
-                | 'structured'
-                | 'image_only';
+            layout_type: "unknown" | "normal_prose" | "full_width" | "mixed_illustration" | "structured" | "image_only";
             /**
              * State
              * @enum {string}
              */
-            state: 'draft' | 'verified';
+            state: "draft" | "verified";
             /** Note */
             note?: string | null;
         };
@@ -3669,18 +3910,12 @@ export interface components {
              * Page Type
              * @enum {string}
              */
-            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            page_type: "unknown" | "narrative" | "toc" | "illustration" | "colophon_or_ad";
             /**
              * Layout Type
              * @enum {string}
              */
-            layout_type:
-                | 'unknown'
-                | 'normal_prose'
-                | 'full_width'
-                | 'mixed_illustration'
-                | 'structured'
-                | 'image_only';
+            layout_type: "unknown" | "normal_prose" | "full_width" | "mixed_illustration" | "structured" | "image_only";
             /** Primary Text */
             primary_text: string;
             /** External Text */
@@ -3689,7 +3924,7 @@ export interface components {
              * Selected Engine
              * @enum {string}
              */
-            selected_engine: 'primary' | 'external' | 'codex';
+            selected_engine: "primary" | "external" | "codex";
             /** Corrected Text */
             corrected_text: string | null;
             /** Selection Reason */
@@ -3705,30 +3940,24 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: 'approved' | 'rejected';
+            state: "approved" | "rejected";
             /** Note */
             note?: string | null;
             /**
              * Page Type
              * @enum {string}
              */
-            page_type: 'unknown' | 'narrative' | 'toc' | 'illustration' | 'colophon_or_ad';
+            page_type: "unknown" | "narrative" | "toc" | "illustration" | "colophon_or_ad";
             /**
              * Layout Type
              * @enum {string}
              */
-            layout_type:
-                | 'unknown'
-                | 'normal_prose'
-                | 'full_width'
-                | 'mixed_illustration'
-                | 'structured'
-                | 'image_only';
+            layout_type: "unknown" | "normal_prose" | "full_width" | "mixed_illustration" | "structured" | "image_only";
             /**
              * Selected Engine
              * @enum {string}
              */
-            selected_engine: 'primary' | 'external' | 'codex';
+            selected_engine: "primary" | "external" | "codex";
             /** Corrected Text */
             corrected_text?: string | null;
         };
@@ -3770,12 +3999,12 @@ export interface components {
             /** Qa Note */
             qa_note: string | null;
             /** Pages */
-            pages: components['schemas']['OcrQaPageOut'][];
+            pages: components["schemas"]["OcrQaPageOut"][];
         };
         /** OcrQaRunListResponse */
         OcrQaRunListResponse: {
             /** Runs */
-            runs: components['schemas']['OcrQaRunSummary'][];
+            runs: components["schemas"]["OcrQaRunSummary"][];
         };
         /** OcrQaRunSummary */
         OcrQaRunSummary: {
@@ -3830,7 +4059,7 @@ export interface components {
         /** PdfListResponse */
         PdfListResponse: {
             /** Files */
-            files: components['schemas']['PdfFileOut'][];
+            files: components["schemas"]["PdfFileOut"][];
             /** Current Path */
             current_path: string;
         };
@@ -3862,7 +4091,7 @@ export interface components {
             asked_at: string;
             /** Finished At */
             finished_at: string | null;
-            scope: components['schemas']['ScopeOut'];
+            scope: components["schemas"]["ScopeOut"];
             /** Question */
             question: string;
             /** Answer */
@@ -3870,7 +4099,7 @@ export interface components {
             /** Prompt */
             prompt: string;
             /** Context */
-            context: components['schemas']['SearchHitOut'][];
+            context: components["schemas"]["SearchHitOut"][];
             /** Model */
             model: string;
             /** Options */
@@ -3892,7 +4121,7 @@ export interface components {
             asked_at: string;
             /** Finished At */
             finished_at: string | null;
-            scope: components['schemas']['ScopeOut'];
+            scope: components["schemas"]["ScopeOut"];
             /** Question */
             question: string;
             /** Answer Preview */
@@ -3903,7 +4132,7 @@ export interface components {
         /** QaHistoryResponse */
         QaHistoryResponse: {
             /** Items */
-            items: components['schemas']['QaHistoryItemOut'][];
+            items: components["schemas"]["QaHistoryItemOut"][];
             /** Total */
             total: number;
         };
@@ -3911,7 +4140,7 @@ export interface components {
         QaRequest: {
             /** Question */
             question: string;
-            scope: components['schemas']['ScopeModel'];
+            scope: components["schemas"]["ScopeModel"];
         };
         /** RebuildEnqueueResponse */
         RebuildEnqueueResponse: {
@@ -3928,19 +4157,19 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: 'book' | 'series' | 'all';
+            type: "book" | "series" | "all";
             /** Target Id */
             target_id: string | null;
             /**
              * Mode
              * @enum {string}
              */
-            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "rebuild" | "ocr" | "full_build" | "generate_contexts" | "generate_relations";
             /**
              * State
              * @enum {string}
              */
-            state: 'completed' | 'failed' | 'canceled';
+            state: "completed" | "failed" | "canceled";
             /** Finished At */
             finished_at?: string | null;
             /** Error Message */
@@ -3954,14 +4183,14 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: 'book' | 'series' | 'all';
+            type: "book" | "series" | "all";
             /** Target Id */
             target_id: string | null;
             /**
              * Mode
              * @enum {string}
              */
-            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "rebuild" | "ocr" | "full_build" | "generate_contexts" | "generate_relations";
             /** Enqueued At */
             enqueued_at?: string | null;
         };
@@ -3971,7 +4200,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: 'book' | 'series' | 'all';
+            type: "book" | "series" | "all";
             /** Target Id */
             target_id?: string | null;
             /**
@@ -3979,7 +4208,7 @@ export interface components {
              * @default rebuild
              * @enum {string}
              */
-            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "rebuild" | "ocr" | "full_build" | "generate_contexts" | "generate_relations";
         };
         /** RebuildRunningJobOut */
         RebuildRunningJobOut: {
@@ -3989,14 +4218,14 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: 'book' | 'series' | 'all';
+            type: "book" | "series" | "all";
             /** Target Id */
             target_id: string | null;
             /**
              * Mode
              * @enum {string}
              */
-            mode: 'rebuild' | 'ocr' | 'full_build' | 'generate_contexts' | 'generate_relations';
+            mode: "rebuild" | "ocr" | "full_build" | "generate_contexts" | "generate_relations";
             /** Started At */
             started_at?: string | null;
             /** Progress Total */
@@ -4012,11 +4241,11 @@ export interface components {
         RebuildStatusResponse: {
             /** Is Running */
             is_running: boolean;
-            current_job?: components['schemas']['RebuildRunningJobOut'] | null;
+            current_job?: components["schemas"]["RebuildRunningJobOut"] | null;
             /** Queued Jobs */
-            queued_jobs: components['schemas']['RebuildQueuedJobOut'][];
+            queued_jobs: components["schemas"]["RebuildQueuedJobOut"][];
             /** Recent Finished */
-            recent_finished: components['schemas']['RebuildFinishedJobOut'][];
+            recent_finished: components["schemas"]["RebuildFinishedJobOut"][];
         };
         /**
          * RecordViewRequest
@@ -4162,7 +4391,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: 'all' | 'series' | 'book';
+            type: "all" | "series" | "book";
             /** Id */
             id?: string | null;
         };
@@ -4172,7 +4401,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: 'all' | 'series' | 'book';
+            type: "all" | "series" | "book";
             /** Id */
             id: string | null;
         };
@@ -4197,7 +4426,7 @@ export interface components {
         SearchRequest: {
             /** Query */
             query: string;
-            scope: components['schemas']['ScopeModel'];
+            scope: components["schemas"]["ScopeModel"];
             /**
              * Offset
              * @default 0
@@ -4212,7 +4441,7 @@ export interface components {
         /** SearchResponse */
         SearchResponse: {
             /** Hits */
-            hits: components['schemas']['SearchHitOut'][];
+            hits: components["schemas"]["SearchHitOut"][];
             /** Total */
             total: number;
             /** Offset */
@@ -4239,7 +4468,7 @@ export interface components {
         /** SeriesSuggestResponse */
         SeriesSuggestResponse: {
             /** Candidates */
-            candidates: components['schemas']['SuggestedSeriesOut'][];
+            candidates: components["schemas"]["SuggestedSeriesOut"][];
         };
         /** SeriesSummaryOut */
         SeriesSummaryOut: {
@@ -4342,7 +4571,7 @@ export interface components {
              * Source
              * @enum {string}
              */
-            source: 'comic' | 'novel';
+            source: "comic" | "novel";
             /** Book Id */
             book_id: string;
         };
@@ -4424,7 +4653,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['PdfListResponse'];
+                    "application/json": components["schemas"]["PdfListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4433,7 +4662,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4447,7 +4676,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['DeletePdfsRequest'];
+                "application/json": components["schemas"]["DeletePdfsRequest"];
             };
         };
         responses: {
@@ -4457,7 +4686,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['DeleteResponse'];
+                    "application/json": components["schemas"]["DeleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4466,7 +4695,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4490,7 +4719,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BookImagesResponse'];
+                    "application/json": components["schemas"]["BookImagesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4499,7 +4728,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4513,7 +4742,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RenameItemRequest'];
+                "application/json": components["schemas"]["RenameItemRequest"];
             };
         };
         responses: {
@@ -4523,7 +4752,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RenameResponse'];
+                    "application/json": components["schemas"]["RenameResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4532,7 +4761,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4551,7 +4780,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['DeletePagesRequest'];
+                "application/json": components["schemas"]["DeletePagesRequest"];
             };
         };
         responses: {
@@ -4561,7 +4790,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['DeletePagesResponse'];
+                    "application/json": components["schemas"]["DeletePagesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4570,7 +4799,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4589,7 +4818,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ReorderPagesRequest'];
+                "application/json": components["schemas"]["ReorderPagesRequest"];
             };
         };
         responses: {
@@ -4599,7 +4828,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ReorderPagesResponse'];
+                    "application/json": components["schemas"]["ReorderPagesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4608,7 +4837,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4622,7 +4851,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['MergePdfsRequest'];
+                "application/json": components["schemas"]["MergePdfsRequest"];
             };
         };
         responses: {
@@ -4632,7 +4861,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['MergePdfsResponse'];
+                    "application/json": components["schemas"]["MergePdfsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4641,7 +4870,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4661,7 +4890,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GenerateStartResponse'];
+                    "application/json": components["schemas"]["GenerateStartResponse"];
                 };
             };
         };
@@ -4681,7 +4910,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GenerateWatcherResponse'];
+                    "application/json": components["schemas"]["GenerateWatcherResponse"];
                 };
             };
         };
@@ -4703,7 +4932,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GenerateJobOut'];
+                    "application/json": components["schemas"]["GenerateJobOut"];
                 };
             };
             /** @description Validation Error */
@@ -4712,7 +4941,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4738,7 +4967,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -4747,7 +4976,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4761,7 +4990,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RegenerateThumbnailRequest'];
+                "application/json": components["schemas"]["RegenerateThumbnailRequest"];
             };
         };
         responses: {
@@ -4771,7 +5000,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RegenerateThumbnailResponse'];
+                    "application/json": components["schemas"]["RegenerateThumbnailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4780,7 +5009,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4794,7 +5023,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RegenerateThumbnailBulkRequest'];
+                "application/json": components["schemas"]["RegenerateThumbnailBulkRequest"];
             };
         };
         responses: {
@@ -4804,7 +5033,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RegenerateThumbnailBulkResponse'];
+                    "application/json": components["schemas"]["RegenerateThumbnailBulkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4813,7 +5042,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4835,7 +5064,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrRunResponse'];
+                    "application/json": components["schemas"]["OcrRunResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4844,7 +5073,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4864,7 +5093,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrStopResponse'];
+                    "application/json": components["schemas"]["OcrStopResponse"];
                 };
             };
         };
@@ -4884,7 +5113,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['StatusResponse'];
+                    "application/json": components["schemas"]["StatusResponse"];
                 };
             };
         };
@@ -4893,14 +5122,14 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrAgentClaimRequest'];
+                "application/json": components["schemas"]["OcrAgentClaimRequest"];
             };
         };
         responses: {
@@ -4910,7 +5139,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrAgentClaimResponse'];
+                    "application/json": components["schemas"]["OcrAgentClaimResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4919,7 +5148,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4928,8 +5157,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-ocr-agent-id'?: string | null;
-                'x-capture-agent-token'?: string | null;
+                "x-ocr-agent-id"?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: number;
@@ -4953,7 +5182,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4962,7 +5191,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: number;
@@ -4971,7 +5200,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrAgentHeartbeatRequest'];
+                "application/json": components["schemas"]["OcrAgentHeartbeatRequest"];
             };
         };
         responses: {
@@ -4981,7 +5210,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                    "application/json": components["schemas"]["OcrAgentActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -4990,7 +5219,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -4999,7 +5228,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: number;
@@ -5008,7 +5237,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrAgentPageSubmitRequest'];
+                "application/json": components["schemas"]["OcrAgentPageSubmitRequest"];
             };
         };
         responses: {
@@ -5018,7 +5247,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                    "application/json": components["schemas"]["OcrAgentActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5027,7 +5256,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5036,7 +5265,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: number;
@@ -5045,7 +5274,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrAgentHeartbeatRequest'];
+                "application/json": components["schemas"]["OcrAgentHeartbeatRequest"];
             };
         };
         responses: {
@@ -5055,7 +5284,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                    "application/json": components["schemas"]["OcrAgentActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5064,7 +5293,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5073,7 +5302,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: number;
@@ -5082,7 +5311,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrAgentFailRequest'];
+                "application/json": components["schemas"]["OcrAgentFailRequest"];
             };
         };
         responses: {
@@ -5092,7 +5321,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrAgentActionResponse'];
+                    "application/json": components["schemas"]["OcrAgentActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5101,7 +5330,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5121,7 +5350,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrQaRunListResponse'];
+                    "application/json": components["schemas"]["OcrQaRunListResponse"];
                 };
             };
         };
@@ -5143,7 +5372,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrQaRunDetail'];
+                    "application/json": components["schemas"]["OcrQaRunDetail"];
                 };
             };
             /** @description Validation Error */
@@ -5152,7 +5381,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5182,7 +5411,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5199,7 +5428,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrQaPageReviewRequest'];
+                "application/json": components["schemas"]["OcrQaPageReviewRequest"];
             };
         };
         responses: {
@@ -5209,7 +5438,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrQaActionResponse'];
+                    "application/json": components["schemas"]["OcrQaActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5218,7 +5447,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5240,7 +5469,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrPageTypeClassificationResponse'];
+                    "application/json": components["schemas"]["OcrPageTypeClassificationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5249,7 +5478,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5265,7 +5494,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrQaRunApproveRequest'];
+                "application/json": components["schemas"]["OcrQaRunApproveRequest"];
             };
         };
         responses: {
@@ -5275,7 +5504,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrQaActionResponse'];
+                    "application/json": components["schemas"]["OcrQaActionResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5284,7 +5513,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5304,7 +5533,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrGroundTruthListResponse'];
+                    "application/json": components["schemas"]["OcrGroundTruthListResponse"];
                 };
             };
         };
@@ -5318,7 +5547,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrGroundTruthSeedRequest'];
+                "application/json": components["schemas"]["OcrGroundTruthSeedRequest"];
             };
         };
         responses: {
@@ -5328,7 +5557,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrGroundTruthSeedResponse'];
+                    "application/json": components["schemas"]["OcrGroundTruthSeedResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5337,7 +5566,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5353,7 +5582,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['OcrGroundTruthUpdateRequest'];
+                "application/json": components["schemas"]["OcrGroundTruthUpdateRequest"];
             };
         };
         responses: {
@@ -5363,7 +5592,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['OcrGroundTruthListResponse'];
+                    "application/json": components["schemas"]["OcrGroundTruthListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5372,7 +5601,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5401,7 +5630,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5423,8 +5652,8 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': {
-                        [key: string]: components['schemas']['BookMetaEntryOut'];
+                    "application/json": {
+                        [key: string]: components["schemas"]["BookMetaEntryOut"];
                     };
                 };
             };
@@ -5434,7 +5663,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5448,7 +5677,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UpdateMetaRequest'];
+                "application/json": components["schemas"]["UpdateMetaRequest"];
             };
         };
         responses: {
@@ -5458,7 +5687,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['MetaUpdateResponse'];
+                    "application/json": components["schemas"]["MetaUpdateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5467,7 +5696,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5489,7 +5718,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -5498,7 +5727,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5512,7 +5741,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RecordViewRequest'];
+                "application/json": components["schemas"]["RecordViewRequest"];
             };
         };
         responses: {
@@ -5522,7 +5751,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RecordViewResponse'];
+                    "application/json": components["schemas"]["RecordViewResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5531,7 +5760,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5547,7 +5776,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['NovelMetaPatchRequest'];
+                "application/json": components["schemas"]["NovelMetaPatchRequest"];
             };
         };
         responses: {
@@ -5557,7 +5786,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['NovelMetaUpdateResponse'];
+                    "application/json": components["schemas"]["NovelMetaUpdateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5566,7 +5795,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5588,7 +5817,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['AdminInitResponse'];
+                    "application/json": components["schemas"]["AdminInitResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5597,7 +5826,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5611,7 +5840,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AssignSeriesRequest'];
+                "application/json": components["schemas"]["AssignSeriesRequest"];
             };
         };
         responses: {
@@ -5621,7 +5850,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SeriesAssignResponse'];
+                    "application/json": components["schemas"]["SeriesAssignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5630,7 +5859,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5644,7 +5873,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UnassignSeriesRequest'];
+                "application/json": components["schemas"]["UnassignSeriesRequest"];
             };
         };
         responses: {
@@ -5654,7 +5883,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SeriesUnassignResponse'];
+                    "application/json": components["schemas"]["SeriesUnassignResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5663,7 +5892,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5677,7 +5906,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ReorderSeriesRequest'];
+                "application/json": components["schemas"]["ReorderSeriesRequest"];
             };
         };
         responses: {
@@ -5687,7 +5916,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SeriesReorderResponse'];
+                    "application/json": components["schemas"]["SeriesReorderResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5696,7 +5925,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5710,7 +5939,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SuggestSeriesRequest'];
+                "application/json": components["schemas"]["SuggestSeriesRequest"];
             };
         };
         responses: {
@@ -5720,7 +5949,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SeriesSuggestResponse'];
+                    "application/json": components["schemas"]["SeriesSuggestResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5729,7 +5958,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5737,7 +5966,7 @@ export interface operations {
     get_new_arrivals_api_hitomi_new_arrivals_get: {
         parameters: {
             query?: {
-                status?: 'unread' | 'read' | 'all';
+                status?: "unread" | "read" | "all";
                 offset?: number;
                 limit?: number;
             };
@@ -5753,7 +5982,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiArrivalsResponse'];
+                    "application/json": components["schemas"]["HitomiArrivalsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5762,7 +5991,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5784,7 +6013,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiDismissResponse'];
+                    "application/json": components["schemas"]["HitomiDismissResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5793,7 +6022,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5813,7 +6042,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiDismissAllResponse'];
+                    "application/json": components["schemas"]["HitomiDismissAllResponse"];
                 };
             };
         };
@@ -5833,7 +6062,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiWatchlistResponse'];
+                    "application/json": components["schemas"]["HitomiWatchlistResponse"];
                 };
             };
         };
@@ -5847,7 +6076,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AddWatchlistRequest'];
+                "application/json": components["schemas"]["AddWatchlistRequest"];
             };
         };
         responses: {
@@ -5857,7 +6086,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiAddArtistResponse'];
+                    "application/json": components["schemas"]["HitomiAddArtistResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5866,7 +6095,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5890,7 +6119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiRemoveArtistResponse'];
+                    "application/json": components["schemas"]["HitomiRemoveArtistResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5899,7 +6128,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5921,7 +6150,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HitomiRunNowResponse'];
+                    "application/json": components["schemas"]["HitomiRunNowResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5930,7 +6159,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5939,12 +6168,9 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
-                book_type?: ('comic' | 'novel' | 'other' | 'unknown') | null;
-                ownership?:
-                    | ('purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown')
-                    | null;
-                capture_state?:
-                    ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending') | null;
+                book_type?: ("comic" | "novel" | "other" | "unknown") | null;
+                ownership?: ("purchased" | "borrowed_active" | "borrowed_ended" | "returned" | "unknown") | null;
+                capture_state?: ("not_captured" | "captured" | "multiple_links" | "capture_pending") | null;
                 page?: number;
                 page_size?: number;
             };
@@ -5960,7 +6186,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCatalogBooksResponse'];
+                    "application/json": components["schemas"]["KindleCatalogBooksResponse"];
                 };
             };
             /** @description Validation Error */
@@ -5969,7 +6195,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5989,7 +6215,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCatalogStatsResponse'];
+                    "application/json": components["schemas"]["KindleCatalogStatsResponse"];
                 };
             };
         };
@@ -6009,7 +6235,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCatalogSourceStatusResponse'];
+                    "application/json": components["schemas"]["KindleCatalogSourceStatusResponse"];
                 };
             };
         };
@@ -6031,7 +6257,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleImportRunsResponse'];
+                    "application/json": components["schemas"]["KindleImportRunsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6040,7 +6266,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6060,7 +6286,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleOrdersImportResponse'];
+                    "application/json": components["schemas"]["KindleOrdersImportResponse"];
                 };
             };
         };
@@ -6080,7 +6306,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleOrdersImportResponse'];
+                    "application/json": components["schemas"]["KindleOrdersImportResponse"];
                 };
             };
         };
@@ -6100,7 +6326,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleOrdersImportResponse'];
+                    "application/json": components["schemas"]["KindleOrdersImportResponse"];
                 };
             };
         };
@@ -6120,7 +6346,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleMigrationPreviewResponse'];
+                    "application/json": components["schemas"]["KindleMigrationPreviewResponse"];
                 };
             };
         };
@@ -6134,7 +6360,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['MigrationCommitRequest'];
+                "application/json": components["schemas"]["MigrationCommitRequest"];
             };
         };
         responses: {
@@ -6144,7 +6370,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleMigrationCommitResponse'];
+                    "application/json": components["schemas"]["KindleMigrationCommitResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6153,7 +6379,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6173,7 +6399,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleUnlinkedBooksResponse'];
+                    "application/json": components["schemas"]["KindleUnlinkedBooksResponse"];
                 };
             };
         };
@@ -6181,7 +6407,7 @@ export interface operations {
     get_link_candidates_api_kindle_catalog_links_candidates_get: {
         parameters: {
             query: {
-                source: 'comic' | 'novel';
+                source: "comic" | "novel";
                 book_id: string;
                 limit?: number;
             };
@@ -6197,7 +6423,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleLinkCandidatesResponse'];
+                    "application/json": components["schemas"]["KindleLinkCandidatesResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6206,7 +6432,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6220,7 +6446,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['LinkRequest'];
+                "application/json": components["schemas"]["LinkRequest"];
             };
         };
         responses: {
@@ -6230,7 +6456,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleLinkResponse'];
+                    "application/json": components["schemas"]["KindleLinkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6239,7 +6465,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6253,7 +6479,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UnlinkRequest'];
+                "application/json": components["schemas"]["UnlinkRequest"];
             };
         };
         responses: {
@@ -6263,7 +6489,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleUnlinkResponse'];
+                    "application/json": components["schemas"]["KindleUnlinkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6272,7 +6498,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6294,7 +6520,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureJobsResponse'];
+                    "application/json": components["schemas"]["KindleCaptureJobsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6303,7 +6529,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6317,7 +6543,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['CaptureJobCreateRequest'];
+                "application/json": components["schemas"]["CaptureJobCreateRequest"];
             };
         };
         responses: {
@@ -6327,7 +6553,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureJobOut'];
+                    "application/json": components["schemas"]["KindleCaptureJobOut"];
                 };
             };
             /** @description Validation Error */
@@ -6336,7 +6562,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6344,7 +6570,7 @@ export interface operations {
     get_capture_quality_warnings_api_kindle_catalog_capture_quality_warnings_get: {
         parameters: {
             query?: {
-                status?: 'unread' | 'read' | 'all';
+                status?: "unread" | "read" | "all";
             };
             header?: never;
             path?: never;
@@ -6358,7 +6584,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureQualityWarningsResponse'];
+                    "application/json": components["schemas"]["KindleCaptureQualityWarningsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6367,7 +6593,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6383,7 +6609,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['CaptureQualityWarningReadRequest'];
+                "application/json": components["schemas"]["CaptureQualityWarningReadRequest"];
             };
         };
         responses: {
@@ -6393,7 +6619,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureQualityWarningOut'];
+                    "application/json": components["schemas"]["KindleCaptureQualityWarningOut"];
                 };
             };
             /** @description Validation Error */
@@ -6402,7 +6628,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6411,14 +6637,14 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path?: never;
             cookie?: never;
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AgentClaimRequest'];
+                "application/json": components["schemas"]["AgentClaimRequest"];
             };
         };
         responses: {
@@ -6428,7 +6654,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleAgentClaimResponse'];
+                    "application/json": components["schemas"]["KindleAgentClaimResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6437,7 +6663,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6446,7 +6672,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: string;
@@ -6455,7 +6681,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AgentStateRequest'];
+                "application/json": components["schemas"]["AgentStateRequest"];
             };
         };
         responses: {
@@ -6465,7 +6691,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureJobOut'];
+                    "application/json": components["schemas"]["KindleCaptureJobOut"];
                 };
             };
             /** @description Validation Error */
@@ -6474,7 +6700,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6483,7 +6709,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: string;
@@ -6492,7 +6718,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AgentHeartbeatRequest'];
+                "application/json": components["schemas"]["AgentHeartbeatRequest"];
             };
         };
         responses: {
@@ -6502,7 +6728,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureHeartbeatResponse'];
+                    "application/json": components["schemas"]["KindleCaptureHeartbeatResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6511,7 +6737,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6520,7 +6746,7 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                'x-capture-agent-token'?: string | null;
+                "x-capture-agent-token"?: string | null;
             };
             path: {
                 job_id: string;
@@ -6529,7 +6755,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AgentCompleteRequest'];
+                "application/json": components["schemas"]["AgentCompleteRequest"];
             };
         };
         responses: {
@@ -6539,7 +6765,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['KindleCaptureCompleteResponse'];
+                    "application/json": components["schemas"]["KindleCaptureCompleteResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6548,7 +6774,245 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_targets_api_kindle_price_watches_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceTargetsResponse"];
+                };
+            };
+        };
+    };
+    list_price_watches_api_kindle_price_watches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceWatchListResponse"];
+                };
+            };
+        };
+    };
+    create_price_watch_api_kindle_price_watches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KindlePriceWatchCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceWatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_price_watch_api_kindle_price_watches__watch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceWatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_price_watch_api_kindle_price_watches__watch_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceWatchDeleteResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_price_watch_api_kindle_price_watches__watch_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KindlePriceWatchUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceWatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_price_history_api_kindle_price_watches__watch_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceHistoryResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    record_price_observation_api_kindle_price_watches__watch_id__observations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KindlePriceObservationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KindlePriceObservationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6570,7 +7034,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': string[];
+                    "application/json": string[];
                 };
             };
             /** @description Validation Error */
@@ -6579,7 +7043,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6593,7 +7057,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['AddGenreRequest'];
+                "application/json": components["schemas"]["AddGenreRequest"];
             };
         };
         responses: {
@@ -6603,7 +7067,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GenreListResponse'];
+                    "application/json": components["schemas"]["GenreListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6612,7 +7076,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6636,7 +7100,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GenreListResponse'];
+                    "application/json": components["schemas"]["GenreListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6645,7 +7109,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6659,7 +7123,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ReorderGenresRequest'];
+                "application/json": components["schemas"]["ReorderGenresRequest"];
             };
         };
         responses: {
@@ -6669,7 +7133,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GenreListResponse'];
+                    "application/json": components["schemas"]["GenreListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6678,7 +7142,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6700,7 +7164,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['CharacterSummary'][];
+                    "application/json": components["schemas"]["CharacterSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -6709,7 +7173,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6732,7 +7196,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['CharacterDetail'];
+                    "application/json": components["schemas"]["CharacterDetail"];
                 };
             };
             /** @description Validation Error */
@@ -6741,7 +7205,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6761,7 +7225,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BookSummaryOut'][];
+                    "application/json": components["schemas"]["BookSummaryOut"][];
                 };
             };
         };
@@ -6781,7 +7245,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SeriesSummaryOut'][];
+                    "application/json": components["schemas"]["SeriesSummaryOut"][];
                 };
             };
         };
@@ -6801,7 +7265,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': string[];
+                    "application/json": string[];
                 };
             };
         };
@@ -6825,7 +7289,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SimilarBookOut'][];
+                    "application/json": components["schemas"]["SimilarBookOut"][];
                 };
             };
             /** @description Validation Error */
@@ -6834,7 +7298,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6856,7 +7320,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BookDetailOut'];
+                    "application/json": components["schemas"]["BookDetailOut"];
                 };
             };
             /** @description Validation Error */
@@ -6865,7 +7329,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6879,7 +7343,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['RebuildRequest'];
+                "application/json": components["schemas"]["RebuildRequest"];
             };
         };
         responses: {
@@ -6889,7 +7353,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RebuildEnqueueResponse'];
+                    "application/json": components["schemas"]["RebuildEnqueueResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6898,7 +7362,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6918,7 +7382,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['RebuildStatusResponse'];
+                    "application/json": components["schemas"]["RebuildStatusResponse"];
                 };
             };
         };
@@ -6947,7 +7411,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6961,7 +7425,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SearchRequest'];
+                "application/json": components["schemas"]["SearchRequest"];
             };
         };
         responses: {
@@ -6971,7 +7435,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['SearchResponse'];
+                    "application/json": components["schemas"]["SearchResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6980,7 +7444,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -6994,7 +7458,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['QaRequest'];
+                "application/json": components["schemas"]["QaRequest"];
             };
         };
         responses: {
@@ -7004,7 +7468,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7013,7 +7477,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7037,7 +7501,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['QaHistoryResponse'];
+                    "application/json": components["schemas"]["QaHistoryResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7046,7 +7510,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7068,7 +7532,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['QaHistoryDetailResponse'];
+                    "application/json": components["schemas"]["QaHistoryDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7077,7 +7541,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7106,7 +7570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7131,7 +7595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ChatSessionSummary'][];
+                    "application/json": components["schemas"]["ChatSessionSummary"][];
                 };
             };
             /** @description Validation Error */
@@ -7140,7 +7604,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7154,7 +7618,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ChatSessionStartRequest'];
+                "application/json": components["schemas"]["ChatSessionStartRequest"];
             };
         };
         responses: {
@@ -7164,7 +7628,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7173,7 +7637,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7195,7 +7659,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['ChatSessionDetailPayload'];
+                    "application/json": components["schemas"]["ChatSessionDetailPayload"];
                 };
             };
             /** @description Validation Error */
@@ -7204,7 +7668,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7233,7 +7697,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7249,7 +7713,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ChatSessionContinueRequest'];
+                "application/json": components["schemas"]["ChatSessionContinueRequest"];
             };
         };
         responses: {
@@ -7259,7 +7723,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7268,7 +7732,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7284,7 +7748,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['ChatSessionTitleUpdate'];
+                "application/json": components["schemas"]["ChatSessionTitleUpdate"];
             };
         };
         responses: {
@@ -7301,7 +7765,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7315,7 +7779,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['GenerateRequest'];
+                "application/json": components["schemas"]["GenerateRequest"];
             };
         };
         responses: {
@@ -7325,7 +7789,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7334,7 +7798,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7356,7 +7820,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['DiscussionHistoryItemOut'][];
+                    "application/json": components["schemas"]["DiscussionHistoryItemOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7365,7 +7829,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7389,7 +7853,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['DiscussionDeleteOut'];
+                    "application/json": components["schemas"]["DiscussionDeleteOut"];
                 };
             };
             /** @description Validation Error */
@@ -7398,7 +7862,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7412,7 +7876,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['EnqueueRequest'];
+                "application/json": components["schemas"]["EnqueueRequest"];
             };
         };
         responses: {
@@ -7422,7 +7886,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BuildEnqueueResponse'];
+                    "application/json": components["schemas"]["BuildEnqueueResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7431,7 +7895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7451,7 +7915,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BuildStatusResponse'];
+                    "application/json": components["schemas"]["BuildStatusResponse"];
                 };
             };
         };
@@ -7480,7 +7944,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7500,7 +7964,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
         };
@@ -7522,7 +7986,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['AmazonImportResponse'];
+                    "application/json": components["schemas"]["AmazonImportResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7531,7 +7995,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7551,7 +8015,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BackupTriggeredResponse'];
+                    "application/json": components["schemas"]["BackupTriggeredResponse"];
                 };
             };
         };
@@ -7571,7 +8035,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['BackupStatusResponse'];
+                    "application/json": components["schemas"]["BackupStatusResponse"];
                 };
             };
         };
@@ -7591,7 +8055,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': string[];
+                    "application/json": string[];
                 };
             };
         };
@@ -7613,7 +8077,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GraphBookOut'][];
+                    "application/json": components["schemas"]["GraphBookOut"][];
                 };
             };
             /** @description Validation Error */
@@ -7622,7 +8086,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7646,7 +8110,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['GraphDataResponse'];
+                    "application/json": components["schemas"]["GraphDataResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7655,7 +8119,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7677,7 +8141,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['PrefsResponse'];
+                    "application/json": components["schemas"]["PrefsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7686,7 +8150,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7700,7 +8164,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['UpdateFiltersRequest'];
+                "application/json": components["schemas"]["UpdateFiltersRequest"];
             };
         };
         responses: {
@@ -7710,7 +8174,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['PrefsUpdateResponse'];
+                    "application/json": components["schemas"]["PrefsUpdateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7719,7 +8183,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7733,7 +8197,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                'application/json': components['schemas']['SetPinRequest'];
+                "application/json": components["schemas"]["SetPinRequest"];
             };
         };
         responses: {
@@ -7743,7 +8207,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['PrefsUpdateResponse'];
+                    "application/json": components["schemas"]["PrefsUpdateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7752,7 +8216,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7776,7 +8240,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['PrefsUpdateResponse'];
+                    "application/json": components["schemas"]["PrefsUpdateResponse"];
                 };
             };
             /** @description Validation Error */
@@ -7785,7 +8249,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -7805,7 +8269,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
         };
@@ -7827,7 +8291,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7836,7 +8300,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    'application/json': components['schemas']['HTTPValidationError'];
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

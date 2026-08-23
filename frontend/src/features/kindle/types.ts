@@ -24,6 +24,13 @@ export type KindleCaptureQualityWarningReadRequest =
 export type KindleLinkRequest = components['schemas']['LinkRequest'];
 export type KindleCaptureJobCreateRequest = components['schemas']['CaptureJobCreateRequest'];
 export type KindleMigrationCommitRequest = components['schemas']['MigrationCommitRequest'];
+export type KindlePriceWatch = components['schemas']['KindlePriceWatchOut'];
+export type KindlePriceWatchListResponse = components['schemas']['KindlePriceWatchListResponse'];
+export type KindlePriceWatchCreateRequest = components['schemas']['KindlePriceWatchCreateRequest'];
+export type KindlePriceWatchUpdateRequest = components['schemas']['KindlePriceWatchUpdateRequest'];
+export type KindlePriceHistoryResponse = components['schemas']['KindlePriceHistoryResponse'];
+export type KindlePriceObservationResponse =
+    components['schemas']['KindlePriceObservationResponse'];
 
 export type KindleBookType = 'comic' | 'novel' | 'other' | 'unknown' | '';
 export type KindleOwnership =

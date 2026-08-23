@@ -103,6 +103,12 @@ export const API_ENDPOINTS = {
         `/api/kindle-catalog/capture-quality-warnings?status=${status}`,
     KINDLE_CAPTURE_QUALITY_WARNING: (warningId: number) =>
         `/api/kindle-catalog/capture-quality-warnings/${warningId}`,
+    /** Kindle 価格監視（Codex ブラウザ観測） */
+    KINDLE_PRICE_WATCHES: '/api/kindle-price-watches',
+    KINDLE_PRICE_WATCH: (watchId: number) => `/api/kindle-price-watches/${watchId}`,
+    KINDLE_PRICE_WATCH_HISTORY: (watchId: number) => `/api/kindle-price-watches/${watchId}/history`,
+    KINDLE_PRICE_WATCH_OBSERVATIONS: (watchId: number) =>
+        `/api/kindle-price-watches/${watchId}/observations`,
     /** UI プリファレンス（フィルター + ピン）取得 */
     PREFS: (source: string) => `/api/prefs?source=${encodeURIComponent(source)}`,
     /** UI フィルター更新 */

@@ -101,6 +101,7 @@ export function getCurrentLocation(pathname: string): RouteLocation {
     if (pathname === '/kindle/links') return { category: 'Kindle', screen: '画像紐付け' };
     if (pathname === '/kindle/capture') return { category: 'Kindle', screen: 'キャプチャ' };
     if (pathname === '/kindle/imports') return { category: 'Kindle', screen: '取込・管理' };
+    if (pathname === '/kindle/price-watch') return { category: 'Kindle', screen: '価格監視' };
     if (pathname.startsWith('/kindle')) return { category: 'Kindle', screen: '購入書籍' };
     return { category: 'Pic2PDF Viewer', screen: 'ホーム' };
 }

@@ -138,6 +138,7 @@ nav:
           - 小説 RAG Sol生成・評価設計: design/詳細設計/機能別/小説RAG_Sol生成・評価設計.md
           - 小説 RAG 検索QA設計: design/詳細設計/機能別/小説RAG_検索QA設計.md
           - Kindle 購入カタログ設計: design/詳細設計/機能別/Kindle購入カタログ設計.md
+          - Kindle 価格監視設計: design/詳細設計/機能別/Kindle価格監視設計.md
           - 画像生成カタログ設計: design/詳細設計/機能別/画像生成カタログ設計.md
           - セキュリティ設計書: design/詳細設計/セキュリティ設計書.md
           - 品質ガードレール: design/詳細設計/品質ガードレール.md
