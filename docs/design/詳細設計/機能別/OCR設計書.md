@@ -155,6 +155,9 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
 - QA開始は入力画像SHA・page数・page結果の完全性を再検証し、分類・risk flag反映後に
   必須pageを`required`、その他を`not_required`としてrunを`awaiting_qa / pending`へ遷移させる。
   canonical `books` / `pages`は変更しない。
+- ADR-0022のQwen＋dots複合版は機械gate未達のレビュー前提engineとして識別し、risk flagや
+  自動分類によらず全pageを`required`にする。narrativeは原画像照合、non-narrativeは分類確認を必須にする。
+  selectorの採用候補はレビュー開始時の初期値にすぎず、QA承認または公開を意味しない。
 - page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
   検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
 - run承認は`required`・`rejected`・未分類page/layoutが0件であること、入力SHAが不変であること、
@@ -335,7 +338,8 @@ B-35の完了判定には、調整に使わない3シリーズ以上・通常散
 場合だけ、3シリーズ以上、normal prose 20画面以上、固有名詞10語・50出現以上、SHA差替え、
 package欠落、開封済み再利用をfail closedで検査する。manifestと台帳の検査・更新は
 ground truth、OCR QA、公開本文を変更しない。正式holdoutの機械単独品質が全policyへ合格するまで、
-B-35、自動公開、Codex最終確認省略を完了扱いにしない。
+自動公開、Codex最終確認省略、標本監査への縮小を完了扱いにしない。全narrativeページを
+原画像照合して補正・承認するレビュー採用laneは別に扱い、未修正予測の性能値と修正後の運用品質を混同しない。
 
 正式holdoutの品質評価では、固有名詞注釈はpolicy JSONに残る汎用corpus用注釈ではなく、
 封印済みmanifestの画像SHA・語集合を使用する。コーパス構成もmanifestで検証済みの3シリーズ・
@@ -451,7 +455,7 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
   適用してもJSSODa固定先頭1枚で誤認文節が4,096 token上限まで反復した。
   swap 0であり64GB unified memory不足ではない。標準MLX-VLMの逐次decodeでは
   日本語tokenによる`KeyError`も起きるため、runtime修正だけで品質合格と見なさず、
-  固定revisionは本番候補にしない。
+  固定revisionは本番候補にしない。元モデルの利用条件はOpenMDW-1.1、tokenizerはCC-BY-4.0とする。
 - Qianfan-OCR MLX 4bitは、公式基準prompt・temperature 0でも固定`000006`がCER 2.0270%、
   `000142`がCER 753.8883%・同一文節反復となった。停止までのpeak footprintは約6.90GiB、
   swap 0であり64GB unified memory不足ではない。変換元revisionもconfigから復元できないため、
@@ -460,6 +464,38 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
   `000142`は段落重複・順序入替によりCER 13.0340%だった。最大RSS約14.34GiB、swap 0であり
   64GB unified memory不足ではない。固定GGUF pairを本番候補にせず、段落dedupe・順序補正で
   採用値を救済しない。
+- Hayai OCR v2は固定revision、固定custom code、公式greedy生成とrepetition penalty 1.20で
+  JSSODa固定1枚目を診断したが、592文字に対して8文字出力・CER 99.4932%だった。
+  最大RSS約1.59GiBで64GB不足ではなく、短い漫画crop向けモデルの全文coverage不適合とする。
+  残りへ進めず本番候補にせず、短文crop化や回転、patch数変更で救済しない。
+- fail-fast不採用候補の一回限りrunnerは恒久保守資産にしない。runtime差分を再診断する期限付きrunnerだけを
+  `maintenance_assets.json`へ登録し、実測・revision・hash・失敗原因は設計書と技術知見を正本とする。
+- Qwen3.5-OCR-JP-2Bは公式固定prompt、greedy生成、最大8,000 token、固定revisionでJSSODaを評価する。
+  HTML layout blockはDOM順の可視文字へ復号し、rubyの`rt`だけを除外する。blockの並べ替え、本文dedupe、
+  言語補正は行わず、raw HTMLも保存する。固定5枚中4枚は総合CER 0.2416%だったが、`001751`が
+  8,000 tokenまで反復したため単体候補は不採用とする。
+- Qwen3.5 OCR + dots.mocr複合候補は、抽出本文へ既存`has_suspicious_repetition`を適用し、反復または
+  8,000 token到達によるHTML末尾切断ならdots.mocr、それ以外はQwenを採用する。selectorは正解本文、CER、
+  ページIDを参照しない。固定5枚では`001751`だけが
+  fallback対象となり、保存済みdots固定5枚集計から導く合成上界は総合CER 0.3285%以下、最大0.6907%以下である。
+  次の固定79枚でも未修復raw出力、HTML末尾切断flag、両候補のprovenanceを保存し、選択後の総合0.5%未満・
+  最大2.0%未満を判定する。実測は15枚時点で総合CER 0.5166%、最大3.1042%となり、最大ページに
+  反復・切断signalがないためfail-fast不採用とする。正解を見たLatin文字やページID条件をselectorへ追加しない。
+- 公開screening調整用v2では、plain textへ保持しない`div` / `ruby` / `rt` / `p` / `br`以外のinline HTML markupも
+  fallback候補信号として記録できる。tag内本文を推測補正せずページ全体をdots.mocrへ送り、同じ公開79枚を
+  最初から再評価する。これは開封済みscreeningで発見した規則なので正式holdoutの合格実績には数えない。
+  実測は`000260`だけをfallbackし、15枚総合CER 0.4776%へ改善したが、同ページのdots出力が2.2173%で
+  最大gateを超えた。残りへ進めずv2も不採用とする。
+- ADR-0022のレビュー前提v3は、Qwenとdotsを全ページで実行し、反復・HTML切断・非保持markup・
+  隣接する狭いvertical blockの左→右bbox順に加えて`is_external_materially_more_complete`をレビュー初期候補の
+  切替信号へ使う。bbox幅300超、上下端差25超、非隣接blockは比較せず、広い段落領域の誤検知を避ける。
+  固定79枚の再開後、`000653`でQwenが
+  中央2段落を欠落してCER 33.3333%となったが既存異常signalがなく、文字量差なら検出できることを確認した。
+  selectorは両候補のID・画像SHAを完全一致で検証し、各候補内でmodel revision・fingerprint・promptが
+  全ページ同一であることも検査する。選択後も両本文をQAへ保存する。
+  79枚中Qwen 72枚、dots 7枚を初期候補に選び、総編集距離223/54,504文字、加重CER 0.4091%、
+  ページ最大2.8835%となった。総合gateは通るが最大gateに未達である。この規則は開封済みscreening由来なので
+  未調整holdout合格値には数えず、全ページ原画像照合を省略しない。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

@@ -18,6 +18,7 @@ _QA_AUDIT_ONLY_FLAGS = frozenset(
         "yomitoku_adjudication",
     }
 )
+_REVIEW_ALL_PAGE_ENGINES = frozenset({"qwen35_dots_review_v1"})
 
 
 def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
@@ -26,6 +27,10 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
     classify_run_pages(run_id)
     risk_pages = annotate_run_qa_risks(run_id)
     with with_db() as conn:
+        run = conn.execute("SELECT engine FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
+        if run is None:
+            raise LookupError(f"OCR run not found: {run_id}")
+        review_all_pages = str(run[0]) in _REVIEW_ALL_PAGE_ENGINES
         current_flags = conn.execute(
             "SELECT page_no, quality_flags_json FROM ocr_page_results WHERE run_id=?",
             (run_id,),
@@ -51,6 +56,11 @@ def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
                 "UPDATE ocr_page_results SET qa_state='required' WHERE run_id=? AND page_type='unknown'",
                 (run_id,),
             )
+            if review_all_pages:
+                conn.execute(
+                    "UPDATE ocr_page_results SET qa_state='required' WHERE run_id=?",
+                    (run_id,),
+                )
             conn.execute(
                 "UPDATE ocr_page_results SET qa_state='required' "
                 "WHERE run_id=? AND (state!='passed' OR layout_type!='normal_prose') "

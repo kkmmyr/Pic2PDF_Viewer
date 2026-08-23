@@ -401,7 +401,7 @@ raw textをページ単位でfsyncするため、将来runtime差分を診断す
 C-RADIO vision encoder + mBART decoderで、20,000 tokenの語彙拡張とCJK・Indicの改善を示す。
 MOSCARに日本語を含むが、公開指標は日本語縦書き小説の文字精度を直接保証しない。
 調査時の元モデルrevisionは`b6742064f4a8cf22a10383ece5e7fbead355ac04`、利用条件は
-NVIDIA Open Model License 1.1である。MLX変換のconfigにsource revisionは記録されておらず、
+OpenMDW License Agreement 1.1であり、同梱tokenizerはCC-BY-4.0である。MLX変換のconfigにsource revisionは記録されておらず、
 変換元の厳密なcommitは復元できない。変換cardのApache-2.0 metadataは元licenseを上書きする
 根拠としない。
 
@@ -428,7 +428,8 @@ runtime表示層の両方の不適合である。反復停止processorは幻覚�
 
 ## 21. 2026-08-23: Qianfan-OCR MLXを次候補に固定
 
-[Baidu公式model card](https://huggingface.co/baidu/Qianfan-OCR)は、4B級のend-to-end文書VLM、
+[Baidu公式model card](https://huggingface.co/baidu/Qianfan-OCR)は4B-parameterのend-to-end文書VLMと説明し、
+配布safetensors metadataは4,741,408,256 parameter（Hugging Face表示は5B）である。
 192言語、Apache-2.0、`do_sample=False`の基本経路を示す。CCOCR multilingual等の汎用公開値はあるが、
 日本語縦書き小説のCER・列読順・生成反復を分離した値はない。公式推論はBF16 Transformersまたは
 vLLMを基準とし、Apple Silicon MLXの正しさまでは保証しない。
@@ -473,3 +474,149 @@ llama-cli出力fileの固定`User:` / `Assistant:` framingだけをprotocolと�
 CER 13.0340%、2枚総合8.0399%となった。2枚目14.57秒、最大RSS 15,393,259,520 byte、peak
 footprint 14,257,417,832 byte、swap 0である。64GB不足ではなく列読順・重複品質の不合格とし、
 残り3枚と79枚を実行しない。段落dedupe・順序補正・再promptで採用値を救済しない。
+
+## 23. 2026-08-23: Hayai OCR v2とhonmono-ocrの実行前screening
+
+[Hayai OCR v2公式model card](https://huggingface.co/JustANormalTinkerer/hayai-ocr-v2)の固定revision
+`fa1ca12bacba3ac09a9fee09c6086ef84c72d8f4`はApache-2.0、約0.2B parameter、F32重み
+622,500,080 byteである。SigLIP2 NaFlexをnative aspect ratioで使い、別text detectorなしで全画像を
+256 patchへ変換し、独自12層causal decoderがgreedy生成する。custom codeの生成loopはEOSまたは指定token
+上限まで継続し、公式例は128 token、repetition penalty 1.20である。
+
+公式finetuningは約2,000件の漫画cropで、公開dataset viewerのtranscription長は最大81文字、公式平均CERは
+8.52%である。したがって小説全ページへの適合を公開値から推定せず、1,024 tokenへ出力budgetだけを広げた
+固定`000006`のfail-fast診断に限定した。`trust_remote_code=True`が必要なので固定2ファイルを事前監査し、
+ネットワーク送信、subprocess、任意コード評価、ファイル削除・書込みがないことを確認した。
+
+Transformers 5.12.0、PyTorch 2.13.0、MPS、公式repetition penalty 1.20、最大1,024 tokenで、
+画像SHA-256 `c7914c0ae3cb15fc2948a1eb78c6061b5bce0ff8af88de377d71902fc8938e10`を評価した。
+592正規化文字に対し予測は「「Incle」の」の8文字、Levenshtein距離589、CER 99.4932%だった。
+2.30秒、process最大RSS 1,710,555,136 byte、MPS driver allocation最大観測1,552,662,528 byteであり、
+64GB unified memory不足ではない。全文coverageと最大CER gateに不合格のため残り4枚・79枚へ進めず、
+短文crop化や回転、patch数変更で同一候補を救済しない。
+
+[honmono-ocr test set](https://huggingface.co/datasets/eridgd/honmono-ocr-test)は14,256件の実画像行を公開し、
+縦書きcropを90度回転した入力、v6-smallの完全行一致83.5%を報告する。以前の404状態からdataset cardと
+benchmarkは公開されたが、2026-08-23時点でもモデルAPIは401、参照GitHubは404で取得不能だった。また
+行認識器単体であり、Kindle/JSSODa全ページにはtext detection、縦横判定、crop回転、列読順復元が別途必要である。
+そのため再現可能なモデル配布とページpipelineが揃うまでB-35の直接候補へ数えない。
+
+## 24. 2026-08-23: Qwen3.5-OCR-JP-2Bの固定5枚screening
+
+[Qwen3.5-OCR-JP-2B model card](https://huggingface.co/ebinan92/Qwen3.5-ocr-jp-2b)の固定revision
+`dc58acc05962cb2ca129c8d3533ab7e5a651cc02`はApache-2.0、BF16 2,782,629,184 parameterで、
+追加custom Pythonを持たない標準Qwen3.5 checkpointである。日本語縦書き、手書き、HTML5 rubyを学習重点とし、
+VJRODa 92/100件でCER 7.3%、JaWildTextでCER 6.33%を報告する。いずれもJSSODa小説ページの
+0.5%・最大2.0% gateを保証しない。
+
+公式契約はprompt `OCR this image as HTML layout blocks with bbox and label.`、greedy生成、最大8,000 token、
+HTML layout block出力である。採用値はraw HTMLからDOM順の可視文字を取り出し、rubyの読み`rt`だけを除外する。
+tag・attribute・単一code fence除去以外の並べ替え、dedupe、言語補正は行わない。Transformers 5.12.0、
+PyTorch 2.13.0、MPS BF16で固定5枚を評価した。任意高速化のFLA・causal-convは未導入で、標準PyTorch実装へ
+fallbackした。これは計算経路の低速化であり、生成条件は変更しない。
+
+| page | 正解文字 | 予測文字 | 距離 | CER | 推論秒 |
+|---|---:|---:|---:|---:|---:|
+| `000006` | 592 | 591 | 1 | 0.1689% | 25.33 |
+| `000142` | 913 | 913 | 0 | 0% | 35.94 |
+| `000158` | 724 | 724 | 5 | 0.6906% | 26.78 |
+| `000609` | 668 | 668 | 1 | 0.1497% | 27.12 |
+| `001751` | 756 | 13,190 | 12,566 | 1,662.1693% | 354.29 |
+
+先頭4枚は距離7/2,897文字・CER 0.2416%で、ページ最大も0.6907%だった。`001751`だけは
+「過去を受け入れ、現在を慈しみ…」を最大8,000 tokenまで反復し、固定5枚単体総合を
+距離12,573/3,653文字・CER 344.1829%へ悪化させた。最初のmodel loadを含むprocess最大RSSは
+3,408,150,528 byte、MPS driver allocation最大観測は6,069,567,488 byteで、OS swapは事前値から
+増加しなかった。Qwen単体は64GB不足ではなく生成停止品質で不採用とする。
+
+既存production guard `has_suspicious_repetition`は保存した抽出本文に対して正常4枚をfalse、`001751`だけを
+trueと判定した。同ページのraw HTMLは最大token到達で末尾tagも未閉鎖だった。rawを修復せず切断flagを保存し、
+反復または末尾切断ならdots.mocr、それ以外はQwenへ切り替える。過去のdots固定5枚は
+総合CER 0.4654%、ページ最大0.6614%なので、756文字の`001751`の距離は整数で5以下である。Qwen正常4枚の
+距離7と合成すると総距離12以下、複合総合CER 0.3285%以下、ページ最大0.6907%以下となる。これは過去集計からの
+数学的上界であり、欠落したdots raw予測の再計測ではない。固定79枚では両候補のrevision・fingerprint・raw出力・
+選択理由を保存し、正解本文をselectorへ渡さず同じ規則を使う。
+
+## 25. 2026-08-23: Qwen3.5 OCR複合候補を15/79枚でfail-fast
+
+Qwen runnerはモデル重みだけでなく`chat_template.jinja`、processor、tokenizer、generation configを含む
+fingerprint `40b08aa62b9673615a8b29c9104b9ea66ef2c25bc482126a3b7a24042957d392`を固定した。
+JSSODa metadata SHA-256は`b521ff3f57fc044d4e92faa76cb32ebf8cfc5669ede6059c9187cb73b33cc2b9`、
+先頭79縦書きページ順リストは`4b66fbdf1778261a7f7429fcfbea085cf281de411c3ec619373da7ca6058f176`である。
+先頭`000006`の再実行は距離1/592文字・CER 0.1689%となり、実行前screeningと一致した。
+
+Transformers 5.12.0、PyTorch 2.13.0、torchvision 0.28.0、MPS BF16、公式prompt、greedy、最大8,000
+tokenで15枚まで実行した。反復・HTML切断は0枚だったが、総編集距離53/10,259文字、総合CER 0.5166%、
+ページ最大は`000260`の14/451文字・3.1042%だった。次点は`000533`の1.3994%、`000228`の0.9115%である。
+
+`000260`は縦書き中の半角`AI`を5箇所とも「と」と出力したほか、「もたらす」を「もたもらで」とするなど、
+生成loopではない通常認識誤りだった。したがって反復・HTML切断だけをcandidate-only signalとする複合selectorは
+同ページでQwenを選び、既定の総合0.5%未満・ページ最大2.0%未満を満たせない。参照正解を見た`AI`文字列、
+ページID、CERでfallbackを増やすのはoracle化になるため行わず、残り64枚を停止した。
+
+公式model cardはvLLMを推奨しつつTransformers経路も提示するが、Apple SiliconではvLLM CUDA経路をそのまま
+比較できない。公開情報上はQwen3.5 visionをMLX-VLMが扱えるものの、このOCR fine-tuneの同一revision変換と
+JSSODa精度保証はない。まず同一MPS条件の再現性を確認し、固定誤りならruntime切替だけを採用理由にしない。
+
+追加2回のMPS再実行は本文SHA-256
+`6eee7d4b63a560341efc13b8a21b0d272c7e67adc089a71e4bbdb9ad095dcd6d`、raw HTML SHA-256
+`a67111f79249d62ee335b9fcc298d097effcb3f686f82c5aae9591da7f87f648`まで初回と一致した。
+MLX-VLM 0.6.15で同じsourceをBF16変換した重みSHA-256は
+`f50dfa3f0004de672da7c60716fa061876f47abf256259865aa799435b0456b0`で、同ページは距離14・CER 3.1042%、
+反復・切断なしだった。最終句には小差があるが`AI`5箇所の誤認は同じで、runtime切替による救済根拠はない。
+
+raw HTMLを比較すると、先頭15枚で`000260`だけが`<i>`を4箇所出力し、いずれも`AI`誤認を含む箇所だった。
+正解を見て`<i>`本文を`AI`へ置換せず、本番plain text契約で保持しないinline装飾tagがあるページ全体を
+dots.mocrへ送るcandidate-only診断は可能である。ただし公開screeningを見て追加した規則なので、同じ79枚を
+最初から再評価する調整版に限り、正式holdoutの実績とは分離する。
+
+dots.mocr固定revision`e539fbb52280393adc081b289ec597430a0f9031`をMLX-VLM 0.6.15でBF16変換した。
+変換shard SHA-256は`ee5b6805e6daed399a12e05809fa6f9d6d50e28fc59bdfc365c8c3b68bbb4a11`と
+`ea920fcabc7a3777b00854eff0a07126adc0acc4d05aabc51ef754a7fe302201`、runner fingerprintは
+`0722d321dfef111c6329633ba8d3f36630bdf36f6915499003f799876d29fc51`である。既存最良の公式layout
+prompt、temperature 0.1、top-p 1.0、seed 0、最大2,048 tokenで`000260`を5.65秒で処理した。
+
+dots出力は`AI`5箇所をすべて「は」と誤認し、距離10/451文字・CER 2.2173%だった。v2 selectorは15枚中
+この1枚だけをdotsへ切り替え、総合を距離49/10,259文字・CER 0.4776%へ改善したが、ページ最大2.2173%で
+2.0%未満gateに不合格である。Qwenの「と」とdotsの「は」の不一致は誤り検出には使えても正解文字を決められず、
+参照正解や言語補正を使うとoracle化する。そのため残り64枚を再実行せず、複合v2も不採用とする。
+
+## 26. 2026-08-23: Qwen＋dotsレビュー版の79枚完走と正式候補化
+
+自動公開候補のfail-fast終了後、ADR-0022の全ページレビューlaneを評価する目的で、同じ開封済み
+JSSODa先頭79縦書きページをQwenとdotsの両方で完走した。Qwenは4/79枚（`000868`、`000967`、
+`001444`、`001751`）が8,000 tokenまで反復してHTML末尾も切断され、単体は総編集距離
+57,194/54,504文字、加重CER 104.9354%、最大2,864.1791%だった。反復4枚を除いた75枚でも
+距離662/51,373文字・CER 1.2886%、最大33.3333%であり、単体採用はできない。
+
+dots.mocrは同じ79枚で反復0、距離490/54,504文字、加重CER 0.8990%、最大4.0155%だった。
+Qwenの反復・HTML切断4枚、非保持`<i>` markup 1枚、隣接する狭い縦列blockの左→右出力1枚、
+dotsが30文字・2%以上長い欠落疑い1枚をdotsへ切り替えたレビュー版は、Qwen 72枚・dots 7枚、
+距離223/54,504文字、加重CER 0.4091%、最大2.8835%、完全一致20/79枚となった。総合0.5%未満は
+満たすが最大2.0%未満には届かないため、機械gate合格・自動公開・レビュー縮小には使わない。
+
+欠落ページ`000653`はQwen 496文字・CER 33.3333%に対しdots 750文字・CER 0.6720%で、文字量差signalが
+有効だった。読順崩壊ページ`000724`はQwen CER 25.2513%に対しdots 0.1256%だった。一方、最初のbbox判定は
+正常に近い`000228`と`000905`も拾ったため、隣接block、各幅300以下、上下端差25以下へ限定した。これにより
+79枚では`000724`だけを検出した。選択はレビュー開始時の初期候補であり、両raw本文を保持して原画像照合する。
+各候補内でmodel revision・fingerprint・promptが全ページ同一でない入力もfail closedで拒否する。
+
+[Qwen公式card](https://huggingface.co/ebinan92/Qwen3.5-ocr-jp-2b)の固定prompt、BF16、Transformers
+`do_sample=False`、最大8,000 tokenを維持した。公式はvLLMを推奨するがApple Siliconで同じCUDA経路は使えない。
+[MLX-VLMの別OCRモデル反復報告](https://github.com/Blaizzy/mlx-vlm/issues/1021)では
+`repetition_penalty`でもloopを防げなかったため、penaltyで出力を救済せず反復guardと独立候補へ隔離する。
+[dots公式layout prompt](https://github.com/studio-dots-ai/dots.mocr)を使い、MLX-VLM 0.6.15、BF16、
+temperature 0.1、top-p 1.0、最大2,048 tokenを固定した。
+[コミュニティの文書OCR実測](https://www.reddit.com/r/LocalLLaMA/comments/1s6cmll/testing_qwen_35_for_ocr_and_redaction_tasks/)でも
+VLMが行や段落を落とす場合があり、独立OCRとのhybridと人手確認が推奨されている。
+
+Qwen前処理のpixel budgetを根拠に低解像度ページを2〜4倍へ拡大した診断では、`000260`はCER 3.1042%から
+2.4390%へ改善したが、`000158`は0.6906%から3.1768%、`000314`は0.7772%から2.4611%へ悪化し、
+`000533`は長大生成へ入った。入力の一律拡大は採用せず、固定元画像を既定にする。79枚のモデル生成時間は
+Qwen 3,179.58秒（中央値25.29秒、最大347.36秒）、dots 1,016.64秒（中央値12.80秒、最大22.20秒）、
+合計4,196.22秒、約53.1秒/ページだった。実書籍の画像条件・文字量・反復率では増減する。
+
+以上から、レビュー前提の正式候補はQwen主候補＋全ページdots副候補とする。残存最大誤り`000713`は
+Qwen 2.8835%、dots 3.1142%で両方が2%を超え、自動候補選択では解決できない。全ページQAと
+narrative全ページの原画像照合・補正を公開条件にする判断は維持する。この79枚はsignal調整に使った
+公開screeningであり、未調整holdoutの性能とは報告しない。

@@ -276,6 +276,37 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
     assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12]
 
 
+def test_review_assisted_engine_requires_every_page(tmp_data_dir) -> None:
+    upgrade_head()
+    book_name = "qa-review-assisted"
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
+    images_dir.mkdir(parents=True)
+    for page_no in range(1, 13):
+        Image.new("RGB", (100, 140), "white").save(images_dir / f"{page_no:03d}.png")
+    input_pages = collect_input_pages(book_name)
+    run_id, _ = prepare_run(
+        book_name,
+        "qwen35_dots_review_v1",
+        "fixed-composite-model",
+        input_pages,
+    )
+
+    for page in input_pages:
+        save_page_result(
+            run_id,
+            _passed_page(page.page_no, page.image_sha256, _unique_content(400)),
+        )
+
+    stage_run_for_qa(run_id, input_pages)
+
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
+            (run_id,),
+        ).fetchall()
+    assert [row[0] for row in rows] == list(range(1, 13))
+
+
 def test_stage_requires_content_risks(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "qa-name-risk"

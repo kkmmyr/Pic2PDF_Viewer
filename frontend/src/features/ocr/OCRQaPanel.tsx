@@ -23,11 +23,21 @@ const LAYOUT_TYPE_LABELS: Record<OcrLayoutType, string> = {
     image_only: '画像のみ',
 };
 
-const ENGINE_LABELS: Record<OcrSelectedEngine, string> = {
+const LEGACY_ENGINE_LABELS: Record<OcrSelectedEngine, string> = {
     primary: 'Surya候補',
     external: 'yomitoku候補',
-    codex: 'Codex確認済み補正',
+    codex: '人手確認済み補正',
 };
+
+const QWEN_DOTS_ENGINE_LABELS: Record<OcrSelectedEngine, string> = {
+    primary: 'Qwen3.5候補',
+    external: 'dots.mocr候補',
+    codex: '人手確認済み補正',
+};
+
+export function getOcrEngineLabels(engine: string | undefined): Record<OcrSelectedEngine, string> {
+    return engine === 'qwen35_dots_review_v1' ? QWEN_DOTS_ENGINE_LABELS : LEGACY_ENGINE_LABELS;
+}
 
 export function OCRQaPanel() {
     const {
@@ -59,6 +69,7 @@ export function OCRQaPanel() {
         approveMutation,
         canApproveRun,
     } = useOCRQaController();
+    const engineLabels = getOcrEngineLabels(detail?.engine);
 
     return (
         <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
@@ -197,7 +208,7 @@ export function OCRQaPanel() {
                                                 }}
                                                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
                                             >
-                                                {Object.entries(ENGINE_LABELS).map(
+                                                {Object.entries(engineLabels).map(
                                                     ([value, label]) => (
                                                         <option key={value} value={value}>
                                                             {label}
@@ -223,7 +234,8 @@ export function OCRQaPanel() {
                                         />
                                         {!selectedPage.external_text && (
                                             <p className="text-xs text-amber-700 dark:text-amber-300">
-                                                この画面にはyomitoku候補が保存されていません。
+                                                この画面には{engineLabels.external}
+                                                が保存されていません。
                                             </p>
                                         )}
                                     </div>

@@ -350,7 +350,9 @@
         "scripts/maintenance/dots_mocr_vertical_predict.py",
         "scripts/maintenance/paddleocr_vl_vertical_predict.py",
         "scripts/maintenance/qianfan_ocr_vertical_predict.py",
+        "scripts/maintenance/qwen35_ocr_jp_vertical_predict.py",
         "scripts/maintenance/sarashina_ocr_vertical_predict.py",
+        "scripts/maintenance/select_qwen35_dots_predictions.py",
         "scripts/maintenance/unlimited_ocr_vertical_predict.py"
       ],
       "classification": "temporary",
