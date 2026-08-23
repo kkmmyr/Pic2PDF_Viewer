@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Sol fact graph candidate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_sha256", "facts"],
+  "properties": {
+    "schema_version": {"type": "string", "const": "sol-fact-graph-v1"},
+    "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "facts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fact_id", "subject", "action", "object", "actors", "temporality",
+          "certainty", "state_before", "state_after", "evidence", "related_fact_ids"
+        ],
+        "properties": {
+          "fact_id": {"type": "string", "minLength": 1},
+          "subject": {"type": "string", "minLength": 1},
+          "action": {"type": "string", "minLength": 1},
+          "object": {"type": ["string", "null"]},
+          "actors": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "role"],
+              "properties": {
+                "name": {"type": "string", "minLength": 1},
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "subject", "tactical_planner", "command_approver",
+                    "physical_actor", "target", "witness", "decision_maker"
+                  ]
+                }
+              }
+            }
+          },
+          "temporality": {"type": "string", "enum": ["past", "current", "future", "conditional", "unknown"]},
+          "certainty": {"type": "string", "enum": ["fact", "inference", "unknown"]},
+          "state_before": {"type": ["string", "null"]},
+          "state_after": {"type": ["string", "null"]},
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["page_no", "quote"],
+              "properties": {
+                "page_no": {"type": "integer"},
+                "quote": {"type": "string", "minLength": 20, "maxLength": 120}
+              }
+            }
+          },
+          "related_fact_ids": {"type": "array", "items": {"type": "string"}}
+        }
+      }
+    }
+  }
+}
