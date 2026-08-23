@@ -15,7 +15,7 @@ import json
 import math
 import os
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -125,51 +125,70 @@ def _resolve_image(dataset_root: Path, output_path: Any, *, record_id: str) -> P
     return image_path
 
 
-def load_vertical_pages(config: RunConfig) -> list[InputPage]:
-    pages: list[InputPage] = []
+def _parse_vertical_record(
+    raw_line: str,
+    *,
+    line_number: int,
+    config: RunConfig,
+    seen: set[str],
+) -> InputPage | None:
+    try:
+        record = json.loads(raw_line)
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"metadata line {line_number} is invalid JSON: {exc.msg}"
+        ) from exc
+    if not isinstance(record, dict) or "id" not in record:
+        raise ValueError(f"metadata line {line_number} must be an object with id")
+    record_id = _canonical_id(record["id"], line_number=line_number)
+    if record_id in seen:
+        raise ValueError(f"metadata contains duplicate id: {record_id}")
+    seen.add(record_id)
+    is_vertical = record.get("is_vertical")
+    if not isinstance(is_vertical, bool):
+        raise ValueError(f"metadata id {record_id} has non-boolean is_vertical")
+    if not is_vertical:
+        return None
+    image_path = _resolve_image(
+        config.dataset_root,
+        record.get("output_path"),
+        record_id=record_id,
+    )
+    return InputPage(
+        record_id=record_id,
+        image_path=image_path,
+        image_relpath=image_path.relative_to(config.dataset_root.resolve()).as_posix(),
+        image_sha256=_sha256(image_path),
+    )
+
+
+def _iter_vertical_pages(config: RunConfig) -> Iterator[InputPage]:
     seen: set[str] = set()
+    page_count = 0
     with config.metadata_path.open(encoding="utf-8") as stream:
         for line_number, raw_line in enumerate(stream, start=1):
             if not raw_line.strip():
                 continue
-            try:
-                record = json.loads(raw_line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(
-                    f"metadata line {line_number} is invalid JSON: {exc.msg}"
-                ) from exc
-            if not isinstance(record, dict) or "id" not in record:
-                raise ValueError(
-                    f"metadata line {line_number} must be an object with id"
-                )
-            record_id = _canonical_id(record["id"], line_number=line_number)
-            if record_id in seen:
-                raise ValueError(f"metadata contains duplicate id: {record_id}")
-            seen.add(record_id)
-            is_vertical = record.get("is_vertical")
-            if not isinstance(is_vertical, bool):
-                raise ValueError(f"metadata id {record_id} has non-boolean is_vertical")
-            if not is_vertical:
+            page = _parse_vertical_record(
+                raw_line,
+                line_number=line_number,
+                config=config,
+                seen=seen,
+            )
+            if page is None:
                 continue
-            image_path = _resolve_image(
-                config.dataset_root, record.get("output_path"), record_id=record_id
-            )
-            pages.append(
-                InputPage(
-                    record_id=record_id,
-                    image_path=image_path,
-                    image_relpath=image_path.relative_to(
-                        config.dataset_root.resolve()
-                    ).as_posix(),
-                    image_sha256=_sha256(image_path),
-                )
-            )
+            page_count += 1
+            yield page
             if (
                 not config.selected_ids
                 and config.limit is not None
-                and len(pages) >= config.limit
+                and page_count >= config.limit
             ):
-                break
+                return
+
+
+def load_vertical_pages(config: RunConfig) -> list[InputPage]:
+    pages = list(_iter_vertical_pages(config))
     if not pages:
         raise ValueError("metadata vertical scope is empty")
     if config.selected_ids:
@@ -298,6 +317,33 @@ def _append_checkpoint(path: Path, record: Mapping[str, Any]) -> None:
         os.fsync(stream.fileno())
 
 
+def _extract_layout_cell(cell: Any, *, index: int) -> str | None:
+    if not isinstance(cell, dict):
+        raise ValueError(f"dots.mocr layout cell {index} is not an object")
+    category = cell.get("category")
+    if category not in LAYOUT_CATEGORIES:
+        raise ValueError(f"dots.mocr layout cell {index} has an invalid category")
+    bbox = cell.get("bbox")
+    if (
+        not isinstance(bbox, list)
+        or len(bbox) != 4
+        or any(
+            isinstance(value, bool) or not isinstance(value, (int, float))
+            for value in bbox
+        )
+        or any(not math.isfinite(value) for value in bbox)
+        or bbox[2] <= bbox[0]
+        or bbox[3] <= bbox[1]
+    ):
+        raise ValueError(f"dots.mocr layout cell {index} has an invalid bbox")
+    text = cell.get("text")
+    if text is None and category == "Picture":
+        return None
+    if not isinstance(text, str):
+        raise ValueError(f"dots.mocr layout cell {index} has no string text")
+    return text if text.strip() else None
+
+
 def _extract_prediction(response: str, *, response_mode: str) -> tuple[str, int | None]:
     if response_mode == "plain_text":
         return response, None
@@ -311,33 +357,11 @@ def _extract_prediction(response: str, *, response_mode: str) -> tuple[str, int 
         ) from exc
     if not isinstance(cells, list) or not cells:
         raise ValueError("dots.mocr layout response must be a non-empty JSON list")
-    text_items: list[str] = []
-    for index, cell in enumerate(cells):
-        if not isinstance(cell, dict):
-            raise ValueError(f"dots.mocr layout cell {index} is not an object")
-        category = cell.get("category")
-        if category not in LAYOUT_CATEGORIES:
-            raise ValueError(f"dots.mocr layout cell {index} has an invalid category")
-        bbox = cell.get("bbox")
-        if (
-            not isinstance(bbox, list)
-            or len(bbox) != 4
-            or any(
-                isinstance(value, bool) or not isinstance(value, (int, float))
-                for value in bbox
-            )
-            or any(not math.isfinite(value) for value in bbox)
-            or bbox[2] <= bbox[0]
-            or bbox[3] <= bbox[1]
-        ):
-            raise ValueError(f"dots.mocr layout cell {index} has an invalid bbox")
-        text = cell.get("text")
-        if text is None and category == "Picture":
-            continue
-        if not isinstance(text, str):
-            raise ValueError(f"dots.mocr layout cell {index} has no string text")
-        if text.strip():
-            text_items.append(text)
+    text_items = [
+        text
+        for index, cell in enumerate(cells)
+        if (text := _extract_layout_cell(cell, index=index)) is not None
+    ]
     prediction = "\n\n".join(text_items)
     if not prediction:
         raise ValueError("dots.mocr layout response has no text cells")

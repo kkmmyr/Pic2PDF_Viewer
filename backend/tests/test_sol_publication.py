@@ -151,3 +151,32 @@ def test_publication_review_requires_fresh_run_and_all_supported() -> None:
             expected_source_sha256=_SOURCE_SHA,
             writing_run_id="writer-1",
         )
+
+
+def test_publication_review_preserves_invalid_page_contract() -> None:
+    publication = _publication()
+    review = {
+        "schema_version": "sol-publication-review-v1",
+        "source_sha256": _SOURCE_SHA,
+        "candidate_sha256": _CANDIDATE["candidate_sha256"],
+        "review_run_id": "review-2",
+        "results": [
+            {
+                "claim_id": claim["claim_id"],
+                "verdict": "supported",
+                "evidence": [{"page_no": 999, "quote": _QUOTE}],
+                "reason": "原文が支持する。",
+            }
+            for claim in publication["claims"]
+        ],
+    }
+
+    with pytest.raises(ValueError, match="invalid evidence page"):
+        verify_publication_review(
+            publication,
+            _CANDIDATE,
+            review,
+            _PAGES,
+            expected_source_sha256=_SOURCE_SHA,
+            writing_run_id="writer-1",
+        )

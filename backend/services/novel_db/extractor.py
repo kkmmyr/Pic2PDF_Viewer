@@ -119,6 +119,96 @@ def _ocr_worker_env() -> dict[str, str]:
     return env
 
 
+def _write_ocr_manifest(tasks: list[OcrTask]) -> Path:
+    with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as manifest:
+        json.dump({"tasks": tasks}, manifest, ensure_ascii=False)
+        return Path(manifest.name)
+
+
+def _start_ocr_worker(
+    manifest_path: Path,
+) -> tuple[subprocess.Popen[str], threading.Thread, queue.Queue[object]]:
+    cmd = [_resolve_ocr_python(), str(_OCR_WORKER_SCRIPT), "--manifest", str(manifest_path)]
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        env=_ocr_worker_env(),
+    )
+    assert proc.stdout is not None
+    events: queue.Queue[object] = queue.Queue()
+    reader = threading.Thread(
+        target=_read_worker_output,
+        args=(proc.stdout, events),
+        name="ocr-worker-stdout",
+        daemon=True,
+    )
+    reader.start()
+    return proc, reader, events
+
+
+def _next_ocr_event(
+    proc: subprocess.Popen[str],
+    events: queue.Queue[object],
+    *,
+    inactivity_timeout_sec: float,
+) -> object:
+    try:
+        return events.get(timeout=inactivity_timeout_sec)
+    except queue.Empty as exc:
+        _stop_worker_process(proc)
+        raise RuntimeError(f"OCR worker produced no output for {inactivity_timeout_sec:g} seconds") from exc
+
+
+def _parse_ocr_worker_line(
+    line: str,
+    *,
+    progress_callback: Callable[[OcrProgressEvent], None] | None,
+) -> tuple[str, OcrPageResult] | None:
+    line = line.strip()
+    if not line:
+        return None
+    data = json.loads(line)
+    if data.get("event") == "fatal":
+        raise RuntimeError(f"OCR worker error: {data.get('error', 'unknown error')}")
+    if data.get("event") == "progress":
+        if progress_callback is not None:
+            progress_callback(data["progress"])
+        return None
+    if data.get("event") != "page":
+        raise RuntimeError(f"unknown OCR worker event: {data.get('event')}")
+    return str(data["book_name"]), data["page"]
+
+
+def _iter_ocr_worker_pages(
+    proc: subprocess.Popen[str],
+    events: queue.Queue[object],
+    *,
+    inactivity_timeout_sec: float,
+    progress_callback: Callable[[OcrProgressEvent], None] | None,
+) -> Iterator[tuple[str, OcrPageResult]]:
+    while True:
+        event = _next_ocr_event(
+            proc,
+            events,
+            inactivity_timeout_sec=inactivity_timeout_sec,
+        )
+        if event is _STREAM_END:
+            return
+        if isinstance(event, BaseException):
+            raise RuntimeError("OCR worker stdout reader failed") from event
+        if not isinstance(event, str):
+            raise RuntimeError("OCR worker stdout reader returned an invalid event")
+        page = _parse_ocr_worker_line(
+            event,
+            progress_callback=progress_callback,
+        )
+        if page is None:
+            continue
+        yield page
+
+
 def iter_ocr_pages(
     tasks: list[OcrTask],
     *,
@@ -138,55 +228,14 @@ def iter_ocr_pages(
     proc: subprocess.Popen[str] | None = None
     reader: threading.Thread | None = None
     try:
-        with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as manifest:
-            json.dump({"tasks": tasks}, manifest, ensure_ascii=False)
-            manifest_path = Path(manifest.name)
-
-        cmd = [_resolve_ocr_python(), str(_OCR_WORKER_SCRIPT), "--manifest", str(manifest_path)]
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            env=_ocr_worker_env(),
+        manifest_path = _write_ocr_manifest(tasks)
+        proc, reader, events = _start_ocr_worker(manifest_path)
+        yield from _iter_ocr_worker_pages(
+            proc,
+            events,
+            inactivity_timeout_sec=inactivity_timeout_sec,
+            progress_callback=progress_callback,
         )
-        assert proc.stdout is not None
-        events: queue.Queue[object] = queue.Queue()
-        reader = threading.Thread(
-            target=_read_worker_output,
-            args=(proc.stdout, events),
-            name="ocr-worker-stdout",
-            daemon=True,
-        )
-        reader.start()
-        while True:
-            try:
-                event = events.get(timeout=inactivity_timeout_sec)
-            except queue.Empty as exc:
-                _stop_worker_process(proc)
-                raise RuntimeError(
-                    f"OCR worker produced no output for {inactivity_timeout_sec:g} seconds"
-                ) from exc
-            if event is _STREAM_END:
-                break
-            if isinstance(event, BaseException):
-                raise RuntimeError("OCR worker stdout reader failed") from event
-            if not isinstance(event, str):
-                raise RuntimeError("OCR worker stdout reader returned an invalid event")
-            line = event
-            line = line.strip()
-            if not line:
-                continue
-            data = json.loads(line)
-            if data.get("event") == "fatal":
-                raise RuntimeError(f"OCR worker error: {data.get('error', 'unknown error')}")
-            if data.get("event") == "progress":
-                if progress_callback is not None:
-                    progress_callback(data["progress"])
-                continue
-            if data.get("event") != "page":
-                raise RuntimeError(f"unknown OCR worker event: {data.get('event')}")
-            yield str(data["book_name"]), data["page"]
 
         proc.wait()
         if proc.returncode != 0:

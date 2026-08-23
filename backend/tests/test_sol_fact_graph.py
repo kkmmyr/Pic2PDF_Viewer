@@ -158,6 +158,15 @@ def test_validate_candidate_rejects_mixed_or_unknown_fact_links() -> None:
         validate_candidate(candidate, _PAGES, expected_source_sha256=_SOURCE_SHA)
 
 
+def test_validate_candidate_rejects_missing_actors_as_contract_error() -> None:
+    candidate = _candidate()
+    del candidate["facts"][0]["actors"]
+    candidate["candidate_sha256"] = candidate_sha256(candidate)
+
+    with pytest.raises(ValueError, match="must have actors"):
+        validate_candidate(candidate, _PAGES, expected_source_sha256=_SOURCE_SHA)
+
+
 def test_verify_review_requires_fresh_complete_supported_review() -> None:
     candidate = _candidate()
     review = _review(candidate)

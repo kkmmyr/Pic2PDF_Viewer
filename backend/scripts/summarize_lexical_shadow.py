@@ -35,6 +35,52 @@ _ICU_FALLBACK_RE = re.compile(
 _TIMESTAMP_RE = re.compile(r"^(?P<value>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})")
 
 
+def _classify_shadow_line(
+    line: str,
+    *,
+    since: datetime | None,
+    until: datetime | None,
+) -> tuple[str, dict[str, int | float | str] | None, datetime | None]:
+    if "lexical shadow" not in line and "lexical ICU fallback" not in line:
+        return "ignore", None, None
+    timestamp = _line_timestamp(line)
+    if (since is not None or until is not None) and (
+        timestamp is None or (since is not None and timestamp < since) or (until is not None and timestamp >= until)
+    ):
+        return "filtered", None, timestamp
+
+    match = _SUCCESS_RE.search(line)
+    if match is not None:
+        return (
+            "success",
+            {
+                "hash": match.group("hash"),
+                "fts": int(match.group("fts")),
+                "icu": int(match.group("icu")),
+                "overlap": int(match.group("overlap")),
+                "fts_ms": float(match.group("fts_ms")),
+                "icu_ms": float(match.group("icu_ms")),
+            },
+            timestamp,
+        )
+
+    match = _UNAVAILABLE_RE.search(line)
+    if match is not None:
+        return (
+            "unavailable",
+            {
+                "hash": match.group("hash"),
+                "fts": int(match.group("fts")),
+                "fts_ms": float(match.group("fts_ms")),
+                "icu_ms": float(match.group("icu_ms")),
+            },
+            timestamp,
+        )
+    if _ICU_FALLBACK_RE.search(line) is not None:
+        return "fallback", None, None
+    return "malformed", None, None
+
+
 def _parse_boundary(value: str | None) -> datetime | None:
     if value is None:
         return None
@@ -88,52 +134,25 @@ def summarize_lines(
     filtered_lines = 0
 
     for line in lines:
-        if "lexical shadow" not in line and "lexical ICU fallback" not in line:
+        kind, record, timestamp = _classify_shadow_line(
+            line,
+            since=since,
+            until=until,
+        )
+        if kind == "ignore":
             continue
         candidate_lines += 1
-        if since is not None or until is not None:
-            timestamp = _line_timestamp(line)
-            if (
-                timestamp is None
-                or (since is not None and timestamp < since)
-                or (until is not None and timestamp >= until)
-            ):
-                filtered_lines += 1
-                continue
-
-        match = _SUCCESS_RE.search(line)
-        if match is not None:
-            timestamp = _line_timestamp(line)
-            record: dict[str, int | float | str] = {
-                "hash": match.group("hash"),
-                "fts": int(match.group("fts")),
-                "icu": int(match.group("icu")),
-                "overlap": int(match.group("overlap")),
-                "fts_ms": float(match.group("fts_ms")),
-                "icu_ms": float(match.group("icu_ms")),
-            }
-            successes.append(record)
+        if kind == "filtered":
+            filtered_lines += 1
+            continue
+        if kind in {"success", "unavailable"}:
+            assert record is not None
+            (successes if kind == "success" else unavailable).append(record)
             query_hashes.add(str(record["hash"]))
             if timestamp is not None:
                 observation_times.append(timestamp)
             continue
-
-        match = _UNAVAILABLE_RE.search(line)
-        if match is not None:
-            timestamp = _line_timestamp(line)
-            record = {
-                "hash": match.group("hash"),
-                "fts": int(match.group("fts")),
-                "fts_ms": float(match.group("fts_ms")),
-                "icu_ms": float(match.group("icu_ms")),
-            }
-            unavailable.append(record)
-            query_hashes.add(str(record["hash"]))
-            if timestamp is not None:
-                observation_times.append(timestamp)
-            continue
-
-        if _ICU_FALLBACK_RE.search(line) is not None:
+        if kind == "fallback":
             lance_fallbacks += 1
             continue
         malformed_lines += 1

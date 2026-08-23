@@ -73,6 +73,85 @@ def build_arrival_item(
     }
 
 
+def _pending_gallery_ids(artist_state: state_store.ArtistState) -> list[int]:
+    return [
+        gallery_id
+        for gallery_id in artist_state.get("pending_gallery_ids", [])
+        if isinstance(gallery_id, int) and not isinstance(gallery_id, bool) and gallery_id > 0
+    ]
+
+
+def _fetch_artist_items(
+    entry: watchlist.WatchlistEntry,
+    candidate_ids: list[int],
+    client: httpx.Client,
+    key: str,
+) -> tuple[list[arrival_store.ArrivalItem], list[str], list[int]]:
+    new_items: list[arrival_store.ArrivalItem] = []
+    errors: list[str] = []
+    failed_ids: list[int] = []
+    for gallery_id in candidate_ids:
+        try:
+            meta = metadata.fetch_metadata(gallery_id, client=client)
+        except (nozomi.HitomiError, metadata.HitomiMetadataError) as e:
+            msg = f"{key}: metadata fetch failed for id={gallery_id}: {e}"
+            print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
+            errors.append(msg)
+            failed_ids.append(gallery_id)
+            continue
+        new_items.append(build_arrival_item(gallery_id, entry, meta))
+    return new_items, errors, failed_ids
+
+
+def _process_artist(
+    entry: watchlist.WatchlistEntry,
+    state: state_store.State,
+    client: httpx.Client,
+    *,
+    threshold: datetime | None,
+) -> tuple[list[arrival_store.ArrivalItem], list[str], int]:
+    key = f"{entry['normalized']}:{entry['language']}"
+    prev_artist = state.get("artists", {}).get(key, {})
+    if should_skip_artist(prev_artist.get("checked_at"), threshold):
+        print(f"[hitomi_monitor] {key}: skipped (recently checked)")
+        return [], [], 1
+
+    try:
+        ids = nozomi.fetch_nozomi_head(
+            entry["normalized"],
+            entry["language"],
+            count=20,
+            client=client,
+        )
+    except nozomi.HitomiError as e:
+        msg = f"{key}: NOZOMI fetch failed: {e}"
+        print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
+        return [], [msg], 0
+
+    pending_ids = _pending_gallery_ids(prev_artist)
+    if not ids and not pending_ids:
+        print(f"[hitomi_monitor] {key}: NOZOMI is empty, skip")
+        return [], [], 0
+
+    prev_top = prev_artist.get("top_id")
+    candidate_ids = list(dict.fromkeys([*nozomi.diff_unseen_ids(ids, prev_top), *pending_ids]))
+    new_items, errors, failed_ids = _fetch_artist_items(entry, candidate_ids, client, key)
+    next_artist_state: state_store.ArtistState = {
+        "checked_at": _now_iso(),
+        "pending_gallery_ids": failed_ids,
+    }
+    if ids:
+        next_artist_state["top_id"] = ids[0]
+    elif isinstance(prev_top, int):
+        next_artist_state["top_id"] = prev_top
+    state.setdefault("artists", {})[key] = next_artist_state
+    print(
+        f"[hitomi_monitor] {key}: top={next_artist_state.get('top_id')}, "
+        f"new={len(new_items)}, pending={len(failed_ids)}"
+    )
+    return new_items, errors, 0
+
+
 def _run_unlocked(
     data_dir: Path = DATA_DIR,
     *,
@@ -115,69 +194,15 @@ def _run_unlocked(
 
     with httpx.Client(timeout=nozomi.DEFAULT_TIMEOUT) as client:
         for entry in entries:
-            key = f"{entry['normalized']}:{entry['language']}"
-
-            # 直近取得済みならスキップ（state.artists[key] を更新しない）
-            prev_artist = state.get("artists", {}).get(key, {})
-            if should_skip_artist(prev_artist.get("checked_at"), threshold):
-                print(f"[hitomi_monitor] {key}: skipped (recently checked)")
-                skipped += 1
-                continue
-
-            try:
-                ids = nozomi.fetch_nozomi_head(
-                    entry["normalized"],
-                    entry["language"],
-                    count=20,
-                    client=client,
-                )
-            except nozomi.HitomiError as e:
-                msg = f"{key}: NOZOMI fetch failed: {e}"
-                print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
-                errors.append(msg)
-                continue
-
-            pending_ids = [
-                gallery_id
-                for gallery_id in prev_artist.get("pending_gallery_ids", [])
-                if isinstance(gallery_id, int) and not isinstance(gallery_id, bool) and gallery_id > 0
-            ]
-
-            if not ids and not pending_ids:
-                print(f"[hitomi_monitor] {key}: NOZOMI is empty, skip")
-                continue
-
-            prev_top = prev_artist.get("top_id")
-            unseen = nozomi.diff_unseen_ids(ids, prev_top)
-            candidate_ids = list(dict.fromkeys([*unseen, *pending_ids]))
-
-            new_for_artist = 0
-            failed_ids: list[int] = []
-            for gid in candidate_ids:
-                try:
-                    meta = metadata.fetch_metadata(gid, client=client)
-                except (nozomi.HitomiError, metadata.HitomiMetadataError) as e:
-                    msg = f"{key}: metadata fetch failed for id={gid}: {e}"
-                    print(f"[hitomi_monitor] WARN: {msg}", file=sys.stderr)
-                    errors.append(msg)
-                    failed_ids.append(gid)
-                    continue
-                new_items.append(build_arrival_item(gid, entry, meta))
-                new_for_artist += 1
-
-            next_artist_state: state_store.ArtistState = {
-                "checked_at": _now_iso(),
-                "pending_gallery_ids": failed_ids,
-            }
-            if ids:
-                next_artist_state["top_id"] = ids[0]
-            elif isinstance(prev_top, int):
-                next_artist_state["top_id"] = prev_top
-            state.setdefault("artists", {})[key] = next_artist_state
-            print(
-                f"[hitomi_monitor] {key}: top={next_artist_state.get('top_id')}, "
-                f"new={new_for_artist}, pending={len(failed_ids)}"
+            artist_items, artist_errors, artist_skipped = _process_artist(
+                entry,
+                state,
+                client,
+                threshold=threshold,
             )
+            new_items.extend(artist_items)
+            errors.extend(artist_errors)
+            skipped += artist_skipped
 
     try:
         added = arrival_store.merge_new_items(new_items)

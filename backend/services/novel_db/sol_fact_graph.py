@@ -77,24 +77,28 @@ def normalize_fact_references(candidate: Mapping[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def apply_quote_repair(
-    original: Mapping[str, Any],
+def _validate_quote_repair_request(
     repair: Mapping[str, Any],
     allowed_evidence: Sequence[tuple[str, int]],
-    page_records: Sequence[Mapping[str, Any]],
     *,
     expected_source_sha256: str,
-) -> dict[str, Any]:
+) -> Any:
     if not allowed_evidence or len(set(allowed_evidence)) != len(allowed_evidence):
         raise ValueError("allowed quote repairs must be non-empty and unique")
     if repair.get("schema_version") != "sol-fact-quote-repair-v1":
         raise ValueError("unsupported quote repair schema")
     if repair.get("source_sha256") != expected_source_sha256:
         raise ValueError("quote repair source digest mismatch")
-    repairs = repair.get("repairs")
+    return repair.get("repairs")
+
+
+def _parse_quote_replacements(
+    repairs: Any,
+    allowed_evidence: Sequence[tuple[str, int]],
+) -> dict[tuple[str, int], str]:
     if not isinstance(repairs, list):
         raise ValueError("quote repairs must be an array")
-    replacement_by_key: dict[tuple[str, int], str] = {}
+    replacements: dict[tuple[str, int], str] = {}
     for item in repairs:
         if not isinstance(item, Mapping):
             raise ValueError("quote repair item must be an object")
@@ -109,12 +113,17 @@ def apply_quote_repair(
         ):
             raise ValueError("quote repair item has invalid fields")
         key = (fact_id, evidence_index)
-        if key in replacement_by_key:
+        if key in replacements:
             raise ValueError(f"duplicate quote repair: {fact_id}:{evidence_index}")
-        replacement_by_key[key] = quote
-    if set(replacement_by_key) != set(allowed_evidence):
+        replacements[key] = quote
+    if set(replacements) != set(allowed_evidence):
         raise ValueError("quote repair does not exactly match the allowlist")
+    return replacements
 
+
+def _prepare_quote_repair_candidate(
+    original: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     updated = copy.deepcopy(dict(original))
     updated.pop("candidate_sha256", None)
     updated_facts = updated.get("facts")
@@ -123,19 +132,42 @@ def apply_quote_repair(
     updated_by_id = {str(fact.get("fact_id")): fact for fact in updated_facts if isinstance(fact, dict)}
     if len(updated_by_id) != len(updated_facts):
         raise ValueError("quote repair fact graph has duplicate or invalid facts")
+    return updated, updated_by_id
+
+
+def _apply_quote_replacements(
+    updated_by_id: Mapping[str, dict[str, Any]],
+    allowed_evidence: Sequence[tuple[str, int]],
+    replacements: Mapping[tuple[str, int], str],
+) -> None:
     for fact_id, evidence_index in allowed_evidence:
         if fact_id not in updated_by_id:
             raise ValueError(f"quote repair references unknown fact: {fact_id}")
         evidence = updated_by_id[fact_id].get("evidence")
-        if (
-            not isinstance(evidence, list)
-            or not 0 <= evidence_index < len(evidence)
-        ):
+        if not isinstance(evidence, list) or not 0 <= evidence_index < len(evidence):
             raise ValueError(f"quote repair evidence index is invalid: {fact_id}:{evidence_index}")
         evidence_item = evidence[evidence_index]
         if not isinstance(evidence_item, dict):
             raise ValueError(f"quote repair evidence is invalid: {fact_id}:{evidence_index}")
-        evidence_item["quote"] = replacement_by_key[(fact_id, evidence_index)]
+        evidence_item["quote"] = replacements[(fact_id, evidence_index)]
+
+
+def apply_quote_repair(
+    original: Mapping[str, Any],
+    repair: Mapping[str, Any],
+    allowed_evidence: Sequence[tuple[str, int]],
+    page_records: Sequence[Mapping[str, Any]],
+    *,
+    expected_source_sha256: str,
+) -> dict[str, Any]:
+    repairs = _validate_quote_repair_request(
+        repair,
+        allowed_evidence,
+        expected_source_sha256=expected_source_sha256,
+    )
+    replacements = _parse_quote_replacements(repairs, allowed_evidence)
+    updated, updated_by_id = _prepare_quote_repair_candidate(original)
+    _apply_quote_replacements(updated_by_id, allowed_evidence, replacements)
     return seal_candidate(updated, page_records, expected_source_sha256=expected_source_sha256)
 
 
@@ -184,6 +216,88 @@ def _validate_evidence(
             raise ValueError(f"{owner} evidence {index} quote is not exact source text")
 
 
+def _validate_fact_header(
+    fact: Any,
+    index: int,
+    seen_ids: set[str],
+) -> str:
+    if not isinstance(fact, Mapping):
+        raise ValueError(f"fact {index} must be an object")
+    fact_id = str(fact.get("fact_id") or "")
+    if not fact_id or fact_id in seen_ids:
+        raise ValueError(f"duplicate or empty fact ID: {fact_id}")
+    seen_ids.add(fact_id)
+    for field in ("subject", "action"):
+        if not isinstance(fact.get(field), str) or not str(fact[field]).strip():
+            raise ValueError(f"fact {fact_id} {field} is required")
+    if fact.get("temporality") not in TEMPORALITIES:
+        raise ValueError(f"fact {fact_id} temporality is invalid")
+    if fact.get("certainty") not in CERTAINTIES:
+        raise ValueError(f"fact {fact_id} certainty is invalid")
+    return fact_id
+
+
+def _validate_fact_actors(fact_id: str, actors: Any) -> None:
+    if not isinstance(actors, list) or not actors:
+        raise ValueError(f"fact {fact_id} must have actors")
+    for actor in actors:
+        if (
+            not isinstance(actor, Mapping)
+            or not isinstance(actor.get("name"), str)
+            or not str(actor["name"]).strip()
+            or actor.get("role") not in ACTOR_ROLES
+        ):
+            raise ValueError(f"fact {fact_id} has an invalid actor")
+
+
+def _validate_fact_links(fact_id: str, related: Any) -> set[str]:
+    if not isinstance(related, list) or any(not isinstance(value, str) for value in related):
+        raise ValueError(f"fact {fact_id} related_fact_ids is invalid")
+    if fact_id in related:
+        raise ValueError(f"fact {fact_id} cannot reference itself")
+    return set(related)
+
+
+def _validate_fact(
+    fact: Any,
+    index: int,
+    pages: Mapping[int, str],
+    seen_ids: set[str],
+    reference_sets: dict[str, set[str]],
+) -> int:
+    fact_id = _validate_fact_header(fact, index, seen_ids)
+    _validate_fact_actors(fact_id, fact.get("actors"))
+    _validate_evidence(fact.get("evidence"), pages, owner=f"fact {fact_id}")
+    reference_sets[fact_id] = _validate_fact_links(fact_id, fact.get("related_fact_ids"))
+    return len(fact["evidence"])
+
+
+def _index_review_results(
+    results: Any,
+    facts: Sequence[Mapping[str, Any]],
+) -> dict[str, Mapping[str, Any]]:
+    if not isinstance(results, list) or len(results) != len(facts):
+        raise ValueError("fact review result count mismatch")
+    by_id = {str(result.get("fact_id")): result for result in results if isinstance(result, Mapping)}
+    expected_ids = {str(fact["fact_id"]) for fact in facts}
+    if set(by_id) != expected_ids or len(by_id) != len(results):
+        raise ValueError("fact review contains duplicate, missing, or extra IDs")
+    return by_id
+
+
+def _validate_review_result(
+    fact_id: str,
+    result: Mapping[str, Any],
+    pages: Mapping[int, str],
+    failures: list[str],
+) -> None:
+    if result.get("verdict") not in VERDICTS:
+        raise ValueError(f"fact review {fact_id} verdict is invalid")
+    _validate_evidence(result.get("evidence"), pages, owner=f"review {fact_id}")
+    if result["verdict"] != "supported":
+        failures.append(fact_id)
+
+
 def validate_candidate(
     candidate: Mapping[str, Any],
     page_records: Sequence[Mapping[str, Any]],
@@ -202,38 +316,13 @@ def validate_candidate(
     reference_sets: dict[str, set[str]] = {}
     evidence_count = 0
     for index, fact in enumerate(facts):
-        if not isinstance(fact, Mapping):
-            raise ValueError(f"fact {index} must be an object")
-        fact_id = str(fact.get("fact_id") or "")
-        if not fact_id or fact_id in seen_ids:
-            raise ValueError(f"duplicate or empty fact ID: {fact_id}")
-        seen_ids.add(fact_id)
-        for field in ("subject", "action"):
-            if not isinstance(fact.get(field), str) or not str(fact[field]).strip():
-                raise ValueError(f"fact {fact_id} {field} is required")
-        if fact.get("temporality") not in TEMPORALITIES:
-            raise ValueError(f"fact {fact_id} temporality is invalid")
-        if fact.get("certainty") not in CERTAINTIES:
-            raise ValueError(f"fact {fact_id} certainty is invalid")
-        actors = fact.get("actors")
-        if not isinstance(actors, list) or not actors:
-            raise ValueError(f"fact {fact_id} must have actors")
-        for actor in actors:
-            if (
-                not isinstance(actor, Mapping)
-                or not isinstance(actor.get("name"), str)
-                or not str(actor["name"]).strip()
-                or actor.get("role") not in ACTOR_ROLES
-            ):
-                raise ValueError(f"fact {fact_id} has an invalid actor")
-        _validate_evidence(fact.get("evidence"), pages, owner=f"fact {fact_id}")
-        evidence_count += len(fact["evidence"])
-        related = fact.get("related_fact_ids")
-        if not isinstance(related, list) or any(not isinstance(value, str) for value in related):
-            raise ValueError(f"fact {fact_id} related_fact_ids is invalid")
-        if fact_id in related:
-            raise ValueError(f"fact {fact_id} cannot reference itself")
-        reference_sets[fact_id] = set(related)
+        evidence_count += _validate_fact(
+            fact,
+            index,
+            pages,
+            seen_ids,
+            reference_sets,
+        )
     for fact_id, references in reference_sets.items():
         missing = references - seen_ids
         if missing:
@@ -268,22 +357,14 @@ def verify_review(
     review_run_id = str(review.get("review_run_id") or "")
     if not review_run_id or review_run_id == generation_run_id:
         raise ValueError("fact review must use a fresh run")
-    results = review.get("results")
     facts = candidate["facts"]
-    if not isinstance(results, list) or len(results) != len(facts):
+    results = review.get("results")
+    if not isinstance(results, list):
         raise ValueError("fact review result count mismatch")
-    by_id = {str(result.get("fact_id")): result for result in results if isinstance(result, Mapping)}
-    expected_ids = {str(fact["fact_id"]) for fact in facts}
-    if set(by_id) != expected_ids or len(by_id) != len(results):
-        raise ValueError("fact review contains duplicate, missing, or extra IDs")
+    by_id = _index_review_results(results, facts)
     failures: list[str] = []
-    for fact_id in sorted(expected_ids):
-        result = by_id[fact_id]
-        if result.get("verdict") not in VERDICTS:
-            raise ValueError(f"fact review {fact_id} verdict is invalid")
-        _validate_evidence(result.get("evidence"), pages, owner=f"review {fact_id}")
-        if result["verdict"] != "supported":
-            failures.append(fact_id)
+    for fact_id in sorted(by_id):
+        _validate_review_result(fact_id, by_id[fact_id], pages, failures)
     if failures:
         raise ValueError(f"fact review is not fully supported: {failures}")
     return {
