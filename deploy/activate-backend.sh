@@ -289,10 +289,13 @@ install_rollback_compatible_migrations() {
     migration_name=$(basename "$migration")
     target="${target_dir}/${migration_name}"
     if [ ! -e "$target" ]; then
-      if [ "$migration_name" != "0014_novel_search_index_state.py" ]; then
-        fail "migration is not approved for backward-compatible rollout: ${migration_name}"
-        return
-      fi
+      case "$migration_name" in
+        0014_novel_search_index_state.py | 0015_ocr_candidate_selection_reason.py) ;;
+        *)
+          fail "migration is not approved for backward-compatible rollout: ${migration_name}"
+          return
+          ;;
+      esac
       cp -p "$migration" "$target"
       copied=$((copied + 1))
       log "Installed rollback-compatible migration: ${migration_name}"

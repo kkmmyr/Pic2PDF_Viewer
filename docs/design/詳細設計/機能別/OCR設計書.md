@@ -187,6 +187,10 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
 - import済みrunはCodexが差分と未解決0件を再確認後、既存のOnline Backup・原子的公開処理で明示的に
   activateする。通常の操作は次のmodule CLIを用い、`import`成功を公開成功とみなさない。
 
+  本番importは`ocr_page_results.selection_reason`を追加するAlembic `0015`と、そのrevisionを知る
+  backendを同一世代で配備した後だけ実行する。DBだけを`0015`へ先行させると旧backendの
+  起動migrationが未知revisionとして失敗するため、世代切替を伴わない手動migrationは禁止する。
+
   ```bash
   cd backend
   uv run python -m tools.codex_reviewed_ocr export --db-path <隔離novel.db> --run-id <run> \
