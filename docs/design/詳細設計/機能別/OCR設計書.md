@@ -559,7 +559,8 @@ model/mmprojのローカル資材が指定された場合はファイルSHAも�
 `primary_raw_output`、`external_raw_output`を不変の原候補として保存する。
 `candidate_manifest_json`には候補ごとのstate、文字数、block数、quality flag、本文SHA、raw出力SHAを
 記録する。保存時に本文・raw出力からSHAを再計算し、不一致、存在しない候補の採用、採用本文と
-原候補の不一致を拒否する。候補選択後も非採用候補を上書き・削除しない。
+原候補の不一致を拒否する。空文字のprimary候補も実測結果としてそのまま保存し、採用済みexternal本文へ
+補完しない。候補選択後も非採用候補を上書き・削除しない。
 
 工程時間は次の粒度で保存し、OS/GPU比較では同じ項目だけを比較する。
 

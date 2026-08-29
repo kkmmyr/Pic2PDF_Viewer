@@ -776,6 +776,48 @@ def test_page_preserves_runtime_candidates_and_phase_timing(staged_book) -> None
     assert saved[5] == ('{"external_ocr_ms":44,"image_read_ms":4,"primary_ocr_ms":120,"selection_ms":2,"total_ms":170}')
 
 
+def test_page_preserves_empty_primary_candidate_when_external_is_selected(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    external_text = "外部候補"
+    primary_raw = "<empty-primary>"
+    external_raw = "<external>"
+    page = _passed_page(1, input_pages[0].image_sha256, external_text)
+    page.update(
+        {
+            "primary_text": "",
+            "external_text": external_text,
+            "primary_raw_output": primary_raw,
+            "external_raw_output": external_raw,
+            "selected_engine": "external",
+            "candidate_manifest": candidate_manifest(
+                primary_text="",
+                primary_raw_output=primary_raw,
+                primary_state="passed",
+                primary_block_count=0,
+                primary_quality_flags=[],
+                primary_attempt_count=1,
+                external_text=external_text,
+                external_raw_output=external_raw,
+                external_state="passed",
+                external_block_count=1,
+                external_quality_flags=["yomitoku_adjudication"],
+                external_attempt_count=2,
+            ),
+        }
+    )
+
+    save_page_result(run_id, page)
+
+    with with_db() as conn:
+        saved = conn.execute(
+            "SELECT primary_text, external_text, selected_engine FROM ocr_page_results WHERE run_id=? AND page_no=1",
+            (run_id,),
+        ).fetchone()
+
+    assert tuple(saved) == ("", external_text, "external")
+
+
 def test_page_rejects_changed_runtime_manifest_and_candidate_sha(staged_book) -> None:
     book_name, input_pages = staged_book
     run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)

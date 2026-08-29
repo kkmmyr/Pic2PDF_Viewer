@@ -103,7 +103,8 @@ def prepare_run(
 
 
 def save_page_result(run_id: int, page: OcrPageResult) -> None:
-    primary_text = str(page.get("primary_text") or page["full_text"] or "")
+    supplied_primary_text = page.get("primary_text")
+    primary_text = str(page["full_text"] if supplied_primary_text is None else supplied_primary_text)
     external_text = page.get("external_text")
     selected_engine = str(page.get("selected_engine", "primary"))
     if selected_engine not in {"primary", "external"}:
