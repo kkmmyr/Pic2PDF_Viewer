@@ -394,6 +394,7 @@ cropping有効、base 1024px、crop 640px、最大4,096 tokenを固定した。�
 したがって失敗原因は64GB unified memory不足ではなく、この固定MLX生成経路の日本語縦書き品質である。
 反復除去を品質値の救済へ使わず、79枚screeningへ進めない。予測CLIはmodel・prompt・入力SHAを固定し、
 raw textをページ単位でfsyncするため、将来runtime差分を診断する場合も今回の不採用値と混在させない。
+<a id="ocr-yomitoku-cross-platform-20260829"></a>
 ## 20. 2026-08-29: 『りゅうおうのおしごと！』YomiToku速度・環境差監査
 
 1巻のWindows run 185とMacから取り込んだrun 186について、138画面すべての画像SHA-256が
