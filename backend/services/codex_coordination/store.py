@@ -4,81 +4,28 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import sqlite3
 import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
-_MAX_BODY_CHARS = 65_536
-_MAX_SUBJECT_CHARS = 256
-_MAX_RESOLUTION_CHARS = 8_192
-_MAX_IDEMPOTENCY_KEY_CHARS = 256
-_MAX_REFS_BYTES = 16_384
-_MAX_CONTEXT_BYTES = 262_144
-
-
-class CoordinationValidationError(ValueError):
-    """入力値が連携契約を満たさない。"""
-
-
-class CoordinationNotFoundError(LookupError):
-    """対象messageまたはtopicが存在しない。"""
-
-
-class CoordinationConflictError(RuntimeError):
-    """冪等キーまたは状態遷移が既存状態と競合した。"""
-
-
-class CoordinationAuthorizationError(PermissionError):
-    """agentが対象messageまたはtopicの参加者ではない。"""
-
-
-def _now() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def _validate_identifier(value: str, name: str) -> str:
-    if not isinstance(value, str) or not _IDENTIFIER_RE.fullmatch(value):
-        raise CoordinationValidationError(f"{name} must match {_IDENTIFIER_RE.pattern}")
-    return value
-
-
-def _validate_text(value: str, name: str, limit: int) -> str:
-    if not isinstance(value, str):
-        raise CoordinationValidationError(f"{name} must be a string")
-    normalized = value.strip()
-    if not normalized:
-        raise CoordinationValidationError(f"{name} must not be empty")
-    if len(normalized) > limit:
-        raise CoordinationValidationError(f"{name} exceeds {limit} characters")
-    return normalized
-
-
-def _canonical_object(
-    value: dict[str, Any] | None,
-    *,
-    name: str,
-    max_bytes: int,
-) -> tuple[dict[str, Any], str]:
-    if value is None:
-        value = {}
-    if not isinstance(value, dict):
-        raise CoordinationValidationError(f"{name} must be a JSON object")
-    try:
-        encoded = json.dumps(
-            value,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-    except (TypeError, ValueError) as exc:
-        raise CoordinationValidationError(f"{name} must contain JSON values") from exc
-    if len(encoded.encode("utf-8")) > max_bytes:
-        raise CoordinationValidationError(f"{name} exceeds {max_bytes} bytes")
-    return value, encoded
+from .schema import initialize_database
+from .validation import (
+    MAX_BODY_CHARS,
+    MAX_CONTEXT_BYTES,
+    MAX_IDEMPOTENCY_KEY_CHARS,
+    MAX_REFS_BYTES,
+    MAX_RESOLUTION_CHARS,
+    MAX_SUBJECT_CHARS,
+    CoordinationAuthorizationError,
+    CoordinationConflictError,
+    CoordinationNotFoundError,
+    CoordinationValidationError,
+    canonical_object,
+    now_utc,
+    validate_identifier,
+    validate_text,
+)
 
 
 class CoordinationStore:
@@ -86,8 +33,7 @@ class CoordinationStore:
 
     def __init__(self, db_path: str | Path) -> None:
         self.db_path = Path(db_path)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._initialize()
+        initialize_database(self.db_path)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path, timeout=5.0)
@@ -95,57 +41,6 @@ class CoordinationStore:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=5000")
         return connection
-
-    def _initialize(self) -> None:
-        with self._connect() as connection:
-            connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS topics (
-                    id TEXT PRIMARY KEY,
-                    subject TEXT NOT NULL,
-                    state TEXT NOT NULL CHECK (state IN ('open', 'closed')),
-                    created_at TEXT NOT NULL,
-                    closed_at TEXT,
-                    closed_by TEXT,
-                    resolution TEXT
-                );
-
-                CREATE TABLE IF NOT EXISTS messages (
-                    id TEXT PRIMARY KEY,
-                    topic_id TEXT NOT NULL REFERENCES topics(id),
-                    sender TEXT NOT NULL,
-                    recipient TEXT NOT NULL,
-                    body TEXT NOT NULL,
-                    refs_json TEXT NOT NULL DEFAULT '{}',
-                    reply_to_id TEXT REFERENCES messages(id),
-                    status TEXT NOT NULL CHECK (status IN ('unread', 'acknowledged')),
-                    created_at TEXT NOT NULL,
-                    acknowledged_at TEXT,
-                    acknowledged_by TEXT,
-                    idempotency_key TEXT
-                );
-
-                CREATE UNIQUE INDEX IF NOT EXISTS uq_messages_sender_idempotency
-                ON messages(sender, idempotency_key)
-                WHERE idempotency_key IS NOT NULL;
-
-                CREATE INDEX IF NOT EXISTS ix_messages_recipient_status_created
-                ON messages(recipient, status, created_at DESC);
-
-                CREATE INDEX IF NOT EXISTS ix_messages_topic_created
-                ON messages(topic_id, created_at);
-
-                CREATE TABLE IF NOT EXISTS comparison_contexts (
-                    comparison_group_id TEXT PRIMARY KEY,
-                    context_json TEXT NOT NULL,
-                    context_sha256 TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-
-                PRAGMA user_version=1;
-                """
-            )
 
     @staticmethod
     def _message_from_row(row: sqlite3.Row) -> dict[str, Any]:
@@ -247,22 +142,22 @@ class CoordinationStore:
         refs: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        sender = _validate_identifier(sender, "sender")
-        recipient = _validate_identifier(recipient, "recipient")
+        sender = validate_identifier(sender, "sender")
+        recipient = validate_identifier(recipient, "recipient")
         if sender == recipient:
             raise CoordinationValidationError("sender and recipient must differ")
-        body = _validate_text(message, "message", _MAX_BODY_CHARS)
-        _, refs_json = _canonical_object(refs, name="refs", max_bytes=_MAX_REFS_BYTES)
+        body = validate_text(message, "message", MAX_BODY_CHARS)
+        _, refs_json = canonical_object(refs, name="refs", max_bytes=MAX_REFS_BYTES)
         if topic_id is not None:
-            topic_id = _validate_identifier(topic_id, "topic_id")
+            topic_id = validate_identifier(topic_id, "topic_id")
         if idempotency_key is not None:
-            idempotency_key = _validate_text(
+            idempotency_key = validate_text(
                 idempotency_key,
                 "idempotency_key",
-                _MAX_IDEMPOTENCY_KEY_CHARS,
+                MAX_IDEMPOTENCY_KEY_CHARS,
             )
         normalized_subject = (
-            _validate_text(subject, "subject", _MAX_SUBJECT_CHARS) if subject is not None else f"Message from {sender}"
+            validate_text(subject, "subject", MAX_SUBJECT_CHARS) if subject is not None else f"Message from {sender}"
         )
 
         with self._connect() as connection:
@@ -280,7 +175,7 @@ class CoordinationStore:
             if existing is not None:
                 return self._message_from_row(existing)
 
-            created_at = _now()
+            created_at = now_utc()
             if topic_id is None:
                 topic_id = str(uuid.uuid4())
                 connection.execute(
@@ -320,11 +215,11 @@ class CoordinationStore:
         topic_id: str | None = None,
         limit: int = 50,
     ) -> list[dict[str, Any]]:
-        recipient = _validate_identifier(recipient, "recipient")
+        recipient = validate_identifier(recipient, "recipient")
         if status not in {"unread", "acknowledged", "all"}:
             raise CoordinationValidationError("status must be unread, acknowledged, or all")
         if topic_id is not None:
-            topic_id = _validate_identifier(topic_id, "topic_id")
+            topic_id = validate_identifier(topic_id, "topic_id")
         if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100:
             raise CoordinationValidationError("limit must be between 1 and 100")
 
@@ -342,13 +237,13 @@ class CoordinationStore:
             return [self._message_from_row(row) for row in connection.execute(query, params).fetchall()]
 
     def get_message(self, message_id: str) -> dict[str, Any]:
-        message_id = _validate_identifier(message_id, "message_id")
+        message_id = validate_identifier(message_id, "message_id")
         with self._connect() as connection:
             return self._message_from_row(self._load_message(connection, message_id))
 
     def acknowledge_message(self, *, message_id: str, agent_id: str) -> dict[str, Any]:
-        message_id = _validate_identifier(message_id, "message_id")
-        agent_id = _validate_identifier(agent_id, "agent_id")
+        message_id = validate_identifier(message_id, "message_id")
+        agent_id = validate_identifier(agent_id, "agent_id")
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             message = self._load_message(connection, message_id)
@@ -360,7 +255,7 @@ class CoordinationStore:
                 return self._message_from_row(message)
             connection.execute(
                 "UPDATE messages SET status='acknowledged', acknowledged_at=?, acknowledged_by=? WHERE id=?",
-                (_now(), agent_id, message_id),
+                (now_utc(), agent_id, message_id),
             )
             return self._message_from_row(self._load_message(connection, message_id))
 
@@ -373,15 +268,15 @@ class CoordinationStore:
         refs: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        message_id = _validate_identifier(message_id, "message_id")
-        sender = _validate_identifier(sender, "sender")
-        body = _validate_text(message, "message", _MAX_BODY_CHARS)
-        _, refs_json = _canonical_object(refs, name="refs", max_bytes=_MAX_REFS_BYTES)
+        message_id = validate_identifier(message_id, "message_id")
+        sender = validate_identifier(sender, "sender")
+        body = validate_text(message, "message", MAX_BODY_CHARS)
+        _, refs_json = canonical_object(refs, name="refs", max_bytes=MAX_REFS_BYTES)
         if idempotency_key is not None:
-            idempotency_key = _validate_text(
+            idempotency_key = validate_text(
                 idempotency_key,
                 "idempotency_key",
-                _MAX_IDEMPOTENCY_KEY_CHARS,
+                MAX_IDEMPOTENCY_KEY_CHARS,
             )
 
         with self._connect() as connection:
@@ -418,16 +313,16 @@ class CoordinationStore:
                     body,
                     refs_json,
                     message_id,
-                    _now(),
+                    now_utc(),
                     idempotency_key,
                 ),
             )
             return self._message_from_row(self._load_message(connection, reply_id))
 
     def close_topic(self, *, topic_id: str, agent_id: str, resolution: str) -> dict[str, Any]:
-        topic_id = _validate_identifier(topic_id, "topic_id")
-        agent_id = _validate_identifier(agent_id, "agent_id")
-        resolution = _validate_text(resolution, "resolution", _MAX_RESOLUTION_CHARS)
+        topic_id = validate_identifier(topic_id, "topic_id")
+        agent_id = validate_identifier(agent_id, "agent_id")
+        resolution = validate_text(resolution, "resolution", MAX_RESOLUTION_CHARS)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             topic = self._load_topic(connection, topic_id)
@@ -439,15 +334,15 @@ class CoordinationStore:
                 return self._topic_from_row(topic)
             connection.execute(
                 "UPDATE topics SET state='closed', closed_at=?, closed_by=?, resolution=? WHERE id=?",
-                (_now(), agent_id, resolution, topic_id),
+                (now_utc(), agent_id, resolution, topic_id),
             )
             return self._topic_from_row(self._load_topic(connection, topic_id))
 
     def upsert_comparison_context(self, *, comparison_group_id: str, context: dict[str, Any]) -> dict[str, Any]:
-        comparison_group_id = _validate_identifier(comparison_group_id, "comparison_group_id")
-        normalized_context, context_json = _canonical_object(context, name="context", max_bytes=_MAX_CONTEXT_BYTES)
+        comparison_group_id = validate_identifier(comparison_group_id, "comparison_group_id")
+        normalized_context, context_json = canonical_object(context, name="context", max_bytes=MAX_CONTEXT_BYTES)
         digest = hashlib.sha256(context_json.encode("utf-8")).hexdigest()
-        updated_at = _now()
+        updated_at = now_utc()
         with self._connect() as connection:
             connection.execute(
                 "INSERT INTO comparison_contexts "
@@ -468,7 +363,7 @@ class CoordinationStore:
         }
 
     def get_comparison_context(self, comparison_group_id: str) -> dict[str, Any]:
-        comparison_group_id = _validate_identifier(comparison_group_id, "comparison_group_id")
+        comparison_group_id = validate_identifier(comparison_group_id, "comparison_group_id")
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM comparison_contexts WHERE comparison_group_id=?",
