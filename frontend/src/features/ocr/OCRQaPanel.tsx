@@ -2,32 +2,19 @@ import { Check, Eye, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
 import { Alert } from '@/components/ui/alert';
 import { API_CONFIG } from '@/config/api';
+import {
+    compactTextLength,
+    ENGINE_LABELS,
+    formatDurationMs,
+    LAYOUT_TYPE_LABELS,
+    PAGE_TYPE_LABELS,
+    qaDecisionLabel,
+    qualityFlagLabel,
+    runtimeManifestLabel,
+} from '@/features/ocr/ocrQaPresentation';
 
 import type { OcrLayoutType, OcrPageType, OcrSelectedEngine } from './types';
 import { useOCRQaController } from './useOCRQaController';
-
-const PAGE_TYPE_LABELS: Record<OcrPageType, string> = {
-    unknown: '未分類',
-    narrative: '本文',
-    toc: '目次',
-    illustration: '挿絵・表紙',
-    colophon_or_ad: '奥付・広告',
-};
-
-const LAYOUT_TYPE_LABELS: Record<OcrLayoutType, string> = {
-    unknown: '未判定',
-    normal_prose: '通常散文',
-    full_width: '全幅本文・要約',
-    mixed_illustration: '本文＋挿絵',
-    structured: '構造化（目次・漢文等）',
-    image_only: '画像のみ',
-};
-
-const ENGINE_LABELS: Record<OcrSelectedEngine, string> = {
-    primary: 'Surya候補',
-    external: 'yomitoku候補',
-    codex: 'Codex確認済み補正',
-};
 
 export function OCRQaPanel() {
     const {
@@ -59,22 +46,27 @@ export function OCRQaPanel() {
         approveMutation,
         canApproveRun,
     } = useOCRQaController();
+    const primaryLength = compactTextLength(selectedPage?.primary_text ?? '');
+    const externalLength = compactTextLength(selectedPage?.external_text ?? '');
+    const externalLengthDifference = externalLength - primaryLength;
 
     return (
         <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
-                <ShieldCheck className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-                <div className="min-w-0 flex-1">
-                    <h2 className="font-bold text-gray-900 dark:text-gray-100">OCR 品質確認</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        原画像とOCR本文を確認後に公開します。QA未承認ではFull Buildできません。
-                    </p>
+            <header className="flex flex-col items-stretch gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center dark:border-gray-700">
+                <div className="flex min-w-0 items-start gap-3 sm:flex-1">
+                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
+                    <div className="min-w-0">
+                        <h2 className="font-bold text-gray-900 dark:text-gray-100">OCR 品質確認</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            全ページを原画像と照合し、OK・修正・保留のいずれかを記録します。
+                        </p>
+                    </div>
                 </div>
                 <select
                     aria-label="QA対象run"
                     value={selectedRunId ?? ''}
                     onChange={(event) => setSelectedRunId(Number(event.target.value))}
-                    className="max-w-sm rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                    className="w-full max-w-sm rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm sm:w-auto dark:border-gray-600 dark:bg-gray-800"
                 >
                     <option value="">対象を選択</option>
                     {awaitingRuns.map((run) => (
@@ -98,12 +90,16 @@ export function OCRQaPanel() {
             {detail && (
                 <>
                     <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 px-5 py-3 text-sm dark:border-gray-700">
-                        <span>要確認 {detail.required_pages}</span>
+                        <span>未確認 {detail.required_pages}</span>
                         <span className="text-green-700 dark:text-green-400">
-                            承認 {detail.approved_pages}
+                            OK・修正 {detail.approved_pages}
                         </span>
                         <span className="text-red-700 dark:text-red-400">
-                            却下 {detail.rejected_pages}
+                            保留 {detail.rejected_pages}
+                        </span>
+                        <span className="basis-full text-xs text-gray-500 dark:text-gray-400">
+                            実行版: {runtimeManifestLabel(detail.runtime_manifest)} / 初期化{' '}
+                            {formatDurationMs(detail.timing.worker_init_ms)}
                         </span>
                         <label className="ml-auto flex items-center gap-2">
                             <input
@@ -142,12 +138,17 @@ export function OCRQaPanel() {
                                 >
                                     <Eye className="h-4 w-4" />
                                     <span className="flex-1">画面 {page.page_no}</span>
-                                    {page.qa_state === 'approved' && (
-                                        <Check className="h-4 w-4 text-green-600" />
-                                    )}
-                                    {page.qa_state === 'rejected' && (
-                                        <X className="h-4 w-4 text-red-600" />
-                                    )}
+                                    <span
+                                        className={`text-xs font-medium ${
+                                            page.qa_state === 'approved'
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : page.qa_state === 'rejected'
+                                                  ? 'text-red-700 dark:text-red-400'
+                                                  : 'text-amber-700 dark:text-amber-300'
+                                        }`}
+                                    >
+                                        {qaDecisionLabel(page.qa_state, page.selected_engine)}
+                                    </span>
                                 </button>
                             ))}
                         </nav>
@@ -167,18 +168,70 @@ export function OCRQaPanel() {
                                     </div>
                                 </div>
                                 <div className="flex min-w-0 flex-col">
-                                    <h3 className="mb-2 font-semibold">OCR本文</h3>
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        <h3 className="font-semibold">OCR候補と確認理由</h3>
+                                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                            機械判定 {selectedPage.state}
+                                        </span>
+                                        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                            QA{' '}
+                                            {qaDecisionLabel(
+                                                selectedPage.qa_state,
+                                                selectedPage.selected_engine,
+                                            )}
+                                        </span>
+                                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                            画面処理{' '}
+                                            {formatDurationMs(
+                                                selectedPage.processing_timing.total_ms,
+                                            )}
+                                        </span>
+                                    </div>
                                     <div className="mb-2 flex flex-wrap gap-1">
                                         {selectedPage.quality_flags.map((flag) => (
                                             <span
                                                 key={flag}
+                                                title={flag}
                                                 className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                                             >
-                                                {flag}
+                                                {qualityFlagLabel(flag)}
                                             </span>
                                         ))}
                                     </div>
                                     <div className="grid gap-2">
+                                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                            <section className="min-w-0 rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                                                <h4 className="mb-1 text-sm font-medium">
+                                                    Surya候補
+                                                    <span className="ml-2 text-xs font-normal text-gray-500">
+                                                        {primaryLength}文字
+                                                    </span>
+                                                </h4>
+                                                <textarea
+                                                    aria-label="Surya候補本文"
+                                                    value={selectedPage.primary_text}
+                                                    readOnly
+                                                    className="min-h-40 w-full resize-y whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-2 text-sm leading-6 dark:border-gray-700 dark:bg-gray-950"
+                                                />
+                                            </section>
+                                            <section className="min-w-0 rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                                                <h4 className="mb-1 text-sm font-medium">
+                                                    yomitoku候補
+                                                    <span className="ml-2 text-xs font-normal text-gray-500">
+                                                        {externalLength}文字（Surya比
+                                                        {externalLengthDifference >= 0 ? '+' : ''}
+                                                        {externalLengthDifference}）
+                                                    </span>
+                                                </h4>
+                                                <textarea
+                                                    aria-label="yomitoku候補本文"
+                                                    value={selectedPage.external_text}
+                                                    readOnly
+                                                    placeholder="候補なし"
+                                                    className="min-h-40 w-full resize-y whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-2 text-sm leading-6 dark:border-gray-700 dark:bg-gray-950"
+                                                />
+                                            </section>
+                                        </div>
                                         <label className="flex items-center gap-3 text-sm">
                                             採用候補
                                             <select
@@ -206,21 +259,21 @@ export function OCRQaPanel() {
                                                 )}
                                             </select>
                                         </label>
-                                        <textarea
-                                            aria-label="採用OCR本文"
-                                            value={
-                                                selectedEngine === 'primary'
-                                                    ? selectedPage.primary_text
-                                                    : selectedEngine === 'external'
-                                                      ? selectedPage.external_text
-                                                      : correctedText
-                                            }
-                                            readOnly={selectedEngine !== 'codex'}
-                                            onChange={(event) =>
-                                                setCorrectedText(event.target.value)
-                                            }
-                                            className="min-h-[280px] max-h-[400px] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-7 read-only:opacity-80 dark:border-gray-700 dark:bg-gray-950"
-                                        />
+                                        {selectedEngine === 'codex' ? (
+                                            <textarea
+                                                aria-label="Codex確認済み補正文"
+                                                value={correctedText}
+                                                onChange={(event) =>
+                                                    setCorrectedText(event.target.value)
+                                                }
+                                                placeholder="原画像で確認した補正文を入力"
+                                                className="min-h-48 max-h-[400px] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-7 dark:border-gray-700 dark:bg-gray-950"
+                                            />
+                                        ) : (
+                                            <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                                                原画像と一致する候補を選び、「OKとして保存」してください。
+                                            </p>
+                                        )}
                                         {!selectedPage.external_text && (
                                             <p className="text-xs text-amber-700 dark:text-amber-300">
                                                 この画面にはyomitoku候補が保存されていません。
@@ -288,7 +341,10 @@ export function OCRQaPanel() {
                                             }
                                             className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >
-                                            <Check className="h-4 w-4" /> 承認
+                                            <Check className="h-4 w-4" />{' '}
+                                            {selectedEngine === 'codex'
+                                                ? '修正として保存'
+                                                : 'OKとして保存'}
                                         </button>
                                         <button
                                             type="button"
@@ -296,7 +352,7 @@ export function OCRQaPanel() {
                                             disabled={pageMutation.isPending}
                                             className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >
-                                            <X className="h-4 w-4" /> 却下
+                                            <X className="h-4 w-4" /> 保留
                                         </button>
                                     </div>
                                 </div>

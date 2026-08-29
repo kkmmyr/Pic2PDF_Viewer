@@ -139,7 +139,12 @@ def claim_ocr_agent_job(
     x_capture_agent_token: str | None = Header(default=None),
 ) -> dict:
     _require_ocr_agent(x_capture_agent_token)
-    return {"job": ocr_agent_jobs.claim(request.agent_id)}
+    job = (
+        ocr_agent_jobs.claim(request.agent_id)
+        if request.model_revision is None
+        else ocr_agent_jobs.claim(request.agent_id, request.model_revision)
+    )
+    return {"job": job}
 
 
 @router.get(
@@ -270,6 +275,9 @@ def review_ocr_qa_page(
             request.layout_type,
             request.selected_engine,
             request.corrected_text,
+            request.review_started_at,
+            request.review_duration_ms,
+            request.correction_duration_ms,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

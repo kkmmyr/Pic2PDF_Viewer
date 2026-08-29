@@ -1,6 +1,6 @@
 # OCR設計書
 
-> status: living | last-verified: 2026-08-22
+> status: living | last-verified: 2026-08-29
 
 <!-- contract-owner: ocr-publication -->
 
@@ -34,7 +34,7 @@ kindle-pdf/main_novel.py
   -> Surya OCR 2 + yomitoku独立照合
   -> ocr_page_resultsへページ単位チェックポイント
   -> awaiting_qa
-  -> 必須ページの画像照合・補正・run承認
+  -> 全ページの画像照合（OK / 修正 / 保留）・run承認
   -> pages / pages_fts / books.ocr_done_atを同一公開処理で更新
 ```
 
@@ -71,7 +71,7 @@ Windowsから本番SQLiteを直接開かない。
 | `OCR_ENGINE` | `surya2` | `surya2` / `yomitoku` |
 | `SURYA_INFERENCE_URL` | `http://127.0.0.1:8768/v1` | OpenAI互換推論URL |
 | `SURYA_MODEL` | `surya-ocr-2` | 推論モデル名 |
-| `SURYA_MODEL_REVISION` | `unversioned` | `ocr_runs.model`へ保存する固定版識別子 |
+| `SURYA_MODEL_REVISION` | `unversioned` | `ocr_runs.model`へ保存する固定版識別子。新規runでは空値・`unversioned`を拒否する |
 | `SURYA_REQUEST_TIMEOUT_SEC` | `600` | 1ページのタイムアウト |
 | `SURYA_MAX_ATTEMPTS` | `3` | 画像候補の最大試行数 |
 | `OCR_WORKER_INACTIVITY_TIMEOUT_SEC` | `2100` | workerのstdout無通信をhangとみなす期限。超過時はterminate後、15秒で終了しなければkillする |
@@ -90,6 +90,7 @@ Windowsから本番SQLiteを直接開かない。
 | `backend/services/novel_db/ocr_worker.py` | standalone CLI、manifest読込、engine選択のprotocol shell |
 | `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
 | `backend/services/novel_db/ocr_worker_engines.py` | 画像読込、Surya/yomitokuのページ処理、候補選択 |
+| `backend/services/novel_db/ocr_provenance.py` | 実行版manifest、source/model SHA、候補本文/raw出力SHAの生成・検証 |
 | `backend/services/novel_db/ocr_candidate_selection.py` | primary/externalの文字量差をQAリスクとworkerで共有する純関数 |
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
@@ -153,7 +154,8 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
 - jobの`current_detail`に出すstage、book、page、attempt、server generation、detailの順序と
   区切りを維持し、workerのprogress eventをjob進捗へ写像する。
 - QA開始は入力画像SHA・page数・page結果の完全性を再検証し、分類・risk flag反映後に
-  必須pageを`required`、その他を`not_required`としてrunを`awaiting_qa / pending`へ遷移させる。
+  全pageを`required`としてrunを`awaiting_qa / pending`へ遷移させる。B-35正式holdoutの
+  機械単独総合合格前は、候補一致、通常散文、試し読み除外を理由に`not_required`へしない。
   canonical `books` / `pages`は変更しない。
 - page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
   検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
@@ -181,6 +183,10 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
 - キャプチャPNGを加工・上書きしない。再試行画像はメモリ上だけで生成する。
 - `raw_output`、検索用 `full_text`、bbox、品質指標を分離して保存する。
 - Surya合格ページも既定でyomitokuが独立再読する。候補一致は正解保証に使わない。
+- selected本文が30文字未満なのにprimaryまたはexternal候補が300文字以上ある場合は、
+  candidateの合否や反復の有無にかかわらず`candidate_content_conflict`を記録する。
+  非narrative分類と長文candidateが衝突する場合は`page_type_text_conflict`も記録し、
+  挿絵・空ページとして自動確定せず原画像確認へ送る。
 - normal proseでprimaryに異常反復があり、externalが256文字以上かつ反復なしの場合は、
   externalのconfidence合否にかかわらずレビュー候補へ切り替える。採用結果には
   `external_recovered_primary_repetition` flagを残して必須QAへ送り、自動公開へ昇格させない。
@@ -248,12 +254,22 @@ confidenceは補助情報であり、列・文章欠落を直接表さない。y
 
 ## 4. ステージング、QA、公開
 
-OCR完了と公開承認を分離する。全ページ処理後はまず `awaiting_qa` へ遷移し、次を確認する。
+OCR完了と公開承認を分離する。全ページ処理後はまず全pageを`required`として
+`awaiting_qa`へ遷移し、原画像と候補を確認する。ページごとの運用判定は次の3段階とする。
+
+- `OK`: 原画像と採用する機械OCR候補が一致する。API上は`qa_state=approved`とする。
+- `修正`: 原画像照合済みの補正文を`selected_engine=codex`と`corrected_text`へ保存し、
+  API上は`qa_state=approved`とする。
+- `保留`: 固有名詞、崩れた文字、読順、分類を確定できない。API上は`qa_state=rejected`とし、
+  解消するまでrunを公開しない。
+
+確認時は次の理由を日本語で表示し、primary / externalの文字数と候補本文を同一画面で比較できるようにする。
 
 - 前付、品質flag付きページ、各書籍の先頭・中間・終盤本文、挿絵混在、固有名詞を含むページ
 - ページ種別 `narrative` / `toc` / `illustration` / `colophon_or_ad`
 - layout種別 `normal_prose` / `structured` / `mixed_illustration` / `full_width` / `image_only`
 - 本編後の第2書名・目次・人物紹介・試し読み境界、反復、UI混入、候補間の大幅な文字量差
+- selected空本文と長文candidateの衝突、非narrative分類と長文candidateの衝突
 
 公開時の不変条件は次のとおり。
 
@@ -412,6 +428,32 @@ Solへ昇格する。モデル・prompt・画像切り出し・CLIが変われ�
 Sol確認の縮小は、固定コーパスと正式holdoutの全ゲート、同一画面3回の反復、100画面の
 出力契約成功率99%以上を満たした版だけで検討する。解禁初期は10%を無作為監査し、重大な
 欠落・意味変更・分類誤り1件で全件確認へ戻す。
+
+### 実行版・原候補・工程時間の監査保存
+
+新規OCR runは、実際にページを処理したworkerが生成する`runtime_manifest_json`を保存する。
+manifestはschema version、OCR engine、固定model revision、Python/OS/CPU、PyTorch・YomiToku等の
+package version、CUDA/MPS/device、worker・wrapper・pipeline source SHA、Git commitとdirty状態を持つ。
+model/mmprojのローカル資材が指定された場合はファイルSHAも保存する。同じrunの途中でmanifestが
+変化した場合はページ保存を拒否し、異なる実行環境の結果を1 runへ混在させない。既存runは
+空manifestのまま読み取り可能とするが、新規runの`model`が空または`unversioned`なら開始しない。
+
+ページ結果は採用後の`full_text`/`raw_output`とは別に、`primary_text`、`external_text`、
+`primary_raw_output`、`external_raw_output`を不変の原候補として保存する。
+`candidate_manifest_json`には候補ごとのstate、文字数、block数、quality flag、本文SHA、raw出力SHAを
+記録する。保存時に本文・raw出力からSHAを再計算し、不一致、存在しない候補の採用、採用本文と
+原候補の不一致を拒否する。候補選択後も非採用候補を上書き・削除しない。
+
+工程時間は次の粒度で保存し、OS/GPU比較では同じ項目だけを比較する。
+
+- run: `started_at`、`ocr_finished_at`、`qa_started_at`、`qa_finished_at`と、worker/server初期化時間を
+  `timing_json`へ保存する。
+- page: 画像読込、primary OCR、external OCR、候補選択、総処理時間を
+  `processing_timing_json`へミリ秒で保存する。
+- QA: 画面表示開始時刻、保存までのactive確認時間、Codex補正文の編集時間をページへ保存する。
+  値は非負整数とし、ブラウザ再読込等で開始時刻が失われた場合は推測値を作らずnullを許す。
+- 公開可能になるまでのwall clockはrunの`started_at`から`qa_finished_at`までとし、OCR計算時間、
+  QA待ち時間、人手確認時間を混ぜた単一の速度値として扱わない。
 
 ## 7. `YomitokuEngine`
 

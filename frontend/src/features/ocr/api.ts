@@ -47,6 +47,9 @@ export function reviewOcrQaPage(
     layoutType: OcrLayoutType,
     selectedEngine: OcrSelectedEngine,
     correctedText: string | null,
+    reviewStartedAt: string | null,
+    reviewDurationMs: number | null,
+    correctionDurationMs: number | null,
 ): Promise<unknown> {
     return apiClient.patch(API_ENDPOINTS.OCR_QA_PAGE(runId, pageNo), {
         state,
@@ -55,6 +58,9 @@ export function reviewOcrQaPage(
         layout_type: layoutType,
         selected_engine: selectedEngine,
         corrected_text: correctedText,
+        review_started_at: reviewStartedAt,
+        review_duration_ms: reviewDurationMs,
+        correction_duration_ms: correctionDurationMs,
     });
 }
 

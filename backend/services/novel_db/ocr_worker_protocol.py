@@ -39,6 +39,12 @@ def page_payload(
     layout_type: str = "unknown",
     primary_text: str | None = None,
     external_text: str | None = None,
+    primary_raw_output: str | None = None,
+    external_raw_output: str | None = None,
+    candidate_manifest: dict[str, Any] | None = None,
+    processing_timing: dict[str, int] | None = None,
+    runtime_manifest: dict[str, Any] | None = None,
+    run_timing: dict[str, int] | None = None,
     selected_engine: str = "primary",
 ) -> dict[str, Any]:
     return {
@@ -60,6 +66,12 @@ def page_payload(
             "layout_type": layout_type,
             "primary_text": primary_text if primary_text is not None else result.full_text,
             "external_text": external_text,
+            "primary_raw_output": primary_raw_output if primary_raw_output is not None else result.raw_output,
+            "external_raw_output": external_raw_output,
+            "candidate_manifest": candidate_manifest,
+            "processing_timing": processing_timing or {},
+            "runtime_manifest": runtime_manifest,
+            "run_timing": run_timing or {},
             "selected_engine": selected_engine,
         },
     }
@@ -71,6 +83,10 @@ def failed_payload(
     image_sha256: str,
     exc: Exception,
     server_generation: int | None = None,
+    *,
+    processing_timing: dict[str, int] | None = None,
+    runtime_manifest: dict[str, Any] | None = None,
+    run_timing: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     return {
         "event": "page",
@@ -88,6 +104,15 @@ def failed_payload(
             "attempt_count": 0,
             "server_generation": server_generation,
             "error_message": str(exc),
+            "primary_text": "",
+            "external_text": None,
+            "primary_raw_output": "",
+            "external_raw_output": None,
+            "candidate_manifest": None,
+            "processing_timing": processing_timing or {},
+            "runtime_manifest": runtime_manifest,
+            "run_timing": run_timing or {},
+            "selected_engine": "primary",
         },
     }
 

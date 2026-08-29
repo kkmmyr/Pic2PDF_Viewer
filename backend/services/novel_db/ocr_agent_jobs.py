@@ -122,7 +122,7 @@ def _recover_stale_jobs() -> None:
                     )
 
 
-def claim(agent_id: str) -> dict | None:
+def claim(agent_id: str, model_revision: str | None = None) -> dict | None:
     _recover_stale_jobs()
     with with_db() as conn:
         existing = conn.execute(
@@ -160,7 +160,7 @@ def claim(agent_id: str) -> dict | None:
 
     try:
         engine = config.app_settings.OCR_ENGINE.casefold()
-        model = config.app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine
+        model = model_revision or (config.app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine)
         targets = _targets(str(row[1]), row[2])
         prepared: list[tuple[str, int]] = []
         for book_name in targets:

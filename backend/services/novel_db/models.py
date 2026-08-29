@@ -199,6 +199,11 @@ class OcrRun(SQLModel, table=True):
     qa_reviewer: str | None = None
     qa_reviewed_at: str | None = None
     qa_note: str | None = None
+    runtime_manifest_json: str = "{}"
+    timing_json: str = "{}"
+    ocr_finished_at: str | None = None
+    qa_started_at: str | None = None
+    qa_finished_at: str | None = None
 
 
 class OcrPageResult(SQLModel, table=True):
@@ -226,10 +231,17 @@ class OcrPageResult(SQLModel, table=True):
     layout_type: str = "unknown"
     primary_text: str | None = None
     external_text: str | None = None
+    primary_raw_output: str | None = None
+    external_raw_output: str | None = None
+    candidate_manifest_json: str = "{}"
+    processing_timing_json: str = "{}"
     selected_engine: str = "primary"
     corrected_text: str | None = None
     published_text: str | None = None
     index_eligible: bool = False
+    review_started_at: str | None = None
+    review_duration_ms: int | None = None
+    correction_duration_ms: int | None = None
 
 
 class OcrAgentJobRun(SQLModel, table=True):

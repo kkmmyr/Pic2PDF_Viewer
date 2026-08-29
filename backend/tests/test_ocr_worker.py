@@ -25,6 +25,7 @@ def _passed_result() -> SuryaPageResult:
 
 
 def _configure_session_policy(monkeypatch, *, max_pages: int) -> None:
+    monkeypatch.setenv("OCR_MODEL_REVISION", "test-model-sha")
     monkeypatch.setenv("SURYA_MAX_ATTEMPTS", "1")
     monkeypatch.setenv("OCR_SERVER_MAX_PAGES", str(max_pages))
     monkeypatch.setenv("OCR_SERVER_CONSECUTIVE_FAILURES", "2")

@@ -47,7 +47,8 @@ def get_qa_run(run_id: int) -> dict:
     with with_db() as conn:
         run = conn.execute(
             "SELECT id, book_name, engine, model, source_page_count, state, qa_state, started_at, "
-            "qa_reviewer, qa_reviewed_at, qa_note FROM ocr_runs WHERE id=?",
+            "qa_reviewer, qa_reviewed_at, qa_note, runtime_manifest_json, timing_json, "
+            "ocr_finished_at, qa_started_at, qa_finished_at FROM ocr_runs WHERE id=?",
             (run_id,),
         ).fetchone()
         if run is None:
@@ -56,7 +57,8 @@ def get_qa_run(run_id: int) -> dict:
             "SELECT page_no, state, qa_state, full_text, char_count, quality_flags_json, "
             "ink_coverage, attempt_count, error_message, qa_note, reviewed_at, "
             "page_type, index_eligible, layout_type, primary_text, external_text, "
-            "selected_engine, corrected_text "
+            "selected_engine, corrected_text, candidate_manifest_json, processing_timing_json, "
+            "review_started_at, review_duration_ms, correction_duration_ms "
             "FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
             (run_id,),
         ).fetchall()
@@ -75,6 +77,11 @@ def get_qa_run(run_id: int) -> dict:
         "qa_reviewer": run[8],
         "qa_reviewed_at": run[9],
         "qa_note": run[10],
+        "runtime_manifest": json.loads(str(run[11] or "{}")),
+        "timing": json.loads(str(run[12] or "{}")),
+        "ocr_finished_at": run[13],
+        "qa_started_at": run[14],
+        "qa_finished_at": run[15],
         "required_pages": required_pages,
         "approved_pages": approved_pages,
         "rejected_pages": rejected_pages,
@@ -98,6 +105,11 @@ def get_qa_run(run_id: int) -> dict:
                 "external_text": str(row[15] or ""),
                 "selected_engine": str(row[16] or "primary"),
                 "corrected_text": row[17],
+                "candidate_manifest": json.loads(str(row[18] or "{}")),
+                "processing_timing": json.loads(str(row[19] or "{}")),
+                "review_started_at": row[20],
+                "review_duration_ms": row[21],
+                "correction_duration_ms": row[22],
                 "image_url": f"/api/ocr/qa/runs/{run_id}/pages/{int(row[0])}/image",
             }
             for row in pages

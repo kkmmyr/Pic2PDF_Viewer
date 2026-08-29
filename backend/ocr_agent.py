@@ -13,6 +13,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+import config as config_module
 from services.novel_db.extractor import OcrTask, iter_ocr_pages
 
 
@@ -126,7 +127,12 @@ def _download_tasks(config: AgentConfig, api: ApiClient, job: dict, root: Path) 
 
 def run_once(config: AgentConfig, api: ApiClient | None = None) -> bool:
     api = api or ApiClient(config)
-    claimed = api.post("/api/ocr/agents/claim", {"agent_id": config.agent_id})
+    engine = config_module.app_settings.OCR_ENGINE.casefold()
+    model_revision = config_module.app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine
+    claimed = api.post(
+        "/api/ocr/agents/claim",
+        {"agent_id": config.agent_id, "model_revision": model_revision},
+    )
     job = claimed.get("job")
     if job is None:
         return False
