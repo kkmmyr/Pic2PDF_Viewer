@@ -1,6 +1,6 @@
 # Mac OCR 補助確認設計
 
-> status: living | last-verified: 2026-07-28
+> status: living | last-verified: 2026-08-29
 
 Mac 専用 OCR アプリを、本番の Windows OCR パイプラインとは独立した
 **第二 OCR・目視確認・比較評価手段**として検証するための方針を定める。
@@ -162,3 +162,28 @@ Mac 専用 OCR アプリの追加評価は、ユーザーが土日に利用で�
 - OwlOCR Pro のローカル AI OCR と Prizmo は、ABBYY の結果が不十分な場合の
   追加候補として保留する
 - 評価を再開するときも、本番DB・公開済みOCR・検索索引を更新しない
+
+## 10. 2026-08-29時点の比較成立状況
+
+『りゅうおうのおしごと！』1巻のWindows run 185とMac取込run 186は、138画面すべてで
+画像SHA-256が一致した。ただしrun 186は`codex_reviewed_qwen35_dots_v1`であり、
+Mac版YomiToku/MPS単独runではない。Mac実機はTailscale上で到達できるがSSH portを拒否しており、
+YomiToku・PyTorch・モデル・MPS設定・実OCR時間を取得できていない。この状態ではrun間差を
+Windows/Mac差またはCUDA/MPS差へ帰属させない。
+
+WindowsではYomiToku 0.12.0・PyTorch 2.11.0+cu128について、同じ30画面のCPU/CUDA本文が
+正規化後30/30一致し、CUDAがページ処理時間で13.75倍速かった。この標本ではbackend差は
+速度に現れ、本文差には現れなかった。Mac MPSにも成立するかは別途同一version・同一設定で確認する。
+
+次のMac YomiToku評価packageは、出力本文に加えて次を必須manifestとする。
+
+- macOS・機種・SoC、Python、YomiToku、PyTorchのversion
+- `mps` / `cpu`、device availability、推論精度と前処理設定
+- OCR wrapper・model・pipelineのSHA-256とdirty状態
+- 入力画面番号・画像SHA-256・処理成否
+- 初期化、画面単位OCR、全体終了、QA、補正、package生成の各時刻
+- 同一process条件での2回実行と正規化本文SHA-256
+
+実測の詳細とWindows基準値は
+[OCR品質改善 技術知見 §16](../../../log/技術知見/OCR品質改善_技術知見.md#16-2026-08-29-りゅうおうのおしごとyomitoku速度環境差監査)
+を参照する。

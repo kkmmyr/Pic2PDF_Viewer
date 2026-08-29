@@ -98,6 +98,18 @@ def test_qa_risk_detects_long_non_narrative_and_name_disagreement() -> None:
     ) == {"named_entity_candidate_disagreement"}
 
 
+def test_qa_risk_detects_empty_selected_text_with_long_external_candidate() -> None:
+    external = "外部OCR候補には本文があります。" + "".join(f"縦列{index}。" for index in range(80))
+
+    assert detect_qa_risk_flags(
+        page_type="illustration",
+        full_text="",
+        char_count=0,
+        primary_text="",
+        external_text=external,
+    ) == {"candidate_content_conflict", "page_type_text_conflict"}
+
+
 def test_qa_risk_ignores_unpaired_candidate_omissions() -> None:
     assert (
         detect_qa_risk_flags(
@@ -239,7 +251,7 @@ def test_classification_preserves_ocr_candidate_selection(staged_book) -> None:
     assert tuple(row) == ("目次\n第一章\n第二章", "外部OCR候補", "external")
 
 
-def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) -> None:
+def test_stage_requires_every_page_even_with_routine_audit_flags(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "qa-flag-selection"
     images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
@@ -273,7 +285,7 @@ def test_stage_requires_risky_flags_but_not_routine_audit_flags(tmp_data_dir) ->
             "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
             (run_id,),
         ).fetchall()
-    assert [row[0] for row in rows] == [1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12]
+    assert [row[0] for row in rows] == list(range(1, 13))
 
 
 def test_stage_requires_content_risks(tmp_data_dir) -> None:

@@ -16,6 +16,7 @@ _HONORIFIC_NAME_RE = re.compile(r"([\u3400-\u9fff々〆ヵヶ]{2,8})(?:さん|�
 _KATAKANA_TERM_RE = re.compile(r"[ァ-ヴー]{4,}")
 _WHITESPACE_RE = re.compile(r"\s+")
 _LONG_NON_NARRATIVE_TEXT = 300
+_SHORT_SELECTED_TEXT = 30
 _UI_OVERLAY_STRONG_MARKERS = ("chatgpt",)
 _UI_OVERLAY_MARKER_COMBINATIONS = (
     ("Kindleカタログ", "UI改善"),
@@ -25,6 +26,7 @@ _CANDIDATE_AUDIT_FLAGS = frozenset({"primary_text_repetition", "external_text_re
 _MANAGED_RISK_FLAGS = frozenset(
     {
         "named_entity_candidate_disagreement",
+        "candidate_content_conflict",
         "page_type_text_conflict",
         "unselected_external_candidate_more_complete",
         "primary_text_repetition",
@@ -77,10 +79,15 @@ def detect_qa_risk_flags(
     external_text: str,
 ) -> set[str]:
     """Return review reasons that are independent from OCR pass/fail state."""
-    normalized_count = max(char_count, len(_WHITESPACE_RE.sub("", full_text)))
+    selected_count = max(char_count, len(_WHITESPACE_RE.sub("", full_text)))
+    primary_count = len(_WHITESPACE_RE.sub("", primary_text))
+    external_count = len(_WHITESPACE_RE.sub("", external_text))
+    candidate_count = max(primary_count, external_count)
     flags: set[str] = set()
-    if page_type != "narrative" and normalized_count >= _LONG_NON_NARRATIVE_TEXT:
+    if page_type != "narrative" and max(selected_count, candidate_count) >= _LONG_NON_NARRATIVE_TEXT:
         flags.add("page_type_text_conflict")
+    if selected_count < _SHORT_SELECTED_TEXT and candidate_count >= _LONG_NON_NARRATIVE_TEXT:
+        flags.add("candidate_content_conflict")
 
     if page_type == "narrative" and primary_text.strip() and external_text.strip():
         primary_terms = _candidate_terms(primary_text)

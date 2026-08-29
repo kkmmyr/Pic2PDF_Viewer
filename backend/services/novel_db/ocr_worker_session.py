@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,6 +12,7 @@ from typing import Any
 from PIL import Image
 
 try:
+    from .ocr_provenance import collect_runtime_manifest
     from .ocr_worker_engines import (
         YomitokuAdjudicator,
         process_surya_task,
@@ -21,6 +23,7 @@ try:
     from .surya_server import SuryaServer
     from .surya_types import OcrSessionPolicy
 except ImportError:
+    from ocr_provenance import collect_runtime_manifest
     from ocr_worker_engines import YomitokuAdjudicator, process_surya_task, read_image
     from ocr_worker_protocol import OcrWorkerTask, emit, emit_progress, failed_payload, page_payload
     from surya_runtime import SuryaClient
@@ -80,6 +83,12 @@ def run_surya(
     read_image_fn: Callable[[Path], tuple[bytes, str, Image.Image]] = read_image,
 ) -> None:
     settings = SuryaWorkerSettings.from_env()
+    manifest_started = time.perf_counter()
+    runtime_manifest = collect_runtime_manifest(
+        "surya2",
+        os.environ.get("OCR_MODEL_REVISION", "unversioned"),
+    )
+    manifest_collection_ms = round((time.perf_counter() - manifest_started) * 1000)
     adjudicator = YomitokuAdjudicator(settings.external_quality_kwargs)
     task_index = 0
     server_generation = 0
@@ -88,7 +97,9 @@ def run_surya(
         server_generation += 1
         policy = OcrSessionPolicy(**settings.policy_kwargs)
         restart_reason = "completed"
+        init_started = time.perf_counter()
         with server_factory(settings.base_url, **settings.server_kwargs) as server:
+            worker_init_ms = round((time.perf_counter() - init_started) * 1000)
             server_owned = server.owns_process
             emit_progress(
                 "server_started",
@@ -105,6 +116,7 @@ def run_surya(
                 image_sha256 = ""
                 result = None
                 surya_failed = True
+                page_started = time.perf_counter()
                 emit_progress(
                     "page_started",
                     server_generation=server_generation,
@@ -113,7 +125,9 @@ def run_surya(
                     page_no=page_no,
                 )
                 try:
+                    read_started = time.perf_counter()
                     _, image_sha256, image = read_image_fn(Path(task["image_path"]))
+                    image_read_ms = round((time.perf_counter() - read_started) * 1000)
                     execution = process_surya_task(
                         task,
                         image_sha256,
@@ -127,6 +141,11 @@ def run_surya(
                     image_sha256 = execution.image_sha256
                     result = execution.result
                     surya_failed = execution.surya_failed
+                    processing_timing = {
+                        "image_read_ms": image_read_ms,
+                        **execution.processing_timing,
+                        "total_ms": round((time.perf_counter() - page_started) * 1000),
+                    }
                     emit(
                         page_payload(
                             execution.book_name,
@@ -137,11 +156,34 @@ def run_surya(
                             layout_type=execution.layout_type,
                             primary_text=execution.primary_text,
                             external_text=execution.external_text,
+                            primary_raw_output=execution.primary_raw_output,
+                            external_raw_output=execution.external_raw_output,
+                            candidate_manifest=execution.candidate_manifest,
+                            processing_timing=processing_timing,
+                            runtime_manifest=runtime_manifest,
+                            run_timing={
+                                "manifest_collection_ms": manifest_collection_ms,
+                                "worker_init_ms": worker_init_ms,
+                            },
                             selected_engine=execution.selected_engine,
                         )
                     )
                 except Exception as exc:
-                    emit(failed_payload(book_name, page_no, image_sha256, exc, server_generation))
+                    emit(
+                        failed_payload(
+                            book_name,
+                            page_no,
+                            image_sha256,
+                            exc,
+                            server_generation,
+                            processing_timing={"total_ms": round((time.perf_counter() - page_started) * 1000)},
+                            runtime_manifest=runtime_manifest,
+                            run_timing={
+                                "manifest_collection_ms": manifest_collection_ms,
+                                "worker_init_ms": worker_init_ms,
+                            },
+                        )
+                    )
 
                 emit_progress(
                     "page_completed",

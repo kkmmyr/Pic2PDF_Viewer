@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime
 
 from .connection import with_db
 from .ocr_layout_types import validate_layout_type
@@ -66,8 +67,22 @@ def review_qa_page(
     layout_type: str,
     selected_engine: str,
     corrected_text: str | None,
+    review_started_at: str | None = None,
+    review_duration_ms: int | None = None,
+    correction_duration_ms: int | None = None,
 ) -> None:
     _validate_review_request(state, page_type, layout_type, selected_engine)
+    if review_started_at is not None:
+        try:
+            datetime.fromisoformat(review_started_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("review started at must be an ISO-8601 timestamp") from exc
+    for label, duration in (
+        ("review duration", review_duration_ms),
+        ("correction duration", correction_duration_ms),
+    ):
+        if duration is not None and (isinstance(duration, bool) or duration < 0):
+            raise ValueError(f"{label} must be non-negative milliseconds")
     with with_db() as conn:
         run = conn.execute("SELECT state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
         if run is None:
@@ -85,6 +100,7 @@ def review_qa_page(
         cursor = conn.execute(
             "UPDATE ocr_page_results SET qa_state=?, qa_note=?, page_type=?, layout_type=?, "
             "selected_engine=?, corrected_text=?, index_eligible=?, "
+            "review_started_at=?, review_duration_ms=?, correction_duration_ms=?, "
             "reviewed_at=datetime('now', '+9 hours') WHERE run_id=? AND page_no=?",
             (
                 state,
@@ -94,6 +110,9 @@ def review_qa_page(
                 selected_engine,
                 corrected,
                 is_index_eligible(page_type),
+                review_started_at,
+                review_duration_ms,
+                correction_duration_ms if selected_engine == "codex" else None,
                 run_id,
                 page_no,
             ),

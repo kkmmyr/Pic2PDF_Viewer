@@ -4169,6 +4169,17 @@
           "agent_id": {
             "title": "Agent Id",
             "type": "string"
+          },
+          "model_revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Revision"
           }
         },
         "required": [
@@ -4290,6 +4301,18 @@
             "title": "Block Count",
             "type": "integer"
           },
+          "candidate_manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Manifest"
+          },
           "char_count": {
             "title": "Char Count",
             "type": "integer"
@@ -4304,6 +4327,17 @@
               }
             ],
             "title": "Error Message"
+          },
+          "external_raw_output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Raw Output"
           },
           "external_text": {
             "anyOf": [
@@ -4352,6 +4386,17 @@
             "title": "Page No",
             "type": "integer"
           },
+          "primary_raw_output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Raw Output"
+          },
           "primary_text": {
             "anyOf": [
               {
@@ -4363,6 +4408,20 @@
             ],
             "title": "Primary Text"
           },
+          "processing_timing": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processing Timing"
+          },
           "quality_flags": {
             "items": {
               "type": "string"
@@ -4373,6 +4432,32 @@
           "raw_output": {
             "title": "Raw Output",
             "type": "string"
+          },
+          "run_timing": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Timing"
+          },
+          "runtime_manifest": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Manifest"
           },
           "selected_engine": {
             "default": "primary",
@@ -4965,6 +5050,11 @@
             "title": "Attempt Count",
             "type": "integer"
           },
+          "candidate_manifest": {
+            "additionalProperties": true,
+            "title": "Candidate Manifest",
+            "type": "object"
+          },
           "char_count": {
             "title": "Char Count",
             "type": "integer"
@@ -4979,6 +5069,17 @@
               }
             ],
             "title": "Corrected Text"
+          },
+          "correction_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Duration Ms"
           },
           "error_message": {
             "anyOf": [
@@ -5049,6 +5150,13 @@
             "title": "Primary Text",
             "type": "string"
           },
+          "processing_timing": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Processing Timing",
+            "type": "object"
+          },
           "qa_note": {
             "anyOf": [
               {
@@ -5070,6 +5178,28 @@
             },
             "title": "Quality Flags",
             "type": "array"
+          },
+          "review_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Duration Ms"
+          },
+          "review_started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Started At"
           },
           "reviewed_at": {
             "anyOf": [
@@ -5114,6 +5244,11 @@
           "external_text",
           "selected_engine",
           "corrected_text",
+          "candidate_manifest",
+          "processing_timing",
+          "review_started_at",
+          "review_duration_ms",
+          "correction_duration_ms",
           "index_eligible",
           "image_url"
         ],
@@ -5132,6 +5267,17 @@
               }
             ],
             "title": "Corrected Text"
+          },
+          "correction_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correction Duration Ms"
           },
           "layout_type": {
             "enum": [
@@ -5166,6 +5312,28 @@
             ],
             "title": "Page Type",
             "type": "string"
+          },
+          "review_duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Duration Ms"
+          },
+          "review_started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Started At"
           },
           "selected_engine": {
             "enum": [
@@ -5240,12 +5408,34 @@
             "title": "Model",
             "type": "string"
           },
+          "ocr_finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ocr Finished At"
+          },
           "pages": {
             "items": {
               "$ref": "#/components/schemas/OcrQaPageOut"
             },
             "title": "Pages",
             "type": "array"
+          },
+          "qa_finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Finished At"
           },
           "qa_note": {
             "anyOf": [
@@ -5280,6 +5470,17 @@
             ],
             "title": "Qa Reviewer"
           },
+          "qa_started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Started At"
+          },
           "qa_state": {
             "title": "Qa State",
             "type": "string"
@@ -5291,6 +5492,11 @@
           "required_pages": {
             "title": "Required Pages",
             "type": "integer"
+          },
+          "runtime_manifest": {
+            "additionalProperties": true,
+            "title": "Runtime Manifest",
+            "type": "object"
           },
           "source_page_count": {
             "title": "Source Page Count",
@@ -5310,6 +5516,13 @@
           "state": {
             "title": "State",
             "type": "string"
+          },
+          "timing": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Timing",
+            "type": "object"
           }
         },
         "required": [
@@ -5327,6 +5540,11 @@
           "qa_reviewer",
           "qa_reviewed_at",
           "qa_note",
+          "runtime_manifest",
+          "timing",
+          "ocr_finished_at",
+          "qa_started_at",
+          "qa_finished_at",
           "pages"
         ],
         "title": "OcrQaRunDetail",

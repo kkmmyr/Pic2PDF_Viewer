@@ -3359,6 +3359,8 @@ export interface components {
         OcrAgentClaimRequest: {
             /** Agent Id */
             agent_id: string;
+            /** Model Revision */
+            model_revision?: string | null;
         };
         /** OcrAgentClaimResponse */
         OcrAgentClaimResponse: {
@@ -3435,6 +3437,26 @@ export interface components {
             primary_text?: string | null;
             /** External Text */
             external_text?: string | null;
+            /** Primary Raw Output */
+            primary_raw_output?: string | null;
+            /** External Raw Output */
+            external_raw_output?: string | null;
+            /** Candidate Manifest */
+            candidate_manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /** Processing Timing */
+            processing_timing?: {
+                [key: string]: number;
+            } | null;
+            /** Runtime Manifest */
+            runtime_manifest?: {
+                [key: string]: unknown;
+            } | null;
+            /** Run Timing */
+            run_timing?: {
+                [key: string]: number;
+            } | null;
             /**
              * Selected Engine
              * @default primary
@@ -3692,6 +3714,20 @@ export interface components {
             selected_engine: 'primary' | 'external' | 'codex';
             /** Corrected Text */
             corrected_text: string | null;
+            /** Candidate Manifest */
+            candidate_manifest: {
+                [key: string]: unknown;
+            };
+            /** Processing Timing */
+            processing_timing: {
+                [key: string]: number;
+            };
+            /** Review Started At */
+            review_started_at: string | null;
+            /** Review Duration Ms */
+            review_duration_ms: number | null;
+            /** Correction Duration Ms */
+            correction_duration_ms: number | null;
             /** Index Eligible */
             index_eligible: boolean;
             /** Image Url */
@@ -3729,6 +3765,12 @@ export interface components {
             selected_engine: 'primary' | 'external' | 'codex';
             /** Corrected Text */
             corrected_text?: string | null;
+            /** Review Started At */
+            review_started_at?: string | null;
+            /** Review Duration Ms */
+            review_duration_ms?: number | null;
+            /** Correction Duration Ms */
+            correction_duration_ms?: number | null;
         };
         /** OcrQaRunApproveRequest */
         OcrQaRunApproveRequest: {
@@ -3767,6 +3809,20 @@ export interface components {
             qa_reviewed_at: string | null;
             /** Qa Note */
             qa_note: string | null;
+            /** Runtime Manifest */
+            runtime_manifest: {
+                [key: string]: unknown;
+            };
+            /** Timing */
+            timing: {
+                [key: string]: number;
+            };
+            /** Ocr Finished At */
+            ocr_finished_at: string | null;
+            /** Qa Started At */
+            qa_started_at: string | null;
+            /** Qa Finished At */
+            qa_finished_at: string | null;
             /** Pages */
             pages: components['schemas']['OcrQaPageOut'][];
         };
@@ -5942,7 +5998,8 @@ export interface operations {
                     | ('purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown')
                     | null;
                 capture_state?:
-                    ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending') | null;
+                    | ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending')
+                    | null;
                 page?: number;
                 page_size?: number;
             };

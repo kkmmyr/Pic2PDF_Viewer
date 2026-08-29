@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { OcrQaRunDetail, OcrQaRunListResponse } from '@/features/ocr/types';
@@ -7,11 +7,12 @@ import { createQueryWrapper } from '@/test/queryTestUtils';
 
 const fetchOcrQaRuns = vi.fn();
 const fetchOcrQaRun = vi.fn();
+const reviewOcrQaPage = vi.fn();
 
 vi.mock('@/features/ocr/api', () => ({
     fetchOcrQaRuns: () => fetchOcrQaRuns(),
     fetchOcrQaRun: (runId: number) => fetchOcrQaRun(runId),
-    reviewOcrQaPage: vi.fn(),
+    reviewOcrQaPage: (...args: unknown[]) => reviewOcrQaPage(...args),
     classifyOcrQaPages: vi.fn(),
     approveOcrQaRun: vi.fn(),
 }));
@@ -39,6 +40,15 @@ const runDetail: OcrQaRunDetail = {
     qa_reviewer: null,
     qa_reviewed_at: null,
     qa_note: null,
+    runtime_manifest: {
+        platform: 'Windows-test',
+        device: { backend: 'cuda' },
+        package_versions: { yomitoku: '0.12.0' },
+    },
+    timing: { worker_init_ms: 500 },
+    ocr_finished_at: null,
+    qa_started_at: null,
+    qa_finished_at: null,
     pages: [
         {
             page_no: 1,
@@ -58,6 +68,11 @@ const runDetail: OcrQaRunDetail = {
             external_text: '',
             selected_engine: 'primary',
             corrected_text: null,
+            candidate_manifest: {},
+            processing_timing: { total_ms: 100 },
+            review_started_at: null,
+            review_duration_ms: null,
+            correction_duration_ms: null,
             index_eligible: true,
             image_url: '/image',
         },
@@ -68,8 +83,10 @@ describe('useOCRQaController', () => {
     beforeEach(() => {
         fetchOcrQaRuns.mockReset();
         fetchOcrQaRun.mockReset();
+        reviewOcrQaPage.mockReset();
         fetchOcrQaRuns.mockResolvedValue(runList);
         fetchOcrQaRun.mockResolvedValue(runDetail);
+        reviewOcrQaPage.mockResolvedValue({});
     });
 
     it('selects the first awaiting run and synchronizes its required page review state', async () => {
@@ -86,5 +103,30 @@ describe('useOCRQaController', () => {
         expect(result.current.layoutType).toBe('normal_prose');
         expect(result.current.note).toBe('確認メモ');
         expect(result.current.canApproveRun).toBe(false);
+    });
+
+    it('submits the page review start and elapsed time without inventing correction time', async () => {
+        const { result } = renderHook(() => useOCRQaController(), {
+            wrapper: createQueryWrapper(),
+        });
+        await waitFor(() => expect(result.current.selectedPageNo).toBe(1));
+
+        act(() => result.current.pageMutation.mutate('approved'));
+        await waitFor(() => expect(reviewOcrQaPage).toHaveBeenCalledOnce());
+
+        const args = reviewOcrQaPage.mock.calls[0];
+        expect(args.slice(0, 8)).toEqual([
+            7,
+            1,
+            'approved',
+            '確認メモ',
+            'narrative',
+            'normal_prose',
+            'primary',
+            null,
+        ]);
+        expect(args[8]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(args[9]).toEqual(expect.any(Number));
+        expect(args[10]).toBeNull();
     });
 });
