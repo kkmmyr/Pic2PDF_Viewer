@@ -11,7 +11,7 @@ import sqlite3
 from collections.abc import Mapping
 from urllib.parse import urlsplit
 
-from services.kindle_catalog import price_notify
+from services.kindle_catalog import price_observation
 from services.kindle_catalog.connection import with_db
 from services.kindle_catalog.price_watch_rows import (
     observation_from_row as _observation_from_row,
@@ -26,9 +26,9 @@ from utils.dt import jst_now
 
 _ASIN_RE = re.compile(r"/(?:dp|gp/product|product)/([A-Z0-9]{10})(?:[/?#]|$)", re.IGNORECASE)
 _ALLOWED_HOSTS = {"amazon.co.jp", "www.amazon.co.jp"}
-_STATUSES = {"ok", "partial", "failed"}
-_SOURCES = {"codex_browser", "manual"}
-_NOTIFICATION_KINDS = {"price_drop", "below_threshold"}
+
+record_observation = price_observation.record_observation
+price_notify = price_observation.price_notify
 
 
 def normalize_amazon_url(url: str) -> tuple[str, str]:
@@ -72,15 +72,48 @@ def _threshold(value: object) -> float:
     return numeric
 
 
-def _price(value: object, field: str) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ValueError(f"{field} は0以上の整数またはnullで指定してください")
-    return value
+def _normalize_update_title(value: object) -> str | None:
+    if value is not None and not isinstance(value, str):
+        raise ValueError("title は文字列またはnullで指定してください")
+    normalized = value.strip() if isinstance(value, str) else None
+    if normalized and len(normalized) > 500:
+        raise ValueError("title は500文字以内で指定してください")
+    return normalized
 
 
-def _get_watch_row(conn, watch_id: int):
+def _watch_update_assignments(changes: Mapping[str, object]) -> tuple[list[str], list[object]]:
+    allowed = {
+        "url",
+        "title",
+        "threshold_percent",
+        "notify_on_drop",
+        "notify_below_threshold",
+        "enabled",
+    }
+    unknown = set(changes) - allowed
+    if unknown:
+        raise ValueError(f"更新できない項目: {', '.join(sorted(unknown))}")
+
+    assignments: list[str] = []
+    params: list[object] = []
+    if "url" in changes:
+        normalized_url, asin = normalize_amazon_url(str(changes["url"]))
+        assignments.extend(("url = ?", "asin = ?"))
+        params.extend((normalized_url, asin))
+    if "title" in changes:
+        assignments.append("title = ?")
+        params.append(_normalize_update_title(changes["title"]))
+    if "threshold_percent" in changes:
+        assignments.append("threshold_percent = ?")
+        params.append(_threshold(changes["threshold_percent"]))
+    for name in ("notify_on_drop", "notify_below_threshold", "enabled"):
+        if name in changes:
+            assignments.append(f"{name} = ?")
+            params.append(_as_bool(changes[name], name))
+    return assignments, params
+
+
+def _get_watch_row(conn: sqlite3.Connection, watch_id: int) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM kindle_price_watches WHERE id = ?", (watch_id,)).fetchone()
 
 
@@ -134,46 +167,15 @@ def create_watch(
             raise
         watch_id = require_lastrowid(cursor.lastrowid, "価格監視の作成IDを取得できませんでした")
         row = _get_watch_row(conn, watch_id)
+        if row is None:
+            raise RuntimeError("登録した価格監視を取得できません")
     return _watch_from_row(row)
 
 
 def update_watch(watch_id: int, changes: Mapping[str, object]) -> dict:
     if not changes:
         return get_watch(watch_id)
-    allowed = {
-        "url",
-        "title",
-        "threshold_percent",
-        "notify_on_drop",
-        "notify_below_threshold",
-        "enabled",
-    }
-    unknown = set(changes) - allowed
-    if unknown:
-        raise ValueError(f"更新できない項目: {', '.join(sorted(unknown))}")
-
-    assignments: list[str] = []
-    params: list[object] = []
-    if "url" in changes:
-        normalized_url, asin = normalize_amazon_url(str(changes["url"]))
-        assignments.extend(("url = ?", "asin = ?"))
-        params.extend((normalized_url, asin))
-    if "title" in changes:
-        title = changes["title"]
-        if title is not None and not isinstance(title, str):
-            raise ValueError("title は文字列またはnullで指定してください")
-        normalized_title = title.strip() if isinstance(title, str) else None
-        if normalized_title and len(normalized_title) > 500:
-            raise ValueError("title は500文字以内で指定してください")
-        assignments.append("title = ?")
-        params.append(normalized_title)
-    if "threshold_percent" in changes:
-        assignments.append("threshold_percent = ?")
-        params.append(_threshold(changes["threshold_percent"]))
-    for name in ("notify_on_drop", "notify_below_threshold", "enabled"):
-        if name in changes:
-            assignments.append(f"{name} = ?")
-            params.append(_as_bool(changes[name], name))
+    assignments, params = _watch_update_assignments(changes)
 
     assignments.append("updated_at = ?")
     params.extend((_now(), watch_id))
@@ -190,6 +192,8 @@ def update_watch(watch_id: int, changes: Mapping[str, object]) -> dict:
                 raise ValueError("同じ URL はすでに登録されています") from exc
             raise
         row = _get_watch_row(conn, watch_id)
+        if row is None:
+            raise KeyError(f"価格監視 {watch_id} が見つかりません")
     return _watch_from_row(row)
 
 
@@ -234,139 +238,3 @@ def list_history(watch_id: int, limit: int = 100) -> list[dict]:
             (watch_id, limit),
         ).fetchall()
     return [_observation_from_row(row) for row in rows]
-
-
-def record_observation(
-    *,
-    watch_id: int,
-    current_price: int | None,
-    list_price: int | None,
-    status: str | None = None,
-    error_message: str | None = None,
-    source: str = "codex_browser",
-    title: str | None = None,
-) -> dict:
-    """Codex ブラウザの1回分の読み取りを保存し、必要なら通知する。"""
-    current = _price(current_price, "current_price")
-    listed = _price(list_price, "list_price")
-    if source not in _SOURCES:
-        raise ValueError(f"source は {', '.join(sorted(_SOURCES))} のいずれかで指定してください")
-    if status is None:
-        if current is not None and listed is not None and listed > 0:
-            status = "ok"
-        elif current is not None or listed is not None:
-            status = "partial"
-        else:
-            status = "failed"
-    if status not in _STATUSES:
-        raise ValueError(f"status は {', '.join(sorted(_STATUSES))} のいずれかで指定してください")
-    if error_message is not None and not isinstance(error_message, str):
-        raise ValueError("error_message は文字列またはnullで指定してください")
-    if title is not None and not isinstance(title, str):
-        raise ValueError("title は文字列またはnullで指定してください")
-    normalized_title = title.strip() if title else None
-
-    ratio = (
-        current / listed * 100 if status == "ok" and current is not None and listed is not None and listed > 0 else None
-    )
-    observed_at = _now()
-    with with_db() as conn:
-        watch = _get_watch_row(conn, watch_id)
-        if watch is None:
-            raise KeyError(f"価格監視 {watch_id} が見つかりません")
-        previous = conn.execute(
-            """
-            SELECT current_price, list_price, ratio_percent
-            FROM kindle_price_observations
-            WHERE watch_id = ? AND current_price IS NOT NULL AND status IN ('ok', 'partial')
-            ORDER BY id DESC LIMIT 1
-            """,
-            (watch_id,),
-        ).fetchone()
-        cursor = conn.execute(
-            """
-            INSERT INTO kindle_price_observations(
-                watch_id, observed_at, current_price, list_price,
-                ratio_percent, status, error_message, source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (watch_id, observed_at, current, listed, ratio, status, error_message, source),
-        )
-        observation_id = require_lastrowid(cursor.lastrowid, "価格観測の作成IDを取得できませんでした")
-        assignments = [
-            "updated_at = ?",
-            "last_checked_at = ?",
-            "last_status = ?",
-            "last_error = ?",
-            "last_current_price = ?",
-            "last_list_price = ?",
-            "last_ratio_percent = ?",
-        ]
-        params: list[object] = [observed_at, observed_at, status, error_message, current, listed, ratio]
-        if normalized_title:
-            assignments.append("title = ?")
-            params.append(normalized_title)
-        params.append(watch_id)
-        conn.execute(
-            f"UPDATE kindle_price_watches SET {', '.join(assignments)} WHERE id = ?",
-            params,
-        )
-
-    previous_price = previous["current_price"] if previous else None
-    previous_ratio = previous["ratio_percent"] if previous else None
-    price_dropped = (
-        status in {"ok", "partial"} and current is not None and previous_price is not None and current < previous_price
-    )
-    crossed_threshold = (
-        ratio is not None
-        and ratio < float(watch["threshold_percent"])
-        and (previous_ratio is None or previous_ratio >= float(watch["threshold_percent"]))
-    )
-    kinds: list[str] = []
-    if bool(watch["notify_on_drop"]) and price_dropped:
-        kinds.append("price_drop")
-    if bool(watch["notify_below_threshold"]) and crossed_threshold:
-        kinds.append("below_threshold")
-
-    notification_results = [{"kind": kind, "sent": False} for kind in kinds]
-    if kinds:
-        sent = price_notify.notify_price_event(
-            title=normalized_title or watch["title"],
-            asin=watch["asin"],
-            url=watch["url"],
-            current_price=current,
-            list_price=listed,
-            ratio_percent=ratio,
-            previous_price=previous_price,
-            kinds=kinds,
-        )
-        if sent:
-            notified_at = _now()
-            with with_db() as conn:
-                for kind in kinds:
-                    conn.execute(
-                        """
-                        INSERT OR IGNORE INTO kindle_price_notifications(
-                            watch_id, observation_id, kind, notified_at
-                        ) VALUES (?, ?, ?, ?)
-                        """,
-                        (watch_id, observation_id, kind, notified_at),
-                    )
-        notification_results = [{"kind": kind, "sent": sent} for kind in kinds]
-
-    return {
-        "observation": {
-            "id": observation_id,
-            "watch_id": watch_id,
-            "observed_at": observed_at,
-            "current_price": current,
-            "list_price": listed,
-            "ratio_percent": ratio,
-            "status": status,
-            "error_message": error_message,
-            "source": source,
-        },
-        "price_dropped": price_dropped,
-        "below_threshold": status == "ok" and ratio is not None and ratio < float(watch["threshold_percent"]),
-        "notifications": notification_results,
-    }

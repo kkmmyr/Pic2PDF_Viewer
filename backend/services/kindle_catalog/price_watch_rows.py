@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import Protocol
+
+
+class _RowLike(Protocol):
+    def __getitem__(self, key: str, /) -> object: ...
 
 
 def _required_int(value: object, field: str) -> int:
@@ -23,7 +27,7 @@ def require_lastrowid(value: int | None, message: str) -> int:
     return value
 
 
-def watch_from_row(row: Mapping[str, object]) -> dict[str, object]:
+def watch_from_row(row: _RowLike) -> dict[str, object]:
     return {
         "id": _required_int(row["id"], "kindle_price_watches.id"),
         "url": row["url"],
@@ -47,7 +51,7 @@ def watch_from_row(row: Mapping[str, object]) -> dict[str, object]:
     }
 
 
-def observation_from_row(row: Mapping[str, object]) -> dict[str, object]:
+def observation_from_row(row: _RowLike) -> dict[str, object]:
     return {
         "id": _required_int(row["id"], "kindle_price_observations.id"),
         "watch_id": _required_int(row["watch_id"], "kindle_price_observations.watch_id"),
