@@ -171,6 +171,13 @@ Mac版YomiToku/MPS単独runではない。Mac実機はTailscale上で到達で�
 YomiToku・PyTorch・モデル・MPS設定・実OCR時間を取得できていない。この状態ではrun間差を
 Windows/Mac差またはCUDA/MPS差へ帰属させない。
 
+再現可能なWindows比較基準はrun 190へ更新する。run 190は同じ138画面のSHA-256をrun 185・186と
+一致確認済みで、Windows 11、RTX 5070、CUDA 12.8、YomiToku 0.12.0、PyTorch 2.11.0+cu128、
+pipeline/model/mmproj SHAを保存している。OCR wall timeは51分11秒、画面平均はprimary OCR 20,134ms、
+external OCR 683ms、総処理20,853msだった。結果は`passed` 117件、`failed` 21件、全138件が
+`required`の`awaiting_qa`であり、自動公開していない。run 186との本文差はengine・補正工程も異なるため、
+この一致入力だけからCUDA/MPS差とは判定しない。
+
 WindowsではYomiToku 0.12.0・PyTorch 2.11.0+cu128について、同じ30画面のCPU/CUDA本文が
 正規化後30/30一致し、CUDAがページ処理時間で13.75倍速かった。この標本ではbackend差は
 速度に現れ、本文差には現れなかった。Mac MPSにも成立するかは別途同一version・同一設定で確認する。

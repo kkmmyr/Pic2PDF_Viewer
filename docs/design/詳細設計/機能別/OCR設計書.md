@@ -573,6 +573,16 @@ model/mmprojのローカル資材が指定された場合はファイルSHAも�
 - 公開可能になるまでのwall clockはrunの`started_at`から`qa_finished_at`までとし、OCR計算時間、
   QA待ち時間、人手確認時間を混ぜた単一の速度値として扱わない。
 
+2026-08-29のWindows受入では、138画面のrun 190がWindows 11、RTX 5070、CUDA 12.8、
+YomiToku 0.12.0、PyTorch 2.11.0+cu128、Git commit、pipeline/model/mmproj SHAをmanifestへ固定し、
+全画面で両候補・候補manifest・工程時間を保存した。空のprimary候補18件も空のまま監査保存され、
+同一入力のrun 185に対して`failed`から`passed`へ3件改善、逆方向の遷移は0件だった。
+
+この受入でページの`passed` 117件、`failed` 21件は品質リスク分類であり、runの実行成否とは分ける。
+全138画面を`required`、runを`awaiting_qa / pending`として隔離し、公開版・canonical本文・検索索引は
+変更しなかった。先行run 189は原候補本文とmanifestのSHA不一致で19画面時点にfail closedとなり、
+checkpointを保持したまま公開へ進まなかった。この挙動を監査保存の受入基準とする。
+
 ## 7. `YomitokuEngine`
 
 `YomitokuEngine`は通常のPyTorch経路で実行し、workerから渡されたデバイスを
