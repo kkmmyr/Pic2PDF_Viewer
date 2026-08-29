@@ -100,6 +100,7 @@ def collect_runtime_manifest(engine: str, model_revision: str) -> dict[str, Any]
         "ocr_worker_engines.py",
         "ocr_worker_session.py",
         "surya_runtime.py",
+        "yomitoku_runtime.py",
     )
     sources = [_file_manifest(module_dir / name) for name in source_names if (module_dir / name).is_file()]
     wrapper_path = Path(os.environ.get("OCR_PATH", "")) / "ocr_engine.py"

@@ -1,6 +1,6 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-08-22
+> status: living | last-verified: 2026-08-29
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
@@ -146,10 +146,13 @@ open http://localhost:5176
 - **リモート Surya を使う場合**: worker の依存を入れた Python を
   `OCR_PYTHON` に設定し、`SURYA_INFERENCE_URL` を到達可能なサーバーへ向ける
 - **yomitoku 補助照合も使う場合**: `OCR_PACKAGE_PATH` が指す環境へ
-  yomitoku と対応する PyTorch を別途用意する
+  MPS対応済みのyomitoku（v0.11.0以降）とPyTorchを別途用意し、
+  `OCR_YOMITOKU_DEVICE=mps`を指定する。`kindle-pdf`の`gpu` groupはMac上で
+  CUDA wheelではなくApple Silicon用PyTorchを解決する。
 
-Mac 上でのローカル Surya / yomitoku 実行は標準運用ではなく、
-GPU・モデル互換性と推論時間を個別に検証する。通常の Mac 開発では
+Mac 上でのローカル Surya 実行は標準運用ではなく、yomitokuは独立照合・比較・
+後方互換用の補助経路として扱う。MPSの演算子fallbackを含むGPU・モデル互換性と推論時間を
+個別に検証する。通常の Mac 開発では
 OCR を実行しないか、既存の Windows OCR agent / 推論サーバーを利用する。
 
 OwlOCR、ABBYY FineReader、Prizmo 等を本番主系とは独立した第二 OCR・
