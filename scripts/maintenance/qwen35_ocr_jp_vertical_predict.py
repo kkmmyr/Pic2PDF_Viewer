@@ -79,9 +79,7 @@ class _LayoutHtmlParser(HTMLParser):
         try:
             x1, y1, x2, y2 = (float(part) for part in parts)
         except ValueError as exc:
-            raise ValueError(
-                "Qwen HTML layout block has a non-numeric data-bbox"
-            ) from exc
+            raise ValueError("Qwen HTML layout block has a non-numeric data-bbox") from exc
         if x2 <= x1 or y2 <= y1:
             raise ValueError("Qwen HTML layout block has an invalid data-bbox")
 
@@ -94,9 +92,7 @@ class _LayoutHtmlParser(HTMLParser):
         has_bbox = "data-bbox" in attr_map
         has_label = "data-label" in attr_map
         if has_bbox != has_label:
-            raise ValueError(
-                "Qwen HTML layout block must have data-bbox and data-label"
-            )
+            raise ValueError("Qwen HTML layout block must have data-bbox and data-label")
         if has_bbox:
             if self._block_tag is not None:
                 raise ValueError("Qwen HTML layout blocks must not be nested")
@@ -267,7 +263,9 @@ def _prediction_record(
         "layout_block_count": block_count,
         "html_truncated": html_truncated,
         "fallback_markup_tags": markup_tags,
-        "suspicious_vertical_bbox_order": has_suspicious_vertical_bbox_order(response),
+        "suspicious_vertical_bbox_order": (
+            False if candidate_error is not None else has_suspicious_vertical_bbox_order(response)
+        ),
         "suspicious_repetition": has_suspicious_repetition(prediction),
         "input_sha256": page.image_sha256,
         "image_relpath": page.image_relpath,
@@ -349,9 +347,7 @@ class _MpsEngine:
     def __init__(self, config: RunConfig) -> None:
         installed = importlib.metadata.version("transformers")
         if installed != config.engine_version:
-            raise ValueError(
-                f"transformers version mismatch: {installed} != {config.engine_version}"
-            )
+            raise ValueError(f"transformers version mismatch: {installed} != {config.engine_version}")
         import torch  # pyright: ignore[reportMissingImports]
         from transformers import (  # pyright: ignore[reportMissingImports]
             AutoModelForImageTextToText,
