@@ -26,7 +26,7 @@ try:
     from .surya_quality import crosscheck_ocr_results, evaluate_external_ocr
     from .surya_runtime import SuryaClient
     from .surya_types import SuryaPageResult
-    from .yomitoku_runtime import initialize_yomitoku_engine
+    from .yomitoku_runtime import initialize_yomitoku_engine, requested_yomitoku_device
 except ImportError:
     from ocr_candidate_selection import (
         is_external_materially_more_complete,
@@ -39,13 +39,21 @@ except ImportError:
     from surya_quality import crosscheck_ocr_results, evaluate_external_ocr
     from surya_runtime import SuryaClient
     from surya_types import SuryaPageResult
-    from yomitoku_runtime import initialize_yomitoku_engine
+    from yomitoku_runtime import initialize_yomitoku_engine, requested_yomitoku_device
 
 _YOMITOKU_ADJUDICATION_FLAGS = {
     "duplicate_text_recovery",
     "sparse_page_block_fallback",
     "sparse_page_variant_consensus",
 }
+
+
+def _requested_yomitoku_device() -> str:
+    return requested_yomitoku_device()
+
+
+def _initialize_yomitoku_engine(engine: Any) -> None:
+    initialize_yomitoku_engine(engine)
 
 
 @dataclass(frozen=True)
@@ -175,7 +183,7 @@ class YomitokuAdjudicator:
             from ocr_engine import get_ocr_engine  # type: ignore[import-not-found]
 
             engine = get_ocr_engine("yomitoku")
-            initialize_yomitoku_engine(engine)
+            _initialize_yomitoku_engine(engine)
             self._engine = engine
         return self._engine
 
@@ -288,7 +296,7 @@ def run_yomitoku(tasks: list[OcrWorkerTask]) -> None:
     manifest_collection_ms = round((time.perf_counter() - manifest_started) * 1000)
     init_started = time.perf_counter()
     engine = get_ocr_engine("yomitoku")
-    initialize_yomitoku_engine(engine)
+    _initialize_yomitoku_engine(engine)
     worker_init_ms = round((time.perf_counter() - init_started) * 1000)
     for task in tasks:
         book_name = str(task["book_name"])

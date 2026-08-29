@@ -236,6 +236,7 @@ class OcrPageResult(SQLModel, table=True):
     candidate_manifest_json: str = "{}"
     processing_timing_json: str = "{}"
     selected_engine: str = "primary"
+    selection_reason: str | None = None
     corrected_text: str | None = None
     published_text: str | None = None
     index_eligible: bool = False

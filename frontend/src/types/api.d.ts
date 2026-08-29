@@ -1202,6 +1202,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    '/api/kindle-price-watches/targets': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Targets
+         * @description Codex のブラウザ観測処理に渡す有効な URL 一覧。
+         */
+        get: operations['export_targets_api_kindle_price_watches_targets_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-price-watches': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Price Watches */
+        get: operations['list_price_watches_api_kindle_price_watches_get'];
+        put?: never;
+        /** Create Price Watch */
+        post: operations['create_price_watch_api_kindle_price_watches_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-price-watches/{watch_id}': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Price Watch */
+        get: operations['get_price_watch_api_kindle_price_watches__watch_id__get'];
+        put?: never;
+        post?: never;
+        /** Delete Price Watch */
+        delete: operations['delete_price_watch_api_kindle_price_watches__watch_id__delete'];
+        options?: never;
+        head?: never;
+        /** Update Price Watch */
+        patch: operations['update_price_watch_api_kindle_price_watches__watch_id__patch'];
+        trace?: never;
+    };
+    '/api/kindle-price-watches/{watch_id}/history': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Price History */
+        get: operations['get_price_history_api_kindle_price_watches__watch_id__history_get'];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    '/api/kindle-price-watches/{watch_id}/observations': {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record Price Observation */
+        post: operations['record_price_observation_api_kindle_price_watches__watch_id__observations_post'];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     '/api/genres': {
         parameters: {
             query?: never;
@@ -3218,6 +3309,187 @@ export interface components {
             /** Files */
             files: components['schemas']['KindleImportFileResultOut'][];
         };
+        /** KindlePriceHistoryResponse */
+        KindlePriceHistoryResponse: {
+            /** Items */
+            items: components['schemas']['KindlePriceObservationOut'][];
+        };
+        /** KindlePriceNotificationOut */
+        KindlePriceNotificationOut: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: 'price_drop' | 'below_threshold';
+            /** Sent */
+            sent: boolean;
+        };
+        /** KindlePriceObservationOut */
+        KindlePriceObservationOut: {
+            /** Id */
+            id: number;
+            /** Watch Id */
+            watch_id: number;
+            /** Observed At */
+            observed_at: string;
+            /** Current Price */
+            current_price: number | null;
+            /** List Price */
+            list_price: number | null;
+            /** Ratio Percent */
+            ratio_percent: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: 'ok' | 'partial' | 'failed';
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: 'codex_browser' | 'manual';
+        };
+        /** KindlePriceObservationRequest */
+        KindlePriceObservationRequest: {
+            /** Current Price */
+            current_price?: number | null;
+            /** List Price */
+            list_price?: number | null;
+            /** Status */
+            status?: ('ok' | 'partial' | 'failed') | null;
+            /** Error Message */
+            error_message?: string | null;
+            /**
+             * Source
+             * @default codex_browser
+             * @enum {string}
+             */
+            source: 'codex_browser' | 'manual';
+            /** Title */
+            title?: string | null;
+        };
+        /** KindlePriceObservationResponse */
+        KindlePriceObservationResponse: {
+            observation: components['schemas']['KindlePriceObservationOut'];
+            /** Price Dropped */
+            price_dropped: boolean;
+            /** Below Threshold */
+            below_threshold: boolean;
+            /** Notifications */
+            notifications: components['schemas']['KindlePriceNotificationOut'][];
+        };
+        /** KindlePriceTargetOut */
+        KindlePriceTargetOut: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string | null;
+            /** Threshold Percent */
+            threshold_percent: number;
+        };
+        /** KindlePriceTargetsResponse */
+        KindlePriceTargetsResponse: {
+            /** Items */
+            items: components['schemas']['KindlePriceTargetOut'][];
+        };
+        /** KindlePriceWatchCreateRequest */
+        KindlePriceWatchCreateRequest: {
+            /** Url */
+            url: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Threshold Percent
+             * @default 50
+             */
+            threshold_percent: number;
+            /**
+             * Notify On Drop
+             * @default true
+             */
+            notify_on_drop: boolean;
+            /**
+             * Notify Below Threshold
+             * @default true
+             */
+            notify_below_threshold: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** KindlePriceWatchDeleteResponse */
+        KindlePriceWatchDeleteResponse: {
+            /** Id */
+            id: number;
+            /** Deleted */
+            deleted: boolean;
+        };
+        /** KindlePriceWatchListResponse */
+        KindlePriceWatchListResponse: {
+            /** Items */
+            items: components['schemas']['KindlePriceWatchOut'][];
+        };
+        /** KindlePriceWatchOut */
+        KindlePriceWatchOut: {
+            /** Id */
+            id: number;
+            /** Url */
+            url: string;
+            /** Asin */
+            asin: string;
+            /** Title */
+            title: string | null;
+            /** Threshold Percent */
+            threshold_percent: number;
+            /** Notify On Drop */
+            notify_on_drop: boolean;
+            /** Notify Below Threshold */
+            notify_below_threshold: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Created At */
+            created_at: string;
+            /** Updated At */
+            updated_at: string;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /**
+             * Last Status
+             * @enum {string}
+             */
+            last_status: 'never' | 'ok' | 'partial' | 'failed';
+            /** Last Error */
+            last_error: string | null;
+            /** Last Current Price */
+            last_current_price: number | null;
+            /** Last List Price */
+            last_list_price: number | null;
+            /** Last Ratio Percent */
+            last_ratio_percent: number | null;
+        };
+        /** KindlePriceWatchUpdateRequest */
+        KindlePriceWatchUpdateRequest: {
+            /** Url */
+            url?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Threshold Percent */
+            threshold_percent?: number | null;
+            /** Notify On Drop */
+            notify_on_drop?: boolean | null;
+            /** Notify Below Threshold */
+            notify_below_threshold?: boolean | null;
+            /** Enabled */
+            enabled?: boolean | null;
+        };
         /** KindleUnlinkResponse */
         KindleUnlinkResponse: {
             /**
@@ -3714,6 +3986,8 @@ export interface components {
             selected_engine: 'primary' | 'external' | 'codex';
             /** Corrected Text */
             corrected_text: string | null;
+            /** Selection Reason */
+            selection_reason: string | null;
             /** Candidate Manifest */
             candidate_manifest: {
                 [key: string]: unknown;
@@ -6595,6 +6869,244 @@ export interface operations {
                 };
                 content: {
                     'application/json': components['schemas']['KindleCaptureCompleteResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    export_targets_api_kindle_price_watches_targets_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceTargetsResponse'];
+                };
+            };
+        };
+    };
+    list_price_watches_api_kindle_price_watches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceWatchListResponse'];
+                };
+            };
+        };
+    };
+    create_price_watch_api_kindle_price_watches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['KindlePriceWatchCreateRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceWatchOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_price_watch_api_kindle_price_watches__watch_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceWatchOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    delete_price_watch_api_kindle_price_watches__watch_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceWatchDeleteResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    update_price_watch_api_kindle_price_watches__watch_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['KindlePriceWatchUpdateRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceWatchOut'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    get_price_history_api_kindle_price_watches__watch_id__history_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceHistoryResponse'];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['HTTPValidationError'];
+                };
+            };
+        };
+    };
+    record_price_observation_api_kindle_price_watches__watch_id__observations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                watch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                'application/json': components['schemas']['KindlePriceObservationRequest'];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    'application/json': components['schemas']['KindlePriceObservationResponse'];
                 };
             };
             /** @description Validation Error */

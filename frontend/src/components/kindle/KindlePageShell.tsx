@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { BookOpen, Download, Link2, ScanLine } from 'lucide-react';
+import { BellRing, BookOpen, Download, Link2, ScanLine } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 import { cn } from '@/lib/utils';
@@ -9,6 +9,7 @@ const TABS = [
     { to: '/kindle/links', label: '画像紐付け', icon: Link2 },
     { to: '/kindle/capture', label: 'キャプチャ', icon: ScanLine },
     { to: '/kindle/imports', label: '取込・管理', icon: Download },
+    { to: '/kindle/price-watch', label: '価格監視', icon: BellRing },
 ] as const;
 
 interface KindlePageShellProps {

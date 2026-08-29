@@ -79,6 +79,7 @@ class RunConfig:
     selected_ids: tuple[str, ...] = ()
     response_mode: str = "plain_text"
     allow_custom_model_code: bool = False
+    allow_empty_prediction: bool = False
 
 
 @dataclass(frozen=True)
@@ -227,7 +228,7 @@ def model_fingerprint(model_path: Path) -> str:
         path
         for path in root.iterdir()
         if path.is_file()
-        and (path.name in selected_names or path.name.endswith(".safetensors"))
+        and (path.name in selected_names or path.name.endswith((".py", ".safetensors")))
     )
     if not any(path.name.endswith(".safetensors") for path in files):
         raise ValueError("model snapshot has no safetensors weights")
@@ -240,7 +241,11 @@ def model_fingerprint(model_path: Path) -> str:
     return digest.hexdigest()
 
 
-def _load_checkpoint(path: Path) -> dict[str, dict[str, Any]]:
+def _load_checkpoint(
+    path: Path,
+    *,
+    allow_empty_prediction: bool = False,
+) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     records: dict[str, dict[str, Any]] = {}
@@ -259,7 +264,15 @@ def _load_checkpoint(path: Path) -> dict[str, dict[str, Any]]:
             record_id = record["id"]
             if record_id in records:
                 raise ValueError(f"checkpoint contains duplicate id: {record_id}")
-            if not isinstance(record.get("pred"), str) or not record["pred"].strip():
+            if not isinstance(record.get("pred"), str):
+                raise ValueError(f"checkpoint id {record_id} has empty prediction")
+            if not record["pred"].strip() and not (
+                allow_empty_prediction
+                and (
+                    record.get("image_only") is True
+                    or isinstance(record.get("candidate_error"), str)
+                )
+            ):
                 raise ValueError(f"checkpoint id {record_id} has empty prediction")
             records[record_id] = record
     return records
@@ -298,8 +311,7 @@ def _validate_checkpoint(
                 continue
             if record.get(field) != value:
                 raise ValueError(
-                    f"checkpoint id {record_id} {field} mismatch: "
-                    f"{record.get(field)!r} != {value!r}"
+                    f"checkpoint id {record_id} {field} mismatch: {record.get(field)!r} != {value!r}"
                 )
         page = pages_by_id[record_id]
         if record.get("input_sha256") != page.image_sha256:
@@ -344,7 +356,12 @@ def _extract_layout_cell(cell: Any, *, index: int) -> str | None:
     return text if text.strip() else None
 
 
-def _extract_prediction(response: str, *, response_mode: str) -> tuple[str, int | None]:
+def _extract_prediction(
+    response: str,
+    *,
+    response_mode: str,
+    allow_empty_prediction: bool = False,
+) -> tuple[str, int | None]:
     if response_mode == "plain_text":
         return response, None
     if response_mode != "layout_json":
@@ -363,7 +380,7 @@ def _extract_prediction(response: str, *, response_mode: str) -> tuple[str, int 
         if (text := _extract_layout_cell(cell, index=index)) is not None
     ]
     prediction = "\n\n".join(text_items)
-    if not prediction:
+    if not prediction and not allow_empty_prediction:
         raise ValueError("dots.mocr layout response has no text cells")
     return prediction, len(cells)
 
@@ -375,7 +392,10 @@ def run_predictions(
 ) -> tuple[int, int]:
     pages = load_vertical_pages(config)
     fingerprint = model_fingerprint(config.model_path)
-    checkpoint = _load_checkpoint(config.output_path)
+    checkpoint = _load_checkpoint(
+        config.output_path,
+        allow_empty_prediction=config.allow_empty_prediction,
+    )
     _validate_checkpoint(
         config=config,
         pages=pages,
@@ -396,9 +416,19 @@ def run_predictions(
         elapsed = time.monotonic() - started_at
         if not isinstance(response, str) or not response.strip():
             raise ValueError(f"dots.mocr prediction id {page.record_id} is empty")
-        prediction, layout_cell_count = _extract_prediction(
-            response, response_mode=config.response_mode
-        )
+        candidate_error: str | None = None
+        try:
+            prediction, layout_cell_count = _extract_prediction(
+                response,
+                response_mode=config.response_mode,
+                allow_empty_prediction=config.allow_empty_prediction,
+            )
+        except ValueError as exc:
+            if not config.allow_empty_prediction:
+                raise
+            prediction = ""
+            layout_cell_count = None
+            candidate_error = str(exc)
         record = {
             "id": page.record_id,
             "pred": prediction,
@@ -417,9 +447,14 @@ def run_predictions(
             "elapsed_seconds": elapsed,
             "generated_at": datetime.now(UTC).isoformat(),
         }
+        if config.response_mode == "layout_json":
+            record["raw_response"] = response
         if layout_cell_count is not None:
             record["layout_cell_count"] = layout_cell_count
-            record["raw_response"] = response
+            if not prediction.strip():
+                record["image_only"] = True
+        if candidate_error is not None:
+            record["candidate_error"] = candidate_error
         _append_checkpoint(config.output_path, record)
         completed += 1
         print(
@@ -434,14 +469,12 @@ class _MlxVlmEngine:
     def __init__(self, config: RunConfig) -> None:
         if not config.allow_custom_model_code:
             raise ValueError(
-                "dots.mocr requires audited custom model code; "
-                "pass --allow-custom-model-code explicitly"
+                "dots.mocr requires audited custom model code; pass --allow-custom-model-code explicitly"
             )
         installed_version = importlib.metadata.version("mlx-vlm")
         if installed_version != config.engine_version:
             raise ValueError(
-                f"mlx-vlm version mismatch: {installed_version} != "
-                f"{config.engine_version}"
+                f"mlx-vlm version mismatch: {installed_version} != {config.engine_version}"
             )
         from mlx_vlm import generate, load  # pyright: ignore[reportMissingImports]
         from mlx_vlm.prompt_utils import (  # pyright: ignore[reportMissingImports]
@@ -496,6 +529,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--limit", type=int)
     parser.add_argument("--id", action="append", dest="selected_ids", default=[])
     parser.add_argument("--allow-custom-model-code", action="store_true")
+    parser.add_argument("--allow-empty-candidate", action="store_true")
     return parser
 
 
@@ -530,6 +564,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         selected_ids=tuple(args.selected_ids),
         response_mode="plain_text" if args.prompt_mode == "ocr" else "layout_json",
         allow_custom_model_code=args.allow_custom_model_code,
+        allow_empty_prediction=args.allow_empty_candidate,
     )
     generated, completed = run_predictions(config, engine_factory=_MlxVlmEngine)
     print(f"run complete: generated={generated}, checkpoint_total={completed}")

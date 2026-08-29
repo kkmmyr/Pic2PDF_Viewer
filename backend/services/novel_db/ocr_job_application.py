@@ -11,6 +11,7 @@ from utils.logger import get_logger
 
 from .extractor import OcrPageResult, OcrProgressEvent, OcrTask
 from .ocr_run_store import OcrInputPage
+from .qwen_dots_worker import COMPOSITE_MODEL_REVISION
 
 logger = get_logger(__name__)
 
@@ -77,7 +78,12 @@ def execute_ocr_job(
 ) -> None:
     """Prepare runs, consume the worker process, and stage each run for QA."""
     engine = config.app_settings.OCR_ENGINE.casefold()
-    model = config.app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine
+    if engine == "surya2":
+        model = config.app_settings.SURYA_MODEL_REVISION
+    elif engine == "qwen35_dots_review_v1":
+        model = COMPOSITE_MODEL_REVISION
+    else:
+        model = engine
     contexts, tasks = _prepare_runs(targets, engine, model, deps)
     try:
         _consume_worker_pages(job_id, tasks, contexts, callbacks, deps)

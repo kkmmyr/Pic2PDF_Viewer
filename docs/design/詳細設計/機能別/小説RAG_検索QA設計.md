@@ -277,6 +277,18 @@ index対象8,576ページをすべて含む。一方、既存dense corpusの6,23
 19冊だけで、整合性ゲートを通らなかった。このtableは基準線にも再利用せず、以下はすべて隔離領域に
 新規作成したtableの結果である。
 
+2026-08-23のrun 184本番公開後にも、production `chunks` tableをSQLite正本と再照合し、既存13冊の
+2,781 ID欠落と32 IDの重複・metadata差分を確認した。TM-7では事前backupを復元検査した後、同一digestの
+`bge-m3`をMac Metalで実行し、欠落・重複対象2,813 IDを再生成した。16件比較でLinux CPU版とのcosineは
+最小0.999996、平均0.999999であり、1024次元を維持した。
+
+全6,321行をSQLite正本から組み立てた隔離tableは、ID欠落・余剰・重複、画面番号・本文等のmetadata差分、
+vector次元異常がすべて0であることを確認してからproduction `chunks`へ切り替えた。固定20問のdense評価は
+R@5 `.525`→`.687`、R@10 `.525`→`.697`、R@30 `.550`→`.842`、MRR@10 `.414`→`.587`、
+nDCG@10 `.412`→`.539`となり、R@30は8問改善・回帰0問だった。page-level ICU revision 1 `8,568`行、
+summary 18行、FTS5本文差分0、run 184の57画面・42,903文字は不変である。以後は日次backupと週次復元試験で
+SQLite／LanceDBのdense全行整合性をfail closed検査する。
+
 #### Gate A — lexical
 
 | 方式 | R@5 | R@10 | R@30 | MRR@10 | nDCG@10 | p95 | build / size | 判定 |

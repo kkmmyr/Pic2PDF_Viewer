@@ -13,3 +13,4 @@ export const KindleCatalogPage = lazy(() => import('@/pages/KindleCatalogPage'))
 export const KindleLinksPage = lazy(() => import('@/pages/KindleLinksPage'));
 export const KindleCapturePage = lazy(() => import('@/pages/KindleCapturePage'));
 export const KindleImportsPage = lazy(() => import('@/pages/KindleImportsPage'));
+export const KindlePriceWatchPage = lazy(() => import('@/pages/KindlePriceWatchPage'));

@@ -152,8 +152,9 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 raw_output, block_count, quality_flags_json, ink_coverage,
                 attempt_count, error_message, layout_type, primary_text,
                 external_text, primary_raw_output, external_raw_output,
-                candidate_manifest_json, processing_timing_json, selected_engine, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                candidate_manifest_json, processing_timing_json, selected_engine,
+                selection_reason, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                       datetime('now', '+9 hours'))
             ON CONFLICT(run_id, page_no) DO UPDATE SET
                 image_sha256 = excluded.image_sha256,
@@ -174,6 +175,7 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 candidate_manifest_json = excluded.candidate_manifest_json,
                 processing_timing_json = excluded.processing_timing_json,
                 selected_engine = excluded.selected_engine,
+                selection_reason = excluded.selection_reason,
                 corrected_text = NULL,
                 review_started_at = NULL,
                 review_duration_ms = NULL,
@@ -201,6 +203,7 @@ def save_page_result(run_id: int, page: OcrPageResult) -> None:
                 candidate_json,
                 canonical_json(processing_timing),
                 selected_engine,
+                page.get("selection_reason"),
             ),
         )
         conn.commit()

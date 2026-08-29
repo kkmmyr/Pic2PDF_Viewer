@@ -1,10 +1,13 @@
+import { useState } from 'react';
+
 import { Check, Eye, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
-import { Alert } from '@/components/ui/alert';
-import { API_CONFIG } from '@/config/api';
+import { OCRQaImageViewer, type ImageZoom } from '@/features/ocr/OCRQaImageViewer';
+import { getOcrEngineLabels } from '@/features/ocr/ocrQaLabels';
+import { OCRQaRunState } from '@/features/ocr/OCRQaRunState';
+import { OCRQaSelectionReason } from '@/features/ocr/OCRQaSelectionReason';
 import {
     compactTextLength,
-    ENGINE_LABELS,
     formatDurationMs,
     LAYOUT_TYPE_LABELS,
     PAGE_TYPE_LABELS,
@@ -17,6 +20,7 @@ import type { OcrLayoutType, OcrPageType, OcrSelectedEngine } from './types';
 import { useOCRQaController } from './useOCRQaController';
 
 export function OCRQaPanel() {
+    const [imageZoom, setImageZoom] = useState<ImageZoom>('double');
     const {
         runsQuery,
         awaitingRuns,
@@ -46,6 +50,7 @@ export function OCRQaPanel() {
         approveMutation,
         canApproveRun,
     } = useOCRQaController();
+    const engineLabels = getOcrEngineLabels(detail?.engine);
     const primaryLength = compactTextLength(selectedPage?.primary_text ?? '');
     const externalLength = compactTextLength(selectedPage?.external_text ?? '');
     const externalLengthDifference = externalLength - primaryLength;
@@ -77,16 +82,11 @@ export function OCRQaPanel() {
                 </select>
             </header>
 
-            {runsQuery.isError && (
-                <Alert variant="error" className="m-4">
-                    QA対象の取得に失敗しました。
-                </Alert>
-            )}
-            {!runsQuery.isLoading && awaitingRuns.length === 0 && (
-                <div className="px-5 py-8 text-center text-sm text-gray-500">
-                    品質確認待ちのOCR結果はありません。
-                </div>
-            )}
+            <OCRQaRunState
+                isError={runsQuery.isError}
+                isLoading={runsQuery.isLoading}
+                awaitingCount={awaitingRuns.length}
+            />
             {detail && (
                 <>
                     <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 px-5 py-3 text-sm dark:border-gray-700">
@@ -154,19 +154,20 @@ export function OCRQaPanel() {
                         </nav>
 
                         {selectedPage ? (
-                            <div className="grid min-w-0 grid-cols-1 gap-4 p-4 xl:grid-cols-2">
-                                <div className="min-w-0">
-                                    <h3 className="mb-2 font-semibold">
-                                        原画像 — 画面 {selectedPage.page_no}
-                                    </h3>
-                                    <div className="flex max-h-[520px] justify-center overflow-auto rounded-lg bg-gray-100 p-2 dark:bg-gray-950">
-                                        <img
-                                            src={`${API_CONFIG.BASE_URL}${selectedPage.image_url}`}
-                                            alt={`${detail.book_name} 画面 ${selectedPage.page_no}`}
-                                            className="h-auto max-w-full object-contain"
-                                        />
-                                    </div>
-                                </div>
+                            <div
+                                className={`grid min-w-0 grid-cols-1 gap-4 p-4 ${
+                                    imageZoom === 'fit'
+                                        ? 'xl:grid-cols-[minmax(0,1fr)_minmax(18rem,1fr)]'
+                                        : ''
+                                }`}
+                            >
+                                <OCRQaImageViewer
+                                    bookName={detail.book_name}
+                                    pageNo={selectedPage.page_no}
+                                    imageUrl={selectedPage.image_url}
+                                    zoom={imageZoom}
+                                    onZoomChange={setImageZoom}
+                                />
                                 <div className="flex min-w-0 flex-col">
                                     <div className="mb-2 flex flex-wrap items-center gap-2">
                                         <h3 className="font-semibold">OCR候補と確認理由</h3>
@@ -198,6 +199,7 @@ export function OCRQaPanel() {
                                             </span>
                                         ))}
                                     </div>
+                                    <OCRQaSelectionReason reason={selectedPage.selection_reason} />
                                     <div className="grid gap-2">
                                         <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                             <section className="min-w-0 rounded-lg border border-gray-200 p-2 dark:border-gray-700">
@@ -250,7 +252,7 @@ export function OCRQaPanel() {
                                                 }}
                                                 className="rounded-lg border border-gray-300 bg-white px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
                                             >
-                                                {Object.entries(ENGINE_LABELS).map(
+                                                {Object.entries(engineLabels).map(
                                                     ([value, label]) => (
                                                         <option key={value} value={value}>
                                                             {label}
@@ -276,7 +278,8 @@ export function OCRQaPanel() {
                                         )}
                                         {!selectedPage.external_text && (
                                             <p className="text-xs text-amber-700 dark:text-amber-300">
-                                                この画面にはyomitoku候補が保存されていません。
+                                                この画面には{engineLabels.external}
+                                                が保存されていません。
                                             </p>
                                         )}
                                     </div>

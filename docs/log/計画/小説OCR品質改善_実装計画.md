@@ -42,7 +42,14 @@
 | dots.mocr Apple Siliconスモーク | 通過 | JSSODa縦書き1〜4段とPaddleOCR-VL最大外れ値の固定5枚で総合CER 0.4654%、最大0.6614%、列欠落・反復0 |
 | dots.mocr JSSODa縦書きscreening | fail-fast完了 | 79/1,125枚の最良layout版で総合CER 0.8990%、最大4.0155%。2.0% gate未達のため本番候補へ昇格しない |
 | Unlimited-OCR Apple Siliconスモーク | fail-fast完了 | 固定5枚すべてで出力反復。総合CER 690.7200%、最大1,069.3122%のため79枚へ進めず不採用 |
-| 機械単独・Codex省略 | 未完了 | 自動公開禁止を維持 |
+| Nemotron Parse 2.0 MLX 8bitスモーク | fail-fast完了 | 通常promptと日本語decodeのruntime不整合を回避後も、固定1枚目で誤認文節が4,096 token上限まで反復したため拡大しない |
+| Qianfan-OCR MLX 4bitスモーク | fail-fast完了 | 固定1枚目で最大CER gate超過、2枚目で生成反復したため不採用 |
+| HunyuanOCR 1.5 BF16 llama.cppスモーク | fail-fast完了 | 固定1枚目は通過したが、2枚目の段落重複・順序入替で最大CER gateを超えたため不採用 |
+| Hayai OCR v2 MPSスモーク | fail-fast完了 | 固定1枚目が8文字出力・CER 99.4932%だったため残り4枚へ進めず不採用 |
+| Qwen3.5-OCR-JP-2B単体スモーク | fail-fast完了 | 固定5枚中4枚は総合CER 0.2416%だが、`001751`が8,000 token反復し、単体総合344.1829%のため不採用 |
+| Qwen3.5 OCR + dots.mocr初期複合候補 | 15/79枚でfail-fast完了 | 総合CER 0.5166%、最大3.1042%。最大ページは反復・HTML切断なしでfallback不能のため自動公開候補として不採用 |
+| Qwen3.5 OCR + dots.mocr Codex隔離運用 | 1冊目を本番採用 | reviewed packageの固定provenance・digest、本番画像再照合、冪等staging、backup、明示公開、FTS5・ICU・bge-m3再索引をrun 184で完了。本番runtimeへは配線せずCodexが1冊ずつ明示反映する |
+| 機械単独・Codex省略 | 対象外 | 利用者QAの代わりにCodex原画像レビューを必須とし、自動公開は禁止を維持 |
 
 ## 4. Phase H1 — 正式holdoutをfail closed化する
 
@@ -275,9 +282,138 @@ JSSODa固定5枚で総合CER 0.5%以下、ページ最大2.0%未満、列欠落�
 公開screening gateを固定5枚で不合格としたため79枚へ進めず、Unlimited-OCRを本番候補から外す。
 反復を隠すno-repeat n-gramや重複削除を採用値へ使わず、必要なら生成loopの原因診断だけを別runにする。
 
-## 7. Phase H4 — Codex確認縮小の段階評価
+次にNVIDIA `NVIDIA-Nemotron-Parse-2.0`を調査した。公式モデルは約903M parameterで
+CJKを含む多言語改善を謳うが、日本語縦書き固有値はない。MLX変換は
+`mlx-community/Nemotron-Parse-2.0-8bit` revision
+`e7e89479657fb3631028ac12b6bc0d5a59ceafe4`を固定した。4bitは変換元の公開試験で
+表の反復回帰があるため使わない。変換cardのApache-2.0表記に依存せず、元モデルの
+OpenMDW License Agreement 1.1と、同梱tokenizerのCC-BY-4.0を利用条件の正本とする。
 
-H3の機械総合合格後にだけ着手する。
+MLX-VLMの通常文promptでは`<<<<`反復となり、元実装の専用task token列
+`</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>`が必須だった。
+さらに標準のBPE streaming detokenizerは日本語token `キ`で`KeyError`になるため、
+評価時だけ`NaiveStreamingDetokenizer`で一括decodeした。それでもJSSODa固定先頭
+`000006`は誤認文節を4,096 token上限まで反復し、42.40秒、process最大RSS約2.20GB、
+peak footprint約41.66GB、swap 0だった。メモリ不足ではなく日本語縦書き品質の不合格とし、
+残り4枚と79枚は実行しない。反復削除、強制停止processor、本文切出しで採用値を救済しない。
+
+次の独立候補はBaidu `Qianfan-OCR`とする。公式model cardは4B-parameterモデルと説明し、
+配布safetensors metadataは4,741,408,256 parameter（Hugging Face表示は5B）である。Apache-2.0、192言語対応、
+`do_sample=False`と`Parse this document to Markdown.`を基準経路として示すが、日本語縦書き小説の
+ページ最大CERは公開していない。Apple Siliconでは
+`jason1966/Qianfan-OCR-MLX-4bit` revision
+`125a392cc25e8750f427c7e09b5a517f07bbf70c`を固定し、MLX-VLM 0.6.15で評価する。
+変換configは元Baidu checkpoint revisionを保持しないため、公式BF16との同一性や変換cardの
+「精度低下なし」を前提にせず、4bit版自体を独立候補として扱う。
+
+実行前に同梱custom Pythonを監査し、model、prompt、画像SHA、engine version、生成設定、raw textを
+fsync checkpointへ残す。temperature 0、最大4,096 token、後処理なしで固定5枚を評価し、総合CER
+0.5%以下、ページ最大2.0%未満、列欠落・反復0を満たした場合だけ先頭79枚へ進む。Markdown記号や
+Layout-as-Thoughtは初回採用値から除外せず、追加説明・思考・反復が本文へ混ざれば品質不合格とする。
+
+固定5枚runは2枚目でfail-fast終了した。`000006`は592正解文字に対し588予測文字、CER 2.0270%で
+ページ最大2.0%未満のgateを単独で超えた。`000142`は913正解文字に対し7,321予測文字、CER
+753.8883%となり、末尾で「決して許されることは」を反復した。2枚の完了時間は14.57秒と80.44秒、
+3枚目を停止するまでのprocess最大RSSは約3.51GiB、peak footprint約6.90GiB、swap 0だった。
+64GB unified memory不足ではなく日本語縦書きの認識・読順・生成反復の不合格とし、残り3枚と
+79枚は実行しない。4bit版のpenalty追加や反復切出しで採用値を救済せず、本番候補から外す。
+
+続けてTencent `HunyuanOCR-1.5`を評価した。公式はPC・consumer GPU向けllama.cpp経路と、
+temperature 0、top_p 1、top_k無効、repetition penalty 1.08を明示する。Apple Siliconでは
+llama.cpp build `b10360-48d22e295`と、`prithivMLmods/HunyuanOCR-1.5-GGUF-Updated`
+revision`9ddd3b47beb0de305ecd89a717748bac080d7aee`のBF16本体・projectorを固定した。
+派生repoのApache-2.0 metadataには依存せず、元モデルのTencent Hunyuan Community Licenseを
+利用条件の正本とする。派生repoは元Tencent revisionを保持しないため、BF16 GGUF自体を候補として判定する。
+
+公式文書解析promptで`000006`は592文字中2文字誤り、CER 0.3378%、欠落・反復0で通過した。
+しかし`000142`は同一段落を二重出力して段落順も入れ替わり、913正解文字に対して1,030予測文字、
+CER 13.0340%だった。2枚総合CERは8.0399%。2枚目は14.57秒、process最大RSS約14.34GiB、
+peak footprint約13.28GiB、swap 0だった。ページ最大2.0%と列欠落・重複gateに不合格のため、
+残り3枚と79枚は実行せず、本番候補から外す。段落重複除去や順序並べ替えで採用値を救済しない。
+
+次候補は`JustANormalTinkerer/hayai-ocr-v2`とする。固定revisionは
+`fa1ca12bacba3ac09a9fee09c6086ef84c72d8f4`、Apache-2.0、F32重み622,500,080 byteである。
+SigLIP2 NaFlexと約0.2Bの独自causal decoderで、text detectorを介さず全画像からgreedy生成する。
+一方、公式finetuning setは約2,000件の短い漫画crop、公開例は最大256 patch・128 token、公式平均CERは
+8.52%であり、592文字以上の小説ページを保証しない。`configuration_hayai.py`と
+`modeling_hayai.py`を固定revisionで監査し、外部書込み・subprocess・任意コード評価がないことを確認後、
+公式repetition penalty 1.20、最大1,024 token、JSSODa固定`000006`だけをMPSで診断した。最大token変更は
+ページ全文を収めるための出力budgetであり、本文dedupe・再認識・samplingは加えていない。
+
+実測では592正規化文字に対して「「Incle」の」の8文字だけを生成し、距離589、CER 99.4932%だった。
+推論2.30秒、process最大RSS 1,710,555,136 byte、MPS driver allocation最大観測1,552,662,528 byteで、
+64GB unified memory不足ではない。ページ最大2.0%未満と列coverageのgateに不合格のため、残り4枚と
+79枚へ進めず本番候補から外す。短文crop、回転、patch数変更による同一モデルの救済は行わない。
+
+fail-fast不採用のNemotron ParseとHunyuanOCRは一回限りの隔離実行で結果・revision・hashを記録済みのため、
+専用runnerを恒久資産として追加しない。Qianfan runnerはcustom code fingerprintとMLX runtime差分を再診断する
+期限付き資産として2026-11-16まで保有する。Hayaiは実測・環境を文書へ残し、再実行CLIを追加しない。
+
+Hayai終了後に`ebinan92/Qwen3.5-ocr-jp-2b`を評価した。固定revisionは
+`dc58acc05962cb2ca129c8d3533ab7e5a651cc02`、Apache-2.0、BF16 2,782,629,184 parameterである。
+公式cardは日本語縦書き・ルビを学習重点とし、VJRODa 92件でCER 7.3%を報告する。これはB-35の
+0.5%基準を保証しないため、未調整holdoutではなくJSSODa固定5枚からfail-fastする。
+
+標準Transformers Qwen3.5実装をPyTorch MPS BF16で使い、公式固定prompt
+`OCR this image as HTML layout blocks with bbox and label.`、`do_sample=False`、最大8,000 tokenとする。
+HTMLはDOM順の可視文字だけを抽出し、rubyの`rt`は本文へ混ぜない。tag・attribute・単一code fence除去は
+出力protocolの復号であり、block順序変更、本文dedupe、言語補正は行わない。raw HTMLと抽出本文をともに保存した。
+
+固定5枚のうち`000006`は距離1・CER 0.1689%、`000142`は距離0・CER 0%、`000158`は距離5・
+CER 0.6906%、`000609`は距離1・CER 0.1497%で、先頭4枚総合は距離7/2,897文字・CER 0.2416%だった。
+一方、`001751`は同一文節を最大8,000 tokenまで反復し、756正解文字に対して13,190予測文字、距離12,566、
+CER 1,662.1693%となった。固定5枚単体総合は距離12,573/3,653文字・CER 344.1829%であり、Qwen単体は
+生成反復gateにより不採用とする。最初のmodel loadを含む最大RSSは3,408,150,528 byte、MPS driver allocationの
+最大観測は6,069,567,488 byteで、swap増加はなかった。64GB unified memory不足ではなく生成停止品質の問題である。
+
+既存の`has_suspicious_repetition`を抽出本文へ適用すると、固定5枚では正常4枚が全てfalse、`001751`だけがtrueだった。
+そこで参照正解をselectorへ渡さず、反復または最大token到達によるHTML末尾切断なら同じ固定dots.mocr候補へ
+切り替え、それ以外はQwenを選ぶ。dots.mocrの
+過去固定5枚実測は各ページCER 0.6614%以下なので、756文字の`001751`の距離は5以下である。Qwen正常4枚の距離7と
+合成した複合候補は距離12以下/3,653文字、総合CER 0.3285%以下、ページ最大0.6907%以下となり、固定5枚gateを通過する。
+これは保存済み集計値から導いた上界で、dotsのraw予測を復元した再計測値ではない。selectorはQwen側の反復flagを
+再計算し、HTML切断、画像SHA、fallback過不足をfail closedで検査する実装へ固定した。
+
+同じ品質blind規則の固定79枚screeningは、15枚をcheckpointした時点で総編集距離53/10,259文字・
+総合CER 0.5166%、ページ最大3.1042%となったため停止した。最大ページ`000260`は451正解文字に対して
+447予測文字、距離14で、縦書き中の半角`AI`を5箇所とも助詞「と」に誤認し、ほかにも約物・文字誤りがあった。
+反復もHTML末尾切断もないため固定selectorではQwenが選ばれ、dots fallbackで救済できない。メモリ・生成停止ではなく
+通常文字認識の品質不合格であり、正解を見て`AI`やページIDを追加fallback条件へ使わない。固定79枚の残り64枚、
+VJRODa、正式holdoutへは進めない。
+
+同じ`000260`をMPS BF16でさらに2回再実行すると、本文とraw HTMLは3回すべてbyte一致した。さらに
+同じsource重みをMLX-VLM 0.6.15でBF16変換し、公式prompt・temperature 0で評価しても距離14・CER 3.1042%で、
+`AI`5箇所の誤認は共通だった。PyTorch MPSの揺らぎやruntime固有誤差ではなく、固定モデルの認識誤りとする。
+
+一方、Qwen raw HTMLは`000260`だけ誤認箇所4つを`<i>`で囲み、他の先頭14枚には`div` / `p`以外の
+可視markupがなかった。本プロジェクトはplain textへ復号して装飾を保持しないため、`div` / `ruby` / `rt` / `p` / `br`
+以外のinline markupをcandidate-onlyの保守的fallback signalとするv2を診断する。これは開封済み公開screeningで
+発見した調整版なので固定5枚合格値や正式性能へ遡及適用せず、dots.mocrの`000260`実測と同じ79枚の再screeningを
+通過した場合だけ次候補に数える。`<i>`本文を`AI`へ置換する補正は行わない。
+
+v2 selectorは既存15枚から`000260`だけをfallback対象にした。dots.mocr固定revisionのBF16 layout版は
+同ページで距離10/451文字・CER 2.2173%となり、`AI`5箇所をすべて「は」と誤認した。15枚複合総合は
+距離49/10,259文字・CER 0.4776%へ改善したが、ページ最大2.2173%で既定2.0%未満を満たさない。
+事前条件どおり残り64枚を再実行せず、v2も本番候補から外す。`<i>`を`AI`へ置換する補正や、Qwenとdotsの
+誤認「と」/「は」から正解を推測する合議は導入しない。
+
+## 7. Phase H4 — レビュー前提laneと確認縮小の段階評価
+
+ADR-0023により、Qwen＋dots複合版はH3の機械総合不合格でもリスク対象の人手画像照合と監査付き残ページ承認を
+条件に導入できる。このlaneではQwenとdotsを全ページ生成し、clean以外の候補選択理由、候補解析失敗、反復、
+有意な文字量差、image-only、通常散文以外のlayout、分類未確定、内容riskとclean中央標本を`required`とする。
+残るclean通常本文は両候補・provenance・画像SHA・非空・非反復・文字量差を再検証し、QAメモへ機械支援承認を
+記録する。人手または機械支援の承認が全対象へ記録されるまで公開しない。
+
+開封済みJSSODa縦書き79枚のレビュー版は、反復・HTML切断4枚、非保持markup 1枚、隣接狭列の
+bbox読順違反1枚、dotsの有意な文字量増加1枚をdots初期候補へ切り替えた。総編集距離223/54,504文字、
+加重CER 0.4091%、最大2.8835%で、総合gateだけを通過した。Qwen単体は反復4/79枚・総合104.9354%、
+反復4枚を除いても1.2886%、dots単体は0.8990%・最大4.0155%だったため、Qwen主候補＋dots副候補を維持する。
+候補間のID・画像SHAに加えて、各候補のrevision・fingerprint・promptが全ページ同一であることを検証する。
+この値は開封後にsignalを調整したscreening値で、H3または未調整holdoutの合格値へ数えない。
+
+自動公開は従来どおりH3の機械総合合格後にだけ着手する。人手確認範囲の縮小は、個人利用のpilotで
+候補切替全15画面、候補異常・分類未確定、clean標本を含む計19画面に重大問題がなかった実績を根拠とする。
 
 1. 同一画面3回で判定と差分が一致することを確認する。
 2. 100画面連続で構造化出力成功率99%以上、timeout・未回収process 0を確認する。
@@ -325,12 +461,30 @@ commit/deploy後のservice経路再確認を残す。実ENOSPCはhost filesystem
 388,210,688 bytesの世代公開、manifestと復元先の`integrity_check=ok`、canonical SHA不変を再確認した。
 監査用世代だけを検証後に削除し、H5の障害注入・本番service経路確認を完了した。
 
-## 9. 完了条件
+同日のrun 184実書籍試験では、ADR-0023に従って全57画面を承認し、隔離DBで公開した。公開前backupは
+389,599,232 bytes、rollback前backupは390,479,872 bytesで、いずれもmanifest・SHA・復元DBの
+`integrity_check=ok`を確認した。旧run 76へrollback後、本文・文字数・page分類・索引可否・FTSは
+公開前と一致し、現在の57画像も存在・入力SHA一致した。画像絶対パスは現在環境へ再基準化され、
+`ocr_done_at`は切替時刻へ更新されるため、DBファイルのバイト一致をrollback成功条件にはしない。
+run 184は`completed / approved`で保持し、隔離DBのactive publicationはrun 76へ戻した。本番DBは未変更である。
 
-B-35は次の全条件を満たした時だけ完了とする。
+本番では同じレビュー結果をdigest
+`d78907dfedf71deadde157104e7b7b5e7b30026f9da88ba39bf40b165e04ec98`のpackageとしてrun 184へ
+冪等stagingし、既存canonical・publication・FTS5・ICU不変を事前backupとの直接比較で確認してから
+publication ID 82へ明示公開した。57画面・42,903文字・検索対象49画面、FTS5不一致0件となり、
+page-level ICU revision 1（8,568行）と対象書籍のbge-m3 83 chunkも再構築・照合済みである。
+`2026-08-23_ocr-run184-prepublish`、公開処理内Online Backup、
+`2026-08-23_ocr-run184-postpublish-preembed`、全処理後の`2026-08-23_ocr-run184-complete`を
+復元点として保持する。
+
+## 9. レビュー前提laneの完了実績
+
+B-35のレビュー前提laneは次の条件を満たして完了した。未完了なのは機械単独自動公開の品質条件だけである。
 
 - H1〜H5の受入条件が自動テストまたは保存済み監査成果物で検証される。
-- 正式holdoutでpolicy JSONの全項目が機械候補として合格する。
+- Qwen＋dots複合engineの版・両raw候補・候補切替理由が保存され、1冊の所有者確認済み知見を含むCodexレビューと監査付き承認を終えている。
+- 必要な補正文を保存し、承認後公開と旧版rollbackを実行して本文・FTS・履歴の整合を確認する。
+- reviewed packageの固定provenance・digest、本番画像再照合、冪等staging、明示公開の分離を隔離DBで確認する。
 - QA未承認・品質未達・障害時に旧公開本文と索引が保持される。
-- 自動公開またはCodex確認縮小の範囲、rollback条件、監査方法がOCR設計書と一致する。
+- 自動公開は、正式holdoutでpolicy JSONの全項目が機械候補として合格するまで無効である。
 - `docs/log/変更履歴.md` とB-35バックログを更新し、完了実績をarchiveへ移す。

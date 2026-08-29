@@ -231,3 +231,55 @@ class CaptureQualityWarning(KindleSQLModel, table=True):
     findings_json: str
     is_read: bool = Field(default=False, index=True)
     read_at: str | None = None
+
+
+class KindlePriceWatch(KindleSQLModel, table=True):
+    """Codex ブラウザで価格を確認する Amazon Kindle URL。"""
+
+    __tablename__ = "kindle_price_watches"  # type: ignore[reportAssignmentType]
+
+    id: int | None = Field(default=None, primary_key=True)
+    url: str = Field(unique=True, index=True, max_length=500)
+    asin: str | None = Field(default=None, index=True, max_length=20)
+    title: str | None = None
+    threshold_percent: float = 50.0
+    notify_on_drop: bool = True
+    notify_below_threshold: bool = True
+    enabled: bool = Field(default=True, index=True)
+    created_at: str
+    updated_at: str
+    last_checked_at: str | None = None
+    last_status: str = Field(default="never", index=True)
+    last_error: str | None = None
+    last_current_price: int | None = None
+    last_list_price: int | None = None
+    last_ratio_percent: float | None = None
+
+
+class KindlePriceObservation(KindleSQLModel, table=True):
+    """1回の Codex ブラウザ観測結果。"""
+
+    __tablename__ = "kindle_price_observations"  # type: ignore[reportAssignmentType]
+
+    id: int | None = Field(default=None, primary_key=True)
+    watch_id: int = Field(foreign_key="kindle_price_watches.id", index=True)
+    observed_at: str = Field(index=True)
+    current_price: int | None = None
+    list_price: int | None = None
+    ratio_percent: float | None = None
+    status: str = Field(index=True)
+    error_message: str | None = None
+    source: str = Field(default="codex_browser", index=True)
+
+
+class KindlePriceNotification(KindleSQLModel, table=True):
+    """同一観測に対する Discord 通知の重複送信を防ぐ記録。"""
+
+    __tablename__ = "kindle_price_notifications"  # type: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("observation_id", "kind"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    watch_id: int = Field(foreign_key="kindle_price_watches.id", index=True)
+    observation_id: int = Field(foreign_key="kindle_price_observations.id", index=True)
+    kind: str = Field(index=True)
+    notified_at: str

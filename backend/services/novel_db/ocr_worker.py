@@ -21,6 +21,7 @@ try:
     from .ocr_worker_protocol import OcrWorkerTask, load_tasks
     from .ocr_worker_protocol import emit as _emit
     from .ocr_worker_session import run_surya
+    from .qwen_dots_worker import run_qwen_dots_review
     from .surya_runtime import SuryaClient
     from .surya_server import SuryaServer
 except ImportError:
@@ -29,6 +30,7 @@ except ImportError:
     from ocr_worker_protocol import OcrWorkerTask, load_tasks
     from ocr_worker_protocol import emit as _emit
     from ocr_worker_session import run_surya
+    from qwen_dots_worker import run_qwen_dots_review
     from surya_runtime import SuryaClient
     from surya_server import SuryaServer
 
@@ -66,6 +68,8 @@ def main() -> None:
             _run_surya(tasks)
         elif engine == "yomitoku":
             _run_yomitoku(tasks)
+        elif engine == "qwen35_dots_review_v1":
+            run_qwen_dots_review(tasks)
         else:
             raise ValueError(f"unsupported OCR_ENGINE: {engine}")
     except Exception as exc:

@@ -67,7 +67,7 @@ class _AppSettings(BaseSettings):
     # OCR パッケージディレクトリ（ocr_engine.py が置かれた common/ocr/ パス）
     # ocr_worker.py サブプロセスに OCR_PATH 環境変数として渡される
     OCR_PACKAGE_PATH: str | None = None
-    # OCRエンジン（surya2 / yomitoku）
+    # OCRエンジン（surya2 / yomitoku / qwen35_dots_review_v1）
     OCR_ENGINE: str = "surya2"
     # yomitokuの実行デバイス（auto: cuda -> mps -> cpu）
     OCR_YOMITOKU_DEVICE: Literal["auto", "cuda", "mps", "cpu"] = "auto"
@@ -94,6 +94,13 @@ class _AppSettings(BaseSettings):
     OCR_EXTERNAL_CONFIDENCE_MEDIAN: float = Field(default=0.85, ge=0.0, le=1.0)
     OCR_EXTERNAL_CONFIDENCE_WEIGHTED_MEAN: float = Field(default=0.75, ge=0.0, le=1.0)
     OCR_EXTERNAL_LOW_CONFIDENCE_CHAR_RATIO: float = Field(default=0.25, ge=0.0, le=1.0)
+    # Qwen3.5 + dots.mocrレビュー前提複合worker（Apple Siliconで逐次実行）
+    OCR_QWEN_PYTHON: str | None = None
+    OCR_DOTS_PYTHON: str | None = None
+    OCR_QWEN_MODEL_PATH: Path | None = None
+    OCR_DOTS_MODEL_PATH: Path | None = None
+    OCR_QWEN_DOTS_ARTIFACT_DIR: Path | None = None
+    OCR_QWEN_DOTS_STAGE_TIMEOUT_SEC: float = Field(default=21600.0, gt=0.0)
     OCR_AGENT_ENABLED: bool = False
     OCR_AGENT_HEARTBEAT_TIMEOUT_SEC: int = Field(default=300, ge=1)
     # 同人誌入力フォルダの自動監視を有効にするか
@@ -102,6 +109,8 @@ class _AppSettings(BaseSettings):
     DOUJIN_WATCH_INTERVAL_SEC: int = 15
     # hitomi 新着監視の実行結果を通知する Discord Webhook URL（未設定時は通知無効）
     HITOMI_DISCORD_WEBHOOK_URL: str | None = None
+    # Kindle 価格監視の値下がり結果を通知する Discord Webhook URL（未設定時は通知無効）
+    KINDLE_PRICE_DISCORD_WEBHOOK_URL: str | None = None
 
 
 _s = _AppSettings()
@@ -163,6 +172,7 @@ KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_SEC: int = _s.KINDLE_CAPTURE_HEARTBEAT_TIMEOUT_
 GEMMA_TOOL_DIR: str | None = str(_s.GEMMA_TOOL_DIR) if _s.GEMMA_TOOL_DIR else None
 META_DB_BACKUP_DIR: str | None = str(_s.META_DB_BACKUP_DIR) if _s.META_DB_BACKUP_DIR else None
 HITOMI_DISCORD_WEBHOOK_URL: str | None = _s.HITOMI_DISCORD_WEBHOOK_URL or None
+KINDLE_PRICE_DISCORD_WEBHOOK_URL: str | None = _s.KINDLE_PRICE_DISCORD_WEBHOOK_URL or None
 
 # ---------------------------------------------------------------------------
 # ソース識別子

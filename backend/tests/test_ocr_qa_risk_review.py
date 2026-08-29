@@ -288,6 +288,45 @@ def test_stage_requires_every_page_even_with_routine_audit_flags(tmp_data_dir) -
     assert [row[0] for row in rows] == list(range(1, 13))
 
 
+def test_review_assisted_engine_requires_every_page_before_formal_holdout(tmp_data_dir) -> None:
+    upgrade_head()
+    book_name = "qa-review-assisted"
+    images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
+    images_dir.mkdir(parents=True)
+    for page_no in range(1, 13):
+        Image.new("RGB", (100, 140), "white").save(images_dir / f"{page_no:03d}.png")
+    input_pages = collect_input_pages(book_name)
+    run_id, _ = prepare_run(
+        book_name,
+        "qwen35_dots_review_v1",
+        "fixed-composite-model",
+        input_pages,
+    )
+
+    for page in input_pages:
+        result = _passed_page(page.page_no, page.image_sha256, _unique_content(400))
+        result["quality_flags"] = [
+            "candidate_disagreement",
+            "review_assisted_composite",
+            "selection_reason:qwen_clean",
+        ]
+        if page.page_no == 10:
+            result["quality_flags"][-1] = "selection_reason:dots_materially_more_complete"
+        if page.page_no == 11:
+            result["primary_text"] = "本文です。" * 60 + "珀陽様が来ました。"
+            result["external_text"] = "本文です。" * 60 + "伯陽様が来ました。"
+        save_page_result(run_id, result)
+
+    stage_run_for_qa(run_id, input_pages)
+
+    with with_db() as conn:
+        rows = conn.execute(
+            "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
+            (run_id,),
+        ).fetchall()
+    assert [row[0] for row in rows] == list(range(1, 13))
+
+
 def test_stage_requires_content_risks(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "qa-name-risk"

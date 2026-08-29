@@ -50,6 +50,7 @@ def test_export_package_is_content_addressed_and_excludes_old_outputs(tmp_path) 
     assert manifest["page_count"] == 2
     assert manifest["page_start"] == 2
     assert manifest["page_end"] == 3
+    assert manifest["prompt_version"] == "sol-fact-graph-v1"
     assert manifest["allowed_outputs"] == ["facts"]
     assert manifest["source_sha256"] != manifest["pages_sha256"]
     assert hashlib.sha256(database.read_bytes()).hexdigest() == before

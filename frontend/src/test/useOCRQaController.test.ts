@@ -68,6 +68,7 @@ const runDetail: OcrQaRunDetail = {
             external_text: '',
             selected_engine: 'primary',
             corrected_text: null,
+            selection_reason: null,
             candidate_manifest: {},
             processing_timing: { total_ms: 100 },
             review_started_at: null,

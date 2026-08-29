@@ -46,6 +46,7 @@ def page_payload(
     runtime_manifest: dict[str, Any] | None = None,
     run_timing: dict[str, int] | None = None,
     selected_engine: str = "primary",
+    selection_reason: str | None = None,
 ) -> dict[str, Any]:
     return {
         "event": "page",
@@ -73,6 +74,7 @@ def page_payload(
             "runtime_manifest": runtime_manifest,
             "run_timing": run_timing or {},
             "selected_engine": selected_engine,
+            "selection_reason": selection_reason,
         },
     }
 

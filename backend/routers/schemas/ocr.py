@@ -55,6 +55,7 @@ class OcrQaPageOut(BaseModel):
     external_text: str
     selected_engine: Literal["primary", "external", "codex"]
     corrected_text: str | None
+    selection_reason: str | None
     candidate_manifest: dict[str, object]
     processing_timing: dict[str, int]
     review_started_at: str | None

@@ -17,8 +17,18 @@ import {
     linkKindleBook,
     previewMigration,
     updateCaptureQualityWarning,
+    createKindlePriceWatch,
+    deleteKindlePriceWatch,
+    fetchKindlePriceHistory,
+    fetchKindlePriceWatches,
+    updateKindlePriceWatch,
 } from '@/features/kindle/api';
-import type { KindleCaptureWarningStatus, KindleCatalogFilters } from '@/features/kindle/types';
+import type {
+    KindleCaptureWarningStatus,
+    KindleCatalogFilters,
+    KindlePriceWatchCreateRequest,
+    KindlePriceWatchUpdateRequest,
+} from '@/features/kindle/types';
 
 const QUERY_ROOT = ['kindleCatalog'] as const;
 
@@ -190,5 +200,57 @@ export function useKindleLinkCandidates(source: 'comic' | 'novel' | null, bookId
             return fetchLinkCandidates(source ?? 'comic', bookId ?? '');
         },
         enabled: source !== null && bookId !== null,
+    });
+}
+
+export function useKindlePriceWatches() {
+    const queryClient = useQueryClient();
+    const watches = useQuery({
+        queryKey: [...QUERY_ROOT, 'priceWatches'],
+        queryFn: fetchKindlePriceWatches,
+    });
+    const createMutation = useMutation({
+        mutationFn: (request: KindlePriceWatchCreateRequest) => createKindlePriceWatch(request),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: [...QUERY_ROOT, 'priceWatches'] });
+        },
+    });
+    const updateMutation = useMutation({
+        mutationFn: ({
+            watchId,
+            request,
+        }: {
+            watchId: number;
+            request: KindlePriceWatchUpdateRequest;
+        }) => updateKindlePriceWatch(watchId, request),
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: [...QUERY_ROOT, 'priceWatches'] });
+        },
+    });
+    const deleteMutation = useMutation({
+        mutationFn: deleteKindlePriceWatch,
+        onSuccess: () => {
+            void queryClient.invalidateQueries({ queryKey: [...QUERY_ROOT, 'priceWatches'] });
+        },
+    });
+
+    return {
+        watches: watches.data?.items ?? [],
+        isLoading: watches.isLoading,
+        error: watches.error,
+        create: createMutation.mutateAsync,
+        creating: createMutation.isPending,
+        update: updateMutation.mutateAsync,
+        updating: updateMutation.isPending,
+        remove: deleteMutation.mutateAsync,
+        removing: deleteMutation.isPending,
+    };
+}
+
+export function useKindlePriceHistory(watchId: number, enabled: boolean) {
+    return useQuery({
+        queryKey: [...QUERY_ROOT, 'priceHistory', watchId],
+        queryFn: () => fetchKindlePriceHistory(watchId),
+        enabled,
     });
 }

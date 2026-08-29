@@ -345,10 +345,24 @@
       "recheck_after": "2026-11-16"
     },
     {
-      "id": "ocr-model-screening-runners",
+      "id": "ocr-production-composite-runners",
       "patterns": [
         "scripts/maintenance/dots_mocr_vertical_predict.py",
+        "scripts/maintenance/qwen35_ocr_checkpoint.py",
+        "scripts/maintenance/qwen35_ocr_jp_vertical_predict.py",
+        "scripts/maintenance/qwen35_ocr_model.py",
+        "scripts/maintenance/select_qwen35_dots_predictions.py"
+      ],
+      "classification": "continuous",
+      "owner": "novel-ocr",
+      "reason": "fixed-revision child runtimes used by qwen35_dots_review_v1 with durable checkpoints",
+      "recheck_after": null
+    },
+    {
+      "id": "ocr-model-screening-runners",
+      "patterns": [
         "scripts/maintenance/paddleocr_vl_vertical_predict.py",
+        "scripts/maintenance/qianfan_ocr_vertical_predict.py",
         "scripts/maintenance/sarashina_ocr_vertical_predict.py",
         "scripts/maintenance/unlimited_ocr_vertical_predict.py"
       ],

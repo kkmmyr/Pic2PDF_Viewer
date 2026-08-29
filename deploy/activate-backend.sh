@@ -290,7 +290,7 @@ install_rollback_compatible_migrations() {
     target="${target_dir}/${migration_name}"
     if [ ! -e "$target" ]; then
       case "$migration_name" in
-        0014_novel_search_index_state.py|0015_ocr_provenance_and_timing.py) ;;
+        0014_novel_search_index_state.py | 0015_ocr_candidate_selection_reason.py | 0016_ocr_provenance_and_timing.py) ;;
         *)
           fail "migration is not approved for backward-compatible rollout: ${migration_name}"
           return

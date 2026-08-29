@@ -32,6 +32,7 @@ kindle-pdf/main_novel.py
   -> ocr_run_store.py（入力SHA固定・未完了ページ再開）
   -> extractor.py -> $OCR_PYTHON ocr_worker.py --manifest <一時JSON>
   -> Surya OCR 2 + yomitoku独立照合
+     または Qwen全ページ -> process終了 -> dots全ページ -> selector
   -> ocr_page_resultsへページ単位チェックポイント
   -> awaiting_qa
   -> 全ページの画像照合（OK / 修正 / 保留）・run承認
@@ -81,6 +82,19 @@ Windowsから本番SQLiteを直接開かない。
 | `OCR_CROSS_ENGINE_MIN_SIMILARITY` | `0.85` | エンジン間の最低一致率 |
 | `OCR_AGENT_ENABLED` | `false` | Windows agentへOCRを委譲する |
 | `OCR_AGENT_HEARTBEAT_TIMEOUT_SEC` | `300` | agent heartbeat期限 |
+| `OCR_QWEN_PYTHON` | 未設定 | Qwen固定runtimeのPython。複合engineでは必須 |
+| `OCR_DOTS_PYTHON` | 未設定 | MLX-VLM固定runtimeのPython。複合engineでは必須 |
+| `OCR_QWEN_MODEL_PATH` | 未設定 | Qwen3.5-OCR-JP-2B固定revisionのローカルpath |
+| `OCR_DOTS_MODEL_PATH` | 未設定 | dots.mocr固定revisionをMLXへ変換したローカルpath |
+| `OCR_QWEN_DOTS_ARTIFACT_DIR` | `NOVEL_DB_DIR/ocr-candidate-artifacts` | 入力・model・prompt scope別の再開可能checkpointと監査artifact |
+| `OCR_QWEN_DOTS_STAGE_TIMEOUT_SEC` | `21600` | Qwenまたはdotsの1段階全体の上限。超過時はrun全体を失敗にする |
+
+`yomitoku`の実行デバイスは、`OCR_PYTHON` / `OCR_PACKAGE_PATH`が指す外部OCR環境で
+`OCR_YOMITOKU_DEVICE`を解決する。WindowsのNVIDIA環境では`cuda`、Apple Siliconでは`mps`を
+使用し、`auto`（既定値）は`cuda`、`mps`、`cpu`の順で利用可能なデバイスを選択する。
+MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降）とPyTorchを使用する。
+`mps`を明示したのにMPSが利用できない場合、またはMac上の外部ラッパーがデバイス指定を受け付けない
+場合は、CPUへ黙って切り替えずworkerを失敗させる。
 
 `yomitoku`の実行デバイスは、`OCR_PYTHON` / `OCR_PACKAGE_PATH`が指す外部OCR環境で
 `OCR_YOMITOKU_DEVICE`を解決する。WindowsのNVIDIA環境では`cuda`、Apple Siliconでは`mps`を
@@ -100,6 +114,10 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 | `backend/services/novel_db/ocr_worker.py` | standalone CLI、manifest読込、engine選択のprotocol shell |
 | `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
 | `backend/services/novel_db/ocr_worker_engines.py` | 画像読込、Surya/yomitokuのページ処理、候補選択 |
+| `backend/services/novel_db/qwen_dots_worker.py` | 固定runtimeを逐次起動し、完全集合検査後に複合page eventを出す |
+| `backend/services/novel_db/codex_reviewed_ocr.py` | reviewed packageの固定schema、digest、model・prompt provenance、page完全性を検証してexportする |
+| `backend/services/novel_db/codex_reviewed_ocr_import.py` | 本番PNG集合・SHAをDB接続前に再検証し、専用runへ冪等stagingする |
+| `backend/tools/codex_reviewed_ocr.py` | Codexが隔離export／Linux staging importを明示実行するCLI。公開処理は含めない |
 | `backend/services/novel_db/ocr_provenance.py` | 実行版manifest、source/model SHA、候補本文/raw出力SHAの生成・検証 |
 | `backend/services/novel_db/ocr_candidate_selection.py` | primary/externalの文字量差をQAリスクとworkerで共有する純関数 |
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
@@ -167,6 +185,90 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
   全pageを`required`としてrunを`awaiting_qa / pending`へ遷移させる。B-35正式holdoutの
   機械単独総合合格前は、候補一致、通常散文、試し読み除外を理由に`not_required`へしない。
   canonical `books` / `pages`は変更しない。
+- ADR-0022を更新した[ADR-0023](../../基本設計/ADR/0023_risk-scoped-qwen-dots-review.md)に基づき、
+  Qwen＋dots複合版はclean以外の選択理由、候補解析失敗、反復、有意な文字量差、image-only、
+  通常散文以外のlayout、分類未確定、内容risk flagのあるpageを`required`にする。加えてcleanな通常本文の
+  中央標本を1page以上`required`にする。残る`qwen_clean`通常本文は候補・provenance・画像SHA・非空・
+  非反復・文字量差を機械監査し、QAメモへ根拠を残して承認できる。selectorの初期候補は承認を意味せず、
+  required pageの人手承認を終えるまでrun公開は禁止する。
+- 上記pilot用QA契約の運用先は、[ADR-0024](../../基本設計/ADR/0024_codex-operated-offline-ocr-publication.md)により
+  Codex管理のMac隔離DBへ限定する。Linux本番とWindows OCR agentの`OCR_ENGINE`は`surya2`を維持し、
+  Qwen＋dots runtime・modelを配備しない。Codexがrisk対象、clean標本、候補差分、既存canonical差分を
+  原画像監査し、原画像から確定できる補正だけを保存する。通常の利用者QAは要求せず、Codexでも一意に
+  確定できないpageだけを公開保留とする。
+- 隔離runの反映には`codex-reviewed-ocr-package-v1`を新設する。packageはschema version、package digest、
+  書名、連続page集合、入力画像SHA、engine/model revision、両候補raw、選択理由、page/layout分類、
+  index可否、選択・補正文、Codex review根拠を保持する。export前に未分類・未解決・欠落pageを拒否する。
+  Linux importは本番画像の完全page集合とSHAを再計算し、固定Qwen／dotsのmodel revision、engine version、
+  prompt ID・SHAとpackage digestを検証してから、専用runへ冪等にstagingする。検証はDB接続前に完了させる。
+  同一digestは既存rowとの完全一致を再確認し、別digestの未公開runがある場合は競合として拒否する。
+  Macから本番SQLiteを直接開かず、DB置換・手動SQL patch・import同時公開を行わない。
+- import済みrunはCodexが差分と未解決0件を再確認後、既存のOnline Backup・原子的公開処理で明示的に
+  activateする。通常の操作は次のmodule CLIを用い、`import`成功を公開成功とみなさない。
+
+  本番importは`ocr_page_results.selection_reason`を追加するAlembic `0015`と、そのrevisionを知る
+  backendを同一世代で配備した後だけ実行する。DBだけを`0015`へ先行させると旧backendの
+  起動migrationが未知revisionとして失敗するため、世代切替を伴わない手動migrationは禁止する。
+
+  ```bash
+  cd backend
+  uv run python -m tools.codex_reviewed_ocr export --db-path <隔離novel.db> --run-id <run> \
+    --reviewer codex --review-note <監査根拠> --output <package.json>
+  uv run python -m tools.codex_reviewed_ocr import --db-path <本番novel.db> \
+    --images-root <本番images> --package <package.json>
+  ```
+- 複合版は64GB unified memoryで両modelを同時常駐させない。Qwenを全page処理してprocessを終了し、
+  dotsを全page処理してprocessを終了した後、page集合・画像SHA・model revision・fingerprint・promptを
+  照合する。段階timeout、終了code非0、欠落・余剰page、選択本文の空文字・反復はrun全体をfail closedにし、
+  部分的なDB page保存や`awaiting_qa`遷移を行わない。各modelのpage checkpointはartifact領域に残して再開する。
+- 複合pageの`raw_output`は`qwen35-dots-page-v1` JSON envelopeとし、Qwenとdotsそれぞれのraw出力、
+  model revision・fingerprint、engine version、prompt ID・SHA、生成条件と選択理由を保持する。
+  `primary_text`はQwen、`external_text`はdots、`selected_engine`は`primary` / `external`へ写像する。
+  `selection_reason`はDB列とQA APIへ複写し、QA画面で候補名と併せて表示する。
+- QA画面の原画像は初期表示を`2倍`とし、`画面幅` / `2倍`をページ単位で切り替えられる。
+  `画面幅`では十分な横幅がある場合にOCR本文と1:1で横並びにし、`2倍`ではOCR本文を下段へ移して
+  画像親領域をページ全幅へ拡張する。構築管理画面自体も最大1800pxまで利用し、従来の画像列に対して
+  おおむね2倍の表示幅を確保する。
+  原画像は親領域の幅以内に収めて横スクロールを発生させず、高さがブラウザ表示領域を超える場合だけ
+  表示された縦スクロールバーで移動できるようにする。画像領域はキーボードfocus可能とし、
+  表示レイアウトだけを変更して元PNG・画像SHA・OCR入力は変更しない。
+- Qwenがraw応答を返したがHTML layout blockを抽出できないページは、run全体のtransport失敗とせず
+  `candidate_error`付き空候補としてcheckpointし、非空のdots候補へ切り替える。両候補が空の場合は、
+  dots raw JSONが非空配列で全要素`category=Picture`、非空textなしと再検証できる場合だけ
+  `dots_image_only_review_required`として空本文を許可する。それ以外の両候補空はrunを失敗にする。
+- dotsがraw応答を返したもののlayout JSONを解析できない場合も、rawと`candidate_error`をcheckpointする。
+  Qwen候補が非空かつ反復なしならQwenを初期候補として全ページQAへ残し、Qwen側にも空・反復などの
+  fail-closed条件がある場合はrun全体を失敗にする。候補解析エラーはtransport成功やQA承認へ読み替えない。
+- 2026-08-23の1冊pilotでは、隔離DBのrun 184で57/57画面を完走し、Qwen 42・dots 15を初期候補として
+  全57画面を初期`required`、runを`awaiting_qa`にした。Qwen候補解析失敗5、dots候補解析失敗1、
+  dots画像のみ4を監査artifactへ保持した。プロジェクトオーナーが候補切替全15画面、候補異常・分類未確定、
+  clean標本を含む計19画面を確認し、重大な欠落・読順崩壊なしと判定した。追加の候補差分・原画像監査で、
+  画面11の2文重複、13の「したかった」誤認、19の「最悪」意味誤認、36の2文欠落を確定し、補正文へ反映した。
+  画面1・4は画像のみ、画面6は本文／全幅本文に分類した。追加7画面をCodex原画像監査、残るclean通常本文
+  31画面をADR-0023の機械支援監査として承認し、全57画面を承認済みにした。
+- run 184は隔離DBで一度公開し、57画面・42,903文字の選択／補正済み本文とFTSが一致することを確認した。
+  公開前backupは`20260823T105530.007192Z-publish-run-184-b4ab82ec2dc7`（389,599,232 bytes）で、
+  manifestと復元DBの`integrity_check=ok`を確認した。その後、旧run 76へrollbackし、57画面・41,707文字の
+  本文、文字数、page分類、索引可否、FTSが公開前世代と一致することを確認した。rollback前backupは
+  `20260823T105642.543933Z-rollback-run-76-4773195e9bcb`（390,479,872 bytes）で同じ検証に合格した。
+  隔離DBはrun 76のrollback publicationをactive、run 184を`completed / approved`のまま保持する。
+  本番DBは変更していない。
+- 同じrun 184を`codex-reviewed-ocr-package-v1`へexportした隔離往復では、packageは1,276,317 bytes、
+  digestは`cc63d0e21ac7aed4d24772c4cdfcbb3d09744e5ec01851a760698b906ae0d25e`だった。レビュー根拠は
+  owner原画像確認19、機械監査31、Codex原画像確認7、補正pageは11・13・19・36として保持した。一時DBへの
+  初回importは57件、再importは同一runの57件すべてを冪等判定し、import前後のcanonical digestは不変だった。
+  明示公開後はpackageと57件一致・FTS不一致0、旧run 76へのrollback後はcanonical完全復元、publish／rollback
+  backup各1世代のSHA・integrityと最終DB integrityに合格した。本番DBは変更していない。
+- その後の本番反映では、review noteを含むpackage digest
+  `d78907dfedf71deadde157104e7b7b5e7b30026f9da88ba39bf40b165e04ec98`をproduction run 184へ
+  57件stagingし、再import 57件の冪等一致を確認した。事前backupとの直接比較でcanonical pages、
+  publication history、FTS5、page-level ICU stateがstaging前後で完全一致した後、publication ID 82として
+  明示公開した。公開本文は57画面・42,903文字、`index_eligible=1`は49画面、FTS5本文不一致0件である。
+  page-level ICUはrevision 1・8,568行・source SHA-256
+  `55c8f39783ffdd30e3f4305362e79383da8ae16195f33edb003ec86945367d89`へactive化し、対象書籍の
+  bge-m3 chunk 83件はSQLite／LanceDBでID・画面番号・本文が一致した。公開前全体backup、公開処理内backup、
+  公開後・embedding前backup、全処理後の`2026-08-23_ocr-run184-complete`を保持し、各SQLiteと
+  LanceDB復元検査に合格している。
 - page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
   検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
 - run承認は`required`・`rejected`・未分類page/layoutが0件であること、入力SHAが不変であること、
@@ -305,6 +407,10 @@ OCR完了と公開承認を分離する。全ページ処理後はまず全page�
    冊子の一部だけを公開しない。既存OCRのない冊子はlegacy runを作らず、初回Sol版を起点とする。
 10. 本番切替前にSQLite Online Backupを取得して復元検証する。DB内の過去の診断画像由来余剰行は
     backupには保持するが、数値名PNG manifestにもとづくlegacy版・比較・rollback正本には含めない。
+11. rollbackはrunの`published_text`、`page_type`、`index_eligible`をcanonicalへ復元し、FTSを再構築する。
+    `image_path`と`books.images_dir`は旧絶対パスを復元せず、入力SHAを再検証した現在のsource pathへ
+    再基準化する。`ocr_done_at`はrollback時刻へ更新するため、成功条件は本文・分類・索引・FTSの一致と
+    現在画像の存在／SHA一致であり、DB全フィールドまたはDBファイルのバイト一致ではない。
 
 Solとlegacyの差分は文字編集距離、増減文字数、空本文、反復、ページ別外れ値として報告するが、
 正解本文がない差分をCERまたは精度と呼ばない。CER比較は同一画像SHAのverified ground truthだけで行う。
@@ -361,7 +467,8 @@ B-35の完了判定には、調整に使わない3シリーズ以上・通常散
 場合だけ、3シリーズ以上、normal prose 20画面以上、固有名詞10語・50出現以上、SHA差替え、
 package欠落、開封済み再利用をfail closedで検査する。manifestと台帳の検査・更新は
 ground truth、OCR QA、公開本文を変更しない。正式holdoutの機械単独品質が全policyへ合格するまで、
-B-35、自動公開、Codex最終確認省略を完了扱いにしない。
+自動公開を完了扱いにしない。ADR-0023のリスク対象・clean標本を人手照合し、残ページを監査付き承認する
+レビュー採用laneは別に扱い、未修正予測の性能値と修正後の運用品質を混同しない。
 
 正式holdoutの品質評価では、固有名詞注釈はpolicy JSONに残る汎用corpus用注釈ではなく、
 封印済みmanifestの画像SHA・語集合を使用する。コーパス構成もmanifestで検証済みの3シリーズ・
@@ -505,6 +612,51 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
 - Unlimited-OCR BF16は、MLX-VLM 0.6.15の固定5枚で全ページが生成反復し、総合CER
   690.7200%、ページ最大1,069.3122%だったため本番候補にしない。最大RSS約7.42GB、swap 0なので
   64GB unified memory不足による不合格とは扱わない。反復除去後の本文を採用値へ転用しない。
+- Nemotron Parse 2.0 MLX 8bitは、元実装の専用task token列と日本語decode回避を
+  適用してもJSSODa固定先頭1枚で誤認文節が4,096 token上限まで反復した。
+  swap 0であり64GB unified memory不足ではない。標準MLX-VLMの逐次decodeでは
+  日本語tokenによる`KeyError`も起きるため、runtime修正だけで品質合格と見なさず、
+  固定revisionは本番候補にしない。元モデルの利用条件はOpenMDW-1.1、tokenizerはCC-BY-4.0とする。
+- Qianfan-OCR MLX 4bitは、公式基準prompt・temperature 0でも固定`000006`がCER 2.0270%、
+  `000142`がCER 753.8883%・同一文節反復となった。停止までのpeak footprintは約6.90GiB、
+  swap 0であり64GB unified memory不足ではない。変換元revisionもconfigから復元できないため、
+  固定変換版を本番候補にせず、反復penaltyや文字列切出しで採用値を救済しない。
+- HunyuanOCR 1.5 BF16 GGUFは、公式llama.cpp生成条件で固定`000006`をCER 0.3378%で通過したが、
+  `000142`は段落重複・順序入替によりCER 13.0340%だった。最大RSS約14.34GiB、swap 0であり
+  64GB unified memory不足ではない。固定GGUF pairを本番候補にせず、段落dedupe・順序補正で
+  採用値を救済しない。
+- Hayai OCR v2は固定revision、固定custom code、公式greedy生成とrepetition penalty 1.20で
+  JSSODa固定1枚目を診断したが、592文字に対して8文字出力・CER 99.4932%だった。
+  最大RSS約1.59GiBで64GB不足ではなく、短い漫画crop向けモデルの全文coverage不適合とする。
+  残りへ進めず本番候補にせず、短文crop化や回転、patch数変更で救済しない。
+- fail-fast不採用候補の一回限りrunnerは恒久保守資産にしない。runtime差分を再診断する期限付きrunnerだけを
+  `maintenance_assets.json`へ登録し、実測・revision・hash・失敗原因は設計書と技術知見を正本とする。
+- Qwen3.5-OCR-JP-2Bは公式固定prompt、greedy生成、最大8,000 token、固定revisionでJSSODaを評価する。
+  HTML layout blockはDOM順の可視文字へ復号し、rubyの`rt`だけを除外する。blockの並べ替え、本文dedupe、
+  言語補正は行わず、raw HTMLも保存する。固定5枚中4枚は総合CER 0.2416%だったが、`001751`が
+  8,000 tokenまで反復したため単体候補は不採用とする。
+- Qwen3.5 OCR + dots.mocr複合候補は、抽出本文へ既存`has_suspicious_repetition`を適用し、反復または
+  8,000 token到達によるHTML末尾切断ならdots.mocr、それ以外はQwenを採用する。selectorは正解本文、CER、
+  ページIDを参照しない。固定5枚では`001751`だけが
+  fallback対象となり、保存済みdots固定5枚集計から導く合成上界は総合CER 0.3285%以下、最大0.6907%以下である。
+  次の固定79枚でも未修復raw出力、HTML末尾切断flag、両候補のprovenanceを保存し、選択後の総合0.5%未満・
+  最大2.0%未満を判定する。実測は15枚時点で総合CER 0.5166%、最大3.1042%となり、最大ページに
+  反復・切断signalがないためfail-fast不採用とする。正解を見たLatin文字やページID条件をselectorへ追加しない。
+- 公開screening調整用v2では、plain textへ保持しない`div` / `ruby` / `rt` / `p` / `br`以外のinline HTML markupも
+  fallback候補信号として記録できる。tag内本文を推測補正せずページ全体をdots.mocrへ送り、同じ公開79枚を
+  最初から再評価する。これは開封済みscreeningで発見した規則なので正式holdoutの合格実績には数えない。
+  実測は`000260`だけをfallbackし、15枚総合CER 0.4776%へ改善したが、同ページのdots出力が2.2173%で
+  最大gateを超えた。残りへ進めずv2も不採用とする。
+- ADR-0022のレビュー前提v3は、Qwenとdotsを全ページで実行し、反復・HTML切断・非保持markup・
+  隣接する狭いvertical blockの左→右bbox順に加えて`is_external_materially_more_complete`をレビュー初期候補の
+  切替信号へ使う。bbox幅300超、上下端差25超、非隣接blockは比較せず、広い段落領域の誤検知を避ける。
+  固定79枚の再開後、`000653`でQwenが
+  中央2段落を欠落してCER 33.3333%となったが既存異常signalがなく、文字量差なら検出できることを確認した。
+  selectorは両候補のID・画像SHAを完全一致で検証し、各候補内でmodel revision・fingerprint・promptが
+  全ページ同一であることも検査する。選択後も両本文をQAへ保存する。
+  79枚中Qwen 72枚、dots 7枚を初期候補に選び、総編集距離223/54,504文字、加重CER 0.4091%、
+  ページ最大2.8835%となった。総合gateは通るが最大gateに未達である。この規則は開封済みscreening由来なので
+  未調整holdout合格値には数えず、自動公開へは昇格しない。人手照合範囲はADR-0023を正本とする。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は

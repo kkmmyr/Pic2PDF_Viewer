@@ -57,7 +57,8 @@ def get_qa_run(run_id: int) -> dict:
             "SELECT page_no, state, qa_state, full_text, char_count, quality_flags_json, "
             "ink_coverage, attempt_count, error_message, qa_note, reviewed_at, "
             "page_type, index_eligible, layout_type, primary_text, external_text, "
-            "selected_engine, corrected_text, candidate_manifest_json, processing_timing_json, "
+            "selected_engine, corrected_text, selection_reason, "
+            "candidate_manifest_json, processing_timing_json, "
             "review_started_at, review_duration_ms, correction_duration_ms "
             "FROM ocr_page_results WHERE run_id=? ORDER BY page_no",
             (run_id,),
@@ -105,11 +106,12 @@ def get_qa_run(run_id: int) -> dict:
                 "external_text": str(row[15] or ""),
                 "selected_engine": str(row[16] or "primary"),
                 "corrected_text": row[17],
-                "candidate_manifest": json.loads(str(row[18] or "{}")),
-                "processing_timing": json.loads(str(row[19] or "{}")),
-                "review_started_at": row[20],
-                "review_duration_ms": row[21],
-                "correction_duration_ms": row[22],
+                "selection_reason": row[18],
+                "candidate_manifest": json.loads(str(row[19] or "{}")),
+                "processing_timing": json.loads(str(row[20] or "{}")),
+                "review_started_at": row[21],
+                "review_duration_ms": row[22],
+                "correction_duration_ms": row[23],
                 "image_url": f"/api/ocr/qa/runs/{run_id}/pages/{int(row[0])}/image",
             }
             for row in pages
