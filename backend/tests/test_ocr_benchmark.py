@@ -371,6 +371,7 @@ def test_cli_engine_choices_and_defaults_remain_stable() -> None:
     args = parser.parse_args(["current"])
     assert args.api_base == "http://medaroserver:8090"
     assert args.policy == benchmark.DEFAULT_POLICY_PATH
+    assert args.yomitoku_device == "auto"
     assert args.fail_on_gate is False
 
 

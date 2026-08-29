@@ -2,9 +2,9 @@ version = 1
 
 [[exemptions]]
 package = "torch"
-locked_version = "2.5.1+cu121"
+locked_version = "2.6.0+cu124"
 expires = 2026-10-18
-reason = "CUDA 12.1・torchvision・torchaudio・yomitokuを同時更新する必要がありGPU実機検証まで現行版を維持する"
+reason = "CUDA 12.4・torchvision・torchaudio・yomitokuを同時更新するため、GPU実機検証完了まで受容する"
 ids = [
   "GHSA-3749-ghw9-m3mg",
   "GHSA-53q9-r3pm-6pq6",
@@ -15,7 +15,12 @@ ids = [
   "GHSA-rrmf-rvhw-rf47",
   "GHSA-vgrw-7cvw-pwgx",
   "GHSA-x3gm-94wq-g975",
+  "PYSEC-2025-191",
   "PYSEC-2025-198",
+  "PYSEC-2025-199",
+  "PYSEC-2025-200",
+  "PYSEC-2025-201",
+  "PYSEC-2025-202",
   "PYSEC-2025-203",
   "PYSEC-2025-204",
   "PYSEC-2025-205",

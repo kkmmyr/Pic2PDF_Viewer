@@ -47,6 +47,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tessdata-dir", type=Path)
     parser.add_argument("--ocr-python", type=Path)
     parser.add_argument("--ocr-path", type=Path)
+    parser.add_argument(
+        "--yomitoku-device",
+        choices=("auto", "cuda", "mps", "cpu"),
+        default="auto",
+        help="yomitoku device passed to the external OCR wrapper",
+    )
     parser.add_argument("--ndlocr-python", type=Path)
     parser.add_argument("--ndlocr-script", type=Path)
     parser.add_argument("--ndlocr-rec-weights", type=Path)
@@ -158,6 +164,7 @@ def _run_downloaded_engine(
                 args.ocr_path,
                 repo_root,
                 work_dir,
+                args.yomitoku_device,
             ),
             None,
         )

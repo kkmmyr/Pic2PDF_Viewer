@@ -15,7 +15,7 @@ def _write_allowlist(path: Path, *, expires: str = "2026-10-18", ids: str = '"GH
                 "version = 1",
                 "[[exemptions]]",
                 'package = "torch"',
-                'locked_version = "2.5.1+cu121"',
+                'locked_version = "2.6.0+cu124"',
                 f"expires = {expires}",
                 'reason = "GPU互換性を実機確認する"',
                 f"ids = [{ids}]",

@@ -106,6 +106,7 @@ def _run_yomitoku(
     ocr_path: Path,
     repo_root: Path,
     work_dir: Path,
+    yomitoku_device: str = "auto",
 ) -> dict[int, str]:
     manifest_path = work_dir / "yomitoku-manifest.json"
     tasks = [
@@ -125,6 +126,7 @@ def _run_yomitoku(
         "PYTHONIOENCODING": "utf-8",
         "OCR_ENGINE": "yomitoku",
         "OCR_PATH": str(ocr_path),
+        "OCR_YOMITOKU_DEVICE": yomitoku_device,
     }
     result = subprocess.run(
         [

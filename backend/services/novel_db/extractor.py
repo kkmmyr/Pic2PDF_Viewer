@@ -96,6 +96,7 @@ def _ocr_worker_env() -> dict[str, str]:
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "OCR_ENGINE": app_settings.OCR_ENGINE}
     values = {
         "OCR_PATH": app_settings.OCR_PACKAGE_PATH,
+        "OCR_YOMITOKU_DEVICE": app_settings.OCR_YOMITOKU_DEVICE,
         "SURYA_INFERENCE_URL": app_settings.SURYA_INFERENCE_URL,
         "SURYA_MODEL": app_settings.SURYA_MODEL,
         "SURYA_LLAMA_SERVER_PATH": app_settings.SURYA_LLAMA_SERVER_PATH,

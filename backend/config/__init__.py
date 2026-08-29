@@ -8,7 +8,7 @@ Novel DB の env 設定（モデル・LLM・検索パラメータ等）は confi
 """
 
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 from dotenv import load_dotenv
 from pydantic import Field
@@ -69,6 +69,8 @@ class _AppSettings(BaseSettings):
     OCR_PACKAGE_PATH: str | None = None
     # OCRエンジン（surya2 / yomitoku / qwen35_dots_review_v1）
     OCR_ENGINE: str = "surya2"
+    # yomitokuの実行デバイス（auto: cuda -> mps -> cpu）
+    OCR_YOMITOKU_DEVICE: Literal["auto", "cuda", "mps", "cpu"] = "auto"
     # Surya OCR 2 OpenAI互換推論サーバー
     SURYA_INFERENCE_URL: str = "http://127.0.0.1:8768/v1"
     SURYA_MODEL: str = "surya-ocr-2"

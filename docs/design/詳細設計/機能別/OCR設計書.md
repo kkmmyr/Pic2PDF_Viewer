@@ -1,6 +1,6 @@
 # OCR設計書
 
-> status: living | last-verified: 2026-08-22
+> status: living | last-verified: 2026-08-29
 
 <!-- contract-owner: ocr-publication -->
 
@@ -68,7 +68,8 @@ Windowsから本番SQLiteを直接開かない。
 | 変数 | 既定値 | 意味 |
 |---|---|---|
 | `OCR_PYTHON` | OS別OCR venv | OCR workerを実行するPython |
-| `OCR_PACKAGE_PATH` | `D:\61.tool\common\ocr` | subprocessへ `OCR_PATH` として渡すパッケージパス |
+| `OCR_PACKAGE_PATH` | Windows: `D:\61.tool\common\ocr` / Mac: `~/Developer/KRAuto/ocr` | subprocessへ `OCR_PATH` として渡すパッケージパス |
+| `OCR_YOMITOKU_DEVICE` | `auto` | yomitokuの実行デバイス。`auto`は`cuda` → `mps` → `cpu`の順で解決 |
 | `OCR_ENGINE` | `surya2` | `surya2` / `yomitoku` |
 | `SURYA_INFERENCE_URL` | `http://127.0.0.1:8768/v1` | OpenAI互換推論URL |
 | `SURYA_MODEL` | `surya-ocr-2` | 推論モデル名 |
@@ -87,6 +88,13 @@ Windowsから本番SQLiteを直接開かない。
 | `OCR_DOTS_MODEL_PATH` | 未設定 | dots.mocr固定revisionをMLXへ変換したローカルpath |
 | `OCR_QWEN_DOTS_ARTIFACT_DIR` | `NOVEL_DB_DIR/ocr-candidate-artifacts` | 入力・model・prompt scope別の再開可能checkpointと監査artifact |
 | `OCR_QWEN_DOTS_STAGE_TIMEOUT_SEC` | `21600` | Qwenまたはdotsの1段階全体の上限。超過時はrun全体を失敗にする |
+
+`yomitoku`の実行デバイスは、`OCR_PYTHON` / `OCR_PACKAGE_PATH`が指す外部OCR環境で
+`OCR_YOMITOKU_DEVICE`を解決する。WindowsのNVIDIA環境では`cuda`、Apple Siliconでは`mps`を
+使用し、`auto`（既定値）は`cuda`、`mps`、`cpu`の順で利用可能なデバイスを選択する。
+MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降）とPyTorchを使用する。
+`mps`を明示したのにMPSが利用できない場合、またはMac上の外部ラッパーがデバイス指定を受け付けない
+場合は、CPUへ黙って切り替えずworkerを失敗させる。
 
 ### 責務境界
 
@@ -514,6 +522,12 @@ Sol確認の縮小は、固定コーパスと正式holdoutの全ゲート、同�
 欠落・意味変更・分類誤り1件で全件確認へ戻す。
 
 ## 7. `YomitokuEngine`
+
+`YomitokuEngine`は通常のPyTorch経路で実行し、workerから渡されたデバイスを
+`OCR(device=...)`へ明示する。Macではまず通常モードを使用する。`--lite`は文字検出器を
+ONNX Runtimeへ切り替える経路があり、MPSで全体が実行されるとは限らないため、MPS性能評価の
+初期条件には含めない。MPS非対応演算子をCPUへフォールバックさせる場合は、実行ログに残し、
+ページ処理時間の比較でMPS実行と混同しない。
 
 通常の縦書き小説ページでは `paragraphs` / `lines` ではなく `words` が返り、本文列は
 幅38〜48pxの長いword、ルビは幅18〜33pxの短いwordになる実測がある。
