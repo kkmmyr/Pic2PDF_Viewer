@@ -93,9 +93,13 @@ MCPのserver instructionsには、agent IDとして`mac-codex` / `windows-codex`
 ## 5. 配置・接続
 
 MCP processは`backend/codex_coordination_mcp.py`を
-`streamable-http` transportで起動する。既定は`127.0.0.1:8790/mcp`で、Linuxではnginxの
-`/mcp`からのみproxyする。Mac/WindowsのCodexはTailscale内の
-`http://medaroserver:8090/mcp`を登録する。
+`streamable-http` transportで起動する。既定は`127.0.0.1:8790/mcp`とする。
+
+- rootでsystem unitとnginxを管理できる環境では、localhost待受とnginx `/mcp` proxyを使う。
+- 現行medaroserverでは`amashio`のuser unitを使い、listen addressをTailscale IPv4
+  `100.107.238.88`へ限定する。Mac/WindowsのCodexには
+  `http://medaroserver:8790/mcp`を登録する。
+- user unitはlingerを前提とし、通常デプロイはactive backend切替後に導入済みunitだけを再起動する。
 
 設定:
 
@@ -106,7 +110,7 @@ MCP processは`backend/codex_coordination_mcp.py`を
 | `CODEX_COORDINATION_PORT` | `8790` | MCP listen port |
 | `CODEX_COORDINATION_LOG_LEVEL` | `INFO` | MCP runtime log level |
 
-初期段階はTailscale到達範囲とlocalhost proxyを信頼境界とする。agent IDは監査用であり、
+初期段階はTailscale到達範囲を信頼境界とする。agent IDは監査用であり、
 強い本人認証ではない。共有bearer tokenまたは端末別認証を導入する場合も、本文schemaや
 message IDを変更せずtransport境界だけを強化する。
 

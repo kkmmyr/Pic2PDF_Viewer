@@ -85,6 +85,14 @@ def test_release_smoke_checks_stable_lance_path_and_active_icu() -> None:
     assert "page ICU no-match smoke unexpectedly returned a row" in script
 
 
+def test_deploy_restarts_installed_codex_coordination_user_service() -> None:
+    script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
+
+    assert "systemctl --user cat codex-coordination-mcp.service" in script
+    assert "systemctl --user restart codex-coordination-mcp.service" in script
+    assert "systemctl --user is-active --quiet codex-coordination-mcp.service" in script
+
+
 def test_activation_allows_reviewed_ocr_migration_and_verifies_columns() -> None:
     script = ACTIVATION_SCRIPT.read_text(encoding="utf-8")
 
