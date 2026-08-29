@@ -13,6 +13,15 @@ from urllib.parse import urlsplit
 
 from services.kindle_catalog import price_notify
 from services.kindle_catalog.connection import with_db
+from services.kindle_catalog.price_watch_rows import (
+    observation_from_row as _observation_from_row,
+)
+from services.kindle_catalog.price_watch_rows import (
+    require_lastrowid,
+)
+from services.kindle_catalog.price_watch_rows import (
+    watch_from_row as _watch_from_row,
+)
 from utils.dt import jst_now
 
 _ASIN_RE = re.compile(r"/(?:dp|gp/product|product)/([A-Z0-9]{10})(?:[/?#]|$)", re.IGNORECASE)
@@ -71,41 +80,6 @@ def _price(value: object, field: str) -> int | None:
     return value
 
 
-def _watch_from_row(row: Mapping[str, object]) -> dict:
-    return {
-        "id": int(row["id"]),
-        "url": row["url"],
-        "asin": row["asin"],
-        "title": row["title"],
-        "threshold_percent": float(row["threshold_percent"]),
-        "notify_on_drop": bool(row["notify_on_drop"]),
-        "notify_below_threshold": bool(row["notify_below_threshold"]),
-        "enabled": bool(row["enabled"]),
-        "created_at": row["created_at"],
-        "updated_at": row["updated_at"],
-        "last_checked_at": row["last_checked_at"],
-        "last_status": row["last_status"],
-        "last_error": row["last_error"],
-        "last_current_price": row["last_current_price"],
-        "last_list_price": row["last_list_price"],
-        "last_ratio_percent": row["last_ratio_percent"],
-    }
-
-
-def _observation_from_row(row: Mapping[str, object]) -> dict:
-    return {
-        "id": int(row["id"]),
-        "watch_id": int(row["watch_id"]),
-        "observed_at": row["observed_at"],
-        "current_price": row["current_price"],
-        "list_price": row["list_price"],
-        "ratio_percent": row["ratio_percent"],
-        "status": row["status"],
-        "error_message": row["error_message"],
-        "source": row["source"],
-    }
-
-
 def _get_watch_row(conn, watch_id: int):
     return conn.execute("SELECT * FROM kindle_price_watches WHERE id = ?", (watch_id,)).fetchone()
 
@@ -158,8 +132,8 @@ def create_watch(
             if "UNIQUE constraint failed" in str(exc):
                 raise ValueError("同じ URL はすでに登録されています") from exc
             raise
-        watch_id = cursor.lastrowid
-        row = _get_watch_row(conn, int(watch_id))
+        watch_id = require_lastrowid(cursor.lastrowid, "価格監視の作成IDを取得できませんでした")
+        row = _get_watch_row(conn, watch_id)
     return _watch_from_row(row)
 
 
@@ -318,7 +292,7 @@ def record_observation(
             """,
             (watch_id, observed_at, current, listed, ratio, status, error_message, source),
         )
-        observation_id = int(cursor.lastrowid)
+        observation_id = require_lastrowid(cursor.lastrowid, "価格観測の作成IDを取得できませんでした")
         assignments = [
             "updated_at = ?",
             "last_checked_at = ?",
