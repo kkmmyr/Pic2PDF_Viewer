@@ -1,6 +1,6 @@
 # OCR品質改善 技術知見
 
-> status: living | last-verified: 2026-08-22
+> status: living | last-verified: 2026-08-29
 
 OCR品質改善で得た実測結果、失敗事例、採否判断を時系列に保存する。
 現在の公開契約は [OCR設計書](../../design/詳細設計/機能別/OCR設計書.md)、
@@ -694,3 +694,44 @@ digestは`76e65d4b9cf648edc6680a34f6ef212bd3041faebdaf0ce3e3563251e433c67d`で�
 旧active run 76へrollbackするとcanonical digestも完全復元した。publish／rollback前に各1世代作成したbackupは
 manifest SHA一致・復元DB `integrity_check=ok`、最終DBも`integrity_check=ok`だった。これにより、重いMac
 runtimeを本番へ配備せず、stagingと公開を分離したままCodexが1冊単位で反映できる。本番DBは変更していない。
+<a id="ocr-yomitoku-cross-platform-20260829"></a>
+## 29. 2026-08-29: 『りゅうおうのおしごと！』YomiToku速度・環境差監査
+
+1巻のWindows run 185とMacから取り込んだrun 186について、138画面すべての画像SHA-256が
+一致することをサーバーDBと再取得画像の双方で確認した。run 186は
+`codex_reviewed_qwen35_dots_v1`であり、Qwen・Dots候補をCodexが原画像確認した合成版である。
+Mac版YomiToku/MPSの結果ではないため、本比較値をOS差・CUDA対MPS差または正式CERとは呼ばない。
+生OCR本文、環境manifest、ページ別指標、実行ログはGit管理外の
+`backend/data/novel_db/audits/yomitoku-cross-platform-20260829-ryuuou-v1/`へ固定した。
+原画像は監査packageへ複製せず、138画面のSHA manifestだけを保存した。
+
+Windows環境はYomiToku 0.12.0、PyTorch 2.11.0+cu128、Python 3.12.10、RTX 5070、
+driver 591.86だった。同一138画面をYomiToku単独で2回処理すると、初期化込み97.89秒と
+95.63秒、失敗0、2回の正規化本文は138/138画面で一致した。通常散文93画面の中央値は
+約0.80秒/画面だった。run 185の保存済み外部候補とは正規化後125/138画面が一致し、
+2日後の固定版再実行と異なる13画面が残った。現在の連続2回は一致するため、直ちに確率的揺らぎと
+断定せず、run 185の`model=unversioned`、pipeline・共通OCRの版、実行設定を再現不能にした
+provenance欠落として扱う。
+
+同じ30画面を同一Windows上でCPUとCUDAへ通すと、正規化本文は30/30画面で一致した。
+ページ処理時間はCPU 367.88秒、CUDA 26.76秒で、CUDAは13.75倍速かった。この固定版・標本では
+CUDAは品質差ではなく速度差として観測された。ただしMac MPSは未測定であり、同じ結論を移植しない。
+
+run 186の原画像確認済み合成本文を運用上の比較参照とした場合、現行YomiToku再実行の
+通常散文編集距離率は6.600%、ページ最大20.038%、5%超56/93画面だった。この参照は人手転記の
+formal ground truthではないためCERではない。一方、run 185ではSurya失敗を契機にYomiToku判定へ
+送った画面が17、低confidenceが17、外部候補反復が6、固有名詞候補不一致が17あった。
+YomiTokuは空振り回避と重大なSurya欠落・反復の救済に強いが、全ページを無条件採用できる精度には
+達していない。通常散文と特殊レイアウトを分け、候補保存とQAを維持する。
+
+速度面ではWindowsのSurya＋YomiToku全pipelineが開始から最終page保存まで49分58秒、
+YomiToku単独が1分37.89秒で、OCR段階は約30.6倍短かった。run 186は128画面を
+19:49:01〜22:36:39の2時間47分38秒で確認しており、15分以上の空白を別sessionとした4 sessionの
+観測span合計は1時間6分1秒だった。採用元はCodex補正110、primary 22、external 6である。
+review時刻はbatch/packageの証跡で人のdwell timeではなく、Mac側OCR開始時刻もないため、
+「OCR＋QA＋修正」の厳密な総時間は未確定である。それでも現状はOCRより確認・補正が支配的で、
+速度優位を運用成果へ変えるには重大誤りの検出recallを落とさずQA対象を縮小する必要がある。
+
+追加で、run 185の外部候補採用ページでは保存済み`primary_text`が`external_text`と同値になり、
+元のSurya候補を後から独立比較できない画面があった。次の品質調整前に、候補を上書きせず保存し、
+YomiToku・PyTorch・device・model/pipeline SHAとOCR/QA/補正時間をrunへ版付き記録する。

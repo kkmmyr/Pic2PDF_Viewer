@@ -170,6 +170,7 @@ def _publish_rows(
             conn.execute(
                 "UPDATE ocr_runs SET state='completed', finished_at=datetime('now', '+9 hours'), "
                 "error_message=NULL, qa_state='approved', qa_reviewer=?, "
-                "qa_reviewed_at=datetime('now', '+9 hours'), qa_note=? WHERE id=?",
+                "qa_reviewed_at=datetime('now', '+9 hours'), qa_finished_at=datetime('now', '+9 hours'), "
+                "qa_note=? WHERE id=?",
                 (reviewer, note, run_id),
             )

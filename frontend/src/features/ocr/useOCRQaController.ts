@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -24,6 +24,9 @@ export function useOCRQaController() {
     const [layoutType, setLayoutType] = useState<OcrLayoutType>('unknown');
     const [selectedEngine, setSelectedEngine] = useState<OcrSelectedEngine>('primary');
     const [correctedText, setCorrectedText] = useState('');
+    const reviewStartedAtRef = useRef<string | null>(null);
+    const reviewStartedMsRef = useRef<number | null>(null);
+    const correctionStartedMsRef = useRef<number | null>(null);
 
     const runsQuery = useQuery({
         queryKey: ['ocrQaRuns'],
@@ -67,6 +70,10 @@ export function useOCRQaController() {
 
     const selectedPage = detail?.pages.find((page) => page.page_no === selectedPageNo);
     useEffect(() => {
+        const now = Date.now();
+        reviewStartedAtRef.current = selectedPage ? new Date(now).toISOString() : null;
+        reviewStartedMsRef.current = selectedPage ? now : null;
+        correctionStartedMsRef.current = null;
         setNote(selectedPage?.qa_note ?? '');
         setPageType(selectedPage?.page_type ?? 'unknown');
         setLayoutType(selectedPage?.layout_type ?? 'unknown');
@@ -79,6 +86,15 @@ export function useOCRQaController() {
         );
     }, [selectedPage]);
 
+    useEffect(() => {
+        if (selectedEngine === 'codex' && correctionStartedMsRef.current === null) {
+            correctionStartedMsRef.current = Date.now();
+        }
+        if (selectedEngine !== 'codex') {
+            correctionStartedMsRef.current = null;
+        }
+    }, [selectedEngine]);
+
     const refresh = async () => {
         await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['ocrQaRuns'] }),
@@ -86,8 +102,9 @@ export function useOCRQaController() {
         ]);
     };
     const pageMutation = useMutation({
-        mutationFn: (state: 'approved' | 'rejected') =>
-            reviewOcrQaPage(
+        mutationFn: (state: 'approved' | 'rejected') => {
+            const now = Date.now();
+            return reviewOcrQaPage(
                 selectedRunId as number,
                 selectedPageNo as number,
                 state,
@@ -96,7 +113,13 @@ export function useOCRQaController() {
                 layoutType,
                 selectedEngine,
                 selectedEngine === 'codex' ? correctedText : null,
-            ),
+                reviewStartedAtRef.current,
+                reviewStartedMsRef.current === null ? null : now - reviewStartedMsRef.current,
+                selectedEngine === 'codex' && correctionStartedMsRef.current !== null
+                    ? now - correctionStartedMsRef.current
+                    : null,
+            );
+        },
         onSuccess: async (_, state) => {
             toast.success(state === 'approved' ? 'ページを承認しました' : 'ページを却下しました');
             await refresh();

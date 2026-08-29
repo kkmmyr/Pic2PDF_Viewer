@@ -2,19 +2,22 @@ import { useState } from 'react';
 
 import { Check, Eye, RefreshCw, ShieldCheck, X } from 'lucide-react';
 
-import { Alert } from '@/components/ui/alert';
-import { API_CONFIG } from '@/config/api';
+import { OCRQaImageViewer, type ImageZoom } from '@/features/ocr/OCRQaImageViewer';
+import { getOcrEngineLabels } from '@/features/ocr/ocrQaLabels';
+import { OCRQaRunState } from '@/features/ocr/OCRQaRunState';
+import { OCRQaSelectionReason } from '@/features/ocr/OCRQaSelectionReason';
 import {
-    getOcrEngineLabels,
-    getSelectionReasonLabel,
+    compactTextLength,
+    formatDurationMs,
     LAYOUT_TYPE_LABELS,
     PAGE_TYPE_LABELS,
-} from '@/features/ocr/ocrQaLabels';
+    qaDecisionLabel,
+    qualityFlagLabel,
+    runtimeManifestLabel,
+} from '@/features/ocr/ocrQaPresentation';
 
 import type { OcrLayoutType, OcrPageType, OcrSelectedEngine } from './types';
 import { useOCRQaController } from './useOCRQaController';
-
-type ImageZoom = 'fit' | 'double';
 
 export function OCRQaPanel() {
     const [imageZoom, setImageZoom] = useState<ImageZoom>('double');
@@ -48,22 +51,27 @@ export function OCRQaPanel() {
         canApproveRun,
     } = useOCRQaController();
     const engineLabels = getOcrEngineLabels(detail?.engine);
+    const primaryLength = compactTextLength(selectedPage?.primary_text ?? '');
+    const externalLength = compactTextLength(selectedPage?.external_text ?? '');
+    const externalLengthDifference = externalLength - primaryLength;
 
     return (
         <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
-            <header className="flex flex-wrap items-center gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
-                <ShieldCheck className="h-5 w-5 text-primary-600 dark:text-primary-400" />
-                <div className="min-w-0 flex-1">
-                    <h2 className="font-bold text-gray-900 dark:text-gray-100">OCR 品質確認</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                        原画像とOCR本文を確認後に公開します。QA未承認ではFull Buildできません。
-                    </p>
+            <header className="flex flex-col items-stretch gap-3 border-b border-gray-200 px-5 py-4 sm:flex-row sm:items-center dark:border-gray-700">
+                <div className="flex min-w-0 items-start gap-3 sm:flex-1">
+                    <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-600 dark:text-primary-400" />
+                    <div className="min-w-0">
+                        <h2 className="font-bold text-gray-900 dark:text-gray-100">OCR 品質確認</h2>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            全ページを原画像と照合し、OK・修正・保留のいずれかを記録します。
+                        </p>
+                    </div>
                 </div>
                 <select
                     aria-label="QA対象run"
                     value={selectedRunId ?? ''}
                     onChange={(event) => setSelectedRunId(Number(event.target.value))}
-                    className="max-w-sm rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                    className="w-full max-w-sm rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm sm:w-auto dark:border-gray-600 dark:bg-gray-800"
                 >
                     <option value="">対象を選択</option>
                     {awaitingRuns.map((run) => (
@@ -74,25 +82,24 @@ export function OCRQaPanel() {
                 </select>
             </header>
 
-            {runsQuery.isError && (
-                <Alert variant="error" className="m-4">
-                    QA対象の取得に失敗しました。
-                </Alert>
-            )}
-            {!runsQuery.isLoading && awaitingRuns.length === 0 && (
-                <div className="px-5 py-8 text-center text-sm text-gray-500">
-                    品質確認待ちのOCR結果はありません。
-                </div>
-            )}
+            <OCRQaRunState
+                isError={runsQuery.isError}
+                isLoading={runsQuery.isLoading}
+                awaitingCount={awaitingRuns.length}
+            />
             {detail && (
                 <>
                     <div className="flex flex-wrap items-center gap-3 border-b border-gray-200 px-5 py-3 text-sm dark:border-gray-700">
-                        <span>要確認 {detail.required_pages}</span>
+                        <span>未確認 {detail.required_pages}</span>
                         <span className="text-green-700 dark:text-green-400">
-                            承認 {detail.approved_pages}
+                            OK・修正 {detail.approved_pages}
                         </span>
                         <span className="text-red-700 dark:text-red-400">
-                            却下 {detail.rejected_pages}
+                            保留 {detail.rejected_pages}
+                        </span>
+                        <span className="basis-full text-xs text-gray-500 dark:text-gray-400">
+                            実行版: {runtimeManifestLabel(detail.runtime_manifest)} / 初期化{' '}
+                            {formatDurationMs(detail.timing.worker_init_ms)}
                         </span>
                         <label className="ml-auto flex items-center gap-2">
                             <input
@@ -131,12 +138,17 @@ export function OCRQaPanel() {
                                 >
                                     <Eye className="h-4 w-4" />
                                     <span className="flex-1">画面 {page.page_no}</span>
-                                    {page.qa_state === 'approved' && (
-                                        <Check className="h-4 w-4 text-green-600" />
-                                    )}
-                                    {page.qa_state === 'rejected' && (
-                                        <X className="h-4 w-4 text-red-600" />
-                                    )}
+                                    <span
+                                        className={`text-xs font-medium ${
+                                            page.qa_state === 'approved'
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : page.qa_state === 'rejected'
+                                                  ? 'text-red-700 dark:text-red-400'
+                                                  : 'text-amber-700 dark:text-amber-300'
+                                        }`}
+                                    >
+                                        {qaDecisionLabel(page.qa_state, page.selected_engine)}
+                                    </span>
                                 </button>
                             ))}
                         </nav>
@@ -149,76 +161,79 @@ export function OCRQaPanel() {
                                         : ''
                                 }`}
                             >
-                                <div className="min-w-0">
-                                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                                        <h3 className="font-semibold">
-                                            原画像 — 画面 {selectedPage.page_no}
-                                        </h3>
-                                        <div
-                                            role="group"
-                                            aria-label="原画像の表示倍率"
-                                            className="flex rounded-lg border border-gray-300 p-0.5 dark:border-gray-600"
-                                        >
-                                            {(
-                                                [
-                                                    ['fit', '画面幅'],
-                                                    ['double', '2倍'],
-                                                ] as const
-                                            ).map(([value, label]) => (
-                                                <button
-                                                    key={value}
-                                                    type="button"
-                                                    aria-pressed={imageZoom === value}
-                                                    onClick={() => setImageZoom(value)}
-                                                    className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                                                        imageZoom === value
-                                                            ? 'bg-primary-600 text-white'
-                                                            : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800'
-                                                    }`}
-                                                >
-                                                    {label}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div
-                                        key={selectedPage.page_no}
-                                        role="region"
-                                        // Scroll regions need focus so arrow keys work without a pointer.
-                                        // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
-                                        tabIndex={0}
-                                        aria-label="拡大した原画像。上下方向はホイール、トラックパッド、矢印キーで移動できます"
-                                        className="h-[calc(100dvh-8rem)] min-h-[640px] max-h-[1200px] overflow-x-hidden overflow-y-auto rounded-lg bg-gray-100 p-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:bg-gray-950"
-                                    >
-                                        <img
-                                            src={`${API_CONFIG.BASE_URL}${selectedPage.image_url}`}
-                                            alt={`${detail.book_name} 画面 ${selectedPage.page_no}`}
-                                            className="h-auto w-full object-contain"
-                                        />
-                                    </div>
-                                </div>
+                                <OCRQaImageViewer
+                                    bookName={detail.book_name}
+                                    pageNo={selectedPage.page_no}
+                                    imageUrl={selectedPage.image_url}
+                                    zoom={imageZoom}
+                                    onZoomChange={setImageZoom}
+                                />
                                 <div className="flex min-w-0 flex-col">
-                                    <h3 className="mb-2 font-semibold">OCR本文</h3>
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                        <h3 className="font-semibold">OCR候補と確認理由</h3>
+                                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                            機械判定 {selectedPage.state}
+                                        </span>
+                                        <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                                            QA{' '}
+                                            {qaDecisionLabel(
+                                                selectedPage.qa_state,
+                                                selectedPage.selected_engine,
+                                            )}
+                                        </span>
+                                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                                            画面処理{' '}
+                                            {formatDurationMs(
+                                                selectedPage.processing_timing.total_ms,
+                                            )}
+                                        </span>
+                                    </div>
                                     <div className="mb-2 flex flex-wrap gap-1">
                                         {selectedPage.quality_flags.map((flag) => (
                                             <span
                                                 key={flag}
+                                                title={flag}
                                                 className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                                             >
-                                                {flag}
+                                                {qualityFlagLabel(flag)}
                                             </span>
                                         ))}
                                     </div>
-                                    {selectedPage.selection_reason && (
-                                        <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 dark:border-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
-                                            初期候補の選択理由:{' '}
-                                            {getSelectionReasonLabel(selectedPage.selection_reason)}
-                                            <span className="ml-1 font-mono text-[11px] opacity-75">
-                                                ({selectedPage.selection_reason})
-                                            </span>
-                                        </p>
-                                    )}
+                                    <OCRQaSelectionReason reason={selectedPage.selection_reason} />
                                     <div className="grid gap-2">
+                                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                                            <section className="min-w-0 rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                                                <h4 className="mb-1 text-sm font-medium">
+                                                    Surya候補
+                                                    <span className="ml-2 text-xs font-normal text-gray-500">
+                                                        {primaryLength}文字
+                                                    </span>
+                                                </h4>
+                                                <textarea
+                                                    aria-label="Surya候補本文"
+                                                    value={selectedPage.primary_text}
+                                                    readOnly
+                                                    className="min-h-40 w-full resize-y whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-2 text-sm leading-6 dark:border-gray-700 dark:bg-gray-950"
+                                                />
+                                            </section>
+                                            <section className="min-w-0 rounded-lg border border-gray-200 p-2 dark:border-gray-700">
+                                                <h4 className="mb-1 text-sm font-medium">
+                                                    yomitoku候補
+                                                    <span className="ml-2 text-xs font-normal text-gray-500">
+                                                        {externalLength}文字（Surya比
+                                                        {externalLengthDifference >= 0 ? '+' : ''}
+                                                        {externalLengthDifference}）
+                                                    </span>
+                                                </h4>
+                                                <textarea
+                                                    aria-label="yomitoku候補本文"
+                                                    value={selectedPage.external_text}
+                                                    readOnly
+                                                    placeholder="候補なし"
+                                                    className="min-h-40 w-full resize-y whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-2 text-sm leading-6 dark:border-gray-700 dark:bg-gray-950"
+                                                />
+                                            </section>
+                                        </div>
                                         <label className="flex items-center gap-3 text-sm">
                                             採用候補
                                             <select
@@ -246,21 +261,21 @@ export function OCRQaPanel() {
                                                 )}
                                             </select>
                                         </label>
-                                        <textarea
-                                            aria-label="採用OCR本文"
-                                            value={
-                                                selectedEngine === 'primary'
-                                                    ? selectedPage.primary_text
-                                                    : selectedEngine === 'external'
-                                                      ? selectedPage.external_text
-                                                      : correctedText
-                                            }
-                                            readOnly={selectedEngine !== 'codex'}
-                                            onChange={(event) =>
-                                                setCorrectedText(event.target.value)
-                                            }
-                                            className="min-h-[280px] max-h-[400px] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-7 read-only:opacity-80 dark:border-gray-700 dark:bg-gray-950"
-                                        />
+                                        {selectedEngine === 'codex' ? (
+                                            <textarea
+                                                aria-label="Codex確認済み補正文"
+                                                value={correctedText}
+                                                onChange={(event) =>
+                                                    setCorrectedText(event.target.value)
+                                                }
+                                                placeholder="原画像で確認した補正文を入力"
+                                                className="min-h-48 max-h-[400px] flex-1 overflow-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm leading-7 dark:border-gray-700 dark:bg-gray-950"
+                                            />
+                                        ) : (
+                                            <p className="rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:bg-blue-950/40 dark:text-blue-200">
+                                                原画像と一致する候補を選び、「OKとして保存」してください。
+                                            </p>
+                                        )}
                                         {!selectedPage.external_text && (
                                             <p className="text-xs text-amber-700 dark:text-amber-300">
                                                 この画面には{engineLabels.external}
@@ -329,7 +344,10 @@ export function OCRQaPanel() {
                                             }
                                             className="flex items-center gap-2 rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >
-                                            <Check className="h-4 w-4" /> 承認
+                                            <Check className="h-4 w-4" />{' '}
+                                            {selectedEngine === 'codex'
+                                                ? '修正として保存'
+                                                : 'OKとして保存'}
                                         </button>
                                         <button
                                             type="button"
@@ -337,7 +355,7 @@ export function OCRQaPanel() {
                                             disabled={pageMutation.isPending}
                                             className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
                                         >
-                                            <X className="h-4 w-4" /> 却下
+                                            <X className="h-4 w-4" /> 保留
                                         </button>
                                     </div>
                                 </div>

@@ -16,6 +16,7 @@ from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
 from services.novel_db.migrations import upgrade_head
 from services.novel_db.ocr_page_classification import classify_run_pages
+from services.novel_db.ocr_provenance import candidate_manifest
 from services.novel_db.ocr_publication_history import activate_published_run
 from services.novel_db.ocr_qa_publication import approve_and_publish_run
 from services.novel_db.ocr_qa_queries import get_qa_image_path, get_qa_run, list_qa_runs
@@ -676,7 +677,7 @@ def test_classify_run_pages_excludes_appended_sample(tmp_data_dir) -> None:
     assert all("sample_content_excluded" in row[3] for row in rows[2:])
 
 
-def test_stage_requires_sample_boundary_but_not_every_excluded_page(tmp_data_dir) -> None:
+def test_stage_requires_every_page_including_excluded_sample_pages(tmp_data_dir) -> None:
     upgrade_head()
     book_name = "sample-boundary-qa"
     images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
@@ -698,4 +699,166 @@ def test_stage_requires_sample_boundary_but_not_every_excluded_page(tmp_data_dir
             "SELECT page_no FROM ocr_page_results WHERE run_id=? AND qa_state='required' ORDER BY page_no",
             (run_id,),
         ).fetchall()
-    assert [row[0] for row in required] == [1, 2, 3, 4, 5, 6, 7, 8, 12, 16]
+    assert [row[0] for row in required] == list(range(1, 17))
+
+
+def test_run_rejects_unversioned_model(staged_book) -> None:
+    book_name, input_pages = staged_book
+
+    with pytest.raises(ValueError, match="model revision"):
+        prepare_run(book_name, "surya2", "unversioned", input_pages)
+
+
+def test_page_preserves_runtime_candidates_and_phase_timing(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    primary_text = "主候補"
+    external_text = "外部候補"
+    primary_raw = "<primary>"
+    external_raw = "<external>"
+    page = _passed_page(1, input_pages[0].image_sha256, external_text)
+    page.update(
+        {
+            "primary_text": primary_text,
+            "external_text": external_text,
+            "primary_raw_output": primary_raw,
+            "external_raw_output": external_raw,
+            "selected_engine": "external",
+            "candidate_manifest": candidate_manifest(
+                primary_text=primary_text,
+                primary_raw_output=primary_raw,
+                primary_state="passed",
+                primary_block_count=1,
+                primary_quality_flags=[],
+                primary_attempt_count=1,
+                external_text=external_text,
+                external_raw_output=external_raw,
+                external_state="passed",
+                external_block_count=2,
+                external_quality_flags=["yomitoku_adjudication"],
+                external_attempt_count=2,
+            ),
+            "processing_timing": {
+                "image_read_ms": 4,
+                "primary_ocr_ms": 120,
+                "external_ocr_ms": 44,
+                "selection_ms": 2,
+                "total_ms": 170,
+            },
+            "runtime_manifest": {
+                "schema_version": 1,
+                "engine": "surya2",
+                "model_revision": "model-sha",
+                "platform": "Windows-test",
+            },
+            "run_timing": {"worker_init_ms": 500},
+        }
+    )
+
+    save_page_result(run_id, page)
+
+    with with_db() as conn:
+        run = conn.execute(
+            "SELECT runtime_manifest_json, timing_json FROM ocr_runs WHERE id=?",
+            (run_id,),
+        ).fetchone()
+        saved = conn.execute(
+            "SELECT primary_text, external_text, primary_raw_output, external_raw_output, "
+            "candidate_manifest_json, processing_timing_json FROM ocr_page_results "
+            "WHERE run_id=? AND page_no=1",
+            (run_id,),
+        ).fetchone()
+
+    assert '"model_revision":"model-sha"' in run[0]
+    assert run[1] == '{"worker_init_ms":500}'
+    assert tuple(saved[:4]) == (primary_text, external_text, primary_raw, external_raw)
+    assert '"text_sha256"' in saved[4]
+    assert saved[5] == ('{"external_ocr_ms":44,"image_read_ms":4,"primary_ocr_ms":120,"selection_ms":2,"total_ms":170}')
+
+
+def test_page_rejects_changed_runtime_manifest_and_candidate_sha(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    first = _passed_page(1, input_pages[0].image_sha256, "本文1")
+    first["runtime_manifest"] = {
+        "schema_version": 1,
+        "engine": "surya2",
+        "model_revision": "model-sha",
+        "platform": "Windows",
+    }
+    save_page_result(run_id, first)
+
+    second = _passed_page(2, input_pages[1].image_sha256, "本文2")
+    second["runtime_manifest"] = {
+        "schema_version": 1,
+        "engine": "surya2",
+        "model_revision": "model-sha",
+        "platform": "macOS",
+    }
+    with pytest.raises(ValueError, match="changed within"):
+        save_page_result(run_id, second)
+
+    tampered = _passed_page(2, input_pages[1].image_sha256, "本文2")
+    manifest = candidate_manifest(
+        primary_text="本文2",
+        primary_raw_output=tampered["raw_output"],
+        primary_state="passed",
+        primary_block_count=1,
+        primary_quality_flags=[],
+        primary_attempt_count=1,
+        external_text=None,
+        external_raw_output=None,
+        external_state=None,
+        external_block_count=None,
+        external_quality_flags=None,
+        external_attempt_count=None,
+    )
+    manifest["primary"]["text_sha256"] = "0" * 64
+    tampered["candidate_manifest"] = manifest
+    with pytest.raises(ValueError, match="primary candidate text_sha256 mismatch"):
+        save_page_result(run_id, tampered)
+
+
+def test_qa_persists_review_and_correction_timing(staged_book) -> None:
+    book_name, input_pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", input_pages)
+    for page in input_pages:
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, f"本文{page.page_no}"))
+    stage_run_for_qa(run_id, input_pages)
+
+    review_qa_page(
+        run_id,
+        1,
+        "approved",
+        None,
+        "narrative",
+        "normal_prose",
+        "codex",
+        "補正文",
+        "2026-08-29T10:00:00.000Z",
+        12_345,
+        4_321,
+    )
+    detail = get_qa_run(run_id)
+
+    assert detail["ocr_finished_at"] is not None
+    assert detail["qa_started_at"] is not None
+    assert detail["qa_finished_at"] is None
+    assert detail["pages"][0]["review_started_at"] == "2026-08-29T10:00:00.000Z"
+    assert detail["pages"][0]["review_duration_ms"] == 12_345
+    assert detail["pages"][0]["correction_duration_ms"] == 4_321
+
+    with pytest.raises(ValueError, match="non-negative"):
+        review_qa_page(
+            run_id,
+            2,
+            "approved",
+            None,
+            "narrative",
+            "normal_prose",
+            "primary",
+            None,
+            "2026-08-29T10:00:00Z",
+            -1,
+            None,
+        )

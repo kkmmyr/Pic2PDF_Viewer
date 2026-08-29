@@ -8,6 +8,7 @@
   "backend/services/novel_db/page_fts.py": 572,
   "backend/services/novel_db/search.py": 462,
   "backend/services/novel_db/surya_runtime.py": 440,
+  "frontend/src/features/kindle/KindlePriceWatchScreen.tsx": 428,
   "scripts/maintenance/check_claude_drift.py": 433,
   "scripts/maintenance/check_docs.py": 479,
   "scripts/maintenance/dots_mocr_vertical_predict.py": 575,

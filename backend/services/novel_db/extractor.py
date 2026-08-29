@@ -65,6 +65,12 @@ class OcrPageResult(PageText):
     layout_type: NotRequired[str]
     primary_text: NotRequired[str | None]
     external_text: NotRequired[str | None]
+    primary_raw_output: NotRequired[str | None]
+    external_raw_output: NotRequired[str | None]
+    candidate_manifest: NotRequired[dict]
+    processing_timing: NotRequired[dict]
+    runtime_manifest: NotRequired[dict]
+    run_timing: NotRequired[dict]
     selected_engine: NotRequired[str]
     selection_reason: NotRequired[str | None]
 
@@ -93,7 +99,14 @@ def _stop_worker_process(proc: subprocess.Popen[str]) -> None:
 def _ocr_worker_env() -> dict[str, str]:
     from config import app_settings
 
-    env = {**os.environ, "PYTHONIOENCODING": "utf-8", "OCR_ENGINE": app_settings.OCR_ENGINE}
+    engine = app_settings.OCR_ENGINE.casefold()
+    model_revision = app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine
+    env = {
+        **os.environ,
+        "PYTHONIOENCODING": "utf-8",
+        "OCR_ENGINE": engine,
+        "OCR_MODEL_REVISION": model_revision,
+    }
     values = {
         "OCR_PATH": app_settings.OCR_PACKAGE_PATH,
         "OCR_YOMITOKU_DEVICE": app_settings.OCR_YOMITOKU_DEVICE,

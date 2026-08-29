@@ -56,6 +56,11 @@ class OcrQaPageOut(BaseModel):
     selected_engine: Literal["primary", "external", "codex"]
     corrected_text: str | None
     selection_reason: str | None
+    candidate_manifest: dict[str, object]
+    processing_timing: dict[str, int]
+    review_started_at: str | None
+    review_duration_ms: int | None
+    correction_duration_ms: int | None
     index_eligible: bool
     image_url: str
 
@@ -64,6 +69,11 @@ class OcrQaRunDetail(OcrQaRunSummary):
     qa_reviewer: str | None
     qa_reviewed_at: str | None
     qa_note: str | None
+    runtime_manifest: dict[str, object]
+    timing: dict[str, int]
+    ocr_finished_at: str | None
+    qa_started_at: str | None
+    qa_finished_at: str | None
     pages: list[OcrQaPageOut]
 
 
@@ -74,6 +84,9 @@ class OcrQaPageReviewRequest(BaseModel):
     layout_type: LayoutType
     selected_engine: Literal["primary", "external", "codex"]
     corrected_text: str | None = None
+    review_started_at: str | None = None
+    review_duration_ms: int | None = None
+    correction_duration_ms: int | None = None
 
 
 class OcrQaRunApproveRequest(BaseModel):
@@ -166,6 +179,7 @@ class OcrGroundTruthListResponse(BaseModel):
 
 class OcrAgentClaimRequest(BaseModel):
     agent_id: str
+    model_revision: str | None = None
 
 
 class OcrAgentTaskOut(BaseModel):
@@ -216,6 +230,12 @@ class OcrAgentPageResultIn(BaseModel):
     layout_type: LayoutType = "unknown"
     primary_text: str | None = None
     external_text: str | None = None
+    primary_raw_output: str | None = None
+    external_raw_output: str | None = None
+    candidate_manifest: dict[str, object] | None = None
+    processing_timing: dict[str, int] | None = None
+    runtime_manifest: dict[str, object] | None = None
+    run_timing: dict[str, int] | None = None
     selected_engine: Literal["primary", "external"] = "primary"
 
 
