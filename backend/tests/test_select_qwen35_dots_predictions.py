@@ -77,6 +77,33 @@ def test_selector_uses_unsupported_markup_as_candidate_only_signal(
     assert selected[0]["selection_reason"] == "unsupported_markup:i"
 
 
+def test_selector_normalizes_dots_table_html_before_repetition_guard(
+    tmp_path: Path,
+) -> None:
+    qwen = _record("contents", "目次本文", engine="qwen")
+    qwen.update(html_truncated=False, suspicious_repetition=False)
+    qwen["raw_response"] = (
+        '<div data-bbox="0 0 10 10" data-label="Table"><table><tr><td>目次本文</td></tr></table></div>'
+    )
+    dots = _record("contents", "", engine="dots")
+    dots["pred"] = "<table><tr>" + "".join("<td>A</td>" for _ in range(10)) + "</tr></table>"
+    dots["raw_response"] = json.dumps(
+        [{"bbox": [0, 0, 10, 10], "category": "Table", "text": dots["pred"]}],
+        ensure_ascii=False,
+    )
+    qwen_path = tmp_path / "qwen.jsonl"
+    dots_path = tmp_path / "dots.jsonl"
+    _write(qwen_path, [qwen])
+    _write(dots_path, [dots])
+
+    selected = select.select_predictions(qwen_path=qwen_path, dots_path=dots_path)
+
+    assert selected[0]["selected_engine"] == "dots.mocr"
+    assert selected[0]["pred"] == "\n".join("A" for _ in range(10))
+    assert selected[0]["external_text"] == selected[0]["pred"]
+    assert "<table>" in selected[0]["external_raw_output"]
+
+
 def test_selector_uses_suspicious_vertical_bbox_order_signal(tmp_path: Path) -> None:
     qwen = _record("order", "段落一段落二", engine="qwen")
     qwen.update(html_truncated=False, suspicious_repetition=False)
@@ -177,6 +204,33 @@ def test_selector_falls_back_from_qwen_parse_error_in_review_mode(tmp_path: Path
         candidate_error="Qwen HTML has no non-empty layout blocks",
     )
     dots = _record("illustrated", "画像内の台詞", engine="dots")
+    qwen_path = tmp_path / "qwen.jsonl"
+    dots_path = tmp_path / "dots.jsonl"
+    _write(qwen_path, [qwen])
+    _write(dots_path, [dots])
+
+    selected = select.select_predictions(
+        qwen_path=qwen_path,
+        dots_path=dots_path,
+        allow_empty_candidates=True,
+    )
+
+    assert selected[0]["selected_engine"] == "dots.mocr"
+    assert selected[0]["selection_reason"] == "qwen_candidate_error"
+
+
+def test_selector_does_not_reparse_invalid_bbox_from_qwen_parse_error(
+    tmp_path: Path,
+) -> None:
+    qwen = _record("invalid-bbox", "", engine="qwen")
+    qwen.update(
+        html_truncated=False,
+        suspicious_repetition=False,
+        suspicious_vertical_bbox_order=False,
+        candidate_error="Qwen HTML layout block has an invalid data-bbox",
+        raw_response='<div data-bbox="0 0 0 10" data-label="Text">本文</div>',
+    )
+    dots = _record("invalid-bbox", "dotsの正常本文", engine="dots")
     qwen_path = tmp_path / "qwen.jsonl"
     dots_path = tmp_path / "dots.jsonl"
     _write(qwen_path, [qwen])

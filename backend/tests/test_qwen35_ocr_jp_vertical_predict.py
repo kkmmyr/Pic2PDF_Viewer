@@ -205,6 +205,25 @@ def test_review_mode_checkpoints_raw_candidate_parse_error(tmp_path: Path) -> No
     assert record["candidate_error"] == "Qwen HTML has no non-empty layout blocks"
 
 
+def test_review_mode_checkpoints_invalid_bbox_without_derived_signal(
+    tmp_path: Path,
+) -> None:
+    base = _config(tmp_path)
+    config = predict.RunConfig(**{**base.__dict__, "allow_empty_prediction": True})
+    response = '<div data-bbox="0 0 0 10" data-label="Text">本文</div>'
+
+    assert predict.run_predictions(
+        config,
+        engine_factory=lambda _config: _Engine(response),
+    ) == (1, 1)
+
+    record = json.loads(config.output_path.read_text(encoding="utf-8"))
+    assert record["pred"] == ""
+    assert record["raw_response"] == response
+    assert record["candidate_error"] == "Qwen HTML layout block has an invalid data-bbox"
+    assert record["suspicious_vertical_bbox_order"] is False
+
+
 def test_resume_rejects_tampered_raw_html_before_engine_creation(
     tmp_path: Path,
 ) -> None:

@@ -12,9 +12,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from collections.abc import Mapping, Sequence
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +39,39 @@ from qwen35_ocr_jp_vertical_predict import (  # noqa: E402  # pyright: ignore[re
     has_suspicious_vertical_bbox_order,
 )
 
+_TABLE_HTML_RE = re.compile(
+    r"</?(?:table|thead|tbody|tfoot|tr|td|th)\b",
+    re.IGNORECASE,
+)
+_VISIBLE_BREAK_TAGS = frozenset({"br", "div", "li", "p", "td", "th", "tr"})
+
+
+class _VisibleTableTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        del attrs
+        if tag.casefold() == "br":
+            self.parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.casefold() in _VISIBLE_BREAK_TAGS:
+            self.parts.append("\n")
+
+
+def _visible_dots_text(text: str) -> str:
+    if not _TABLE_HTML_RE.search(text):
+        return text
+    parser = _VisibleTableTextParser()
+    parser.feed(text)
+    parser.close()
+    return "\n".join(line.strip() for line in "".join(parser.parts).splitlines() if line.strip())
+
 
 def _load_predictions(
     path: Path,
@@ -54,9 +89,7 @@ def _load_predictions(
             try:
                 record = json.loads(raw_line)
             except json.JSONDecodeError as exc:
-                raise ValueError(
-                    f"{source} line {line_number} is invalid JSON: {exc.msg}"
-                ) from exc
+                raise ValueError(f"{source} line {line_number} is invalid JSON: {exc.msg}") from exc
             if not isinstance(record, dict) or not isinstance(record.get("id"), str):
                 raise ValueError(f"{source} line {line_number} has no string id")
             record_id = record["id"]
@@ -66,10 +99,7 @@ def _load_predictions(
                 raise ValueError(f"{source} id {record_id} has an empty prediction")
             if not record["pred"].strip() and not (
                 allow_empty_candidates
-                and (
-                    isinstance(record.get("candidate_error"), str)
-                    or record.get("image_only") is True
-                )
+                and (isinstance(record.get("candidate_error"), str) or record.get("image_only") is True)
             ):
                 raise ValueError(f"{source} id {record_id} has an empty prediction")
             records[record_id] = record
@@ -88,9 +118,7 @@ def _require_provenance(record: Mapping[str, Any], *, source: str) -> None:
             raise ValueError(f"{source} id {record_id} has no {field}")
 
 
-def _provenance_signature(
-    record: Mapping[str, Any], *, source: str
-) -> tuple[str, str, str]:
+def _provenance_signature(record: Mapping[str, Any], *, source: str) -> tuple[str, str, str]:
     _require_provenance(record, source=source)
     return (
         str(record["model_revision"]),
@@ -135,12 +163,8 @@ def _validate_prediction_scope(
         raise ValueError(f"dots predictions are missing qwen ids: {missing[:20]}")
     if extra:
         raise ValueError(f"dots predictions contain non-qwen ids: {extra[:20]}")
-    qwen_signatures = {
-        _provenance_signature(record, source="qwen") for record in qwen.values()
-    }
-    dots_signatures = {
-        _provenance_signature(record, source="dots") for record in dots.values()
-    }
+    qwen_signatures = {_provenance_signature(record, source="qwen") for record in qwen.values()}
+    dots_signatures = {_provenance_signature(record, source="dots") for record in dots.values()}
     if len(qwen_signatures) != 1:
         raise ValueError("qwen predictions mix model or prompt provenance")
     if len(dots_signatures) != 1:
@@ -166,7 +190,10 @@ def _validated_qwen_signals(
     stored_tags = record.get("fallback_markup_tags")
     if stored_tags is not None and stored_tags != list(markup_tags):
         raise ValueError(f"qwen id {record_id} fallback markup mismatch")
-    bbox_order_suspicious = has_suspicious_vertical_bbox_order(raw_response)
+    candidate_error = record.get("candidate_error")
+    bbox_order_suspicious = (
+        False if isinstance(candidate_error, str) else has_suspicious_vertical_bbox_order(raw_response)
+    )
     stored_bbox_order = record.get("suspicious_vertical_bbox_order")
     if stored_bbox_order is not None and stored_bbox_order != bbox_order_suspicious:
         raise ValueError(f"qwen id {record_id} bbox order flag mismatch")
@@ -174,9 +201,7 @@ def _validated_qwen_signals(
 
 
 def _qwen_flags(record_id: str, record: Mapping[str, Any]) -> list[str]:
-    repetition, markup_tags, bbox_order_suspicious = _validated_qwen_signals(
-        record_id, record
-    )
+    repetition, markup_tags, bbox_order_suspicious = _validated_qwen_signals(record_id, record)
     flags = []
     if isinstance(record.get("candidate_error"), str):
         flags.append("qwen_candidate_error")
@@ -195,9 +220,7 @@ def _validate_image_only(record_id: str, dots_record: Mapping[str, Any]) -> None
     try:
         dots_cells = json.loads(str(dots_record.get("raw_response") or ""))
     except json.JSONDecodeError as exc:
-        raise ValueError(
-            f"dots id {record_id} image-only raw response is invalid"
-        ) from exc
+        raise ValueError(f"dots id {record_id} image-only raw response is invalid") from exc
     safe = (
         isinstance(dots_cells, list)
         and bool(dots_cells)
@@ -221,28 +244,18 @@ def _selection_decision(
         raise ValueError(f"dots id {record_id} input_sha256 mismatch")
     flags = _qwen_flags(record_id, qwen_record)
     qwen_text = str(qwen_record["pred"])
-    dots_text = str(dots_record["pred"])
+    dots_text = _visible_dots_text(str(dots_record["pred"]))
     if isinstance(dots_record.get("candidate_error"), str):
-        reason = (
-            "qwen_flagged_dots_candidate_error"
-            if flags
-            else "qwen_clean_dots_candidate_error"
-        )
+        reason = "qwen_flagged_dots_candidate_error" if flags else "qwen_clean_dots_candidate_error"
         return False, reason
-    if (
-        not qwen_text.strip()
-        and not dots_text.strip()
-        and dots_record.get("image_only") is True
-    ):
+    if not qwen_text.strip() and not dots_text.strip() and dots_record.get("image_only") is True:
         _validate_image_only(record_id, dots_record)
         return True, "dots_image_only_review_required"
     if flags and dots_text.strip():
         return True, "+".join(flags)
     if flags:
         return False, "qwen_flagged_dots_empty_review_required"
-    if not has_suspicious_repetition(
-        dots_text
-    ) and is_external_materially_more_complete(qwen_text, dots_text):
+    if not has_suspicious_repetition(dots_text) and is_external_materially_more_complete(qwen_text, dots_text):
         return True, "dots_materially_more_complete"
     return False, "qwen_clean"
 
@@ -256,17 +269,16 @@ def _selected_record(
     reason: str,
 ) -> dict[str, Any]:
     chosen = dots_record if use_fallback else qwen_record
-    if (
-        use_fallback
-        and str(chosen["pred"]).strip()
-        and has_suspicious_repetition(str(chosen["pred"]))
-    ):
+    qwen_text = str(qwen_record["pred"])
+    dots_text = _visible_dots_text(str(dots_record["pred"]))
+    chosen_text = dots_text if use_fallback else qwen_text
+    if use_fallback and chosen_text.strip() and has_suspicious_repetition(chosen_text):
         raise ValueError(f"fallback id {record_id} also repeats")
     return {
         "id": record_id,
-        "pred": chosen["pred"],
-        "primary_text": qwen_record["pred"],
-        "external_text": dots_record["pred"],
+        "pred": chosen_text,
+        "primary_text": qwen_text,
+        "external_text": dots_text,
         "primary_raw_output": qwen_record["raw_response"],
         "external_raw_output": dots_record.get("raw_response", ""),
         "primary_provenance": _provenance(qwen_record),
@@ -330,9 +342,7 @@ def _write_atomic(path: Path, records: Sequence[Mapping[str, Any]]) -> None:
     try:
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             for record in records:
-                stream.write(
-                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
-                )
+                stream.write(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
                 stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
@@ -364,12 +374,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         allow_empty_candidates=args.allow_empty_candidates,
     )
     _write_atomic(args.output, selected)
-    fallback_count = sum(
-        record["selected_engine"] == "dots.mocr" for record in selected
-    )
-    print(
-        f"selected {len(selected)} pages: qwen={len(selected) - fallback_count}, dots.mocr={fallback_count}"
-    )
+    fallback_count = sum(record["selected_engine"] == "dots.mocr" for record in selected)
+    print(f"selected {len(selected)} pages: qwen={len(selected) - fallback_count}, dots.mocr={fallback_count}")
     return 0
 
 

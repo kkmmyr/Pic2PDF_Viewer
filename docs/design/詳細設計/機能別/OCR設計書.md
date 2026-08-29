@@ -225,6 +225,8 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
   model revision・fingerprint、engine version、prompt ID・SHA、生成条件と選択理由を保持する。
   `primary_text`はQwen、`external_text`はdots、`selected_engine`は`primary` / `external`へ写像する。
   `selection_reason`はDB列とQA APIへ複写し、QA画面で候補名と併せて表示する。
+- dotsの`Table`セルがHTMLを返した場合、raw JSONは監査用に保存したまま、selectorが
+  `pred`と`external_text`をDOM順の可視文字列へ正規化する。HTMLタグの繰り返しは本文反復シグナルに含めない。
 - QA画面の原画像は初期表示を`2倍`とし、`画面幅` / `2倍`をページ単位で切り替えられる。
   `画面幅`では十分な横幅がある場合にOCR本文と1:1で横並びにし、`2倍`ではOCR本文を下段へ移して
   画像親領域をページ全幅へ拡張する。構築管理画面自体も最大1800pxまで利用し、従来の画像列に対して
@@ -236,6 +238,8 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
   `candidate_error`付き空候補としてcheckpointし、非空のdots候補へ切り替える。両候補が空の場合は、
   dots raw JSONが非空配列で全要素`category=Picture`、非空textなしと再検証できる場合だけ
   `dots_image_only_review_required`として空本文を許可する。それ以外の両候補空はrunを失敗にする。
+- `candidate_error`を付けたQwen候補は、不正bboxを前提とする縦列順序シグナルを`false`とし、
+  selectorもそのbboxを再解析しない。raw応答は監査用に保存したまま、`qwen_candidate_error`でdots候補へ切り替える。
 - dotsがraw応答を返したもののlayout JSONを解析できない場合も、rawと`candidate_error`をcheckpointする。
   Qwen候補が非空かつ反復なしならQwenを初期候補として全ページQAへ残し、Qwen側にも空・反復などの
   fail-closed条件がある場合はrun全体を失敗にする。候補解析エラーはtransport成功やQA承認へ読み替えない。
