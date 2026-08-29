@@ -1,0 +1,19 @@
+[Unit]
+Description=Codex Coordination MCP (user service)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/pic2pdf-viewer/backend
+EnvironmentFile=/opt/pic2pdf-viewer/.env
+Environment=CODEX_COORDINATION_HOST=100.107.238.88
+Environment=CODEX_COORDINATION_PORT=8790
+Environment=CODEX_COORDINATION_DB_PATH=/opt/pic2pdf-viewer/data/codex_coordination.db
+ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/python codex_coordination_mcp.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/pic2pdf-viewer/logs/codex-coordination-stdout.log
+StandardError=append:/opt/pic2pdf-viewer/logs/codex-coordination-stderr.log
+
+[Install]
+WantedBy=default.target

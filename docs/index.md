@@ -60,6 +60,7 @@ Markdownを正本とし、HTMLは閲覧用の生成物とする。
 | Kindle Windows agentのクラス・処理順・実装パラメータ | `kindle-pdf/docs/detailed_design.md`（本サイト外の実装モジュール設計。横断契約を再定義しない） |
 | Kindle実機で観測した制約・障害・復旧実績 | [Kindle自動撮影_実機知見.md](log/技術知見/Kindle自動撮影_実機知見.md)（契約は定義しない） |
 | OCRの現行処理・QA・公開契約と品質指標の意味 | [OCR設計書.md](design/詳細設計/機能別/OCR設計書.md) |
+| Mac / Windows Codex間のメッセージ、topic、比較文脈の中継契約 | [Codex端末間連携設計.md](design/詳細設計/機能別/Codex端末間連携設計.md) |
 | OCR品質ゲートの機械判定値 | `scripts/maintenance/ocr_quality_policy.json`（説明と変更手順はOCR設計書） |
 | OCR品質改善の未完了Phase・詳細な受入条件 | [小説OCR品質改善_実装計画.md](log/計画/小説OCR品質改善_実装計画.md)（[バックログ](log/計画/バックログ.md)は優先度と要約だけを所有） |
 | 小説 RAG の実機ベンチ・モデル選定・トラブルシュート | [小説RAG_技術知見.md](log/技術知見/小説RAG_技術知見.md) |

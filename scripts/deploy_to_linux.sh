@@ -84,6 +84,12 @@ DEPLOY_LABEL="$(date +%Y-%m-%d_%H%M%S)_pre-deploy"
 ssh "${LINUX}" "bash '${APP_ROOT}/deploy/activate-backend.sh' \
   '${DEPLOY_LABEL}' '${NEXT_BACKEND}' '${NEXT_COMMON}' '${STAGED_WORKSPACE}'"
 
+# MCP user serviceが導入済みなら、active backend symlinkの切替後に新世代へ追従させる。
+ssh "${LINUX}" "if systemctl --user cat codex-coordination-mcp.service >/dev/null 2>&1; then \
+  systemctl --user restart codex-coordination-mcp.service && \
+  systemctl --user is-active --quiet codex-coordination-mcp.service; \
+fi"
+
 echo ""
 echo "Deploy complete: http://${LINUX_HOST}:8090"
 echo "Backend generation: ${NEXT_BACKEND}"

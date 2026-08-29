@@ -132,6 +132,7 @@ nav:
           - API: design/詳細設計/API.md
           - OCR 設計書: design/詳細設計/機能別/OCR設計書.md
           - Mac OCR 補助確認設計: design/詳細設計/機能別/Mac_OCR補助確認設計.md
+          - Codex 端末間連携設計: design/詳細設計/機能別/Codex端末間連携設計.md
           - hitomi 新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
           - 小説 RAG データ設計: design/詳細設計/機能別/小説RAG_データ.md
           - 小説 RAG パイプライン設計: design/詳細設計/機能別/小説RAG_パイプライン設計.md
