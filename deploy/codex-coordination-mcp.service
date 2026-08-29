@@ -1,0 +1,18 @@
+[Unit]
+Description=Codex Coordination MCP
+After=network.target pic2pdf-viewer.service
+Requires=pic2pdf-viewer.service
+
+[Service]
+Type=simple
+User=amashio
+WorkingDirectory=/opt/pic2pdf-viewer/backend
+EnvironmentFile=/opt/pic2pdf-viewer/.env
+ExecStart=/opt/pic2pdf-viewer/backend/.venv/bin/python codex_coordination_mcp.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=append:/opt/pic2pdf-viewer/logs/codex-coordination-stdout.log
+StandardError=append:/opt/pic2pdf-viewer/logs/codex-coordination-stderr.log
+
+[Install]
+WantedBy=multi-user.target
