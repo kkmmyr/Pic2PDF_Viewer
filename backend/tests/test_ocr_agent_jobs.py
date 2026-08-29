@@ -10,6 +10,8 @@ from services.novel_db import ocr_agent_jobs
 from services.novel_db.connection import with_db
 from services.novel_db.migrations import upgrade_head
 
+_MODEL_REVISION = "surya2-test-v1"
+
 
 @pytest.fixture
 def agent_job(tmp_data_dir, monkeypatch) -> tuple[int, str, list[Path]]:
@@ -54,7 +56,7 @@ def _page(page_no: int, path: Path) -> dict:
 def test_agent_claim_submit_complete_stages_qa(agent_job) -> None:
     job_id, book_name, paths = agent_job
 
-    job = ocr_agent_jobs.claim("windows-ocr-1")
+    job = ocr_agent_jobs.claim("windows-ocr-1", _MODEL_REVISION)
 
     assert job is not None
     assert job["id"] == job_id
@@ -90,8 +92,8 @@ def test_agent_claim_submit_complete_stages_qa(agent_job) -> None:
 
 def test_agent_reclaim_returns_same_job_and_rejects_wrong_owner(agent_job) -> None:
     job_id, book_name, _ = agent_job
-    first = ocr_agent_jobs.claim("windows-ocr-1")
-    second = ocr_agent_jobs.claim("windows-ocr-1")
+    first = ocr_agent_jobs.claim("windows-ocr-1", _MODEL_REVISION)
+    second = ocr_agent_jobs.claim("windows-ocr-1", _MODEL_REVISION)
 
     assert first is not None and second is not None
     assert first["id"] == second["id"] == job_id
@@ -101,7 +103,7 @@ def test_agent_reclaim_returns_same_job_and_rejects_wrong_owner(agent_job) -> No
 
 def test_agent_rejects_page_hash_mismatch(agent_job) -> None:
     job_id, book_name, paths = agent_job
-    ocr_agent_jobs.claim("windows-ocr-1")
+    ocr_agent_jobs.claim("windows-ocr-1", _MODEL_REVISION)
     page = _page(1, paths[0])
     page["image_sha256"] = "0" * 64
 
@@ -111,7 +113,7 @@ def test_agent_rejects_page_hash_mismatch(agent_job) -> None:
 
 def test_agent_heartbeat_timeout_fails_staging_without_touching_canonical(agent_job) -> None:
     job_id, book_name, _ = agent_job
-    claimed = ocr_agent_jobs.claim("windows-ocr-1")
+    claimed = ocr_agent_jobs.claim("windows-ocr-1", _MODEL_REVISION)
     assert claimed is not None
     run_id = int(claimed["books"][0]["run_id"])
     with with_db() as conn:
@@ -149,7 +151,7 @@ def test_agent_heartbeat_timeout_fails_staging_without_touching_canonical(agent_
         )
         conn.commit()
 
-    assert ocr_agent_jobs.claim("windows-ocr-2") is None
+    assert ocr_agent_jobs.claim("windows-ocr-2", _MODEL_REVISION) is None
 
     with with_db() as conn:
         job = conn.execute(
