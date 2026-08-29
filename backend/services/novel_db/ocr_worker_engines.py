@@ -6,7 +6,6 @@ import hashlib
 import io
 import json
 import os
-import platform
 import sys
 import time
 from dataclasses import dataclass, replace
@@ -27,7 +26,7 @@ try:
     from .surya_quality import crosscheck_ocr_results, evaluate_external_ocr
     from .surya_runtime import SuryaClient
     from .surya_types import SuryaPageResult
-    from .yomitoku_device import initialize_yomitoku_engine, requested_yomitoku_device
+    from .yomitoku_runtime import initialize_yomitoku_engine, requested_yomitoku_device
 except ImportError:
     from ocr_candidate_selection import (
         is_external_materially_more_complete,
@@ -40,7 +39,7 @@ except ImportError:
     from surya_quality import crosscheck_ocr_results, evaluate_external_ocr
     from surya_runtime import SuryaClient
     from surya_types import SuryaPageResult
-    from yomitoku_device import initialize_yomitoku_engine, requested_yomitoku_device
+    from yomitoku_runtime import initialize_yomitoku_engine, requested_yomitoku_device
 
 _YOMITOKU_ADJUDICATION_FLAGS = {
     "duplicate_text_recovery",
@@ -54,11 +53,7 @@ def _requested_yomitoku_device() -> str:
 
 
 def _initialize_yomitoku_engine(engine: Any) -> None:
-    initialize_yomitoku_engine(
-        engine,
-        requested=_requested_yomitoku_device(),
-        system_name=platform.system(),
-    )
+    initialize_yomitoku_engine(engine)
 
 
 @dataclass(frozen=True)

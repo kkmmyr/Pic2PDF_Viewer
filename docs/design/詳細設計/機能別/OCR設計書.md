@@ -96,6 +96,15 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 `mps`を明示したのにMPSが利用できない場合、またはMac上の外部ラッパーがデバイス指定を受け付けない
 場合は、CPUへ黙って切り替えずworkerを失敗させる。
 
+`yomitoku`の実行デバイスは、`OCR_PYTHON` / `OCR_PACKAGE_PATH`が指す外部OCR環境で
+`OCR_YOMITOKU_DEVICE`を解決する。WindowsのNVIDIA環境では`cuda`、Apple Siliconでは`mps`を
+使用し、`auto`（既定値）は`cuda`、`mps`、`cpu`の順で利用可能なデバイスを選択する。
+MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降）とPyTorchを使用する。
+`mps`を明示したのにMPSが利用できない場合、またはMac上の外部ラッパーがデバイス指定を受け付けない
+場合は、CPUへ黙って切り替えずworkerを失敗させる。
+デバイス値の検証と新旧ラッパーAPIへの変換は`yomitoku_runtime.py`へ集約し、
+`ocr_worker_engines.py`は補助照合と後方互換OCRのどちらからも同じ初期化関数を呼ぶ。
+
 ### 責務境界
 
 | ファイル | 責務 |
