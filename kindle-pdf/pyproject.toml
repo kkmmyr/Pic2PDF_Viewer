@@ -17,21 +17,39 @@ dev = [
     "pytest",
 ]
 gpu = [
-    "yomitoku",
-    "torch==2.5.1",
-    "torchvision==0.20.1",
-    "torchaudio==2.5.1",
+    "yomitoku==0.11.0",
+    # Windows/Linux: CUDA 12.4. Mac: the platform-specific entries below use MPS.
+    "torch==2.6.0; sys_platform != 'darwin'",
+    "torchvision==0.21.0; sys_platform != 'darwin'",
+    "torchaudio==2.6.0; sys_platform != 'darwin'",
+    "torch==2.6.0; sys_platform == 'darwin'",
+    "torchvision==0.21.0; sys_platform == 'darwin'",
+    "torchaudio==2.6.0; sys_platform == 'darwin'",
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu121" }
-torchvision = { index = "pytorch-cu121" }
-torchaudio = { index = "pytorch-cu121" }
+torch = [
+    { index = "pytorch-cu124", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
+torchvision = [
+    { index = "pytorch-cu124", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
+torchaudio = [
+    { index = "pytorch-cu124", marker = "sys_platform != 'darwin'" },
+    { index = "pytorch-cpu", marker = "sys_platform == 'darwin'" },
+]
 
 [tool.uv]
 package = false

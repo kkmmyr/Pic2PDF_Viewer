@@ -1,6 +1,6 @@
 # uv 環境セットアップ
 
-> status: living | last-verified: 2026-07-27
+> status: living | last-verified: 2026-08-29
 
 本プロジェクトの Python 環境は [uv](https://docs.astral.sh/uv/) の
 workspace として管理する。
@@ -82,12 +82,29 @@ uv sync --group dev
 
 ## GPU 補助依存
 
-`kindle-pdf` の `gpu` group は yomitoku + CUDA 12.1 版 PyTorch を含む。
+`kindle-pdf` の `gpu` group は yomitoku と PyTorch を含む。OS markerにより、
+Windows/LinuxはCUDA 12.4版、MacはApple SiliconのMPS backendを使用する。
 主系の Surya OCR 2 は llama-server を使うため、この group を必要としない。
 
 ```bash
-uv sync --package pic2pdf-viewer-kindle --group gpu
+# Windows/Linux: CUDA 12.4
+uv sync --python 3.12 --package pic2pdf-viewer-kindle --group gpu
 ```
+
+Macも同じコマンドで、OS markerによりCUDA wheelではなくMac向けPyTorchが解決される。
+確認コマンドは次のとおり。
+
+```bash
+# Windows/Linux
+uv run --python 3.12 --package pic2pdf-viewer-kindle python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+
+# Mac（Apple Silicon）
+uv run --python 3.12 --package pic2pdf-viewer-kindle python -c "import torch; print(torch.__version__); print(torch.backends.mps.is_available())"
+```
+
+OCR workerの外部環境でyomitokuを使う場合は、Windowsでは
+`OCR_YOMITOKU_DEVICE=cuda`、Macでは`OCR_YOMITOKU_DEVICE=mps`を設定する。
+未指定の`auto`は利用可能なCUDA → MPS → CPUの順で選択する。
 
 詳細は [OCR・Embedding GPU 環境セットアップ](GPU環境セットアップ.md) を参照。
 

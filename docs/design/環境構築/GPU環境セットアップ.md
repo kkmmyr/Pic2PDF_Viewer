@@ -1,6 +1,6 @@
 # OCR・Embedding・ローカルLLM GPU環境セットアップ
 
-> status: living | last-verified: 2026-08-22
+> status: living | last-verified: 2026-08-29
 
 本書は現在利用できる起動・切替手順だけを扱う。モデル比較の数値と不採用試験は
 [GPU・モデル検証履歴](../../archive/検証/GPU環境セットアップ_検証履歴.md)および
@@ -11,7 +11,7 @@
 | 系統 | 通常運用 | 実行基盤 |
 |---|---|---|
 | Surya OCR 2 | OCR主系 | OpenAI互換`llama-server` + GGUF |
-| yomitoku | 独立照合・後方互換 | Python + PyTorch CUDA |
+| yomitoku | 独立照合・後方互換 | Windows/Linux: PyTorch CUDA、Mac: PyTorch MPS |
 | bge-m3 | Embedding | Ollama。MacはMLX FP16 + CLSを選択可 |
 | Qwen | 主生成・QA | Windows/Linuxはllama-server、MacはMLXを選択可 |
 
@@ -41,14 +41,47 @@ SURYA_MMPROJ_PATH=D:\path\to\surya-2-mmproj.gguf
 
 ## 3. yomitoku補助環境
 
+`kindle-pdf`の`gpu` dependency groupはOS markerでPyTorchの取得先を切り替える。
+Windows/LinuxではCUDA 12.4、MacではApple Silicon用PyTorch（MPS backend）を使用し、
+同じgroup名でもCUDA wheelをMacへインストールしない。
+
+### 3.1 Windows/Linux（CUDA）
+
 ```powershell
 # リポジトリルート
-uv sync --package pic2pdf-viewer-kindle --group gpu
-uv run --package pic2pdf-viewer-kindle python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
+uv sync --python 3.12 --package pic2pdf-viewer-kindle --group gpu
+uv run --python 3.12 --package pic2pdf-viewer-kindle python -c "import torch; print(torch.__version__); print(torch.cuda.is_available())"
 ```
 
 `True`でない場合はNVIDIA driverとCUDA版PyTorchを確認する。backendの通常OCRが使う
 `OCR_PYTHON` / `OCR_PACKAGE_PATH`の外部環境と、`kindle-pdf` GPU groupは別環境である。
+
+`.env`では次を指定する。
+
+```dotenv
+OCR_YOMITOKU_DEVICE=cuda
+```
+
+### 3.2 Mac（Apple Silicon / MPS）
+
+```bash
+# リポジトリルート
+uv sync --python 3.12 --package pic2pdf-viewer-kindle --group gpu
+uv run --python 3.12 --package pic2pdf-viewer-kindle python -c \
+  "import torch; print(torch.__version__); print(torch.backends.mps.is_available())"
+```
+
+`True`でない場合は、arm64版Python、PyTorch、macOSのMetal/MPS環境を確認する。
+Macの`.env`では、外部OCR環境の場所とMPSを明示する。
+
+```dotenv
+OCR_PYTHON=/Users/<user>/.venv/ocr/bin/python
+OCR_PACKAGE_PATH=/Users/<user>/Developer/KRAuto/ocr
+OCR_YOMITOKU_DEVICE=mps
+```
+
+外部`ocr_engine.py`は`initialize(device=...)`を受け付けるMPS対応版へ更新する。
+MPS非対応演算子のCPU fallbackを有効にする場合も、MPS実行としての速度測定とは分けて記録する。
 
 ## 4. bge-m3
 
@@ -137,12 +170,15 @@ Nemotron 75B/30B、Ornith 35B-A3B、Gemma MLXの再現手順は現行運用で�
 - 自動起動用3 path
 - `nvidia-smi`と他processのGPU占有
 
-### yomitokuでCUDAを利用できない
+### yomitokuでGPUを利用できない
 
-- PyTorch versionが`+cu121`か
-- `kindle-pdf/pyproject.toml`の`pytorch-cu121` sourceが適用されたか
+- Windows/Linux: PyTorch versionが`+cu124`か、`kindle-pdf/pyproject.toml`の
+  `pytorch-cu124` sourceが適用されたか
+- Mac: `torch.backends.mps.is_available()`が`True`か、`OCR_YOMITOKU_DEVICE=mps`を
+  指定した外部ラッパーが使われているか
 
-CUDA/PyTorchを変更するときは、yomitoku実機比較とsecurity allowlistを同じ変更で確認する。
+CUDA/PyTorchまたはMPS/PyTorchを変更するときは、yomitoku実機比較とsecurity allowlistを
+同じ変更で確認する。
 
 ## 関連文書
 
