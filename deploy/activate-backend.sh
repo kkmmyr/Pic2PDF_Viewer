@@ -290,7 +290,7 @@ install_rollback_compatible_migrations() {
     target="${target_dir}/${migration_name}"
     if [ ! -e "$target" ]; then
       case "$migration_name" in
-        0014_novel_search_index_state.py | 0015_ocr_candidate_selection_reason.py) ;;
+        0014_novel_search_index_state.py | 0015_ocr_candidate_selection_reason.py | 0016_ocr_provenance_and_timing.py) ;;
         *)
           fail "migration is not approved for backward-compatible rollout: ${migration_name}"
           return
@@ -332,6 +332,8 @@ try:
         "SELECT 1 FROM sqlite_master "
         "WHERE type='table' AND name='novel_search_index_state'"
     ).fetchone()
+    run_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(ocr_runs)")}
+    page_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(ocr_page_results)")}
 finally:
     connection.close()
 
@@ -343,6 +345,19 @@ if integrity != "ok":
     raise SystemExit(f"novel.db integrity check failed after migration: {integrity}")
 if page_state is None:
     raise SystemExit("novel_search_index_state table is missing after migration")
+required_run_columns = {"runtime_manifest_json", "timing_json", "ocr_finished_at", "qa_finished_at"}
+required_page_columns = {
+    "primary_raw_output",
+    "external_raw_output",
+    "candidate_manifest_json",
+    "processing_timing_json",
+    "review_duration_ms",
+    "correction_duration_ms",
+}
+if missing := required_run_columns - run_columns:
+    raise SystemExit(f"ocr_runs migration columns are missing: {sorted(missing)}")
+if missing := required_page_columns - page_columns:
+    raise SystemExit(f"ocr_page_results migration columns are missing: {sorted(missing)}")
 print(f"Schema migration passed: revision={actual_revision}, integrity={integrity}")
 PY
 }

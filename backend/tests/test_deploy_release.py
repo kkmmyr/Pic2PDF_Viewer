@@ -85,11 +85,14 @@ def test_release_smoke_checks_stable_lance_path_and_active_icu() -> None:
     assert "page ICU no-match smoke unexpectedly returned a row" in script
 
 
-def test_activation_allows_reviewed_ocr_backward_compatible_migration() -> None:
+def test_activation_allows_reviewed_ocr_migration_and_verifies_columns() -> None:
     script = ACTIVATION_SCRIPT.read_text(encoding="utf-8")
 
-    assert "0014_novel_search_index_state.py | 0015_ocr_candidate_selection_reason.py" in script
+    assert "0015_ocr_candidate_selection_reason.py | 0016_ocr_provenance_and_timing.py" in script
     assert "migration is not approved for backward-compatible rollout" in script
+    assert 'required_run_columns = {"runtime_manifest_json", "timing_json"' in script
+    assert '"candidate_manifest_json",' in script
+    assert "ocr_page_results migration columns are missing" in script
 
 
 def test_activation_rejects_appledouble_before_systemd_or_writes(tmp_path: Path) -> None:

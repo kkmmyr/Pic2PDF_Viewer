@@ -185,5 +185,5 @@ WindowsではYomiToku 0.12.0・PyTorch 2.11.0+cu128について、同じ30画面
 - 同一process条件での2回実行と正規化本文SHA-256
 
 実測の詳細とWindows基準値は
-[OCR品質改善 技術知見 §16](../../../log/技術知見/OCR品質改善_技術知見.md#16-2026-08-29-りゅうおうのおしごとyomitoku速度環境差監査)
+[OCR品質改善 技術知見 §20](../../../log/技術知見/OCR品質改善_技術知見.md#ocr-yomitoku-cross-platform-20260829)
 を参照する。
