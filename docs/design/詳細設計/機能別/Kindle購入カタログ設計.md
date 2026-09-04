@@ -1,6 +1,6 @@
 # Kindle 購入カタログ設計
 
-> status: living | last-verified: 2026-08-10
+> status: living | last-verified: 2026-09-05
 
 ## 1. 目的と境界
 
@@ -245,12 +245,15 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
 
 ## 9. UI
 
-初回移行完了後の通常運用 UI は、購入書籍、画像紐付け、キャプチャ、取込・管理の 4 ページへ分離する。各ページは Kindle 領域内の共通サブナビゲーションと固有 URL を持ち、購入書籍を初期ページとする。実装前の UI/UX 要件と受入経緯は[凍結要件記録](../../../archive/要件/Kindle購入カタログ画面_UI改善_要件.md)を参照する。
+通常運用UIは、購入書籍、画像紐付け、キャプチャ、取込・管理、価格監視の5ページで構成する。
+`KindlePageShell`が共通サブナビゲーションを持ち、各ページは固有URLを持つ。
+購入書籍を入口とし、価格監視の契約は[Kindle価格監視設計](Kindle価格監視設計.md)、
+初期UIの要件と受入経緯は[凍結要件記録](../../../archive/要件/Kindle購入カタログ画面_UI改善_要件.md)を参照する。
 
 フロントエンド実装は`features/kindle/`を所有境界とする。`api.ts`はHTTP、`queries.ts`は
 TanStack Queryとinvalidate、`types.ts`はOpenAPI生成型alias、各`*Screen.tsx`は表示と
 操作controllerを所有する。route pageはscreenを配置するだけとし、URL、query key、
-invalidate範囲、toast文言、responsive layoutをこの再配置では変更しない。
+invalidate範囲、toast文言、responsive layoutはfeature側が所有する。
 
 - 購入書籍は検索中心の高密度テーブルとし、行から書籍詳細パネルを開く。
 - 画像紐付けは Pic2PDFViewer の既存画像と Kindle カタログ候補を 2 カラムで比較し、最終確認後だけ ASIN を設定する。
@@ -273,4 +276,5 @@ invalidate範囲、toast文言、responsive layoutをこの再配置では変更
   `URLSearchParams`を変更せず新しい値を返し、reloadと戻る・進むで同じ条件を復元する。
 - iPad 相当幅では購入一覧の著者をタイトル・ASINの下へ移し、種別・所有状態・画像状態をその下のバッジへまとめる。画像紐付けの 2 カラムは縦積みにし、端末種別による情報・機能の制限は行わない。
 
-4ページへのUI再構成自体は既存 API、DB スキーマ、取込ロジックを変更していない。後続の自動撮影取込では capture job 状態、heartbeat、agent API を拡張したが、Amazonデータ取込、既存画像の自動ASIN確定、旧アプリ画像・表紙・レビュー移行は変更していない。
+画面構成とAPI・DB契約を分けて管理する。capture jobの状態・heartbeat・agent APIは本書、
+価格観測・通知はKindle価格監視設計を正本とし、画面の数からデータ更新範囲を推測しない。

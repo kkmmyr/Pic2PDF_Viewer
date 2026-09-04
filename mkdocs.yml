@@ -184,6 +184,8 @@ nav:
       - Kindle自動撮影取込 完了記録: archive/Kindle自動撮影取込_実装計画.md
       - 漫画 AI 検証: archive/検証/漫画AI検証.md
       - OCR 旧 SearchablePDF 設計: archive/OCR_旧SearchablePDF設計.md
+      - OCR 候補評価・公開・Windows実測（2026-08）: archive/検証/OCR候補評価・公開・Windows実測_2026-08.md
+      - 小説RAG モデル比較・索引復旧（2026-08）: archive/検証/小説RAG_モデル比較・索引復旧_2026-08.md
       - hitomi 監視 実装計画と設計判断: archive/hitomi監視_実装計画と設計判断.md
       - hitomi 新着監視 設計運用履歴: archive/検証/hitomi新着監視_設計運用履歴.md
       - ADR-0004 hitomi 初期Windows運用: archive/検証/ADR0004_hitomi監視_初期Windows運用.md

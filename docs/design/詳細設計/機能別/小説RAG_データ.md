@@ -1,6 +1,6 @@
 # 小説 RAG データ設計（スキーマ・環境変数・API・レイアウト）
 
-> status: living | last-verified: 2026-08-29
+> status: living | last-verified: 2026-09-05
 
 小説 RAG（novel_db）サブシステムの横断的な事実の正本。DB スキーマ / 環境変数 / ディレクトリレイアウト / API エンドポイント一覧 / LLM backend・port を 1 箇所に集約する。個別処理の設計は [パイプライン設計](小説RAG_パイプライン設計.md)・[検索QA設計](小説RAG_検索QA設計.md)を参照。
 
@@ -193,14 +193,13 @@ Alembic upgrade、世代table作成、整合検査、active pointer切替まで�
 - SQLite: `backend/data/novel_db/novel.db`（`NOVEL_DB_DIR`）
 - LanceDB: `NOVEL_DB_DIR`の親にある`novel.lancedb`（`NOVEL_DB_LANCE_PATH`。通常開発では
   `backend/data/novel.lancedb`、Linux productionでは`/opt/pic2pdf-viewer/data/novel.lancedb`）
-- 小説の PDF / 画像 / サムネイル: `backend/data/kindle_novel/{pdfs,images,thumbnails}`（source=`novel` は内部的に `kindle_novel` ディレクトリに対応）
+- 小説の画像 / サムネイル: `backend/data/kindle_novel/{images,thumbnails}`（source=`novel`は内部的に`kindle_novel`に対応）。Searchable PDFは生成せず、旧`pdfs`ディレクトリを現行の出力先としない。
 - `kindle_novel/images/` 直下の各ディレクトリは書籍候補として列挙されるため、予備撮影・中断結果は置かない。診断データは `kindle_novel/capture_diagnostics/` 等の兄弟ディレクトリへ保管する。
 
 LanceDB directoryは`chunks`、`summaries`、世代別`pages_icu_*`を一体として扱う。release世代間の
 移設時はactive page tableの検索成功だけで完全性を判定せず、移設前の全実体と検証済みbackupから
-table名・schema・行内容を照合する。productionの2026-08-22復旧後基準は`chunks=3,489`、
-`summaries=18`、active page table `8,576`で、snapshot
-`2026-08-22_164434_post-lance-repair`の別directory復元試験に合格している。
+table名・schema・行内容を照合する。過去の行数を現在の固定値にせず、移設対象世代ごとに検証する。
+[2026-08-22の索引復旧記録](../../../archive/検証/小説RAG_モデル比較・索引復旧_2026-08.md#lance-repair)を参照する。
 
 ---
 
@@ -232,7 +231,11 @@ table名・schema・行内容を照合する。productionの2026-08-22復旧後�
 | POST | `/novel_db/sessions/{session_id}/messages` | メッセージ送信（マルチターン QA, SSE） | chat.py |
 | PATCH | `/novel_db/sessions/{session_id}/title` | セッションタイトル変更 | chat.py |
 
-キャラ関係グラフ（`character_relations`）を返す専用エンドポイントは**現状無い**（`graph_query.py` は内部ロジックからのみ利用）。
+キャラクター関係グラフは別routerの`/api/novel_graph`配下で読み取り専用APIとして公開する。
+`routers/novel_graph.py`がseries一覧、対象書籍一覧、series単位のnodes/edgesを返し、
+`graph_query.py`がDB読取とグラフ構築を担当する。`book_ids`で書籍を絞り込める。
+不正な整数指定は400、nodes/edgesがともに空のグラフは404とする。
+エンドポイントと型の正本は`/openapi.json`、画面は`/novel/graph`である。
 
 ---
 
@@ -251,9 +254,12 @@ table名・schema・行内容を照合する。productionの2026-08-22復旧後�
 `MlxBackend` / `MlxDsparkBackend`を使用する。`mlx_dspark`構成では11437をbge-m3の
 Embedding-only serverとして使い、生成用Qwenを11439へ二重ロードしない。
 
-### 5.2 backend シングルトン（`services/novel_db/_llm_backend.py`）
+### 5.2 用途別backend（`services/novel_db/llm_provider.py`）
 
-各サービスは backend を個別構築せず、ここから import する。
+各サービスは`get_llm_provider()`から用途別backendを取得し、必要に応じて`NovelLlmProvider`を注入する。
+`_llm_backend.py`は既存importの互換facadeであり、新規application codeの参照先にしない。
+下表の大文字名は互換aliasを示し、provider上の対応fieldは`qwen` / `gemma` / `query`である。
+独立検証用の`verifier`もproviderが所有し、その利用境界は[パイプライン設計](小説RAG_パイプライン設計.md)を参照する。
 
 | シングルトン | 実体 | モデル | 主な利用先 |
 |---|---|---|---|
@@ -266,5 +272,5 @@ Embedding-only serverとして使い、生成用Qwenを11439へ二重ロード�
 - embedding（bge-m3）は既定で CPU 推論（`NOVEL_DB_EMBED_NUM_GPU=0`）。llama-server の Qwen に VRAM を譲るため。GPU に戻すには `NOVEL_DB_EMBED_NUM_GPU=99` を設定して uvicorn を再起動。
 - QA の num_ctx は `NOVEL_DB_QA_NUM_CTX=32768`（full-book モードは `131072`）。llama-server は `-c 36864` 以上で起動している前提。
 - MLX時はmodel設定をローカルパスまたはHugging Face IDへ揃える。Qwen/Gemmaは同じtext-generation cacheを逐次切替するため、別モデルの生成を同時に開始しない。bge-m3は別embedding cacheへ保持される。
-- `mlx_dspark`時はQwen3.8の生成を11439、bge-m3のEmbeddingを11437へ分離する。`mlx-dspark`は`response_format`を生成制約に使わないため、`format="json"`を明示したJSON objectタスクだけを共通Backendの限定adapterで自然停止・形式検証する。JSON配列の関係抽出は対象外とする。Qwen3.8は比較用のMac opt-inであり、固定小説品質ゲート合格までは`full_build` / `generate_relations`と、Gemma役をQwenへ寄せた`generate_contexts`をjob開始前に拒否する。非永続のQAだけを許可し、公開SQLite行を更新しない。
+- `mlx_dspark`時はQwen3.8の生成を11439、bge-m3のEmbeddingを11437へ分離する。`mlx-dspark`は`response_format`を生成制約に使わないため、`format="json"`を明示したJSON objectタスクだけを共通Backendの限定adapterで自然停止・形式検証する。JSON配列の関係抽出は対象外とする。Qwen3.8は比較用のMac opt-inであり、固定小説品質ゲート合格までは`full_build` / `generate_relations`と、Gemma役をQwenへ寄せた`generate_contexts`をjob開始前に拒否する。比較用QAを許可するが、通常のQA APIは`qa_history`へ履歴を保存する。公開本文・索引の生成更新とQA履歴の永続化を区別する。
 - 2026-08-17実機ではGemma MLXが固定判定・人物抽出・出力終端の品質ゲートに不合格だったため、Macの採用構成も`NOVEL_DB_GEMMA_BACKEND=ollama`を維持する。`mlx`分岐は将来の変換/runtime再評価用であり、現在の推奨値ではない。
