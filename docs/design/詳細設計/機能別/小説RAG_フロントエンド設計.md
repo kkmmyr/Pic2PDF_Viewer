@@ -1,6 +1,6 @@
 # 小説RAG フロントエンド設計
 
-> status: living | last-verified: 2026-08-01
+> status: living | last-verified: 2026-09-05
 
 小説DBの検索、QA、chat、読書会、書誌管理、OCR管理に関するフロントエンド設計。
 backendの検索・QA契約は[小説RAG 検索QA設計](小説RAG_検索QA設計.md)、
@@ -14,13 +14,13 @@ backendの検索・QA契約は[小説RAG 検索QA設計](小説RAG_検索QA設�
 
 ## 1. 画面構成
 
-- `NovelDbPage`: 書籍一覧、series drilldown、検索、QA。各`BookCard`は
+- `NovelDbPage`: 書籍一覧、series drilldown、全書籍検索。各`BookCard`は
   `catalog_summary`がある場合だけ「短い要約」として最大4行表示する。
-- `NovelDetailPage`: 書誌、詳細あらすじ`summary`、character、類似書籍。
+- `NovelDetailPage`: 書誌、詳細あらすじ`summary`、character、類似書籍、書籍内検索、QA・履歴、chat。
   一覧向け`catalog_summary`で詳細あらすじを置き換えない。
 - `NovelDiscussionPage`: 読書会生成と履歴。
 - `NovelManagePage`: OCR / build job、Amazon情報取込、QA承認。
-- `NovelReaderPage`: Kindle撮影画像とOCR本文の参照。
+- `NovelReaderPage`: Kindle撮影画像の閲覧。検索結果から対象画面へ遷移する。
 
 PageはURLと主要queryを組み合わせ、通信とSSE parsingは`features/novel_db/`または
 `features/novel_build/`へ委譲する。
@@ -45,14 +45,14 @@ SSE受信中本文だけをlocal stateに置く。
 
 ## 3. ScopeとURL
 
-検索とQAの対象範囲はURLへ保存する。
+検索とQAの対象範囲は画面側が決定する。
 
-- `scope=all`
-- `scope=series&series_id=...`
-- `scope=book&book=...`
+- `NovelDbPage`の検索は固定の`all` scopeを使う。series drilldownは書籍一覧の絞り込みであり、検索scopeを変更しない。
+- `NovelDetailPage`はURL pathの`bookName`からbook scopeを作り、書籍内検索、QA・履歴、chatへ渡す。
+- 検索結果の画像リンクは`/novel/reader/:bookName?page=N`で対象画面を開く。
 
-`useNovelDbScope`がparseと更新を担当し、未知値は`all`へfallbackする。
-query更新は`replace: true`を使い、入力操作ごとにhistoryを増やさない。
+`useNovelDbScope`は実装ファイルとして残っているが、現行画面からは使用されない。
+`scope` query parameterによる全体・series・book切替を、現行UIの契約として扱わない。
 
 ---
 
@@ -61,7 +61,7 @@ query更新は`replace: true`を使い、入力操作ごとにhistoryを増や�
 QA、chat、読書会はrequest bodyを必要とするため、標準`EventSource`ではなく
 `fetch(POST)`と`ReadableStream`を使用する。
 
-- transportは`features/novel_db/sse.ts`へ限定する。
+- transportは`features/novel_db/sse-transport.ts`へ集約し、`qa-sse.ts` / `chat-sse.ts` / `discussion-sse.ts`が用途別eventを変換する。
 - `eventsource-parser`へSSE frame境界の解釈を委譲する。
 - app側はJSON変換とevent typeの振り分けだけを行う。
 - 中断は`AbortController`を使用し、serverのcanceled履歴契約を維持する。

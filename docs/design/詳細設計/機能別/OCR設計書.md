@@ -1,6 +1,6 @@
 # OCR設計書
 
-> status: living | last-verified: 2026-08-29
+> status: living | last-verified: 2026-09-05
 
 <!-- contract-owner: ocr-publication -->
 
@@ -70,7 +70,7 @@ Windowsから本番SQLiteを直接開かない。
 | `OCR_PYTHON` | OS別OCR venv | OCR workerを実行するPython |
 | `OCR_PACKAGE_PATH` | Windows: `D:\61.tool\common\ocr` / Mac: `~/Developer/KRAuto/ocr` | subprocessへ `OCR_PATH` として渡すパッケージパス |
 | `OCR_YOMITOKU_DEVICE` | `auto` | yomitokuの実行デバイス。`auto`は`cuda` → `mps` → `cpu`の順で解決 |
-| `OCR_ENGINE` | `surya2` | `surya2` / `yomitoku` |
+| `OCR_ENGINE` | `surya2` | `surya2` / `yomitoku` / `qwen35_dots_review_v1`。複合版の運用先制限は§2を参照 |
 | `SURYA_INFERENCE_URL` | `http://127.0.0.1:8768/v1` | OpenAI互換推論URL |
 | `SURYA_MODEL` | `surya-ocr-2` | 推論モデル名 |
 | `SURYA_MODEL_REVISION` | `unversioned` | `ocr_runs.model`へ保存する固定版識別子。新規runでは空値・`unversioned`を拒否する |
@@ -95,13 +95,6 @@ Windowsから本番SQLiteを直接開かない。
 MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降）とPyTorchを使用する。
 `mps`を明示したのにMPSが利用できない場合、またはMac上の外部ラッパーがデバイス指定を受け付けない
 場合は、CPUへ黙って切り替えずworkerを失敗させる。
-
-`yomitoku`の実行デバイスは、`OCR_PYTHON` / `OCR_PACKAGE_PATH`が指す外部OCR環境で
-`OCR_YOMITOKU_DEVICE`を解決する。WindowsのNVIDIA環境では`cuda`、Apple Siliconでは`mps`を
-使用し、`auto`（既定値）は`cuda`、`mps`、`cpu`の順で利用可能なデバイスを選択する。
-MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降）とPyTorchを使用する。
-`mps`を明示したのにMPSが利用できない場合、またはMac上の外部ラッパーがデバイス指定を受け付けない
-場合は、CPUへ黙って切り替えずworkerを失敗させる。
 デバイス値の検証と新旧ラッパーAPIへの変換は`yomitoku_runtime.py`へ集約し、
 `ocr_worker_engines.py`は補助照合と後方互換OCRのどちらからも同じ初期化関数を呼ぶ。
 
@@ -110,6 +103,7 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 | ファイル | 責務 |
 |---|---|
 | `backend/routers/ocr.py` | run / stop / status / QA API |
+| `backend/services/novel_db/ocr_agent_jobs.py` | Windows agentのclaim・heartbeat・画像取得・page submit・complete・failとjob/run所有権の検証 |
 | `backend/services/novel_db/extractor.py` | OCR subprocess呼び出し |
 | `backend/services/novel_db/ocr_worker.py` | standalone CLI、manifest読込、engine選択のprotocol shell |
 | `backend/services/novel_db/ocr_worker_protocol.py` | task・page・progressの型、JSONL payload生成・出力 |
@@ -123,11 +117,6 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
 | `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
-
-親processはworkerのJSONLを別threadで読み、最後のstdout eventから
-`OCR_WORKER_INACTIVITY_TIMEOUT_SEC`を超えた場合にworkerを回収して失敗とする。page結果が一部返っていても
-呼出し全体を成功扱いせず、後続の公開・FTS更新へ進めない。generatorの途中破棄時も同じ回収処理を行い、
-孤児processを残さない。既定値は1ページの最大3試行を許容する値とし、隔離試験では短い期限へ上書きする。
 | `backend/services/novel_db/surya_parsing.py` | 公式prompt、HTML/layout/bbox解析 |
 | `backend/services/novel_db/surya_quality.py` | coverage、品質flag、補助OCR照合 |
 | `backend/services/novel_db/surya_server.py` | llama-serverのhealth check・起動・終了 |
@@ -152,6 +141,11 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 | `backend/services/novel_db/ocr_staging.py` | run store・classification・QAの既存import契約を保つ期限付きfacade |
 | `backend/services/novel_db/job_worker.py` | queue workerと既存monkeypatch pointを保つfacade |
 | `D:\61.tool\common\ocr\ocr_engine.py` | yomitokuラッパー |
+
+親processはworkerのJSONLを別threadで読み、最後のstdout eventから
+`OCR_WORKER_INACTIVITY_TIMEOUT_SEC`を超えた場合にworkerを回収して失敗とする。page結果が一部返っていても
+呼出し全体を成功扱いせず、後続の公開・FTS更新へ進めない。generatorの途中破棄時も同じ回収処理を行い、
+孤児processを残さない。既定値は1ページの最大3試行を許容する値とし、隔離試験では短い期限へ上書きする。
 
 フロントエンドは`features/ocr/api.ts`をstatus / run / stop、QA、ground truthのHTTP境界、
 `useOcrStatus`、`useOCRQaController`、`useOCRGroundTruthController`をQuery/mutation/input状態の
@@ -243,36 +237,7 @@ OpenAPI生成型を`features/ocr/types.ts`から参照する。
 - dotsがraw応答を返したもののlayout JSONを解析できない場合も、rawと`candidate_error`をcheckpointする。
   Qwen候補が非空かつ反復なしならQwenを初期候補として全ページQAへ残し、Qwen側にも空・反復などの
   fail-closed条件がある場合はrun全体を失敗にする。候補解析エラーはtransport成功やQA承認へ読み替えない。
-- 2026-08-23の1冊pilotでは、隔離DBのrun 184で57/57画面を完走し、Qwen 42・dots 15を初期候補として
-  全57画面を初期`required`、runを`awaiting_qa`にした。Qwen候補解析失敗5、dots候補解析失敗1、
-  dots画像のみ4を監査artifactへ保持した。プロジェクトオーナーが候補切替全15画面、候補異常・分類未確定、
-  clean標本を含む計19画面を確認し、重大な欠落・読順崩壊なしと判定した。追加の候補差分・原画像監査で、
-  画面11の2文重複、13の「したかった」誤認、19の「最悪」意味誤認、36の2文欠落を確定し、補正文へ反映した。
-  画面1・4は画像のみ、画面6は本文／全幅本文に分類した。追加7画面をCodex原画像監査、残るclean通常本文
-  31画面をADR-0023の機械支援監査として承認し、全57画面を承認済みにした。
-- run 184は隔離DBで一度公開し、57画面・42,903文字の選択／補正済み本文とFTSが一致することを確認した。
-  公開前backupは`20260823T105530.007192Z-publish-run-184-b4ab82ec2dc7`（389,599,232 bytes）で、
-  manifestと復元DBの`integrity_check=ok`を確認した。その後、旧run 76へrollbackし、57画面・41,707文字の
-  本文、文字数、page分類、索引可否、FTSが公開前世代と一致することを確認した。rollback前backupは
-  `20260823T105642.543933Z-rollback-run-76-4773195e9bcb`（390,479,872 bytes）で同じ検証に合格した。
-  隔離DBはrun 76のrollback publicationをactive、run 184を`completed / approved`のまま保持する。
-  本番DBは変更していない。
-- 同じrun 184を`codex-reviewed-ocr-package-v1`へexportした隔離往復では、packageは1,276,317 bytes、
-  digestは`cc63d0e21ac7aed4d24772c4cdfcbb3d09744e5ec01851a760698b906ae0d25e`だった。レビュー根拠は
-  owner原画像確認19、機械監査31、Codex原画像確認7、補正pageは11・13・19・36として保持した。一時DBへの
-  初回importは57件、再importは同一runの57件すべてを冪等判定し、import前後のcanonical digestは不変だった。
-  明示公開後はpackageと57件一致・FTS不一致0、旧run 76へのrollback後はcanonical完全復元、publish／rollback
-  backup各1世代のSHA・integrityと最終DB integrityに合格した。本番DBは変更していない。
-- その後の本番反映では、review noteを含むpackage digest
-  `d78907dfedf71deadde157104e7b7b5e7b30026f9da88ba39bf40b165e04ec98`をproduction run 184へ
-  57件stagingし、再import 57件の冪等一致を確認した。事前backupとの直接比較でcanonical pages、
-  publication history、FTS5、page-level ICU stateがstaging前後で完全一致した後、publication ID 82として
-  明示公開した。公開本文は57画面・42,903文字、`index_eligible=1`は49画面、FTS5本文不一致0件である。
-  page-level ICUはrevision 1・8,568行・source SHA-256
-  `55c8f39783ffdd30e3f4305362e79383da8ae16195f33edb003ec86945367d89`へactive化し、対象書籍の
-  bge-m3 chunk 83件はSQLite／LanceDBでID・画面番号・本文が一致した。公開前全体backup、公開処理内backup、
-  公開後・embedding前backup、全処理後の`2026-08-23_ocr-run184-complete`を保持し、各SQLiteと
-  LanceDB復元検査に合格している。
+- 隔離pilot、本番staging、明示公開、rollbackの実測は[OCR検証履歴](../../../archive/検証/OCR候補評価・公開・Windows実測_2026-08.md#run184)を参照する。過去の公開成功は別runの公開条件を代替しない。
 - page reviewは`awaiting_qa` runだけを対象とし、state・page/layout分類・採用engine・補正文を
   検証して1pageだけを更新する。failed narrativeはCodex確認済み補正文なしで承認しない。
 - run承認は`required`・`rejected`・未分類page/layoutが0件であること、入力SHAが不変であること、
@@ -552,11 +517,13 @@ Sol確認の縮小は、固定コーパスと正式holdoutの全ゲート、同�
 
 ### 実行版・原候補・工程時間の監査保存
 
-新規OCR runは、実際にページを処理したworkerが生成する`runtime_manifest_json`を保存する。
+新規OCR runは、実際にページを処理したworkerが生成する`runtime_manifest_json`を保存する設計である。
+ただしWindows agentの入力ではmanifestの省略が許容されており、現行実装はこの必須条件を
+全経路で強制していない。[既知の問題](../../../log/既知の問題.md#ocr-agent-runtime-manifest)を参照する。
 manifestはschema version、OCR engine、固定model revision、Python/OS/CPU、PyTorch・YomiToku等の
 package version、CUDA/MPS/device、worker・wrapper・pipeline source SHA、Git commitとdirty状態を持つ。
 model/mmprojのローカル資材が指定された場合はファイルSHAも保存する。同じrunの途中でmanifestが
-変化した場合はページ保存を拒否し、異なる実行環境の結果を1 runへ混在させない。既存runは
+送信されたmanifestが変化した場合はページ保存を拒否し、異なる実行環境の結果を1 runへ混在させない。既存runは
 空manifestのまま読み取り可能とするが、新規runの`model`が空または`unversioned`なら開始しない。
 
 ページ結果は採用後の`full_text`/`raw_output`とは別に、`primary_text`、`external_text`、
@@ -577,15 +544,9 @@ model/mmprojのローカル資材が指定された場合はファイルSHAも�
 - 公開可能になるまでのwall clockはrunの`started_at`から`qa_finished_at`までとし、OCR計算時間、
   QA待ち時間、人手確認時間を混ぜた単一の速度値として扱わない。
 
-2026-08-29のWindows受入では、138画面のrun 190がWindows 11、RTX 5070、CUDA 12.8、
-YomiToku 0.12.0、PyTorch 2.11.0+cu128、Git commit、pipeline/model/mmproj SHAをmanifestへ固定し、
-全画面で両候補・候補manifest・工程時間を保存した。空のprimary候補18件も空のまま監査保存され、
-同一入力のrun 185に対して`failed`から`passed`へ3件改善、逆方向の遷移は0件だった。
-
-この受入でページの`passed` 117件、`failed` 21件は品質リスク分類であり、runの実行成否とは分ける。
-全138画面を`required`、runを`awaiting_qa / pending`として隔離し、公開版・canonical本文・検索索引は
-変更しなかった。先行run 189は原候補本文とmanifestのSHA不一致で19画面時点にfail closedとなり、
-checkpointを保持したまま公開へ進まなかった。この挙動を監査保存の受入基準とする。
+監査保存の受入では、空のprimary候補も実測値として保存し、原候補本文とmanifestのSHA不一致時は
+checkpointを保持して失敗させる。ページの`passed / failed`は品質リスク分類であり、runの実行成否や
+QA承認とは区別する。[Windows run 189・190の検証履歴](../../../archive/検証/OCR候補評価・公開・Windows実測_2026-08.md#windows-runtime)を参照する。
 
 ## 7. `YomitokuEngine`
 
@@ -620,58 +581,25 @@ ASCIIピリオド・中黒の連続を三点リーダーへ、連続ハイフン
 - 両候補が同じ列・固有名詞を誤る場合、候補比較だけでは検出できない。
 - B-35正式holdoutの封印・一度だけ開封は機械強制するが、新しい未調整holdoutでの
   機械単独総合合格は未達である。
-- Google Document AI Enterprise OCR `pretrained-ocr-v2.1.1-2025-01-31`は、2026-08-22の
-  開封済み30画面pilotでルビ混入と縦列読順崩壊を確認したため、正規本文の生成元にしない。
-  利用する場合は外部候補としてstagingに隔離し、列coverage・約物・ルビを原画像で独立確認する。
-  pilot差分率はverified ground truthに対するCERではなく、自動公開条件へ転用しない。
-- Unlimited-OCR BF16は、MLX-VLM 0.6.15の固定5枚で全ページが生成反復し、総合CER
-  690.7200%、ページ最大1,069.3122%だったため本番候補にしない。最大RSS約7.42GB、swap 0なので
-  64GB unified memory不足による不合格とは扱わない。反復除去後の本文を採用値へ転用しない。
-- Nemotron Parse 2.0 MLX 8bitは、元実装の専用task token列と日本語decode回避を
-  適用してもJSSODa固定先頭1枚で誤認文節が4,096 token上限まで反復した。
-  swap 0であり64GB unified memory不足ではない。標準MLX-VLMの逐次decodeでは
-  日本語tokenによる`KeyError`も起きるため、runtime修正だけで品質合格と見なさず、
-  固定revisionは本番候補にしない。元モデルの利用条件はOpenMDW-1.1、tokenizerはCC-BY-4.0とする。
-- Qianfan-OCR MLX 4bitは、公式基準prompt・temperature 0でも固定`000006`がCER 2.0270%、
-  `000142`がCER 753.8883%・同一文節反復となった。停止までのpeak footprintは約6.90GiB、
-  swap 0であり64GB unified memory不足ではない。変換元revisionもconfigから復元できないため、
-  固定変換版を本番候補にせず、反復penaltyや文字列切出しで採用値を救済しない。
-- HunyuanOCR 1.5 BF16 GGUFは、公式llama.cpp生成条件で固定`000006`をCER 0.3378%で通過したが、
-  `000142`は段落重複・順序入替によりCER 13.0340%だった。最大RSS約14.34GiB、swap 0であり
-  64GB unified memory不足ではない。固定GGUF pairを本番候補にせず、段落dedupe・順序補正で
-  採用値を救済しない。
-- Hayai OCR v2は固定revision、固定custom code、公式greedy生成とrepetition penalty 1.20で
-  JSSODa固定1枚目を診断したが、592文字に対して8文字出力・CER 99.4932%だった。
-  最大RSS約1.59GiBで64GB不足ではなく、短い漫画crop向けモデルの全文coverage不適合とする。
-  残りへ進めず本番候補にせず、短文crop化や回転、patch数変更で救済しない。
-- fail-fast不採用候補の一回限りrunnerは恒久保守資産にしない。runtime差分を再診断する期限付きrunnerだけを
-  `maintenance_assets.json`へ登録し、実測・revision・hash・失敗原因は設計書と技術知見を正本とする。
-- Qwen3.5-OCR-JP-2Bは公式固定prompt、greedy生成、最大8,000 token、固定revisionでJSSODaを評価する。
-  HTML layout blockはDOM順の可視文字へ復号し、rubyの`rt`だけを除外する。blockの並べ替え、本文dedupe、
-  言語補正は行わず、raw HTMLも保存する。固定5枚中4枚は総合CER 0.2416%だったが、`001751`が
-  8,000 tokenまで反復したため単体候補は不採用とする。
-- Qwen3.5 OCR + dots.mocr複合候補は、抽出本文へ既存`has_suspicious_repetition`を適用し、反復または
-  8,000 token到達によるHTML末尾切断ならdots.mocr、それ以外はQwenを採用する。selectorは正解本文、CER、
-  ページIDを参照しない。固定5枚では`001751`だけが
-  fallback対象となり、保存済みdots固定5枚集計から導く合成上界は総合CER 0.3285%以下、最大0.6907%以下である。
-  次の固定79枚でも未修復raw出力、HTML末尾切断flag、両候補のprovenanceを保存し、選択後の総合0.5%未満・
-  最大2.0%未満を判定する。実測は15枚時点で総合CER 0.5166%、最大3.1042%となり、最大ページに
-  反復・切断signalがないためfail-fast不採用とする。正解を見たLatin文字やページID条件をselectorへ追加しない。
-- 公開screening調整用v2では、plain textへ保持しない`div` / `ruby` / `rt` / `p` / `br`以外のinline HTML markupも
-  fallback候補信号として記録できる。tag内本文を推測補正せずページ全体をdots.mocrへ送り、同じ公開79枚を
-  最初から再評価する。これは開封済みscreeningで発見した規則なので正式holdoutの合格実績には数えない。
-  実測は`000260`だけをfallbackし、15枚総合CER 0.4776%へ改善したが、同ページのdots出力が2.2173%で
-  最大gateを超えた。残りへ進めずv2も不採用とする。
-- ADR-0022のレビュー前提v3は、Qwenとdotsを全ページで実行し、反復・HTML切断・非保持markup・
-  隣接する狭いvertical blockの左→右bbox順に加えて`is_external_materially_more_complete`をレビュー初期候補の
-  切替信号へ使う。bbox幅300超、上下端差25超、非隣接blockは比較せず、広い段落領域の誤検知を避ける。
-  固定79枚の再開後、`000653`でQwenが
-  中央2段落を欠落してCER 33.3333%となったが既存異常signalがなく、文字量差なら検出できることを確認した。
-  selectorは両候補のID・画像SHAを完全一致で検証し、各候補内でmodel revision・fingerprint・promptが
-  全ページ同一であることも検査する。選択後も両本文をQAへ保存する。
-  79枚中Qwen 72枚、dots 7枚を初期候補に選び、総編集距離223/54,504文字、加重CER 0.4091%、
-  ページ最大2.8835%となった。総合gateは通るが最大gateに未達である。この規則は開封済みscreening由来なので
-  未調整holdout合格値には数えず、自動公開へは昇格しない。人手照合範囲はADR-0023を正本とする。
+### 候補の採否と再評価境界
+
+| 候補 | 現在の扱い |
+|---|---|
+| Google Document AI Enterprise OCR | 正規本文の生成元にせず、使う場合は外部候補としてstagingに隔離し、列coverage・約物・ルビを原画像で確認する |
+| Unlimited-OCR / Nemotron Parse 2.0 / Qianfan-OCR / HunyuanOCR 1.5 / Hayai OCR v2 | 評価した固定版は本番候補にしない。反復除去・段落並べ替え・切出し等で採用値を救済しない |
+| Qwen3.5-OCR-JP-2B単体、Qwen＋dots v1・v2 | 評価した単体・selectorは不採用。開封済みscreeningから作った規則を未調整holdoutの合格実績へ転用しない |
+| Qwen＋dotsレビュー前提v3 | 機械単独の自動公開へ昇格しない。運用先、QA範囲、package import・明示公開は§2およびADR-0023・0024に従う |
+
+v3は両候補を全ページで実行し、反復・HTML切断・非保持markup・隣接する狭いvertical blockの
+左→右bbox順・`is_external_materially_more_complete`を初期候補の切替信号にする。
+bbox幅300超、上下端差25超、非隣接blockは比較しない。両候補のID・画像SHAの完全一致と、
+各候補内のmodel revision・fingerprint・promptの全ページ同一性を検証し、選択後も両本文を保存する。
+QwenのHTMLはDOM順で復号して`rt`を除外し、rawを保持する。本文の推測補正やdedupeは行わない。
+
+候補別の固定版、入力、CER、RSS、失敗原因は[候補評価履歴](../../../archive/検証/OCR候補評価・公開・Windows実測_2026-08.md#candidate-screening)を参照する。
+pilot差分率をverified ground truthに対するCERへ読み替えず、runtime起動成功を品質合格としない。
+fail-fast不採用候補の一回限りrunnerは恒久保守資産にせず、期限付き再診断runnerは
+`maintenance_assets.json`へ登録する。現在の採否は本書、実測・revision・hashは技術知見と検証履歴へ保存する。
 
 GPUセットアップは [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)、
 Mac補助評価は [Mac OCR補助確認設計](Mac_OCR補助確認設計.md)、削除済みSearchablePDF設計は
