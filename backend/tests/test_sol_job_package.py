@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 
 import pytest
@@ -57,11 +58,12 @@ def test_export_package_is_content_addressed_and_excludes_old_outputs(tmp_path) 
     serialized = (output / "manifest.json").read_text(encoding="utf-8")
     assert str(database) not in serialized
     assert "summary" not in serialized
-    pages = [json.loads(line) for line in (output / "pages.jsonl").read_text().splitlines()]
+    pages = [json.loads(line) for line in (output / "pages.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [page["page_no"] for page in pages] == [2, 3]
-    assert output.stat().st_mode & 0o777 == 0o700
-    assert (output / "manifest.json").stat().st_mode & 0o777 == 0o600
-    assert (output / "pages.jsonl").stat().st_mode & 0o777 == 0o600
+    if os.name != "nt":
+        assert output.stat().st_mode & 0o777 == 0o700
+        assert (output / "manifest.json").stat().st_mode & 0o777 == 0o600
+        assert (output / "pages.jsonl").stat().st_mode & 0o777 == 0o600
 
 
 def test_export_package_rejects_naive_ack_and_input_overflow(tmp_path) -> None:

@@ -1,13 +1,13 @@
-"""`docs/**/*.md` の整合性を検査する（pre-commit フックからコミットをブロックする）。
+"""`docs/**/*.md`と管理対象module設計書の整合性を検査する。
 
 check_claude_drift.py（`.claude/` 向け・常に exit 0 の人間判断ツール）とは異なり、
 本スクリプトは違反があれば **exit 1** する。以下 11 ルールを検査する。
 
-  Rule 1: docs 間の相対 Markdown リンク切れ
+  Rule 1: docs と管理対象module設計書の相対 Markdown リンク切れ
   Rule 2: メインの変更履歴.md の行数肥大化（週次ローテーション漏れ）
   Rule 3: mkdocs.yml の nav ツリーとの同期（dead entry / orphan ファイル）
-  Rule 4: design/ 各 spec 文書のサイズ超過（ブロッキング）
-  Rule 5: design/ 各 spec 文書の status ヘッダ欠落（ブロッキング）
+  Rule 4: design/ と管理対象module設計書のサイズ超過（ブロッキング）
+  Rule 5: design/ と管理対象module設計書の status ヘッダ欠落（ブロッキング）
   Rule 6: ファイルマップ文書の「主要ファイル補足」注釈の参照切れ（ブロッキング）
   Rule 7: 登録済み横断契約の正本マップリンク欠落（ブロッキング）
   Rule 8: 登録済み横断契約のowner marker欠落・重複（ブロッキング）
@@ -32,6 +32,7 @@ import yaml
 
 from check_docs_contracts import find_violations as find_contract_violations
 from check_docs_file_map import find_violations as find_file_map_violations
+from check_docs_sources import is_frozen_record, iter_link_checked_docs
 
 # Windows 環境で日本語ファイルパスが文字化けしないよう UTF-8 出力を強制
 if hasattr(sys.stdout, "reconfigure"):
@@ -64,6 +65,10 @@ DESIGN_DIR = DOCS_DIR / "design"
 ADR_DIR = DESIGN_DIR / "基本設計" / "ADR"
 TECH_KNOWLEDGE_DIR = DOCS_DIR / "log" / "技術知見"
 PLAN_DIR = DOCS_DIR / "log" / "計画"
+MANAGED_MODULE_DESIGN_DOCS = (
+    PROJECT_ROOT / "kindle-pdf" / "docs" / "basic_design.md",
+    PROJECT_ROOT / "kindle-pdf" / "docs" / "detailed_design.md",
+)
 PLAN_STATUS_HEADER_RE = re.compile(
     r"^>\s*status:\s*(?:active|blocked)\s*\|\s*"
     r"last-verified:\s*\d{4}-\d{2}-\d{2}\s*\|\s*owner:\s*\S.*$"
@@ -92,25 +97,8 @@ def _iter_non_fenced_lines(md_file: Path):
         yield lineno, line
 
 
-def _is_frozen_record(md_file: Path) -> bool:
-    """凍結記録（追記専用・原則編集しない）か判定する。
-
-    これらの文書が「その後に分割・削除された doc / コード」を指すのは歴史記録として
-    正常なので、リンク切れをブロッキング違反にせず情報表示に留める（doc の正当な
-    再編のたびに過去の変更履歴を書き換えさせないため。方法論の罠カタログ §8-3）。
-    - archive/ 配下すべて
-    - 週次アーカイブ 変更履歴/YYYY-Www.md（メインの log/変更履歴.md は living なので対象外）
-    """
-    parts = md_file.relative_to(DOCS_DIR).parts
-    if "archive" in parts:
-        return True
-    if "変更履歴" in parts and WEEKLY_CHANGELOG_RE.match(md_file.name):
-        return True
-    return False
-
-
 def check_broken_links() -> tuple[list[str], list[str]]:
-    """docs/**/*.md 内の相対 Markdown リンク（*.md 宛て）の切れを検出する。
+    """living文書内の相対Markdownリンク（*.md宛て）の切れを検出する。
 
     リンクはリンク元ファイル自身のディレクトリ基準で解決する（このリポジトリの
     docs 内リンクは実際にそう書かれているため。例: `../log/変更履歴.md`）。
@@ -119,9 +107,9 @@ def check_broken_links() -> tuple[list[str], list[str]]:
     """
     violations: list[str] = []
     frozen_info: list[str] = []
-    for md_file in sorted(DOCS_DIR.rglob("*.md")):
+    for md_file in iter_link_checked_docs(DOCS_DIR, MANAGED_MODULE_DESIGN_DOCS):
         rel_file = md_file.relative_to(PROJECT_ROOT)
-        frozen = _is_frozen_record(md_file)
+        frozen = is_frozen_record(md_file, DOCS_DIR, WEEKLY_CHANGELOG_RE)
         for lineno, line in _iter_non_fenced_lines(md_file):
             for m in MD_LINK_RE.finditer(line):
                 raw = m.group(1).strip()
@@ -279,23 +267,27 @@ def check_nav_sync() -> list[str]:
 
 
 def _iter_design_docs():
-    """design/ 配下の spec 文書を yield する。
+    """design/ 配下と明示管理するmoduleのspec文書をyieldする。
 
     ADR（Architecture Decision Records）は「一度 accepted になれば凍結」という
     独自ライフサイクルを持つ記録文書なので、status ヘッダ・サイズ番犬の対象外。
     """
     if not DESIGN_DIR.exists():
-        return
-    for md_file in sorted(DESIGN_DIR.rglob("*.md")):
-        if "ADR" in md_file.relative_to(DESIGN_DIR).parts:
-            continue
-        yield md_file
+        design_docs: list[Path] = []
+    else:
+        design_docs = sorted(DESIGN_DIR.rglob("*.md"))
+    for md_file in design_docs:
+        if "ADR" not in md_file.relative_to(DESIGN_DIR).parts:
+            yield md_file
+    yield from MANAGED_MODULE_DESIGN_DOCS
 
 
 def check_design_doc_size() -> list[str]:
     """Rule 4（fail・ブロック）: design/ の spec 文書が上限行数を超えていないか。"""
     violations: list[str] = []
     for md_file in _iter_design_docs():
+        if not md_file.exists():
+            continue
         rel = md_file.relative_to(PROJECT_ROOT)
         line_count = len(
             md_file.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -315,6 +307,9 @@ def check_design_headers() -> list[str]:
     violations: list[str] = []
     for md_file in _iter_design_docs():
         rel = md_file.relative_to(PROJECT_ROOT)
+        if not md_file.exists():
+            violations.append(f"{rel}: 管理対象の設計書が存在しません")
+            continue
         head = md_file.read_text(encoding="utf-8", errors="replace").splitlines()[:10]
         if not any(STATUS_HEADER_RE.match(line.strip()) for line in head):
             violations.append(
@@ -420,7 +415,7 @@ def main() -> None:
 
     print("=== check_docs: docs/ 整合性チェック ===\n")
 
-    _print_violations("[Rule 1] docs 間リンク切れ（living）", broken_links)
+    _print_violations("[Rule 1] docs/module 間リンク切れ（living）", broken_links)
     if frozen_link_info:
         print(
             f"  （凍結記録内のリンク切れ {len(frozen_link_info)} 件 = 歴史記録につき非ブロック・情報のみ）"
@@ -436,10 +431,10 @@ def main() -> None:
         "[Rule 3] mkdocs.yml nav 同期 (dead entry / orphan)", nav_violations
     )
     _print_violations(
-        f"[Rule 4] design/ 文書サイズ (> {DESIGN_DOC_LINE_LIMIT} 行) [blocking]",
+        f"[Rule 4] design/module文書サイズ (> {DESIGN_DOC_LINE_LIMIT} 行) [blocking]",
         size_violations,
     )
-    _print_violations("[Rule 5] design/ status ヘッダ欠落", header_missing)
+    _print_violations("[Rule 5] design/module status ヘッダ欠落", header_missing)
     _print_violations("[Rule 6] ファイルマップ注釈の参照切れ", file_map_violations)
     _print_violations("[Rule 7] 横断契約の正本マップリンク", contract_links)
     _print_violations("[Rule 8] 横断契約のowner marker", contract_markers)
@@ -451,9 +446,7 @@ def main() -> None:
         f"[Rule 10] 技術知見サイズ (> {TECH_KNOWLEDGE_LINE_LIMIT} 行)",
         knowledge_size_violations,
     )
-    _print_violations(
-        "[Rule 11] 計画ライフサイクル", plan_lifecycle_violations
-    )
+    _print_violations("[Rule 11] 計画ライフサイクル", plan_lifecycle_violations)
 
     total = (
         len(broken_links)

@@ -113,6 +113,15 @@ function ReaderPanelContent() {
         [direction, handleNext, handlePrev, toggleBothUI, showHeader, showSlider],
     );
 
+    const handleContentKeyDown = useCallback(
+        (e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            toggleBothUI(showHeader, showSlider);
+        },
+        [showHeader, showSlider, toggleBothUI],
+    );
+
     return (
         <>
             <ReaderHeader />
@@ -162,12 +171,16 @@ function ReaderPanelContent() {
                     className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
                 >
                     <div
-                        className="min-h-full flex items-center justify-center p-4 w-full"
+                        className="min-h-full flex items-center justify-center p-4 w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                         style={{ touchAction: 'pan-y' }}
                         onClick={handleContentClick}
+                        onKeyDown={handleContentKeyDown}
                         onTouchStart={onTouchStart}
                         onTouchEnd={onTouchEnd}
                         onTouchCancel={onTouchCancel}
+                        role="button"
+                        tabIndex={0}
+                        aria-label="読書画面。左右の領域でページを移動し、中央またはEnterキーで操作表示を切り替えます"
                     >
                         <ReaderPageView />
                     </div>

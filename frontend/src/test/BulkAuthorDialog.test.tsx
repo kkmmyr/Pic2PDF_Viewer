@@ -16,7 +16,7 @@ describe('BulkAuthorDialog', () => {
             />,
         );
 
-        expect(screen.getByRole('textbox')).toHaveValue('');
+        expect(screen.getByRole('combobox')).toHaveValue('');
 
         fireEvent.click(screen.getByRole('button', { name: '一括適用' }));
 

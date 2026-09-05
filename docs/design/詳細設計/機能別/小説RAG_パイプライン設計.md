@@ -23,7 +23,7 @@ images/*.png ──[ocr]──────────► pages.full_text (+ pag
       │        [full_build] ────────┤ books.summary + books.catalog_summary + book_characters
       │                              │                         … full_builder（事実抽出→個別執筆→校正）
       │                              │
-      │  [generate_contexts] ───────┤ chunks.contextual_text + 再embed  … full_builder.build_book_contexts
+      │  [generate_contexts] ───────┤ chunks.contextual_text + 再embed  … context_generation
       │                              │
       └──[extract_characters CLI]──► pages.main_characters              … character_extractor
                                      │
@@ -229,10 +229,11 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
 
 補足: `character_summarizer.summarize_character`は、1キャラ×1冊の個別執筆と全巻範囲入力選択を担い、full buildとCLI `build_character_summaries.py`から共用する。`character_db`は`book_characters`の集計・CRUDを担う。
 
-## 5. ステップ 4: チャンク文脈生成（`full_builder.build_book_contexts` + `contextualizer`）B-9
+## 5. ステップ 4: チャンク文脈生成（`context_generation` + `contextualizer`）B-9
 
 Anthropic の Contextual Retrieval 手法。各チャンクに「書籍内のどの場面か」の 1 文（80〜120 字）を付け、`(contextual_text + 本文)` を再 embedding して recall を上げる。**B-23 で full_build から分離した独立ジョブ**（`mode=generate_contexts`）。
 
+- **調停（`context_generation.build_book_contexts`）**: 対象チャンク選定、LLM生成の失敗隔離、embeddingバッチ、LanceDB置換、SQLite確定を所有する。`full_builder.build_book_contexts`は既存import互換の公開窓口として同じ関数を再公開し、full buildの要約・人物生成責務へ文脈生成処理を戻さない。
 - **生成（`contextualizer.generate_chunk_context`）**: 書名 + 書籍サマリ + チャンク先頭 1200 字を GEMMA_BACKEND に投げる。プロンプトは**本文の固有名詞と特徴的フレーズを必ず含める**よう明示（`num_predict=256`, `num_ctx=8192`）。失敗時は空文字を返し未処理のまま残す。
 - **対象**: `book.summary` がある書籍の、`contextual_text IS NULL` のチャンク（`redo=True` で全チャンク）。サマリ未生成の書籍はスキップ（Step 2 が前提）。
 - **skip 判定（`should_skip_context`）**: `char_count < NOVEL_DB_MIN_BODY_CHARS`(300) または先頭/末尾 `NOVEL_DB_BODY_PAGE_MARGIN`(5) ページ以内のチャンクは `contextual_text = NULL` に保つ。

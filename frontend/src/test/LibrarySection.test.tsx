@@ -85,7 +85,7 @@ async function openAuthorDialogForAllBooks() {
 }
 
 async function selectExistingAuthor() {
-    fireEvent.focus(screen.getByRole('textbox'));
+    fireEvent.focus(screen.getByRole('combobox'));
     fireEvent.mouseDown(await screen.findByText('既存作者'));
 }
 

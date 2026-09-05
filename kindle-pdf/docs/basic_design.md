@@ -1,5 +1,7 @@
 # Kindle キャプチャツール 基本設計書
 
+> status: living | last-verified: 2026-09-05
+
 実機依存の観測値、障害切り分け、再撮影後の品質確認は
 [Kindle 自動撮影 実機知見](../../docs/log/技術知見/Kindle自動撮影_実機知見.md)を参照する。
 Linux backendを含むjob状態、heartbeat、正式登録、シリーズ停止・再開条件は

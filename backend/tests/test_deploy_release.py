@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -20,10 +21,55 @@ def _write_executable(path: Path, body: str) -> None:
     _ = path.chmod(0o755)
 
 
+def _require_bash() -> str:
+    candidates = [shutil.which("bash")]
+    if program_files := os.environ.get("ProgramFiles"):
+        candidates.extend(
+            [
+                str(Path(program_files) / "Git" / "bin" / "bash.exe"),
+                str(Path(program_files) / "Git" / "usr" / "bin" / "bash.exe"),
+            ]
+        )
+    for candidate in dict.fromkeys(path for path in candidates if path):
+        try:
+            completed = subprocess.run(
+                [candidate, "-c", "exit 0"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if completed.returncode == 0:
+            return candidate
+    pytest.skip("usable bash is unavailable; release shell checks run in Linux CI")
+
+
+def _path_for_bash(bash: str, path: Path) -> str:
+    if os.name != "nt":
+        return str(path)
+    completed = subprocess.run(
+        [bash, "-c", 'cygpath -u "$1"', "path-conversion", str(path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return completed.stdout.strip()
+
+
+def _symlink_or_skip(link: Path, target: Path, *, target_is_directory: bool) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=target_is_directory)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable in this environment: {exc}")
+
+
 @pytest.mark.parametrize("script", [ARCHIVE_HELPER, DEPLOY_SCRIPT, ACTIVATION_SCRIPT])
 def test_release_shell_scripts_have_valid_bash_syntax(script: Path) -> None:
+    bash = _require_bash()
     completed = subprocess.run(
-        ["bash", "-n", str(script)],
+        [bash, "-n", str(script)],
         capture_output=True,
         text=True,
         check=False,
@@ -33,6 +79,7 @@ def test_release_shell_scripts_have_valid_bash_syntax(script: Path) -> None:
 
 
 def test_release_archive_drops_host_metadata(tmp_path: Path) -> None:
+    bash = _require_bash()
     source = tmp_path / "source"
     nested = source / "nested"
     nested.mkdir(parents=True)
@@ -52,13 +99,13 @@ def test_release_archive_drops_host_metadata(tmp_path: Path) -> None:
     archive = tmp_path / "release.tar.gz"
     completed = subprocess.run(
         [
-            "bash",
+            bash,
             "-c",
             'source "$1"; create_release_archive -czf "$2" -C "$3" .',
             "release-archive-test",
-            str(ARCHIVE_HELPER),
-            str(archive),
-            str(source),
+            _path_for_bash(bash, ARCHIVE_HELPER),
+            _path_for_bash(bash, archive),
+            _path_for_bash(bash, source),
         ],
         capture_output=True,
         text=True,
@@ -104,6 +151,7 @@ def test_activation_allows_reviewed_ocr_migration_and_verifies_columns() -> None
 
 
 def test_activation_rejects_appledouble_before_systemd_or_writes(tmp_path: Path) -> None:
+    bash = _require_bash()
     app_root = tmp_path / "app"
     previous_backend = app_root / "backend-previous"
     next_backend = app_root / "backend-next"
@@ -122,9 +170,9 @@ def test_activation_rejects_appledouble_before_systemd_or_writes(tmp_path: Path)
     ):
         _ = path.write_text("fixture\n", encoding="utf-8")
     _ = (next_backend / "._0012_fixture.py").write_text("appledouble\n", encoding="utf-8")
-    _ = (workspace / "backend").symlink_to(next_backend, target_is_directory=True)
-    _ = (workspace / "common" / "llm").symlink_to(next_common, target_is_directory=True)
-    _ = (app_root / "backend").symlink_to(previous_backend, target_is_directory=True)
+    _symlink_or_skip(workspace / "backend", next_backend, target_is_directory=True)
+    _symlink_or_skip(workspace / "common" / "llm", next_common, target_is_directory=True)
+    _symlink_or_skip(app_root / "backend", previous_backend, target_is_directory=True)
 
     active_python = previous_backend / ".venv" / "bin" / "python"
     fake_uv = tmp_path / "fake-uv"
@@ -142,21 +190,21 @@ def test_activation_rejects_appledouble_before_systemd_or_writes(tmp_path: Path)
     env.update(
         {
             "PATH": f"{fake_bin}{os.pathsep}{env['PATH']}",
-            "PIC2PDF_APP_ROOT": str(app_root),
-            "PIC2PDF_UV_BIN": str(fake_uv),
-            "PIC2PDF_PYTHON_BIN": str(fake_python),
+            "PIC2PDF_APP_ROOT": _path_for_bash(bash, app_root),
+            "PIC2PDF_UV_BIN": _path_for_bash(bash, fake_uv),
+            "PIC2PDF_PYTHON_BIN": _path_for_bash(bash, fake_python),
             "PIC2PDF_SERVICE_NAME": "pic2pdf-test",
-            "PIC2PDF_TEST_SYSTEMCTL_MARKER": str(marker),
+            "PIC2PDF_TEST_SYSTEMCTL_MARKER": _path_for_bash(bash, marker),
         }
     )
     completed = subprocess.run(
         [
-            "bash",
-            str(ACTIVATION_SCRIPT),
+            bash,
+            _path_for_bash(bash, ACTIVATION_SCRIPT),
             "release-test",
-            str(next_backend),
-            str(next_common),
-            str(workspace),
+            _path_for_bash(bash, next_backend),
+            _path_for_bash(bash, next_common),
+            _path_for_bash(bash, workspace),
         ],
         capture_output=True,
         text=True,

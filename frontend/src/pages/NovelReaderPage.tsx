@@ -109,6 +109,15 @@ export default function NovelReaderPage() {
         [direction, handleNext, handlePrev],
     );
 
+    const handleAreaKeyDown = useCallback(
+        (e: React.KeyboardEvent<HTMLDivElement>) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            handleNext();
+        },
+        [handleNext],
+    );
+
     if (!bookName) return null;
 
     const contentH = windowHeight - HEADER_H;
@@ -197,9 +206,13 @@ export default function NovelReaderPage() {
 
             {/* コンテンツ */}
             <div
-                className="flex items-center justify-center cursor-pointer"
+                className="flex items-center justify-center cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 style={{ marginTop: HEADER_H, height: contentH }}
                 onClick={handleAreaClick}
+                onKeyDown={handleAreaKeyDown}
+                role="button"
+                tabIndex={0}
+                aria-label="小説読書画面。左右の領域または矢印キーでページを移動し、Enterキーで次へ進みます"
             >
                 {numPages === 0 ? (
                     <p className="text-gray-400">読み込み中...</p>

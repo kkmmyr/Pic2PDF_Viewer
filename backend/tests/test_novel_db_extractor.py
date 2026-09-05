@@ -169,5 +169,11 @@ time.sleep(30)
 
     assert time.monotonic() - started < 5
     pid = int(pid_file.read_text(encoding="utf-8"))
-    with pytest.raises(ProcessLookupError):
+    try:
         os.kill(pid, 0)
+    except ProcessLookupError:
+        pass
+    except OSError as exc:
+        assert sys.platform == "win32" and exc.winerror == 87
+    else:
+        pytest.fail("OCR worker process is still alive")

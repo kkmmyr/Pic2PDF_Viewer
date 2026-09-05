@@ -72,7 +72,7 @@ export function Dialog({
                     data-slot="dialog-content"
                     className={cn(
                         'fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
-                        'bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full mx-4',
+                        'bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-[calc(100%-2rem)]',
                         'border border-gray-200 dark:border-gray-700',
                         MAX_WIDTH_CLASS[maxWidth],
                         zClass,

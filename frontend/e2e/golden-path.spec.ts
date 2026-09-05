@@ -58,6 +58,34 @@ test.describe('検索フィルタ', () => {
     });
 });
 
+test.describe('モバイル共通ダイアログ', () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+
+    test('左右16pxを確保し、TabとEscapeで操作できる', async ({ page }) => {
+        const consoleErrors: string[] = [];
+        page.on('console', (message) => {
+            if (message.type() === 'error') consoleErrors.push(message.text());
+        });
+        page.on('pageerror', (error) => consoleErrors.push(error.message));
+
+        await page.goto('/doujin');
+        await page.getByRole('button', { name: /絞り込み/ }).click();
+
+        const dialog = page.getByRole('dialog');
+        await expect(dialog).toBeVisible();
+        const box = await dialog.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box?.x).toBeCloseTo(16, 0);
+        expect(390 - ((box?.x ?? 0) + (box?.width ?? 0))).toBeCloseTo(16, 0);
+
+        await page.keyboard.press('Tab');
+        await expect(dialog.locator(':focus')).toHaveCount(1);
+        await page.keyboard.press('Escape');
+        await expect(dialog).not.toBeVisible();
+        expect(consoleErrors).toEqual([]);
+    });
+});
+
 // ── 4. ダークモード切替 ──────────────────────────────────────────────────
 test.describe('ダークモード', () => {
     test('ダークモードをトグルできる', async ({ page }) => {
