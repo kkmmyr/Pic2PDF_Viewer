@@ -1,7 +1,14 @@
 # Kindle キャプチャツール 詳細設計書
 
+> status: living | last-verified: 2026-09-05
+
 実機依存の観測値、障害切り分け、再撮影後の品質確認は
 [Kindle 自動撮影 実機知見](../../docs/log/技術知見/Kindle自動撮影_実機知見.md)を参照する。
+
+本書はWindows側の撮影module内部を所有する。利用者要件、capture jobの状態遷移、
+登録・公開境界は[Kindle自動撮影ジョブ契約](../../docs/design/詳細設計/機能別/Kindle自動撮影ジョブ契約.md)を正本とし、
+本書で再定義しない。`scripts/maintenance/check_docs.py`は本書と基本設計書の状態ヘッダ、
+行数、相対Markdownリンクを検査する。
 
 ## 1. モジュール構成・クラス設計
 
@@ -305,8 +312,11 @@ version 2 manifestと`.partial → .ready`公開、`capture_agent.py`は工程�
 
 ### 漫画（`run_comic.bat`）
 
+手動・互換経路はKindleのページ設定を変更・検証しない。利用者が起動前に「2 ページ」へ
+設定し、ツールはその表示状態を使う。自動設定と状態検証はcapture jobのagent経路だけが行う。
+
 ```
-起動 → Kindle ウィンドウ検索 → agent はページ設定を「2 ページ」へ固定
+起動 → Kindle ウィンドウ検索 → 現在のページ設定を維持
     → 新 Kindle は最大化 / 旧 Kindle は F11
     → ダイアログでタイトル確認
     → ReadingArea上下境界 + 見開き安全幅を検出 → CROP 座標確定
@@ -317,8 +327,11 @@ version 2 manifestと`.partial → .ready`公開、`capture_agent.py`は工程�
 
 ### 小説（`run_novel.bat`）
 
+手動・互換経路はKindleのページ設定を変更・検証しない。利用者が起動前に「1 ページ」へ
+設定し、ツールはその表示状態を使う。自動設定と状態検証はcapture jobのagent経路だけが行う。
+
 ```
-起動 → Kindle ウィンドウ検索 → agent はページ設定を「1 ページ」へ固定
+起動 → Kindle ウィンドウ検索 → 現在のページ設定を維持
     → 新 Kindle は最大化 / 旧 Kindle は F11
     → ダイアログでタイトル確認
     → 白背景スキャン → CROP 座標確定
