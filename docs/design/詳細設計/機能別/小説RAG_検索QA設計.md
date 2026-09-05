@@ -6,7 +6,7 @@ novel タブのハイブリッド検索・RAG 質問応答・マルチターン�
 
 **環境変数・スキーマ・LLM backend / port・API 一覧は [データ設計](小説RAG_データ.md) が正本**。本書は重複記載せず、検索・QA の処理フローに集中する。段階拡大（num_ctx PoC→A→B→C・top_k）や俯瞰質問三段改善（B-5/B-8/B-9）の経緯は [設計過程（凍結）](../../../archive/小説RAG_設計過程.md)、実機ベンチ・モデル選定は [技術知見](../../../log/技術知見/小説RAG_技術知見.md)。
 
-検索/QA のコアは `backend/services/novel_db/` の `search_scope.py` / `search.py` / `page_fts.py` / `book_summary_search.py` / `retrieval.py` / `prompt_builder.py` / `query_expander.py` / `llm.py` / `qa_history.py` / `qa_sessions.py` / `discussion_service.py`（+ `discussion_cast.py` / `discussion_prompts.py` / `discussion_checks.py`）、ルーターは `backend/routers/novel_db/{search,qa,chat}.py`。
+検索/QA のコアは `backend/services/novel_db/` の `search_scope.py` / `search.py` / `page_fts.py`（公開窓口）/ `page_fts_state.py` / `page_fts_builder.py` / `page_fts_query.py` / `book_summary_search.py` / `retrieval.py` / `prompt_builder.py` / `query_expander.py` / `llm.py` / `qa_history.py` / `qa_sessions.py` / `discussion_service.py`（+ `discussion_cast.py` / `discussion_prompts.py` / `discussion_checks.py`）、ルーターは `backend/routers/novel_db/{search,qa,chat}.py`。
 
 ---
 
@@ -38,6 +38,13 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 サマリやコンテキスト生成の処理量抑制には引き続き利用できる。
 
 ### 1.1 ICU indexの構築・世代切替
+
+page-level ICU索引の内部責務は次の3層に固定する。`page_fts.py`は既存利用箇所向けに公開型・関数・
+build loggerを再公開するだけの窓口とし、処理を重複実装しない。
+
+- `page_fts_state.py`: SQLite stateの取得・stale更新、条件付きactive pointer切替、active manifestとtableの検証。
+- `page_fts_builder.py`: canonical page読込み・digest・immutable table構築・公開前検証・失敗table除去。
+- `page_fts_query.py`: scopeとprefilter、ICU検索、canonical SQLite再照合、snippet生成。
 
 `build_page_fts_index.py`はSQLite `pages`を`id`順で全件読み、`index_eligible=1`のpageを
 新しい`pages_icu_r<revision>_<hash>_<build-id>` tableへ書く。既存の

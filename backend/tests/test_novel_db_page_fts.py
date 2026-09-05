@@ -6,7 +6,7 @@ import sqlite3
 
 import pytest
 
-from services.novel_db import page_fts
+from services.novel_db import page_fts, page_fts_builder, page_fts_query, page_fts_state
 from services.novel_db.connection import with_db
 from services.novel_db.lance_store import get_db
 from services.novel_db.migrations import upgrade_head
@@ -57,6 +57,16 @@ def populated_page_fts_db(tmp_data_dir) -> None:
         conn.commit()
 
 
+def test_page_fts_facade_preserves_public_contract() -> None:
+    assert page_fts.build_page_fts_index is page_fts_builder.build_page_fts_index
+    assert page_fts.build_page_fts_snippet is page_fts_query.build_page_fts_snippet
+    assert page_fts.search_page_fts is page_fts_query.search_page_fts
+    assert page_fts.get_page_fts_state is page_fts_state.get_page_fts_state
+    assert page_fts.mark_page_fts_stale is page_fts_state.mark_page_fts_stale
+    assert page_fts.PageFtsUnavailable is page_fts_state.PageFtsUnavailable
+    assert page_fts.logger is page_fts_state.logger
+
+
 def test_build_activates_complete_icu_index_and_searches_by_scope(populated_page_fts_db) -> None:
     with with_db() as conn:
         result = build_page_fts_index(conn)
@@ -105,14 +115,14 @@ def test_concurrent_source_change_rejects_activation_and_removes_scratch_table(
     with with_db() as conn:
         first = build_page_fts_index(conn)
         tables_before = set(get_db().list_tables().tables)
-        original_activate = page_fts._activate_index
+        original_activate = page_fts_builder._activate_index
 
         def activate_after_source_change(connection, **kwargs):
             mark_page_fts_stale(connection)
             connection.commit()
             return original_activate(connection, **kwargs)
 
-        monkeypatch.setattr(page_fts, "_activate_index", activate_after_source_change)
+        monkeypatch.setattr(page_fts_builder, "_activate_index", activate_after_source_change)
         with pytest.raises(PageFtsBuildConflict, match="changed"):
             build_page_fts_index(conn)
 
