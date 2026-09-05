@@ -20,15 +20,14 @@ from typing import Any
 
 import numpy as np
 
-_SCRIPT_DIR = Path(__file__).resolve().parent
-if str(_SCRIPT_DIR) not in sys.path:
-    sys.path.insert(0, str(_SCRIPT_DIR))
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(_BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_DIR))
 
-from export_novel_embeddings_mlx import (
+from scripts.novel_embedding_eval_common import (
     PROFILES,
     Chunk,
     EvalQuery,
-    _max_rss_bytes,
     _percentile,
     _save_npz,
     _sha256_file,
@@ -37,6 +36,7 @@ from export_novel_embeddings_mlx import (
     load_queries,
     open_sqlite_read_only,
 )
+from scripts.novel_eval_runtime import process_max_rss_bytes as _max_rss_bytes
 
 SCHEMA_VERSION = 1
 MODEL_ID = "agentmish/pplx-embed-context-v1-0.6b-mlx"
@@ -44,7 +44,7 @@ MODEL_REVISION = "51c6d3cb34a9063c363ee5e94ac6ffc851088630"
 SOURCE_MODEL_ID = "perplexity-ai/pplx-embed-context-v1-0.6b"
 SOURCE_REVISION = "c2fe8bee1aee42534425a1dfa7f976f6c1a5d16b"
 PROFILE_NAME = "pplx_context_0_6b"
-DEFAULT_FIXTURE = _SCRIPT_DIR / "fixtures" / "novel_search_eval_v1.json"
+DEFAULT_FIXTURE = Path(__file__).with_name("fixtures") / "novel_search_eval_v1.json"
 EXPECTED_FILES = {
     "config.json": "06dcdc1712d379fdd33a734ed3968b565ec701b8031f70eecd57692ba47885eb",
     "conversion.json": "2bd152776c58ed1e6d7d64748fac17030762f29f1e41d6601d601ba12940007a",
@@ -203,8 +203,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    import mlx.core as mx
-
     args = _build_parser().parse_args(argv)
     if args.max_length < 512 or args.max_length > 32768:
         raise ValueError("--max-length must be between 512 and 32768")
@@ -214,6 +212,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError("--output must use the .npz suffix")
     if args.output.exists() or args.manifest.exists():
         raise FileExistsError("output or manifest already exists")
+
+    import mlx.core as mx
 
     started_at = datetime.now(UTC)
     model_manifest = verify_model(args.model)

@@ -150,6 +150,7 @@ LLM 呼び出しとは独立した純関数群。
 書籍全文を Qwen 131k コンテキストに投入し、固定ホストキャラ 2 人（レイ＆ミオ）による番組台本を 2 段の LLM 呼び出しで SSE 生成する。B-20（自由ペルソナ 2 人の読書会対話）を置き換えた。要件確定と検証の経緯は[凍結記録](../../../archive/要件/読書会ロングフォーム拡張_要件・検証記録.md)を参照する。
 
 - **モジュール構成**: `discussion_cast.py`（ホスト人格核）/ `discussion_prompts.py`（構成・台本prompt）/ `discussion_parser.py`（plan・turnの純粋parse/validate）/ `discussion_stream.py`（segment/turn event生成）/ `discussion_checks.py`（DoD機械チェック）/ `discussion_repository.py`（history保存・一覧・削除）/ `discussion_service.py`（application orchestrationと互換公開面）。
+- **受付と実行の境界**: routerは入力検証・HTTP応答・SSEの符号化を担当し、全文取得から構成・台本生成、DoD検査、保存までの調停はserviceが所有する。切断確認を注入し、切断時は保存しない。既存のHTTPエラー、SSEイベント順序、保存JSON v2を維持する。
 - **2 段パイプライン**:
     1. **構成ステップ** (`generate_plan`): 書籍を読ませて構成メモ JSON（対立する 2 つの推し解釈 `stances`・テーマ 2 件・脱線ネタカード 2〜3 枚 [facts=正確な固有情報 / keywords=言及判定用]）を生成。`temperature=0.4 / num_predict=2048`。LLM の JSON 出力は確率的に崩れるため、パース・バリデーション失敗時は同一プロンプトで最大 3 回まで自動リトライする（`_PLAN_MAX_ATTEMPTS`。KV cache が効くため再試行は安価）。
     2. **台本ステップ** (`stream_discussion_turns`): 番組構成（OPフック→テーマ1→テーマ2→脱線→締め、セグメント別ターン数指定）で台本を SSE ストリーミング。`temperature=0.7 / num_predict=8192`。
@@ -336,6 +337,14 @@ result / manifest JSONは本文・snippet・embeddingを含まないため、has
 `eval_novel_dense.py`、`export_novel_embeddings_mlx.py`、
 `export_novel_embeddings_pplx_mlx.py`、`export_novel_embeddings_nemotron_mlx.py`、回帰testは
 `backend/tests/test_eval_novel_*.py`と`test_export_novel_embeddings_*.py`を正本とする。
+
+評価用のデータ型・fixture検証・NPZ出力は`novel_embedding_eval_common.py`、
+順位指標計算は`novel_eval_metrics.py`、OS固有の最大RSS取得は`novel_eval_runtime.py`が所有する。
+各評価CLIは既存の公開関数を維持してこれらへ委譲する。
+共通部分はWindowsでもimport・テストできる。RSSの非対応環境で架空の値を返さず、
+macOSのbyte値とLinuxのKiB値の換算を維持する。MLX実推論は専用環境で実行する。
+lexical / dense / rerankerのRecall・MRR・nDCG計算は共通の純関数を使い、
+方式別の入力変換、計測単位、CLI引数、report形式、モデルhash検証とread-only DB契約は維持する。
 
 ### 10.5 B-37 未調整holdoutの封印・一回評価
 

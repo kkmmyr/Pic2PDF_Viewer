@@ -21,7 +21,6 @@ import argparse
 import hashlib
 import json
 import math
-import resource
 import sqlite3
 import statistics
 import sys
@@ -31,6 +30,13 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+if __package__:
+    from scripts.novel_eval_metrics import metrics_for_ranking as _ranking_metrics
+    from scripts.novel_eval_runtime import process_max_rss_bytes as _max_rss_bytes
+else:
+    from novel_eval_metrics import metrics_for_ranking as _ranking_metrics
+    from novel_eval_runtime import process_max_rss_bytes as _max_rss_bytes
 
 SCHEMA_VERSION = 1
 MODEL_ID = "mlx-community/Qwen3-Reranker-0.6B-4bit"
@@ -100,11 +106,6 @@ def _percentile(values: Sequence[float], percentile: float) -> float:
 
 def _mean(values: Sequence[float]) -> float:
     return statistics.fmean(values) if values else 0.0
-
-
-def _max_rss_bytes() -> int:
-    value = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    return int(value if sys.platform == "darwin" else value * 1024)
 
 
 def verify_model(path: Path) -> dict[str, Any]:
@@ -318,30 +319,7 @@ class Qwen3Reranker:
 
 
 def metrics_for_ranking(ranking: Sequence[PageKey], relevant: dict[PageKey, int]) -> dict[str, float]:
-    relevant_keys = set(relevant)
-
-    def recall_at(k: int) -> float:
-        return len(relevant_keys & set(ranking[:k])) / len(relevant_keys)
-
-    reciprocal_rank = 0.0
-    for rank, key in enumerate(ranking[:10], start=1):
-        if key in relevant_keys:
-            reciprocal_rank = 1.0 / rank
-            break
-    dcg = sum(
-        ((2 ** relevant.get(key, 0)) - 1) / math.log2(rank + 1)
-        for rank, key in enumerate(ranking[:10], start=1)
-        if key in relevant
-    )
-    ideal_grades = sorted(relevant.values(), reverse=True)[:10]
-    ideal_dcg = sum(((2**grade) - 1) / math.log2(rank + 1) for rank, grade in enumerate(ideal_grades, start=1))
-    return {
-        "recall_at_5": recall_at(5),
-        "recall_at_10": recall_at(10),
-        "recall_at_30": recall_at(30),
-        "mrr_at_10": reciprocal_rank,
-        "ndcg_at_10": dcg / ideal_dcg if ideal_dcg else 0.0,
-    }
+    return _ranking_metrics(ranking, relevant)
 
 
 def _aggregate(case_results: Sequence[dict[str, Any]], latencies: Sequence[float]) -> dict[str, Any]:

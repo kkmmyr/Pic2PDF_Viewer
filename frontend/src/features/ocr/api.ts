@@ -4,11 +4,12 @@ import { API_ENDPOINTS } from '@/config/api';
 import type {
     OcrGroundTruthListResponse,
     OcrLayoutType,
+    OcrQaActionResponse,
+    OcrQaPageReviewRequest,
     OcrPageType,
     OcrQaRunDetail,
     OcrQaRunListResponse,
     OcrRunResponse,
-    OcrSelectedEngine,
     OcrStatusResponse,
     OcrStopResponse,
 } from './types';
@@ -41,27 +42,12 @@ export function fetchOcrQaRun(runId: number): Promise<OcrQaRunDetail> {
 export function reviewOcrQaPage(
     runId: number,
     pageNo: number,
-    state: 'approved' | 'rejected',
-    note: string | null,
-    pageType: OcrPageType,
-    layoutType: OcrLayoutType,
-    selectedEngine: OcrSelectedEngine,
-    correctedText: string | null,
-    reviewStartedAt: string | null,
-    reviewDurationMs: number | null,
-    correctionDurationMs: number | null,
-): Promise<unknown> {
-    return apiClient.patch(API_ENDPOINTS.OCR_QA_PAGE(runId, pageNo), {
-        state,
-        note,
-        page_type: pageType,
-        layout_type: layoutType,
-        selected_engine: selectedEngine,
-        corrected_text: correctedText,
-        review_started_at: reviewStartedAt,
-        review_duration_ms: reviewDurationMs,
-        correction_duration_ms: correctionDurationMs,
-    });
+    request: OcrQaPageReviewRequest,
+): Promise<OcrQaActionResponse> {
+    return apiClient.patch<unknown, OcrQaActionResponse>(
+        API_ENDPOINTS.OCR_QA_PAGE(runId, pageNo),
+        request,
+    );
 }
 
 export function classifyOcrQaPages(runId: number): Promise<unknown> {

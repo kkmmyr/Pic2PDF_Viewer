@@ -154,6 +154,9 @@ request bodyではなくOpenAPI契約のquery parameterとする。status / run 
 OpenAPI生成型を`features/ocr/types.ts`から参照する。
 `useOcrStatus`は表示状態とrun / stop操作を所有し、2秒間隔でstatusを取得する。
 HTTP呼出しはすべて`features/ocr/api.ts`へ委譲する。
+ページQA更新はrun ID・page番号とOpenAPI生成型のrequestオブジェクトを渡し、
+応答も`OcrQaActionResponse`の生成型を使用する。修正文・開始時刻・経過時間・補正時間を
+位置引数で受け渡さず、HTTP payloadの項目名、未指定/nullの扱いとQA承認条件を維持する。
 
 ### 互換facadeとテスト所有
 

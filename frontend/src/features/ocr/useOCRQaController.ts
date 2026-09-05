@@ -11,7 +11,12 @@ import {
     fetchOcrQaRuns,
     reviewOcrQaPage,
 } from './api';
-import type { OcrLayoutType, OcrPageType, OcrSelectedEngine } from './types';
+import type {
+    OcrLayoutType,
+    OcrPageType,
+    OcrQaPageReviewRequest,
+    OcrSelectedEngine,
+} from './types';
 
 export function useOCRQaController() {
     const queryClient = useQueryClient();
@@ -104,21 +109,22 @@ export function useOCRQaController() {
     const pageMutation = useMutation({
         mutationFn: (state: 'approved' | 'rejected') => {
             const now = Date.now();
-            return reviewOcrQaPage(
-                selectedRunId as number,
-                selectedPageNo as number,
+            const request: OcrQaPageReviewRequest = {
                 state,
-                note || null,
-                pageType,
-                layoutType,
-                selectedEngine,
-                selectedEngine === 'codex' ? correctedText : null,
-                reviewStartedAtRef.current,
-                reviewStartedMsRef.current === null ? null : now - reviewStartedMsRef.current,
-                selectedEngine === 'codex' && correctionStartedMsRef.current !== null
-                    ? now - correctionStartedMsRef.current
-                    : null,
-            );
+                note: note || null,
+                page_type: pageType,
+                layout_type: layoutType,
+                selected_engine: selectedEngine,
+                corrected_text: selectedEngine === 'codex' ? correctedText : null,
+                review_started_at: reviewStartedAtRef.current,
+                review_duration_ms:
+                    reviewStartedMsRef.current === null ? null : now - reviewStartedMsRef.current,
+                correction_duration_ms:
+                    selectedEngine === 'codex' && correctionStartedMsRef.current !== null
+                        ? now - correctionStartedMsRef.current
+                        : null,
+            };
+            return reviewOcrQaPage(selectedRunId as number, selectedPageNo as number, request);
         },
         onSuccess: async (_, state) => {
             toast.success(state === 'approved' ? 'ページを承認しました' : 'ページを却下しました');

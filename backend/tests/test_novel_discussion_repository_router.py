@@ -201,11 +201,11 @@ def _parse_sse(text: str) -> list[dict]:
 
 def test_generate_token_overflow_returns_error_sse(client, monkeypatch):
     """本文が MAX_INPUT_TOKENS を超えるときエラー SSE が返る。"""
-    import routers.novel_discussion as disc_router
+    import services.novel_db.discussion_service as disc_service
 
     huge_text = "あ" * int(MAX_INPUT_TOKENS * 1.5 * 1.5 + 100)
     fake_hit = _hit(1, huge_text)
-    monkeypatch.setattr(disc_router, "load_all_pages_of_book", lambda *a, **kw: [fake_hit])
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", lambda *a, **kw: [fake_hit])
 
     resp = client.post("/api/novel/discussion/generate", json={"book_name": "test-book"})
     assert resp.status_code == 200
@@ -226,9 +226,9 @@ def test_history_rejects_unsafe_book_name(client):
 
 def test_generate_no_pages_returns_error_sse(client, monkeypatch):
     """インデックスが空のときエラー SSE が返る。"""
-    import routers.novel_discussion as disc_router
+    import services.novel_db.discussion_service as disc_service
 
-    monkeypatch.setattr(disc_router, "load_all_pages_of_book", lambda *a, **kw: [])
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", lambda *a, **kw: [])
 
     resp = client.post("/api/novel/discussion/generate", json={"book_name": "missing-book"})
     assert resp.status_code == 200
@@ -241,11 +241,11 @@ def test_generate_full_flow_sse(client, monkeypatch, tmp_data_dir):
     """planning → scripting → segment/turn → done（checks 付き）の一連の SSE を検証する。"""
     from pathlib import Path
 
-    import routers.novel_discussion as disc_router
+    import services.novel_db.discussion_service as disc_service
     import services.novel_db.discussion_service as svc
 
     monkeypatch.setattr(svc, "DISCUSSIONS_DIR", Path(tmp_data_dir["KINDLE_NOVEL_DIR"]) / "discussions")
-    monkeypatch.setattr(disc_router, "load_all_pages_of_book", lambda *a, **kw: [_hit(1, "本文")])
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", lambda *a, **kw: [_hit(1, "本文")])
 
     async def fake_generate_plan(messages, **kwargs):
         return _PLAN
@@ -255,8 +255,8 @@ def test_generate_full_flow_sse(client, monkeypatch, tmp_data_dir):
         yield {"type": "turn", "speaker": "A", "text": "こころが刺さる。", "segment": "op_hook"}
         yield {"type": "turn", "speaker": "B", "text": "わかる。", "segment": "op_hook"}
 
-    monkeypatch.setattr(disc_router, "generate_plan", fake_generate_plan)
-    monkeypatch.setattr(disc_router, "stream_discussion_turns", fake_stream)
+    monkeypatch.setattr(disc_service, "generate_plan", fake_generate_plan)
+    monkeypatch.setattr(disc_service, "stream_discussion_turns", fake_stream)
 
     resp = client.post("/api/novel/discussion/generate", json={"book_name": "test-book"})
     assert resp.status_code == 200
@@ -282,14 +282,14 @@ def test_generate_full_flow_sse(client, monkeypatch, tmp_data_dir):
 
 
 def test_generate_plan_failure_returns_error_sse(client, monkeypatch):
-    import routers.novel_discussion as disc_router
+    import services.novel_db.discussion_service as disc_service
 
-    monkeypatch.setattr(disc_router, "load_all_pages_of_book", lambda *a, **kw: [_hit(1, "本文")])
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", lambda *a, **kw: [_hit(1, "本文")])
 
     async def failing_plan(messages, **kwargs):
         raise ValueError("構成メモの JSON パースに失敗しました")
 
-    monkeypatch.setattr(disc_router, "generate_plan", failing_plan)
+    monkeypatch.setattr(disc_service, "generate_plan", failing_plan)
 
     resp = client.post("/api/novel/discussion/generate", json={"book_name": "test-book"})
     events = _parse_sse(resp.text)
@@ -301,6 +301,87 @@ def test_generate_plan_failure_returns_error_sse(client, monkeypatch):
 # ---------------------------------------------------------------------------
 # router: DELETE /novel/discussion/history/{filename}
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("disconnect_after", [0, 1, 2])
+async def test_generate_disconnect_does_not_save(disconnect_after, discussions_dir, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    import routers.novel_discussion as disc_router
+    import services.novel_db.discussion_service as disc_service
+
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", lambda *a, **kw: [_hit(1)])
+    monkeypatch.setattr(disc_service, "generate_plan", AsyncMock(return_value=_PLAN))
+    stream_events = [
+        {"type": "segment", "id": "op_hook"},
+        {"type": "turn", "speaker": "A", "text": "発言A", "segment": "op_hook"},
+        {"type": "turn", "speaker": "B", "text": "発言B", "segment": "op_hook"},
+    ]
+
+    async def fake_stream(messages):
+        for event in stream_events:
+            yield event
+
+    monkeypatch.setattr(disc_service, "stream_discussion_turns", fake_stream)
+    disconnected = AsyncMock(side_effect=[False] * disconnect_after + [True])
+    response = await disc_router.generate_discussion(
+        disc_router.GenerateRequest(book_name="test-book"),
+        SimpleNamespace(is_disconnected=disconnected),
+    )
+    events = _parse_sse("".join([frame async for frame in response.body_iterator]))
+    assert events[:2] == [
+        {"type": "status", "stage": "planning"},
+        {"type": "status", "stage": "scripting"},
+    ]
+    assert len(events) == 2 + disconnect_after
+    assert disconnected.await_count == disconnect_after + 1
+    assert not list(discussions_dir.rglob("*.json"))
+
+
+@pytest.mark.parametrize("stream_fails", [False, True])
+def test_generate_empty_or_failed_stream_does_not_save(client, discussions_dir, monkeypatch, stream_fails):
+    from unittest.mock import AsyncMock
+
+    import services.novel_db.discussion_service as disc_service
+
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", lambda *a, **kw: [_hit(1)])
+    monkeypatch.setattr(disc_service, "generate_plan", AsyncMock(return_value=_PLAN))
+
+    async def fake_stream(messages):
+        yield {"type": "segment", "id": "op_hook"}
+        if stream_fails:
+            yield {"type": "turn", "speaker": "A", "text": "途中の発言", "segment": "op_hook"}
+            raise RuntimeError("stream interrupted")
+
+    monkeypatch.setattr(disc_service, "stream_discussion_turns", fake_stream)
+    response = client.post("/api/novel/discussion/generate", json={"book_name": "test-book"})
+    events = _parse_sse(response.text)
+    assert response.status_code == 200
+    expected_last = {"type": "error", "message": "stream interrupted"} if stream_fails else {"type": "done"}
+    assert events[-1] == expected_last
+    assert [event["type"] for event in events] == (
+        ["status", "status", "segment", "turn", "error"] if stream_fails else ["status", "status", "segment", "done"]
+    )
+    assert not list(discussions_dir.rglob("*.json"))
+
+
+async def test_generate_database_failure_precedes_streaming(tmp_data_dir, monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    import routers.novel_discussion as disc_router
+    import services.novel_db.discussion_service as disc_service
+
+    def failing_load(*args, **kwargs):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(disc_service, "load_all_pages_of_book", failing_load)
+    with pytest.raises(RuntimeError, match="database unavailable"):
+        await disc_router.generate_discussion(
+            disc_router.GenerateRequest(book_name="test-book"),
+            SimpleNamespace(is_disconnected=AsyncMock(return_value=False)),
+        )
 
 
 def test_delete_history_success(client, monkeypatch, tmp_data_dir):

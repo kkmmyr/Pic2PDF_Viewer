@@ -24,18 +24,32 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
-from export_novel_embeddings_mlx import (
-    PROFILES,
-    Chunk,
-    _max_rss_bytes,
-    _percentile,
-    _save_npz,
-    _sha256_file,
-    _write_json,
-    load_chunks,
-    load_queries,
-    open_sqlite_read_only,
-)
+if __package__:
+    from scripts.novel_embedding_eval_common import (
+        PROFILES,
+        Chunk,
+        _percentile,
+        _save_npz,
+        _sha256_file,
+        _write_json,
+        load_chunks,
+        load_queries,
+        open_sqlite_read_only,
+    )
+    from scripts.novel_eval_runtime import process_max_rss_bytes as _max_rss_bytes
+else:
+    from novel_embedding_eval_common import (
+        PROFILES,
+        Chunk,
+        _percentile,
+        _save_npz,
+        _sha256_file,
+        _write_json,
+        load_chunks,
+        load_queries,
+        open_sqlite_read_only,
+    )
+    from novel_eval_runtime import process_max_rss_bytes as _max_rss_bytes
 
 SCHEMA_VERSION = 1
 MODEL_ID = "mlx-community/Nemotron-3-Embed-1B-BF16-8bit"
@@ -164,8 +178,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    import mlx.core as mx
-
     args = _build_parser().parse_args(argv)
     if args.batch_size < 1 or args.batch_size > 32:
         raise ValueError("--batch-size must be between 1 and 32")
@@ -177,6 +189,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError("--output must use the .npz suffix")
     if args.output.exists() or args.manifest.exists():
         raise FileExistsError("output or manifest already exists")
+
+    import mlx.core as mx
 
     started_at = datetime.now(UTC)
     model_manifest = verify_model(args.model)

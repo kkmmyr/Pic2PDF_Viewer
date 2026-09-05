@@ -5,7 +5,14 @@ from dataclasses import dataclass
 import pytest
 
 from scripts.export_novel_embeddings_mlx import Chunk
-from scripts.export_novel_embeddings_pplx_mlx import build_context_windows
+from scripts.export_novel_embeddings_pplx_mlx import (
+    _percentile,
+    build_context_windows,
+    load_chunks,
+    load_queries,
+    open_sqlite_read_only,
+)
+from scripts.novel_embedding_eval_common import _percentile as common_percentile
 
 
 @dataclass
@@ -49,3 +56,18 @@ def test_context_windows_reject_single_oversized_chunk() -> None:
 
     with pytest.raises(RuntimeError, match="exceeds contextual max_length"):
         build_context_windows(chunks, FakeTokenizer(), max_length=5)
+
+
+def test_moved_helpers_remain_directly_importable() -> None:
+    assert _percentile is common_percentile
+    assert callable(load_chunks)
+    assert callable(load_queries)
+    assert callable(open_sqlite_read_only)
+
+
+def test_moved_load_helpers_remain_star_importable() -> None:
+    namespace: dict[str, object] = {}
+
+    exec("from scripts.export_novel_embeddings_pplx_mlx import *", namespace)
+
+    assert {"load_chunks", "load_queries", "open_sqlite_read_only"} <= set(namespace)
