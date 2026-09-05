@@ -8,21 +8,16 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Check } from 'lucide-react';
-import { toast } from 'sonner';
 
 import type { BookSummary } from '@/features/novel_db/types';
-import { fetchNovelAuthors, fetchSeries, patchNovelBookMeta } from '@/features/novel_db/api';
 import {
     type GroupMode,
     type NovelBookGroup,
     useNovelLibraryGroup,
 } from '@/hooks/useNovelLibraryGroup';
-import type { ExistingSeriesOption } from '@/types';
+import { useNovelLibraryBulkActions } from '@/hooks/novel_db/useNovelLibraryBulkActions';
 import { BulkAuthorDialog } from '@/components/library/BulkAuthorDialog';
-import {
-    BulkSeriesAssignDialog,
-    type BulkSeriesAssignResult,
-} from '@/components/library/BulkSeriesAssignDialog';
+import { BulkSeriesAssignDialog } from '@/components/library/BulkSeriesAssignDialog';
 import BookCard from './BookCard';
 import SeriesGroupCard from './SeriesGroupCard';
 import { LibraryViewModeSelector } from './LibraryViewModeSelector';
@@ -48,11 +43,6 @@ export default function LibrarySection({
     const [groupMode, setGroupMode] = useState<GroupMode>('series');
     const [isSelecting, setIsSelecting] = useState(false);
     const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
-
-    const [showAuthorDialog, setShowAuthorDialog] = useState(false);
-    const [showSeriesDialog, setShowSeriesDialog] = useState(false);
-    const [allAuthors, setAllAuthors] = useState<string[]>([]);
-    const [allSeriesForDialog, setAllSeriesForDialog] = useState<ExistingSeriesOption[]>([]);
 
     const { groups, ungrouped } = useNovelLibraryGroup(books, groupMode);
 
@@ -104,61 +94,28 @@ export default function LibrarySection({
         setSelectedNames(new Set());
     }, []);
 
+    const {
+        showAuthorDialog,
+        setShowAuthorDialog,
+        showSeriesDialog,
+        setShowSeriesDialog,
+        allAuthors,
+        allSeriesForDialog,
+        openAuthorDialog,
+        openSeriesDialog,
+        applyAuthors,
+        assignSeries,
+    } = useNovelLibraryBulkActions({
+        books,
+        selectedNames,
+        onMetaRefetch,
+        onClearSelection: exitSelecting,
+    });
+
     const toggleSelecting = useCallback(() => {
         if (isSelecting) exitSelecting();
         else setIsSelecting(true);
     }, [isSelecting, exitSelecting]);
-
-    const openAuthorDialog = async () => {
-        const authors = await fetchNovelAuthors().catch(() => {
-            toast.error('作者一覧の取得に失敗しました');
-            return [];
-        });
-        setAllAuthors(authors);
-        setShowAuthorDialog(true);
-    };
-
-    const openSeriesDialog = async () => {
-        const series = await fetchSeries().catch(() => {
-            toast.error('シリーズ一覧の取得に失敗しました');
-            return [];
-        });
-        const options: ExistingSeriesOption[] = series.map((s) => {
-            let max = 0;
-            for (const b of books) {
-                if (b.series_id === s.id && b.volume !== null && b.volume > max) max = b.volume;
-            }
-            return { id: s.id, title: s.name, maxIndex: max };
-        });
-        setAllSeriesForDialog(options);
-        setShowSeriesDialog(true);
-    };
-
-    const handleApplyAuthors = async (authors: string[]) => {
-        const targets = books.filter((b) => selectedNames.has(b.name));
-        for (const book of targets) {
-            await patchNovelBookMeta(`${book.name}.pdf`, { authors });
-        }
-        onMetaRefetch();
-        exitSelecting();
-    };
-
-    const handleAssignSeries = async (params: BulkSeriesAssignResult) => {
-        const targets = books.filter((b) => selectedNames.has(b.name));
-        for (let i = 0; i < targets.length; i++) {
-            const book = targets[i];
-            if (params.mode === 'remove') {
-                await patchNovelBookMeta(`${book.name}.pdf`, { series_id: '' });
-            } else {
-                await patchNovelBookMeta(`${book.name}.pdf`, {
-                    series_id: params.seriesId,
-                    volume: params.indexes?.[i] ?? null,
-                });
-            }
-        }
-        onMetaRefetch();
-        exitSelecting();
-    };
 
     const renderCard = (book: BookSummary) => {
         const selected = selectedNames.has(book.name);
@@ -326,7 +283,7 @@ export default function LibrarySection({
                 targetCount={selectedList.length}
                 allAuthors={allAuthors}
                 onClose={() => setShowAuthorDialog(false)}
-                onApply={handleApplyAuthors}
+                onApply={applyAuthors}
             />
             <BulkSeriesAssignDialog
                 open={showSeriesDialog}
@@ -335,7 +292,7 @@ export default function LibrarySection({
                 nested
                 showRemoveMode
                 onClose={() => setShowSeriesDialog(false)}
-                onAssign={handleAssignSeries}
+                onAssign={assignSeries}
             />
         </section>
     );

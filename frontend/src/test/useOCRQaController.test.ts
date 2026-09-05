@@ -115,19 +115,18 @@ describe('useOCRQaController', () => {
         act(() => result.current.pageMutation.mutate('approved'));
         await waitFor(() => expect(reviewOcrQaPage).toHaveBeenCalledOnce());
 
-        const args = reviewOcrQaPage.mock.calls[0];
-        expect(args.slice(0, 8)).toEqual([
-            7,
-            1,
-            'approved',
-            '確認メモ',
-            'narrative',
-            'normal_prose',
-            'primary',
-            null,
-        ]);
-        expect(args[8]).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-        expect(args[9]).toEqual(expect.any(Number));
-        expect(args[10]).toBeNull();
+        const [runId, pageNo, request] = reviewOcrQaPage.mock.calls[0];
+        expect([runId, pageNo]).toEqual([7, 1]);
+        expect(request).toMatchObject({
+            state: 'approved',
+            note: '確認メモ',
+            page_type: 'narrative',
+            layout_type: 'normal_prose',
+            selected_engine: 'primary',
+            corrected_text: null,
+            correction_duration_ms: null,
+        });
+        expect(request.review_started_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+        expect(request.review_duration_ms).toEqual(expect.any(Number));
     });
 });

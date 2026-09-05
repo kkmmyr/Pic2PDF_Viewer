@@ -25,6 +25,12 @@ backendの検索・QA契約は[小説RAG 検索QA設計](小説RAG_検索QA設�
 PageはURLと主要queryを組み合わせ、通信とSSE parsingは`features/novel_db/`または
 `features/novel_build/`へ委譲する。
 
+`LibrarySection`は表示・選択・URLの`dd`を所有し、一括作者/シリーズ操作の候補取得、
+書籍順の逐次更新、成功時の再取得は`hooks/novel_db/useNovelLibraryBulkActions.ts`へ委譲する。
+hookは再試行なしのmutationで候補取得と更新を実行する。作者は明示選択を必須とし、
+途中失敗時は後続更新を止めて選択状態を残す。全件成功時だけ再取得と選択解除を行う。
+候補取得失敗時の通知と空候補でのdialog表示、シリーズ巻数の対応も維持する。
+
 ---
 
 ## 2. Query cache

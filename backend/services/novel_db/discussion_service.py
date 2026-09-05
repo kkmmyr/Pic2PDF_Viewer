@@ -3,13 +3,23 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
-from config import KINDLE_NOVEL_DIR, NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_FULL_BOOK_NUM_CTX
+from config import (
+    KINDLE_NOVEL_DIR,
+    NOVEL_DB_BODY_PAGE_MARGIN,
+    NOVEL_DB_LLM_MODEL,
+    NOVEL_DB_MIN_BODY_CHARS,
+    NOVEL_DB_QA_FULL_BOOK_NUM_CTX,
+)
 from utils.logger import get_logger
 
+from .connection import with_db
+from .discussion_cast import HOST_A, HOST_B
+from .discussion_checks import run_checks
 from .discussion_parser import extract_plan_json, parse_turns_from_text, validate_plan
+from .discussion_prompts import build_plan_messages, build_script_messages, resolve_segment_titles
 from .discussion_repository import (
     count_discussions as count_discussions_from,
 )
@@ -29,7 +39,7 @@ from .discussion_stream import stream_discussion_events
 from .llm import astream_chat as _astream_chat
 from .llm_options import make_llm_options
 from .llm_provider import NovelLlmProvider
-from .search import SearchHit
+from .search import SearchHit, load_all_pages_of_book
 
 logger = get_logger(__name__)
 DISCUSSIONS_DIR = Path(KINDLE_NOVEL_DIR) / "discussions"
@@ -174,3 +184,107 @@ def list_discussions(book_name: str) -> list[dict]:
 
 def delete_discussion(book_name: str, filename: str) -> bool:
     return delete_discussion_from(DISCUSSIONS_DIR, book_name, filename)
+
+
+def prepare_discussion(
+    book_name: str,
+    *,
+    is_disconnected: Callable[[], Awaitable[bool]],
+) -> AsyncIterator[dict]:
+    """Load input before HTTP streaming starts; return application events."""
+    with with_db() as conn:
+        hits = load_all_pages_of_book(
+            conn,
+            book_name,
+            min_chars=NOVEL_DB_MIN_BODY_CHARS,
+            body_page_margin=NOVEL_DB_BODY_PAGE_MARGIN,
+        )
+    if not hits:
+        return _error_events(f"書籍「{book_name}」のページデータが見つかりません。インデックスを再構築してください。")
+    token_count = estimate_book_tokens(hits)
+    if token_count > MAX_INPUT_TOKENS:
+        return _error_events(f"本文が長すぎます（推定 {token_count:,} トークン、上限 {MAX_INPUT_TOKENS:,} トークン）。")
+    return _generate_discussion_events(book_name, format_book_text(hits), is_disconnected)
+
+
+async def _error_events(message: str) -> AsyncIterator[dict]:
+    yield {"type": "error", "message": message}
+
+
+async def _generate_discussion_events(
+    book_name: str,
+    book_text: str,
+    is_disconnected: Callable[[], Awaitable[bool]],
+) -> AsyncIterator[dict]:
+    # --- 構成ステップ（Call 1） ---
+    yield {"type": "status", "stage": "planning"}
+    try:
+        plan = await generate_plan(build_plan_messages(book_name, book_text))
+    except Exception as e:
+        logger.exception("generate_discussion planning failed")
+        yield {"type": "error", "message": str(e)}
+        return
+
+    segments = resolve_segment_titles(plan)
+    segment_titles = {s["id"]: s["title"] for s in segments}
+
+    # --- 台本ステップ（Call 2） ---
+    yield {"type": "status", "stage": "scripting"}
+    script_messages = build_script_messages(book_name, book_text, plan)
+    accumulated_turns: list[dict] = []
+    segments_seen: list[str] = []
+    try:
+        async for ev in stream_discussion_turns(script_messages):
+            if await is_disconnected():
+                return
+            if ev["type"] == "segment":
+                segments_seen.append(ev["id"])
+                yield {
+                    "type": "segment",
+                    "id": ev["id"],
+                    "title": segment_titles.get(ev["id"], ev["id"]),
+                }
+                continue
+            accumulated_turns.append(
+                {
+                    "speaker": ev["speaker"],
+                    "text": ev["text"],
+                    "segment": ev["segment"],
+                }
+            )
+            yield ev
+    except Exception as e:
+        logger.exception("generate_discussion SSE failed")
+        yield {"type": "error", "message": str(e)}
+        return
+
+    if not accumulated_turns:
+        yield {"type": "done"}
+        return
+
+    checks = run_checks(accumulated_turns, segments_seen, plan["cards"])
+    cast_snapshot = [
+        {
+            "id": HOST_A.id,
+            "marker": HOST_A.marker,
+            "name": HOST_A.name,
+            "profile": HOST_A.profile,
+            "stance": plan["stances"]["a"],
+        },
+        {
+            "id": HOST_B.id,
+            "marker": HOST_B.marker,
+            "name": HOST_B.name,
+            "profile": HOST_B.profile,
+            "stance": plan["stances"]["b"],
+        },
+    ]
+    saved_path = save_discussion(
+        book_name,
+        cast_snapshot,
+        segments,
+        plan["cards"],
+        accumulated_turns,
+        checks,
+    )
+    yield {"type": "done", "saved_path": saved_path, "checks": checks}
