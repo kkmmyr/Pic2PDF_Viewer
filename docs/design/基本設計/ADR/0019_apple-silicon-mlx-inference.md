@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-17
-- **Last verified**: 2026-08-22
+- **Last verified**: 2026-09-05
 - **決定者**: プロジェクトオーナー
 - **関連**: [ADR-0009](0009_llm-backend-llama-server.md) / [小説RAG データ設計](../../詳細設計/機能別/小説RAG_データ.md) / [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)
 
@@ -21,8 +21,11 @@ Windows/Linux本番は安定稼働中であり、Mac対応によって既定経�
 5. bge-m3 MLXはFP16 + CLS poolingを必須とする。mean poolingは既存Ollama索引と
    異なるベクトル空間になるため使用しない。
 6. runtime疎通と小説品質を別ゲートにする。transport smokeだけでモデルを本番採用しない。
-7. Qwen3.8、Nemotron、Ornithなどの比較候補は、固定本文・prompt・sampling・出力上限・
+7. Qwen3.8、Nemotron、Ornith、Graniteなどの比較候補は、固定本文・prompt・sampling・出力上限・
    機械ゲートを揃えた再評価に合格するまでopt-in比較に限定する。
+8. Ollamaで128K以上に対応する比較モデルをMacで評価するときは、`num_ctx`をリクエストごとに
+   明示し、`ollama ps`で実際のcontext、メモリ使用量、GPU配置を確認する。固定ゲート合格前は
+   32,768を基準とし、長文上限だけを理由に64K以上へ拡大しない。
 
 ## 採用理由
 
@@ -40,11 +43,14 @@ Windows/Linux本番は安定稼働中であり、Mac対応によって既定経�
 | Nemotron Puzzle 75B | 不採用 | 64GBへロード可能でも固定ケース不合格 |
 | Nemotron 30B | 不採用 | thinkingを含む長文抽出の根拠精度・効率が不足 |
 | Ornith 1.5 35B-A3B | 不採用 | 短窓schemaは改善したが、長文の停止・日本語意味精度が不合格 |
+| Granite 4.2 30B Q4_K_M | 比較のみ | M1 Max 64GBへ22GB・GPU 100%・32Kでロードできたが、固定小説ケースは公式の思考なし0/3、低思考2/3、低温0/3で、途中発言と最終合意の時系列誤認が残った |
 
 ## 影響
 
 - MLX runtimeとモデルはrepo外の専用venv・モデルディレクトリで管理する。
 - Qwen/Gemmaなど異なる生成モデルを同じcacheで処理中に切り替えない。
+- Granite 4.2 30Bはrepo外のOllamaモデルとして比較用に保持し、主生成・既定QA・自動公開へ
+  配線しない。公式samplingは`temperature=1.0`、`top_p=0.95`とし、再評価時も対照条件として残す。
 - Embedding切替前に1024次元、同一文cosine、旧新交差検索を確認する。
 - LanceDB内容の完全性はMLX runtime互換とは別問題であり、page-level ICU索引は
   [ADR-0020](0020_page-level-lancedb-icu-shadow.md)の世代管理・完全再構築契約に従う。
@@ -57,4 +63,5 @@ Windows/Linux本番は安定稼働中であり、Mac対応によって既定経�
 - メモリ使用量だけでなく、同一入力の意味精度と公開可否を比較した。
 
 詳細な実測値と試行履歴は
-[Apple Silicon MLX検証履歴](../../../archive/検証/Apple_Silicon_MLX_検証履歴.md)に凍結した。
+[Apple Silicon MLX検証履歴](../../../archive/検証/Apple_Silicon_MLX_検証履歴.md)と
+[小説RAG技術知見](../../../log/技術知見/小説RAG_技術知見.md)を参照する。

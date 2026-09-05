@@ -167,9 +167,11 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
   | Muse Glimmer | 任意の第二検証候補。Qwen停止後にlocalhost限定serverで起動し、検証後に停止する。同時生成・自動公開・機械ゲート代替は禁止。3回再現性とduplicate BOS解消前は本番採用・恒久不採用を確定しない |
   | Nemotron 3.5 Lightning | 巻全体生成・自動公開へ配線しない。比較時は短いblockのdirect抽出、型付き局所照合、固定fixtureでdirectが落ちる最終状態判定のthinkingを区別する。MLX本番配線は行わず、MLX prompt cacheは無効化する |
   | Qwen3.8-27B | Qwen3.6の自動置換・本番既定値・自動公開へ配線しない。再開時は主語・行動・対象・中間/最終状態を固定した中間表を早期ゲートとし、同一入力・生成条件で意味と完了理由を比較する |
+  | Granite 4.2 30B | Ollama Q4_K_Mを比較用に限定し、主生成・既定QA・自動公開へ配線しない。M1 Max 64GBでは`num_ctx=32768`を明示して直列実行し、`ollama ps`でcontextとGPU配置を確認する。再評価は固定小説ケース3 seedの全合格を早期ゲートとし、思考なし・低思考・sampling変更の成功例を合算しない |
   | Codex Luna | Qwenの代替生成・補助初稿・自動公開役へ昇格しない。固定ケースと少数主張の手動確認付き補助QAに限定し、主体・否定・最終状態・不可逆状態を確認する |
 
-  Qwen3.8のMLX-dspark transport smokeは品質採否を代替しない。applicationは`mlx_dspark`選択中の
+  Qwen3.8のMLX-dspark transport smokeやGraniteのGPU 100%ロード、strict JSON、自然停止は品質採否を代替しない。
+  applicationは`mlx_dspark`選択中の
   `full_build` / `generate_relations`と、`NOVEL_DB_GEMMA_BACKEND=qwen`時の`generate_contexts`を
   job開始前にfail closedし、比較用QAだけを許可する。
   比較の入力・条件・成功例・反例・工程時間・未決事項は[モデル比較履歴](../../../archive/検証/小説RAG_モデル比較・索引復旧_2026-08.md#model-comparisons)を参照する。
