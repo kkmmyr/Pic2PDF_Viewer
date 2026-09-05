@@ -4,6 +4,29 @@
 現在の答えは[正本マップ](../index.md#canonical-map)、未完了作業は[計画](../log/計画/バックログ.md)から調べる。
 週次変更履歴は配置先を変えず、[変更履歴の週別索引](../log/変更履歴.md)から参照する。
 
+## 旧リンクの置換先
+
+凍結記録内のリンクは当時の配置を証跡として保持するため、移動後も本文を書き換えない。
+旧リンクが開けない場合は、次の現行正本または保存先から辿る。
+
+| 旧参照 | 現在の参照先 |
+|---|---|
+| `小説テキスト検索・RAG機能_バックエンド設計.md` | [小説RAG データ](../design/詳細設計/機能別/小説RAG_データ.md) / [パイプライン](../design/詳細設計/機能別/小説RAG_パイプライン設計.md) / [検索・QA](../design/詳細設計/機能別/小説RAG_検索QA設計.md) |
+| `0009_llm-backend-llama-server.md` | [ADR-0009](../design/基本設計/ADR/0009_llm-backend-llama-server.md) |
+| `0010_uv-workspace-monorepo.md` | [ADR-0010](../design/基本設計/ADR/0010_uv-workspace-monorepo.md) |
+| `0018_sol-primary-post-ocr-generation.md` | [ADR-0018](../design/基本設計/ADR/0018_sol-primary-post-ocr-generation.md) |
+| `0019_apple-silicon-mlx-inference.md` | [ADR-0019](../design/基本設計/ADR/0019_apple-silicon-mlx-inference.md) |
+| `MacローカルLLM移行・比較計画.md` | [Apple Silicon MLX検証履歴](検証/Apple_Silicon_MLX_検証履歴.md) / [小説RAG 技術知見](../log/技術知見/小説RAG_技術知見.md) |
+| `uv環境セットアップ.md` | [uv環境セットアップ](../design/環境構築/uv環境セットアップ.md) |
+| `OCR設計書.md` | [OCR設計書](../design/詳細設計/機能別/OCR設計書.md) |
+| `小説RAG_データ.md` | [小説RAG データ](../design/詳細設計/機能別/小説RAG_データ.md) |
+| `小説RAG_パイプライン設計.md` | [小説RAG パイプライン](../design/詳細設計/機能別/小説RAG_パイプライン設計.md) |
+| `小説RAG_検索QA設計.md` | [小説RAG 検索・QA](../design/詳細設計/機能別/小説RAG_検索QA設計.md) |
+| `バックログ.md` | [バックログ](../log/計画/バックログ.md) |
+| `小説RAG_技術知見.md` | [小説RAG 技術知見](../log/技術知見/小説RAG_技術知見.md) |
+| `OCR品質改善_技術知見.md` | [OCR品質改善 技術知見](../log/技術知見/OCR品質改善_技術知見.md) |
+| `茉莉花官吏伝_シリーズ横断分析.md` | [茉莉花官吏伝 シリーズ横断分析](../log/技術知見/茉莉花官吏伝_シリーズ横断分析.md) |
+
 ## 完了計画・旧設計
 
 - [CI修理計画書](CI修理計画書.md)
