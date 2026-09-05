@@ -1,6 +1,6 @@
 # Mac 開発環境セットアップ
 
-> status: living | last-verified: 2026-08-29
+> status: living | last-verified: 2026-09-05
 
 Windows をメイン環境として運用しつつ、Mac からコード編集・テスト実行・git 操作を行うための手順。
 
@@ -99,7 +99,7 @@ cd backend && uv run pytest -q
 cd ../kindle-pdf && uv run pytest -q
 
 # フロントエンド
-cd frontend && npm run test
+cd ../frontend && npm run test
 ```
 
 Kindle testはmacOSでも収集・実行する。Windows API、UI Automation、
@@ -166,46 +166,12 @@ OwlOCR、ABBYY FineReader、Prizmo 等を本番主系とは独立した第二 OC
 
 ---
 
-## 将来のローカルLLM推論ホスト利用
+## ローカルLLM推論ホストの境界
 
-M1 Max 64GBを小説RAGのLLM推論ホストとして使う案は比較中であり、現時点の本番構成ではない。
-候補はQwen3.8-27B Dense、現行Qwen3.6-35B-A3B、Qwen3.6-27B Dense、Gemma 4-31B、
-Muse Glimmer 30B、Nemotron 3.5 Lightning 30B-A3Bである。2026-08-15までの初回比較では、
-Qwen3.8を現行Qwen3.6の自動置換にせず、Qwen3.6をローカル系統の主生成器として維持する。
-Museは短い根拠窓の高リスク主張に対する任意の第二検証候補とする。
-Nemotronは短窓thinkingだけ合格したが、長文事実抽出の話者・場面・ページ根拠・人物名で不合格となり、
-巻全体へ拡大していない。公開成果物の主生成はADR-0018のSol段階移行を優先する。
+Mac MLXは明示的なopt-inによる対話QAの比較経路として扱う。永続生成jobは拒否し、通常のWindows/Linux設定や公開成果物を自動で置き換えない。採用契約は[ADR-0019](../基本設計/ADR/0019_apple-silicon-mlx-inference.md)、起動・切替手順は[GPU環境セットアップ](GPU環境セットアップ.md)を参照する。
 
-- Macから本番DBを直接開かない。
-- 推論APIをLANへ無認証公開しない。Linux本番へのSSH reverse tunnelを使う。
-- 比較中の生成物は公開せず、監査スナップショットと全文差分を保存する。
-- QwenとMuseは64GBへ同時常駐できても同時生成しない。Qwenを停止してからMuseを起動し、
-  Muse検証後に停止する。131,072 contextの同時常駐は空き約7%のため通常運用にしない。
-- Museの初回試験時のOllama 0.30.11はvision projector非対応で推論できなかった。
-  比較時だけ言語GGUFをHomebrew版`llama-server`へ渡し、`127.0.0.1`限定で起動する。
-- Nemotron導入時にHomebrew Ollamaを0.32.9へ更新し、Qwen3.8の必須runtimeに合わせて
-  0.32.12へ更新済みである。Nemotronの公式Q4_K_Mは25GB、
-  32,768 contextで空きメモリ54%、swap 0だったが、比較用登録に留め、本番設定へ配線しない。
-  Muse projectorの更新後runtime上の再試験は未実施なので、Museの運用経路は変更しない。
-- Qwen3.8は`qwen3.8:27b`、Q4_K_M、17GB、context 262,144で追加登録済みである。
-  10巻の同一プロンプトと`think=false`でQwen3.6と比較したが、完成要約に主体誤り、
-  最終合意の欠落、途中切れが残った。人物事実抽出の反復崩壊は減ったが、巻全体は
-  Qwen3.6の約31分22秒に対し約97分12秒だった。比較用登録に留め、本番既定値へ配線しない。
-  途中切れに出力・context上限到達が含まれるため、完全不採用ではなく設定再評価待ちとする。
-  保存済み事実表に対する局所A/Bのみ実行し、合格条件だけを巻全体へ拡大する。
-- Qwen3.8のMac MLX比較経路として、生成を`mlx-dspark`の`127.0.0.1:11439`、
-  bge-m3をEmbedding-only `mlx_vlm.server`の`127.0.0.1:11437`へ分離できる。
-  M1 Max 64GBではQwen3.8 4bitのload、DFlash2、131,072 context・KV 8bit、短答、
-  限定JSON、1024次元Embeddingまで疎通済みである。ただしこれはruntime確認であり、直前項の
-  Ollama Q4_K_Mによる小説品質不合格を取り消さない。`.env`でのopt-in比較に限定し、
-  applicationは永続生成jobを拒否してQAだけを許可する。Windows/Linux既定値と自動公開は変更しない。詳細は
-  [ADR-0019](../基本設計/ADR/0019_apple-silicon-mlx-inference.md)と
-  [GPU環境セットアップ](GPU環境セットアップ.md)を参照する。
-- Mac停止やモデル不採用時はWindowsの現行推論環境へ戻す。
-- Kindle撮影、OCR、検索索引構築はMac移行と独立して継続する。
-
-現行の起動・切替手順は[GPU環境セットアップ](GPU環境セットアップ.md)、
-過去の比較結果は[MacローカルLLM比較 完了記録](../../archive/検証/MacローカルLLM移行・比較_完了記録.md)を参照する。
+Macから本番DBを直接開かず、推論APIはlocalhostとSSH reverse tunnelで接続する。比較生成物は公開せず、監査用の出力を保存する。Kindle撮影、OCR、検索索引構築とは独立して運用する。
+過去のモデル比較、実測値、当時のruntime導入状況は[追加実測履歴](../../archive/検証/環境構築_追加実測履歴_2026-09-05.md)へ分離した。
 
 ---
 

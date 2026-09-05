@@ -1,6 +1,6 @@
 # Mac OCR 補助確認設計
 
-> status: living | last-verified: 2026-08-29
+> status: living | last-verified: 2026-09-05
 
 Mac 専用 OCR アプリを、本番の Windows OCR パイプラインとは独立した
 **第二 OCR・目視確認・比較評価手段**として検証するための方針を定める。
@@ -163,24 +163,14 @@ Mac 専用 OCR アプリの追加評価は、ユーザーが土日に利用で�
   追加候補として保留する
 - 評価を再開するときも、本番DB・公開済みOCR・検索索引を更新しない
 
-## 10. 2026-08-29時点の比較成立状況
+## 10. 比較の成立条件
 
-『りゅうおうのおしごと！』1巻のWindows run 185とMac取込run 186は、138画面すべてで
-画像SHA-256が一致した。ただしrun 186は`codex_reviewed_qwen35_dots_v1`であり、
-Mac版YomiToku/MPS単独runではない。Mac実機はTailscale上で到達できるがSSH portを拒否しており、
-YomiToku・PyTorch・モデル・MPS設定・実OCR時間を取得できていない。この状態ではrun間差を
-Windows/Mac差またはCUDA/MPS差へ帰属させない。
+Mac単独のYomiToku/MPS実測が未取得のため、WindowsとMacの差をCUDA/MPS差へ帰属しない。
+比較時は入力SHA-256、両環境のruntime manifest、同一条件での2回実行を必須とする。
+run 185 / 186 / 190とWindows CPU/CUDA比較の記録は
+[追加実測履歴（凍結）](../../../archive/検証/Mac_OCR補助確認_追加実測履歴_2026-09-05.md)を参照する。
 
-再現可能なWindows比較基準はrun 190へ更新する。run 190は同じ138画面のSHA-256をrun 185・186と
-一致確認済みで、Windows 11、RTX 5070、CUDA 12.8、YomiToku 0.12.0、PyTorch 2.11.0+cu128、
-pipeline/model/mmproj SHAを保存している。OCR wall timeは51分11秒、画面平均はprimary OCR 20,134ms、
-external OCR 683ms、総処理20,853msだった。結果は`passed` 117件、`failed` 21件、全138件が
-`required`の`awaiting_qa`であり、自動公開していない。run 186との本文差はengine・補正工程も異なるため、
-この一致入力だけからCUDA/MPS差とは判定しない。
-
-WindowsではYomiToku 0.12.0・PyTorch 2.11.0+cu128について、同じ30画面のCPU/CUDA本文が
-正規化後30/30一致し、CUDAがページ処理時間で13.75倍速かった。この標本ではbackend差は
-速度に現れ、本文差には現れなかった。Mac MPSにも成立するかは別途同一version・同一設定で確認する。
+Windows側の保存済み比較基準はrun 190を参照する。新たなMac比較では同一入力・設定・来歴の成立を再確認する。
 
 次のMac YomiToku評価packageは、出力本文に加えて次を必須manifestとする。
 

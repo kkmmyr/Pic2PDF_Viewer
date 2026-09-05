@@ -62,18 +62,8 @@ medaroserver へ配置する前に、列構成とデータ件数を確認し、�
 バージョンを1つだけ選択して、バックエンドが認識する正規名へコピーする。
 複数バージョンを結合・同時配置しない。
 
-2026-07-30 生成データでは次を確認した。
-
-| 論理データ | 採用元 | 配置時の正規名 |
-|---|---|---|
-| 取得日・所有関係 | `Kindle.UnifiedLibraryIndex.CustomerRelationshipIndex.3.1.csv` | `Kindle.UnifiedLibraryIndex.CustomerRelationshipIndex_FE.csv` |
-| ジャンル | `Kindle.UnifiedLibraryIndex.CustomerGenres.3.1.csv` | `Kindle.UnifiedLibraryIndex.CustomerGenres_FE.csv` |
-| 著者 | `Kindle.UnifiedLibraryIndex.CustomerAuthorNameRelationship.3.1.csv` | `Kindle.UnifiedLibraryIndex.CustomerAuthorNameRelationship_FE.csv` |
-
-`CustomerRelationshipIndex.3.1` は11,727行・有効ASIN 11,700件超を持つ本体データで、
-`1.1` は11行・有効ASIN 3件、`2.2` は8行・有効ASIN 0件だった。`1.1` の有効ASINは
-すべて `3.1` に含まれ、旧版は Collection Follow / Customer Metadata / Sample Owner
-中心であるため取り込まない。3系列のCSVヘッダーは従来 `_FE` ファイルと一致する。
+比較済みエクスポートの件数・採用元は
+[追加実測履歴（凍結）](../../../archive/検証/Kindle購入カタログ_追加実測履歴_2026-09-05.md)を参照する。
 
 バージョン番号だけを根拠に将来のファイルを自動採用しない。列構成、ASIN件数、
 `Item Owner` の有無、旧版にしか存在しない有効ASINがないことを確認してから正規化する。
@@ -159,15 +149,9 @@ Windows側の合否だけを信用せず、証跡欠落・不一致・blocking�
 対象ページ、正規化bounds、最大MADを証跡へ残す。これは登録拒否へ使わず、単一・2画面、
 右下以外、通知位置が動くUIは検出対象外とする。
 
-2026-08-22の未調整実画像holdoutでは、検出結果を参照せず固定seedとタイトルfamily hashだけで
-漫画2冊・小説2冊（524画面）を選び、全画像SHA-256を先に封印した。Codex画像QAでは撮影欠陥を
-0件と判定した一方、近似重複5、白紙・疎6、低容量13、小説端密度2の計26 warningが出た。
-したがって、これらを欠陥として扱った暫定適合率は0%であり、完全重複以外のraw warningを
-blockingへ昇格しない。固定seedで完全重複・白紙化・微差重複・25%上端切れを各1件注入した
-制御故障では5 codeすべてrecall 1.0だったが、実陽性の人手labelを代替する根拠にはしない。
-保存済み履歴339画面の再監査では、既知の校正用汚染と仕様策定前のUI混入、途中終了だけが
-見つかり、未調整の独立実陽性は残っていなかった。B-32はこの不足と検出限界を明記して完了し、
-今後の実障害は修正前画像と確定labelを別の回帰コーパスへ受動的に追加する。
+未調整holdoutの数値は[追加実測履歴（凍結）](../../../archive/検証/Kindle購入カタログ_追加実測履歴_2026-09-05.md)へ分離した。
+完全重複以外のraw warningは、確定した実陽性の人手labelなしにblockingへ昇格しない。実障害は
+修正前画像と確定labelを別の回帰コーパスへ追加して再評価する。
 
 warning証跡は次の2テーブルへ保存する。
 
