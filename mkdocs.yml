@@ -8,7 +8,7 @@
 # - プレビュー: mkdocs serve  →  http://localhost:8000
 # - リリース統合: FastAPI が frontend/public/site/ を /docs-html にもマウントする
 #
-# 詳細は CLAUDE.md「設計ドキュメントの HTML 配信」セクション。
+# 詳細は docs/design/環境構築/設計書運用ルール.md のHTMLビルド手順。
 
 site_name: Pic2PDF_Viewer 設計ドキュメント
 site_description: WebP/ZIP → PDF ビューア（OCR + 小説 RAG 機能含む）の設計ドキュメント
@@ -28,13 +28,8 @@ use_directory_urls: false
 # 独立かつ正確に検知しているため、mkdocs 側の links.not_found は info に格下げする。
 # nav の同期（omitted_files / not_found）は check_docs.py Rule 3 と独立した二重チェックとして
 # デフォルト（warn＝strict で失敗）のまま維持する。
-# anchors（見出しアンカーの不一致）: mkdocs のデフォルト slugifier は日本語見出しの
-# 非 ASCII 文字を anchor id から全て落とす仕様のため、日本語テキストをそのまま anchor
-# フラグメントに書いた古いリンクは高確率で壊れる。design/ 配下の実リンクは 2026-07-03 に
-# 全て実際の生成 id へ修正済み（17件 → 1件）。残る1件は docs/log/変更履歴/ 配下の凍結済み
-# 週次アーカイブへの自己リンクで、アーカイブは編集しない方針のため意図的に未修正。
-# 新しい週次アーカイブが切り出されるたびに同種の乖離が発生しうるため、anchors は
-# 恒久的に info のままとする（1件だけのために strict を有効化する価値は無い）。
+# anchorsは凍結済み記録の旧見出しも報告するためinfoにする。
+# living文書の見出し参照は文書再編時に生成HTMLと別途照合する。
 validation:
   links:
     not_found: info
@@ -107,100 +102,77 @@ plugins:
 extra:
   generator: false  # フッタの "Made with Material for MkDocs" を非表示
 
-# ナビゲーション（手書き）。
-# docs/ は 3 バケット構成: design/（静的）/ log/（育つ運用ログ）/ archive/（凍結）。
-# 新規ファイル追加時は本ファイルに追記する（docs/index.md はリンク一覧を持たないため追記不要）。
+# 物理配置はdesign/log/archive、navは読み手の目的で分類する。
+# living文書を追加したらnavへ、横断契約を追加したらindexの正本マップにも登録する。
+# 凍結記録とADRはそれぞれの索引から全件へ到達できるようにする。
 nav:
   - ホーム: index.md
   - 設計:
-      - 要件定義:
-          - 要件定義書: design/要件定義/要件定義書.md
-          - Kindle自動撮影取込_要件: design/要件定義/Kindle自動撮影取込_要件.md
-      - 基本設計:
-          - 基本設計書: design/基本設計/基本設計書.md
-          - ADR 一覧: design/基本設計/ADR/README.md
-          - ADR-0017 Kindle runtime sqlite3: design/基本設計/ADR/0017_kindle-catalog-runtime-sqlite3.md
-          - ADR-0018 Sol OCR後生成: design/基本設計/ADR/0018_sol-primary-post-ocr-generation.md
-      - 詳細設計:
-          - 共通: design/詳細設計/詳細設計書_共通.md
-          - バックエンド編: design/詳細設計/詳細設計書_バックエンド編.md
-          - バックエンド編_ファイルマップ: design/詳細設計/詳細設計書_バックエンド_ファイルマップ.md
-          - フロントエンド編: design/詳細設計/詳細設計書_フロントエンド編.md
-          - フロントエンド編_ファイルマップ: design/詳細設計/詳細設計書_フロントエンド_ファイルマップ.md
-          - ライブラリ・リーダー UI: design/詳細設計/機能別/ライブラリ・リーダーUI設計.md
-          - 小説 RAG フロントエンド: design/詳細設計/機能別/小説RAG_フロントエンド設計.md
-          - API: design/詳細設計/API.md
-          - OCR 設計書: design/詳細設計/機能別/OCR設計書.md
-          - Mac OCR 補助確認設計: design/詳細設計/機能別/Mac_OCR補助確認設計.md
-          - Codex 端末間連携設計: design/詳細設計/機能別/Codex端末間連携設計.md
-          - hitomi 新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
-          - 小説 RAG データ設計: design/詳細設計/機能別/小説RAG_データ.md
-          - 小説 RAG パイプライン設計: design/詳細設計/機能別/小説RAG_パイプライン設計.md
-          - 小説 RAG Sol生成・評価設計: design/詳細設計/機能別/小説RAG_Sol生成・評価設計.md
-          - 小説 RAG 検索QA設計: design/詳細設計/機能別/小説RAG_検索QA設計.md
-          - Kindle 購入カタログ設計: design/詳細設計/機能別/Kindle購入カタログ設計.md
-          - Kindle 価格監視設計: design/詳細設計/機能別/Kindle価格監視設計.md
-          - 画像生成カタログ設計: design/詳細設計/機能別/画像生成カタログ設計.md
-          - セキュリティ設計書: design/詳細設計/セキュリティ設計書.md
+      - 全体像・要件:
+          - 要件定義: design/要件定義/要件定義書.md
+          - 基本設計: design/基本設計/基本設計書.md
+      - 共通・各層の設計:
+          - データ配置・配信構成: design/詳細設計/詳細設計書_共通.md
+          - バックエンド: design/詳細設計/詳細設計書_バックエンド編.md
+          - バックエンド ファイルマップ: design/詳細設計/詳細設計書_バックエンド_ファイルマップ.md
+          - フロントエンド: design/詳細設計/詳細設計書_フロントエンド編.md
+          - フロントエンド ファイルマップ: design/詳細設計/詳細設計書_フロントエンド_ファイルマップ.md
+          - API設計: design/詳細設計/API.md
+          - セキュリティ: design/詳細設計/セキュリティ設計書.md
+      - 機能別設計:
+          - 閲覧・取り込み:
+              - ライブラリ・リーダー: design/詳細設計/機能別/ライブラリ・リーダーUI設計.md
+              - hitomi新着監視: design/詳細設計/機能別/hitomi新着監視設計書.md
+          - Kindle:
+              - 自動撮影の利用要件: design/要件定義/Kindle自動撮影取込_要件.md
+              - 購入カタログ・画面: design/詳細設計/機能別/Kindle購入カタログ設計.md
+              - 自動撮影ジョブ契約: design/詳細設計/機能別/Kindle自動撮影ジョブ契約.md
+              - 価格監視: design/詳細設計/機能別/Kindle価格監視設計.md
+          - OCR:
+              - 実行・QA・公開: design/詳細設計/機能別/OCR設計書.md
+              - Mac補助確認の比較契約: design/詳細設計/機能別/Mac_OCR補助確認設計.md
+          - 小説RAG:
+              - データ: design/詳細設計/機能別/小説RAG_データ.md
+              - 構築パイプライン: design/詳細設計/機能別/小説RAG_パイプライン設計.md
+              - 検索・QA: design/詳細設計/機能別/小説RAG_検索QA設計.md
+              - フロントエンド: design/詳細設計/機能別/小説RAG_フロントエンド設計.md
+              - Sol隔離生成・評価: design/詳細設計/機能別/小説RAG_Sol生成・評価設計.md
+          - 端末・外部連携:
+              - Codex端末間連携: design/詳細設計/機能別/Codex端末間連携設計.md
+              - 画像生成カタログとの境界: design/詳細設計/機能別/画像生成カタログ設計.md
+      - 設計判断（ADR）:
+          - ADR一覧: design/基本設計/ADR/README.md
+  - 開発・運用:
+      - 開発環境:
+          - uv workspace: design/環境構築/uv環境セットアップ.md
+          - Mac開発環境: design/環境構築/Mac開発環境セットアップ.md
+          - GPU環境: design/環境構築/GPU環境セットアップ.md
+      - 配備・日常運用:
+          - 運用・バックアップ・障害対応: design/環境構築/運用ガイド.md
+          - Linux・Sambaセットアップ: design/環境構築/Linux_Sambaセットアップ.md
+          - Windowsサービス化: design/環境構築/Windowsサービス化セットアップ.md
+          - サーバー操作コマンド: design/環境構築/サーバー連携よく利用するコマンド.md
+          - RemoteControl Discord通知: design/環境構築/RemoteControl_Discord通知設定.md
+          - 既知の問題: log/既知の問題.md
+      - 開発ルール:
+          - 設計書の更新・ビルド: design/環境構築/設計書運用ルール.md
           - 品質ガードレール: design/詳細設計/品質ガードレール.md
-      - 環境構築:
-          - GPU 環境セットアップ: design/環境構築/GPU環境セットアップ.md
-          - uv 環境セットアップ: design/環境構築/uv環境セットアップ.md
-          - Windows サービス化: design/環境構築/Windowsサービス化セットアップ.md
-          - Linux デプロイ (Samba): design/環境構築/Linux_Sambaセットアップ.md
-          - Mac 開発環境: design/環境構築/Mac開発環境セットアップ.md
-          - Codex サブエージェント運用: design/環境構築/Codexサブエージェント運用.md
-          - 保守資産・互換層台帳: design/環境構築/保守資産・互換層台帳.md
-          - 運用ガイド: design/環境構築/運用ガイド.md
-          - 設計書運用ルール: design/環境構築/設計書運用ルール.md
-          - サーバー連携コマンド: design/環境構築/サーバー連携よく利用するコマンド.md
-          - RemoteControl Discord 通知設定: design/環境構築/RemoteControl_Discord通知設定.md
+          - 保守資産・互換層: design/環境構築/保守資産・互換層台帳.md
+          - Codexサブエージェント運用: design/環境構築/Codexサブエージェント運用.md
           - ライセンス・コンプライアンス: design/環境構築/ライセンス・コンプライアンス.md
-  - 記録:
-      - 変更履歴: log/変更履歴.md
-      - 既知の問題: log/既知の問題.md
-      - Kindle 自動撮影 実機知見: log/技術知見/Kindle自動撮影_実機知見.md
-      - OCR 品質改善 技術知見: log/技術知見/OCR品質改善_技術知見.md
-      - 小説 RAG 技術知見: log/技術知見/小説RAG_技術知見.md
-      - 茉莉花官吏伝 シリーズ横断分析: log/技術知見/茉莉花官吏伝_シリーズ横断分析.md
-      - テスト知見: log/技術知見/テスト知見.md
   - 計画:
-      - バックログ: log/計画/バックログ.md
-      - 小説OCR品質改善 実装計画: log/計画/小説OCR品質改善_実装計画.md
-      - リファクタリング計画書: log/計画/リファクタリング計画書.md
-      - R0〜R7 リファクタリング契約表: archive/リファクタリング契約表_R0-R7.md
-  - アーカイブ:
-      - リファクタリング履歴: archive/リファクタリング履歴.md
-      - 品質ガードレール導入 完了記録: archive/設計書・ソースコード健全性維持計画.md
-      - CI 修理計画書: archive/CI修理計画書.md
-      - テスト整備計画書（BE）: archive/テスト整備計画書.md
-      - テスト整備計画書（FE）: archive/テスト整備計画書_フロントエンド編.md
-      - Linux サーバー移行計画: archive/Linuxサーバー移行計画.md
-      - やりたいこと整理_2026-05-12: archive/やりたいこと整理_2026-05-12.md
-      - 実装ログ_2026-04-14: archive/実装ログ_2026-04-14.md
-      - LLM 層リファクタリング_完了記録: archive/LLM層リファクタリング_完了記録.md
-      - Kindle購入カタログ統合 完了記録: archive/Kindle購入カタログ統合_実装計画.md
-      - Kindle購入カタログ画面 UI改善 完了記録: archive/Kindle購入カタログ画面_UI改善引継ぎ.md
-      - Kindle自動撮影取込 完了記録: archive/Kindle自動撮影取込_実装計画.md
-      - 漫画 AI 検証: archive/検証/漫画AI検証.md
-      - OCR 旧 SearchablePDF 設計: archive/OCR_旧SearchablePDF設計.md
-      - OCR 候補評価・公開・Windows実測（2026-08）: archive/検証/OCR候補評価・公開・Windows実測_2026-08.md
-      - 小説RAG モデル比較・索引復旧（2026-08）: archive/検証/小説RAG_モデル比較・索引復旧_2026-08.md
-      - hitomi 監視 実装計画と設計判断: archive/hitomi監視_実装計画と設計判断.md
-      - hitomi 新着監視 設計運用履歴: archive/検証/hitomi新着監視_設計運用履歴.md
-      - ADR-0004 hitomi 初期Windows運用: archive/検証/ADR0004_hitomi監視_初期Windows運用.md
-      - Kindle 自動撮影 実機検証履歴: archive/検証/Kindle自動撮影_実機検証履歴.md
-      - Kindle購入カタログ画面 UI改善 要件記録: archive/要件/Kindle購入カタログ画面_UI改善_要件.md
-      - 書籍類似度推薦 初期要件メモ: archive/要件/書籍類似度推薦_初期要件メモ.md
-      - 読書会ロングフォーム 要件・検証記録: archive/要件/読書会ロングフォーム拡張_要件・検証記録.md
-      - バックログ 2026-08-22 整理前: archive/検証/バックログ_2026-08-22_整理前.md
-      - 小説RAG 設計過程: archive/小説RAG_設計過程.md
-      - 小説RAG FE 設計過程: archive/小説RAG_FE設計過程.md
-      - Kindle購入カタログ_追加実測履歴_2026-09-05: archive/検証/Kindle購入カタログ_追加実測履歴_2026-09-05.md
-      - Mac_OCR補助確認_追加実測履歴_2026-09-05: archive/検証/Mac_OCR補助確認_追加実測履歴_2026-09-05.md
-      - ライセンス確認資料_旧記録_2026-05: archive/検証/ライセンス確認資料_旧記録_2026-05.md
-      - 小説RAG_Sol生成・評価_追加実測履歴_2026-09-05: archive/検証/小説RAG_Sol生成・評価_追加実測履歴_2026-09-05.md
-      - 小説RAG_検索QA_追加実測履歴_2026-09-05: archive/検証/小説RAG_検索QA_追加実測履歴_2026-09-05.md
-      - 環境構築_追加実測履歴_2026-09-05: archive/検証/環境構築_追加実測履歴_2026-09-05.md
-      - 画像生成カタログ_初期設計_2026-08: archive/検証/画像生成カタログ_初期設計_2026-08.md
-      - 設計書最新化_照合・稼働確認_2026-09-05: archive/検証/設計書最新化_照合・稼働確認_2026-09-05.md
+      - バックログ・優先順位: log/計画/バックログ.md
+      - OCR品質改善・Mac比較: log/計画/小説OCR品質改善_実装計画.md
+      - Sol生成・評価の導入: log/計画/Sol生成・評価_導入計画.md
+      - 内部改善・技術メンテナンス: log/計画/リファクタリング計画書.md
+  - 記録・履歴:
+      - 変更履歴: log/変更履歴.md
+      - 技術知見:
+          - Kindle実機: log/技術知見/Kindle自動撮影_実機知見.md
+          - OCR品質: log/技術知見/OCR品質改善_技術知見.md
+          - 小説RAG・モデル比較: log/技術知見/小説RAG_技術知見.md
+          - テスト: log/技術知見/テスト知見.md
+      - 評価資料:
+          - 茉莉花官吏伝 シリーズ横断分析: log/技術知見/茉莉花官吏伝_シリーズ横断分析.md
+      - 過去の記録:
+          - アーカイブ索引: archive/index.md

@@ -152,6 +152,8 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 所有者とし、各Panelは表示とevent配線だけを行う。runの単冊指定`target_dir`は
 request bodyではなくOpenAPI契約のquery parameterとする。status / run / stopを含む
 OpenAPI生成型を`features/ocr/types.ts`から参照する。
+`useOcrStatus`は表示状態とrun / stop操作を所有し、2秒間隔でstatusを取得する。
+HTTP呼出しはすべて`features/ocr/api.ts`へ委譲する。
 
 ### 互換facadeとテスト所有
 
@@ -343,6 +345,10 @@ OCR完了と公開承認を分離する。全ページ処理後はまず全page�
   API上は`qa_state=approved`とする。
 - `保留`: 固有名詞、崩れた文字、読順、分類を確定できない。API上は`qa_state=rejected`とし、
   解消するまでrunを公開しない。
+
+QA画面はrunのOS、device、YomiToku版、worker初期化時間とページ総処理時間を表示する。
+未記録の時間は推測せず、未記録として扱う。表示語彙、候補文字数、時間・runtime manifestの整形は
+`ocrQaPresentation.ts`が所有する。
 
 確認時は次の理由を日本語で表示し、primary / externalの文字数と候補本文を同一画面で比較できるようにする。
 

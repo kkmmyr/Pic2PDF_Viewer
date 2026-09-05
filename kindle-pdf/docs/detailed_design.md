@@ -39,6 +39,9 @@
 - **`get_book_title()`**: ウィンドウタイトルから書籍名を抽出し、ダイアログで確認。
 - **`capture_loop(title)`**: メインキャプチャループ（安定画像取得→保存→ページめくり→変化・再安定待ち）。`CaptureResult`へ画面数、保存先、終了理由、無変化観測回数、遷移集計、撮影矩形を記録する。期待枚数へ達した場合も追加のページ送りで無変化を確認し、次画面が存在すれば期待値不一致として失敗する。表紙から2画面目へ進む最初の遷移に限り、選択済みキーで無変化なら反対キーを1回だけ試し、本文開始後と終端では方向を切り替えない。保存候補が2画面前と連続2回一致する `A → B → A → B` を検出した場合、最低撮影数（漫画10・小説50）より前なら誤方向として失敗する。最低撮影数を満たした後はKindle末尾の往復と判定し、最初の重複画像を一時領域から破棄して直前の一意な画面を終端とする。期待枚数指定時は、その枚数より前の周期を末尾扱いしない。単発の2画面前一致だけでは停止しない。
 - **`_next_page()`**: Kindle の世代にかかわらず、利用者が確定した方向の矢印キーを送る。
+- **画面変化の判定**: 全画面の平均絶対差に加え、`PAGE_VISUAL_PIXEL_THRESHOLD`を超えた画素の比率を
+  `PAGE_VISUAL_CHANGED_RATIO_THRESHOLD`と比較する。章扉・著作権表記など疎な画面の変化を
+  全画面平均だけで同一と判定しない。値の定義は`capture_base.py:Config`、処理は`capture_loop.py`が所有する。
 - **`_wait_for_stable_page()`**: 直前ページとの平均画素差を検出した後、同等画像が `PAGE_STABLE_SEC` 継続するまで待ち、白い遷移フレームやhover表示等を保存対象から除外する。
 - **`create_pdf(title, image_dir)`**: 連番 PNG から PDF を生成。
 
@@ -139,6 +142,8 @@ adapterからcapture agentやHTTP transportを参照しない。
 - 検索欄は限定取得したcontrolの `ValuePattern.SetValue` で半角ASIN全体を置換し、
   同じpatternから完全一致を読み戻した場合だけ候補探索へ進む。
   表示倍率が異なるマルチモニター環境でも検索欄の矩形クリックには依存しない。
+- 検索値の読戻し成功後も、ASIN付き候補が0件なら`reader_timeout_seconds`内で有界に再取得する。
+  直後の1回の0件を`book_not_found`へ変換せず、遅延描画を待ってから本人照合する。
 - `library-more-menu-<ASIN>` が一意に見つかった場合だけ対象カードを操作する。
 - 読書画面の `backButton` は本人照合済みcontrolへフォーカスを設定し、
   通常のEnterキーでライブラリへ戻る。現行版では座標クリックを受け付けない
@@ -155,10 +160,11 @@ adapterからcapture agentやHTTP transportを参照しない。
   `attach_running_app()`はWindowsのforeground threadへ一時的にinput queueを接続して
   Kindleを前面化し、`GetForegroundWindow()`が対象handleと一致したことを確認する。
   一致しない場合はcontrol中心をクリックせず`kindle_ui_unavailable`で停止する。
-  小説は `FooterLabelText=Location 1 ...・0%` を表紙とする。直接遷移後が
+  小説は`Location 1`指定を読み戻せた場合、`FooterLabelText`の`Location 1〜4・0%`を先頭近傍として許容する。
+  固定画像を含む書籍の開始位置補正に対応する範囲であり、`Location 5+`または`1%+`は拒否する。直接遷移後が
   `ページ1/N・0%` の場合は表紙の次の画面であるため、`ReadingArea` へ
   フォーカスを戻してから逆方向へ1回だけ送り、
-  `Location 1 ...・0%` を再確認する。ページ本体よりフッター属性の更新が遅れる
+  同じ先頭近傍条件を再確認する。ページ本体よりフッター属性の更新が遅れる
   場合は追加のページ送りをせず、同じ control の更新だけを有界回数待つ。
   2ページ表示の漫画はロケーション `1`を
   指定しても実測上 `Location 2 ...・0%` となるため、source別に検証する。
@@ -273,7 +279,7 @@ version 2 manifestと`.partial → .ready`公開、`capture_agent.py`は工程�
 ### 1.9. シリーズ実行から利用する限定復旧
 
 シリーズ全体のjob順序、停止、session state、再開条件は
-[Kindle 購入カタログ設計 §7.2](../../docs/design/詳細設計/機能別/Kindle購入カタログ設計.md#72-シリーズ直列実行)を正本とする。
+[Kindle自動撮影ジョブ契約 §4](../../docs/design/詳細設計/機能別/Kindle自動撮影ジョブ契約.md#kindle-series-runner)を正本とする。
 
 `kindle_capture_recovery.py` は、rootの `scripts/capture_kindle_series.py` から
 明示的に指定された場合だけStore版Kindleを再起動し、ライブラリで同じASINを

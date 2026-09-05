@@ -17,12 +17,15 @@ Use this skill when the user asks to run the migrated source command `check-docs
 |---|---|
 | `docs/design/要件定義/要件定義書.md` | 機能の存在 |
 | `docs/design/基本設計/基本設計書.md` | アーキテクチャ・技術スタック |
-| `docs/design/詳細設計/詳細設計書_バックエンド編.md` | バックエンド／Kindle／データディレクトリのファイルマップ（最重要）+ バックエンド／Kindle／OCRエンジンのクラス設計 |
+| `docs/design/詳細設計/詳細設計書_バックエンド編.md` | バックエンドのHTTP・共通サービス・保存責務 |
+| `docs/design/詳細設計/詳細設計書_バックエンド_ファイルマップ.md` | backend／Kindleの自動生成ファイルマップ |
 | `docs/design/詳細設計/詳細設計書_フロントエンド_ファイルマップ.md` | フロントエンドのファイルマップ（最重要）|
 | `docs/design/詳細設計/詳細設計書_フロントエンド編.md` | Context／フック／UI／コンポーネント設計 |
-| `docs/design/詳細設計/詳細設計書_共通.md` | 全体ディレクトリ構成・運用・リリースビルド |
-| `docs/design/詳細設計/API.md` | エンドポイント・レスポンス形式 |
-| `docs/design/詳細設計/機能別/OCR設計書.md` | OCR/Kindle 領域（変更があるときのみ）|
+| `docs/design/詳細設計/詳細設計書_共通.md` | 全体配置・source・静的配信・リリース構成 |
+| `docs/design/詳細設計/API.md` | OpenAPIで表せない境界・失敗時挙動（一覧と型は`/openapi.json`） |
+| `docs/design/詳細設計/機能別/OCR設計書.md` | OCR候補・QA・公開 |
+| `docs/design/詳細設計/機能別/Kindle自動撮影ジョブ契約.md` | job・manifest・登録補償・シリーズ実行 |
+| `kindle-pdf/docs/detailed_design.md` | WindowsのUI操作・撮影内部 |
 
 ## 進め方
 
@@ -47,7 +50,7 @@ Use this skill when the user asks to run the migrated source command `check-docs
 - [ ] BBB — 設計書にあるが実装にない: ファイルパス
 
 #### API.md（一覧は /openapi.json）
-- [ ] CCC — エンドポイント未記載: `POST /api/xxx`
+- [ ] CCC — OpenAPIと実装の契約不一致: `POST /api/xxx`
 - [ ] DDD — レスポンス例の不一致
 
 ### 📝 参考指摘（リファクタリング範囲外）

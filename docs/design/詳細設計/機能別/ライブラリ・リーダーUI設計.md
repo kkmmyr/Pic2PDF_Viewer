@@ -150,6 +150,8 @@ ReaderPanel（JSX orchestration）
 
 - `ReaderPanel`はsubcomponentを組み合わせ、工程ロジックを持たない。
 - `ReaderPageView`はPDF worker、document、画像またはPDF page描画を担当する。
+  `pdfjs.GlobalWorkerOptions.workerSrc`は`<Document>`を使う同じモジュールで設定し、
+  `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`からVite経由で読み込む。CDNは使わない。
 - `ReaderHeader`、`ReaderPageView`、shortcut dialogは`ReaderContext`を
   field selectorで購読する。
 - 書籍切替時は旧requestをcancelし、page、search、related page、edit stateをresetする。

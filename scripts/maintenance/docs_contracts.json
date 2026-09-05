@@ -23,6 +23,10 @@
     {
       "id": "docs-governance",
       "owner": "docs/design/環境構築/設計書運用ルール.md"
+    },
+    {
+      "id": "kindle-capture",
+      "owner": "docs/design/詳細設計/機能別/Kindle自動撮影ジョブ契約.md"
     }
   ]
 }
