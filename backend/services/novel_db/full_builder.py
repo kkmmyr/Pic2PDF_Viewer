@@ -1,11 +1,9 @@
-"""§4.5 本構築統合: 1 冊の全構築パイプラインを 1 関数に統合する。
+"""§4.5 本構築統合: 1冊の再構築・要約・人物生成を1関数に統合する。
 
 処理ステップ:
   1. rebuild_from_pages  — チャンク分割 + embedding 再構築（常実行）
   2. summarize_and_characters — 事実抽出後に書籍サマリと人物辞典を個別生成・校正し、
                                 全件合格後に一括確定
-  3. generate_contexts   — チャンク位置説明生成 + 再 embedding（redo=False かつ contextual_text 存在でスキップ）
-
 詳細は docs/design/詳細設計/機能別/小説RAG_パイプライン設計.md §4・§7。
 """
 
@@ -16,17 +14,16 @@ from collections.abc import Callable
 
 from utils.logger import get_logger
 
-from .builder import EMBED_BATCH_SIZE, rebuild_from_pages
+from .builder import rebuild_from_pages
 from .character_names import derive_character_evidence_aliases, normalize_character_entries
 from .connection import with_db
-from .contextualizer import generate_chunk_context, make_embedding_input
-from .embedder import embed_batch
-from .lance_store import get_chunks_table
+from .context_generation import build_book_contexts
 from .summarizer import index_book_summary, summarize_book_with_characters
 
 logger = get_logger(__name__)
 
 StepCallback = Callable[[str], None]
+__all__ = ["build_book_contexts", "build_book_full"]
 
 
 def build_book_full(
@@ -70,34 +67,6 @@ def build_book_full(
     with with_db() as conn:
         _run_combined_step(conn, book_name, redo=redo, log=_log, detail=_detail)
 
-    _log("finished")
-
-
-def build_book_contexts(
-    book_name: str,
-    *,
-    redo: bool = False,
-    step_callback: StepCallback | None = None,
-    detail_callback: StepCallback | None = None,
-) -> None:
-    """Step 3（コンテキスト生成 + 再 embedding）のみを実行する（B-23 分離ジョブ）。
-
-    build_book_full() で Step 1+2 完了後に手動投入する想定。
-    `contextual_text IS NULL` のチャンクのみ対象（途中失敗からのリカバリ対応）。
-    """
-
-    def _log(msg: str) -> None:
-        logger.info("[generate_contexts:%s] %s", book_name, msg)
-        if step_callback:
-            step_callback(msg)
-
-    def _detail(msg: str) -> None:
-        if detail_callback:
-            detail_callback(msg)
-
-    _log("step 1/1: generate_contexts")
-    with with_db() as conn:
-        _run_generate_contexts(conn, book_name, redo=redo, log=_log, detail=_detail)
     _log("finished")
 
 
@@ -300,110 +269,3 @@ def _guard_character_deletion_regression(
             "character deletion regression failed; evidenced published characters missing: "
             f"{names}; existing generated content was preserved"
         )
-
-
-def _run_generate_contexts(
-    conn: sqlite3.Connection,
-    book_name: str,
-    *,
-    redo: bool,
-    log: StepCallback,
-    detail: StepCallback | None = None,
-) -> None:
-    book_row = conn.execute("SELECT id, summary FROM books WHERE name = ?", (book_name,)).fetchone()
-    if book_row is None:
-        log("  skip: book not found in DB")
-        return
-    book_id, book_summary = book_row
-
-    if not book_summary or not book_summary.strip():
-        log("  skip: book summary missing (run step 2 first)")
-        return
-
-    sql = """
-        SELECT
-            c.id AS chunk_id,
-            c.text AS chunk_text,
-            b.name AS book_name,
-            p.page_no,
-            p.char_count,
-            b.page_count
-        FROM chunks c
-        JOIN pages p ON c.page_id = p.id
-        JOIN books b ON p.book_id = b.id
-        WHERE p.book_id = ?
-    """
-    if not redo:
-        sql += " AND c.contextual_text IS NULL"
-    sql += " ORDER BY c.id"
-    chunks = conn.execute(sql, (book_id,)).fetchall()
-
-    if not chunks:
-        log("  skip: no chunks to contextualize (all done)")
-        return
-
-    total_chunks = len(chunks)
-    log(f"  processing {total_chunks} chunks")
-    lance_table = get_chunks_table()
-    done = 0
-    for batch_start in range(0, total_chunks, EMBED_BATCH_SIZE):
-        batch = chunks[batch_start : batch_start + EMBED_BATCH_SIZE]
-        generated: list[tuple[sqlite3.Row, str]] = []
-
-        for row in batch:
-            chunk_id = row["chunk_id"]
-            chunk_text = row["chunk_text"]
-            if detail:
-                detail(f"コンテキスト {batch_start + len(generated)}/{total_chunks} チャンク")
-            try:
-                ctx = generate_chunk_context(book_name, book_summary, chunk_text)
-                if ctx:
-                    generated.append((row, ctx))
-            except Exception as exc:
-                log(f"  chunk {chunk_id} context error: {exc}")
-                logger.warning(
-                    "[full_build:%s] generate_context chunk %s failed: %s",
-                    book_name,
-                    chunk_id,
-                    exc,
-                )
-
-        if not generated:
-            continue
-
-        try:
-            embeddings = embed_batch([make_embedding_input(ctx, row["chunk_text"]) for row, ctx in generated])
-            lance_rows = [
-                {
-                    "chunk_id": row["chunk_id"],
-                    "book_name": row["book_name"],
-                    "page_no": row["page_no"],
-                    "text": row["chunk_text"],
-                    "char_count": row["char_count"] or 0,
-                    "page_count": row["page_count"] or 0,
-                    "embedding": embedding,
-                }
-                for (row, _), embedding in zip(generated, embeddings, strict=True)
-            ]
-            chunk_ids = ", ".join(str(row["chunk_id"]) for row, _ in generated)
-            lance_table.delete(f"chunk_id IN ({chunk_ids})")
-            lance_table.add(lance_rows)
-
-            with conn:
-                conn.executemany(
-                    "UPDATE chunks SET contextual_text = ? WHERE id = ?",
-                    [(ctx, row["chunk_id"]) for row, ctx in generated],
-                )
-            done += len(generated)
-        except Exception as exc:
-            first_id = generated[0][0]["chunk_id"]
-            last_id = generated[-1][0]["chunk_id"]
-            log(f"  batch {first_id}-{last_id} error: {exc}")
-            logger.warning(
-                "[full_build:%s] generate_context batch %s-%s failed: %s",
-                book_name,
-                first_id,
-                last_id,
-                exc,
-            )
-    log(f"  done: {done}/{total_chunks} chunks")

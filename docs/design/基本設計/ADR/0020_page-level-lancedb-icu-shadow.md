@@ -83,7 +83,10 @@ dependency lock、writer停止確認、backup / restore検査、manifest検証�
 
 ### 影響範囲
 
-- `services/novel_db/page_fts.py`: 構築、active世代検証、ICU検索、stale管理
+- `services/novel_db/page_fts.py`: 既存importを維持する公開窓口
+- `services/novel_db/page_fts_state.py`: stale管理、active世代・manifest検証
+- `services/novel_db/page_fts_builder.py`: 完全再構築、公開前整合検証、失敗table除去
+- `services/novel_db/page_fts_query.py`: ICU検索、SQLite再照合、snippet生成
 - `services/novel_db/search.py`: lexical backend選択、shadow観測、FTS5 fallback
 - `models.py` / Alembic revision 0014: `novel_search_index_state`
 - OCR公開・legacy OCR保存・1ページ補正: canonical本文変更時のstale更新

@@ -354,7 +354,12 @@ def _write_atomic(path: Path, records: Sequence[Mapping[str, Any]]) -> None:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary_path, path)
-        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            directory_fd = os.open(path.parent, os.O_RDONLY)
+        except OSError:
+            if os.name == "nt":
+                return
+            raise
         try:
             os.fsync(directory_fd)
         finally:

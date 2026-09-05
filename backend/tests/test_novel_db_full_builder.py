@@ -1,7 +1,7 @@
 """services/novel_db/full_builder.py の単体テスト。
 
-外部依存（LLM / embed_batch / LanceDB）はモック化し、スキップ条件・
-コールバック呼び出し・DB 書き込みロジックのみを検証する。
+外部LLMはモック化し、スキップ条件・コールバック呼び出し・
+DB書き込みロジックのみを検証する。
 """
 
 from __future__ import annotations
@@ -13,8 +13,6 @@ import pytest
 from services.novel_db import with_db
 from services.novel_db.full_builder import (
     _run_combined_step,
-    _run_generate_contexts,
-    build_book_contexts,
     build_book_full,
 )
 from services.novel_db.migrations import upgrade_head
@@ -52,15 +50,6 @@ def _insert_page(conn, book_id: int, page_no: int, text: str) -> int:
     cur = conn.execute(
         "INSERT INTO pages (book_id, page_no, image_path, full_text, char_count) VALUES (?, ?, ?, ?, ?)",
         (book_id, page_no, None, text, len(text)),
-    )
-    conn.commit()
-    return cur.lastrowid
-
-
-def _insert_chunk(conn, page_id: int, idx: int = 0, ctx_text: str | None = None) -> int:
-    cur = conn.execute(
-        "INSERT INTO chunks (page_id, chunk_idx, text, char_count, contextual_text) VALUES (?, ?, ?, ?, ?)",
-        (page_id, idx, "chunk text", 10, ctx_text),
     )
     conn.commit()
     return cur.lastrowid
@@ -347,107 +336,6 @@ class TestRunCombinedStep:
         assert [tuple(row) for row in characters] == [("既存人物", "旧人物説明")]
 
 
-class TestRunGenerateContexts:
-    """_run_generate_contexts のスキップ条件を検証する。"""
-
-    def test_skips_when_book_not_found(self, db_conn):
-        logs = []
-        _run_generate_contexts(db_conn, "no-book", redo=False, log=logs.append)
-        assert any("skip" in m for m in logs)
-
-    def test_skips_when_summary_is_missing(self, db_conn):
-        _insert_book(db_conn, "nosum", summary=None)
-        logs = []
-        _run_generate_contexts(db_conn, "nosum", redo=False, log=logs.append)
-        assert any("skip" in m for m in logs)
-
-    def test_skips_when_all_chunks_already_have_context(self, db_conn):
-        """redo=False かつ全チャンクに contextual_text があればスキップ。"""
-        book_id = _insert_book(db_conn, "done-book", summary="サマリあり")
-        page_id = _insert_page(db_conn, book_id, 1, "本文")
-        _insert_chunk(db_conn, page_id, ctx_text="既存コンテキスト")
-
-        logs = []
-        with patch("services.novel_db.full_builder.generate_chunk_context") as mock_ctx:
-            _run_generate_contexts(db_conn, "done-book", redo=False, log=logs.append)
-            mock_ctx.assert_not_called()
-
-        assert any("skip" in m for m in logs)
-
-    def test_processes_chunks_without_context(self, db_conn, monkeypatch):
-        """contextual_text が NULL のチャンクのみ処理する。"""
-        book_id = _insert_book(db_conn, "partial-book", summary="サマリ")
-        page_id = _insert_page(db_conn, book_id, 1, "本文")
-        _insert_chunk(db_conn, page_id, 0, ctx_text=None)
-        _insert_chunk(db_conn, page_id, 1, ctx_text="既存")
-
-        mock_ctx = MagicMock(return_value="生成コンテキスト")
-        mock_embed = MagicMock(return_value=[[0.1] * 1024])
-        mock_lance = MagicMock()
-        mock_lance.delete = MagicMock()
-        mock_lance.add = MagicMock()
-
-        with (
-            patch("services.novel_db.full_builder.generate_chunk_context", mock_ctx),
-            patch("services.novel_db.full_builder.embed_batch", mock_embed),
-            patch("services.novel_db.full_builder.get_chunks_table", return_value=mock_lance),
-            patch("services.novel_db.full_builder.make_embedding_input", return_value="input"),
-        ):
-            _run_generate_contexts(db_conn, "partial-book", redo=False, log=lambda _: None)
-
-        # context なしのチャンク 1 件だけが処理される
-        assert mock_ctx.call_count == 1
-
-    def test_batches_embedding_and_storage_updates(self, db_conn):
-        """複数チャンクを1回のEmbedding/LanceDB更新へまとめる。"""
-        book_id = _insert_book(db_conn, "batch-book", summary="サマリ")
-        page_id = _insert_page(db_conn, book_id, 1, "本文")
-        chunk_ids = [_insert_chunk(db_conn, page_id, idx) for idx in range(3)]
-
-        mock_lance = MagicMock()
-        with (
-            patch(
-                "services.novel_db.full_builder.generate_chunk_context",
-                side_effect=["文脈1", "文脈2", "文脈3"],
-            ),
-            patch(
-                "services.novel_db.full_builder.embed_batch",
-                return_value=[[0.1] * 1024, [0.2] * 1024, [0.3] * 1024],
-            ) as mock_embed,
-            patch("services.novel_db.full_builder.get_chunks_table", return_value=mock_lance),
-        ):
-            _run_generate_contexts(db_conn, "batch-book", redo=False, log=lambda _: None)
-
-        mock_embed.assert_called_once()
-        mock_lance.delete.assert_called_once()
-        assert " IN (" in mock_lance.delete.call_args.args[0]
-        assert len(mock_lance.add.call_args.args[0]) == 3
-        stored = db_conn.execute(
-            "SELECT contextual_text FROM chunks WHERE id IN (?, ?, ?) ORDER BY id",
-            chunk_ids,
-        ).fetchall()
-        assert [row[0] for row in stored] == ["文脈1", "文脈2", "文脈3"]
-
-    def test_failed_batch_remains_retryable(self, db_conn):
-        """Embedding失敗時はSQLiteに文脈を確定しない。"""
-        book_id = _insert_book(db_conn, "retry-book", summary="サマリ")
-        page_id = _insert_page(db_conn, book_id, 1, "本文")
-        chunk_id = _insert_chunk(db_conn, page_id)
-
-        with (
-            patch("services.novel_db.full_builder.generate_chunk_context", return_value="生成文脈"),
-            patch("services.novel_db.full_builder.embed_batch", side_effect=RuntimeError("down")),
-            patch("services.novel_db.full_builder.get_chunks_table", return_value=MagicMock()),
-        ):
-            _run_generate_contexts(db_conn, "retry-book", redo=False, log=lambda _: None)
-
-        stored = db_conn.execute(
-            "SELECT contextual_text FROM chunks WHERE id = ?",
-            (chunk_id,),
-        ).fetchone()
-        assert stored[0] is None
-
-
 class TestBuildBookFull:
     """build_book_full の高レベルフローを検証する。"""
 
@@ -481,14 +369,3 @@ class TestBuildBookFull:
         assert len(steps) >= 4
         assert "start" in steps[0]
         assert "finished" in steps[-1]
-
-
-class TestBuildBookContexts:
-    """build_book_contexts の高レベルフローを検証する。"""
-
-    def test_calls_generate_contexts(self):
-        mock_ctx = MagicMock()
-        with patch("services.novel_db.full_builder._run_generate_contexts", mock_ctx):
-            build_book_contexts("ctx-book")
-
-        mock_ctx.assert_called_once()

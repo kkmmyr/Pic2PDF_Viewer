@@ -161,7 +161,10 @@ def test_settings_preserve_virtualenv_python_symlinks(tmp_path: Path, monkeypatc
     runtime = tmp_path / "runtime"
     runtime.mkdir()
     python_link = tmp_path / "venv-python"
-    python_link.symlink_to(sys.executable)
+    try:
+        python_link.symlink_to(sys.executable)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable in this environment: {exc}")
     qwen_model = tmp_path / "qwen-model"
     dots_model = tmp_path / "dots-model"
     qwen_model.mkdir()
