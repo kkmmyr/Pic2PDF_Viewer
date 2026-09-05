@@ -18,7 +18,7 @@ describe('SearchableSelect', () => {
                 onChange={() => {}}
             />,
         );
-        const input = getByRole('textbox') as HTMLInputElement;
+        const input = getByRole('combobox') as HTMLInputElement;
         expect(input.value).toBe('');
         expect(input.placeholder).toBe('作者: すべて');
     });
@@ -27,7 +27,7 @@ describe('SearchableSelect', () => {
         const { getByRole } = render(
             <SearchableSelect value="Apple" options={opts} emptyLabel="-" onChange={() => {}} />,
         );
-        expect((getByRole('textbox') as HTMLInputElement).value).toBe('Apple');
+        expect((getByRole('combobox') as HTMLInputElement).value).toBe('Apple');
     });
 
     it('開閉トグル: ChevronDown ボタンで開く', () => {
@@ -43,7 +43,7 @@ describe('SearchableSelect', () => {
         const { getByRole, queryByText } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={() => {}} />,
         );
-        fireEvent.focus(getByRole('textbox'));
+        fireEvent.focus(getByRole('combobox'));
         expect(queryByText('Apple')).not.toBeNull();
     });
 
@@ -51,8 +51,8 @@ describe('SearchableSelect', () => {
         const { getByRole, queryByText } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={() => {}} />,
         );
-        fireEvent.focus(getByRole('textbox'));
-        fireEvent.change(getByRole('textbox'), { target: { value: 'AP' } });
+        fireEvent.focus(getByRole('combobox'));
+        fireEvent.change(getByRole('combobox'), { target: { value: 'AP' } });
         expect(queryByText('Apple')).not.toBeNull();
         expect(queryByText('Banana')).toBeNull();
         expect(queryByText('Cherry')).toBeNull();
@@ -63,8 +63,8 @@ describe('SearchableSelect', () => {
         const { getByRole } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={onChange} />,
         );
-        fireEvent.focus(getByRole('textbox'));
-        fireEvent.keyDown(getByRole('textbox'), { key: 'Enter' });
+        fireEvent.focus(getByRole('combobox'));
+        fireEvent.keyDown(getByRole('combobox'), { key: 'Enter' });
         expect(onChange).toHaveBeenCalledWith('');
     });
 
@@ -73,9 +73,9 @@ describe('SearchableSelect', () => {
         const { getByRole } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={onChange} />,
         );
-        fireEvent.focus(getByRole('textbox'));
-        fireEvent.keyDown(getByRole('textbox'), { key: 'ArrowDown' });
-        fireEvent.keyDown(getByRole('textbox'), { key: 'Enter' });
+        fireEvent.focus(getByRole('combobox'));
+        fireEvent.keyDown(getByRole('combobox'), { key: 'ArrowDown' });
+        fireEvent.keyDown(getByRole('combobox'), { key: 'Enter' });
         expect(onChange).toHaveBeenCalledWith('Apple');
     });
 
@@ -84,11 +84,11 @@ describe('SearchableSelect', () => {
         const { getByRole } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={onChange} />,
         );
-        fireEvent.focus(getByRole('textbox'));
-        fireEvent.keyDown(getByRole('textbox'), { key: 'ArrowDown' });
-        fireEvent.keyDown(getByRole('textbox'), { key: 'ArrowDown' });
-        fireEvent.keyDown(getByRole('textbox'), { key: 'ArrowUp' });
-        fireEvent.keyDown(getByRole('textbox'), { key: 'Enter' });
+        fireEvent.focus(getByRole('combobox'));
+        fireEvent.keyDown(getByRole('combobox'), { key: 'ArrowDown' });
+        fireEvent.keyDown(getByRole('combobox'), { key: 'ArrowDown' });
+        fireEvent.keyDown(getByRole('combobox'), { key: 'ArrowUp' });
+        fireEvent.keyDown(getByRole('combobox'), { key: 'Enter' });
         expect(onChange).toHaveBeenCalledWith('Apple');
     });
 
@@ -97,9 +97,9 @@ describe('SearchableSelect', () => {
         const { getByRole, queryByText } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={onChange} />,
         );
-        fireEvent.focus(getByRole('textbox'));
+        fireEvent.focus(getByRole('combobox'));
         expect(queryByText('Apple')).not.toBeNull();
-        fireEvent.keyDown(getByRole('textbox'), { key: 'Escape' });
+        fireEvent.keyDown(getByRole('combobox'), { key: 'Escape' });
         expect(queryByText('Apple')).toBeNull();
         expect(onChange).not.toHaveBeenCalled();
     });
@@ -109,7 +109,7 @@ describe('SearchableSelect', () => {
         const { getByRole, getByText } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={onChange} />,
         );
-        fireEvent.focus(getByRole('textbox'));
+        fireEvent.focus(getByRole('combobox'));
         fireEvent.mouseDown(getByText('Banana'));
         expect(onChange).toHaveBeenCalledWith('Banana');
     });
@@ -134,8 +134,8 @@ describe('SearchableSelect', () => {
         const { getByRole, getByText } = render(
             <SearchableSelect value="" options={opts} emptyLabel="all" onChange={() => {}} />,
         );
-        fireEvent.focus(getByRole('textbox'));
-        fireEvent.change(getByRole('textbox'), { target: { value: 'ZZZZ' } });
+        fireEvent.focus(getByRole('combobox'));
+        fireEvent.change(getByRole('combobox'), { target: { value: 'ZZZZ' } });
         expect(getByText('該当なし')).toBeInTheDocument();
     });
 
@@ -146,9 +146,30 @@ describe('SearchableSelect', () => {
                 <button>outside</button>
             </div>,
         );
-        fireEvent.focus(getByRole('textbox'));
+        fireEvent.focus(getByRole('combobox'));
         expect(queryByText('Apple')).not.toBeNull();
         fireEvent.mouseDown(document.body);
         expect(queryByText('Apple')).toBeNull();
+    });
+
+    it('combobox と listbox の状態・候補関係を公開する', () => {
+        const { getByRole, getAllByRole } = render(
+            <SearchableSelect
+                value=""
+                options={opts}
+                emptyLabel="作者: すべて"
+                onChange={() => {}}
+            />,
+        );
+        const combobox = getByRole('combobox');
+        expect(combobox).toHaveAttribute('aria-expanded', 'false');
+
+        fireEvent.focus(combobox);
+
+        const listbox = getByRole('listbox');
+        expect(combobox).toHaveAttribute('aria-expanded', 'true');
+        expect(combobox).toHaveAttribute('aria-controls', listbox.id);
+        expect(combobox).toHaveAttribute('aria-activedescendant', getAllByRole('option')[0].id);
+        expect(getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
     });
 });

@@ -140,7 +140,10 @@ describe('Dialog', () => {
                 <div />
             </Dialog>,
         );
-        expect(screen.getByRole('dialog').className).toContain('max-w-sm');
+        const dialog = screen.getByRole('dialog');
+        expect(dialog.className).toContain('max-w-sm');
+        expect(dialog.className).toContain('w-[calc(100%-2rem)]');
+        expect(dialog.className).not.toContain('mx-4');
     });
 });
 

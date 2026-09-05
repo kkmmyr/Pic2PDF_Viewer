@@ -27,10 +27,7 @@ export default tseslint.config(
         },
         rules: {
             ...reactHooks.configs.recommended.rules,
-            'react-refresh/only-export-components': [
-                'warn',
-                { allowConstantExport: true },
-            ],
+            'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
             // any 禁止（プロジェクトポリシー: frontend-conventions）
             '@typescript-eslint/no-explicit-any': 'error',
             // 未使用変数: _ プレフィックスは許可
@@ -48,10 +45,10 @@ export default tseslint.config(
             // 正当なパターンを多数フラグするため無効化する。
             'react-hooks/set-state-in-effect': 'off',
 
-            // LAN 個人アプリのため div onClick パターンは warn のみ（error に昇格させない）
-            'jsx-a11y/click-events-have-key-events': 'warn',
-            'jsx-a11y/no-static-element-interactions': 'warn',
-            'jsx-a11y/no-noninteractive-element-interactions': 'warn',
+            // click 操作は native 要素または keyboard 操作を必須とし、警告の再発をCIで拒否する。
+            'jsx-a11y/click-events-have-key-events': 'error',
+            'jsx-a11y/no-static-element-interactions': 'error',
+            'jsx-a11y/no-noninteractive-element-interactions': 'error',
         },
     },
     // テストファイルは緩める

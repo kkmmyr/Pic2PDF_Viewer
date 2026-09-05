@@ -45,7 +45,8 @@ function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps)
         'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700';
 
     return (
-        <div
+        <button
+            type="button"
             ref={setNodeRef}
             style={style}
             {...attributes}
@@ -54,7 +55,7 @@ function SortableGenrePill({ genre, isActive, onClick }: SortableGenrePillProps)
             className={`${btnBase} ${isActive ? btnActive : btnInactive}`}
         >
             {genre}
-        </div>
+        </button>
     );
 }
 

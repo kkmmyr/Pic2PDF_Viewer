@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useLayoutEffect, useId } from 'react';
 import { ChevronDown, X } from 'lucide-react';
 
 interface SearchableSelectProps {
@@ -36,6 +36,7 @@ export function SearchableSelect({
     const containerRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
+    const listboxId = useId();
 
     // 表示用アイテム: 先頭に「すべて (空文字 value)」+ フィルタ済み options
     const items = useMemo(() => {
@@ -111,6 +112,7 @@ export function SearchableSelect({
 
     // 入力欄の表示: 開いてる間は query、閉じている間は選択中の value
     const displayValue = isOpen ? query : value;
+    const activeOptionId = items[highlight] ? `${listboxId}-option-${highlight}` : undefined;
 
     return (
         <div ref={containerRef} className={`relative ${className}`}>
@@ -118,6 +120,12 @@ export function SearchableSelect({
                 <input
                     ref={inputRef}
                     type="text"
+                    role="combobox"
+                    aria-label={emptyLabel}
+                    aria-autocomplete="list"
+                    aria-expanded={isOpen}
+                    aria-controls={isOpen ? listboxId : undefined}
+                    aria-activedescendant={isOpen ? activeOptionId : undefined}
                     value={displayValue}
                     onChange={(e) => {
                         setQuery(e.target.value);
@@ -137,6 +145,7 @@ export function SearchableSelect({
                         onClick={() => select('')}
                         className="px-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                         title="クリア"
+                        aria-label="選択をクリア"
                     >
                         <X className="w-3.5 h-3.5" />
                     </button>
@@ -162,7 +171,9 @@ export function SearchableSelect({
             </div>
             {isOpen && (
                 <ul
+                    id={listboxId}
                     ref={listRef}
+                    role="listbox"
                     className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-auto border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 shadow-lg z-header"
                 >
                     {items.length === 1 && query.trim() ? (
@@ -173,6 +184,9 @@ export function SearchableSelect({
                         items.map((item, i) => (
                             <li
                                 key={item.value || '__empty__'}
+                                id={`${listboxId}-option-${i}`}
+                                role="option"
+                                aria-selected={item.value === value}
                                 onMouseDown={(e) => {
                                     e.preventDefault();
                                     select(item.value);
