@@ -26,6 +26,7 @@
 
 ## 検証記録
 
+- [設計書配備・OCR入力契約_本番確認_2026-09-05](検証/設計書配備・OCR入力契約_本番確認_2026-09-05.md)
 - [ADR0004_hitomi監視_初期Windows運用](検証/ADR0004_hitomi監視_初期Windows運用.md)
 - [Apple_Silicon_MLX_検証履歴](検証/Apple_Silicon_MLX_検証履歴.md)
 - [GPU環境セットアップ_検証履歴](検証/GPU環境セットアップ_検証履歴.md)
