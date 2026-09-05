@@ -1,8 +1,8 @@
 # 小説OCR品質改善 実装計画
 
-> status: active | last-verified: 2026-09-05 | owner: project owner
+> status: blocked | last-verified: 2026-09-05 | owner: project owner
 >
-> 状態詳細: H3の新規未調整holdout評価、Mac補助OCRの製品比較と同一条件のOS/device比較が未完了
+> 状態詳細: H3は新しい独立候補の確定待ち、Mac比較は利用可能なMac環境とユーザー起点の再開待ち
 > 対象: Kindle小説画像のOCR、品質判定、Windows OCR agent、QA公開
 
 完了済み工程、候補比較、実測値、reviewed packageの公開・rollback記録は
@@ -29,17 +29,19 @@
 
 | 項目 | 状態 | 次の判断 |
 |---|---|---|
-| H1・H2の品質ゲート基盤 | 完了 | policy JSONとOCR設計書の契約を維持する |
-| H3の未調整holdout | 未着手 | 新規の品質非参照holdoutを封印して一度だけ評価する |
+| H3の未調整holdout | blocked | ページ最大CERを下げる新しい独立候補・仮説を先に固定する |
 | reviewed packageによるCodex隔離運用 | 条件付き採用 | 原画像レビューと明示公開を省略せず、自動公開へ一般化しない |
-| Mac補助OCRの製品比較 | 未着手 | 固定コーパス・比較契約・端末内処理の条件で評価する |
+| Mac補助OCRの製品比較 | blocked | 利用可能なMacとユーザーの再開指示が揃ってから無料体験を評価する |
+
+H1・H2の完了工程と既存候補の不採用理由は、本文へ再掲せず凍結記録と技術知見を参照する。
 
 ## 4. Phase H3 — 未調整holdoutで機械候補を再評価する
 
-新しい未調整holdoutを封印し、閾値や選択規則を変更せず一度だけ評価する。候補は現行primary / external、
-配布NDLOCR-Lite、独立した採用候補モデル、文字位置合議と候補支持付き固有名詞補正、
-新しい列欠落検出・部分再OCRを実装した場合の固定版とする。候補ごとの公開screening、model revision、
-prompt、seed、runtime manifestを固定し、開封済みの評価結果から候補選択規則を調整しない。
+ページ最大CERを下げる新しい独立候補または検出・部分再OCRの仮説を先に固定し、その候補だけを
+新しい未調整holdoutで一度評価する。現行primary / external、NDLOCR-Lite、Qwen＋dots固定版など、
+[OCR設計書の既知の制限](../../design/詳細設計/機能別/OCR設計書.md)にある既存候補を
+同じ条件のまま再試行しない。候補の公開screening、model revision、prompt、seed、runtime manifestを固定し、
+開封後の結果から候補選択規則を調整しない。
 
 ### 受入条件
 
@@ -50,10 +52,11 @@ ground truth自身との比較を機械合格へ混ぜない。不合格なら�
 
 ### 実施順序
 
-1. 品質を参照しない入力選定、画像SHA、reference SHA、package digestを検査してholdoutを封印する。
-2. engine起動前にmanifest・policy digest・ページ種別・対象完全性を検証し、条件外ならfail closedで終了する。
-3. 固定した候補を一度だけ実行し、項目別結果・終了コード・runtime manifestを保存する。
-4. 合格時も画像照合QAと明示公開を省略せず、不合格時はholdoutを再利用しない。
+1. 新候補の仮説、固定版、既存候補との独立性、失敗時の停止条件を承認する。
+2. 品質を参照しない入力選定、画像SHA、reference SHA、package digestを検査してholdoutを封印する。
+3. engine起動前にmanifest・policy digest・ページ種別・対象完全性を検証し、条件外ならfail closedで終了する。
+4. 固定した候補を一度だけ実行し、項目別結果・終了コード・runtime manifestを保存する。
+5. 合格時も画像照合QAと明示公開を省略せず、不合格時はholdoutを再利用しない。
 
 <a id="mac-ocr-evaluation"></a>
 ## 5. Mac補助OCRの製品比較
