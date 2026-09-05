@@ -9,6 +9,7 @@ import config
 
 from .connection import with_db
 from .extractor import OcrPageResult
+from .ocr_provenance import model_revision_for_engine
 from .ocr_qa_staging import stage_run_for_qa
 from .ocr_run_store import collect_input_pages, mark_run_failed, prepare_run, save_page_result
 
@@ -160,7 +161,7 @@ def claim(agent_id: str, model_revision: str | None = None) -> dict | None:
 
     try:
         engine = config.app_settings.OCR_ENGINE.casefold()
-        model = model_revision or (config.app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine)
+        model = model_revision or model_revision_for_engine(engine, config.app_settings.SURYA_MODEL_REVISION)
         targets = _targets(str(row[1]), row[2])
         prepared: list[tuple[str, int]] = []
         for book_name in targets:

@@ -14,12 +14,22 @@ import importlib.metadata
 import json
 import math
 import os
+import sys
 import time
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
+
+_MAINTENANCE_DIR = Path(__file__).resolve().parent
+if str(_MAINTENANCE_DIR) not in sys.path:
+    sys.path.insert(0, str(_MAINTENANCE_DIR))
+
+from qwen_dots_provenance import (  # noqa: E402
+    collect_dots_runtime_manifest,
+    dots_prediction_record,
+    prediction_checkpoint_contract,
+)
 
 OCR_PROMPT = "Extract the text content from this image."
 LAYOUT_CATEGORIES = frozenset(
@@ -80,6 +90,7 @@ class RunConfig:
     response_mode: str = "plain_text"
     allow_custom_model_code: bool = False
     allow_empty_prediction: bool = False
+    runtime_manifest: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -284,23 +295,13 @@ def _validate_checkpoint(
     pages: list[InputPage],
     checkpoint: Mapping[str, Mapping[str, Any]],
     fingerprint: str,
+    runtime_manifest: dict[str, Any] | None = None,
 ) -> None:
     pages_by_id = {page.record_id: page for page in pages}
     extra = sorted(set(checkpoint) - set(pages_by_id))
     if extra:
         raise ValueError(f"checkpoint has metadata-external ids: {extra[:20]}")
-    expected = {
-        "model_revision": config.model_revision,
-        "model_fingerprint": fingerprint,
-        "engine_version": config.engine_version,
-        "prompt_id": config.prompt_id,
-        "prompt_sha256": hashlib.sha256(config.prompt.encode()).hexdigest(),
-        "seed": config.seed,
-        "max_tokens": config.max_tokens,
-        "temperature": config.temperature,
-        "top_p": config.top_p,
-        "response_mode": config.response_mode,
-    }
+    expected = prediction_checkpoint_contract(config, fingerprint)
     for record_id, record in checkpoint.items():
         for field, value in expected.items():
             if (
@@ -401,6 +402,7 @@ def run_predictions(
         pages=pages,
         checkpoint=checkpoint,
         fingerprint=fingerprint,
+        runtime_manifest=config.runtime_manifest,
     )
     pending = [page for page in pages if page.record_id not in checkpoint]
     if not pending:
@@ -414,52 +416,20 @@ def run_predictions(
         started_at = time.monotonic()
         response = engine.generate(page.image_path)
         elapsed = time.monotonic() - started_at
-        if not isinstance(response, str) or not response.strip():
-            raise ValueError(f"dots.mocr prediction id {page.record_id} is empty")
-        candidate_error: str | None = None
-        try:
-            prediction, layout_cell_count = _extract_prediction(
-                response,
-                response_mode=config.response_mode,
-                allow_empty_prediction=config.allow_empty_prediction,
-            )
-        except ValueError as exc:
-            if not config.allow_empty_prediction:
-                raise
-            prediction = ""
-            layout_cell_count = None
-            candidate_error = str(exc)
-        record = {
-            "id": page.record_id,
-            "pred": prediction,
-            "input_sha256": page.image_sha256,
-            "image_relpath": page.image_relpath,
-            "model_revision": config.model_revision,
-            "model_fingerprint": fingerprint,
-            "engine_version": config.engine_version,
-            "prompt_id": config.prompt_id,
-            "prompt_sha256": prompt_sha256,
-            "seed": config.seed,
-            "max_tokens": config.max_tokens,
-            "temperature": config.temperature,
-            "top_p": config.top_p,
-            "response_mode": config.response_mode,
-            "elapsed_seconds": elapsed,
-            "generated_at": datetime.now(UTC).isoformat(),
-        }
-        if config.response_mode == "layout_json":
-            record["raw_response"] = response
-        if layout_cell_count is not None:
-            record["layout_cell_count"] = layout_cell_count
-            if not prediction.strip():
-                record["image_only"] = True
-        if candidate_error is not None:
-            record["candidate_error"] = candidate_error
+        record = dots_prediction_record(
+            config=config,
+            page=page,
+            response=response,
+            elapsed=elapsed,
+            fingerprint=fingerprint,
+            prompt_sha256=prompt_sha256,
+            extract_prediction=_extract_prediction,
+        )
         _append_checkpoint(config.output_path, record)
         completed += 1
         print(
             f"checkpointed {page.record_id}: {completed}/{len(pages)} "
-            f"(elapsed={elapsed:.2f}s, chars={len(prediction)})",
+            f"(elapsed={elapsed:.2f}s, chars={len(record['pred'])})",
             flush=True,
         )
     return len(pending), completed
@@ -565,6 +535,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         response_mode="plain_text" if args.prompt_mode == "ocr" else "layout_json",
         allow_custom_model_code=args.allow_custom_model_code,
         allow_empty_prediction=args.allow_empty_candidate,
+        runtime_manifest=collect_dots_runtime_manifest(
+            args.model_revision, Path(__file__)
+        ),
     )
     generated, completed = run_predictions(config, engine_factory=_MlxVlmEngine)
     print(f"run complete: generated={generated}, checkpoint_total={completed}")

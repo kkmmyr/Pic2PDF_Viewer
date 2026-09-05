@@ -234,7 +234,7 @@ class OcrAgentPageResultIn(BaseModel):
     external_raw_output: str | None = None
     candidate_manifest: dict[str, object] | None = None
     processing_timing: dict[str, int] | None = None
-    runtime_manifest: dict[str, object] | None = None
+    runtime_manifest: dict[str, object]
     run_timing: dict[str, int] | None = None
     selected_engine: Literal["primary", "external"] = "primary"
 

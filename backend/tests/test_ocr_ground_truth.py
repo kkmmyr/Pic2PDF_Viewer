@@ -17,8 +17,11 @@ from services.novel_db.ocr_ground_truth import (
 from services.novel_db.ocr_run_store import collect_input_pages, prepare_run, save_page_result
 
 
-def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
+def _passed_page(
+    page_no: int, image_sha256: str, text: str, *, engine: str = "surya2", model: str = "model-sha"
+) -> OcrPageResult:
     return {
+        "runtime_manifest": {"schema_version": 1, "engine": engine, "model_revision": model},
         "page_no": page_no,
         "image_sha256": image_sha256,
         "state": "passed",

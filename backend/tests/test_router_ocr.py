@@ -141,6 +141,39 @@ class TestGetOcrStatus:
 
 
 class TestOcrAgentApi:
+    @pytest.mark.parametrize("page_manifest", [{}, {"runtime_manifest": None}])
+    def test_page_submit_rejects_missing_manifest(self, client, monkeypatch, page_manifest):
+        import config
+
+        monkeypatch.setattr(config.app_settings, "OCR_AGENT_ENABLED", True)
+        monkeypatch.setattr(config, "KINDLE_CAPTURE_AGENT_TOKEN", "test-token")
+        captured = []
+        monkeypatch.setattr("routers.ocr.ocr_agent_jobs.submit_page", lambda *args: captured.append(args))
+        response = client.post(
+            "/api/ocr/agents/jobs/7/pages",
+            headers={"X-Capture-Agent-Token": "test-token"},
+            json={
+                "agent_id": "windows-1",
+                "book_name": "book",
+                "page": {
+                    "page_no": 1,
+                    "image_sha256": "a" * 64,
+                    "state": "passed",
+                    "full_text": "本文",
+                    "char_count": 2,
+                    "raw_output": "",
+                    "block_count": 1,
+                    "quality_flags": [],
+                    "ink_coverage": 1.0,
+                    "attempt_count": 1,
+                    **page_manifest,
+                },
+            },
+        )
+        assert response.status_code == 422
+        assert any(error["loc"] == ["body", "page", "runtime_manifest"] for error in response.json()["detail"])
+        assert not captured
+
     def test_claim_requires_enabled_agent_and_valid_token(self, client, monkeypatch):
         import config
 
@@ -187,6 +220,7 @@ class TestOcrAgentApi:
                 "agent_id": "windows-1",
                 "book_name": "book",
                 "page": {
+                    "runtime_manifest": {"schema_version": 1, "engine": "surya2", "model_revision": "test-model"},
                     "page_no": 1,
                     "image_sha256": "a" * 64,
                     "state": "passed",

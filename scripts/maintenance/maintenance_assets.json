@@ -351,6 +351,7 @@
         "scripts/maintenance/qwen35_ocr_checkpoint.py",
         "scripts/maintenance/qwen35_ocr_jp_vertical_predict.py",
         "scripts/maintenance/qwen35_ocr_model.py",
+        "scripts/maintenance/qwen_dots_provenance.py",
         "scripts/maintenance/select_qwen35_dots_predictions.py"
       ],
       "classification": "continuous",

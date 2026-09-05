@@ -25,6 +25,15 @@ def _provenance(engine: str) -> dict[str, object]:
     }
 
 
+def _runtime_manifest(engine: str, revision: str) -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "engine": engine,
+        "model_revision": revision,
+        "observed_by": "test-inference-process",
+    }
+
+
 def test_composite_worker_emits_auditable_page_after_both_stages(
     tmp_path: Path,
     monkeypatch,
@@ -64,6 +73,8 @@ def test_composite_worker_emits_auditable_page_after_both_stages(
             "external_raw_output": '[{"bbox":[0,0,100,100],"category":"Text","text":"dots本文"}]',
             "primary_provenance": _provenance("qwen"),
             "external_provenance": _provenance("dots"),
+            "primary_runtime_manifest": _runtime_manifest("qwen3.5-ocr-jp-2b", qwen_dots_worker.QWEN_MODEL_REVISION),
+            "external_runtime_manifest": _runtime_manifest("dots.mocr", qwen_dots_worker.DOTS_MODEL_REVISION),
             "input_sha256": image_sha256,
             "selected_engine": "qwen3.5-ocr-jp-2b",
             "selection_reason": "qwen_clean",
@@ -82,6 +93,10 @@ def test_composite_worker_emits_auditable_page_after_both_stages(
     envelope = json.loads(page["raw_output"])
     assert envelope["schema"] == "qwen35-dots-page-v1"
     assert envelope["primary"]["provenance"]["model_revision"] == "qwen-revision"
+    assert page["runtime_manifest"]["engine"] == "qwen35_dots_review_v1"
+    assert page["runtime_manifest"]["inference_processes"]["qwen"]["engine"] == "qwen3.5-ocr-jp-2b"
+    assert page["runtime_manifest"]["inference_processes"]["dots"]["engine"] == "dots.mocr"
+    assert "adjudication_worker" in page["runtime_manifest"]
 
 
 def test_composite_worker_rejects_repetitive_selected_candidate(
@@ -118,6 +133,8 @@ def test_composite_worker_rejects_repetitive_selected_candidate(
             "external_raw_output": '[{"raw":true}]',
             "primary_provenance": _provenance("qwen"),
             "external_provenance": _provenance("dots"),
+            "primary_runtime_manifest": _runtime_manifest("qwen3.5-ocr-jp-2b", qwen_dots_worker.QWEN_MODEL_REVISION),
+            "external_runtime_manifest": _runtime_manifest("dots.mocr", qwen_dots_worker.DOTS_MODEL_REVISION),
             "input_sha256": qwen_dots_worker._sha256(image_path),
             "selected_engine": "qwen3.5-ocr-jp-2b",
             "selection_reason": "qwen_clean",

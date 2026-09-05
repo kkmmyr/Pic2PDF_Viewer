@@ -99,8 +99,10 @@ def _stop_worker_process(proc: subprocess.Popen[str]) -> None:
 def _ocr_worker_env() -> dict[str, str]:
     from config import app_settings
 
+    from .ocr_provenance import model_revision_for_engine
+
     engine = app_settings.OCR_ENGINE.casefold()
-    model_revision = app_settings.SURYA_MODEL_REVISION if engine == "surya2" else engine
+    model_revision = model_revision_for_engine(engine, app_settings.SURYA_MODEL_REVISION)
     env = {
         **os.environ,
         "PYTHONIOENCODING": "utf-8",

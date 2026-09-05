@@ -5,12 +5,13 @@ from __future__ import annotations
 from .connection import with_db
 from .ocr_page_classification import classify_run_pages
 from .ocr_qa_risk import annotate_run_qa_risks
-from .ocr_run_store import OcrInputPage, validate_complete_run
+from .ocr_run_store import OcrInputPage, validate_complete_run, validate_run_provenance
 
 
 def stage_run_for_qa(run_id: int, input_pages: list[OcrInputPage]) -> None:
     """Move a complete OCR run to QA without publishing canonical text."""
     validate_complete_run(run_id, input_pages)
+    validate_run_provenance(run_id)
     classify_run_pages(run_id)
     annotate_run_qa_risks(run_id)
     with with_db() as conn:

@@ -34,8 +34,11 @@ def staged_book(tmp_data_dir) -> tuple[str, list]:
     return book_name, collect_input_pages(book_name)
 
 
-def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
+def _passed_page(
+    page_no: int, image_sha256: str, text: str, *, engine: str = "surya2", model: str = "model-sha"
+) -> OcrPageResult:
     return {
+        "runtime_manifest": {"schema_version": 1, "engine": engine, "model_revision": model},
         "page_no": page_no,
         "image_sha256": image_sha256,
         "state": "passed",
@@ -304,7 +307,13 @@ def test_review_assisted_engine_requires_every_page_before_formal_holdout(tmp_da
     )
 
     for page in input_pages:
-        result = _passed_page(page.page_no, page.image_sha256, _unique_content(400))
+        result = _passed_page(
+            page.page_no,
+            page.image_sha256,
+            _unique_content(400),
+            engine="qwen35_dots_review_v1",
+            model="fixed-composite-model",
+        )
         result["quality_flags"] = [
             "candidate_disagreement",
             "review_assisted_composite",
