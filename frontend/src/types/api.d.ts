@@ -3722,9 +3722,9 @@ export interface components {
                 [key: string]: number;
             } | null;
             /** Runtime Manifest */
-            runtime_manifest?: {
+            runtime_manifest: {
                 [key: string]: unknown;
-            } | null;
+            };
             /** Run Timing */
             run_timing?: {
                 [key: string]: number;

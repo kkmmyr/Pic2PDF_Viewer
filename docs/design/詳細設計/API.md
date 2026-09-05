@@ -1,6 +1,6 @@
 # API 仕様
 
-> status: living | last-verified: 2026-07-27
+> status: living | last-verified: 2026-09-05
 
 <!-- contract-owner: openapi-design -->
 
@@ -29,13 +29,15 @@ discussion 型は、これらの OpenAPI 生成型から参照する。
 
 ---
 
-## タイムスタンプ形式（JST 統一）
+## タイムスタンプ形式
 
-SQLite に保存・API で返されるタイムスタンプはすべて **JST (Asia/Tokyo, UTC+9)** で格納する。
+日時形式はフィールドの契約に従う。API全体をJST文字列へ統一しているわけではない。
 
 - **SQLite**: `datetime('now', '+9 hours')` で挿入（スペース区切り `YYYY-MM-DD HH:MM:SS` 形式、タイムゾーン接尾辞なし）
 - **Python (backend)**: `datetime.now(ZoneInfo("Asia/Tokyo"))`（`utils.dt.jst_now()` ラッパー経由）
-- **フロントエンド**: `utils/date.ts` の `parseSqliteUtc` が `+09:00` を付与して Date 化し、`formatSqliteUtcAsJst` で JST 表示する
+- **フロントエンド**: 上記のSQLite日時文字列は `utils/date.ts` の `parseSqliteUtc` が `+09:00` を付与して Date 化し、`formatSqliteUtcAsJst` で JST 表示する
+- **Unix時刻**: 書籍メタデータの `last_viewed_at` は `time.time()` による秒単位の数値（float）。SQLite日時文字列のパーサーへ渡さない。
+- **UTC ISO 8601**: 同人誌取り込み監視の `last_scan_at` / `finished_at` はUTCオフセット付き文字列。タイムゾーンを保持して解釈する。
 
 > **既存 DB データの注意**: 移行前（UTC 保存時代）のレコードには同様に `+09:00` が付与されるため、9 時間早い表示になる。rebuild / 再生成後のデータから正しい JST 時刻に切り替わる。
 

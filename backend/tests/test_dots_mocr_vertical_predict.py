@@ -69,6 +69,7 @@ def _config(tmp_path: Path) -> Any:
         engine_version="0.6.15",
         prompt_id="dots-mocr-prompt-ocr-v1",
         prompt="Extract the text content from this image.",
+        runtime_manifest=predict.collect_dots_runtime_manifest("revision-sha", _SCRIPT_PATH),
     )
 
 
@@ -213,6 +214,7 @@ def test_run_checkpoints_each_page_and_records_generation_contract(
     assert records[0]["temperature"] == 0.1
     assert len(records[0]["model_fingerprint"]) == 64
     assert len(records[0]["prompt_sha256"]) == 64
+    assert records[0]["runtime_manifest"] == config.runtime_manifest
 
 
 def test_review_mode_checkpoints_invalid_layout_json_as_auditable_candidate_error(

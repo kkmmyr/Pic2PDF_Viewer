@@ -48,6 +48,63 @@ def test_facade_preserves_public_symbol_identity() -> None:
     assert qa_facade.list_qa_runs is list_qa_runs
 
 
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        None,
+        {},
+        {"schema_version": True},
+        {"schema_version": 1, "engine": "other", "model_revision": "model-sha"},
+        {"schema_version": 1, "engine": "surya2", "model_revision": "wrong"},
+    ],
+)
+def test_page_manifest_rejection_preserves_checkpoint(staged_book, manifest) -> None:
+    book_name, pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", pages)
+    save_page_result(run_id, _passed_page(1, pages[0].image_sha256, "保存済み"))
+    invalid = _passed_page(1, pages[0].image_sha256, "上書き禁止")
+    invalid["runtime_manifest"] = manifest
+    with pytest.raises(ValueError, match="runtime manifest"):
+        save_page_result(run_id, invalid)
+    with with_db() as conn:
+        assert (
+            conn.execute("SELECT full_text FROM ocr_page_results WHERE run_id=?", (run_id,)).fetchone()[0] == "保存済み"
+        )
+
+
+def test_legacy_pages_without_manifest_are_not_resumed_or_relabelled(staged_book) -> None:
+    book_name, pages = staged_book
+    run_id, _ = prepare_run(book_name, "surya2", "model-sha", pages)
+    for page in pages:
+        save_page_result(run_id, _passed_page(page.page_no, page.image_sha256, "旧結果"))
+    with with_db() as conn:
+        conn.execute("UPDATE ocr_runs SET runtime_manifest_json='{}' WHERE id=?", (run_id,))
+        conn.commit()
+    assert get_qa_run(run_id)["runtime_manifest"] == {}
+    with pytest.raises(ValueError, match="runtime manifest"):
+        stage_run_for_qa(run_id, pages)
+    with pytest.raises(ValueError, match="start a new run"):
+        save_page_result(run_id, _passed_page(1, pages[0].image_sha256, "後付け禁止"))
+    new_id, tasks = prepare_run(book_name, "surya2", "model-sha", pages)
+    assert new_id != run_id
+    assert [task["page_no"] for task in tasks] == [1, 2]
+    with with_db() as conn:
+        assert conn.execute("SELECT state FROM ocr_runs WHERE id=?", (run_id,)).fetchone()[0] == "running"
+        assert [row[0] for row in conn.execute("SELECT full_text FROM ocr_page_results WHERE run_id=?", (run_id,))] == [
+            "旧結果",
+            "旧結果",
+        ]
+
+
+def test_legacy_awaiting_qa_manifest_is_not_required_retroactively(staged_book) -> None:
+    run_id, _ = _prepare_approved_run(staged_book)
+    with with_db() as conn:
+        conn.execute("UPDATE ocr_runs SET runtime_manifest_json='{}' WHERE id=?", (run_id,))
+        conn.commit()
+    approve_and_publish_run(run_id, "legacy-reviewer")
+    assert get_qa_run(run_id)["runtime_manifest"] == {}
+
+
 @pytest.fixture
 def staged_book(tmp_data_dir) -> tuple[str, list]:
     upgrade_head()
@@ -59,8 +116,11 @@ def staged_book(tmp_data_dir) -> tuple[str, list]:
     return book_name, collect_input_pages(book_name)
 
 
-def _passed_page(page_no: int, image_sha256: str, text: str) -> OcrPageResult:
+def _passed_page(
+    page_no: int, image_sha256: str, text: str, *, engine: str = "surya2", model: str = "model-sha"
+) -> OcrPageResult:
     return {
+        "runtime_manifest": {"schema_version": 1, "engine": engine, "model_revision": model},
         "page_no": page_no,
         "image_sha256": image_sha256,
         "state": "passed",
@@ -84,7 +144,9 @@ def test_qa_detail_exposes_candidate_selection_reason(staged_book) -> None:
     book_name, input_pages = staged_book
     run_id, _ = prepare_run(book_name, "qwen35_dots_review_v1", "composite", input_pages)
     for page in input_pages:
-        result = _passed_page(page.page_no, page.image_sha256, "本文")
+        result = _passed_page(
+            page.page_no, page.image_sha256, "本文", engine="qwen35_dots_review_v1", model="composite"
+        )
         result["selection_reason"] = "dots_materially_more_complete"
         save_page_result(run_id, result)
     stage_run_for_qa(run_id, input_pages)

@@ -13,7 +13,7 @@ from utils.path_utils import resolve_under_base, validate_safe_name
 
 from .connection import with_db
 from .extractor import OcrPageResult, OcrTask
-from .ocr_provenance import candidate_manifest, canonical_json, validate_model_revision
+from .ocr_provenance import candidate_manifest, canonical_json, validate_model_revision, validate_runtime_manifest
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,10 @@ def prepare_run(
         row = conn.execute(
             "SELECT id FROM ocr_runs "
             "WHERE book_name = ? AND engine = ? AND model = ? AND source_page_count = ? "
-            "AND state IN ('running', 'failed') ORDER BY id DESC LIMIT 1",
+            "AND state IN ('running', 'failed') "
+            "AND (COALESCE(runtime_manifest_json, '{}') NOT IN ('', '{}', 'null') "
+            "OR NOT EXISTS (SELECT 1 FROM ocr_page_results WHERE run_id=ocr_runs.id)) "
+            "ORDER BY id DESC LIMIT 1",
             (book_name, engine, model, len(input_pages)),
         ).fetchone()
         with conn:
@@ -256,26 +259,22 @@ def _validate_timing(value: dict, label: str) -> dict[str, int]:
 
 def _save_run_provenance(conn, run_id: int, runtime_manifest: dict | None, run_timing: dict) -> None:
     row = conn.execute(
-        "SELECT model, runtime_manifest_json, timing_json FROM ocr_runs WHERE id=?",
+        "SELECT model, runtime_manifest_json, timing_json, engine FROM ocr_runs WHERE id=?",
         (run_id,),
     ).fetchone()
     if row is None:
         raise LookupError(f"OCR run not found: {run_id}")
-    if runtime_manifest is not None:
-        if not isinstance(runtime_manifest, dict) or runtime_manifest.get("schema_version") != 1:
-            raise ValueError("OCR runtime manifest schema_version must be 1")
-        manifest_model = validate_model_revision(str(runtime_manifest.get("model_revision", "")))
-        if manifest_model != str(row[0]):
-            raise ValueError("OCR runtime manifest model revision does not match the run")
-        manifest_json = canonical_json(runtime_manifest)
-        stored_manifest = str(row[1] or "{}")
-        if stored_manifest not in {"", "{}"} and stored_manifest != manifest_json:
-            raise ValueError("OCR runtime manifest changed within the same run")
-        if stored_manifest in {"", "{}"}:
-            conn.execute(
-                "UPDATE ocr_runs SET runtime_manifest_json=? WHERE id=?",
-                (manifest_json, run_id),
-            )
+    manifest_json = validate_runtime_manifest(runtime_manifest, str(row[3]), str(row[0]))
+    stored_manifest = str(row[1] or "{}")
+    if stored_manifest not in {"", "{}"} and stored_manifest != manifest_json:
+        raise ValueError("OCR runtime manifest changed within the same run")
+    if stored_manifest in {"", "{}"}:
+        if conn.execute("SELECT 1 FROM ocr_page_results WHERE run_id=? LIMIT 1", (run_id,)).fetchone():
+            raise ValueError("OCR runtime manifest missing for existing pages; start a new run")
+        conn.execute(
+            "UPDATE ocr_runs SET runtime_manifest_json=? WHERE id=?",
+            (manifest_json, run_id),
+        )
     timing = _validate_timing(run_timing, "run timing")
     if timing:
         stored_timing = json.loads(str(row[2] or "{}"))
@@ -285,6 +284,18 @@ def _save_run_provenance(conn, run_id: int, runtime_manifest: dict | None, run_t
             "UPDATE ocr_runs SET timing_json=? WHERE id=?",
             (canonical_json(stored_timing), run_id),
         )
+
+
+def validate_run_provenance(run_id: int) -> None:
+    with with_db() as conn:
+        row = conn.execute("SELECT runtime_manifest_json, engine, model FROM ocr_runs WHERE id=?", (run_id,)).fetchone()
+    if row is None:
+        raise ValueError(f"OCR run not found: {run_id}")
+    try:
+        manifest = json.loads(str(row[0] or "{}"))
+    except json.JSONDecodeError as exc:
+        raise ValueError("OCR runtime manifest is invalid JSON") from exc
+    validate_runtime_manifest(manifest, str(row[1]), str(row[2]))
 
 
 def mark_run_failed(run_id: int, error: str) -> None:

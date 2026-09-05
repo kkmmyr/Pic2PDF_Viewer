@@ -1,6 +1,6 @@
 # Claude Code Remote Control + Discord通知 設定書
 
-> status: living | last-verified: 2026-07-03
+> status: living | last-verified: 2026-09-05
 
 ## 概要
 
@@ -41,7 +41,7 @@ Claude Code の Remote Control セッションを起動した際に、接続URL�
 Git Bashで実行：
 
 ```bash
-printf "export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...'\n" > ~/.bashrc
+printf "export DISCORD_WEBHOOK_URL='https://discord.com/api/webhooks/...'\n" >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -111,5 +111,5 @@ https://claude.ai/code?environment=env_XXXXX
 |---|---|---|
 | `claude-rc` が認識されない | プロファイル未反映 | `. $PROFILE`（PS）または `source ~/.bashrc`（Git Bash）を実行 |
 | Workspace not trusted エラー | ワークスペース未承認 | `cd /d/61.tool/Pic2PDF_Viewer && claude` で一度起動して承認 |
-| Discord通知が届かない | Webhook URL未設定または無効 | `echo $DISCORD_WEBHOOK_URL` で確認、無効な場合は再作成 |
+| Discord通知が届かない | Webhook URL未設定または無効 | `test -n "$DISCORD_WEBHOOK_URL" && echo configured` で値を表示せず有無を確認、無効な場合は再作成 |
 | 日本語を含むメッセージが届かない | Git BashのUTF-8エンコード問題 | メッセージ本文をASCIIのみにする |

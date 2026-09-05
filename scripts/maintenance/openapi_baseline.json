@@ -5037,16 +5037,9 @@
             "title": "Run Timing"
           },
           "runtime_manifest": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Runtime Manifest"
+            "additionalProperties": true,
+            "title": "Runtime Manifest",
+            "type": "object"
           },
           "selected_engine": {
             "default": "primary",
@@ -5083,7 +5076,8 @@
           "block_count",
           "quality_flags",
           "ink_coverage",
-          "attempt_count"
+          "attempt_count",
+          "runtime_manifest"
         ],
         "title": "OcrAgentPageResultIn",
         "type": "object"

@@ -15,7 +15,7 @@
 | [0001](0001_react-vite-typescript-frontend.md) | フロントエンドに React + Vite + TypeScript を採用 | Accepted | 2026-01-12（遡及） |
 | [0002](0002_fastapi-backend.md) | バックエンドに FastAPI を採用 | Accepted | 2026-01-12（遡及） |
 | [0003](0003_generated-image-only-mode.md) | `generated` ソースを image-only モードに切替 | Accepted | 2026-05-05 |
-| [0004](0004_hitomi-standalone-script.md) | hitomi 監視を独立スクリプト + Task Scheduler で実行 | Accepted | 2026-04-29 |
+| [0004](0004_hitomi-standalone-script.md) | hitomi 監視を独立スクリプト + OSスケジューラ（Linux systemd）で実行 | Accepted | 2026-04-29 |
 | [0005](0005_uv-python-package-manager.md) | Python パッケージ管理を `uv` に移行 | Accepted | 2026-04-26 |
 | [0006](0006_backend-log-file-persistence.md) | バックエンドログを RotatingFileHandler でファイル永続化 | Accepted | 2026-05-07 |
 | [0007](0007_llm-extraction-qwen-adoption.md) | 小説 RAG の LLM を Qwen3.6 に切替 + 共通モジュールに切り出し | Accepted | 2026-05-10 |

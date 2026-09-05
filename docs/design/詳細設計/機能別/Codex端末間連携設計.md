@@ -1,6 +1,6 @@
 # Codex端末間連携設計
 
-> status: living | last-verified: 2026-08-29
+> status: living | last-verified: 2026-09-05
 
 MacとWindowsで動くCodexが、コピー＆ペーストを介さずに作業依頼・回答・OCR比較文脈を
 共有するためのMCPサービスを定義する。本サービスはmedaroserverを中継点とする
@@ -98,7 +98,8 @@ MCP processは`backend/codex_coordination_mcp.py`を
 - rootでsystem unitとnginxを管理できる環境では、localhost待受とnginx `/mcp` proxyを使う。
 - 現行medaroserverでは`amashio`のuser unitを使い、listen addressをTailscale IPv4
   `100.107.238.88`へ限定する。Mac/WindowsのCodexには
-  `http://medaroserver:8790/mcp`を登録する。
+  `http://100.107.238.88:8790/mcp`を登録する。`medaroserver`というホスト名を使う場合は、
+  LANアドレスではなくこのTailscaleアドレスへ解決されることを確認する。
 - user unitはlingerを前提とし、通常デプロイはactive backend切替後に導入済みunitだけを再起動する。
 
 設定:

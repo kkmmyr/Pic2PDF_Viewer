@@ -17,11 +17,13 @@ try:
     from .ocr_content_guards import has_suspicious_repetition
     from .ocr_layout_types import suggest_layout_type
     from .ocr_worker_protocol import OcrWorkerTask, emit, emit_progress, page_payload
+    from .qwen_dots_provenance import composite_runtime_manifest
     from .surya_types import SuryaPageResult
 except ImportError:
     from ocr_content_guards import has_suspicious_repetition
     from ocr_layout_types import suggest_layout_type
     from ocr_worker_protocol import OcrWorkerTask, emit, emit_progress, page_payload
+    from qwen_dots_provenance import composite_runtime_manifest
     from surya_types import SuryaPageResult
 
 QWEN_MODEL_REVISION = "dc58acc05962cb2ca129c8d3533ab7e5a651cc02"
@@ -338,6 +340,12 @@ def run_qwen_dots_review(tasks: list[OcrWorkerTask]) -> None:
         total_pages=len(tasks),
     )
     records = _load_selected(selected_output, set(scope.task_by_id))
+    runtime_manifest = composite_runtime_manifest(
+        records,
+        qwen_model_revision=QWEN_MODEL_REVISION,
+        dots_model_revision=DOTS_MODEL_REVISION,
+        composite_model_revision=COMPOSITE_MODEL_REVISION,
+    )
     for record in records:
         task = scope.task_by_id[record["id"]]
         selected_text = str(record.get("pred") or "")
@@ -385,6 +393,7 @@ def run_qwen_dots_review(tasks: list[OcrWorkerTask]) -> None:
             layout_type=layout_type,
             primary_text=primary_text,
             external_text=external_text,
+            runtime_manifest=runtime_manifest,
             selected_engine=selected_engine,
             selection_reason=selection_reason,
         )

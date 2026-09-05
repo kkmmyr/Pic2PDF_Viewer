@@ -62,6 +62,10 @@ def _config(tmp_path: Path) -> Any:
         temperature=0.0,
         top_p=1.0,
         response_mode="html_layout_v1",
+        runtime_manifest=predict.collect_qwen_runtime_manifest(
+            predict.MODEL_REVISION,
+            _SCRIPT_PATH,
+        ),
     )
 
 
@@ -182,6 +186,7 @@ def test_run_checkpoints_raw_html_provenance_and_repetition(
     assert record["suspicious_repetition"] is True
     assert record["html_protocol_version"] == predict.HTML_PROTOCOL_VERSION
     assert record["generation_mode"] == predict.GENERATION_MODE
+    assert record["runtime_manifest"] == config.runtime_manifest
 
     assert predict.run_predictions(
         config,
@@ -283,6 +288,8 @@ def test_main_uses_fixed_official_contract(
     assert config.temperature == 0.0
     assert config.response_mode == "html_layout_v1"
     assert config.allow_custom_model_code is False
+    assert config.runtime_manifest["engine"] == "qwen3.5-ocr-jp-2b"
+    assert config.runtime_manifest["model_revision"] == predict.MODEL_REVISION
     assert captured["engine_factory"] is predict._MpsEngine
 
 

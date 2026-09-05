@@ -17,6 +17,7 @@ _MODEL_REVISION = "surya2-test-v1"
 def agent_job(tmp_data_dir, monkeypatch) -> tuple[int, str, list[Path]]:
     upgrade_head()
     monkeypatch.setattr("config.app_settings.OCR_AGENT_ENABLED", True)
+    monkeypatch.setattr("config.app_settings.OCR_ENGINE", "surya2")
     monkeypatch.setattr("config.app_settings.OCR_AGENT_HEARTBEAT_TIMEOUT_SEC", 300)
     book_name = "ocr-agent-book"
     images_dir = Path(tmp_data_dir["KINDLE_NOVEL_IMAGES_DIR"]) / book_name
@@ -38,6 +39,7 @@ def _page(page_no: int, path: Path) -> dict:
     image_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
     text = f"本文{page_no}"
     return {
+        "runtime_manifest": {"schema_version": 1, "engine": "surya2", "model_revision": _MODEL_REVISION},
         "page_no": page_no,
         "image_sha256": image_sha256,
         "state": "passed",

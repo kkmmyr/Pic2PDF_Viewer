@@ -15,7 +15,6 @@ import re
 import sys
 import time
 from collections.abc import Callable, Sequence
-from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Protocol
@@ -24,7 +23,7 @@ _ROOT_DIR = Path(__file__).resolve().parents[2]
 _MAINTENANCE_DIR = Path(__file__).resolve().parent
 _BACKEND_DIR = _ROOT_DIR / "backend"
 _NOVEL_DB_SERVICE_DIR = _BACKEND_DIR / "services" / "novel_db"
-for _import_path in (_MAINTENANCE_DIR, _NOVEL_DB_SERVICE_DIR):
+for _import_path in (_NOVEL_DB_SERVICE_DIR, _MAINTENANCE_DIR):
     if str(_import_path) not in sys.path:
         sys.path.insert(0, str(_import_path))
 
@@ -43,6 +42,11 @@ from qwen35_ocr_checkpoint import (  # noqa: E402  # pyright: ignore[reportMissi
     validate_qwen_checkpoint,
 )
 from qwen35_ocr_model import model_fingerprint  # noqa: E402  # pyright: ignore[reportMissingImports]
+from qwen_dots_provenance import (  # noqa: E402  # pyright: ignore[reportMissingImports]
+    attach_runtime_manifest,
+    collect_qwen_runtime_manifest,
+    qwen_prediction_record,
+)
 
 MODEL_REVISION = "dc58acc05962cb2ca129c8d3533ab7e5a651cc02"
 OCR_PROMPT = "OCR this image as HTML layout blocks with bbox and label."
@@ -79,7 +83,9 @@ class _LayoutHtmlParser(HTMLParser):
         try:
             x1, y1, x2, y2 = (float(part) for part in parts)
         except ValueError as exc:
-            raise ValueError("Qwen HTML layout block has a non-numeric data-bbox") from exc
+            raise ValueError(
+                "Qwen HTML layout block has a non-numeric data-bbox"
+            ) from exc
         if x2 <= x1 or y2 <= y1:
             raise ValueError("Qwen HTML layout block has an invalid data-bbox")
 
@@ -92,7 +98,9 @@ class _LayoutHtmlParser(HTMLParser):
         has_bbox = "data-bbox" in attr_map
         has_label = "data-label" in attr_map
         if has_bbox != has_label:
-            raise ValueError("Qwen HTML layout block must have data-bbox and data-label")
+            raise ValueError(
+                "Qwen HTML layout block must have data-bbox and data-label"
+            )
         if has_bbox:
             if self._block_tag is not None:
                 raise ValueError("Qwen HTML layout blocks must not be nested")
@@ -255,38 +263,24 @@ def _prediction_record(
         html_truncated = False
         candidate_error = str(exc)
     markup_tags = fallback_markup_tags(response)
-    record: dict[str, Any] = {
-        "id": page.record_id,
-        "pred": prediction,
-        "raw_response": response,
-        "raw_response_sha256": hashlib.sha256(response.encode()).hexdigest(),
-        "layout_block_count": block_count,
-        "html_truncated": html_truncated,
-        "fallback_markup_tags": markup_tags,
-        "suspicious_vertical_bbox_order": (
-            False if candidate_error is not None else has_suspicious_vertical_bbox_order(response)
-        ),
-        "suspicious_repetition": has_suspicious_repetition(prediction),
-        "input_sha256": page.image_sha256,
-        "image_relpath": page.image_relpath,
-        "model_revision": config.model_revision,
-        "model_fingerprint": fingerprint,
-        "engine_version": config.engine_version,
-        "prompt_id": config.prompt_id,
-        "prompt_sha256": prompt_sha256,
-        "seed": config.seed,
-        "max_tokens": config.max_tokens,
-        "temperature": config.temperature,
-        "top_p": config.top_p,
-        "response_mode": config.response_mode,
-        "html_protocol_version": HTML_PROTOCOL_VERSION,
-        "generation_mode": GENERATION_MODE,
-        "elapsed_seconds": elapsed,
-        "generated_at": datetime.now(UTC).isoformat(),
-    }
-    if candidate_error is not None:
-        record["candidate_error"] = candidate_error
-    return record
+    return qwen_prediction_record(
+        config=config,
+        page=page,
+        response=response,
+        elapsed=elapsed,
+        fingerprint=fingerprint,
+        prompt_sha256=prompt_sha256,
+        prediction=prediction,
+        block_count=block_count,
+        html_truncated=html_truncated,
+        markup_tags=markup_tags,
+        bbox_order_suspicious=candidate_error is None
+        and has_suspicious_vertical_bbox_order(response),
+        suspicious_repetition=has_suspicious_repetition(prediction),
+        html_protocol_version=HTML_PROTOCOL_VERSION,
+        generation_mode=GENERATION_MODE,
+        candidate_error=candidate_error,
+    )
 
 
 def run_predictions(
@@ -305,6 +299,7 @@ def run_predictions(
         pages=pages,
         checkpoint=checkpoint,
         fingerprint=fingerprint,
+        runtime_manifest=config.runtime_manifest,
     )
     validate_qwen_checkpoint(
         checkpoint,
@@ -323,13 +318,16 @@ def run_predictions(
         started_at = time.monotonic()
         response = engine.generate(page.image_path)
         elapsed = time.monotonic() - started_at
-        record = _prediction_record(
-            config=config,
-            page=page,
-            response=response,
-            elapsed=elapsed,
-            fingerprint=fingerprint,
-            prompt_sha256=prompt_sha256,
+        record = attach_runtime_manifest(
+            _prediction_record(
+                config=config,
+                page=page,
+                response=response,
+                elapsed=elapsed,
+                fingerprint=fingerprint,
+                prompt_sha256=prompt_sha256,
+            ),
+            config.runtime_manifest,
         )
         _append_checkpoint(config.output_path, record)
         completed += 1
@@ -347,7 +345,9 @@ class _MpsEngine:
     def __init__(self, config: RunConfig) -> None:
         installed = importlib.metadata.version("transformers")
         if installed != config.engine_version:
-            raise ValueError(f"transformers version mismatch: {installed} != {config.engine_version}")
+            raise ValueError(
+                f"transformers version mismatch: {installed} != {config.engine_version}"
+            )
         import torch  # pyright: ignore[reportMissingImports]
         from transformers import (  # pyright: ignore[reportMissingImports]
             AutoModelForImageTextToText,
@@ -452,6 +452,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         response_mode="html_layout_v1",
         allow_custom_model_code=False,
         allow_empty_prediction=args.allow_empty_candidate,
+        runtime_manifest=collect_qwen_runtime_manifest(
+            args.model_revision, Path(__file__)
+        ),
     )
     generated, completed = run_predictions(config, engine_factory=_MpsEngine)
     print(f"run complete: generated={generated}, checkpoint_total={completed}")

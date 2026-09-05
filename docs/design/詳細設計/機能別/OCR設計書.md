@@ -517,14 +517,18 @@ Sol確認の縮小は、固定コーパスと正式holdoutの全ゲート、同�
 
 ### 実行版・原候補・工程時間の監査保存
 
-新規OCR runは、実際にページを処理したworkerが生成する`runtime_manifest_json`を保存する設計である。
-ただしWindows agentの入力ではmanifestの省略が許容されており、現行実装はこの必須条件を
-全経路で強制していない。[既知の問題](../../../log/既知の問題.md#ocr-agent-runtime-manifest)を参照する。
+worker/Windows agent経由で新たに保存する各ページは、実行側が生成した`runtime_manifest`を必須とする。
+agent APIは省略・nullを422で拒否する。共通保存処理ではschema version、runのengine・固定model revisionとの
+一致、同一run内のmanifest不変性を検証し、不正なページは保存しない。QA待ちへの移行時にも保存済みmanifestを検証する。
+manifestなしでページが保存された旧runは再開対象から外し、新runで全ページを処理する。旧runとページは履歴として保持し、
+新しい実行環境情報を旧ページへ後付けしない。既存ジョブが旧runをclaim済みの場合も、ページ保存・QA移行で拒否する。
 manifestはschema version、OCR engine、固定model revision、Python/OS/CPU、PyTorch・YomiToku等の
 package version、CUDA/MPS/device、worker・wrapper・pipeline source SHA、Git commitとdirty状態を持つ。
-model/mmprojのローカル資材が指定された場合はファイルSHAも保存する。同じrunの途中でmanifestが
-送信されたmanifestが変化した場合はページ保存を拒否し、異なる実行環境の結果を1 runへ混在させない。既存runは
-空manifestのまま読み取り可能とするが、新規runの`model`が空または`unversioned`なら開始しない。
+model/mmprojのローカル資材が指定された場合はファイルSHAも保存する。Qwen＋dots経路は両推論プロセスの
+実行環境情報と、調停workerの情報を区別して保存する。
+既存runは空manifestのまま読み取り可能とする。導入前にQA待ちへ移行済みのrunの承認、および既存公開runの
+rollbackは従来契約を維持し、今回の必須化を遡及適用しない。Codexの明示的なオフライン取込は別の監査成果物契約に従う。
+新規runの`model`が空または`unversioned`なら開始しない。
 
 ページ結果は採用後の`full_text`/`raw_output`とは別に、`primary_text`、`external_text`、
 `primary_raw_output`、`external_raw_output`を不変の原候補として保存する。

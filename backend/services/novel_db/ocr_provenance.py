@@ -27,6 +27,31 @@ def validate_model_revision(model_revision: str) -> str:
     return revision
 
 
+def model_revision_for_engine(engine: str, surya_revision: str) -> str:
+    if engine == "surya2":
+        return surya_revision
+    if engine == "qwen35_dots_review_v1":
+        from .qwen_dots_worker import COMPOSITE_MODEL_REVISION
+
+        return COMPOSITE_MODEL_REVISION
+    return engine
+
+
+def validate_runtime_manifest(manifest: object, engine: str, model: str) -> str:
+    if (
+        not isinstance(manifest, dict)
+        or type(manifest.get("schema_version")) is not int
+        or manifest["schema_version"] != 1
+    ):
+        raise ValueError("OCR runtime manifest schema_version must be 1")
+    if manifest.get("engine") != engine:
+        raise ValueError("OCR runtime manifest engine does not match the run")
+    revision = manifest.get("model_revision")
+    if not isinstance(revision, str) or validate_model_revision(revision) != model:
+        raise ValueError("OCR runtime manifest model revision does not match the run")
+    return canonical_json(manifest)
+
+
 def _sha256_file(path: Path) -> str:
     with path.open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest()
@@ -99,6 +124,9 @@ def collect_runtime_manifest(engine: str, model_revision: str) -> dict[str, Any]
         "ocr_worker_protocol.py",
         "ocr_worker_engines.py",
         "ocr_worker_session.py",
+        "ocr_provenance.py",
+        "qwen_dots_worker.py",
+        "qwen_dots_provenance.py",
         "surya_runtime.py",
         "yomitoku_runtime.py",
     )

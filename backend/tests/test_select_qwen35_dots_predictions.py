@@ -17,6 +17,7 @@ _SPEC.loader.exec_module(select)
 
 
 def _record(record_id: str, pred: str, *, engine: str) -> dict[str, Any]:
+    runtime_engine = "qwen3.5-ocr-jp-2b" if engine == "qwen" else "dots.mocr"
     return {
         "id": record_id,
         "pred": pred,
@@ -25,6 +26,12 @@ def _record(record_id: str, pred: str, *, engine: str) -> dict[str, Any]:
         "model_fingerprint": f"{engine}-fingerprint",
         "prompt_id": f"{engine}-prompt",
         "raw_response": (f'<div data-bbox="0 0 10 10" data-label="Text"><p>{pred}</p></div>'),
+        "runtime_manifest": {
+            "schema_version": 1,
+            "engine": runtime_engine,
+            "model_revision": f"{engine}-revision",
+            "observed_by": "test",
+        },
     }
 
 
@@ -169,6 +176,24 @@ def test_selector_rejects_mixed_candidate_provenance(tmp_path: Path) -> None:
     )
 
     with pytest.raises(ValueError, match="qwen predictions mix"):
+        select.select_predictions(qwen_path=qwen_path, dots_path=dots_path)
+
+
+def test_selector_rejects_mixed_runtime_manifests(tmp_path: Path) -> None:
+    first = _record("first", "第一本文", engine="qwen")
+    first.update(html_truncated=False, suspicious_repetition=False)
+    second = _record("second", "第二本文", engine="qwen")
+    second.update(html_truncated=False, suspicious_repetition=False)
+    second["runtime_manifest"] = {**second["runtime_manifest"], "observed_by": "other-process"}
+    qwen_path = tmp_path / "qwen.jsonl"
+    dots_path = tmp_path / "dots.jsonl"
+    _write(qwen_path, [first, second])
+    _write(
+        dots_path,
+        [_record("first", "第一候補", engine="dots"), _record("second", "第二候補", engine="dots")],
+    )
+
+    with pytest.raises(ValueError, match="qwen predictions mix runtime manifests"):
         select.select_predictions(qwen_path=qwen_path, dots_path=dots_path)
 
 
