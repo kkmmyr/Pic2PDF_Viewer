@@ -128,6 +128,47 @@ def _backend_script_violations(project_root: Path) -> list[str]:
     return violations
 
 
+def _resolved_backend_imports(path: Path, project_root: Path) -> list[tuple[int, str]]:
+    """Resolve relative and from-package imports for the explicitly isolated modules."""
+    package = list(path.relative_to(project_root).parent.parts)
+    imports: set[tuple[int, str]] = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            targets = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            prefix = package[: len(package) - node.level + 1] if node.level else []
+            module = ".".join(prefix + ([node.module] if node.module else []))
+            targets = [module, *(f"{module}.{alias.name}" for alias in node.names)]
+        else:
+            continue
+        imports.update(
+            (node.lineno, target.removeprefix("backend.")) for target in targets
+        )
+    return sorted(imports)
+
+
+def _isolated_backend_violations(project_root: Path) -> list[str]:
+    runtime = project_root / "backend" / "bootstrap" / "runtime.py"
+    library = project_root / "backend" / "services" / "library"
+    paths = ([runtime] if runtime.is_file() else []) + sorted(library.rglob("*.py"))
+    forbidden = {"main", "bootstrap", "routers", "config", "fastapi", "starlette"}
+    violations: list[str] = []
+    for path in paths:
+        for line, module in _resolved_backend_imports(path, project_root):
+            root = module.split(".")[0]
+            own_library = module == "services.library" or module.startswith(
+                "services.library."
+            )
+            if root in forbidden or (
+                root == "services" and (path == runtime or not own_library)
+            ):
+                # One diagnostic per import statement even for "from package import module".
+                message = f"{path.relative_to(project_root).as_posix()}:{line}: isolated backend module imports {root}"
+                if message not in violations:
+                    violations.append(message)
+    return violations
+
+
 def _frontend_violations(project_root: Path) -> list[str]:
     violations: list[str] = []
     frontend_root = project_root / "frontend" / "src"
@@ -187,6 +228,7 @@ def _kindle_violations(project_root: Path) -> list[str]:
 def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
     violations = _backend_violations(project_root)
     violations.extend(_backend_script_violations(project_root))
+    violations.extend(_isolated_backend_violations(project_root))
     violations.extend(_frontend_violations(project_root))
     violations.extend(_kindle_violations(project_root))
     return sorted(violations)
