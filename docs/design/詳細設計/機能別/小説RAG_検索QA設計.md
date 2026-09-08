@@ -1,6 +1,6 @@
 # 小説 RAG 検索・QA 設計
 
-> status: living | last-verified: 2026-09-05
+> status: living | last-verified: 2026-09-08
 
 novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会番組台本生成の現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
 
@@ -15,6 +15,14 @@ novel タブのハイブリッド検索・RAG 質問応答・マルチターン�
 lexical検索（既定FTS5、段階導入中のpage-level LanceDB ICU BM25）とベクトル検索
 （LanceDB KNN）を Reciprocal Rank Fusion（RRF）でページ単位に融合する。
 
+`search.py`は公開入口・検索設定の選択・scope解決・embedding/接続の組立と実行順を所有する。
+`search_queries.py`は呼出し元から受け取るSQLite接続・LanceDB tableでの候補取得と人物読取り、
+`search_ranking.py`は接続を持たないページ単位のRRF統合・件数制限、`search_presentation.py`は
+`SearchHit`とsnippet/画像URLの整形を担当する。既存の`search.SearchHit`等の公開importは維持する。
+検索adapterを差し替えても順位統合・表示用整形を同じ固定入力で検査できる構成とする。
+全文読込みは本文をそのままQAへ渡す経路であり、検索snippet向けのescapeや200字制限を適用しない。
+page全文索引の状態遷移、N3の公開後サマリ索引更新、復旧方式はこの分離では変更しない。
+
 - **Scope（`search_scope.py`）**: `Scope(type, id)`。`type` は `all` / `series` / `book`。`resolve_book_names(scope)`（lru_cache）が対象書籍名リストを返す（`all` は None = 全件、`series` は `meta2.db` から展開、`book` は 1 冊）。空リストなら 0 件。
 - **lexical selector（`lexical_search`）**: `NOVEL_DB_LEXICAL_BACKEND`の`fts5` / `shadow` / `lance_icu`を選ぶ。初期既定値は`fts5`。`shadow`も利用者へ返す順位はFTS5と完全同一で、ICUは観測専用。`lance_icu`でICUがmissing / stale / 不整合 / 例外の場合はFTS5へ縮退するが、正常な0-hitはfallbackしない。
 - **FTS5（`fts_search`）**: `build_fts5_or_query` が質問から 2 文字以上のトークンを抽出し `"t1" OR "t2" …` に整形。`snippet(pages_fts, …, '<mark>', '</mark>', …)` + `bm25()` で取得。`char_count >= min_chars` と先頭/末尾 `body_page_margin` ページ除外を WHERE に、scope を `b.name IN (...)` で適用。
@@ -22,6 +30,9 @@ lexical検索（既定FTS5、段階導入中のpage-level LanceDB ICU BM25）と
 - **ICU BM25（`page_fts.search_page_fts`）**: active世代がSQLiteの現行`source_revision`と一致する場合だけ`MatchQuery(query, "text")`を実行する。scopeはSQLiteでbook IDへ解決して数値prefilterし、`char_count` / `page_no`もLanceDB側でprefilterする。結果IDの本文・書名・公開可否はSQLiteから再取得し、snippetはquery中の最長一致断片を中心に最大200字へ決定的に切り出す。
 - **ベクトル（`vec_search`）**: 質問を bge-m3 で埋め込み、LanceDB `chunks` を KNN 検索。フィルタ有り時は `k = max(top*5, 50)` を多めに取り、`char_count`・`book_name` を prefilter、`body_page_margin` は取得後にページ番号で後置フィルタ、`_distance` 昇順で top 件。**ベクトルの埋め込みは B-9 適用後 `(contextual_text + 本文)`**（[パイプライン設計 §5](小説RAG_パイプライン設計.md)）なので、語彙一致のない抽象クエリでも位置説明経由でヒットする。
 - **RRF 融合（`hybrid_search`）**: FTS/ベクトル各リストの順位で `score += 1/(k_rrf + rank + 1)`（`k_rrf=60`）を `(book_name, page_no)` に加算。FTS ヒットは `sanitize_snippet` 済み snippet、ベクトルのみのヒットは本文先頭 200 字（`html.escape` のみ）。`max_per_book`（scope=all/series 用）で書籍偏りを抑え top 件に絞り、`_fetch_main_characters` で各ページの主要登場人物を JOIN。返り値は `SearchHit{book_name, page_no, snippet, has_highlight, image_url, rrf_score, main_characters}`。
+- 同一ページの複数チャンクも各順位分を加算する。同点はlexical候補→vector候補の初出順を維持する。
+  snippetは最初のlexical候補を採用し、空文字の場合は最初のvector本文へ移る。vector本文は200字へ
+  切り出してからescapeする。画像URLは書名全体をURL encodeし、ページ番号を最低3桁へ整形する。
 - **snippet サニタイズ（`sanitize_snippet`）**: `html.escape` で全エスケープ後、`&lt;mark&gt;` のみ `<mark>` に復元。フロントは `dangerouslySetInnerHTML` を追加サニタイザ無しで安全に使える。
 - **書籍サマリ検索（`book_summary_search.py` の `search_book_summaries`）B-8**: LanceDB `summaries` テーブルへの KNN（FTS5 は使わない — サマリは抽象表現中心で意味類似が効く）。`[(book_name, distance), …]`。空テーブル時は空リスト（後方互換）。
 - **サマリ用途分離**: RAG検索・類似書籍・横断QAには網羅性を優先した`books.summary`を使う。`books.catalog_summary`は400〜700文字の選書用で、書籍一覧・詳細APIから返すが、検索embeddingの入力には使わない。

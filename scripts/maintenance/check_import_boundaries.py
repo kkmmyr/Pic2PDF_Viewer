@@ -169,14 +169,23 @@ def _isolated_backend_violations(project_root: Path) -> list[str]:
     return violations
 
 
-def _full_build_violations(project_root: Path) -> list[str]:
+def _novel_module_violations(project_root: Path) -> list[str]:
     allowed_modules = {
         "full_build_content": {"services.novel_db.character_names"},
         "full_build_repository": {"sqlite3", "services.novel_db.full_build_content"},
+        "search_ranking": set(),
+        "search_presentation": {
+            "html",
+            "re",
+            "urllib.parse",
+            "services.novel_db.search_ranking",
+        },
+        "search_queries": {"sqlite3", "lancedb.table"},
     }
     common = {"__future__", "collections", "dataclasses", "typing"}
     violations: set[str] = set()
     for name, dependencies in allowed_modules.items():
+        boundary = "Full Build" if name.startswith("full_build") else "Search"
         path = project_root / "backend" / "services" / "novel_db" / f"{name}.py"
         if not path.is_file():
             continue
@@ -189,7 +198,7 @@ def _full_build_violations(project_root: Path) -> list[str]:
             ):
                 continue
             violations.add(
-                f"{path.relative_to(project_root).as_posix()}:{line}: Full Build boundary imports {module}"
+                f"{path.relative_to(project_root).as_posix()}:{line}: {boundary} boundary imports {module}"
             )
     return sorted(violations)
 
@@ -254,7 +263,7 @@ def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
     violations = _backend_violations(project_root)
     violations.extend(_backend_script_violations(project_root))
     violations.extend(_isolated_backend_violations(project_root))
-    violations.extend(_full_build_violations(project_root))
+    violations.extend(_novel_module_violations(project_root))
     violations.extend(_frontend_violations(project_root))
     violations.extend(_kindle_violations(project_root))
     return sorted(violations)
