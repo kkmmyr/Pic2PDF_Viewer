@@ -92,6 +92,9 @@ describe('OCRGroundTruthPanel', () => {
         renderPanel();
         await screen.findByText('評価対象書籍');
 
+        // 一覧到着後、選択ページの本文と編集stateが反映されてから入力する。
+        await screen.findByText('OCR本文');
+
         const verifyButton = screen.getByRole('button', { name: '検証済みにする' });
         expect(verifyButton).toBeDisabled();
 
