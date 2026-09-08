@@ -159,6 +159,15 @@ def _isolated_backend_violations(project_root: Path) -> list[str]:
             own_library = module == "services.library" or module.startswith(
                 "services.library."
             )
+            if path == library / "capture_metadata.py":
+                if not any(
+                    module == name or module.startswith(name + ".")
+                    for name in {"__future__", "copy", "dataclasses", "typing", "services.meta_store"}
+                ) and module != "services":
+                    violations.append(
+                        f"{path.relative_to(project_root).as_posix()}:{line}: Library metadata adapter imports {module}"
+                    )
+                continue
             if root in forbidden or (
                 root == "services" and (path == runtime or not own_library)
             ):
@@ -167,6 +176,18 @@ def _isolated_backend_violations(project_root: Path) -> list[str]:
                 if message not in violations:
                     violations.append(message)
     return violations
+
+
+def _capture_publication_violations(project_root: Path) -> list[str]:
+    path = project_root / "backend/services/kindle_catalog/capture_publication.py"
+    if not path.is_file():
+        return []
+    forbidden = {"services.meta_store", "services.meta_db"}
+    return sorted({
+        f"{path.relative_to(project_root).as_posix()}:{line}: Capture publication must use Library metadata operations"
+        for line, module in _resolved_backend_imports(path, project_root)
+        if any(module == name or module.startswith(name + ".") for name in forbidden)
+    })
 
 
 def _novel_module_violations(project_root: Path) -> list[str]:
@@ -274,6 +295,7 @@ def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
     violations = _backend_violations(project_root)
     violations.extend(_backend_script_violations(project_root))
     violations.extend(_isolated_backend_violations(project_root))
+    violations.extend(_capture_publication_violations(project_root))
     violations.extend(_novel_module_violations(project_root))
     violations.extend(_frontend_violations(project_root))
     violations.extend(_kindle_violations(project_root))

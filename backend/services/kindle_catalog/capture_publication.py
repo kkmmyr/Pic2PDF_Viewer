@@ -2,7 +2,6 @@
 
 import os
 import shutil
-from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +9,7 @@ from pathlib import Path
 import config
 from config import get_dirs_by_source
 from services.kindle_catalog.capture_package_validator import safe_title
-from services.meta_store import load_meta, update_meta_locked
+from services.library.capture_metadata import CaptureMetadataChange, validate_capture_replacement
 
 
 @dataclass
@@ -31,7 +30,7 @@ class CapturePublication:
     existing_backed_up: bool = field(default=False, init=False)
     target_published: bool = field(default=False, init=False)
     meta_updated: bool = field(default=False, init=False)
-    previous_meta_entry: dict | None = field(default=None, init=False)
+    _metadata: CaptureMetadataChange = field(default_factory=CaptureMetadataChange, init=False)
 
     def __post_init__(self) -> None:
         self.title = safe_title(self.job["title"])
@@ -58,9 +57,7 @@ class CapturePublication:
     def _validate_replacement(self) -> None:
         if not self.replacing_existing:
             return
-        existing_meta = load_meta(self.job["source"]).get(self.book_id)
-        if existing_meta is None or existing_meta.get("asin") != self.job["asin"]:
-            raise ValueError("同名の別書籍が既にあるため置換できません")
+        validate_capture_replacement(self.job["source"], self.book_id, self.job["asin"])
 
     def stage(self, files: list[Path]) -> None:
         if self.staging.exists():
@@ -81,12 +78,7 @@ class CapturePublication:
         self.target_published = True
 
     def update_meta(self) -> None:
-        def _apply(data: dict) -> None:
-            self.previous_meta_entry = deepcopy(data.get(self.book_id))
-            entry = data.setdefault(self.book_id, {"authors": []})
-            entry["asin"] = self.job["asin"]
-
-        update_meta_locked(self.job["source"], _apply)
+        self._metadata.apply(self.job["source"], self.book_id, self.job["asin"])
         self.meta_updated = True
 
     def archive_package(self) -> None:
@@ -111,10 +103,4 @@ class CapturePublication:
             shutil.rmtree(self.backup_generation, ignore_errors=True)
 
     def _restore_meta(self) -> None:
-        def _restore(data: dict) -> None:
-            if self.previous_meta_entry is None:
-                data.pop(self.book_id, None)
-            else:
-                data[self.book_id] = self.previous_meta_entry
-
-        update_meta_locked(self.job["source"], _restore)
+        self._metadata.restore(self.job["source"], self.book_id)
