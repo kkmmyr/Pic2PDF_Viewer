@@ -20,7 +20,6 @@
   "backend/services/novel_db/chunker.py:chunk_book": 11,
   "backend/services/novel_db/llm_provider.py:build_llm_provider": 14,
   "backend/services/novel_db/ocr_ground_truth.py:update_ground_truth": 11,
-  "backend/services/novel_db/search.py:hybrid_search": 11,
   "backend/services/novel_db/surya_quality.py:evaluate_external_ocr": 11,
   "backend/services/novel_db/surya_quality.py:evaluate_page_quality": 12,
   "backend/services/series_suggester.py:suggest_series": 12,
