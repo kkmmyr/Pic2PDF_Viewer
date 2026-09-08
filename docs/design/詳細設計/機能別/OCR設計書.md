@@ -1,6 +1,6 @@
 # OCR設計書
 
-> status: living | last-verified: 2026-09-05
+> status: living | last-verified: 2026-09-08
 
 <!-- contract-owner: ocr-publication -->
 
@@ -116,6 +116,7 @@ MacでMPSを利用する場合は、MPS対応済みのyomitoku（v0.11.0以降�
 | `backend/services/novel_db/ocr_candidate_selection.py` | primary/externalの文字量差をQAリスクとworkerで共有する純関数 |
 | `backend/services/novel_db/ocr_worker_session.py` | 環境設定、server世代、再起動policy、task進行のorchestration |
 | `backend/services/novel_db/ocr_job_application.py` | run準備、worker process結果の保存、失敗分類、QA準備のapplication service |
+| `backend/services/novel_db/ocr_job_configuration.py` | 実行時設定からrunのengine/model revisionを選び、`OcrRunSpec`を返す組立用adapter |
 | `backend/services/novel_db/surya_types.py` | OCR・layout・品質・再起動policyの型 |
 | `backend/services/novel_db/surya_parsing.py` | 公式prompt、HTML/layout/bbox解析 |
 | `backend/services/novel_db/surya_quality.py` | coverage、品質flag、補助OCR照合 |
@@ -157,6 +158,22 @@ HTTP呼出しはすべて`features/ocr/api.ts`へ委譲する。
 ページQA更新はrun ID・page番号とOpenAPI生成型のrequestオブジェクトを渡し、
 応答も`OcrQaActionResponse`の生成型を使用する。修正文・開始時刻・経過時間・補正時間を
 位置引数で受け渡さず、HTTP payloadの項目名、未指定/nullの扱いとQA承認条件を維持する。
+
+### OCR jobの依存組立と設定参照
+
+`job_worker.py`は呼出しごとに`OcrJobDependencies`を組み立て、保存・worker・QA操作と
+`resolve_ocr_run_spec`を渡す。`ocr_job_application.py`は注入された操作の順序を所有し、
+configや具体engineのrevisionを直接参照しない。既存のページ・入力型は`TYPE_CHECKING`内だけで参照する。
+
+- 設定adapterは対象解決と初期進捗通知の後、OCR jobのrun準備前に一度だけ呼ぶ。
+  対象0冊でも設定を解決する。OCR以外のmodeでは呼ばず、job間で設定値をcacheしない。
+- `OCR_ENGINE.casefold()`をengineとし、Suryaは`SURYA_MODEL_REVISION`、複合engineは
+  `COMPOSITE_MODEL_REVISION`、それ以外はengine名をmodel revisionへ渡す。trimや新たな妥当性判定は追加しない。
+- `OcrRunSpec`はrunの識別情報だけを持つ。process起動・runtime manifest・server世代・retryは
+  既存extractor/worker/sessionの責任、候補SHA・checkpoint・QA待ち・公開拒否は各保存/QA moduleの責任である。
+- 設定・入力収集・run準備の例外はworker結果消費の失敗処理より前で伝播する。
+  複数冊の準備途中で失敗した場合、先行runを一括failedにしない既存の範囲を維持する。
+  worker消費/ページ保存の失敗は全準備済みrunをfailedとし、QA準備の失敗は冊単位で記録して残りを続ける。
 
 ### 互換facadeとテスト所有
 

@@ -181,11 +181,22 @@ def _novel_module_violations(project_root: Path) -> list[str]:
             "services.novel_db.search_ranking",
         },
         "search_queries": {"sqlite3", "lancedb.table"},
+        "ocr_job_application": {
+            "utils.logger",
+            "services.novel_db.extractor",
+            "services.novel_db.ocr_run_store",
+        },
     }
     common = {"__future__", "collections", "dataclasses", "typing"}
     violations: set[str] = set()
     for name, dependencies in allowed_modules.items():
-        boundary = "Full Build" if name.startswith("full_build") else "Search"
+        boundary = (
+            "Full Build"
+            if name.startswith("full_build")
+            else "OCR application"
+            if name == "ocr_job_application"
+            else "Search"
+        )
         path = project_root / "backend" / "services" / "novel_db" / f"{name}.py"
         if not path.is_file():
             continue

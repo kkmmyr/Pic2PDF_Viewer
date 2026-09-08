@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
+from unittest.mock import Mock
 
 import pytest
 from PIL import Image
@@ -14,6 +16,7 @@ from services.novel_db import ocr_qa as qa_facade
 from services.novel_db import ocr_staging as staging_facade
 from services.novel_db.connection import with_db
 from services.novel_db.extractor import OcrPageResult
+from services.novel_db.job_worker import NovelDbJobWorker
 from services.novel_db.migrations import upgrade_head
 from services.novel_db.ocr_page_classification import classify_run_pages
 from services.novel_db.ocr_provenance import candidate_manifest
@@ -260,6 +263,59 @@ def test_run_resumes_then_requires_qa_before_publication(staged_book) -> None:
             "SELECT source_revision, status FROM novel_search_index_state WHERE index_name='page_icu'"
         ).fetchone()
         assert tuple(index_state) == (1, "stale")
+
+
+def test_ocr_job_retry_preserves_checkpoint_and_stops_at_qa(staged_book, monkeypatch) -> None:
+    """実保存とjob組立を接続し、fake worker中断後も原候補を再利用する。"""
+    import config
+    from services.novel_db import job_worker
+
+    book_name, input_pages = staged_book
+    monkeypatch.setattr(config.app_settings, "OCR_ENGINE", "Surya2")
+    monkeypatch.setattr(config.app_settings, "SURYA_MODEL_REVISION", "model-sha")
+    worker = NovelDbJobWorker(threading.Event(), threading.Event())
+    monkeypatch.setattr(worker, "_resolve_targets", Mock(return_value=[book_name]))
+    monkeypatch.setattr(worker, "_update_progress", Mock())
+    monkeypatch.setattr(worker, "_update_detail", Mock())
+    attempts: list[list[int]] = []
+
+    def pages(tasks, *, progress_callback):
+        attempts.append([task["page_no"] for task in tasks])
+        for task in tasks:
+            page_no = task["page_no"]
+            yield book_name, _passed_page(page_no, input_pages[page_no - 1].image_sha256, f"候補{page_no}")
+            if len(attempts) == 1:
+                raise RuntimeError("worker interrupted")
+
+    monkeypatch.setattr(job_worker, "iter_ocr_pages", pages)
+    job = {"id": 7, "job_type": "book", "target_id": book_name, "mode": "ocr"}
+    with pytest.raises(RuntimeError, match="worker interrupted"):
+        worker._execute_job(job)
+    checkpoint_sql = (
+        "SELECT image_sha256, full_text, raw_output, candidate_manifest_json, attempt_count "
+        "FROM ocr_page_results WHERE run_id=? AND page_no=1"
+    )
+    with with_db() as conn:
+        run = conn.execute("SELECT id, state, engine, model, runtime_manifest_json FROM ocr_runs").fetchone()
+        run_id = run[0]
+        assert tuple(run)[1:4] == ("failed", "surya2", "model-sha")
+        manifest = run[4]
+        checkpoint = tuple(conn.execute(checkpoint_sql, (run_id,)).fetchone())
+        assert checkpoint[0] == input_pages[0].image_sha256
+        assert checkpoint[3] != "{}"
+        assert conn.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0
+
+    worker._execute_job(job)
+
+    assert attempts == [[1, 2], [2]]
+    with with_db() as conn:
+        runs = conn.execute("SELECT id, state, runtime_manifest_json FROM ocr_runs").fetchall()
+        assert [tuple(row) for row in runs] == [(run_id, "awaiting_qa", manifest)]
+        assert tuple(conn.execute(checkpoint_sql, (run_id,)).fetchone()) == checkpoint
+        assert conn.execute("SELECT COUNT(*) FROM books").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM ocr_publications").fetchone()[0] == 0
+    with pytest.raises(ValueError, match="required"):
+        approve_and_publish_run(run_id, "tester")
 
 
 def test_stage_rejects_source_image_changed_after_ocr(staged_book) -> None:

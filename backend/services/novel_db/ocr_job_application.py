@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-import config
 from utils.logger import get_logger
 
-from .extractor import OcrPageResult, OcrProgressEvent, OcrTask
-from .ocr_run_store import OcrInputPage
-from .qwen_dots_worker import COMPOSITE_MODEL_REVISION
+if TYPE_CHECKING:
+    from .extractor import OcrPageResult, OcrProgressEvent, OcrTask
+    from .ocr_run_store import OcrInputPage
 
 logger = get_logger(__name__)
 
@@ -26,7 +25,16 @@ class OcrPageIterator(Protocol):
 
 
 @dataclass(frozen=True)
+class OcrRunSpec:
+    """Run identity selected by the composition adapter, not a worker session."""
+
+    engine: str
+    model_revision: str
+
+
+@dataclass(frozen=True)
 class OcrJobDependencies:
+    resolve_run_spec: Callable[[], OcrRunSpec]
     collect_input_pages: Callable[[str], list[OcrInputPage]]
     prepare_run: Callable[[str, str, str, list[OcrInputPage]], tuple[int, list[OcrTask]]]
     iter_ocr_pages: OcrPageIterator
@@ -77,14 +85,8 @@ def execute_ocr_job(
     deps: OcrJobDependencies,
 ) -> None:
     """Prepare runs, consume the worker process, and stage each run for QA."""
-    engine = config.app_settings.OCR_ENGINE.casefold()
-    if engine == "surya2":
-        model = config.app_settings.SURYA_MODEL_REVISION
-    elif engine == "qwen35_dots_review_v1":
-        model = COMPOSITE_MODEL_REVISION
-    else:
-        model = engine
-    contexts, tasks = _prepare_runs(targets, engine, model, deps)
+    spec = deps.resolve_run_spec()
+    contexts, tasks = _prepare_runs(targets, spec.engine, spec.model_revision, deps)
     try:
         _consume_worker_pages(job_id, tasks, contexts, callbacks, deps)
     except Exception as exc:
