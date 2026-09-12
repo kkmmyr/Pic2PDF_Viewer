@@ -30,7 +30,7 @@ def test_full_build_dependency_boundary(tmp_path: Path, module: str, source: str
     path = tmp_path / "backend" / "services" / "novel_db" / f"{module}.py"
     path.parent.mkdir(parents=True)
     path.write_text(source + "\n", encoding="utf-8")
-    violations = import_boundaries.find_violations(tmp_path)
+    violations = import_boundaries.find_violations(tmp_path, require_novel_targets=False)
     assert bool(violations) is rejected
     if rejected:
         assert all("Full Build boundary" in violation for violation in violations)

@@ -37,6 +37,15 @@
       "rollback": "restore the facade from Git and rerun generated content audit tests"
     },
     {
+      "path": "backend/services/novel_db/page_fts.py",
+      "status": "maintain",
+      "owner": "novel-retrieval",
+      "evidence": "builder.py, page_index_builder.py, ocr_qa_publication.py, search.py and backend/scripts/build_page_fts_index.py use the 14-symbol public surface, including the shared build logger",
+      "recheck_after": null,
+      "removal_condition": "reassess when public or CLI entry points change; remove only after all runtime, test and external operational callers adopt a replacement API",
+      "rollback": "restore the facade from Git and rerun page FTS public identity, index lifecycle and CLI manifest/logging tests"
+    },
+    {
       "path": "scripts/maintenance/benchmark_ocr_ground_truth.py",
       "status": "maintain",
       "owner": "novel-ocr",

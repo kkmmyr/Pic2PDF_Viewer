@@ -22,6 +22,29 @@ from services.novel_db.page_fts import (
 from services.novel_db.search import Scope, sanitize_snippet
 
 
+def test_public_facade_preserves_exports_and_object_identity() -> None:
+    owners = {
+        page_fts_builder: ("PageFtsBuildResult", "build_page_fts_index"),
+        page_fts_query: ("build_page_fts_snippet", "search_page_fts"),
+        page_fts_state: (
+            "PAGE_FTS_INDEX_CONFIG",
+            "PAGE_FTS_INDEX_NAME",
+            "PAGE_FTS_STATE_KEY",
+            "PageFtsBuildConflict",
+            "PageFtsBuildError",
+            "PageFtsState",
+            "PageFtsUnavailable",
+            "get_page_fts_state",
+            "logger",
+            "mark_page_fts_stale",
+        ),
+    }
+    assert set(page_fts.__all__) == {name for names in owners.values() for name in names}
+    for owner, names in owners.items():
+        for name in names:
+            assert getattr(page_fts, name) is getattr(owner, name)
+
+
 def _insert_book(conn: sqlite3.Connection, name: str, pages: list[tuple[str, bool]]) -> int:
     cursor = conn.execute(
         "INSERT INTO books (name, pdf_path, images_dir, page_count) VALUES (?, '', '', ?)",

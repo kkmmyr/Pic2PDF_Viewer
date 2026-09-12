@@ -32,7 +32,7 @@ def test_ocr_application_import_boundary(tmp_path: Path, source: str, rejected: 
     path.parent.mkdir(parents=True)
     path.write_text(source + "\n", encoding="utf-8")
 
-    violations = import_boundaries.find_violations(tmp_path)
+    violations = import_boundaries.find_violations(tmp_path, require_novel_targets=False)
 
     assert bool(violations) is rejected
     if rejected:

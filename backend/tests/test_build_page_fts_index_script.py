@@ -1,10 +1,22 @@
 from __future__ import annotations
 
 import json
+import logging
+import sys
 from contextlib import nullcontext
 
 from scripts import build_page_fts_index
-from services.novel_db.page_fts import PageFtsBuildResult
+from services.novel_db.page_fts import PageFtsBuildResult, logger
+
+
+def test_cli_routes_shared_build_logger_away_from_json_stdout(monkeypatch) -> None:
+    handler = logging.StreamHandler(sys.stdout)
+    monkeypatch.setattr(logger, "handlers", [handler])
+
+    assert build_page_fts_index.page_fts_logger is logger
+    build_page_fts_index._route_build_logs_to_stderr()
+
+    assert handler.stream is sys.stderr
 
 
 def test_cli_prints_manifest_without_page_text(monkeypatch, capsys) -> None:

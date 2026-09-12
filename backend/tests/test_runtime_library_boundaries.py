@@ -31,7 +31,7 @@ def test_isolated_backend_import_boundaries(tmp_path: Path, path: str, source: s
     target = tmp_path / "backend" / path
     target.parent.mkdir(parents=True)
     target.write_text(source + "\n", encoding="utf-8")
-    violations = import_boundaries.find_violations(tmp_path)
+    violations = import_boundaries.find_violations(tmp_path, require_novel_targets=False)
     assert bool(violations) is rejected
     if rejected:
         assert any("isolated backend module" in violation for violation in violations)

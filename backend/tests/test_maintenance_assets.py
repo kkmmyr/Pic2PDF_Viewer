@@ -1,6 +1,7 @@
 """Maintenance asset inventory validation tests."""
 
 import importlib.util
+import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -13,6 +14,17 @@ sys.modules[_SPEC.name] = _MODULE
 _SPEC.loader.exec_module(_MODULE)
 classify_scripts = _MODULE.classify_scripts
 find_errors = _MODULE.find_errors
+
+
+def test_page_fts_public_entry_is_registered_and_maintained() -> None:
+    inventory = json.loads(_MODULE.INVENTORY_PATH.read_text(encoding="utf-8"))
+    entries = [
+        entry for entry in inventory["compatibility"] if entry["path"] == "backend/services/novel_db/page_fts.py"
+    ]
+    assert len(entries) == 1
+    assert entries[0]["status"] == "maintain"
+    assert entries[0]["owner"] == "novel-retrieval"
+    assert _MODULE.validate_compatibility(entries, _MODULE.PROJECT_ROOT, today=date(2026, 9, 12)) == []
 
 
 def test_classify_scripts_requires_exactly_one_group() -> None:

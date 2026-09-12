@@ -112,7 +112,7 @@ def test_reader_session_import_boundaries(tmp_path: Path, relative: str, module:
     path = tmp_path / "frontend/src" / relative
     path.parent.mkdir(parents=True)
     path.write_text(f"import {{ value }} from '{module}';\n", encoding="utf-8")
-    violations = import_boundaries.find_violations(tmp_path)
+    violations = import_boundaries.find_violations(tmp_path, require_novel_targets=False)
     assert violations == (
         [] if valid else [f"frontend/src/{relative}:1: Library/Reader session boundary imports {module}"]
     )
@@ -130,7 +130,7 @@ def test_import_boundaries_detect_all_three_layer_violations(tmp_path: Path) -> 
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
-    assert import_boundaries.find_violations(tmp_path) == [
+    assert import_boundaries.find_violations(tmp_path, require_novel_targets=False) == [
         "backend/services/bad.py:1: backend service must not import routers (routers)",
         ("frontend/src/hooks/bad.ts:1: frontend lower layer must not import pages (@/pages/ViewerPage)"),
         (
@@ -152,7 +152,7 @@ def test_import_boundaries_reject_reviewed_compatibility_facades(tmp_path: Path)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
 
-    assert import_boundaries.find_violations(tmp_path) == [
+    assert import_boundaries.find_violations(tmp_path, require_novel_targets=False) == [
         (
             "backend/scripts/bad.py:1: Novel RAG script must not import compatibility "
             "facade (services.novel_db._prompts)"

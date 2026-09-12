@@ -18,6 +18,14 @@ KINDLE_FORBIDDEN_PREFIXES = (
 )
 NOVEL_RAG_COMPAT_MODULES = {"_llm_backend", "_prompts"}
 NOVEL_OCR_COMPAT_MODULES = {"ocr_qa", "ocr_staging", "surya_ocr"}
+NOVEL_MODULE_PATHS = {
+    "full_build_content": "full_build_content.py",
+    "full_build_repository": "full_build_repository.py",
+    "search_ranking": "search_ranking.py",
+    "search_presentation": "search_presentation.py",
+    "search_queries": "search_queries.py",
+    "ocr_job_application": "ocr_job_application.py",
+}
 FRONTEND_REMOVED_MODULES = {
     "@/features/novel_db/sse",
     "@/hooks/useKindleCatalog",
@@ -203,7 +211,9 @@ def _capture_publication_violations(project_root: Path) -> list[str]:
     )
 
 
-def _novel_module_violations(project_root: Path) -> list[str]:
+def _novel_module_violations(
+    project_root: Path, *, require_targets: bool = True
+) -> list[str]:
     allowed_modules = {
         "full_build_content": {"services.novel_db.character_names"},
         "full_build_repository": {"sqlite3", "services.novel_db.full_build_content"},
@@ -221,6 +231,10 @@ def _novel_module_violations(project_root: Path) -> list[str]:
             "services.novel_db.ocr_run_store",
         },
     }
+    if set(NOVEL_MODULE_PATHS) != set(allowed_modules):
+        return ["Novel boundary target registration: expected all six reviewed modules"]
+    if len(set(NOVEL_MODULE_PATHS.values())) != len(NOVEL_MODULE_PATHS):
+        return ["Novel boundary target registration: duplicate paths"]
     common = {"__future__", "collections", "dataclasses", "typing"}
     violations: set[str] = set()
     for name, dependencies in allowed_modules.items():
@@ -231,8 +245,12 @@ def _novel_module_violations(project_root: Path) -> list[str]:
             if name == "ocr_job_application"
             else "Search"
         )
-        path = project_root / "backend" / "services" / "novel_db" / f"{name}.py"
+        path = project_root / "backend/services/novel_db" / NOVEL_MODULE_PATHS[name]
         if not path.is_file():
+            if require_targets:
+                violations.add(
+                    f"{path.relative_to(project_root).as_posix()}: required Novel boundary target is missing"
+                )
             continue
         for line, module in _resolved_backend_imports(path, project_root):
             if module in {"services", "services.novel_db"}:
@@ -328,12 +346,16 @@ def _kindle_violations(project_root: Path) -> list[str]:
     return violations
 
 
-def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
+def find_violations(
+    project_root: Path = PROJECT_ROOT, *, require_novel_targets: bool = True
+) -> list[str]:
     violations = _backend_violations(project_root)
     violations.extend(_backend_script_violations(project_root))
     violations.extend(_isolated_backend_violations(project_root))
     violations.extend(_capture_publication_violations(project_root))
-    violations.extend(_novel_module_violations(project_root))
+    violations.extend(
+        _novel_module_violations(project_root, require_targets=require_novel_targets)
+    )
     violations.extend(_frontend_violations(project_root))
     violations.extend(_reader_session_violations(project_root))
     violations.extend(_kindle_violations(project_root))
