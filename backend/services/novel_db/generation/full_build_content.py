@@ -6,7 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import NamedTuple
 
-from .character_names import derive_character_evidence_aliases, normalize_character_entries
+from ..character_names import derive_character_evidence_aliases, normalize_character_entries
 
 
 @dataclass(frozen=True)

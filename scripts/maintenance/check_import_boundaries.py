@@ -19,8 +19,8 @@ KINDLE_FORBIDDEN_PREFIXES = (
 NOVEL_RAG_COMPAT_MODULES = {"_llm_backend", "_prompts"}
 NOVEL_OCR_COMPAT_MODULES = {"ocr_qa", "ocr_staging", "surya_ocr"}
 NOVEL_MODULE_PATHS = {
-    "full_build_content": "full_build_content.py",
-    "full_build_repository": "full_build_repository.py",
+    "full_build_content": "generation/full_build_content.py",
+    "full_build_repository": "generation/full_build_repository.py",
     "search_ranking": "search_ranking.py",
     "search_presentation": "search_presentation.py",
     "search_queries": "search_queries.py",
@@ -216,7 +216,10 @@ def _novel_module_violations(
 ) -> list[str]:
     allowed_modules = {
         "full_build_content": {"services.novel_db.character_names"},
-        "full_build_repository": {"sqlite3", "services.novel_db.full_build_content"},
+        "full_build_repository": {
+            "sqlite3",
+            "services.novel_db.generation.full_build_content",
+        },
         "search_ranking": set(),
         "search_presentation": {
             "html",

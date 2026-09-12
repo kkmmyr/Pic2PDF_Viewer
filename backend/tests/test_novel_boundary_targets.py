@@ -6,29 +6,31 @@ import pytest
 
 from tests.test_quality_guardrails import import_boundaries
 
-TARGETS = (
-    "full_build_content",
-    "full_build_repository",
-    "search_ranking",
-    "search_presentation",
-    "search_queries",
-    "ocr_job_application",
-)
+TARGETS = {
+    "full_build_content": "generation/full_build_content.py",
+    "full_build_repository": "generation/full_build_repository.py",
+    "search_ranking": "search_ranking.py",
+    "search_presentation": "search_presentation.py",
+    "search_queries": "search_queries.py",
+    "ocr_job_application": "ocr_job_application.py",
+}
 
 
 @pytest.fixture
 def boundary_tree(tmp_path: Path) -> Path:
     root = tmp_path / "backend/services/novel_db"
     root.mkdir(parents=True)
-    for name in TARGETS:
-        (root / f"{name}.py").write_text("from __future__ import annotations\n", encoding="utf-8")
+    for relative in TARGETS.values():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("from __future__ import annotations\n", encoding="utf-8")
     return tmp_path
 
 
 @pytest.mark.parametrize("name", TARGETS)
 @pytest.mark.parametrize("move", [False, True], ids=["deleted", "unregistered-move"])
 def test_required_boundary_cannot_disappear(boundary_tree: Path, name: str, move: bool) -> None:
-    path = boundary_tree / "backend/services/novel_db" / f"{name}.py"
+    path = boundary_tree / "backend/services/novel_db" / TARGETS[name]
     if move:
         destination = path.parent / "nested" / path.name
         destination.parent.mkdir()
@@ -108,5 +110,5 @@ def test_cli_requires_all_boundary_targets(
 
 
 def test_current_repository_retains_all_reviewed_boundaries() -> None:
-    assert set(import_boundaries.NOVEL_MODULE_PATHS) == set(TARGETS)
+    assert import_boundaries.NOVEL_MODULE_PATHS == TARGETS
     assert import_boundaries.find_violations() == []
