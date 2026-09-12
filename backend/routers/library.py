@@ -2,16 +2,19 @@ import os
 from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
-from natsort import natsorted
 from pydantic import BaseModel
 
 from config import get_dirs_by_source
 from routers._deps import assert_valid_source, log_and_raise_500, validate_request_targets, validated_source
 from routers.api_schemas import BookImagesResponse, DeleteResponse, PdfListResponse, RenameResponse
 from services.file_manager import FileManager
+from services.library.image_listing import (
+    ImageDirectoryMissingError,
+    ImageDirectoryNotDirectoryError,
+    list_book_image_files,
+)
 from services.library_listing import invalidate_library_listing, list_library_books
 from services.meta_store import make_key, update_meta_locked
-from utils.file_utils import is_image_file
 from utils.logger import get_logger
 from utils.path_utils import join_path, resolve_under_base, validate_safe_name, validate_safe_path
 
@@ -39,7 +42,7 @@ def list_pdfs(background_tasks: BackgroundTasks, path: str = "", source: str = D
 
 @router.get("/books/{path:path}/images", response_model=BookImagesResponse)
 @log_and_raise_500("list_book_images")
-def list_book_images(path: str, source: str = Depends(validated_source)):
+def list_book_images(path: str, source: str = Depends(validated_source)) -> dict[str, list[str]]:
     validate_safe_path(path)
 
     dirs = get_dirs_by_source(source)
@@ -48,22 +51,18 @@ def list_book_images(path: str, source: str = Depends(validated_source)):
 
     target_dir = resolve_under_base(base_images_dir, path)
 
-    if not os.path.exists(target_dir):
-        raise HTTPException(status_code=404, detail="Images not found")
-
-    if not os.path.isdir(target_dir):
-        raise HTTPException(status_code=400, detail="Not a directory")
-
-    files = os.listdir(target_dir)
-    images = [f for f in files if is_image_file(f)]
-    images = natsorted(images)
+    try:
+        images = list_book_image_files(target_dir)
+    except ImageDirectoryMissingError as error:
+        raise HTTPException(status_code=404, detail="Images not found") from error
+    except ImageDirectoryNotDirectoryError as error:
+        raise HTTPException(status_code=400, detail="Not a directory") from error
 
     image_urls = []
     for img in images:
-        rel_path = join_path(path, img)
+        rel_path = join_path(path, img.name)
         encoded = "/".join(quote(seg, safe="") for seg in rel_path.replace(os.sep, "/").split("/"))
-        version = os.stat(join_path(target_dir, img)).st_mtime_ns
-        image_urls.append(f"{url_prefix}/{encoded}?v={version}")
+        image_urls.append(f"{url_prefix}/{encoded}?v={img.mtime_ns}")
 
     return {"images": image_urls}
 

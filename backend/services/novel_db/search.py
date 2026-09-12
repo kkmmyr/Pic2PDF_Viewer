@@ -6,12 +6,9 @@
 from __future__ import annotations
 
 import hashlib
-import html
 import re
 import sqlite3
 import time
-from dataclasses import dataclass
-from urllib.parse import quote
 
 from config.novel_db import novel_db_settings as _cfg
 from utils.logger import get_logger
@@ -20,62 +17,14 @@ from .book_summary_search import find_similar_books, search_book_summaries
 from .embedder import embed_batch
 from .lance_store import get_chunks_table
 from .page_fts import search_page_fts
+from .search_presentation import SearchHit, present_full_book_pages, present_ranked_pages, sanitize_snippet
+from .search_queries import fetch_main_characters as _fetch_main_characters
+from .search_queries import query_fts_rows, query_vector_rows
+from .search_ranking import rank_pages
 from .search_scope import Scope, ScopeType
 from .search_scope import resolve_book_names as _resolve_book_names
 
 logger = get_logger(__name__)
-
-# ──────────────────────────────────────────────
-# 共有データクラス・ユーティリティ
-# ──────────────────────────────────────────────
-
-
-@dataclass
-class SearchHit:
-    book_name: str
-    page_no: int
-    snippet: str
-    has_highlight: bool
-    image_url: str | None
-    rrf_score: float
-    # ページの主要登場人物（character_extractor が生成、未抽出なら空リスト）
-    main_characters: list[str] | None = None
-
-    def __post_init__(self) -> None:
-        if self.main_characters is None:
-            self.main_characters = []
-
-
-def _image_url(book_name: str, page_no: int) -> str:
-    encoded = quote(book_name, safe="")
-    return f"/kindle_novel/images/{encoded}/{page_no:03d}.png"
-
-
-def _fetch_main_characters(conn: sqlite3.Connection, keys: list[tuple[str, int]]) -> dict[tuple[str, int], list[str]]:
-    """指定された (book_name, page_no) の組に対して main_characters を一括取得する。"""
-    if not keys:
-        return {}
-    cols = {row[1] for row in conn.execute("PRAGMA table_info(pages)").fetchall()}
-    if "main_characters" not in cols:
-        return {}
-    placeholders = " OR ".join(["(b.name = ? AND p.page_no = ?)"] * len(keys))
-    params: list = []
-    for book, page in keys:
-        params.extend([book, page])
-    sql = f"""
-        SELECT b.name, p.page_no, p.main_characters
-        FROM pages p
-        JOIN books b ON p.book_id = b.id
-        WHERE {placeholders}
-    """
-    result: dict[tuple[str, int], list[str]] = {}
-    for book_name, page_no, raw in conn.execute(sql, params):
-        if raw is None or raw == "":
-            result[(book_name, page_no)] = []
-        else:
-            result[(book_name, page_no)] = [n.strip() for n in raw.split(",") if n.strip()]
-    return result
-
 
 # ──────────────────────────────────────────────
 # FTS5 BM25 全文検索
@@ -85,18 +34,6 @@ def _fetch_main_characters(conn: sqlite3.Connection, keys: list[tuple[str, int]]
 _FTS5_SPECIAL = re.compile(r'[?*"^():+\-]')
 # トークン抽出（日本語: ひらがな・カタカナ・漢字 + 英数字）
 _TOKEN_RE = re.compile(r"[ぁ-んァ-ヴー一-龯々ヶa-zA-Z0-9]+")
-# snippet 内の `&lt;mark&gt;` 復元用
-_MARK_ESCAPED = re.compile(r"&lt;(/?mark)&gt;")
-
-
-def sanitize_snippet(text: str) -> str:
-    """FTS5 snippet 出力を `<mark>` のみ許可する HTML として安全化する。
-
-    1. `html.escape()` で全エスケープ
-    2. `&lt;mark&gt;` / `&lt;/mark&gt;` のみを `<mark>` / `</mark>` に戻す
-    """
-    escaped = html.escape(text)
-    return _MARK_ESCAPED.sub(r"<\1>", escaped)
 
 
 def build_fts5_or_query(query: str, min_len: int = 2) -> str:
@@ -130,31 +67,14 @@ def fts_search(
     if book_names is not None and not book_names:
         return []
 
-    sql = """
-        SELECT b.name, p.page_no,
-               snippet(pages_fts, 0, '<mark>', '</mark>', '…', 32) AS snippet,
-               bm25(pages_fts) AS score
-        FROM pages_fts
-        JOIN pages p ON pages_fts.rowid = p.id
-        JOIN books b ON p.book_id = b.id
-        WHERE pages_fts MATCH ?
-          AND p.index_eligible = 1
-          AND p.char_count >= ?
-          AND p.page_no > ?
-          AND p.page_no <= b.page_count - ?
-    """
-    params: list = [or_query, min_chars, body_page_margin, body_page_margin]
-    if book_names is not None:
-        placeholders = ",".join(["?"] * len(book_names))
-        sql += f" AND b.name IN ({placeholders})"
-        params.extend(book_names)
-    sql += " ORDER BY score ASC, p.id ASC LIMIT ?"
-    params.append(top)
-
-    try:
-        return conn.execute(sql, params).fetchall()
-    except sqlite3.OperationalError:
-        return []
+    return query_fts_rows(
+        conn,
+        or_query,
+        book_names,
+        top,
+        min_chars=min_chars,
+        body_page_margin=body_page_margin,
+    )
 
 
 def _search_key_set(rows: list[tuple]) -> set[tuple[str, int]]:
@@ -251,35 +171,14 @@ def vec_search(
 
     emb = embed_batch([query])[0]
 
-    has_extra_filter = min_chars > 0 or body_page_margin > 0 or book_names is not None
-    k = max(top * 5, 50) if has_extra_filter else top
-
-    table = get_chunks_table()
-    query_builder = (
-        table.search(emb).limit(k).select(["chunk_id", "book_name", "page_no", "text", "char_count", "page_count"])
+    return query_vector_rows(
+        get_chunks_table(),
+        emb,
+        book_names,
+        top,
+        min_chars=min_chars,
+        body_page_margin=body_page_margin,
     )
-
-    filters: list[str] = []
-    if min_chars > 0:
-        filters.append(f"char_count >= {min_chars}")
-    if book_names is not None:
-        quoted = ", ".join(f"'{n}'" for n in book_names)
-        filters.append(f"book_name IN ({quoted})")
-    if filters:
-        query_builder = query_builder.where(" AND ".join(filters), prefilter=True)
-
-    results = query_builder.to_list()
-
-    if body_page_margin > 0:
-        results = [
-            r
-            for r in results
-            if r["page_no"] > body_page_margin and r["page_no"] <= (r["page_count"] - body_page_margin)
-        ]
-
-    results.sort(key=lambda r: r["_distance"])
-    rows: list[tuple] = [(r["book_name"], r["page_no"], r["text"], r["_distance"]) for r in results[:top]]
-    return rows
 
 
 # ──────────────────────────────────────────────
@@ -324,71 +223,10 @@ def hybrid_search(
         body_page_margin=body_page_margin,
     )
 
-    pages: dict[tuple[str, int], dict] = {}
-
-    for rank, row in enumerate(fts):
-        book_name, page_no, raw_snippet, _score = row
-        key = (book_name, page_no)
-        entry = pages.setdefault(
-            key,
-            {"score": 0.0, "snippet": None, "has_highlight": False, "vec_text": None},
-        )
-        entry["score"] += 1.0 / (k_rrf + rank + 1)
-        if entry["snippet"] is None:
-            entry["snippet"] = sanitize_snippet(raw_snippet)
-            entry["has_highlight"] = "<mark>" in entry["snippet"]
-
-    for rank, row in enumerate(vec):
-        book_name, page_no, chunk_text, _dist = row
-        key = (book_name, page_no)
-        entry = pages.setdefault(
-            key,
-            {"score": 0.0, "snippet": None, "has_highlight": False, "vec_text": None},
-        )
-        entry["score"] += 1.0 / (k_rrf + rank + 1)
-        if entry["vec_text"] is None:
-            entry["vec_text"] = chunk_text
-
-    ranked = sorted(pages.items(), key=lambda x: -x[1]["score"])
-
-    if max_per_book is not None and max_per_book > 0:
-        per_book: dict[str, int] = {}
-        filtered: list[tuple[tuple[str, int], dict]] = []
-        for (book_name, page_no), data in ranked:
-            if per_book.get(book_name, 0) >= max_per_book:
-                continue
-            per_book[book_name] = per_book.get(book_name, 0) + 1
-            filtered.append(((book_name, page_no), data))
-            if len(filtered) >= top:
-                break
-        ranked = filtered
-    else:
-        ranked = ranked[:top]
-
-    keys = [(b, p) for (b, p), _ in ranked]
+    ranked = rank_pages(fts, vec, top=top, k_rrf=k_rrf, max_per_book=max_per_book)
+    keys = [(page.book_name, page.page_no) for page in ranked]
     main_chars_map = _fetch_main_characters(conn, keys)
-
-    hits: list[SearchHit] = []
-    for (book_name, page_no), data in ranked:
-        if data["snippet"]:
-            snippet = data["snippet"]
-            has_highlight = data["has_highlight"]
-        else:
-            text = (data["vec_text"] or "")[:200]
-            snippet = html.escape(text)
-            has_highlight = False
-        hits.append(
-            SearchHit(
-                book_name=book_name,
-                page_no=page_no,
-                snippet=snippet,
-                has_highlight=has_highlight,
-                image_url=_image_url(book_name, page_no),
-                rrf_score=data["score"],
-                main_characters=main_chars_map.get((book_name, page_no), []),
-            )
-        )
-    return hits
+    return present_ranked_pages(ranked, main_chars_map)
 
 
 def load_all_pages_of_book(
@@ -430,20 +268,7 @@ def load_all_pages_of_book(
     keys = [(book_name, r[0]) for r in rows]
     main_chars_map = _fetch_main_characters(conn, keys)
 
-    hits: list[SearchHit] = []
-    for page_no, full_text in rows:
-        hits.append(
-            SearchHit(
-                book_name=book_name,
-                page_no=page_no,
-                snippet=full_text or "",
-                has_highlight=False,
-                image_url=_image_url(book_name, page_no),
-                rrf_score=0.0,
-                main_characters=main_chars_map.get((book_name, page_no), []),
-            ),
-        )
-    return hits
+    return present_full_book_pages(book_name, rows, main_chars_map)
 
 
 __all__ = [

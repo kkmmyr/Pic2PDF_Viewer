@@ -1,4 +1,5 @@
 import os
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -6,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from bootstrap.runtime import RuntimeResources, manage_runtime
 from config import (
     COMIC_IMAGES_DIR,
     COMIC_PDF_DIR,
@@ -50,18 +52,17 @@ logger = get_logger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """起動時に meta_db / novel_db の初期化・マイグレーションと job_queue / doujin_watcher を起動する。"""
-    init_db()
-    upgrade_head()
-    upgrade_kindle_catalog()
-    await job_queue.start()
-    await doujin_watcher.start()
-    try:
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Bind current resources per lifespan; retain main's existing patchable entry points."""
+    resources = RuntimeResources(
+        initialize_meta=init_db,
+        migrate_novel=upgrade_head,
+        migrate_kindle=upgrade_kindle_catalog,
+        job_queue=job_queue,
+        doujin_watcher=doujin_watcher,
+    )
+    async with manage_runtime(resources):
         yield
-    finally:
-        await doujin_watcher.stop()
-        await job_queue.stop()
 
 
 app = FastAPI(

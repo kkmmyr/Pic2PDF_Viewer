@@ -1,6 +1,6 @@
 # Kindle 自動撮影ジョブ契約
 
-> status: living | last-verified: 2026-09-05
+> status: living | last-verified: 2026-09-08
 
 <!-- contract-owner: kindle-capture -->
 
@@ -134,8 +134,10 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
   `capture_registration.py`は完了workflowを調停する。
   `capture_registration_repository.py`は完了対象jobの取得と所有・状態確認、
   条件付き`awaiting_files → succeeded`更新を担当する。
-  `capture_publication.py`はstaging copy、既存target退避、正式publish、meta更新、
-  package archiveと逆順補償を担当し、catalog DBを直接参照しない。
+  `capture_publication.py`はstaging copy、既存target退避、正式publish、Libraryメタ操作の呼出し、
+  package archiveと補償順・完了flagを担当し、catalog DB・`meta_store`を直接参照しない。
+  `services/library/capture_metadata.py`は置換可否のメタ検査、ASIN更新、更新前snapshotと復元を所有する。
+  同moduleだけが既存`meta_store`へ委譲し、DB接続・transaction・source lockは同storeが所有する。
 - **作成排他**: `capture_job_repository.create()` は `BEGIN IMMEDIATE` 内で
   全source・全ASINの未完了jobが0件であることを確認してからINSERTする。
   runner側の事前確認とは独立した最終防衛線とする。
@@ -152,6 +154,21 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
   `PIC2PDF_DATA_DIR/.capture-replacement-backup/<時刻>_<job短縮ID>/`へ世代退避し、
   新画像・meta・package・job更新の失敗時は旧画像を同じ正式パスへ戻す。
   同名でもASINが異なる、または既存metaでASINを確認できない場合は置換しない。
+
+
+### Libraryメタ操作と失敗範囲
+
+- 正式画像が存在するときだけ`validate_capture_replacement(source, book_id, asin)`を呼び、
+  同じASINを確認する。画像がない場合はこの照合を追加しない。
+- publicationごとの`CaptureMetadataChange`が更新前entryを保持する。`apply()`は
+  `update_meta_locked`のcallback内でdeepcopyしてからASINだけを更新する。
+  新規entryの既定値は`authors: []`。既存の著者・既読・閲覧回数等と別書籍/別sourceを保持する。
+- `meta_updated`は保存呼出しが正常終了した後だけtrueにする。`restore()`は更新前entryが
+  なければ当該entryを削除し、あればentry全体を戻す。撮影側はSQLやentry編集を持たない。
+- 復元時は更新直前snapshotを使い、後からの同一entry編集とmergeしない既存動作を維持する。
+  メタ復元自体が失敗すると例外が伝播し、後続のpackage/画像復元へ進まない。
+  補償失敗時にも残る資産を回収する改善は、リファクタと分けて
+  [リファクタリング計画書](../../../log/計画/リファクタリング計画書.md)のTM-11で管理する。
 
 
 ## 6. agent設定と再開境界

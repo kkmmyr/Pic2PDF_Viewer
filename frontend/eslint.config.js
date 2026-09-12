@@ -10,7 +10,15 @@ import globals from 'globals';
 
 export default tseslint.config(
     {
-        ignores: ['dist', 'node_modules', 'coverage', '*.config.js', 'public'],
+        ignores: [
+            'dist',
+            'node_modules',
+            'coverage',
+            '*.config.js',
+            'public',
+            'playwright-output',
+            'playwright-report',
+        ],
     },
     js.configs.recommended,
     ...tseslint.configs.recommended,

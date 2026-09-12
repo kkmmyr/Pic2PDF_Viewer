@@ -15,6 +15,7 @@ from .job_executor import JobExecutionDependencies, execute_job
 from .job_state import claim_next_job, mark_finished, update_detail, update_progress, update_step
 from .job_targets import resolve_targets
 from .ocr_job_application import OcrJobDependencies
+from .ocr_job_configuration import resolve_ocr_run_spec
 from .ocr_qa_staging import stage_run_for_qa
 from .ocr_run_store import collect_input_pages, mark_run_failed, prepare_run, save_page_result
 from .relation_extractor import generate_book_relations
@@ -86,6 +87,7 @@ class NovelDbJobWorker:
         # points on this facade for tests and operational extensions.
         dependencies = JobExecutionDependencies(
             ocr=OcrJobDependencies(
+                resolve_run_spec=resolve_ocr_run_spec,
                 collect_input_pages=collect_input_pages,
                 prepare_run=prepare_run,
                 iter_ocr_pages=iter_ocr_pages,

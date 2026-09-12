@@ -93,6 +93,31 @@ def test_openapi_normalization_is_stable_and_drops_runtime_servers() -> None:
     assert openapi_contract.normalize_schema(first) == openapi_contract.normalize_schema(second)
 
 
+@pytest.mark.parametrize(
+    ("relative", "module", "valid"),
+    [
+        ("pages/ViewerPage.tsx", "@/features/library", True),
+        ("pages/ViewerPage.tsx", "@/hooks/library/useUrlState", False),
+        ("features/library/LibraryWorkspace.tsx", "@/features/reader", True),
+        ("features/library/LibraryWorkspace.tsx", "@/components/reader", False),
+        ("features/library/LibraryWorkspace.tsx", "@/features/reader/useReaderLifecycle", False),
+        ("features/reader/useReaderLifecycle.ts", "react", True),
+        ("features/reader/useReaderLifecycle.ts", "@/stores/libraryStore", False),
+        ("features/reader/useReaderLifecycle.ts", "react-router-dom", False),
+        ("features/reader/useReaderLifecycle.ts", "@/config/api_client", False),
+        ("features/reader/useReaderLifecycle.ts", "./index", False),
+    ],
+)
+def test_reader_session_import_boundaries(tmp_path: Path, relative: str, module: str, valid: bool) -> None:
+    path = tmp_path / "frontend/src" / relative
+    path.parent.mkdir(parents=True)
+    path.write_text(f"import {{ value }} from '{module}';\n", encoding="utf-8")
+    violations = import_boundaries.find_violations(tmp_path)
+    assert violations == (
+        [] if valid else [f"frontend/src/{relative}:1: Library/Reader session boundary imports {module}"]
+    )
+
+
 def test_import_boundaries_detect_all_three_layer_violations(tmp_path: Path) -> None:
     files = {
         "backend/services/bad.py": "from routers import library\n",

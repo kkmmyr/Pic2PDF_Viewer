@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
+import { useReaderLifecycle } from '@/features/reader/useReaderLifecycle';
 import { pdfjs } from 'react-pdf';
 import type { LibrarySource, ReadingDirection } from '@/types';
 import { buildStaticUrl, STATIC_PATHS } from '@/config/api';
@@ -11,15 +12,15 @@ import { useReaderNavigation } from '@/hooks/reader/useReaderNavigation';
 import { useSpreadMode } from '@/hooks/reader/useSpreadMode';
 import { useEditMode } from '@/hooks/reader/useEditMode';
 import { useFullscreen } from '@/hooks/reader/useFullscreen';
-import { useNextSeriesVolume, usePrevSeriesVolume } from './useNextSeriesVolume';
-import { useRelatedBooks } from './useRelatedBooks';
-import { usePdfSearch } from './usePdfSearch';
-import { useReaderUIState } from './useReaderUIState';
-import { usePdfDocumentState } from './usePdfDocumentState';
-import { useRelatedBooksNavigation } from './useRelatedBooksNavigation';
-import { useReadProgressTracker } from './useReadProgressTracker';
-import { useVolumeNavigation } from './useVolumeNavigation';
-import { useReaderInput } from './useReaderInput';
+import { useNextSeriesVolume, usePrevSeriesVolume } from '@/hooks/reader/useNextSeriesVolume';
+import { useRelatedBooks } from '@/hooks/reader/useRelatedBooks';
+import { usePdfSearch } from '@/hooks/reader/usePdfSearch';
+import { useReaderUIState } from '@/hooks/reader/useReaderUIState';
+import { usePdfDocumentState } from '@/hooks/reader/usePdfDocumentState';
+import { useRelatedBooksNavigation } from '@/hooks/reader/useRelatedBooksNavigation';
+import { useReadProgressTracker } from '@/hooks/reader/useReadProgressTracker';
+import { useVolumeNavigation } from '@/hooks/reader/useVolumeNavigation';
+import { useReaderInput } from '@/hooks/reader/useReaderInput';
 
 interface UseReaderStateProps {
     selectedPdf: string;
@@ -33,7 +34,7 @@ interface UseReaderStateProps {
 
 /**
  * ReaderPanel が必要とする全 state / handler を集約するフック。
- * 各専門 hook の呼び出しと副作用（useEffect / useCallback）をここに集める。
+ * 専門hookを組み立て、初期化順はuseReaderLifecycleへ委譲する。
  * ReaderPanel 本体は JSX のオーケストレーターに集中できる。
  */
 export function useReaderState({
@@ -47,7 +48,6 @@ export function useReaderState({
 }: UseReaderStateProps) {
     const { height: windowHeight } = useWindowSize();
     const [direction, setDirection] = useState<ReadingDirection>('rtl');
-    const initialPageKey = useRef<string | null>(null);
 
     const {
         numPages,
@@ -180,42 +180,22 @@ export function useReaderState({
 
     useImagePreloader(imageUrls, pageNumber - 1, 3);
 
-    useEffect(() => {
-        resetEditMode();
-        resetNumPages();
-        resetAutoSpread();
-        handleCloseSearch();
-        resetPage();
-        setIsOnRelatedPage(false);
-    }, [
+    useReaderLifecycle({
         selectedPdf,
-        resetPage,
-        handleCloseSearch,
+        initialPage,
+        isImageMode,
+        imageNumPages,
+        numPages,
+        pageNumber,
         resetEditMode,
-        resetAutoSpread,
         resetNumPages,
+        resetAutoSpread,
+        handleCloseSearch,
+        resetPage,
         setIsOnRelatedPage,
-    ]);
-
-    // 書籍 state のリセット後に画像ページ数を同期する。キャッシュ済みの画像一覧が
-    // 初回 render から存在する再オープンでも、numPages=0 が後勝ちしない順序にする。
-    useEffect(() => {
-        if (isImageMode) setNumPages(imageNumPages);
-    }, [selectedPdf, isImageMode, imageNumPages, setNumPages]);
-
-    useEffect(() => {
-        if (numPages <= 0) return;
-        const key = `${selectedPdf}\u0000${initialPage ?? 1}`;
-        if (initialPageKey.current === key) return;
-        initialPageKey.current = key;
-        setPageNumber(Math.min(initialPage ?? 1, numPages));
-    }, [selectedPdf, initialPage, numPages, setPageNumber]);
-
-    // ページペア切替時に Auto 見開き判定をリセット。直後に PageRenderer の onRenderSuccess
-    // で左右両ページの寸法が通知され、片方でも横長なら 1 ページ表示に確定する。
-    useEffect(() => {
-        resetAutoSpread();
-    }, [pageNumber, resetAutoSpread]);
+        setNumPages,
+        setPageNumber,
+    });
 
     const handleClose = useCallback(() => {
         resetPage();
