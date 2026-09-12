@@ -25,6 +25,18 @@ def load_awaiting_job(job_id: str, agent_id: str) -> dict:
     return job
 
 
+def load_recovery_job(job_id: str) -> dict:
+    """復旧対象の同一性確認。成功済み・稼働中jobには補償を実行しない。"""
+    with with_db() as conn:
+        row = conn.execute(
+            "SELECT cj.*, b.title FROM capture_jobs cj JOIN books b ON b.asin=cj.asin WHERE cj.id=?",
+            (job_id,),
+        ).fetchone()
+    if row is None or row["status"] not in {"awaiting_files", "failed"}:
+        raise ValueError("復旧できるキャプチャジョブ状態ではありません")
+    return row_dict(row)
+
+
 def mark_succeeded(
     job_id: str,
     agent_id: str,

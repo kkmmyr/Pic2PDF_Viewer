@@ -1,6 +1,6 @@
 # Kindle 自動撮影ジョブ契約
 
-> status: living | last-verified: 2026-09-08
+> status: living | last-verified: 2026-09-12
 
 <!-- contract-owner: kindle-capture -->
 
@@ -146,7 +146,8 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
 - **エラー**: agent 所有権と許可状態遷移を transaction 内で検証し、異なる agent、terminal job、逆向き遷移を拒否する。
 - **補償**: 正式画像配置、`meta2.db`更新、packageの`processed/`移動、
   capture job成功更新の順に実行する。途中で失敗した場合は画像とmetaを戻し、
-  packageを`.ready`へ復元してjobを`awaiting_files`のまま維持する。
+  packageを`.ready`へ復元することを試みる。補償側ではjob状態を更新せず、
+  通常は`awaiting_files`を維持し、外部からの`failed`等への変更も上書きしない。
   ready検証、staging copy、既存target退避、target publish、meta更新、package archive、
   job更新直前を障害注入境界とし、条件付きjob更新が1行以外の場合も同じ補償を行う。
 - **再撮影置換**: 正式画像が既にある場合は、metaの同一`book_id`が同じASINを
@@ -165,10 +166,32 @@ process消失・許可error codeを同時に満たし、再起動後に同一ASI
   新規entryの既定値は`authors: []`。既存の著者・既読・閲覧回数等と別書籍/別sourceを保持する。
 - `meta_updated`は保存呼出しが正常終了した後だけtrueにする。`restore()`は更新前entryが
   なければ当該entryを削除し、あればentry全体を戻す。撮影側はSQLやentry編集を持たない。
-- 復元時は更新直前snapshotを使い、後からの同一entry編集とmergeしない既存動作を維持する。
-  メタ復元自体が失敗すると例外が伝播し、後続のpackage/画像復元へ進まない。
-  補償失敗時にも残る資産を回収する改善は、リファクタと分けて
-  [リファクタリング計画書](../../../log/計画/リファクタリング計画書.md)のTM-11で管理する。
+- 復元時は更新直前snapshotを使い、後からの同一entry編集とはmergeしない。
+  復元直前のentryが更新後snapshotとも更新前snapshotとも異なる場合は、競合として上書きを拒否する。
+
+<a id="capture-recovery"></a>
+### 補償失敗の保持と再開
+
+- 補償はmeta→package→staging削除→新target削除→旧target復元→空の退避世代削除の順。
+  各成功flagを消し、途中失敗でも独立した後続補償を試みる。再試行は残るflagだけを実行する。
+  新target削除が未完了なら旧target復元を止め、旧target未復元なら退避世代を削除しない。
+  package復元先や旧画像復元先に既存資産がある場合は上書きせず、退避世代は空directoryだけを削除する。
+- 登録失敗時、補償が成功すれば元の例外をそのまま返す。補償も失敗した場合は
+  `CaptureRollbackError`のcauseに元の例外と全補償失敗の`ExceptionGroup`を保持し、
+  job ID、処理名、資産path、残るflag、メタsnapshotを復旧記録へ保存する。
+- 記録は`PIC2PDF_DATA_DIR/.capture-recovery/<job_id>.json`。
+  公開開始前に排他的に`publishing`記録を作り、補償開始前に`resuming`、失敗後に`recovery`を保存する。
+  補償成功で記録を削除する。job成功後の記録削除だけが失敗した場合は成功状態を維持してログへ残す。
+  記録が1件でも残る間は新しい完了登録を拒否し、未復元状態を通常再試行で上書きしない。
+- `tools.recover_capture`は既定で記録の表示だけを行う。明示した`--resume`ではjobの
+  同一性・状態（awaiting_files / failed）、snapshot、現在の設定から再計算した全pathを照合し、
+  `recovery`の残りだけを復元する。job状態や公開監査の変更、撮影の再実行は行わない。
+- 再開は同directoryの`<job_id>.lock`を排他的に作ってから記録を再読する。
+  重複再開を拒否し、残存lockも新規完了登録の停止条件とする。強制終了で残ったlockは時刻で奪取しない。
+- process強制終了、破損記録、設定変更、記録更新失敗など状態を確定できない場合は自動再開しない。
+  記録保存にも失敗した場合は例外noteへ状態を残し、最初のmarkerを保持する。
+  これは分散transactionや任意のクラッシュからの自動修復を保証しない。
+  操作前にwriterを停止し、[運用ガイド](../../環境構築/運用ガイド.md#capture-recovery)に従って復旧する。
 
 
 ## 6. agent設定と再開境界
