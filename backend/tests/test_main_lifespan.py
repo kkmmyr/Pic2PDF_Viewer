@@ -57,7 +57,7 @@ async def test_lifespan_stops_resources_when_serving_raises(monkeypatch: pytest.
 
 
 @pytest.mark.parametrize("fail_at", [step for step in STEPS if step != "serve"])
-async def test_lifespan_propagates_resource_failure_at_current_boundary(
+async def test_lifespan_propagates_failure_after_stopping_started_resources(
     monkeypatch: pytest.MonkeyPatch, fail_at: str
 ) -> None:
     import main
@@ -67,8 +67,10 @@ async def test_lifespan_propagates_resource_failure_at_current_boundary(
     with pytest.raises(RuntimeError, match=fail_at):
         async with main.app.router.lifespan_context(main.app):
             events.append("serve")
-    # Partial-start and stop-failure cleanup is not silently changed by extraction.
-    assert events == STEPS[: STEPS.index(fail_at) + 1]
+    expected = STEPS[: STEPS.index(fail_at) + 1]
+    if fail_at in {"watcher.start", "watcher.stop"}:
+        expected.append("queue.stop")
+    assert events == expected
 
 
 async def test_lifespan_resolves_resources_for_each_session() -> None:
