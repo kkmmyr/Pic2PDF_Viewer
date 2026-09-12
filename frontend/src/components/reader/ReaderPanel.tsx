@@ -1,7 +1,8 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { LibrarySource } from '@/types';
 import { ReaderProvider, useReaderContext } from '@/contexts/ReaderContext';
 import { useTouchSwipe } from '@/hooks/reader/useTouchSwipe';
+import { useWheelPageNavigation } from '@/hooks/reader/useWheelPageNavigation';
 import { PdfSearchBar } from './PdfSearchBar';
 import { PageSlider } from './PageSlider';
 import { PageGridOverlay } from './PageGridOverlay';
@@ -44,6 +45,7 @@ function ReaderPanelContent() {
         showSlider,
         toggleBothUI,
         isSearchOpen,
+        isHelpOpen,
         isOnRelatedPage,
         contentTopOffset,
         // PageSlider
@@ -81,6 +83,20 @@ function ReaderPanelContent() {
         confirmDeletePages,
         cancelDeletePages,
     } = useReaderContext();
+
+    const readerContentRef = useRef<HTMLDivElement>(null);
+    useWheelPageNavigation({
+        targetRef: readerContentRef,
+        enabled:
+            numPages > 0 &&
+            !isOnRelatedPage &&
+            !isSearchOpen &&
+            !isHelpOpen &&
+            !isEditMode &&
+            pendingDeleteCount === 0,
+        onNext: handleNext,
+        onPrev: handlePrev,
+    });
 
     const { onTouchStart, onTouchEnd, onTouchCancel } = useTouchSwipe({
         onSwipeLeft: direction === 'rtl' ? handlePrev : handleNext,
@@ -168,6 +184,7 @@ function ReaderPanelContent() {
                 </div>
             ) : (
                 <div
+                    ref={readerContentRef}
                     className={`flex-1 bg-gray-100 dark:bg-gray-950 overflow-auto relative ${contentTopOffset}`}
                 >
                     <div
@@ -180,7 +197,7 @@ function ReaderPanelContent() {
                         onTouchCancel={onTouchCancel}
                         role="button"
                         tabIndex={0}
-                        aria-label="読書画面。左右の領域でページを移動し、中央またはEnterキーで操作表示を切り替えます"
+                        aria-label="読書画面。左右の領域または上下のホイールでページを移動し、中央またはEnterキーで操作表示を切り替えます"
                     >
                         <ReaderPageView />
                     </div>

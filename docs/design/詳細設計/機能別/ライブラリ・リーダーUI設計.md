@@ -1,6 +1,6 @@
 # ライブラリ・リーダーUI設計
 
-> status: living | last-verified: 2026-09-08
+> status: living | last-verified: 2026-09-12
 
 `doujin` / `comic` / `novel`のライブラリ表示と、画像・PDF readerの現行設計を定める。
 ファイルの所在は
@@ -156,6 +156,8 @@ ReaderPanel（JSX orchestration）
 ```
 
 - `ReaderPanel`はsubcomponentを組み合わせ、工程ロジックを持たない。
+- `useWheelPageNavigation`はReader本文要素へ非passiveの`wheel` listenerを登録し、
+  delta正規化、縦方向判定、gesture単位の連続発火抑止を担当する。
 - `ReaderPageView`はPDF worker、document、画像またはPDF page描画を担当する。
   `pdfjs.GlobalWorkerOptions.workerSrc`は`<Document>`を使う同じモジュールで設定し、
   `new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url)`からVite経由で読み込む。CDNは使わない。
@@ -183,6 +185,7 @@ Reader内部から公開barrelへ逆参照せず、循環を避ける。公開�
 - LTR: 右側操作で次へ、左側操作で戻る。
 - RTL: 左側操作で次へ、右側操作で戻る。
 - keyboardの左右矢印、click zone、swipeは同じ意味へ変換する。
+- wheel / trackpadは読み方向に依存せず、下方向を次page、上方向を前pageへ変換する。
 
 ### 見開き
 
@@ -203,6 +206,12 @@ contentを左右・中央の3zoneへ分ける。
 - 読み方向上の前zone: 前page。
 - 中央: headerとsliderの表示切替。
 - 次zone: 次page。
+- 通常pageのcontent領域では縦方向のwheel deltaを累積し、閾値到達時に1回だけpageを移動する。
+  慣性を含む同一gesture中は追加移動せず、無入力期間の後に次のgestureを受け付ける。
+- pixel / line / page単位のdeltaをpixel相当へ正規化する。横方向優位の入力と、
+  Ctrl / Meta / Alt / Shift付き入力は処理せずbrowserの標準操作を維持する。
+- page移動として受理する縦wheelはnative scrollを抑止する。関連書籍pageはカード一覧の
+  縦scrollを維持するためwheel page navigationの対象外とする。
 
 入力中、dialog表示中、edit overlay中はglobal navigationを抑制する。
 

@@ -134,6 +134,14 @@ for (const width of [1280, 390]) {
             await page.keyboard.press('Shift+Tab');
             await page.keyboard.press('Escape');
             await expect(page.getByRole('dialog')).not.toBeVisible();
+            const readerContent = page.getByRole('button', { name: /^読書画面/ });
+            await readerContent.hover();
+            await page.mouse.wheel(0, 100);
+            await expect(page.getByRole('img', { name: 'Page 2', exact: true })).toBeVisible();
+            await page.waitForTimeout(250);
+            await page.mouse.wheel(0, -100);
+            await expect(page.getByRole('img', { name: 'Page 1', exact: true })).toBeVisible();
+            await page.waitForTimeout(250);
             await page.keyboard.press('ArrowLeft');
             await expect(page.getByRole('img', { name: 'Page 2', exact: true })).toBeVisible();
             await page.keyboard.press('ArrowLeft');
@@ -206,6 +214,9 @@ for (const mode of ['image', 'pdf'] as const) {
         }
         await page.keyboard.press('ArrowRight');
         await expect(page.getByText('1 / 4', { exact: true })).toBeAttached();
+        await page.getByRole('button', { name: /^読書画面/ }).hover();
+        await page.mouse.wheel(0, 100);
+        await expect(page.getByText('2 / 4', { exact: true })).toBeAttached();
         expect(fixture.requests.some((request) => request.source === 'doujin')).toBe(true);
         expect(fixture.unexpected).toEqual([]);
         expect(errors).toEqual([]);

@@ -16,6 +16,9 @@ export const API_CONFIG = {
 export const UI_CONFIG = {
     SEARCH_DEBOUNCE_MS: 300,
     PRELOAD_MARGIN: '200px',
+    READER_WHEEL_THRESHOLD_PX: 40,
+    READER_WHEEL_GESTURE_END_MS: 180,
+    READER_WHEEL_LINE_PX: 16,
 } as const;
 
 export const NOVEL_DB_CONFIG = {
