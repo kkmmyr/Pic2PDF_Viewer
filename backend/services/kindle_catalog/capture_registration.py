@@ -9,10 +9,14 @@ from services.kindle_catalog.capture_package_validator import (
     validate_ready_dir,
 )
 from services.kindle_catalog.capture_publication import CapturePublication
+from services.kindle_catalog.capture_recovery_record import CaptureRollbackError, require_no_pending_recovery
 from services.kindle_catalog.capture_registration_repository import (
     load_awaiting_job,
     mark_succeeded,
 )
+from utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def _inject_failure(_point: str) -> None:
@@ -26,12 +30,14 @@ def complete(
     completed_at: datetime,
 ) -> dict:
     """`<job_id>.ready`を検証し、正式領域へatomic publishする。"""
+    require_no_pending_recovery()
     job = load_awaiting_job(job_id, agent_id)
     ready_dir = Path(config.KINDLE_CAPTURE_INBOX_DIR) / f"{job_id}.ready"
     manifest, files = validate_ready_dir(job, ready_dir)
     quality_audit = build_quality_audit(manifest)
     _inject_failure("after_ready_validation")
     publication = CapturePublication(job, ready_dir, completed_at)
+    publication.begin()
     try:
         publication.stage(files)
         _inject_failure("after_staging_copy")
@@ -53,9 +59,18 @@ def complete(
             captured_screens=len(files),
             quality_audit=quality_audit,
         )
-    except Exception:
-        publication.rollback()
+    except Exception as original:
+        try:
+            publication.rollback(original=original)
+        except CaptureRollbackError as recovery:
+            raise recovery from ExceptionGroup(
+                "Capture registration and compensation failures", [original, *recovery.failures]
+            )
         raise
+    try:
+        publication.clear_recovery()
+    except OSError:
+        logger.exception("Capture succeeded but recovery marker cleanup failed: job=%s", job_id)
     return {
         "job_id": job_id,
         "status": "succeeded",

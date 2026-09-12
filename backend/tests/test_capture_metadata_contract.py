@@ -9,6 +9,7 @@ import pytest
 
 import config
 from services.kindle_catalog.capture_publication import CapturePublication
+from services.kindle_catalog.capture_recovery_record import CaptureRollbackError, read_record
 from services.library import capture_metadata
 from services.meta_db import db_connection
 from services.meta_store import load_meta, update_meta_locked
@@ -102,7 +103,7 @@ def test_metadata_write_failure_preserves_rows_and_leaves_flag_false(tmp_data_di
     assert load_meta("comic") == before
 
 
-def test_metadata_restore_failure_stops_remaining_compensation(tmp_data_dir, tmp_path):
+def test_metadata_restore_failure_still_removes_published_images(tmp_data_dir, tmp_path):
     seed("comic", OLD)
     capture = publication(tmp_path)
     capture.target.mkdir()
@@ -115,11 +116,17 @@ def test_metadata_restore_failure_stops_remaining_compensation(tmp_data_dir, tmp
             "WHEN NEW.asin='old-asin' BEGIN SELECT RAISE(ABORT, 'meta restore failed'); END"
         )
 
-    with pytest.raises(sqlite3.IntegrityError, match="meta restore failed"):
+    with pytest.raises(CaptureRollbackError) as caught:
         capture.rollback()
 
     assert load_meta("comic")[BOOK]["asin"] == "new-asin"
-    assert (capture.target / "001.png").read_bytes() == b"published-image"
+    assert not capture.target.exists()
+    assert isinstance(caught.value.failures[0], sqlite3.IntegrityError)
+    assert read_record("job-id").pending.meta_updated is True
+    with db_connection() as conn:
+        conn.execute("DROP TRIGGER reject_restore")
+    capture.rollback()
+    assert load_meta("comic")[BOOK] == OLD
 
 
 @pytest.mark.parametrize("write_fails", [False, True])
