@@ -1,6 +1,6 @@
 # ライブラリ・リーダーUI設計
 
-> status: living | last-verified: 2026-08-16
+> status: living | last-verified: 2026-09-08
 
 `doujin` / `comic` / `novel`のライブラリ表示と、画像・PDF readerの現行設計を定める。
 ファイルの所在は
@@ -11,10 +11,16 @@
 
 ## 1. 画面とURL
 
-`ViewerPage`はURLからsource、path、選択書籍を導出し、ライブラリとreaderを切り替える。
+`ViewerPage`は`features/library`の公開入口`LibraryWorkspace`を配置する。
+`useLibrarySession`がURLの解釈、storeへのsource/path同期、選択・閉じる・上階層への
+遷移、編集後の`pdfQueryKey(path, source)`無効化を調停する。
+`LibraryWorkspace`は一覧のmount保持とreaderの表示を所有し、readerは
+`features/reader`の公開入口から参照する。
 
 - source: URL pathから`doujin | comic | novel`を導出。
 - path / file: `?path=` / `?file=`。
+- 初期page: `?page=`。ページ数確定後に上限へ丸めて適用する。
+- 書籍選択・閉じる操作は`page`を消去し、作者・seriesなど他のqueryを保持する。
 - 作者・シリーズdrilldown: `?author=` / `?series=`。
 - ブラウザーの戻る・進むで一覧階層と選択書籍を復元できる。
 
@@ -32,14 +38,14 @@ URL / libraryStore
       ├─ useBookMeta / useGenres（server state）
       ├─ filter / sort / grouping（derived state）
       └─ LibraryPanelContext
-
-`useLibraryPanel`は画面向けの公開facadeであり、API副作用を直接増やさない。rename、
-thumbnail再生成、PDF一覧invalidateは`useLibraryBookActions`、filter・selection・dialog・
-displayは責務別hookが所有する。facadeはこれらを合成して既存context契約を維持する。
           ├─ LibraryHeader
           ├─ PdfGrid
           └─ LibraryDialogs
 ```
+
+`useLibraryPanel`は画面向けの公開facadeであり、API副作用を直接増やさない。rename、
+thumbnail再生成、PDF一覧invalidateは`useLibraryBookActions`、filter・selection・dialog・
+displayは責務別hookが所有する。facadeはこれらを合成して既存context契約を維持する。
 
 - PDF一覧、meta、genre、設定はTanStack Queryで取得する。
 - `libraryStore`はcurrent path、選択mode、選択項目などUI状態だけを保持する。
@@ -145,6 +151,7 @@ ReaderPanel（JSX orchestration）
       ├─ edit mode
       ├─ search
       ├─ read progress
+      ├─ useReaderLifecycle（書籍切替・画像ページ数・初期page・見開きresetの順序）
       └─ related books / volume navigation
 ```
 
@@ -155,6 +162,15 @@ ReaderPanel（JSX orchestration）
 - `ReaderHeader`、`ReaderPageView`、shortcut dialogは`ReaderContext`を
   field selectorで購読する。
 - 書籍切替時は旧requestをcancelし、page、search、related page、edit stateをresetする。
+
+`useReaderState`の公開返却値と`ReaderContext`のselector契約は維持する。
+`features/reader/useReaderLifecycle`はReactだけに依存し、渡された値とcallbackを使って
+書籍stateのreset → 画像ページ数の同期 → URL初期pageの適用 → page pairの見開きresetを
+順に登録する。画像キャッシュがある再オープンでもページ数が0で残らない順序を保つ。
+初期pageの適用済みkeyは既存どおり書籍名と初期pageであり、path/sourceを含める変更はしない。
+ページ移動、読了判定、編集、検索、閉じる処理は既存の専門hook・facadeが所有する。
+Reader内部から公開barrelへ逆参照せず、循環を避ける。公開入口・lifecycleの依存境界を
+`check_import_boundaries.py`で検査する。
 
 `novel`の画像本文は`NovelReaderPage`が担当し、OCR本文は`novel.db`を参照する。
 

@@ -160,10 +160,19 @@ def _isolated_backend_violations(project_root: Path) -> list[str]:
                 "services.library."
             )
             if path == library / "capture_metadata.py":
-                if not any(
-                    module == name or module.startswith(name + ".")
-                    for name in {"__future__", "copy", "dataclasses", "typing", "services.meta_store"}
-                ) and module != "services":
+                if (
+                    not any(
+                        module == name or module.startswith(name + ".")
+                        for name in {
+                            "__future__",
+                            "copy",
+                            "dataclasses",
+                            "typing",
+                            "services.meta_store",
+                        }
+                    )
+                    and module != "services"
+                ):
                     violations.append(
                         f"{path.relative_to(project_root).as_posix()}:{line}: Library metadata adapter imports {module}"
                     )
@@ -183,11 +192,15 @@ def _capture_publication_violations(project_root: Path) -> list[str]:
     if not path.is_file():
         return []
     forbidden = {"services.meta_store", "services.meta_db"}
-    return sorted({
-        f"{path.relative_to(project_root).as_posix()}:{line}: Capture publication must use Library metadata operations"
-        for line, module in _resolved_backend_imports(path, project_root)
-        if any(module == name or module.startswith(name + ".") for name in forbidden)
-    })
+    return sorted(
+        {
+            f"{path.relative_to(project_root).as_posix()}:{line}: Capture publication must use Library metadata operations"
+            for line, module in _resolved_backend_imports(path, project_root)
+            if any(
+                module == name or module.startswith(name + ".") for name in forbidden
+            )
+        }
+    )
 
 
 def _novel_module_violations(project_root: Path) -> list[str]:
@@ -273,6 +286,30 @@ def _frontend_violations(project_root: Path) -> list[str]:
     return violations
 
 
+def _reader_session_violations(project_root: Path) -> list[str]:
+    """Keep the reviewed route, view lifetime, and lifecycle boundaries narrow."""
+    allowed = {
+        "pages/ViewerPage.tsx": {"@/features/library"},
+        "features/library/LibraryWorkspace.tsx": {
+            "@/components/library",
+            "@/features/reader",
+            "@/features/library/useLibrarySession",
+        },
+        "features/reader/useReaderLifecycle.ts": {"react"},
+    }
+    violations: list[str] = []
+    for relative, modules in allowed.items():
+        path = project_root / "frontend/src" / relative
+        if not path.is_file():
+            continue
+        for line, module in _frontend_imports(path):
+            if module not in modules:
+                violations.append(
+                    f"frontend/src/{relative}:{line}: Library/Reader session boundary imports {module}"
+                )
+    return violations
+
+
 def _kindle_violations(project_root: Path) -> list[str]:
     violations: list[str] = []
     kindle_root = project_root / "kindle-pdf"
@@ -298,6 +335,7 @@ def find_violations(project_root: Path = PROJECT_ROOT) -> list[str]:
     violations.extend(_capture_publication_violations(project_root))
     violations.extend(_novel_module_violations(project_root))
     violations.extend(_frontend_violations(project_root))
+    violations.extend(_reader_session_violations(project_root))
     violations.extend(_kindle_violations(project_root))
     return sorted(violations)
 
