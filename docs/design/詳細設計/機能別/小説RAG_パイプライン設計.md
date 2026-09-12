@@ -1,6 +1,6 @@
 # 小説 RAG 構築パイプライン設計
 
-> status: living | last-verified: 2026-09-08
+> status: living | last-verified: 2026-09-12
 
 novel タブの本文を検索・QA 可能にするための **DB 構築パイプライン**（OCR 取込 → チャンク分割 → embedding → 文脈生成 → キャラ抽出 → 書籍サマリ）の現在形設計。検索・QA 側は [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
@@ -204,7 +204,7 @@ LLM呼び出しごとのtemperature・出力長・context長は用途別prompt m
 - **一括確定**: 詳細あらすじ、短縮要約、全人物説明をメモリ上で完成・検査してから、`books.summary`、`books.catalog_summary`、`book_characters`を単一SQLiteトランザクションで置換する。生成・校正・検査が失敗した場合は既存の公開行を維持する。事実抽出checkpoint・grounding監査は独立して保存するため、DB全体が未変更になる保証ではない。SQL置換・commitの失敗時はrollbackし、索引更新へ進まない。
 - **索引更新**: 公開行のcommit後に`summary_index.index_book_summary`が詳細あらすじのLanceDB embeddingを更新する。既定の索引エラーはwarningで記録し、本構築は完了する。SQLite公開行は戻さない。embedding生成・削除の失敗では旧索引が残る場合があり、削除後の追加失敗では索引が欠落し得る。索引の健全性をskip条件に使わないため、通常の再実行は自動修復にならない。索引の復旧方式変更は内部構造の分離と別に判断する。
 - **skip 条件**: `books.summary`と`books.catalog_summary`がいずれも非空、人物説明が非NULLの行が1件以上あり、かつ`redo=False`ならStep 2全体をスキップする。人物説明の空文字は非NULLとして数える。旧構築済み書籍で短縮要約だけがない場合は再生成対象となる。
-- **責務と保存境界**: `full_builder.py`が既存状態の確認、生成呼出し、人物検査、SQL置換、commit/rollback、commit後索引更新、job進捗通知の順序を所有する。`summarizer.py`の公開tuple返却を`GeneratedBookContent`へ受け取り、`full_build_content.py`で人物の正規化・本文根拠・削除回帰を検査する。この検査moduleはDB・モデルへ接続せず、ページデータと既存人物名を引数で受け取る。`full_build_repository.py`は本構築で必要な既存状態・適格ページの読取りと公開行のSQL置換を担当し、接続の生成・commit/rollback・索引更新は行わない。文脈生成の入口と所有者は§6を維持する。
+- **責務と保存境界**: `full_builder.py`が既存状態の確認、生成呼出し、人物検査、SQL置換、commit/rollback、commit後索引更新、job進捗通知の順序を所有する。`summarizer.py`の公開tuple返却を`GeneratedBookContent`へ受け取り、`generation/full_build_content.py`で人物の正規化・本文根拠・削除回帰を検査する。この検査moduleはDB・モデルへ接続せず、ページデータと既存人物名を引数で受け取る。`generation/full_build_repository.py`は本構築で必要な既存状態・適格ページの読取りと公開行のSQL置換を担当し、接続の生成・commit/rollback・索引更新は行わない。文脈生成の入口と所有者は§6を維持する。
 - **本文入力**: `char_count >= NOVEL_DB_MIN_BODY_CHARS`かつ先頭/末尾`NOVEL_DB_BODY_PAGE_MARGIN`ページを除いた`index_eligible=1`本文を、ページ番号付きでページ順に使用する。
 - **生成文の品質方針**: 詳細あらすじ、分割要約、人物像には目標文字数や
   1段落固定を設けない。`num_predict`はLLM暴走防止とcontext保護の技術上限であり、

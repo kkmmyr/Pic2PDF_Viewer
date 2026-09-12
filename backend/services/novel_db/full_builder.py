@@ -17,8 +17,12 @@ from utils.logger import get_logger
 from .builder import rebuild_from_pages
 from .connection import with_db
 from .context_generation import build_book_contexts
-from .full_build_content import GeneratedBookContent, guard_character_deletion_regression, prepare_character_rows
-from .full_build_repository import (
+from .generation.full_build_content import (
+    GeneratedBookContent,
+    guard_character_deletion_regression,
+    prepare_character_rows,
+)
+from .generation.full_build_repository import (
     load_character_deletion_texts,
     load_character_evidence_pages,
     load_published_book_state,

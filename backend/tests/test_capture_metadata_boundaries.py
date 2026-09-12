@@ -38,4 +38,4 @@ def test_capture_metadata_dependency_scope(tmp_path: Path, module: str, source: 
     path.parent.mkdir(parents=True)
     path.write_text(source + "\n", encoding="utf-8")
 
-    assert bool(import_boundaries.find_violations(tmp_path)) is rejected
+    assert bool(import_boundaries.find_violations(tmp_path, require_novel_targets=False)) is rejected

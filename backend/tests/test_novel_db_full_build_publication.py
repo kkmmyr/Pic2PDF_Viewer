@@ -7,14 +7,21 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.novel_db import full_builder, summary_index, with_db
-from services.novel_db.full_build_content import CharacterRow, GeneratedBookContent
-from services.novel_db.full_build_repository import replace_published_content
+from services.novel_db import context_generation, full_builder, summary_index, with_db
 from services.novel_db.generated_content_snapshot import capture_generated_content
+from services.novel_db.generation.full_build_content import CharacterRow, GeneratedBookContent
+from services.novel_db.generation.full_build_repository import replace_published_content
 from services.novel_db.migrations import upgrade_head
 
 BOOK = "publication-contract"
 GENERATED = ("新しい詳細", "新しい一覧", {"アリス": "新しい人物説明"})
+
+
+def test_full_build_public_entry_keeps_shared_types_and_operations() -> None:
+    assert full_builder.GeneratedBookContent is GeneratedBookContent
+    assert full_builder.replace_published_content is replace_published_content
+    assert full_builder.build_book_contexts is context_generation.build_book_contexts
+    assert full_builder.__all__ == ["build_book_contexts", "build_book_full"]
 
 
 class CommitFailureConnection(sqlite3.Connection):
