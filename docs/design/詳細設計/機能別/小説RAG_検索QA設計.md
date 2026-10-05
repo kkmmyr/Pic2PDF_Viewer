@@ -159,6 +159,15 @@ LLM 呼び出しとは独立した純関数群。
 - **`LLM_OPTIONS`**: `temperature=0.2 / repeat_penalty=1.2 / num_predict=4096 / num_ctx=NOVEL_DB_QA_NUM_CTX`。`MlxBackend`は`repeat_penalty`を`repetition_penalty`へ変換し、`top_k`、`min_p`、`seed`、presence/frequency penaltyも転送する。**注意: llama-server / MLXとも`num_ctx`はserver起動時の上限で決まり、リクエスト値は使わない**。
 - **ストリーミング**: `stream_qa(prompt)` はproviderの`qwen.astream_ask`、`stream_chat(messages)`は`qwen.astream_chat`（LlamaServer / MLX対応、Ollamaは`NotImplementedError`）に委譲。バックエンド分岐・thinking抑制（`enable_thinking=False`）・SSE→Ollama形式正規化はすべて共通モジュール`local_llm`側。`_astream_ask` / `astream_chat`の薄いラッパはテストのmonkeypatch点。イベントは`{response, done, done_reason, eval_count, …}`のOllama互換dict。
 
+MacのQwen3.6 MLX-VLMをLinuxから利用する場合、SSH reverse tunnel経由のloopback URLを
+`NOVEL_DB_MLX_BASE_URL`へ設定する。LinuxクライアントはHTTP adapterのみを使い、
+Mac専用のMLX依存をLinuxへ導入しない。常設接続・起動・復旧の正本は
+[GPU環境セットアップ §5.1](../../環境構築/GPU環境セットアップ.md#51-macのqwenをlinuxのqaから利用する)を参照する。
+モデル比較は同じ公開本文版・検索結果・prompt・samplingを固定し、生成のみを
+`stream_qa(..., provider=...)`で実行する。比較中はQA履歴を含め本番DBへ書かない。
+本番`/qa`は履歴を保存するため、疎通確認時は生成の終了・回答・引用ページと履歴を検証し、
+本文・索引が不変であることを別途確認する。サーバー利用可否は索引readyから推定しない。
+
 ## 6. 単発 QA エンドポイント（`routers/novel_db/qa.py`）
 
 `POST /qa`（SSE）: `require_not_locked` 依存でジョブ実行中は 503 + Retry-After（[パイプライン設計 §7](小説RAG_パイプライン設計.md)）。
