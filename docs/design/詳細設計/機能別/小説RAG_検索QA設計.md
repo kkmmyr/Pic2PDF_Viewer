@@ -154,6 +154,30 @@ LLM 呼び出しとは独立した純関数群。
 - **書籍俯瞰サマリブロック（`_build_summaries_block`）**: `book_summaries` があり scope が book 以外のとき、`【書籍俯瞰サマリ】` セクションを先頭に埋め込む（背景知識、根拠はページ抜粋を主とするよう指示）。scope=book では付与しない。
 - **チャット用（`build_chat_context_block` + `build_chat_system_message`）B-16**: 本文抜粋 + サマリブロックを 1 文字列にまとめ、`CHAT_SYSTEM_TEMPLATE`（読書補助アシスタント、スコープ説明 + 参照本文）の system メッセージに埋める。質問・回答ルールは system 側に持たせる。
 
+### 4.1 原文照合付き引用回答
+
+単発`/qa`は`NOVEL_DB_QA_RESPONSE_MODE=generative`（既定）で従来の文章生成を使い、
+`verified_quotes`では`qa_grounding.py`の引用回答を使う。引用回答は自由な解釈・要約文を
+生成せず、取得本文の中で質問に答える原文を選ぶ。単語への短縮で具体名や建物の特徴を
+落とさないよう、検証済みの引用全体を回答として返す。チャットの方式は変更しない。
+
+`qa_source_snapshot.py`は取得ページのcanonical本文、書籍・ページ対応、公開本文digest
+（active OCR runを含む）と`indexed_at`を固定する。モデルへは順序に対応した`source_id`と
+本文だけを渡し、書名・ページを生成し直させない。旧要約・人物ヒントは根拠へ含めない。
+モデルのJSONは`status`と`evidence[{source_id, quote}]`だけを受理し、自然停止、重複キーや
+非有限値のないobject、取得済み出典、1〜4件・各500文字以内、本文との一致を検証する。
+空白・改行の整形差だけを照合時に許容し、表示には元のcanonical文字列を使う。
+
+未検証の生成内容はSSEへ配信しない。検証後にも本文版・索引利用可否・ページ本文を
+再確認し、変更があれば回答を破棄して既存のerror履歴へ保存する。無効JSON、引用不一致、
+自然停止後のJSON/引用照合失敗だけは同じ固定本文と一般的な検証理由で最大2試行する。
+正しい出典番号や期待回答は再試行へ渡さず、番号の自動補正もしない。未完了・length停止、
+timeout・切断は再試行せず失敗とし、通算600秒を上限とする。文章生成への自動fallbackはしない。待機中は
+SSE commentで接続を維持する。履歴のoptionsには回答方式・本文版・検証試行結果を保存する。
+本文版の最終確認と履歴確定は同じSQLite書き込みトランザクションで行い、その後に回答を配信する。
+引用一致は質問への十分さを保証しないため、実際の質問・期待する内容・根拠ページを
+別に検証する。広い解釈・全体要約への対応は、この方式の合格と区別する。
+
 ## 5. LLM 呼び出し層（`llm.py` / `llm_provider.py`）
 
 - **provider（`llm_provider`）**: `NovelLlmProvider` が `qwen`（LlamaServer 11435またはMLX 11437）/ `gemma`（Ollama 11434、Qwen流用、またはMLX 11437）/ `query`（既定Ollama、GemmaがMLXならMLX、timeout 60）/ `verifier` を束ねる。未知のbackend値は構築時に`LLMError`で即失敗する。`get_llm_provider()` は設定から遅延構築した既定providerを返し、application serviceは省略可能なprovider引数でfakeを注入できる。`_llm_backend`は既存import用facadeで、新規コードの依存先にはしない。詳細は[データ設計 §5](小説RAG_データ.md)。

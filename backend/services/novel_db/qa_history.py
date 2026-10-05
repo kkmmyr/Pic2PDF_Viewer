@@ -50,7 +50,15 @@ def save_finish(
     answer: str,
     done_reason: str,
     eval_count: int | None,
+    validation_attempts: list[dict] | None = None,
 ) -> None:
+    if validation_attempts is not None:
+        row = conn.execute("SELECT options_json FROM qa_history WHERE id=?", (history_id,)).fetchone()
+        if row is None:
+            raise ValueError("QA history disappeared")
+        options = json.loads(row[0])
+        options["qa_validation_attempts"] = validation_attempts
+        conn.execute("UPDATE qa_history SET options_json=? WHERE id=?", (json.dumps(options), history_id))
     conn.execute(
         "UPDATE qa_history SET answer = ?, finished_at = datetime('now', '+9 hours'), "
         "done_reason = ?, eval_count = ? WHERE id = ?",
