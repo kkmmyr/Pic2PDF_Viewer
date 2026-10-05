@@ -150,13 +150,14 @@ active pointerを照合する専用手順を設計してから行う。
 LLM 呼び出しとは独立した純関数群。
 
 - **単発 QA（`build_prompt`）**: `PROMPT_TEMPLATE` に、各ページを `[page N, 主要登場人物: …]`（scope=book）/ `[書名 page N, …]`（all/series）ヘッダ + 本文で並べた `context` を差し込む。回答ルールは「根拠ページ番号明記」「発言者・行動者の帰属明示」「別ページのキャラを安易に統合しない」「抽象質問は具体シーン 3 つ以上で構造的に」等。`main_characters` が空ならヒント行は省略。
+- 具体的な質問は要点を簡潔に答え、短い原文引用を添えるよう指示する。本文にない補足を避け、推論は明示する。長いcontextでも指示を参照しやすいよう、contextの後、質問の直前に1〜3文・原文を改変しない引用・読み仮名等の補足禁止・地の文を発言へ誤帰属しないルールを再掲する。これは生成への指示であり、回答の事実性を保証する検証器ではない。
 - **書籍俯瞰サマリブロック（`_build_summaries_block`）**: `book_summaries` があり scope が book 以外のとき、`【書籍俯瞰サマリ】` セクションを先頭に埋め込む（背景知識、根拠はページ抜粋を主とするよう指示）。scope=book では付与しない。
 - **チャット用（`build_chat_context_block` + `build_chat_system_message`）B-16**: 本文抜粋 + サマリブロックを 1 文字列にまとめ、`CHAT_SYSTEM_TEMPLATE`（読書補助アシスタント、スコープ説明 + 参照本文）の system メッセージに埋める。質問・回答ルールは system 側に持たせる。
 
 ## 5. LLM 呼び出し層（`llm.py` / `llm_provider.py`）
 
 - **provider（`llm_provider`）**: `NovelLlmProvider` が `qwen`（LlamaServer 11435またはMLX 11437）/ `gemma`（Ollama 11434、Qwen流用、またはMLX 11437）/ `query`（既定Ollama、GemmaがMLXならMLX、timeout 60）/ `verifier` を束ねる。未知のbackend値は構築時に`LLMError`で即失敗する。`get_llm_provider()` は設定から遅延構築した既定providerを返し、application serviceは省略可能なprovider引数でfakeを注入できる。`_llm_backend`は既存import用facadeで、新規コードの依存先にはしない。詳細は[データ設計 §5](小説RAG_データ.md)。
-- **`LLM_OPTIONS`**: `temperature=0.2 / repeat_penalty=1.2 / num_predict=4096 / num_ctx=NOVEL_DB_QA_NUM_CTX`。`MlxBackend`は`repeat_penalty`を`repetition_penalty`へ変換し、`top_k`、`min_p`、`seed`、presence/frequency penaltyも転送する。**注意: llama-server / MLXとも`num_ctx`はserver起動時の上限で決まり、リクエスト値は使わない**。
+- **`LLM_OPTIONS`**: `temperature=0.2 / repeat_penalty=NOVEL_DB_QA_REPEAT_PENALTY（既定1.2） / num_predict=4096 / num_ctx=NOVEL_DB_QA_NUM_CTX`。`NOVEL_DB_QA_PRESENCE_PENALTY`が指定されていればQA/chat optionsへ追加する（既定未指定でproviderの値を保持）。両設定はQA/chatだけに適用し、人物抽出・要約・文脈生成のsamplingへ波及させない。`MlxBackend`は`repeat_penalty`を`repetition_penalty`へ変換し、`top_k`、`min_p`、`seed`、presence/frequency penaltyも転送する。**注意: llama-server / MLXとも`num_ctx`はserver起動時の上限で決まり、リクエスト値は使わない**。
 - **ストリーミング**: `stream_qa(prompt)` はproviderの`qwen.astream_ask`、`stream_chat(messages)`は`qwen.astream_chat`（LlamaServer / MLX対応、Ollamaは`NotImplementedError`）に委譲。バックエンド分岐・thinking抑制（`enable_thinking=False`）・SSE→Ollama形式正規化はすべて共通モジュール`local_llm`側。`_astream_ask` / `astream_chat`の薄いラッパはテストのmonkeypatch点。イベントは`{response, done, done_reason, eval_count, …}`のOllama互換dict。
 
 MacのQwen3.6 MLX-VLMをLinuxから利用する場合、SSH reverse tunnel経由のloopback URLを

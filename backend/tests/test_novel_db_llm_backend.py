@@ -7,6 +7,8 @@ monkeypatch と `build_prompt` 安定性確認に絞る。
 
 from __future__ import annotations
 
+import pytest
+
 
 class TestStreamQaPassthrough:
     """`stream_qa` が `_astream_ask` 経由で options/model を正しく渡すことを確認。
@@ -111,3 +113,71 @@ class TestBuildPromptStability:
         assert "【書籍俯瞰サマリ】" in prompt
         assert "■ Book A" in prompt
         assert "あらすじ" in prompt
+
+
+def test_qa_options_omit_unspecified_presence_and_preserve_defaults(monkeypatch):
+    from services.novel_db import llm
+
+    monkeypatch.setattr(llm.novel_db_settings, "NOVEL_DB_QA_REPEAT_PENALTY", 1.2)
+    monkeypatch.setattr(llm.novel_db_settings, "NOVEL_DB_QA_PRESENCE_PENALTY", None)
+    assert llm._qa_options() == {
+        "temperature": 0.2,
+        "repeat_penalty": 1.2,
+        "num_predict": 4096,
+        "num_ctx": llm.NOVEL_DB_QA_NUM_CTX,
+    }
+
+
+@pytest.mark.parametrize("method", ["qa", "chat"])
+async def test_explicit_zero_reaches_final_mlx_body_without_affecting_provider_defaults(monkeypatch, method):
+    from local_llm import BackendConfig, MlxBackend
+
+    from services.novel_db import llm
+    from services.novel_db.llm_provider import _QWEN_MLX_DEFAULT_OPTIONS, NovelLlmProvider
+
+    monkeypatch.setattr(llm.novel_db_settings, "NOVEL_DB_QA_REPEAT_PENALTY", 1.05)
+    monkeypatch.setattr(llm.novel_db_settings, "NOVEL_DB_QA_PRESENCE_PENALTY", 0.0)
+    options = llm._qa_options()
+    monkeypatch.setattr(llm, "LLM_OPTIONS", options)
+    backend = MlxBackend(
+        BackendConfig(base_url="http://test-mlx", model="model", default_options=_QWEN_MLX_DEFAULT_OPTIONS)
+    )
+    provider = NovelLlmProvider(qwen=backend, gemma=backend, query=backend, verifier=backend)
+    captured = []
+
+    async def fake_http(body, timeout=None):
+        captured.append(body)
+        yield {"response": "answer", "done": False}
+        yield {"response": "", "done": True}
+
+    monkeypatch.setattr(backend, "_stream_body_async", fake_http)
+    stream = (
+        llm.stream_qa("question", provider=provider)
+        if method == "qa"
+        else llm.stream_chat([{"role": "user", "content": "question"}], provider=provider)
+    )
+    events = [event async for event in stream]
+    assert events[0]["response"] == "answer"
+    assert captured[0]["presence_penalty"] == options["presence_penalty"] == 0.0
+    assert captured[0]["repetition_penalty"] == options["repeat_penalty"] == 1.05
+    assert captured[0]["temperature"] == options["temperature"] == 0.2
+    assert captured[0]["max_tokens"] == options["num_predict"] == 4096
+    assert _QWEN_MLX_DEFAULT_OPTIONS["presence_penalty"] == 1.5
+    assert _QWEN_MLX_DEFAULT_OPTIONS["repeat_penalty"] == 1.2
+
+
+async def test_stream_chat_preserves_custom_options(monkeypatch):
+    from services.novel_db import llm
+
+    seen = []
+    options = {"presence_penalty": 0.0, "repeat_penalty": 1.05}
+
+    async def fake_chat(messages, *, model=None, options=None, timeout=None):
+        seen.append(options)
+        yield {"response": "", "done": True}
+
+    monkeypatch.setattr(llm, "astream_chat", fake_chat)
+    async for _ in llm.stream_chat([{"role": "user", "content": "question"}], options=options):
+        pass
+    assert seen == [options]
+    assert seen[0] is options

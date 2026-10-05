@@ -12,21 +12,31 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_NUM_CTX
+from config.novel_db import novel_db_settings
 
 from .llm_options import make_llm_options
 from .llm_provider import NovelLlmProvider, get_llm_provider
+
 
 # PoC で確定した QA 用 LLM パラメータ。num_ctx は config 化されており、B-13 段階 A〜C で
 # 段階拡大（既定 32768）。
 # 注意: llama-server / MLX backendではnum_ctxはserver起動時の上限で決まるため、ここで
 # 渡しても無視される（指定しても害はない）。envがllama_serverの場合は
 # start-qwen-server.bat 側で `-c 131072` を変更すること。
-LLM_OPTIONS = make_llm_options(
-    temperature=0.2,
-    repeat_penalty=1.2,
-    num_predict=4096,
-    num_ctx=NOVEL_DB_QA_NUM_CTX,
-)
+def _qa_options() -> dict:
+    options = make_llm_options(
+        temperature=0.2,
+        repeat_penalty=novel_db_settings.NOVEL_DB_QA_REPEAT_PENALTY,
+        num_predict=4096,
+        num_ctx=NOVEL_DB_QA_NUM_CTX,
+    )
+    presence = novel_db_settings.NOVEL_DB_QA_PRESENCE_PENALTY
+    if presence is not None:
+        options["presence_penalty"] = presence
+    return options
+
+
+LLM_OPTIONS = _qa_options()
 
 
 async def _astream_ask(
