@@ -12,6 +12,14 @@ novel タブのハイブリッド検索・RAG 質問応答・マルチターン�
 
 ## 1. 検索（`search_scope.py` / `search.py` / `book_summary_search.py`）
 
+本文公開とRAG利用状態は別に扱う。状態・GPT-6.1取り込み契約は[OCR設計書](OCR設計書.md)を参照。
+ベクトル検索・サマリ検索・類似冊検索はSQLiteの`indexed_at IS NOT NULL`冊と要求scopeの積集合を
+LanceDBのprefilterへ渡す。空集合ではEmbedding APIも呼ばない。古い実体は保持しても検索に使わない。
+通常RAGは未構築冊のlexicalヒットと古いSQLiteサマリも除外する。全冊本文モードで未構築冊を要求した
+場合はQA/チャット開始APIが409を返し、LLM呼び出し・履歴作成を行わない。
+本文の全文検索APIは未構築冊を検索でき、ICUがstaleならcanonical FTS5へ縮退する。
+
+
 lexical検索（既定FTS5、段階導入中のpage-level LanceDB ICU BM25）とベクトル検索
 （LanceDB KNN）を Reciprocal Rank Fusion（RRF）でページ単位に融合する。
 

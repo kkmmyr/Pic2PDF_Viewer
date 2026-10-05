@@ -19,7 +19,7 @@ from services.novel_db.qa_history import (
     save_finish,
     save_start,
 )
-from services.novel_db.retrieval import retrieve
+from services.novel_db.retrieval import RagNotReady, retrieve
 from utils.logger import get_logger
 
 from ._deps import require_not_locked
@@ -39,7 +39,10 @@ async def post_qa(
     scope = Scope(type=request.scope.type, id=request.scope.id)
 
     with with_db() as conn:
-        result = retrieve(conn, request.question, scope)
+        try:
+            result = retrieve(conn, request.question, scope)
+        except RagNotReady as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         prompt = build_prompt(
             request.question,
             result.hits,

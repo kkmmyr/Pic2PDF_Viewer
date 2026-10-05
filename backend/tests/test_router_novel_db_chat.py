@@ -242,3 +242,20 @@ def test_post_chat_session_message_404_for_missing(client, db_initialized, monke
         json={"question": "x"},
     )
     assert res.status_code == 404
+
+
+@pytest.mark.parametrize("endpoint", ["/api/novel_db/qa", "/api/novel_db/sessions"])
+def test_pending_rag_rejected_without_history(client, db_initialized, monkeypatch, endpoint):
+    import services.novel_db.retrieval as retrieval
+
+    monkeypatch.setattr(retrieval, "NOVEL_DB_QA_FULL_BOOK_MODE", True)
+    with with_db() as conn:
+        conn.execute(
+            "INSERT INTO books (name, pdf_path, images_dir, page_count, ocr_done_at) VALUES ('pending', '', '', 1, 'now')"
+        )
+        conn.commit()
+    res = client.post(endpoint, json={"question": "質問", "scope": {"type": "book", "id": "pending"}})
+    assert res.status_code == 409
+    with with_db() as conn:
+        assert conn.execute("SELECT COUNT(*) FROM qa_history").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM qa_sessions").fetchone()[0] == 0

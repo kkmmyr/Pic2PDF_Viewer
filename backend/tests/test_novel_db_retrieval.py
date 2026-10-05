@@ -31,6 +31,13 @@ def db_conn(tmp_data_dir):
 
     upgrade_head()
     with with_db() as conn:
+        for name in ("b", "b1", "book-a"):
+            conn.execute(
+                "INSERT INTO books (name, pdf_path, images_dir, page_count, indexed_at) "
+                "VALUES (?, '', '', 1, datetime('now'))",
+                (name,),
+            )
+        conn.commit()
         yield conn
 
 

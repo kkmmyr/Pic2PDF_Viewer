@@ -435,8 +435,28 @@ GPT-6.1による手動画像OCRは、製品の自動OCR・公開経路とは別�
 
 候補bundle・全文TXT・裁定・段階別manifestをGit管理外へ保存する。これは確認済み指摘に対する
 運用上の完了判定であり、独立した正解全文や未調整holdoutによる正式CER・H3合格ではない。
-GPT-6.1 bundleの製品import契約は未実装であり、既存Sol v2またはQwen＋dotsのschema・model
-provenanceを流用しない。本番DBへのimport、QA承認、canonical・FTS・索引更新は別判断とする。
+GPT-6.1隔離成果物は、版固定した専用`gpt61-body-publication-v1`パッケージへ取り込む。
+既存Sol v2またはQwen＋dotsのschema・model provenanceは流用しない。取り込み担当が旧台帳、
+最終bundle、各ページの原画像SHA・最終本文、品質合格の証跡を再照合し、品質保留・比較実験を除外する。
+パッケージは書名、モデル、成果物ファイルSHA、品質証跡SHA、全ページ、期待する現行本文digestを持つ。
+SHAはUTF-8 canonical JSON（キーソート、空白なし、ensure_ascii=False）のパッケージ本体から算出する。
+同一パッケージの再実行は公開済みrunを照合してno-opとし、現行版が別版なら拒否する。
+別パッケージは期待する現行本文digestの一致を要求し、意図しない上書きを拒否する。
+
+`gpt61_body_reviewed_v1` engineで最終レビュー本文と原成果物を保存し、本文・あとがきを公開する。
+専用adapterはnarrative/afterwordを製品のnarrativeへ、tocをtocへ、挿絵・表紙等をillustrationへ、
+広告・奥付等をcolophon_or_adへ対応づける。原分類・other_text・非本文留保は監査rawに保持し、
+非本文はcanonicalの空文字として保存する。既存QA importerを経由して推論情報を捏造しない。
+検証済みSQLite Online Backupを先に作り、書籍・run・ページ・公開履歴・FTS5・ICU世代の無効化を
+同一write transactionで確定する。失敗は全rollbackし、旧成果物・旧台帳・旧runは保持する。
+
+第1段階は本文公開（`ocr_done_at`）と全文検索までとし、`indexed_at=NULL`をRAG未再構築状態とする。
+ベクトル検索・類似冊・サマリベクトル検索・RAG付加サマリは、SQLiteで`indexed_at`が非NULLの冊だけを
+許可する。RAGの未構築冊への質問は拒否するが、本文の全文検索は利用できる。
+旧Embedding実体は削除せず、本文更新と同時に利用を遮断する。ICU全文索引の構築はEmbedding構築と別工程。
+第2段階では本文版とEmbedding・サマリ版を照合したready切替を整備してから再構築する。
+新しい反映台帳に版・SHA・品質根拠・公開結果・検索検証・バックアップ・復旧手順・失敗理由を保存し、
+他チャットの台帳を変更しない。
 
 複数冊を並列処理する場合は、画像を見る前のcanonical登録・OCR履歴と画面数で対象を選定し、
 選定記録を固定する。冊子ごとのチャット・保存先・裁定を分離し、他冊の候補を参照しない。

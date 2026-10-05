@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import sqlite3
 
+from .connection import with_db
 from .embedder import embed_batch
 from .lance_store import get_summaries_table
 from .search_scope import Scope, resolve_book_names
+from .summary_repository import get_rag_ready_book_names
 
 
 def search_book_summaries(
@@ -17,8 +19,8 @@ def search_book_summaries(
     top: int = 11,
 ) -> list[tuple[str, float]]:
     """書籍サマリをベクトル検索し、距離の昇順で返す。"""
-    book_names = resolve_book_names(scope)
-    if book_names is not None and not book_names:
+    book_names = get_rag_ready_book_names(conn, resolve_book_names(scope))
+    if not book_names:
         return []
 
     table = get_summaries_table()
@@ -26,14 +28,10 @@ def search_book_summaries(
         return []
 
     embedding = embed_batch([query])[0]
-    limit = max(top * 2, 22) if book_names is not None else top
-    query_builder = table.search(embedding).limit(limit).select(["book_name"])
-    if book_names is not None:
-        quoted = ", ".join(f"'{name}'" for name in book_names)
-        query_builder = query_builder.where(
-            f"book_name IN ({quoted})",
-            prefilter=True,
-        )
+    quoted = ", ".join("'" + name.replace("'", "''") + "'" for name in book_names)
+    query_builder = (
+        table.search(embedding).limit(top).select(["book_name"]).where(f"book_name IN ({quoted})", prefilter=True)
+    )
 
     results = query_builder.to_list()
     results.sort(key=lambda result: result["_distance"])
@@ -42,6 +40,10 @@ def search_book_summaries(
 
 def find_similar_books(book_name: str, *, top: int = 5) -> list[dict]:
     """指定書籍に意味的に近い書籍を返す。"""
+    with with_db() as conn:
+        ready_names = get_rag_ready_book_names(conn)
+    if book_name not in ready_names:
+        return []
     table = get_summaries_table()
     if table.count_rows() == 0:
         return []
@@ -51,7 +53,16 @@ def find_similar_books(book_name: str, *, top: int = 5) -> list[dict]:
     if not matched:
         return []
 
-    results = table.search(matched[0]["embedding"]).limit(top + 1).to_list()
+    quoted = ", ".join("'" + name.replace("'", "''") + "'" for name in ready_names)
+    results = (
+        table.search(matched[0]["embedding"])
+        .where(
+            f"book_name IN ({quoted})",
+            prefilter=True,
+        )
+        .limit(top + 1)
+        .to_list()
+    )
     results.sort(key=lambda result: result["_distance"])
     return [
         {

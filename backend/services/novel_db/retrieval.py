@@ -28,6 +28,13 @@ from services.novel_db.search import (
 )
 from services.novel_db.summarizer import load_summaries_for_books
 
+from .search_scope import resolve_book_names
+from .summary_repository import get_rag_ready_book_names
+
+
+class RagNotReady(ValueError):
+    """The requested body is published but its RAG artifacts are unavailable."""
+
 
 @dataclass
 class RetrievalResult:
@@ -42,10 +49,13 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
     full_book_mode（scope=book + NOVEL_DB_QA_FULL_BOOK_MODE 有効）のとき
     全ページ読み。それ以外は hybrid_search + Query Expansion + 書籍サマリ付与。
     """
+    ready_names = set(get_rag_ready_book_names(conn, resolve_book_names(scope)))
     full_book_mode = NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
     qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX} if full_book_mode else LLM_OPTIONS
 
     if full_book_mode:
+        if scope.id not in ready_names:
+            raise RagNotReady(f"RAG is not available until rebuilding: {scope.id}")
         assert scope.id is not None  # full_book_mode は scope.id != None を条件に設定される
         hits = load_all_pages_of_book(
             conn,
@@ -54,6 +64,9 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             body_page_margin=0,
         )
         return RetrievalResult(hits=hits, book_summaries=None, qa_options=qa_options)
+
+    if not ready_names:
+        return RetrievalResult(hits=[], book_summaries=None, qa_options=qa_options)
 
     # 通常 RAG 経路
     # scope=all / series では書籍偏り抑制のため max_per_book を有効化
@@ -74,6 +87,8 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             body_page_margin=0,
         )
         for h in sub_rows:
+            if h.book_name not in ready_names:
+                continue
             key = (h.book_name, h.page_no)
             existing = rows_by_key.get(key)
             if existing is None or h.rrf_score > existing.rrf_score:
@@ -91,7 +106,7 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             top=NOVEL_DB_QA_TOP_SUMMARIES,
         )
         relevant_book_names = sorted(
-            hit_book_names | {name for name, _ in summary_hits},
+            hit_book_names | {name for name, _ in summary_hits if name in ready_names},
         )
         book_summaries = load_summaries_for_books(conn, relevant_book_names)
     else:
