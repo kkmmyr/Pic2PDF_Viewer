@@ -1,6 +1,6 @@
 # 小説 RAG 検索・QA 設計
 
-> status: living | last-verified: 2026-09-08
+> status: living | last-verified: 2026-10-05
 
 novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会番組台本生成の現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
 
@@ -55,6 +55,15 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 これにより章間の短文、詩、短い会話だけの本文も検索できる。目次・挿絵・広告等は
 `index_eligible=0`かつ公開本文空欄で除外する。文字数・ページ位置フィルタは、
 サマリやコンテキスト生成の処理量抑制には引き続き利用できる。
+
+通常RAGは順位確定後、選択したページの本文をSQLiteから再取得してQA/chatへ渡す。
+検索一覧の短いsnippetは回答根拠に使わず、根拠本文に含まれるmarkupも保持する。
+欠落・非本文ページは回答生成前に拒否する。
+
+GPT-6.1の版固定再構築では、本文公開、Embedding照合完了、RAG検索・回答検証を
+別状態として台帳に記録する。索引照合が完了した冊だけreadyへ進め、古いsummaryと人物ヒント、
+contextual embeddingは無効化する。summaryが未生成でも本文チャンクによるRAGは利用できるが、
+類似書籍と俯瞰summaryは未提供となる。構築契約は[パイプライン設計 §3.1](小説RAG_パイプライン設計.md#gpt61-versioned-rag-build)を参照。
 
 ### 1.1 ICU indexの構築・世代切替
 

@@ -7,7 +7,7 @@ full_book_mode 分岐・書籍サマリ付与）を 1 か所にまとめる。
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from config import (
     NOVEL_DB_QA_EXPAND_ENABLED,
@@ -41,6 +41,22 @@ class RetrievalResult:
     hits: list[SearchHit]
     book_summaries: dict[str, str] | None
     qa_options: dict
+
+
+def _canonical_hits(conn: sqlite3.Connection, hits: list[SearchHit]) -> list[SearchHit]:
+    result = []
+    for hit in hits:
+        if type(hit.page_no) is not int or hit.page_no <= 0:
+            raise ValueError("RAG hit has an invalid page number")
+        rows = conn.execute(
+            "SELECT p.full_text FROM pages p JOIN books b ON b.id=p.book_id "
+            "WHERE b.name=? AND p.page_no=? AND p.index_eligible=1 AND b.indexed_at IS NOT NULL",
+            (hit.book_name, hit.page_no),
+        ).fetchall()
+        if len(rows) != 1 or not isinstance(rows[0][0], str) or not rows[0][0].strip():
+            raise ValueError(f"RAG canonical body unavailable: {hit.book_name} page {hit.page_no}")
+        result.append(replace(hit, snippet=rows[0][0], has_highlight=False))
+    return result
 
 
 def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> RetrievalResult:
@@ -93,7 +109,7 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             existing = rows_by_key.get(key)
             if existing is None or h.rrf_score > existing.rrf_score:
                 rows_by_key[key] = h
-    hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[:NOVEL_DB_QA_TOP_K]
+    hits = _canonical_hits(conn, sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[:NOVEL_DB_QA_TOP_K])
 
     # scope=all / series ではヒット書籍の俯瞰サマリをプロンプトに付与する
     # B-8: ページヒット書籍 + サマリベクトル検索 top-K を合流させる

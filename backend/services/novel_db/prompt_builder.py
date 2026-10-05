@@ -134,7 +134,8 @@ def build_prompt(
             header = f"[page {h.page_no}{chars_hint}]"
         else:
             header = f"[{h.book_name} page {h.page_no}{chars_hint}]"
-        ctx_lines.append(f"{header}\n{_strip_html(h.snippet)}")
+        text = _strip_html(h.snippet) if h.has_highlight else h.snippet
+        ctx_lines.append(f"{header}\n{text}")
 
     context = "\n\n".join(ctx_lines)
     summaries_block = _build_summaries_block(book_summaries, scope)
@@ -166,7 +167,8 @@ def build_chat_context_block(
             header = f"[page {h.page_no}{chars_hint}]"
         else:
             header = f"[{h.book_name} page {h.page_no}{chars_hint}]"
-        ctx_lines.append(f"{header}\n{_strip_html(h.snippet)}")
+        text = _strip_html(h.snippet) if h.has_highlight else h.snippet
+        ctx_lines.append(f"{header}\n{text}")
 
     context = "\n\n".join(ctx_lines)
     summaries_block = _build_summaries_block(book_summaries, scope)

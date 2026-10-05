@@ -165,7 +165,9 @@ def _load_images(images_root: Path, package: dict[str, Any]) -> list[OcrInputPag
     return inputs
 
 
-def _verify_published(conn: sqlite3.Connection, package: dict[str, Any], run_id: int) -> dict[str, Any]:
+def _verify_published(
+    conn: sqlite3.Connection, package: dict[str, Any], run_id: int, *, check_fts: bool = True
+) -> dict[str, Any]:
     name = package["book_name"]
     book = conn.execute("SELECT id, ocr_done_at, indexed_at FROM books WHERE name=?", (name,)).fetchone()
     active = (
@@ -191,7 +193,8 @@ def _verify_published(conn: sqlite3.Connection, package: dict[str, Any], run_id:
     ]
     if [list(row) for row in rows] != expected:
         raise ValueError("published body differs from sealed artifact")
-    conn.execute("INSERT INTO pages_fts(pages_fts, rank) VALUES('integrity-check', 1)")
+    if check_fts:
+        conn.execute("INSERT INTO pages_fts(pages_fts, rank) VALUES('integrity-check', 1)")
     return {
         "book_name": name,
         "run_id": run_id,
@@ -200,7 +203,7 @@ def _verify_published(conn: sqlite3.Connection, package: dict[str, Any], run_id:
         "rag_available": book[2] is not None,
         "pages_verified": len(rows),
         "body_characters": sum(len(row[1]) for row in expected),
-        "fts5_integrity": "ok",
+        "fts5_integrity": "ok" if check_fts else "not_checked",
         "publication_note": active[1],
         "current_sha256": current_digest(conn, name),
     }
