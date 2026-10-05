@@ -81,6 +81,7 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 
 `gpt61_rag_build` はGPT-6.1専用公開packageとactive OCR runを確認し、
 公開本文・ページ種別・package SHA・本文digestを固定して構築する。
+文字数metadataが本文長と一致しない場合は、短文除外による索引欠落を避けるため公開前に拒否する。
 通常のrebuild/full_buildとは別に、運用担当が唯一のwriterとして冊単位に実行する。
 
 - 準備は本番ストアを変更せず、現行`chunk_page`設定と`embed_batch`で生成する。

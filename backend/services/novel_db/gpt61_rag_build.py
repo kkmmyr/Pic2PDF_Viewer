@@ -60,6 +60,8 @@ def _chunks(conn: sqlite3.Connection, package: dict[str, Any]) -> list[dict[str,
         "WHERE b.name=? AND p.index_eligible=1 ORDER BY p.page_no",
         (package["book_name"],),
     ).fetchall()
+    if any(p[3] != len(p[2] or "") for p in rows):
+        raise ValueError("canonical character count mismatch")
     return [
         {"page_id": p[0], "page_no": p[1], "chunk_idx": i, "text": text, "char_count": p[3]}
         for p in rows

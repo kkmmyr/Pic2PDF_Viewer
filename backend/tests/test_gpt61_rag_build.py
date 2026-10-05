@@ -229,3 +229,15 @@ def test_execution_provenance_separates_checkpoints_and_is_sealed(published, tmp
         build.publish_build(conn, package, changed)
     result = build.publish_build(conn, package, gpu)
     assert result["execution"] == gpu["execution"]
+
+
+def test_corrupt_page_character_count_cannot_silently_omit_body(published, tmp_path):
+    conn, package, staged = published
+    conn.execute("UPDATE pages SET char_count=0 WHERE page_no=1")
+    conn.commit()
+    with pytest.raises(ValueError, match="canonical character count mismatch"):
+        build.prepare_build(conn, package, tmp_path / "corrupt-count")
+    with pytest.raises(ValueError, match="canonical character count mismatch"):
+        build.publish_build(conn, package, staged)
+    assert conn.execute("SELECT indexed_at FROM books").fetchone()[0] is None
+    assert get_chunks_table().count_rows() == 0
