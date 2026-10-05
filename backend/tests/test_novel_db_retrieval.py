@@ -272,3 +272,43 @@ def test_same_page_number_reads_correct_book(db_conn, normal_rag, monkeypatch):
     result = retrieve(db_conn, "質問", Scope("all"))
     assert [h.snippet for h in result.hits] == ["b canonical page 1", "b1 canonical page 1"]
     assert [h.rrf_score for h in result.hits] == [0.8, 0.6]
+
+
+@pytest.mark.parametrize("full_book_mode", [False, True])
+@pytest.mark.parametrize("book_name", ["b", "missing-book"])
+def test_unready_book_is_rejected_in_both_modes(db_conn, monkeypatch, full_book_mode, book_name):
+    import services.novel_db.retrieval as ret_mod
+
+    db_conn.execute("UPDATE books SET indexed_at=NULL WHERE name='b'")
+    db_conn.commit()
+    monkeypatch.setattr(ret_mod, "NOVEL_DB_QA_FULL_BOOK_MODE", full_book_mode)
+    load = MagicMock()
+    search = MagicMock()
+    monkeypatch.setattr(ret_mod, "load_all_pages_of_book", load)
+    monkeypatch.setattr(ret_mod, "hybrid_search", search)
+    with pytest.raises(ret_mod.RagNotReady, match="RAG is not available"):
+        retrieve(db_conn, "質問", Scope("book", book_name))
+    load.assert_not_called()
+    search.assert_not_called()
+
+
+@pytest.mark.parametrize("full_book_mode", [False, True])
+@pytest.mark.parametrize("scope", [Scope("all"), Scope("series", "empty-series")])
+def test_empty_ready_all_or_series_preserves_empty_result(db_conn, monkeypatch, full_book_mode, scope):
+    import services.novel_db.retrieval as ret_mod
+
+    db_conn.execute("UPDATE books SET indexed_at=NULL")
+    db_conn.commit()
+    monkeypatch.setattr(ret_mod, "NOVEL_DB_QA_FULL_BOOK_MODE", full_book_mode)
+    if scope.type == "series":
+        monkeypatch.setattr(ret_mod, "resolve_book_names", lambda _: ["b", "b1"])
+    load = MagicMock()
+    search = MagicMock()
+    monkeypatch.setattr(ret_mod, "load_all_pages_of_book", load)
+    monkeypatch.setattr(ret_mod, "hybrid_search", search)
+    result = retrieve(db_conn, "質問", scope)
+    assert result.hits == []
+    assert result.book_summaries is None
+    assert result.qa_options == ret_mod.LLM_OPTIONS
+    load.assert_not_called()
+    search.assert_not_called()

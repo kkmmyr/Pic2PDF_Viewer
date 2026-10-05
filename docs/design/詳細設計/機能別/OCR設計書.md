@@ -443,15 +443,9 @@ SHAはUTF-8 canonical JSON（キーソート、空白なし、ensure_ascii=False
 同一パッケージの再実行は公開済みrunを照合してno-opとし、現行版が別版なら拒否する。
 別パッケージは期待する現行本文digestの一致を要求し、意図しない上書きを拒否する。
 
-本文範囲で再判定した成果物では、合格の評価範囲（読書本文・通常の章節見出し・あとがき）と
-対象外の未解決署名・装飾・UIを品質証跡へ明記する。本文外留保を本文の未解決0と混同しない。
-原ページJSONにモデル・画像SHAが省略される場合は、封印済み画像manifestとGPT-6.1セッション
-証跡を照合した`gpt61-body-scope-normalized-page-v1`へ明示変換する。元の本文・分類は変更せず、
-原JSONのpath/SHA、継承画像manifest、モデル証跡、評価範囲を保存する。公開用final SHAは
-変換後JSONを指し、元JSON SHAとは区別する。冊bundleは`gpt61-body-scope-normalized-bundle-v1`
-とし、全ページと原最終manifest・本文TXTのSHAを固定する。別表示の再取得画像は独立QAの
-補助証跡として保持し、元のページ番号へ推測で割り当てない。本番原画像全ページのSHAも
-照合してから受け入れる。既存publication契約の版固定・再実行・復旧条件は変えない。
+本文範囲の再判定では、読書本文・通常の章節見出し・あとがきを品質範囲とし、対象外の署名・装飾・UIの未解決記録を保持する。
+model/画像SHAがない原JSONは、封印済み画像manifest・GPT-6.1セッション証跡を照合した`gpt61-body-scope-normalized-page-v1`へ明示変換する。本文・分類は変更せず、原JSON path/SHA・画像manifest・モデル証跡・評価範囲を保存し、公開用final SHAは変換後JSONを指し、元JSON SHAと区別する。
+冊bundleは`gpt61-body-scope-normalized-bundle-v1`として全ページ・原最終manifest・本文TXTのSHAを固定する。別表示の再取得画像はQA補助証跡として保持し、元ページ番号を推測で割り当てない。本番原画像全ページSHAも照合する。既存の版固定・再実行・復旧条件は維持する。
 
 `gpt61_body_reviewed_v1` engineで最終レビュー本文と原成果物を保存し、本文・あとがきを公開する。
 専用adapterはnarrative/afterwordを製品のnarrativeへ、tocをtocへ、挿絵・表紙等をillustrationへ、

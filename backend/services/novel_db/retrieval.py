@@ -66,12 +66,12 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
     全ページ読み。それ以外は hybrid_search + Query Expansion + 書籍サマリ付与。
     """
     ready_names = set(get_rag_ready_book_names(conn, resolve_book_names(scope)))
+    if scope.type == "book" and scope.id not in ready_names:
+        raise RagNotReady(f"RAG is not available until rebuilding: {scope.id}")
     full_book_mode = NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
     qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX} if full_book_mode else LLM_OPTIONS
 
     if full_book_mode:
-        if scope.id not in ready_names:
-            raise RagNotReady(f"RAG is not available until rebuilding: {scope.id}")
         assert scope.id is not None  # full_book_mode は scope.id != None を条件に設定される
         hits = load_all_pages_of_book(
             conn,
