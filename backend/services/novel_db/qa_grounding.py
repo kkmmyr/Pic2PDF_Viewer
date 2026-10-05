@@ -182,7 +182,11 @@ async def _collect_verified(
                     raise LLMError(f"unverified quote answer after two attempts: {error}") from error
                 attempt_prompt = prompt + (
                     "\n\n前の出力は出典/引用の検証に失敗し破棄された。"
-                    "source_idと原文を再確認して指定JSONだけを返す。検証理由:" + str(error)
+                    "source_idと原文を再確認して指定JSONだけを返す。"
+                    "quoteは本文に実在する一つの連続範囲。途中の台詞・地の文・行を省略して連結しない。"
+                    "離れた箇所は別のevidenceとして返す。"
+                    "答えを含む短い一つの台詞または一文を優先し、複数の台詞・文が必要なら別々のevidenceに分ける。"
+                    "検証理由:" + str(error)
                 )
             else:
                 attempts.append({"attempt": attempt, "passed": True})
