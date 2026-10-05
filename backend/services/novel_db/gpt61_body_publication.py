@@ -97,6 +97,21 @@ def _validate_quality(quality: Any) -> None:
         _sha(item.get("sha256"))
 
 
+def publication_text(page: dict[str, Any]) -> str:
+    """Resolve only the explicitly sealed source field, never a heuristic fallback."""
+    field = page.get("body_text_field", "text")
+    if field not in {"text", "other_text"}:
+        raise ValueError("invalid body text field")
+    if field == "other_text":
+        if page.get("page_type") != "afterword" or page.get("text") != "":
+            raise ValueError("other_text adoption requires an empty-text afterword")
+        value = page.get("artifact", {}).get("other_text")
+        if not isinstance(value, str):
+            raise ValueError("reviewed afterword other_text is required")
+        return value
+    return page["text"]
+
+
 def _validate_page(page: dict[str, Any], number: int) -> None:
     if type(page.get("page_no")) is not int or page["page_no"] != number:
         raise ValueError("pages must be contiguous")
@@ -105,7 +120,7 @@ def _validate_page(page: dict[str, Any], number: int) -> None:
     _sha(page.get("image_sha256"))
     _sha(page.get("final_sha256"))
     if page["page_type"] in _BODY_TYPES:
-        if not page["text"].strip() or page.get("uncertain_spans"):
+        if not publication_text(page).strip() or page.get("uncertain_spans"):
             raise ValueError("empty or unresolved body page")
     if not isinstance(page.get("artifact"), dict):
         raise ValueError("original page artifact required")
@@ -168,7 +183,7 @@ def _verify_published(conn: sqlite3.Connection, package: dict[str, Any], run_id:
     expected = [
         [
             p["page_no"],
-            p["text"] if p["page_type"] in _BODY_TYPES else "",
+            publication_text(p) if p["page_type"] in _BODY_TYPES else "",
             _TYPE_MAP[p["page_type"]],
             p["page_type"] in _BODY_TYPES,
         ]
@@ -238,7 +253,7 @@ def publish_package(*, db_path: Path, images_root: Path, package: dict[str, Any]
         publications = []
         for page, image in zip(package["pages"], inputs, strict=True):
             body = page["page_type"] in _BODY_TYPES
-            text = page["text"] if body else ""
+            text = publication_text(page) if body else ""
             kind = _TYPE_MAP[page["page_type"]]
             conn.execute(
                 "INSERT INTO ocr_page_results (run_id, page_no, image_sha256, state, full_text, primary_text, char_count, raw_output, qa_state, qa_note, reviewed_at, page_type, layout_type, selected_engine, index_eligible) VALUES (?, ?, ?, 'passed', ?, ?, ?, ?, 'approved', ?, datetime('now', '+9 hours'), ?, ?, 'primary', ?)",
@@ -246,9 +261,9 @@ def publish_package(*, db_path: Path, images_root: Path, package: dict[str, Any]
                     run_id,
                     page["page_no"],
                     image.image_sha256,
-                    page["text"],
-                    page["text"],
-                    len(page["text"]),
+                    publication_text(page),
+                    publication_text(page),
+                    len(publication_text(page)),
                     json.dumps(page, ensure_ascii=False),
                     note,
                     kind,

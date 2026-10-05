@@ -447,6 +447,11 @@ SHAはUTF-8 canonical JSON（キーソート、空白なし、ensure_ascii=False
 専用adapterはnarrative/afterwordを製品のnarrativeへ、tocをtocへ、挿絵・表紙等をillustrationへ、
 広告・奥付等をcolophon_or_adへ対応づける。原分類・other_text・非本文留保は監査rawに保持し、
 非本文はcanonicalの空文字として保存する。既存QA importerを経由して推論情報を捏造しない。
+あとがきが原成果物の`other_text`に保存されている場合は、原分類がafterword、`text`が空、
+`other_text`が非空、未解決箇所0を確認したページだけ、パッケージの`body_text_field=other_text`で
+採用フィールドを版・SHAに固定する。narrativeや他分類へのfallback、両欄の自動連結は行わない。
+元ページの`text`・`other_text`はそのまま監査保存する。公開文字数は採用したページ文字列のlen合計とし、
+旧報告のTXT結合境界や保存欄によって異なる文字数と混同しない。
 検証済みSQLite Online Backupを先に作り、書籍・run・ページ・公開履歴・FTS5・ICU世代の無効化を
 同一write transactionで確定する。失敗は全rollbackし、旧成果物・旧台帳・旧runは保持する。
 

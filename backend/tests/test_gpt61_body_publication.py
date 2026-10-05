@@ -140,3 +140,35 @@ def test_failed_replacement_preserves_existing_body_and_fts(setup_book, monkeypa
         assert conn.execute("SELECT COUNT(*) FROM pages_fts WHERE pages_fts MATCH '公開本文'").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM ocr_runs").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM ocr_publications WHERE retired_at IS NULL").fetchone()[0] == 1
+
+
+def test_explicit_afterword_field_preserves_original_artifact(setup_book):
+    db, root, package = setup_book
+    page = package["pages"][0]
+    original_text = page["text"]
+    page["text"] = ""
+    page["artifact"]["text"] = ""
+    page["artifact"]["other_text"] = original_text
+    page["body_text_field"] = "other_text"
+    package["package_sha256"] = publication.package_digest(package)
+    result = publish(setup_book)
+    assert result["body_characters"] == len(original_text)
+    with with_db(str(db)) as conn:
+        assert conn.execute("SELECT full_text FROM pages").fetchone()[0] == original_text
+        raw = json.loads(conn.execute("SELECT raw_output FROM ocr_page_results").fetchone()[0])
+        assert raw["artifact"]["text"] == ""
+        assert raw["artifact"]["other_text"] == original_text
+    assert publish(setup_book)["status"] == "already_published"
+
+
+@pytest.mark.parametrize("kind,text", [("narrative", ""), ("afterword", "already present")])
+def test_other_field_is_not_a_general_fallback(setup_book, kind, text):
+    _, _, package = setup_book
+    page = package["pages"][0]
+    page["page_type"] = page["artifact"]["page_type"] = kind
+    page["text"] = page["artifact"]["text"] = text
+    page["artifact"]["other_text"] = "reviewed other text"
+    page["body_text_field"] = "other_text"
+    package["package_sha256"] = publication.package_digest(package)
+    with pytest.raises(ValueError, match="empty-text afterword"):
+        publish(setup_book)
