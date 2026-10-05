@@ -64,15 +64,32 @@ def _nonfinite(value: str) -> None:
     raise ValueError(f"non-finite JSON constant: {value}")
 
 
-def _canonical_quote(source: str, quote: str) -> str:
+def _canonical_quote(source: str, quote: str) -> tuple[int, int]:
     positioned = [(index, char) for index, char in enumerate(source) if not char.isspace()]
     needle = "".join(char for char in quote if not char.isspace())
     if not needle:
         raise ValueError("empty quote")
-    offset = "".join(char for _, char in positioned).find(needle)
+    normalized = "".join(char for _, char in positioned)
+    offset = normalized.find(needle)
     if offset < 0:
         raise ValueError("quote does not match canonical source")
-    return source[positioned[offset][0] : positioned[offset + len(needle) - 1][0] + 1]
+    if normalized.find(needle, offset + 1) >= 0:
+        raise ValueError("quote has ambiguous canonical source position")
+    return positioned[offset][0], positioned[offset + len(needle) - 1][0] + 1
+
+
+def _quote_context(source: str, start: int, end: int) -> str:
+    """Include the containing lines and one adjacent line per side, bounded by 500 chars."""
+    line_start = source.rfind("\n", 0, start) + 1
+    previous_start = source.rfind("\n", 0, max(0, line_start - 1)) + 1
+    line_end = source.find("\n", end)
+    if line_end < 0:
+        following_end = len(source)
+    else:
+        following_end = source.find("\n", line_end + 1)
+        if following_end < 0:
+            following_end = len(source)
+    return source[max(previous_start, start - 500) : min(following_end, end + 500)]
 
 
 def validate_quote_answer(raw: str, sources: Sequence[QaSource]) -> str:
@@ -102,12 +119,14 @@ def validate_quote_answer(raw: str, sources: Sequence[QaSource]) -> str:
         if not isinstance(quote, str) or not 1 <= len(quote) <= 500:
             raise ValueError("invalid quote length")
         source = by_id[source_id]
-        canonical = _canonical_quote(source.text, quote)
+        start, end = _canonical_quote(source.text, quote)
+        canonical = source.text[start:end]
         identity = (source.book_name, source.page_no, canonical)
         if identity in seen:
             raise ValueError("duplicate quote from same source")
         seen.add(identity)
-        block = "\n".join("> " + line for line in canonical.split("\n"))
+        context = _quote_context(source.text, start, end)
+        block = "\n".join("> " + line for line in context.split("\n"))
         rendered.append(f"根拠（{source.book_name}／page {source.page_no}）：\n\n{block}")
     return "\n\n".join(rendered)
 

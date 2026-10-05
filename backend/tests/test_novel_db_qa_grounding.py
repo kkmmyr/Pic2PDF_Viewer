@@ -57,8 +57,35 @@ def test_prompt_serialization_and_frozen_sources(sources):
 def test_whitespace_normalization_restores_canonical_quote_and_metadata(sources):
     answer = grounding.validate_quote_answer(raw(), sources)
     assert "本A／page 7" in answer
-    assert "> 答えは\n> 　青い石。" in answer
-    assert "青い石。後書き。" not in answer
+    assert "> 前置き。答えは\n> 　青い石。後書き。" in answer
+
+
+@pytest.mark.parametrize(
+    ("text", "quote", "expected"),
+    [
+        (
+            "さらに前\n【トリィティ】\n光を放つ魔法。\n次の文脈\nさらに後",
+            "光を放つ魔法。",
+            "【トリィティ】\n光を放つ魔法。\n次の文脈",
+        ),
+        ("前行\n左側。選択本文。右側\n後行\n除外", "選択本文。", "前行\n左側。選択本文。右側\n後行"),
+        ("選択本文。\n後行\n除外", "選択本文。", "選択本文。\n後行"),
+        ("除外\n前行\n選択本文。", "選択本文。", "前行\n選択本文。"),
+        ("あ" * 600 + "選択本文。" + "い" * 600, "選択本文。", "あ" * 500 + "選択本文。" + "い" * 500),
+    ],
+)
+def test_quote_context_is_exact_bounded_canonical_slice(text, quote, expected):
+    source = grounding.QaSource(0, "本", 1, text)
+    result = grounding.validate_quote_answer(raw(quote), [source])
+    assert result == "根拠（本／page 1）：\n\n" + "\n".join("> " + line for line in expected.split("\n"))
+
+
+def test_mismatch_rejected_before_context_and_ambiguous_position_rejected():
+    source = grounding.QaSource(0, "本", 1, "名前\n本文。\n本文。")
+    with pytest.raises(ValueError, match="does not match"):
+        grounding.validate_quote_answer(raw("架空の本文。"), [source])
+    with pytest.raises(ValueError, match="ambiguous"):
+        grounding.validate_quote_answer(raw("本文。"), [source])
 
 
 def test_not_found_is_explicit(sources):
