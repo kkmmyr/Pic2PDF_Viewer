@@ -163,7 +163,7 @@ LLM 呼び出しとは独立した純関数群。
 MacのQwen3.6 MLX-VLMをLinuxから利用する場合、SSH reverse tunnel経由のloopback URLを
 `NOVEL_DB_MLX_BASE_URL`へ設定する。LinuxクライアントはHTTP adapterのみを使い、
 Mac専用のMLX依存をLinuxへ導入しない。常設接続・起動・復旧の正本は
-[GPU環境セットアップ §5.1](../../環境構築/GPU環境セットアップ.md#51-macのqwenをlinuxのqaから利用する)を参照する。
+[GPU環境セットアップ §5.1](../../環境構築/GPU環境セットアップ.md#51-macqwenlinuxqa)を参照する。
 モデル比較は同じ公開本文版・検索結果・prompt・samplingを固定し、生成のみを
 `stream_qa(..., provider=...)`で実行する。比較中はQA履歴を含め本番DBへ書かない。
 本番`/qa`は履歴を保存するため、疎通確認時は生成の終了・回答・引用ページと履歴を検証し、
