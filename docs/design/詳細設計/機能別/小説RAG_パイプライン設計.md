@@ -1,6 +1,6 @@
 # 小説 RAG 構築パイプライン設計
 
-> status: living | last-verified: 2026-10-05
+> status: living | last-verified: 2026-10-07
 
 novel タブの本文を検索・QA 可能にするための **DB 構築パイプライン**（OCR 取込 → チャンク分割 → embedding → 文脈生成 → キャラ抽出 → 書籍サマリ）の現在形設計。検索・QA 側は [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
@@ -102,8 +102,14 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
   failed manifestと理由を保存する。再開は同じ本文版・checkpointを確認して対象冊を全置換し、
   部分書き込みや孤立行を収束させる。同一版の完成済み処理は実索引照合後にno-opとする。
 - 本番公開は共通backup flock、稼働queue/OCR writerなしの確認、service停止窓を併用する。
-  準備中はserviceを継続でき、公開transactionの間だけ書き込みを止める。
-  SQLiteとLanceの復元可能な事前backupを保持する。既存停止済みOCR管理・定期処理は再開しない。
+  準備中はserviceを継続でき、公開と整合したバックアップに必要な間だけ書き込みを止める。
+  SQLite Online Backupと同時点のLance `chunks`・`summaries`・SQLiteが指すactive ICU全文検索テーブルを
+  一組で保存する。全ファイルSHA、SQLite整合性、隔離復元後のSQL/Lance対応と全文検索を検証する。
+  稼働appをSTOPする場合は、既存SQLite書込みを待って予約ロックを保持した状態で停止し、
+  事前登録したtrapで再開する。子writerの不存在も確認する。
+  同名backupは最初の試行時点を保持し、再試行で上書きしない。復旧世代を選ぶ際は後続冊とQA履歴への影響を確認する。
+  まず1冊で本文公開・索引照合・実検索・複数の実API回答と根拠の意味照合を通し、
+  反映台帳の合格を確認してから残りを順次公開する。既存停止済みOCR管理・定期処理は再開しない。
 
 ## 4. ステップ 3: 書籍サマリ + キャラクター辞典（`full_builder` + `summarizer`）
 
