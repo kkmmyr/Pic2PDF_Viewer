@@ -80,14 +80,13 @@ def test_rag_excludes_pending_lexical_hits(freshness_db, monkeypatch):
     assert result.book_summaries == {"ready": "old summary"}
 
 
-def test_pending_rag_skips_search_and_full_book_rejects(freshness_db, monkeypatch):
+@pytest.mark.parametrize("full_book_mode", [False, True])
+def test_pending_book_rejects_before_search_in_every_mode(freshness_db, monkeypatch, full_book_mode):
     blocked = MagicMock(side_effect=AssertionError("must not retrieve pending book"))
     for name in ("hybrid_search", "expand_query", "load_all_pages_of_book"):
         monkeypatch.setattr(retrieval, name, blocked)
-    monkeypatch.setattr(retrieval, "NOVEL_DB_QA_FULL_BOOK_MODE", False)
-    assert retrieval.retrieve(freshness_db, "query", Scope("book", "pending")).hits == []
-    monkeypatch.setattr(retrieval, "NOVEL_DB_QA_FULL_BOOK_MODE", True)
-    with pytest.raises(ValueError, match="RAG is not available"):
+    monkeypatch.setattr(retrieval, "NOVEL_DB_QA_FULL_BOOK_MODE", full_book_mode)
+    with pytest.raises(retrieval.RagNotReady, match="RAG is not available"):
         retrieval.retrieve(freshness_db, "query", Scope("book", "pending"))
     blocked.assert_not_called()
 
