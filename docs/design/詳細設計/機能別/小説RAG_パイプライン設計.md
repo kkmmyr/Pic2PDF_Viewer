@@ -1,6 +1,6 @@
 # 小説 RAG 構築パイプライン設計
 
-> status: living | last-verified: 2026-10-07
+> status: living | last-verified: 2026-10-08
 
 novel タブの本文を検索・QA 可能にするための **DB 構築パイプライン**（OCR 取込 → チャンク分割 → embedding → 文脈生成 → キャラ抽出 → 書籍サマリ）の現在形設計。検索・QA 側は [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
@@ -84,6 +84,14 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
 文字数metadataが本文長と一致しない場合は、短文除外による索引欠落を避けるため公開前に拒否する。
 通常のrebuild/full_buildとは別に、運用担当が唯一のwriterとして冊単位に実行する。
 
+- 取り込み対象は品質合格の採用版を固定する。差し替えページやrevisionがある場合は、
+  採用manifest・版選択記録・品質証拠と各ページのSHAを照合し、旧finalへ戻らない。
+  本文範囲の合格と非本文の判読留保を分け、対象外の文字を本文へ昇格させない。
+- writerは接続先SQLite・Lance・原画像ルートと新規監査namespaceの絶対パスを確認する。
+  再開時もactive runの採用artifact・品質・全rawページを封印packageと照合し、
+  本文digestだけで採用版の一致を判断しない。公開中の多ストア検証・exportも共通lock内で行う。
+  FTS5の公開確認には3文字以上の本文語句を使い、ICUの短語検索とは別に判定する。
+
 - 準備は本番ストアを変更せず、現行`chunk_page`設定と`embed_batch`で生成する。
   16件ごとのcheckpointを入力・設定・vector hashとともにatomic保存し、再開時に照合する。
   モデル名・backend・次元・chunk設定を封印し、運用台帳には実モデルdigestも記録する。
@@ -105,6 +113,9 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
   準備中はserviceを継続でき、公開と整合したバックアップに必要な間だけ書き込みを止める。
   SQLite Online Backupと同時点のLance `chunks`・`summaries`・SQLiteが指すactive ICU全文検索テーブルを
   一組で保存する。全ファイルSHA、SQLite整合性、隔離復元後のSQL/Lance対応と全文検索を検証する。
+  内容検証は保存原本の複製で行い、Lance接続時の補助metadataを原本へ追加しない。
+  検証前後に原本のファイル集合とSHAが不変であることを確認する。
+  ファイル差し替えによる復旧ではserviceを終了し、SQLiteとLanceを同じ世代の一組へ戻してから再開する。
   稼働appをSTOPする場合は、既存SQLite書込みを待って予約ロックを保持した状態で停止し、
   事前登録したtrapで再開する。子writerの不存在も確認する。
   同名backupは最初の試行時点を保持し、再試行で上書きしない。復旧世代を選ぶ際は後続冊とQA履歴への影響を確認する。
