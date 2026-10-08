@@ -10,5 +10,6 @@
   "scripts/maintenance/check_docs.py": 472,
   "scripts/maintenance/dots_mocr_vertical_predict.py": 548,
   "scripts/maintenance/ensemble_ocr_candidates.py": 553,
+  "scripts/maintenance/ocr_offline_ledger.py": 555,
   "scripts/maintenance/qwen35_ocr_jp_vertical_predict.py": 465
 }
