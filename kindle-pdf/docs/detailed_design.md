@@ -1,6 +1,6 @@
 # Kindle キャプチャツール 詳細設計書
 
-> status: living | last-verified: 2026-09-05
+> status: living | last-verified: 2026-09-19
 
 実機依存の観測値、障害切り分け、再撮影後の品質確認は
 [Kindle 自動撮影 実機知見](../../docs/log/技術知見/Kindle自動撮影_実機知見.md)を参照する。
@@ -196,6 +196,12 @@ adapterからcapture agentやHTTP transportを参照しない。
   `ReadingArea` 全体、`novel` は `ReadingArea` の左右端と
   `TopChrome.bottom` / `Footer.top` を合成し、書名とページ・進捗表示を除外する。
   各矩形の包含関係を検証できない場合は撮影を開始しない。
+  小説agentはこれを本文境界として使い、取得フレームの上下には別途`reading_area_bounds()`を使う。
+  `NovelKindleCapturer.configure_cover_frame()`は最大化後の本文境界を画像相対座標へ検証・変換する。
+  表紙と確認済みの先頭`001.png`は全高を保存する。以降は本文の上下を白い余白にし、本文画素を
+  移動・縮小せず保持する。全画像の寸法とmanifestの撮影矩形は一致する。
+  変化・安定・終端の比較は全フレームで同じ本文領域を使うため、保存方式の切替や進捗表示だけで
+  カナリア成功・ページ送り成功と判断しない。本文境界がフレーム外なら撮影を開始しない。
 - 通常の単冊経路とcapture agentはKindleの起動、ログイン、画面ロック解除を行わない。
   シリーズ直列実行のオプトイン復旧だけは、撮影開始前の失敗でKindleプロセスの消失を
   確認した場合に限ってStoreアプリを再起動する。プロセスが残るUI不調は強制終了しない。
