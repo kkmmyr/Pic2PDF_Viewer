@@ -46,7 +46,10 @@ def watch_from_row(row: _RowLike) -> dict[str, object]:
         "last_status": row["last_status"],
         "last_error": row["last_error"],
         "last_current_price": row["last_current_price"],
+        "last_points": row["last_points"],
+        "last_effective_price": row["last_effective_price"],
         "last_list_price": row["last_list_price"],
+        "last_list_price_source": row["last_list_price_source"],
         "last_ratio_percent": row["last_ratio_percent"],
     }
 
@@ -57,7 +60,10 @@ def observation_from_row(row: _RowLike) -> dict[str, object]:
         "watch_id": _required_int(row["watch_id"], "kindle_price_observations.watch_id"),
         "observed_at": row["observed_at"],
         "current_price": row["current_price"],
+        "points": row["points"],
+        "effective_price": row["effective_price"],
         "list_price": row["list_price"],
+        "list_price_source": row["list_price_source"],
         "ratio_percent": row["ratio_percent"],
         "status": row["status"],
         "error_message": row["error_message"],

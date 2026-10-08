@@ -31,7 +31,10 @@ const watch = {
     last_status: 'never' as const,
     last_error: null,
     last_current_price: null,
+    last_points: null,
+    last_effective_price: null,
     last_list_price: null,
+    last_list_price_source: null,
     last_ratio_percent: null,
 };
 
@@ -87,6 +90,39 @@ describe('KindlePriceWatchPage', () => {
                 enabled: true,
             });
         });
+    });
+
+    it('ポイント差引後の実質価格と紙版定価を表示する', () => {
+        mockedUseKindlePriceWatches.mockReturnValue({
+            watches: [
+                {
+                    ...watch,
+                    last_status: 'ok',
+                    last_current_price: 891,
+                    last_points: 9,
+                    last_effective_price: 882,
+                    last_list_price: 990,
+                    last_list_price_source: 'paper',
+                    last_ratio_percent: 89.1,
+                },
+            ],
+            isLoading: false,
+            error: null,
+            create,
+            creating: false,
+            update,
+            updating: false,
+            remove,
+            removing: false,
+        } as ReturnType<typeof useKindlePriceWatches>);
+
+        renderPage();
+
+        expect(screen.getByText('付与ポイント')).toBeInTheDocument();
+        expect(screen.getByText('9 pt')).toBeInTheDocument();
+        expect(screen.getByText('実質価格')).toBeInTheDocument();
+        expect(screen.getByText('紙版定価')).toBeInTheDocument();
+        expect(screen.getByText('￥882')).toBeInTheDocument();
     });
 
     it('停止と削除を確認ダイアログ経由で行える', async () => {

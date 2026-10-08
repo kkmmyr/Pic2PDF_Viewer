@@ -228,7 +228,8 @@ def list_history(watch_id: int, limit: int = 100) -> list[dict]:
             raise KeyError(f"価格監視 {watch_id} が見つかりません")
         rows = conn.execute(
             """
-            SELECT id, watch_id, observed_at, current_price, list_price,
+            SELECT id, watch_id, observed_at, current_price, points,
+                   effective_price, list_price, list_price_source,
                    ratio_percent, status, error_message, source
             FROM kindle_price_observations
             WHERE watch_id = ?

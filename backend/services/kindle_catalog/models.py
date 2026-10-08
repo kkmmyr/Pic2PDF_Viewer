@@ -252,7 +252,10 @@ class KindlePriceWatch(KindleSQLModel, table=True):
     last_status: str = Field(default="never", index=True)
     last_error: str | None = None
     last_current_price: int | None = None
+    last_points: int | None = None
+    last_effective_price: int | None = None
     last_list_price: int | None = None
+    last_list_price_source: str | None = None
     last_ratio_percent: float | None = None
 
 
@@ -265,7 +268,10 @@ class KindlePriceObservation(KindleSQLModel, table=True):
     watch_id: int = Field(foreign_key="kindle_price_watches.id", index=True)
     observed_at: str = Field(index=True)
     current_price: int | None = None
+    points: int | None = None
+    effective_price: int | None = None
     list_price: int | None = None
+    list_price_source: str | None = None
     ratio_percent: float | None = None
     status: str = Field(index=True)
     error_message: str | None = None

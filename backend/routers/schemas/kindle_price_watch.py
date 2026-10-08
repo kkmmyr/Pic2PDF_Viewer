@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 PriceStatus = Literal["ok", "partial", "failed"]
+ListPriceSource = Literal["kindle", "paper"]
 
 
 class KindlePriceWatchCreateRequest(BaseModel):
@@ -27,7 +28,9 @@ class KindlePriceWatchUpdateRequest(BaseModel):
 
 class KindlePriceObservationRequest(BaseModel):
     current_price: int | None = Field(default=None, ge=0)
+    points: int | None = Field(default=None, ge=0)
     list_price: int | None = Field(default=None, ge=0)
+    list_price_source: ListPriceSource | None = None
     status: PriceStatus | None = None
     error_message: str | None = Field(default=None, max_length=1000)
     source: Literal["codex_browser", "manual"] = "codex_browser"
@@ -39,7 +42,10 @@ class KindlePriceObservationOut(BaseModel):
     watch_id: int
     observed_at: str
     current_price: int | None
+    points: int | None
+    effective_price: int | None
     list_price: int | None
+    list_price_source: ListPriceSource | None
     ratio_percent: float | None
     status: PriceStatus
     error_message: str | None
@@ -61,7 +67,10 @@ class KindlePriceWatchOut(BaseModel):
     last_status: Literal["never", "ok", "partial", "failed"]
     last_error: str | None
     last_current_price: int | None
+    last_points: int | None
+    last_effective_price: int | None
     last_list_price: int | None
+    last_list_price_source: ListPriceSource | None
     last_ratio_percent: float | None
 
 
