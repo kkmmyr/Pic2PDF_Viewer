@@ -112,14 +112,19 @@ class _Controller:
         assert source == "novel"
         return (0, 100, 1000, 728)
 
+    def reading_area_bounds(self) -> tuple[int, int, int, int]:
+        return (0, 48, 1000, 768)
+
     def go_to_start(self, *, source, direction, on_poll) -> None:
         type(self).start_sources.append(source)
         assert direction in {"left", "right"}
         on_poll()
 
 
-def _fake_canary(_job, *, reading_area_bounds_provider):
-    assert reading_area_bounds_provider() == (0, 100, 1000, 728)
+def _fake_canary(_job, *, reading_area_bounds_provider, content_bounds_provider=None):
+    if content_bounds_provider is not None:
+        assert reading_area_bounds_provider() == (0, 48, 1000, 768)
+        assert content_bounds_provider() == (0, 100, 1000, 728)
     return {
         "policy_version": "kindle-capture-canary-v1",
         "passed": True,
@@ -147,8 +152,10 @@ def _fake_capture(
     on_page,
     *,
     reading_area_bounds_provider,
+    content_bounds_provider=None,
 ):
-    assert reading_area_bounds_provider() == (0, 100, 1000, 728)
+    assert reading_area_bounds_provider() == (0, 48, 1000, 768)
+    assert content_bounds_provider() == (0, 100, 1000, 728)
     image_dir = output_root / "captured"
     image_dir.mkdir()
     for page in range(1, 6):
@@ -389,6 +396,27 @@ def test_publish_failure_removes_partial_package(tmp_path) -> None:
 
     assert exc.value.error_code == "transfer_failed"
     assert not (config.inbox / f"{_job()['id']}.partial").exists()
+
+
+def test_body_bounds_failure_restores_window(tmp_path, monkeypatch) -> None:
+    from unittest.mock import Mock
+
+    capturer = Mock()
+    monkeypatch.setattr(capture_agent, "NovelKindleCapturer", lambda: capturer)
+
+    def unavailable_bounds():
+        raise RuntimeError("ReadingArea is unavailable")
+
+    with pytest.raises(RuntimeError, match="ReadingArea is unavailable"):
+        capture_agent._configured_capturer(
+            _job(),
+            tmp_path,
+            reading_area_bounds_provider=lambda: (0, 48, 1000, 768),
+            content_bounds_provider=unavailable_bounds,
+        )
+
+    capturer.cleanup.assert_called_once()
+    capturer.capture_loop.assert_not_called()
 
 
 def test_publish_retries_transient_ready_rename(
