@@ -85,8 +85,8 @@ class _NovelDbSettings(BaseSettings):
     NOVEL_DB_QA_TOP_K: int = 64
     # B-13 段階 B（2026-05-11 採用）: 32768（llama-server を -c 36864 で起動する必要あり）。
     NOVEL_DB_QA_NUM_CTX: int = 32768
-    NOVEL_DB_QA_REPEAT_PENALTY: float = Field(1.2, gt=0, allow_inf_nan=False)
-    NOVEL_DB_QA_PRESENCE_PENALTY: float | None = Field(None, ge=-2, le=2, allow_inf_nan=False)
+    NOVEL_DB_QA_REPEAT_PENALTY: float = Field(default=1.2, gt=0, allow_inf_nan=False)
+    NOVEL_DB_QA_PRESENCE_PENALTY: float | None = Field(default=None, ge=-2, le=2, allow_inf_nan=False)
     NOVEL_DB_QA_RESPONSE_MODE: Literal["generative", "verified_quotes"] = "generative"
 
     # B-11 Query Expansion（2026-05-11 採用）

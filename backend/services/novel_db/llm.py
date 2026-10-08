@@ -9,7 +9,7 @@ ADR-0009（推論バックエンド切替）。
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 
 from config import NOVEL_DB_LLM_MODEL, NOVEL_DB_QA_NUM_CTX
 from config.novel_db import novel_db_settings
@@ -68,7 +68,7 @@ async def stream_qa(
     options: dict | None = None,
     timeout: float = 600.0,
     provider: NovelLlmProvider | None = None,
-) -> AsyncIterator[dict]:
+) -> AsyncGenerator[dict, None]:
     """Qwen に stream=True で投げ、各イベントを yield する。
 
     実体は`llm_provider`から取得したQwen backendの`astream_ask`を呼ぶだけ。

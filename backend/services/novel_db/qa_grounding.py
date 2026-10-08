@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncGenerator, Sequence
 from contextlib import suppress
 from dataclasses import asdict, dataclass
 
@@ -202,7 +202,7 @@ async def stream_verified_quotes(
     options: dict,
     provider: NovelLlmProvider | None = None,
     timeout: float = 600,
-) -> AsyncIterator[dict]:
+) -> AsyncGenerator[dict, None]:
     sources = tuple(sources)
     task = asyncio.create_task(_collect_verified(prompt, sources, model, options, provider, timeout))
     try:

@@ -45,7 +45,7 @@ def build_message(
         reasons.append("設定した定価比を下回りました")
     ratio = "不明" if ratio_percent is None else f"{ratio_percent:.1f}%"
     list_price_label = {"kindle": "Kindle定価/参考価格", "paper": "紙版定価"}.get(
-        list_price_source,
+        list_price_source or "",
         "定価/参考価格",
     )
     return (

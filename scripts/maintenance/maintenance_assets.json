@@ -336,7 +336,7 @@
   "script_groups": [
     {
       "id": "root-python",
-      "patterns": ["scripts/*.py"],
+      "patterns": ["scripts/*.py", "scripts/tests/test_setup_mac_qwen_qa.py"],
       "classification": "continuous",
       "owner": "platform",
       "reason": "repository and Kindle-series operational entry points",
@@ -375,6 +375,17 @@
       "classification": "continuous",
       "owner": "quality",
       "reason": "quality gates, benchmark comparison, and reproducible OCR evaluation",
+      "recheck_after": null
+    },
+    {
+      "id": "offline-ocr-ledger",
+      "patterns": [
+        "scripts/maintenance/ocr_offline_ledger.py",
+        "scripts/maintenance/tests/test_ocr_offline_ledger.py"
+      ],
+      "classification": "continuous",
+      "owner": "novel-ocr",
+      "reason": "durable offline OCR reservations, progress, verification and stop/resume contracts",
       "recheck_after": null
     },
     {

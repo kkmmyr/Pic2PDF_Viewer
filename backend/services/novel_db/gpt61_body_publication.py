@@ -236,7 +236,8 @@ def publish_package(*, db_path: Path, images_root: Path, package: dict[str, Any]
             "INSERT INTO ocr_runs (book_name, engine, model, source_page_count, state, started_at, qa_state, runtime_manifest_json) VALUES (?, ?, ?, ?, 'awaiting_qa', datetime('now', '+9 hours'), 'pending', ?)",
             (name, ENGINE, MODEL, len(inputs), json.dumps(provenance, ensure_ascii=False)),
         )
-        run_id = int(cursor.lastrowid)
+        assert cursor.lastrowid is not None
+        run_id = cursor.lastrowid
         backup = create_verified_publication_backup(run_id, "publish", db_path=db_path)
         note = f"GPT-6.1 quality accepted; package={package['package_sha256']}; verified backup={backup}"
         book = conn.execute("SELECT id FROM books WHERE name=?", (name,)).fetchone()
@@ -245,7 +246,8 @@ def publish_package(*, db_path: Path, images_root: Path, package: dict[str, Any]
                 "INSERT INTO books (name, pdf_path, images_dir, page_count, ocr_done_at) VALUES (?, '', ?, ?, datetime('now', '+9 hours'))",
                 (name, str(inputs[0].image_path.parent), len(inputs)),
             )
-            book_id = int(cursor.lastrowid)
+            assert cursor.lastrowid is not None
+            book_id = cursor.lastrowid
         else:
             book_id = int(book[0])
             ensure_legacy_snapshot(conn, book_id=book_id, book_name=name, input_pages=inputs, actor="codex")
