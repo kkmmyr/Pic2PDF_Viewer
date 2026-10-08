@@ -40,4 +40,7 @@ Kindle内部実装は`kindle-pdf/docs/`、共通LLMのモジュール利用は`c
 
 - backend編集: `backend-conventions`
 - frontend編集: `frontend-conventions`
-- 設計書→変更履歴→ソース修正の順序: `docs-workflow`
+- 設計に影響する変更の文書振り分け: `docs-workflow`
+- テスト追加・修正や副作用ロジック・バグ修正の検証設計: `test-writing`
+
+この一覧は固定の読み順ではない。対象に必要なskillを実装前に確認し、文書・実装の変更工程とは区別する。
