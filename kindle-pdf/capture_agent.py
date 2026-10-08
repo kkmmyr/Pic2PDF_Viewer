@@ -59,11 +59,13 @@ def _capture(
     on_page,
     *,
     reading_area_bounds_provider,
+    content_bounds_provider=None,
 ):
     capturer = _configured_capturer(
         job,
         output_root,
         reading_area_bounds_provider=reading_area_bounds_provider,
+        content_bounds_provider=content_bounds_provider,
     )
     try:
         result = capturer.capture_loop(
@@ -82,6 +84,7 @@ def _configured_capturer(
     output_root: Path,
     *,
     reading_area_bounds_provider,
+    content_bounds_provider=None,
 ):
     capturer = (
         NovelKindleCapturer() if job["source"] == "novel" else AutoKindleCapturer()
@@ -99,6 +102,8 @@ def _configured_capturer(
         capturer.setup_window(
             reading_area_bounds_provider=reading_area_bounds_provider,
         )
+        if content_bounds_provider is not None:
+            capturer.configure_cover_frame(content_bounds_provider())
     except Exception:
         capturer.cleanup()
         raise
@@ -109,11 +114,13 @@ def _run_canary(
     job: dict,
     *,
     reading_area_bounds_provider,
+    content_bounds_provider=None,
 ) -> dict:
     capturer = _configured_capturer(
         job,
         Path(tempfile.gettempdir()),
         reading_area_bounds_provider=reading_area_bounds_provider,
+        content_bounds_provider=content_bounds_provider,
     )
     try:
         return run_capture_canary(capturer).to_manifest()
@@ -202,12 +209,20 @@ def _run_claimed_job(
     )
     heartbeat.raise_if_failed()
 
-    def bounds_provider():
-        return controller.capture_area_bounds(job["source"])
-
+    bounds_provider = (
+        controller.reading_area_bounds
+        if job["source"] == "novel"
+        else lambda: controller.capture_area_bounds(job["source"])
+    )
+    content_bounds_provider = (
+        (lambda: controller.capture_area_bounds("novel"))
+        if job["source"] == "novel"
+        else None
+    )
     canary_report = _run_canary(
         job,
         reading_area_bounds_provider=bounds_provider,
+        content_bounds_provider=content_bounds_provider,
     )
     controller.go_to_start(
         source=job["source"],
@@ -236,6 +251,7 @@ def _run_claimed_job(
                 Path(temp),
                 on_page,
                 reading_area_bounds_provider=bounds_provider,
+                content_bounds_provider=content_bounds_provider,
             )
             page_count = capture_result.captured_screens
             image_dir = Path(capture_result.image_dir)

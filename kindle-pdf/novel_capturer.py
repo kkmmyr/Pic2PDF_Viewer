@@ -58,6 +58,40 @@ class NovelKindleCapturer(AutoKindleCapturer):
         super().__init__()
         self.config = NovelConfig()
         self.ocr = None
+        self._body_rows: tuple[int, int] | None = None
+
+    def configure_cover_frame(self, body_bounds: tuple[int, int, int, int]) -> None:
+        """表紙全高のフレーム内で、本文として保持する行を固定する。"""
+        if self.rect is None:
+            raise RuntimeError("Kindle window rectangle is unavailable.")
+        left, top, right, bottom = body_bounds
+        frame_left = self.rect.left + self.config.CROP_X1
+        frame_right = self.rect.left + self.config.CROP_X2
+        frame_top = self.rect.top + self.config.CROP_Y1
+        frame_bottom = self.rect.top + self.config.CROP_Y2
+        if not (
+            left <= frame_left < frame_right <= right
+            and frame_top <= top < bottom <= frame_bottom
+        ):
+            raise RuntimeError("Novel body bounds do not fit the capture frame.")
+        self._body_rows = (top - frame_top, bottom - frame_top)
+
+    def _images_visually_equal(self, left: np.ndarray, right: np.ndarray) -> bool:
+        if left.shape != right.shape:
+            return False
+        if self._body_rows is not None:
+            top, bottom = self._body_rows
+            left, right = left[top:bottom], right[top:bottom]
+        return super()._images_visually_equal(left, right)
+
+    def _save_image(self, image: np.ndarray, filepath: str) -> None:
+        # agentは先頭が表紙であることを検証済み。判定用の原フレームは変更しない。
+        if self._body_rows is not None and os.path.basename(filepath) != "001.png":
+            top, bottom = self._body_rows
+            content = np.full_like(image, 255)
+            content[top:bottom] = image[top:bottom]
+            image = content
+        super()._save_image(image, filepath)
 
     def initialize(self):
         # No OCR init needed
