@@ -288,4 +288,4 @@ class KindlePriceNotification(KindleSQLModel, table=True):
     watch_id: int = Field(foreign_key="kindle_price_watches.id", index=True)
     observation_id: int = Field(foreign_key="kindle_price_observations.id", index=True)
     kind: str = Field(index=True)
-    notified_at: str
+    notified_at: str | None = None

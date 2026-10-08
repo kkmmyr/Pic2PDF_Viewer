@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import sqlite3
 
-from services.kindle_catalog import price_notify
+from services.kindle_catalog import price_delivery
 from services.kindle_catalog.connection import with_db
+from services.kindle_catalog.price_delivery import price_notify as price_notify
 from utils.dt import jst_now
 
 _STATUSES = {"ok", "partial", "failed"}
@@ -230,52 +231,6 @@ def _notification_kinds(watch: sqlite3.Row, price_dropped: bool, crossed_thresho
     return kinds
 
 
-def _send_notifications(
-    watch: sqlite3.Row,
-    *,
-    watch_id: int,
-    observation_id: int,
-    current: int | None,
-    points: int | None,
-    effective: int | None,
-    listed: int | None,
-    list_price_source: str | None,
-    ratio: float | None,
-    previous: sqlite3.Row | None,
-    normalized_title: str | None,
-    kinds: list[str],
-) -> list[dict[str, object]]:
-    notification_results = [{"kind": kind, "sent": False} for kind in kinds]
-    if not kinds:
-        return notification_results
-    sent = price_notify.notify_price_event(
-        title=normalized_title or watch["title"],
-        asin=watch["asin"],
-        url=watch["url"],
-        current_price=current,
-        points=points,
-        effective_price=effective,
-        list_price=listed,
-        list_price_source=list_price_source,
-        ratio_percent=ratio,
-        previous_price=previous["effective_price"] if previous else None,
-        kinds=kinds,
-    )
-    if sent:
-        notified_at = _now()
-        with with_db() as conn:
-            for kind in kinds:
-                conn.execute(
-                    """
-                    INSERT OR IGNORE INTO kindle_price_notifications(
-                        watch_id, observation_id, kind, notified_at
-                    ) VALUES (?, ?, ?, ?)
-                    """,
-                    (watch_id, observation_id, kind, notified_at),
-                )
-    return [{"kind": kind, "sent": sent} for kind in kinds]
-
-
 def record_observation(
     *,
     watch_id: int,
@@ -333,21 +288,14 @@ def record_observation(
             previous=previous,
         )
         kinds = _notification_kinds(watch, price_dropped, crossed_threshold)
+        price_delivery.queue_notification_events(
+            conn,
+            watch_id=watch_id,
+            observation_id=observation_id,
+            kinds=kinds,
+        )
 
-    notification_results = _send_notifications(
-        watch,
-        watch_id=watch_id,
-        observation_id=observation_id,
-        current=current,
-        points=normalized_points,
-        effective=effective,
-        listed=listed,
-        list_price_source=normalized_list_source,
-        ratio=ratio,
-        previous=previous,
-        normalized_title=normalized_title,
-        kinds=kinds,
-    )
+    notification_results = price_delivery.send_pending_notifications(watch_id)
     return {
         "observation": {
             "id": observation_id,

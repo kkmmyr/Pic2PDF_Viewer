@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from services.kindle_catalog.connection import with_db
 from services.kindle_catalog.migrations import upgrade_head
 from services.kindle_catalog.price_watch import (
     create_watch,
@@ -72,6 +73,63 @@ def test_price_observation_notifies_on_first_threshold_crossing_and_later_drop(t
     assert dropped["notifications"] == [{"kind": "price_drop", "sent": True}]
     assert notify.call_count == 2
     assert len(list_history(watch["id"])) == 3
+
+
+def test_failed_price_notification_is_retried_on_next_observation(tmp_data_dir):
+    upgrade_head()
+    watch = create_watch(
+        url="https://www.amazon.co.jp/dp/B012345678",
+        threshold_percent=50,
+    )
+
+    with patch(
+        "services.kindle_catalog.price_watch.price_notify.notify_price_event",
+        side_effect=[False, True],
+    ) as notify:
+        failed = record_observation(
+            watch_id=watch["id"],
+            current_price=400,
+            points=50,
+            list_price=1000,
+            list_price_source="paper",
+            title="再送テスト本",
+        )
+        with with_db() as conn:
+            pending = conn.execute(
+                "SELECT kind, notified_at FROM kindle_price_notifications WHERE watch_id = ?",
+                (watch["id"],),
+            ).fetchone()
+        retried = record_observation(
+            watch_id=watch["id"],
+            current_price=450,
+            points=50,
+            list_price=1000,
+            list_price_source="paper",
+        )
+        after_success = record_observation(
+            watch_id=watch["id"],
+            current_price=450,
+            points=50,
+            list_price=1000,
+            list_price_source="paper",
+        )
+
+    assert failed["notifications"] == [{"kind": "below_threshold", "sent": False}]
+    assert pending is not None
+    assert pending["notified_at"] is None
+    assert retried["notifications"] == [{"kind": "below_threshold", "sent": True}]
+    assert after_success["notifications"] == []
+    assert notify.call_count == 2
+    assert notify.call_args_list[1].kwargs["current_price"] == 400
+    assert notify.call_args_list[1].kwargs["effective_price"] == 350
+    with with_db() as conn:
+        notification = conn.execute(
+            "SELECT kind, notified_at FROM kindle_price_notifications WHERE watch_id = ?",
+            (watch["id"],),
+        ).fetchone()
+    assert notification is not None
+    assert notification["kind"] == "below_threshold"
+    assert notification["notified_at"] is not None
 
 
 def test_partial_observation_fails_closed_without_threshold_notification(tmp_data_dir):
