@@ -106,3 +106,21 @@ def test_summaries_appear_before_context():
     summary_pos = prompt.index("【書籍俯瞰サマリ】")
     page_pos = prompt.index("[book-1 page 50]")
     assert summary_pos < page_pos
+
+
+def test_canonical_markup_is_preserved_in_qa_and_chat():
+    from services.novel_db.prompt_builder import build_chat_context_block
+
+    text = "本文の<mark>文字列</mark>と<ruby>原文</ruby>"
+    hits = [_hit("book-1", 50, snippet=text)]
+    assert text in build_prompt("質問", hits, Scope("book", "book-1"))
+    assert text in build_chat_context_block(hits, Scope("book", "book-1"))
+
+
+def test_search_highlights_are_removed_only_for_display_snippets():
+    from services.novel_db.prompt_builder import build_chat_context_block
+
+    hit = _hit("book-1", 50, snippet="検索<mark>表示</mark>")
+    hit.has_highlight = True
+    assert "検索表示" in build_prompt("質問", [hit], Scope("book", "book-1"))
+    assert "検索表示" in build_chat_context_block([hit], Scope("book", "book-1"))

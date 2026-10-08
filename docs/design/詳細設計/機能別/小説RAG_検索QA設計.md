@@ -1,6 +1,6 @@
 # 小説 RAG 検索・QA 設計
 
-> status: living | last-verified: 2026-09-08
+> status: living | last-verified: 2026-10-08
 
 novel タブのハイブリッド検索・RAG 質問応答・マルチターンチャット・読書会番組台本生成の現在形設計。DB 構築側は [パイプライン設計](小説RAG_パイプライン設計.md) を参照。
 
@@ -11,6 +11,14 @@ novel タブのハイブリッド検索・RAG 質問応答・マルチターン�
 ---
 
 ## 1. 検索（`search_scope.py` / `search.py` / `book_summary_search.py`）
+
+本文公開とRAG利用状態は別に扱う。状態・GPT-6.1取り込み契約は[OCR設計書](OCR設計書.md)を参照。
+ベクトル検索・サマリ検索・類似冊検索はSQLiteの`indexed_at IS NOT NULL`冊と要求scopeの積集合を
+LanceDBのprefilterへ渡す。空集合ではEmbedding APIも呼ばない。古い実体は保持しても検索に使わない。
+通常RAGは未構築冊のlexicalヒットと古いSQLiteサマリも除外する。全冊本文モードで未構築冊を要求した
+場合はQA/チャット開始APIが409を返し、LLM呼び出し・履歴作成を行わない。
+本文の全文検索APIは未構築冊を検索でき、ICUがstaleならcanonical FTS5へ縮退する。
+
 
 lexical検索（既定FTS5、段階導入中のpage-level LanceDB ICU BM25）とベクトル検索
 （LanceDB KNN）を Reciprocal Rank Fusion（RRF）でページ単位に融合する。
@@ -47,6 +55,15 @@ OCR QAで `page_type` と `index_eligible` を明示確定した書籍は、`ind
 これにより章間の短文、詩、短い会話だけの本文も検索できる。目次・挿絵・広告等は
 `index_eligible=0`かつ公開本文空欄で除外する。文字数・ページ位置フィルタは、
 サマリやコンテキスト生成の処理量抑制には引き続き利用できる。
+
+通常RAGは順位確定後、選択したページの本文をSQLiteから再取得してQA/chatへ渡す。
+検索一覧の短いsnippetは回答根拠に使わず、根拠本文に含まれるmarkupも保持する。
+欠落・非本文ページは回答生成前に拒否する。
+
+GPT-6.1の版固定再構築では、本文公開、Embedding照合完了、RAG検索・回答検証を
+別状態として台帳に記録する。索引照合が完了した冊だけreadyへ進め、古いsummaryと人物ヒント、
+contextual embeddingは無効化する。summaryが未生成でも本文チャンクによるRAGは利用できるが、
+類似書籍と俯瞰summaryは未提供となる。構築契約は[パイプライン設計 §3.1](小説RAG_パイプライン設計.md#gpt61-versioned-rag-build)を参照。
 
 ### 1.1 ICU indexの構築・世代切替
 
@@ -133,14 +150,80 @@ active pointerを照合する専用手順を設計してから行う。
 LLM 呼び出しとは独立した純関数群。
 
 - **単発 QA（`build_prompt`）**: `PROMPT_TEMPLATE` に、各ページを `[page N, 主要登場人物: …]`（scope=book）/ `[書名 page N, …]`（all/series）ヘッダ + 本文で並べた `context` を差し込む。回答ルールは「根拠ページ番号明記」「発言者・行動者の帰属明示」「別ページのキャラを安易に統合しない」「抽象質問は具体シーン 3 つ以上で構造的に」等。`main_characters` が空ならヒント行は省略。
+- 具体的な質問は要点を簡潔に答え、短い原文引用を添えるよう指示する。本文にない補足を避け、推論は明示する。長いcontextでも指示を参照しやすいよう、contextの後、質問の直前に1〜3文・原文を改変しない引用・読み仮名等の補足禁止・地の文を発言へ誤帰属しないルールを再掲する。これは生成への指示であり、回答の事実性を保証する検証器ではない。
 - **書籍俯瞰サマリブロック（`_build_summaries_block`）**: `book_summaries` があり scope が book 以外のとき、`【書籍俯瞰サマリ】` セクションを先頭に埋め込む（背景知識、根拠はページ抜粋を主とするよう指示）。scope=book では付与しない。
 - **チャット用（`build_chat_context_block` + `build_chat_system_message`）B-16**: 本文抜粋 + サマリブロックを 1 文字列にまとめ、`CHAT_SYSTEM_TEMPLATE`（読書補助アシスタント、スコープ説明 + 参照本文）の system メッセージに埋める。質問・回答ルールは system 側に持たせる。
+
+### 4.1 原文照合付き引用回答
+
+書籍指定QA/chatは、全冊本文方式・通常RAG方式のどちらでも`indexed_at`がNULLなら
+`RagNotReady`（HTTP 409）で拒否する。未構築を「該当箇所なし」の回答として扱わない。
+all/seriesは利用可能冊のみを対象とし、対象が0冊なら従来の空検索結果を維持する。
+
+単発`/qa`は`NOVEL_DB_QA_RESPONSE_MODE=generative`（既定）で従来の文章生成を使い、
+`verified_quotes`では`qa_grounding.py`の引用回答を使う。引用回答は自由な解釈・要約文を
+生成せず、取得本文の中で質問に答える原文を選ぶ。単語への短縮で具体名や建物の特徴を
+落とさないよう、検証済みの引用全体を回答として返す。チャットの方式は変更しない。
+
+`qa_source_snapshot.py`は取得ページのcanonical本文、書籍・ページ対応、公開本文digest
+（active OCR runを含む）と`indexed_at`を固定する。モデルへは順序に対応した`source_id`と
+本文だけを渡し、書名・ページを生成し直させない。旧要約・人物ヒントは根拠へ含めない。
+モデルのJSONは`status`と`evidence[{source_id, quote}]`だけを受理し、自然停止、重複キーや
+非有限値のないobject、取得済み出典、1〜4件・各500文字以内、本文との一致を検証する。
+空白・改行の整形差だけを照合時に許容し、位置が複数一致する引用は拒否する。表示には
+引用行と直前・直後1行（追加各側500文字以内）を同一ページのcanonical連続sliceで含め、
+名称や会話の文脈を切らない。モデルの選択引用自体の各500文字上限は維持する。
+
+未検証の生成内容はSSEへ配信しない。検証後にも本文版・索引利用可否・ページ本文を
+再確認し、変更があれば回答を破棄して既存のerror履歴へ保存する。無効JSON、引用不一致、
+自然停止後のJSON/引用照合失敗だけは同じ固定本文と一般的な検証理由で最大2試行する。
+再試行は答えを含む短い一つの台詞・一文を優先し、途中の行を省略して連結せず、離れた箇所は別のevidenceとする。
+正しい出典番号や期待回答は再試行へ渡さず、番号の自動補正もしない。未完了・length停止、
+timeout・切断は再試行せず失敗とし、通算600秒を上限とする。文章生成への自動fallbackはしない。待機中は
+SSE commentで接続を維持する。履歴のoptionsには回答方式・本文版を保存し、成功時は検証試行結果も保存する。
+本文版の最終確認と履歴確定は同じSQLite書き込みトランザクションで行い、その後に回答を配信する。
+常設QAの引用回答用profileは`NOVEL_DB_QA_FULL_BOOK_MODE=false`、`NOVEL_DB_QA_TOP_K=12`、
+`NOVEL_DB_QA_EXPAND_ENABLED=false`、QA repeat penalty 1.0・presence penalty 0.0を使う。
+具体質問の取得原文へ入力を絞り、展開モデルの依存と長い全冊入力を避ける。Embeddingモデル・
+チャンク設定には波及しない。解釈・全体要約を含む広い質問の十分さは別に評価する。
+引用一致は質問への十分さを保証しないため、実際の質問・期待する内容・根拠ページを
+別に検証する。広い解釈・全体要約への対応は、この方式の合格と区別する。
+
+<a id="qa-verification-hold"></a>
+### 4.2 回答検証の保留と解除
+
+本文公開、索引整合性、実回答の品質判定は独立して扱う。期待ページを取得でき、公開本文・
+チャンク・Embeddingの版が一致していても、モデルが選んだ引用が指定出典のcanonical本文と
+一致せず再試行後も拒否された場合は、反映台帳の回答検証を保留とし、失敗理由とhistory IDを残す。
+この場合、本文公開・全文検索・検証済み索引の状態は維持する。`indexed_at`は索引の利用可否を示し、
+QA合格を保証しない。台帳の保留は品質判定の記録であり、APIは各回答のcanonical照合で配信可否を決める。
+未検証の回答は表示・成功保存せず、エラー履歴を保存する。
+
+失敗時の現行履歴には質問・prompt・取得本文・モデル・設定・本文版・最終エラーが残るが、
+失敗した各試行の生成JSON・引用そのものと検証結果一覧は永続化されない。
+したがって最終エラーだけで文字改変、出典選択、非連続引用などの詳細原因を断定しない。
+発生冊・質問・確認済み事項・未特定事項は[既知の問題](../../../log/既知の問題.md)を正本とする。
+
+保留解除の前に、失敗時の質問・本文版・取得本文・prompt・モデル・設定を固定して隔離環境で再現し、
+各試行の生成JSON、選択出典・引用、照合結果を監査記録へ保存して原因を調べる。
+本番履歴への生応答の自動保存は未実装のため、診断では隔離監査側で記録を取得する。
+改善後は失敗質問と既存成功例を実HTTPで再検証し、回答内容・根拠ページ・公開本文との一致を確認して
+台帳の合格判定を更新する。期待回答やページのヒント、引用の自動修復、照合条件の緩和で通過させない。
 
 ## 5. LLM 呼び出し層（`llm.py` / `llm_provider.py`）
 
 - **provider（`llm_provider`）**: `NovelLlmProvider` が `qwen`（LlamaServer 11435またはMLX 11437）/ `gemma`（Ollama 11434、Qwen流用、またはMLX 11437）/ `query`（既定Ollama、GemmaがMLXならMLX、timeout 60）/ `verifier` を束ねる。未知のbackend値は構築時に`LLMError`で即失敗する。`get_llm_provider()` は設定から遅延構築した既定providerを返し、application serviceは省略可能なprovider引数でfakeを注入できる。`_llm_backend`は既存import用facadeで、新規コードの依存先にはしない。詳細は[データ設計 §5](小説RAG_データ.md)。
-- **`LLM_OPTIONS`**: `temperature=0.2 / repeat_penalty=1.2 / num_predict=4096 / num_ctx=NOVEL_DB_QA_NUM_CTX`。`MlxBackend`は`repeat_penalty`を`repetition_penalty`へ変換し、`top_k`、`min_p`、`seed`、presence/frequency penaltyも転送する。**注意: llama-server / MLXとも`num_ctx`はserver起動時の上限で決まり、リクエスト値は使わない**。
+- **`LLM_OPTIONS`**: `temperature=0.2 / repeat_penalty=NOVEL_DB_QA_REPEAT_PENALTY（既定1.2） / num_predict=4096 / num_ctx=NOVEL_DB_QA_NUM_CTX`。`NOVEL_DB_QA_PRESENCE_PENALTY`が指定されていればQA/chat optionsへ追加する（既定未指定でproviderの値を保持）。両設定はQA/chatだけに適用し、人物抽出・要約・文脈生成のsamplingへ波及させない。`MlxBackend`は`repeat_penalty`を`repetition_penalty`へ変換し、`top_k`、`min_p`、`seed`、presence/frequency penaltyも転送する。**注意: llama-server / MLXとも`num_ctx`はserver起動時の上限で決まり、リクエスト値は使わない**。
 - **ストリーミング**: `stream_qa(prompt)` はproviderの`qwen.astream_ask`、`stream_chat(messages)`は`qwen.astream_chat`（LlamaServer / MLX対応、Ollamaは`NotImplementedError`）に委譲。バックエンド分岐・thinking抑制（`enable_thinking=False`）・SSE→Ollama形式正規化はすべて共通モジュール`local_llm`側。`_astream_ask` / `astream_chat`の薄いラッパはテストのmonkeypatch点。イベントは`{response, done, done_reason, eval_count, …}`のOllama互換dict。
+
+MacのQwen3.6 MLX-VLMをLinuxから利用する場合、SSH reverse tunnel経由のloopback URLを
+`NOVEL_DB_MLX_BASE_URL`へ設定する。LinuxクライアントはHTTP adapterのみを使い、
+Mac専用のMLX依存をLinuxへ導入しない。常設接続・起動・復旧の正本は
+[GPU環境セットアップ §5.1](../../環境構築/GPU環境セットアップ.md#51-macqwenlinuxqa)を参照する。
+モデル比較は同じ公開本文版・検索結果・prompt・samplingを固定し、生成のみを
+`stream_qa(..., provider=...)`で実行する。比較中はQA履歴を含め本番DBへ書かない。
+本番`/qa`は履歴を保存するため、疎通確認時は生成の終了・回答・引用ページと履歴を検証し、
+本文・索引が不変であることを別途確認する。サーバー利用可否は索引readyから推定しない。
 
 ## 6. 単発 QA エンドポイント（`routers/novel_db/qa.py`）
 

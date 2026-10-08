@@ -147,6 +147,39 @@ NOVEL_DB_EMBED_MODEL=/path/to/pic2pdf-mlx/models/bge-m3-fp16
 `/health`、生成短答、限定JSON、Embedding 1024次元を確認する。異なる生成モデルを
 同じcacheで同時実行しない。Windows/Linux既定値と公開データはMac切替で変更しない。
 
+### 5.1 MacのQwenをLinuxのQAから利用する
+
+LinuxのDB・検索索引を保持し、Qwenの回答生成だけMacのMLX-VLMへ委譲できる。
+MacのQwen3.6は`127.0.0.1:11437`、同時生成1件で起動する。MacからLinuxへ
+SSH reverse tunnelを張り、Linuxでも`127.0.0.1:11437`を使用する。LANへの直接bindは行わない。
+EmbeddingとGemmaの接続先は既存Linux設定を維持し、本文・Embeddingの再構築は不要。
+
+`scripts/setup_mac_qwen_qa.py`は既定で導入計画だけをJSON出力する。`--install`は
+MacのログインユーザーのLaunchAgentへQwenとSSHを別々に登録し、ログを
+`~/.local/share/pic2pdf-mlx/qa-service/logs/`へ保存する。同一構成の再実行は重複起動せず、
+別プロセスのポート占有や既存plistとの設定差は拒否する。`--stop`はこの2サービスだけ停止し、
+モデル・設定・ログを保持する。SSH鍵と既存host key確認を使い、Macのログイン・起動中に運用する。
+`caffeinate -i`でアイドルスリープを抑制するが、手動スリープ・蓋を閉じた状態の稼働は保証しない。
+
+```bash
+uv run python scripts/setup_mac_qwen_qa.py
+uv run python scripts/setup_mac_qwen_qa.py --install
+```
+
+Linuxの環境変数は、設定バックアップと実接続・回答検証を済ませてから次を選択する。
+モデル名はMac上の実パスであり、Linux側へモデルをコピーしない。
+
+```dotenv
+NOVEL_DB_LLM_BACKEND=mlx
+NOVEL_DB_MLX_BASE_URL=http://127.0.0.1:11437
+NOVEL_DB_LLM_MODEL=/Users/medaro/.local/share/pic2pdf-mlx/models/qwen3.6-35b-a3b-4bit
+```
+
+providerはプロセス内でcacheされるため、設定変更後にbackendサービスを再起動する。
+接続断はQAエラーとして検出し、別モデルへ自動切替しない。本文公開・索引readyと
+回答サーバーの利用可否・回答品質は別々に検証する。rollbackはLinuxの保存済み設定を復元し、
+backendを再起動してからMacの新規2サービスを停止する。旧OCR管理・定期フォローは操作しない。
+
 ## 6. Qwen3.8比較経路
 
 Qwen3.8-27Bの`mlx-dspark`は`127.0.0.1:11439`、bge-m3は`11437`へ分離する。

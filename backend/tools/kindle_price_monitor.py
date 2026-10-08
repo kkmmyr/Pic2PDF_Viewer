@@ -7,7 +7,7 @@ JSON を ``ingest`` に渡す前提で、監視対象のエクスポートと結
 
     cd backend
     uv run python -m tools.kindle_price_monitor export-targets
-    printf '[{"watch_id": 1, "current_price": 499, "list_price": 1000}]' | \
+    printf '[{"watch_id": 1, "current_price": 499, "points": 5, "list_price": 1000, "list_price_source": "paper"}]' | \
         uv run python -m tools.kindle_price_monitor ingest
 """
 
@@ -66,7 +66,9 @@ def _run_ingest(path: Path | None) -> int:
             result = record_observation(
                 watch_id=watch_id,
                 current_price=record.get("current_price"),
+                points=record.get("points"),
                 list_price=record.get("list_price"),
+                list_price_source=record.get("list_price_source"),
                 status=record.get("status"),
                 error_message=record.get("error_message"),
                 source=record.get("source", "codex_browser"),

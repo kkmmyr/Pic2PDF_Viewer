@@ -3826,6 +3826,17 @@
             ],
             "title": "Current Price"
           },
+          "effective_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Price"
+          },
           "error_message": {
             "anyOf": [
               {
@@ -3852,9 +3863,35 @@
             ],
             "title": "List Price"
           },
+          "list_price_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "kindle",
+                  "paper"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "List Price Source"
+          },
           "observed_at": {
             "title": "Observed At",
             "type": "string"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
           },
           "ratio_percent": {
             "anyOf": [
@@ -3894,7 +3931,10 @@
           "watch_id",
           "observed_at",
           "current_price",
+          "points",
+          "effective_price",
           "list_price",
+          "list_price_source",
           "ratio_percent",
           "status",
           "error_message",
@@ -3940,6 +3980,33 @@
               }
             ],
             "title": "List Price"
+          },
+          "list_price_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "kindle",
+                  "paper"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "List Price Source"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
           },
           "source": {
             "default": "codex_browser",
@@ -4191,6 +4258,17 @@
             ],
             "title": "Last Current Price"
           },
+          "last_effective_price": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Effective Price"
+          },
           "last_error": {
             "anyOf": [
               {
@@ -4212,6 +4290,32 @@
               }
             ],
             "title": "Last List Price"
+          },
+          "last_list_price_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "kindle",
+                  "paper"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last List Price Source"
+          },
+          "last_points": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Points"
           },
           "last_ratio_percent": {
             "anyOf": [
@@ -4281,7 +4385,10 @@
           "last_status",
           "last_error",
           "last_current_price",
+          "last_points",
+          "last_effective_price",
           "last_list_price",
+          "last_list_price_source",
           "last_ratio_percent"
         ],
         "title": "KindlePriceWatchOut",

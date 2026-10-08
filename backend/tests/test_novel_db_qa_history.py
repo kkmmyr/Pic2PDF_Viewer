@@ -152,3 +152,26 @@ def test_delete_history_removes_row(history_db):
         assert delete_history(conn, history_id) is True
         assert delete_history(conn, history_id) is False  # 二度目は False
         assert get_history_detail(conn, history_id) is None
+
+
+def test_verified_attempts_preserve_original_options(history_db):
+    with with_db() as conn:
+        history_id = save_start(
+            conn,
+            scope=Scope(type="all"),
+            question="Q",
+            prompt="P",
+            hits=[],
+            model="m",
+            options={"temperature": 0.2, "qa_body_versions": {"book": "sealed"}},
+        )
+        attempts = [{"attempt": 1, "passed": False, "failure": "wrong source"}, {"attempt": 2, "passed": True}]
+        save_finish(
+            conn, history_id, answer="canonical", done_reason="stop", eval_count=2, validation_attempts=attempts
+        )
+        detail = get_history_detail(conn, history_id)
+    assert detail["options"] == {
+        "temperature": 0.2,
+        "qa_body_versions": {"book": "sealed"},
+        "qa_validation_attempts": attempts,
+    }

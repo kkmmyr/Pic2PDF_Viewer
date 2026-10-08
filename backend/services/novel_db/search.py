@@ -23,6 +23,7 @@ from .search_queries import query_fts_rows, query_vector_rows
 from .search_ranking import rank_pages
 from .search_scope import Scope, ScopeType
 from .search_scope import resolve_book_names as _resolve_book_names
+from .summary_repository import get_rag_ready_book_names
 
 logger = get_logger(__name__)
 
@@ -165,8 +166,8 @@ def vec_search(
         min_chars: char_count フィルタ。
         body_page_margin: 各書籍の先頭・末尾 N ページを除外。
     """
-    book_names = _resolve_book_names(scope)
-    if book_names is not None and not book_names:
+    book_names = get_rag_ready_book_names(conn, _resolve_book_names(scope))
+    if not book_names:
         return []
 
     emb = embed_batch([query])[0]

@@ -15,13 +15,20 @@ def _yen(value: int | None) -> str:
     return "不明" if value is None else f"￥{value:,}"
 
 
+def _points(value: int | None) -> str:
+    return "不明" if value is None else f"{value:,} pt"
+
+
 def build_message(
     *,
     title: str | None,
     asin: str | None,
     url: str,
     current_price: int | None,
+    points: int | None,
+    effective_price: int | None,
     list_price: int | None,
+    list_price_source: str | None,
     ratio_percent: float | None,
     previous_price: int | None,
     kinds: list[str],
@@ -30,17 +37,23 @@ def build_message(
     subject = title or asin or "Kindle 本"
     reasons: list[str] = []
     if "price_drop" in kinds:
-        if previous_price is not None and current_price is not None:
-            reasons.append(f"値下がり（{_yen(previous_price)} → {_yen(current_price)}）")
+        if previous_price is not None and effective_price is not None:
+            reasons.append(f"実質価格の値下がり（{_yen(previous_price)} → {_yen(effective_price)}）")
         else:
             reasons.append("値下がり")
     if "below_threshold" in kinds:
         reasons.append("設定した定価比を下回りました")
     ratio = "不明" if ratio_percent is None else f"{ratio_percent:.1f}%"
+    list_price_label = {"kindle": "Kindle定価/参考価格", "paper": "紙版定価"}.get(
+        list_price_source or "",
+        "定価/参考価格",
+    )
     return (
         f"📚 Kindle価格監視: {subject}\n"
         f"現在価格: {_yen(current_price)}\n"
-        f"定価/参考価格: {_yen(list_price)}\n"
+        f"付与ポイント: {_points(points)}\n"
+        f"実質価格: {_yen(effective_price)}\n"
+        f"{list_price_label}: {_yen(list_price)}\n"
         f"定価比: {ratio}\n"
         f"理由: {' / '.join(reasons)}\n"
         f"{url}"
@@ -53,7 +66,10 @@ def notify_price_event(
     asin: str | None,
     url: str,
     current_price: int | None,
+    points: int | None,
+    effective_price: int | None,
     list_price: int | None,
+    list_price_source: str | None,
     ratio_percent: float | None,
     previous_price: int | None,
     kinds: list[str],
@@ -72,7 +88,10 @@ def notify_price_event(
                     asin=asin,
                     url=url,
                     current_price=current_price,
+                    points=points,
+                    effective_price=effective_price,
                     list_price=list_price,
+                    list_price_source=list_price_source,
                     ratio_percent=ratio_percent,
                     previous_price=previous_price,
                     kinds=kinds,

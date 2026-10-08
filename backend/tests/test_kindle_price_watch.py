@@ -4,9 +4,11 @@ from unittest.mock import patch
 
 import pytest
 
+from services.kindle_catalog.connection import with_db
 from services.kindle_catalog.migrations import upgrade_head
 from services.kindle_catalog.price_watch import (
     create_watch,
+    get_watch,
     list_history,
     normalize_amazon_url,
     record_observation,
@@ -41,21 +43,28 @@ def test_price_observation_notifies_on_first_threshold_crossing_and_later_drop(t
         first = record_observation(
             watch_id=watch["id"],
             current_price=400,
+            points=50,
             list_price=1000,
+            list_price_source="paper",
             title="テスト本",
         )
         same_price = record_observation(
             watch_id=watch["id"],
             current_price=400,
+            points=50,
             list_price=1000,
+            list_price_source="paper",
         )
         dropped = record_observation(
             watch_id=watch["id"],
-            current_price=300,
+            current_price=350,
+            points=75,
             list_price=1000,
+            list_price_source="paper",
         )
 
-    assert first["observation"]["ratio_percent"] == 40.0
+    assert first["observation"]["effective_price"] == 350
+    assert first["observation"]["ratio_percent"] == 35.0
     assert first["below_threshold"] is True
     assert first["notifications"] == [{"kind": "below_threshold", "sent": True}]
     assert same_price["price_dropped"] is False
@@ -64,6 +73,63 @@ def test_price_observation_notifies_on_first_threshold_crossing_and_later_drop(t
     assert dropped["notifications"] == [{"kind": "price_drop", "sent": True}]
     assert notify.call_count == 2
     assert len(list_history(watch["id"])) == 3
+
+
+def test_failed_price_notification_is_retried_on_next_observation(tmp_data_dir):
+    upgrade_head()
+    watch = create_watch(
+        url="https://www.amazon.co.jp/dp/B012345678",
+        threshold_percent=50,
+    )
+
+    with patch(
+        "services.kindle_catalog.price_watch.price_notify.notify_price_event",
+        side_effect=[False, True],
+    ) as notify:
+        failed = record_observation(
+            watch_id=watch["id"],
+            current_price=400,
+            points=50,
+            list_price=1000,
+            list_price_source="paper",
+            title="再送テスト本",
+        )
+        with with_db() as conn:
+            pending = conn.execute(
+                "SELECT kind, notified_at FROM kindle_price_notifications WHERE watch_id = ?",
+                (watch["id"],),
+            ).fetchone()
+        retried = record_observation(
+            watch_id=watch["id"],
+            current_price=450,
+            points=50,
+            list_price=1000,
+            list_price_source="paper",
+        )
+        after_success = record_observation(
+            watch_id=watch["id"],
+            current_price=450,
+            points=50,
+            list_price=1000,
+            list_price_source="paper",
+        )
+
+    assert failed["notifications"] == [{"kind": "below_threshold", "sent": False}]
+    assert pending is not None
+    assert pending["notified_at"] is None
+    assert retried["notifications"] == [{"kind": "below_threshold", "sent": True}]
+    assert after_success["notifications"] == []
+    assert notify.call_count == 2
+    assert notify.call_args_list[1].kwargs["current_price"] == 400
+    assert notify.call_args_list[1].kwargs["effective_price"] == 350
+    with with_db() as conn:
+        notification = conn.execute(
+            "SELECT kind, notified_at FROM kindle_price_notifications WHERE watch_id = ?",
+            (watch["id"],),
+        ).fetchone()
+    assert notification is not None
+    assert notification["kind"] == "below_threshold"
+    assert notification["notified_at"] is not None
 
 
 def test_partial_observation_fails_closed_without_threshold_notification(tmp_data_dir):
@@ -77,7 +143,9 @@ def test_partial_observation_fails_closed_without_threshold_notification(tmp_dat
         result = record_observation(
             watch_id=watch["id"],
             current_price=400,
+            points=10,
             list_price=None,
+            list_price_source=None,
             status="partial",
             error_message="定価/参考価格を読み取れませんでした",
         )
@@ -87,6 +155,41 @@ def test_partial_observation_fails_closed_without_threshold_notification(tmp_dat
     assert result["below_threshold"] is False
     assert result["notifications"] == []
     notify.assert_not_called()
+
+
+def test_paper_list_price_and_points_are_saved_as_effective_price(tmp_data_dir):
+    upgrade_head()
+    watch = create_watch(url="https://www.amazon.co.jp/dp/B012345678")
+
+    result = record_observation(
+        watch_id=watch["id"],
+        current_price=891,
+        points=9,
+        list_price=990,
+        list_price_source="paper",
+    )
+
+    assert result["observation"]["effective_price"] == 882
+    assert result["observation"]["list_price_source"] == "paper"
+    assert result["observation"]["ratio_percent"] == pytest.approx(89.0909)
+    updated = get_watch(watch["id"])
+    assert updated["last_points"] == 9
+    assert updated["last_effective_price"] == 882
+    assert updated["last_list_price_source"] == "paper"
+
+
+def test_complete_observation_requires_points_and_list_price_source(tmp_data_dir):
+    upgrade_head()
+    watch = create_watch(url="https://www.amazon.co.jp/dp/B012345678")
+
+    with pytest.raises(ValueError, match="list_price_source"):
+        record_observation(
+            watch_id=watch["id"],
+            current_price=500,
+            points=5,
+            list_price=1000,
+            list_price_source=None,
+        )
 
 
 def test_price_watch_api_crud_and_observation(client):
@@ -110,10 +213,16 @@ def test_price_watch_api_crud_and_observation(client):
 
     observation = client.post(
         f"/api/kindle-price-watches/{watch['id']}/observations",
-        json={"current_price": 500, "list_price": 1000},
+        json={
+            "current_price": 500,
+            "points": 20,
+            "list_price": 1000,
+            "list_price_source": "paper",
+        },
     )
     assert observation.status_code == 200
-    assert observation.json()["observation"]["ratio_percent"] == 50.0
+    assert observation.json()["observation"]["effective_price"] == 480
+    assert observation.json()["observation"]["ratio_percent"] == 48.0
 
     update = client.patch(
         f"/api/kindle-price-watches/{watch['id']}",

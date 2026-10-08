@@ -89,6 +89,7 @@ def test_equal_rrf_scores_keep_first_seen_order_and_book_limit(contract_db, monk
 
 
 def test_vector_filters_overfetch_distance_ties_and_margin(contract_db, monkeypatch):
+    _insert_book_with_pages(contract_db, "A", ["本文"])
     table = MagicMock()
     builder = table.search.return_value
     builder.limit.return_value = builder

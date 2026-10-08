@@ -2,7 +2,7 @@
 
 - **Status**: Accepted
 - **Date**: 2026-08-17
-- **Last verified**: 2026-09-05
+- **Last verified**: 2026-09-23
 - **決定者**: プロジェクトオーナー
 - **関連**: [ADR-0009](0009_llm-backend-llama-server.md) / [小説RAG データ設計](../../詳細設計/機能別/小説RAG_データ.md) / [GPU環境セットアップ](../../環境構築/GPU環境セットアップ.md)
 
@@ -29,7 +29,8 @@ Windows/Linux本番は安定稼働中であり、Mac対応によって既定経�
 
 ## 採用理由
 
-- Qwen3.6 MLXは固定ケース、構造化出力、長文処理をM1 Max 64GBで完走した。
+- Qwen3.6 MLXは公式sampling相当の固定ケースと長文の両工程をM1 Max 64GBで自然停止まで完走し、
+  比較候補より運用へ近い。追加主張の厳密形式と長文の意味品質は公開ゲートで補う。
 - bge-m3 FP16 + CLSは既存Ollama embeddingと同一文cosine・検索順位の互換を確認できた。
 - Macだけ環境変数で切り替えられ、Windows/Linux本番とrollbackを維持できる。
 - MLX化しても長距離の事実統合誤りは残るため、公開成果物の品質ゲートは省略できない。
@@ -44,10 +45,25 @@ Windows/Linux本番は安定稼働中であり、Mac対応によって既定経�
 | Nemotron 30B | 不採用 | thinkingを含む長文抽出の根拠精度・効率が不足 |
 | Ornith 1.5 35B-A3B | 不採用 | 短窓schemaは改善したが、長文の停止・日本語意味精度が不合格 |
 | Granite 4.2 30B Q4_K_M | 比較のみ | M1 Max 64GBへ22GB・GPU 100%・32Kでロードできたが、固定小説ケースは公式の思考なし0/3、低思考2/3、低温0/3で、途中発言と最終合意の時系列誤認が残った |
+| Nex-N2.5-mini MLX 4-bit | 短窓の比較候補 | mediumは固定ケースを通るが、現行出力枠で20ページ事実抽出が回答前に終了するため主生成を置換しない |
+| K2 Horizon 36B-A4B MLX 4-bit | この構成では不採用 | highの回答前終了、lowの根拠誤読・多言語混入、独自templateとの接続差分が残る |
+| MiMo V2.6 Distill Qwen 9B Q8_0 | 不採用 | llama.cpp接続とthinkingあり短窓3/3は通るが、追加主張の厳密契約と20ページ抽出に不合格 |
+| llm-jp-4-33b-thinking Q4_K_M | 次期隔離評価候補 | 日本語品質と20.2GBのQ4は有望だが、65K contextと専用llama.cpp forkが必要で、現行131K経路を置換できない |
+| llm-jp-4-32b-a3b-thinking | 速度優先の次点 | active 3.83Bは軽いが、公式日本語benchmarkは33B denseが上回る |
 
 ## 影響
 
 - MLX runtimeとモデルはrepo外の専用venv・モデルディレクトリで管理する。
+- Nexの思考制御は`reasoning_effort`をtemplateへ渡す必要があり、現行backendの
+  `enable_thinking`だけでは切り替わらない。隔離評価の成功をそのままアプリ接続済みとは扱わない。
+- K2は独自の思考境界・assistant履歴フィールドへの対応が必要で、モデル名だけの差し替えでは
+  複数ターンQAへ接続できない。
+- MiMo 9Bは現行`LlamaServerBackend`へ接続できるが、thinkingなしの意味精度とthinkingありの
+  長文停止が不合格である。Qwen3.5派生のため、独立verifierの系統差を増やす候補にも優先しない。
+- llm-jp-4 33Bは日本語向けの別系統候補として、LLM-jp forkのllama.cppで隔離評価する。
+  upstream llama.cppへそのまま接続せず、65Kを超える一冊全文には現行Qwen3.6を維持する。
+- MLXの品質比較では実サーバーのseed試験を先に通す。import時compileによる乱数固定の
+  影響と通常runtimeの対処状況は[既知の問題](../../../log/既知の問題.md)を参照する。
 - Qwen/Gemmaなど異なる生成モデルを同じcacheで処理中に切り替えない。
 - Granite 4.2 30Bはrepo外のOllamaモデルとして比較用に保持し、主生成・既定QA・自動公開へ
   配線しない。公式samplingは`temperature=1.0`、`top_p=0.95`とし、再評価時も対照条件として残す。
@@ -64,4 +80,7 @@ Windows/Linux本番は安定稼働中であり、Mac対応によって既定経�
 
 詳細な実測値と試行履歴は
 [Apple Silicon MLX検証履歴](../../../archive/検証/Apple_Silicon_MLX_検証履歴.md)と
-[小説RAG技術知見](../../../log/技術知見/小説RAG_技術知見.md)を参照する。
+[小説RAG技術知見](../../../log/技術知見/小説RAG_技術知見.md)、
+[Nex / K2評価](../../../archive/検証/Nex_K2_Horizon_ローカルLLM評価_2026-09-18.md)、
+[MiMo 9B評価](../../../archive/検証/MiMo_V2.6_Distill_Qwen_9B_ローカルLLM評価_2026-09-23.md)、
+[Qwen3.6 / MiMo再比較・候補調査](../../../archive/検証/Qwen3.6_MiMo_再比較・ローカルLLM候補調査_2026-09-23.md)を参照する。

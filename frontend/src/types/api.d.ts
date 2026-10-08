@@ -3334,8 +3334,14 @@ export interface components {
             observed_at: string;
             /** Current Price */
             current_price: number | null;
+            /** Points */
+            points: number | null;
+            /** Effective Price */
+            effective_price: number | null;
             /** List Price */
             list_price: number | null;
+            /** List Price Source */
+            list_price_source: ('kindle' | 'paper') | null;
             /** Ratio Percent */
             ratio_percent: number | null;
             /**
@@ -3355,8 +3361,12 @@ export interface components {
         KindlePriceObservationRequest: {
             /** Current Price */
             current_price?: number | null;
+            /** Points */
+            points?: number | null;
             /** List Price */
             list_price?: number | null;
+            /** List Price Source */
+            list_price_source?: ('kindle' | 'paper') | null;
             /** Status */
             status?: ('ok' | 'partial' | 'failed') | null;
             /** Error Message */
@@ -3470,8 +3480,14 @@ export interface components {
             last_error: string | null;
             /** Last Current Price */
             last_current_price: number | null;
+            /** Last Points */
+            last_points: number | null;
+            /** Last Effective Price */
+            last_effective_price: number | null;
             /** Last List Price */
             last_list_price: number | null;
+            /** Last List Price Source */
+            last_list_price_source: ('kindle' | 'paper') | null;
             /** Last Ratio Percent */
             last_ratio_percent: number | null;
         };
@@ -6272,8 +6288,7 @@ export interface operations {
                     | ('purchased' | 'borrowed_active' | 'borrowed_ended' | 'returned' | 'unknown')
                     | null;
                 capture_state?:
-                    | ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending')
-                    | null;
+                    ('not_captured' | 'captured' | 'multiple_links' | 'capture_pending') | null;
                 page?: number;
                 page_size?: number;
             };

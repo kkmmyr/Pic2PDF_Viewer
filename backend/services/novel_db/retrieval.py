@@ -7,7 +7,7 @@ full_book_mode 分岐・書籍サマリ付与）を 1 か所にまとめる。
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from config import (
     NOVEL_DB_QA_EXPAND_ENABLED,
@@ -28,6 +28,13 @@ from services.novel_db.search import (
 )
 from services.novel_db.summarizer import load_summaries_for_books
 
+from .search_scope import resolve_book_names
+from .summary_repository import get_rag_ready_book_names
+
+
+class RagNotReady(ValueError):
+    """The requested body is published but its RAG artifacts are unavailable."""
+
 
 @dataclass
 class RetrievalResult:
@@ -36,12 +43,31 @@ class RetrievalResult:
     qa_options: dict
 
 
+def _canonical_hits(conn: sqlite3.Connection, hits: list[SearchHit]) -> list[SearchHit]:
+    result = []
+    for hit in hits:
+        if type(hit.page_no) is not int or hit.page_no <= 0:
+            raise ValueError("RAG hit has an invalid page number")
+        rows = conn.execute(
+            "SELECT p.full_text FROM pages p JOIN books b ON b.id=p.book_id "
+            "WHERE b.name=? AND p.page_no=? AND p.index_eligible=1 AND b.indexed_at IS NOT NULL",
+            (hit.book_name, hit.page_no),
+        ).fetchall()
+        if len(rows) != 1 or not isinstance(rows[0][0], str) or not rows[0][0].strip():
+            raise ValueError(f"RAG canonical body unavailable: {hit.book_name} page {hit.page_no}")
+        result.append(replace(hit, snippet=rows[0][0], has_highlight=False))
+    return result
+
+
 def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> RetrievalResult:
     """scope・question に応じた hits / book_summaries / qa_options を返す。
 
     full_book_mode（scope=book + NOVEL_DB_QA_FULL_BOOK_MODE 有効）のとき
     全ページ読み。それ以外は hybrid_search + Query Expansion + 書籍サマリ付与。
     """
+    ready_names = set(get_rag_ready_book_names(conn, resolve_book_names(scope)))
+    if scope.type == "book" and scope.id not in ready_names:
+        raise RagNotReady(f"RAG is not available until rebuilding: {scope.id}")
     full_book_mode = NOVEL_DB_QA_FULL_BOOK_MODE and scope.type == "book" and scope.id is not None
     qa_options = {**LLM_OPTIONS, "num_ctx": NOVEL_DB_QA_FULL_BOOK_NUM_CTX} if full_book_mode else LLM_OPTIONS
 
@@ -54,6 +80,9 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             body_page_margin=0,
         )
         return RetrievalResult(hits=hits, book_summaries=None, qa_options=qa_options)
+
+    if not ready_names:
+        return RetrievalResult(hits=[], book_summaries=None, qa_options=qa_options)
 
     # 通常 RAG 経路
     # scope=all / series では書籍偏り抑制のため max_per_book を有効化
@@ -74,11 +103,13 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             body_page_margin=0,
         )
         for h in sub_rows:
+            if h.book_name not in ready_names:
+                continue
             key = (h.book_name, h.page_no)
             existing = rows_by_key.get(key)
             if existing is None or h.rrf_score > existing.rrf_score:
                 rows_by_key[key] = h
-    hits = sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[:NOVEL_DB_QA_TOP_K]
+    hits = _canonical_hits(conn, sorted(rows_by_key.values(), key=lambda h: -h.rrf_score)[:NOVEL_DB_QA_TOP_K])
 
     # scope=all / series ではヒット書籍の俯瞰サマリをプロンプトに付与する
     # B-8: ページヒット書籍 + サマリベクトル検索 top-K を合流させる
@@ -91,7 +122,7 @@ def retrieve(conn: sqlite3.Connection, question: str, scope: Scope) -> Retrieval
             top=NOVEL_DB_QA_TOP_SUMMARIES,
         )
         relevant_book_names = sorted(
-            hit_book_names | {name for name, _ in summary_hits},
+            hit_book_names | {name for name, _ in summary_hits if name in ready_names},
         )
         book_summaries = load_summaries_for_books(conn, relevant_book_names)
     else:

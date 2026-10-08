@@ -275,12 +275,68 @@
       "owner": "novel-ocr",
       "reason": "holdout validation and manifest commit are one fail-closed operation",
       "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "backend/routers/novel_db/qa.py:post_qa",
+      "owner": "novel-rag",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "backend/routers/novel_db/qa.py:event_stream",
+      "owner": "novel-rag",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "backend/services/novel_db/gpt61_rag_build.py:verify_build",
+      "owner": "novel-rag",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "backend/services/novel_db/qa_grounding.py:validate_quote_answer",
+      "owner": "novel-rag",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/ocr_offline_ledger.py:validate",
+      "owner": "novel-ocr",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/maintenance/ocr_offline_ledger.py:operate",
+      "owner": "novel-ocr",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "C901",
+      "key": "scripts/setup_mac_qwen_qa.py:_check_configuration",
+      "owner": "platform",
+      "reason": "Existing committed implementation at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
+    },
+    {
+      "rule": "code-size",
+      "key": "scripts/maintenance/ocr_offline_ledger.py",
+      "owner": "novel-ocr",
+      "reason": "Existing 555-line offline OCR ledger at dc43511; baseline reconciliation only, with no source change",
+      "recheck_after": "2026-11-16"
     }
   ],
   "script_groups": [
     {
       "id": "root-python",
-      "patterns": ["scripts/*.py"],
+      "patterns": ["scripts/*.py", "scripts/tests/test_setup_mac_qwen_qa.py"],
       "classification": "continuous",
       "owner": "platform",
       "reason": "repository and Kindle-series operational entry points",
@@ -319,6 +375,17 @@
       "classification": "continuous",
       "owner": "quality",
       "reason": "quality gates, benchmark comparison, and reproducible OCR evaluation",
+      "recheck_after": null
+    },
+    {
+      "id": "offline-ocr-ledger",
+      "patterns": [
+        "scripts/maintenance/ocr_offline_ledger.py",
+        "scripts/maintenance/tests/test_ocr_offline_ledger.py"
+      ],
+      "classification": "continuous",
+      "owner": "novel-ocr",
+      "reason": "durable offline OCR reservations, progress, verification and stop/resume contracts",
       "recheck_after": null
     },
     {

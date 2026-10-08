@@ -87,7 +87,24 @@ def load_summaries_for_books(
         return {}
     placeholders = ",".join("?" * len(book_names))
     rows = conn.execute(
-        f"SELECT name, summary FROM books WHERE name IN ({placeholders}) AND summary IS NOT NULL AND summary <> ''",
+        f"SELECT name, summary FROM books WHERE name IN ({placeholders}) AND indexed_at IS NOT NULL AND summary IS NOT NULL AND summary <> ''",
         book_names,
     ).fetchall()
     return {str(name): str(summary) for name, summary in rows}
+
+
+def get_rag_ready_book_names(
+    conn: sqlite3.Connection,
+    book_names: list[str] | None = None,
+) -> list[str]:
+    """Resolve current RAG eligibility from SQLite, never from retained Lance rows."""
+    if book_names == []:
+        return []
+    sql = "SELECT name FROM books WHERE indexed_at IS NOT NULL"
+    params: list[str] = []
+    if book_names is not None:
+        placeholders = ",".join("?" for _ in book_names)
+        sql += f" AND name IN ({placeholders})"
+        params.extend(book_names)
+    sql += " ORDER BY name"
+    return [str(row[0]) for row in conn.execute(sql, params)]

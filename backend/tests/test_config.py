@@ -83,3 +83,40 @@ class TestNovelDbSettings:
         settings = _NovelDbSettings()
 
         assert settings.NOVEL_DB_LANCE_PATH == str(explicit)
+
+
+class TestQaSamplingSettings:
+    def test_unspecified_preserves_existing_defaults(self, monkeypatch):
+        monkeypatch.delenv("NOVEL_DB_QA_REPEAT_PENALTY", raising=False)
+        monkeypatch.delenv("NOVEL_DB_QA_PRESENCE_PENALTY", raising=False)
+        settings = _NovelDbSettings()
+        assert settings.NOVEL_DB_QA_REPEAT_PENALTY == 1.2
+        assert settings.NOVEL_DB_QA_PRESENCE_PENALTY is None
+
+    @pytest.mark.parametrize("presence", ["0", "-2", "2", "1.5"])
+    def test_environment_parses_explicit_values(self, monkeypatch, presence):
+        monkeypatch.setenv("NOVEL_DB_QA_REPEAT_PENALTY", "1.05")
+        monkeypatch.setenv("NOVEL_DB_QA_PRESENCE_PENALTY", presence)
+        settings = _NovelDbSettings()
+        assert settings.NOVEL_DB_QA_REPEAT_PENALTY == 1.05
+        assert settings.NOVEL_DB_QA_PRESENCE_PENALTY == float(presence)
+
+    @pytest.mark.parametrize(
+        "name,value",
+        [
+            ("NOVEL_DB_QA_REPEAT_PENALTY", "0"),
+            ("NOVEL_DB_QA_REPEAT_PENALTY", "-1"),
+            ("NOVEL_DB_QA_REPEAT_PENALTY", "nan"),
+            ("NOVEL_DB_QA_REPEAT_PENALTY", "inf"),
+            ("NOVEL_DB_QA_PRESENCE_PENALTY", "-2.01"),
+            ("NOVEL_DB_QA_PRESENCE_PENALTY", "2.01"),
+            ("NOVEL_DB_QA_PRESENCE_PENALTY", "nan"),
+            ("NOVEL_DB_QA_PRESENCE_PENALTY", "wrong"),
+        ],
+    )
+    def test_invalid_environment_is_rejected(self, monkeypatch, name, value):
+        from pydantic import ValidationError
+
+        monkeypatch.setenv(name, value)
+        with pytest.raises(ValidationError):
+            _NovelDbSettings()

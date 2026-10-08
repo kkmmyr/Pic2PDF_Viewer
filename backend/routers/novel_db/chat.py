@@ -25,7 +25,7 @@ from services.novel_db.qa_sessions import (
     load_chat_messages,
     update_session_title,
 )
-from services.novel_db.retrieval import retrieve
+from services.novel_db.retrieval import RagNotReady, retrieve
 from utils.logger import get_logger
 
 from ._deps import require_not_locked
@@ -209,7 +209,10 @@ async def post_chat_session_start(
     scope = Scope(type=request.scope.type, id=request.scope.id)
 
     with with_db() as conn:
-        result = retrieve(conn, request.question, scope)
+        try:
+            result = retrieve(conn, request.question, scope)
+        except RagNotReady as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         context_block = build_chat_context_block(
             result.hits,
             scope,

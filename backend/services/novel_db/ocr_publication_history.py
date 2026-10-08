@@ -10,6 +10,7 @@ from typing import Any
 from .connection import open_db, with_db
 from .ocr_publication_backup import append_backup_reference, create_verified_publication_backup
 from .ocr_run_store import OcrInputPage, collect_input_pages
+from .page_fts_state import mark_page_fts_stale
 
 
 @dataclass(frozen=True)
@@ -234,6 +235,7 @@ def activate_published_run(run_id: int, actor: str, note: str | None = None) -> 
                 action="rollback",
                 note=append_backup_reference(note, backup_reference),
             )
+            mark_page_fts_stale(conn)
 
 
 def snapshot_legacy_from_manifest(

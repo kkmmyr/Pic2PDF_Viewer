@@ -1,6 +1,8 @@
 {
   "backend/alembic/versions/0001_initial.py:upgrade": 12,
   "backend/routers/meta/novel.py:patch_novel_meta": 11,
+  "backend/routers/novel_db/qa.py:event_stream": 12,
+  "backend/routers/novel_db/qa.py:post_qa": 16,
   "backend/scripts/build_chunk_contexts.py:_process_book": 11,
   "backend/scripts/eval_novel_dense.py:load_fixture": 13,
   "backend/scripts/eval_novel_dense.py:main": 13,
@@ -18,8 +20,10 @@
   "backend/services/file_manager.py:rename_with_assets": 12,
   "backend/services/novel_db/builder.py:rebuild_from_pages": 12,
   "backend/services/novel_db/chunker.py:chunk_book": 11,
+  "backend/services/novel_db/gpt61_rag_build.py:verify_build": 11,
   "backend/services/novel_db/llm_provider.py:build_llm_provider": 14,
   "backend/services/novel_db/ocr_ground_truth.py:update_ground_truth": 11,
+  "backend/services/novel_db/qa_grounding.py:validate_quote_answer": 12,
   "backend/services/novel_db/surya_quality.py:evaluate_external_ocr": 11,
   "backend/services/novel_db/surya_quality.py:evaluate_page_quality": 12,
   "backend/services/series_suggester.py:suggest_series": 12,
@@ -33,5 +37,8 @@
   "scripts/maintenance/ensemble_ocr_candidates.py:ensemble_reports": 12,
   "scripts/maintenance/ensemble_ocr_candidates.py:load_proper_noun_ledger": 12,
   "scripts/maintenance/generate_file_map.py:run": 11,
-  "scripts/maintenance/seed_ocr_holdout_from_qa.py:main": 11
+  "scripts/maintenance/ocr_offline_ledger.py:operate": 30,
+  "scripts/maintenance/ocr_offline_ledger.py:validate": 32,
+  "scripts/maintenance/seed_ocr_holdout_from_qa.py:main": 11,
+  "scripts/setup_mac_qwen_qa.py:_check_configuration": 17
 }

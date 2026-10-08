@@ -1,6 +1,6 @@
 # 小説 RAG 構築パイプライン設計
 
-> status: living | last-verified: 2026-09-12
+> status: living | last-verified: 2026-10-08
 
 novel タブの本文を検索・QA 可能にするための **DB 構築パイプライン**（OCR 取込 → チャンク分割 → embedding → 文脈生成 → キャラ抽出 → 書籍サマリ）の現在形設計。検索・QA 側は [検索QA設計](小説RAG_検索QA設計.md) を参照。
 
@@ -75,6 +75,52 @@ yomitoku は独立照合と `OCR_ENGINE=yomitoku` の比較・後方互換用と
   更新前から対象chunk IDのSQLite件数とLanceDB件数が一致しない場合は変更せず中止し、
   ページ単位処理で不整合を上書きせず書籍単位再構築へフォールバックする。
 - **クロスページ実験 `chunk_book`**: 全ページ連結 + bisect で page_id 解決する実験実装（1200 字 / overlap 120）。本番未採用、`eval_chunk_strategy.py` 用に残置（判断経緯は [設計過程](../../../archive/小説RAG_設計過程.md)）。
+
+<a id="gpt61-versioned-rag-build"></a>
+### 3.1 GPT-6.1公開本文の版固定再構築
+
+`gpt61_rag_build` はGPT-6.1専用公開packageとactive OCR runを確認し、
+公開本文・ページ種別・package SHA・本文digestを固定して構築する。
+文字数metadataが本文長と一致しない場合は、短文除外による索引欠落を避けるため公開前に拒否する。
+通常のrebuild/full_buildとは別に、運用担当が唯一のwriterとして冊単位に実行する。
+
+- 取り込み対象は品質合格の採用版を固定する。差し替えページやrevisionがある場合は、
+  採用manifest・版選択記録・品質証拠と各ページのSHAを照合し、旧finalへ戻らない。
+  本文範囲の合格と非本文の判読留保を分け、対象外の文字を本文へ昇格させない。
+- writerは接続先SQLite・Lance・原画像ルートと新規監査namespaceの絶対パスを確認する。
+  再開時もactive runの採用artifact・品質・全rawページを封印packageと照合し、
+  本文digestだけで採用版の一致を判断しない。公開中の多ストア検証・exportも共通lock内で行う。
+  FTS5の公開確認には3文字以上の本文語句を使い、ICUの短語検索とは別に判定する。
+
+- 準備は本番ストアを変更せず、現行`chunk_page`設定と`embed_batch`で生成する。
+  16件ごとのcheckpointを入力・設定・vector hashとともにatomic保存し、再開時に照合する。
+  モデル名・backend・次元・chunk設定を封印し、運用台帳には実モデルdigestも記録する。
+  同じ重みを別ホストで計算する場合は実行環境をcheckpointに含め、設定・出力差を検証する。
+  本番query側のEmbedding設定変更とは分離する。
+- 公開直前に本文版を再照合し、`indexed_at=NULL`と派生データ無効化を先に確定する。
+  対象book_nameのLance行（孤立IDを含む）と旧SQLite chunk IDsを除去し、
+  同じ本文から作ったSQLite chunksとfloat32 vectorsを置換する。
+- 要約・一覧要約・人物辞典・関係・事実抽出cache・根拠検証記録・page人物ヒント・
+  summary vectorsを対象冊だけ無効化する。新chunksのcontextual_textはNULLで、
+  本文のみのembeddingを使用する。派生生成は新本文版から別途行う。
+- SQLite/LanceのID集合・件数・重複・本文・ページ番号・metadata・embeddingを全件照合し、
+  `ocr_runs.runtime_manifest_json.rag_build`へ本文/package/設定/staged digest/件数を保存する。
+  照合後だけ`indexed_at`を設定する。台帳の実検索・実回答検証は別の状態で管理する。
+- 二ストア全体のtransactionは存在しない。途中失敗は`indexed_at=NULL`を維持し、
+  failed manifestと理由を保存する。再開は同じ本文版・checkpointを確認して対象冊を全置換し、
+  部分書き込みや孤立行を収束させる。同一版の完成済み処理は実索引照合後にno-opとする。
+- 本番公開は共通backup flock、稼働queue/OCR writerなしの確認、service停止窓を併用する。
+  準備中はserviceを継続でき、公開と整合したバックアップに必要な間だけ書き込みを止める。
+  SQLite Online Backupと同時点のLance `chunks`・`summaries`・SQLiteが指すactive ICU全文検索テーブルを
+  一組で保存する。全ファイルSHA、SQLite整合性、隔離復元後のSQL/Lance対応と全文検索を検証する。
+  内容検証は保存原本の複製で行い、Lance接続時の補助metadataを原本へ追加しない。
+  検証前後に原本のファイル集合とSHAが不変であることを確認する。
+  ファイル差し替えによる復旧ではserviceを終了し、SQLiteとLanceを同じ世代の一組へ戻してから再開する。
+  稼働appをSTOPする場合は、既存SQLite書込みを待って予約ロックを保持した状態で停止し、
+  事前登録したtrapで再開する。子writerの不存在も確認する。
+  同名backupは最初の試行時点を保持し、再試行で上書きしない。復旧世代を選ぶ際は後続冊とQA履歴への影響を確認する。
+  まず1冊で本文公開・索引照合・実検索・複数の実API回答と根拠の意味照合を通し、
+  反映台帳の合格を確認してから残りを順次公開する。既存停止済みOCR管理・定期処理は再開しない。
 
 ## 4. ステップ 3: 書籍サマリ + キャラクター辞典（`full_builder` + `summarizer`）
 

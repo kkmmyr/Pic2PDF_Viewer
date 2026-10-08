@@ -85,6 +85,9 @@ class _NovelDbSettings(BaseSettings):
     NOVEL_DB_QA_TOP_K: int = 64
     # B-13 段階 B（2026-05-11 採用）: 32768（llama-server を -c 36864 で起動する必要あり）。
     NOVEL_DB_QA_NUM_CTX: int = 32768
+    NOVEL_DB_QA_REPEAT_PENALTY: float = Field(default=1.2, gt=0, allow_inf_nan=False)
+    NOVEL_DB_QA_PRESENCE_PENALTY: float | None = Field(default=None, ge=-2, le=2, allow_inf_nan=False)
+    NOVEL_DB_QA_RESPONSE_MODE: Literal["generative", "verified_quotes"] = "generative"
 
     # B-11 Query Expansion（2026-05-11 採用）
     NOVEL_DB_QA_EXPAND_ENABLED: bool = True
@@ -127,6 +130,9 @@ NOVEL_DB_QA_MAX_PER_BOOK = 5  # 固定値（書籍ごと取得上限）
 NOVEL_DB_BODY_PAGE_MARGIN = 5  # 固定値（先頭/末尾の除外ページ数）
 NOVEL_DB_QA_TOP_SUMMARIES = 11  # 固定値（サマリ上限件数）
 NOVEL_DB_QA_NUM_CTX = _s.NOVEL_DB_QA_NUM_CTX
+NOVEL_DB_QA_RESPONSE_MODE = _s.NOVEL_DB_QA_RESPONSE_MODE
+NOVEL_DB_QA_REPEAT_PENALTY = _s.NOVEL_DB_QA_REPEAT_PENALTY
+NOVEL_DB_QA_PRESENCE_PENALTY = _s.NOVEL_DB_QA_PRESENCE_PENALTY
 NOVEL_DB_QA_EXPAND_ENABLED = _s.NOVEL_DB_QA_EXPAND_ENABLED
 NOVEL_DB_QA_EXPAND_N = _s.NOVEL_DB_QA_EXPAND_N
 NOVEL_DB_QA_EXPAND_MODEL = _s.NOVEL_DB_QA_EXPAND_MODEL

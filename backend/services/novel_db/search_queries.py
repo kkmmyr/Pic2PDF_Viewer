@@ -65,7 +65,7 @@ def query_vector_rows(
     if min_chars > 0:
         filters.append(f"char_count >= {min_chars}")
     if book_names is not None:
-        quoted = ", ".join(f"'{n}'" for n in book_names)
+        quoted = ", ".join("'" + n.replace("'", "''") + "'" for n in book_names)
         filters.append(f"book_name IN ({quoted})")
     if filters:
         query_builder = query_builder.where(" AND ".join(filters), prefilter=True)

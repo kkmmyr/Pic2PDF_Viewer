@@ -14,6 +14,24 @@
 - **pre-commit hooks**（`.pre-commit-config.yaml`）が設定済み — commit 時に ruff --fix（Python）/ prettier（TS/TSX/CSS）が自動整形される
 - **`docs/` は 3 バケット構成**: `design/`（静的設計書・編集イン・プレース）/ `log/`（生きた文書・変更履歴等）/ `archive/`（凍結）。`docs/**/*.md` か `mkdocs.yml` を含むコミットは `check-docs` pre-commit hook（`scripts/maintenance/check_docs.py`）でリンク切れ・nav 孤児・`log/変更履歴.md` の行数超過（800行）を機械チェックされ、違反時はコミットがブロックされる
 
+## タスクに応じたskillの選択
+
+まず本ファイルを確認し、変更内容に該当するskillだけを参照する。4つのskillを毎回固定順に読む必要はない。
+
+| タスク・変更内容 | 参照するskill |
+|---|---|
+| 全体把握、新機能、大きめのリファクタ、複数ファイル変更 | `architecture-overview`で関連設計と正本を特定 |
+| 設計の意図・挙動・API・データ構造に影響する変更 | `docs-workflow`で更新する設計書を振り分け |
+| backendのPython/FastAPI編集 | `backend-conventions` |
+| frontendのReact/TypeScript編集 | `frontend-conventions`（両領域の変更なら両方） |
+| テスト追加・修正、副作用ロジックの追加・変更、バグ修正 | `test-writing`で検証対象・失敗条件・再現テストを確認 |
+
+単一ファイルの軽微な修正では全体把握を省略でき、typo・コメント整理・スタイルのみでは`docs-workflow`は不要。テスト追加のみの文書更新省略条件は「タスク完了後の必須アクション」を参照する。
+
+実装前に関連設計・対象領域の規約・必要な検証方針を確認する。`test-writing`はテストを最後に実行するための読み物ではなく、実装前の検証設計でも参照する。TDDや固定のテスト作成順を強制するものではない。
+
+skillの参照順と実作業の工程は区別する。設計に影響する変更の工程は、設計書運用ルールの「変更手順」に従う。調査・試作中の仮説や未確定案を現行仕様として正本に書かず、採用する変更が決まってから設計書・変更履歴・実装へ反映する。必要なテスト、API型生成、Alembic、UIの実ブラウザ確認等の既存要件は引き続き適用する。
+
 ## 起動コマンド
 
 ```bash

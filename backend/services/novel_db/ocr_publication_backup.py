@@ -34,15 +34,17 @@ def _write_manifest(path: Path, payload: dict[str, object]) -> None:
         os.fsync(file.fileno())
 
 
-def create_verified_publication_backup(run_id: int, operation: PublicationOperation) -> str:
+def create_verified_publication_backup(
+    run_id: int, operation: PublicationOperation, *, db_path: Path | None = None
+) -> str:
     """Create and verify a pre-operation backup, then atomically publish its generation."""
     if run_id < 1:
         raise ValueError("run_id must be positive")
-    source_path = app_settings.NOVEL_DB_DIR / "novel.db"
+    source_path = db_path or app_settings.NOVEL_DB_DIR / "novel.db"
     if not source_path.is_file():
         raise FileNotFoundError(f"novel database not found: {source_path}")
 
-    backup_root = app_settings.NOVEL_DB_DIR.parent / "ocr-publication-backups"
+    backup_root = source_path.parent.parent / "ocr-publication-backups"
     backup_root.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(UTC)
     label = f"{created_at.strftime('%Y%m%dT%H%M%S.%fZ')}-{operation}-run-{run_id}-{uuid4().hex[:12]}"
